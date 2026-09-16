@@ -51,6 +51,7 @@ describe("StarterWorkPoolCloud density", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -74,6 +75,7 @@ describe("StarterWorkPoolCloud density", () => {
         error={null}
         canAct
         fullWidth
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -102,6 +104,7 @@ describe("StarterWorkPoolCloud density", () => {
         error={null}
         canAct
         fullWidth
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -113,7 +116,13 @@ describe("StarterWorkPoolCloud density", () => {
   it("does not render competency badges in either pool view", async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <StarterWorkPoolCloud tasks={[task(1)]} isLoading={false} error={null} canAct />,
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={vi.fn()}
+      />,
     );
 
     expect(screen.queryByText("react")).not.toBeInTheDocument();
@@ -138,6 +147,7 @@ describe("StarterWorkPoolCloud density", () => {
         error={null}
         canAct
         fullWidth
+        onOpenTask={vi.fn()}
       />,
     );
 

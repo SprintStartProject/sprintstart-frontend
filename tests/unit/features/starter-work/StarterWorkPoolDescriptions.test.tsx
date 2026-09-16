@@ -49,6 +49,7 @@ describe("StarterWorkPoolCloud descriptions", () => {
         isLoading={false}
         error={null}
         canAct={false}
+        onOpenTask={vi.fn()}
       />,
     );
 

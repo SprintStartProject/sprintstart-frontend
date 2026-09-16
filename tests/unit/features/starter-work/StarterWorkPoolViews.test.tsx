@@ -1,9 +1,8 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/components/StarterWorkPoolCloud";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
-import { orientationService } from "../../../../src/services/orientationService";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { mockViewport } from "../../setup/matchMedia";
 import { renderWithProviders } from "../../setup/test-utils";
@@ -53,6 +52,7 @@ describe("StarterWorkPoolCloud views", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -66,7 +66,13 @@ describe("StarterWorkPoolCloud views", () => {
   it("switches to issue-style list rows and shows only the repository name", async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <StarterWorkPoolCloud tasks={[task(1)]} isLoading={false} error={null} canAct />,
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={vi.fn()}
+      />,
     );
 
     expect(screen.getByText("repo")).toBeInTheDocument();
@@ -82,31 +88,28 @@ describe("StarterWorkPoolCloud views", () => {
     );
   });
 
-  it("uses the full list-row surface as the orientation drawer trigger", async () => {
+  it("uses the full list-row surface as the detail-drawer trigger", async () => {
     const user = userEvent.setup();
-    const fetchOrientation = vi
-      .spyOn(orientationService, "fetchTaskOrientation")
-      .mockResolvedValue({
-        taskId: "task-1",
-        taskTitle: "Starter task 1",
-        taskUrl: null,
-        packet: null,
-        reason: null,
-      });
+    const onOpenTask = vi.fn();
     renderWithProviders(
-      <StarterWorkPoolCloud tasks={[task(1)]} isLoading={false} error={null} canAct />,
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={onOpenTask}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "List view" }));
     const rowTrigger = screen.getByRole("button", {
-      name: "Edit orientation for Starter task 1",
+      name: "Open details for Starter task 1",
     });
     expect(rowTrigger).toHaveClass("absolute", "inset-0");
 
     await user.click(rowTrigger);
 
-    await waitFor(() => expect(fetchOrientation).toHaveBeenCalledWith("task-1", "p1"));
-    expect(await screen.findByTestId("orientation-editor")).toBeInTheDocument();
+    expect(onOpenTask).toHaveBeenCalledWith(task(1));
   });
 
   it("marks an unseen task with a dashed row and a dot in list view too", async () => {
@@ -118,6 +121,7 @@ describe("StarterWorkPoolCloud views", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 

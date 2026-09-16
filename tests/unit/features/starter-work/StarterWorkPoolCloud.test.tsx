@@ -1,10 +1,9 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StarterWorkPoolCloud } from "../../../../src/features/starter-work/components/StarterWorkPoolCloud";
 import { ToastProvider } from "../../../../src/context/ToastProvider";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
-import { orientationService } from "../../../../src/services/orientationService";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { mockViewport } from "../../setup/matchMedia";
 import { renderWithProviders } from "../../setup/test-utils";
@@ -52,7 +51,13 @@ describe("StarterWorkPoolCloud", () => {
   it("shows pool load failures as a toast", async () => {
     renderWithProviders(
       <ToastProvider>
-        <StarterWorkPoolCloud tasks={[]} isLoading={false} error="pool unavailable" canAct />
+        <StarterWorkPoolCloud
+          tasks={[]}
+          isLoading={false}
+          error="pool unavailable"
+          canAct
+          onOpenTask={vi.fn()}
+        />
       </ToastProvider>,
     );
 
@@ -68,6 +73,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -82,6 +88,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -100,6 +107,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -109,26 +117,40 @@ describe("StarterWorkPoolCloud", () => {
     expect(screen.queryByText("Starter task 1")).not.toBeInTheDocument();
   });
 
-  it("opens the existing orientation editor for the selected pool task", async () => {
+  it("opens the task's detail drawer instead of an editor, on either the cloud or the list", async () => {
     const user = userEvent.setup();
-    const fetchOrientation = vi
-      .spyOn(orientationService, "fetchTaskOrientation")
-      .mockResolvedValue({
-        taskId: "task-1",
-        taskTitle: "Starter task 1",
-        taskUrl: null,
-        packet: null,
-        reason: null,
-      });
-
+    const onOpenTask = vi.fn();
     renderWithProviders(
-      <StarterWorkPoolCloud tasks={[task(1)]} isLoading={false} error={null} canAct />,
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={onOpenTask}
+      />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Edit orientation for Starter task 1" }));
+    await user.click(screen.getByRole("button", { name: "Open details for Starter task 1" }));
 
-    await waitFor(() => expect(fetchOrientation).toHaveBeenCalledWith("task-1", "p1"));
-    expect(await screen.findByTestId("orientation-editor")).toBeInTheDocument();
+    expect(onOpenTask).toHaveBeenCalledWith(task(1));
+  });
+
+  it("opens the drawer for HR too — the drawer itself reads as decision-free for them", async () => {
+    const user = userEvent.setup();
+    const onOpenTask = vi.fn();
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct={false}
+        onOpenTask={onOpenTask}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open details for Starter task 1" }));
+
+    expect(onOpenTask).toHaveBeenCalledWith(task(1));
   });
 
   it("sorts unseen tasks first and marks them, leaving seen ones with a checkmark", () => {
@@ -139,6 +161,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -155,6 +178,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -171,6 +195,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -189,6 +214,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -206,6 +232,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -218,7 +245,13 @@ describe("StarterWorkPoolCloud", () => {
   it("says so, rather than showing the whole pool, when a filter matches nothing", async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <StarterWorkPoolCloud tasks={[task(1)]} isLoading={false} error={null} canAct />,
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={vi.fn()}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Task 0" }));
@@ -249,6 +282,7 @@ describe("StarterWorkPoolCloud", () => {
         isLoading={false}
         error={null}
         canAct
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -269,6 +303,7 @@ describe("StarterWorkPoolCloud", () => {
         error={null}
         canAct
         onSync={onSync}
+        onOpenTask={vi.fn()}
       />,
     );
 
@@ -283,6 +318,7 @@ describe("StarterWorkPoolCloud", () => {
         canAct
         onSync={onSync}
         isSyncing
+        onOpenTask={vi.fn()}
       />,
     );
     expect(screen.getByRole("button", { name: "Syncing…" })).toBeDisabled();
@@ -296,6 +332,7 @@ describe("StarterWorkPoolCloud", () => {
         error={null}
         canAct={false}
         onSync={vi.fn()}
+        onOpenTask={vi.fn()}
       />,
     );
 

@@ -31,6 +31,8 @@ export const queryKeys = {
     pool: () => ["starter-work", "pool"] as const,
     review: () => ["starter-work", "review"] as const,
     corpusIssues: (projectId: string) => ["starter-work", "corpus", projectId] as const,
+    taskOrientation: (taskId: string, projectId: string) =>
+      ["starter-work", "orientation", taskId, projectId] as const,
   },
   profile: {
     mine: (userId: string) => ["profile", userId] as const,

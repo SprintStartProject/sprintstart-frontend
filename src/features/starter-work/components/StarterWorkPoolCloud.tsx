@@ -6,9 +6,7 @@ import {
   ChevronRight,
   Cloud,
   List as ListIcon,
-  Loader2,
   PackageOpen,
-  PencilLine,
   RefreshCw,
 } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
@@ -21,12 +19,9 @@ import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { useToast } from "../../../context/useToast";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { useIsSmUp } from "../../../hooks/useIsSmUp";
-import { orientationService } from "../../../services/orientationService";
 import { queryKeys } from "../../../services/queryKeys";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { centralSpringToken } from "../../../styles/tokens";
-import { OrientationEditor } from "../../orientation/components/OrientationEditor";
-import type { MyOrientation } from "../../orientation/types";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { StarterWorkTask } from "../types";
@@ -150,7 +145,7 @@ type StarterWorkPoolCloudProps = {
   unseenIds?: ReadonlySet<string>;
   isLoading: boolean;
   error: string | null;
-  /** HR reads the pool; only PM/ADMIN can open the orientation editor or sync it. */
+  /** HR reads the pool; only PM/ADMIN can act from the task's detail drawer. */
   canAct: boolean;
   /**
    * Whether the pool spans the full content width (its own tab, or the overview with no open
@@ -161,14 +156,13 @@ type StarterWorkPoolCloudProps = {
   /** Reconciles the pool against its trackers now. Omitted hides the sync control entirely. */
   onSync?: () => void;
   isSyncing?: boolean;
+  /** Opens the task's detail drawer. Every task opens it, HR included — the drawer itself is read-only for them. */
+  onOpenTask: (task: StarterWorkTask) => void;
 };
 
 type PoolTaskProps = {
   task: StarterWorkTask;
   unseen: boolean;
-  canOpen: boolean;
-  isOpening: boolean;
-  isBusy: boolean;
   onOpen: (task: StarterWorkTask) => void;
 };
 
@@ -246,8 +240,8 @@ function PoolTaskStatusMarker({ unseen }: { unseen: boolean }) {
   );
 }
 
-/** A cloud card whose stretched button makes the entire surface open the orientation drawer. */
-function PoolCloudCard({ task, unseen, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
+/** A cloud card whose stretched button makes the entire surface open the task's detail drawer. */
+function PoolCloudCard({ task, unseen, onOpen }: PoolTaskProps) {
   const description = task.summary?.trim();
 
   return (
@@ -255,15 +249,12 @@ function PoolCloudCard({ task, unseen, canOpen, isOpening, isBusy, onOpen }: Poo
       roundedClassName="rounded-2xl"
       className={`h-full focus-within:ring-2 focus-within:ring-app-focus ${unseen ? "border-dashed" : ""}`}
     >
-      {canOpen && (
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onOpen(task)}
-          aria-label={`Edit orientation for ${task.title}`}
-          className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
-        />
-      )}
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        aria-label={`Open details for ${task.title}`}
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      />
 
       <article className="pointer-events-none relative z-10 flex h-full flex-col gap-2 p-4">
         <div className="flex items-start gap-2">
@@ -274,15 +265,10 @@ function PoolCloudCard({ task, unseen, canOpen, isOpening, isBusy, onOpen }: Poo
           >
             {task.title}
           </h3>
-          {canOpen && (
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted">
-              {isOpening ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <PencilLine className="h-4 w-4" aria-hidden="true" />
-              )}
-            </span>
-          )}
+          <ChevronRight
+            className="h-4 w-4 shrink-0 self-center text-app-text-disabled"
+            aria-hidden="true"
+          />
         </div>
 
         {description && (
@@ -300,20 +286,17 @@ function PoolCloudCard({ task, unseen, canOpen, isOpening, isBusy, onOpen }: Poo
 }
 
 /** Pool task in the same compact row language as the issue browser directly below it. */
-function PoolListRow({ task, unseen, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
+function PoolListRow({ task, unseen, onOpen }: PoolTaskProps) {
   const description = task.summary?.trim();
 
   return (
     <li className="group relative h-full" data-testid={`pool-list-task-${task.id}`}>
-      {canOpen && (
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onOpen(task)}
-          aria-label={`Edit orientation for ${task.title}`}
-          className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
-        />
-      )}
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        aria-label={`Open details for ${task.title}`}
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      />
 
       {/* h-full so that side by side in the full-width grid, the row's two cards match the taller
           one's height; in the single stacked column it is a no-op. */}
@@ -337,16 +320,10 @@ function PoolListRow({ task, unseen, canOpen, isOpening, isBusy, onOpen }: PoolT
           </div>
         </div>
 
-        {canOpen && (
-          <span className="flex shrink-0 items-center gap-2 self-center text-app-text-muted">
-            {isOpening ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <PencilLine className="h-4 w-4" aria-hidden="true" />
-            )}
-            <ChevronRight className="h-4 w-4 text-app-text-disabled" aria-hidden="true" />
-          </span>
-        )}
+        <ChevronRight
+          className="h-4 w-4 shrink-0 self-center text-app-text-disabled"
+          aria-hidden="true"
+        />
       </div>
     </li>
   );
@@ -356,8 +333,8 @@ function PoolListRow({ task, unseen, canOpen, isOpening, isBusy, onOpen }: PoolT
  * The reviewed starter-work pool with interchangeable cloud and list views.
  *
  * Cloud cards use one of five compositions and list rows deliberately mirror the issue browser.
- * Both representations make the whole task surface the orientation trigger, while HR keeps a
- * non-interactive read-only view matching the backend's authoring permissions.
+ * Both representations make the whole task surface the drawer trigger — HR opens the same
+ * read-only drawer, matching the backend's authoring permissions on what it can actually do there.
  */
 export function StarterWorkPoolCloud({
   tasks,
@@ -368,6 +345,7 @@ export function StarterWorkPoolCloud({
   fullWidth = false,
   onSync,
   isSyncing = false,
+  onOpenTask,
 }: StarterWorkPoolCloudProps) {
   const { selectedProjectId, selectedProject } = useProjectContext();
   const prefersReducedMotion = useReducedMotion();
@@ -376,11 +354,6 @@ export function StarterWorkPoolCloud({
 
   const [view, setView] = useState<PoolView>("cloud");
   const [layoutIndex, setLayoutIndex] = useState(0);
-  const [openingId, setOpeningId] = useState<string | null>(null);
-  const [editing, setEditing] = useState<{
-    task: StarterWorkTask;
-    orientation: MyOrientation;
-  } | null>(null);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<PoolStatusFilter>("all");
   const [onlyProject, setOnlyProject] = useState(false);
@@ -451,21 +424,6 @@ export function StarterWorkPoolCloud({
     showErrorToast("Pool unavailable", { description: error });
   }, [error, showErrorToast]);
 
-  const openEditor = async (task: StarterWorkTask) => {
-    if (!selectedProjectId) return;
-    setOpeningId(task.id);
-    try {
-      const orientation = await orientationService.fetchTaskOrientation(task.id, selectedProjectId);
-      setEditing({ task, orientation });
-    } catch (err) {
-      showErrorToast("Orientation unavailable", {
-        description: err instanceof Error ? err.message : "Please try again.",
-      });
-    } finally {
-      setOpeningId(null);
-    }
-  };
-
   const changeView = (nextView: PoolView) => {
     setView(nextView);
     setPage(1);
@@ -486,8 +444,6 @@ export function StarterWorkPoolCloud({
     setPage(nextPage);
     if (effectiveView === "cloud") setLayoutIndex((current) => nextCloudLayout(current));
   };
-
-  const canOpenTask = canAct && Boolean(selectedProjectId);
 
   return (
     <section className="@container" data-testid="starter-work-pool" aria-label="Tasks in the pool">
@@ -649,10 +605,7 @@ export function StarterWorkPoolCloud({
                         <PoolCloudCard
                           task={task}
                           unseen={unseenIds.has(task.id)}
-                          canOpen={canOpenTask}
-                          isOpening={openingId === task.id}
-                          isBusy={openingId !== null}
-                          onOpen={(selected) => void openEditor(selected)}
+                          onOpen={onOpenTask}
                         />
                       </motion.li>
                     );
@@ -673,10 +626,7 @@ export function StarterWorkPoolCloud({
                   key={task.id}
                   task={task}
                   unseen={unseenIds.has(task.id)}
-                  canOpen={canOpenTask}
-                  isOpening={openingId === task.id}
-                  isBusy={openingId !== null}
-                  onOpen={(selected) => void openEditor(selected)}
+                  onOpen={onOpenTask}
                 />
               ))}
             </ul>
@@ -689,34 +639,6 @@ export function StarterWorkPoolCloud({
             className="mt-5"
           />
         </>
-      )}
-
-      {editing && selectedProjectId && (
-        <OrientationEditor
-          taskTitle={editing.task.title}
-          taskUrl={editing.task.sourceUrl}
-          initial={editing.orientation.packet}
-          onSave={async (input) => {
-            await orientationService.authorTaskOrientation(
-              editing.task.id,
-              selectedProjectId,
-              input,
-            );
-            return true;
-          }}
-          onRevert={
-            editing.orientation.packet
-              ? async () => {
-                  await orientationService.revertTaskOrientation(
-                    editing.task.id,
-                    selectedProjectId,
-                  );
-                  return true;
-                }
-              : undefined
-          }
-          onClose={() => setEditing(null)}
-        />
       )}
     </section>
   );

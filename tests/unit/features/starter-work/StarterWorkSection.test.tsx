@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { StarterWorkSection } from "../../../../src/features/starter-work/components/StarterWorkSection";
 import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
+import { orientationService } from "../../../../src/services/orientationService";
 import { userService } from "../../../../src/services/userService";
 import type { StarterWorkTask } from "../../../../src/features/starter-work/types";
 
@@ -33,11 +34,13 @@ function render(ui: ReactElement) {
   return testingRender(<ToastProvider>{ui}</ToastProvider>);
 }
 
-/** Switches to a section tab; the review cards and their actions only render under "Review" now. */
-async function openTab(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const tabs = await screen.findByRole("group", { name: "Filter sections" });
-  await user.click(within(tabs).getByText(name));
-}
+const emptyOrientation = {
+  taskId: "task-1",
+  taskTitle: "Fix the login redirect",
+  taskUrl: null,
+  packet: null,
+  reason: null,
+};
 
 const task: StarterWorkTask = {
   id: "task-1",
@@ -58,13 +61,13 @@ describe("StarterWorkSection", () => {
     permissionGroup.current = "PM";
     selectedProjectId.current = "p1";
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({ tasks: [task] });
-    // The page loads the live pool for the overview alongside the review queue. Stub it (and the
-    // caller's projects) so these tests stay about the review queue.
-    vi.spyOn(starterWorkService, "fetchPool").mockResolvedValue([]);
+    // The overview shows the whole pool, which by default just holds the one unreviewed task.
+    vi.spyOn(starterWorkService, "fetchPool").mockResolvedValue([task]);
     vi.spyOn(userService, "getMyProjects").mockResolvedValue([]);
     // The page also renders the corpus issue browser, which reads the selected project's
     // ingested issues. Its own behaviour is covered in CorpusIssueBrowser.test.tsx.
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
+    vi.spyOn(orientationService, "fetchTaskOrientation").mockResolvedValue(emptyOrientation);
   });
 
   it("shows every live pool task in the overview, and how many are still unreviewed", async () => {
@@ -84,12 +87,10 @@ describe("StarterWorkSection", () => {
     expect(within(pool).getByText("Document the auth flow")).toBeInTheDocument();
   });
 
-  it("shows the AI scope-safety rationale in the task detail", async () => {
+  it("opens a pool task's detail drawer, showing its rationale and competencies", async () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
-    await openTab(user, "Review");
 
-    // The list stays compact; the rationale — the claim a PM is checking — opens with the detail.
     await user.click(
       await screen.findByRole("button", { name: /open details for fix the login redirect/i }),
     );
@@ -97,6 +98,8 @@ describe("StarterWorkSection", () => {
     expect(
       await screen.findByText(/touches one file and has clear acceptance criteria/i),
     ).toBeInTheDocument();
+    expect(screen.getByText("kotlin")).toBeInTheDocument();
+    expect(screen.getByText("auth")).toBeInTheDocument();
 
     const dialog = screen.getByRole("dialog");
     const overlay = screen
@@ -105,24 +108,16 @@ describe("StarterWorkSection", () => {
     expect(overlay).toHaveClass("bg-app-overlay", "opacity-100");
   });
 
-  it("lists the competencies that become prerequisites", async () => {
-    const user = userEvent.setup();
-    render(<StarterWorkSection />);
-    await openTab(user, "Review");
-
-    await screen.findByText("Fix the login redirect");
-    expect(screen.getByText("kotlin")).toBeInTheDocument();
-    expect(screen.getByText("auth")).toBeInTheDocument();
-  });
-
-  it("approves through the service and drops the task from the queue", async () => {
+  it("approves through the service and closes the drawer", async () => {
     const user = userEvent.setup();
     const approve = vi
       .spyOn(starterWorkService, "markReviewed")
       .mockResolvedValue({ ...task, status: "LIVE", reviewed: true });
     render(<StarterWorkSection />);
-    await openTab(user, "Review");
 
+    await user.click(
+      await screen.findByRole("button", { name: /open details for fix the login redirect/i }),
+    );
     await user.click(await screen.findByTestId("approve-task-task-1"));
 
     await waitFor(() => expect(approve).toHaveBeenCalledWith("task-1"));
@@ -131,15 +126,42 @@ describe("StarterWorkSection", () => {
     );
   });
 
-  it("offers the overview, review, pool and issues sections and no orientation tab", async () => {
+  it("flags a task for Task 0 from the drawer", async () => {
+    const user = userEvent.setup();
+    const setTaskZero = vi
+      .spyOn(starterWorkService, "setTaskZero")
+      .mockResolvedValue({ ...task, taskZeroEligible: true });
+    render(<StarterWorkSection />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /open details for fix the login redirect/i }),
+    );
+    await user.click(await screen.findByRole("switch", { name: "Use as Task 0" }));
+
+    await waitFor(() => expect(setTaskZero).toHaveBeenCalledWith("task-1", true));
+  });
+
+  it("opens the existing orientation editor from the drawer", async () => {
+    const user = userEvent.setup();
+    render(<StarterWorkSection />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /open details for fix the login redirect/i }),
+    );
+    await user.click(await screen.findByRole("button", { name: "Write orientation" }));
+
+    expect(await screen.findByTestId("orientation-editor")).toBeInTheDocument();
+  });
+
+  it("offers the overview, pool and issues sections and no orientation or review tab", async () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
 
     const tabs = await screen.findByRole("group", { name: "Filter sections" });
     expect(within(tabs).getByText("Overview")).toBeInTheDocument();
-    expect(within(tabs).getByText("Review")).toBeInTheDocument();
     expect(within(tabs).getByText("Pool")).toBeInTheDocument();
     expect(within(tabs).getByText("Issues")).toBeInTheDocument();
+    expect(within(tabs).queryByText("Review")).not.toBeInTheDocument();
     expect(within(tabs).queryByText("Orientation")).not.toBeInTheDocument();
 
     // The pool section stands on its own under the Pool tab, without the issue browser beside it.
@@ -150,13 +172,18 @@ describe("StarterWorkSection", () => {
     );
   });
 
-  it("lets HR read the queue but not decide on it", async () => {
+  it("lets HR read a task's drawer but not decide on it", async () => {
     permissionGroup.current = "HR";
     const user = userEvent.setup();
     render(<StarterWorkSection />);
-    await openTab(user, "Review");
 
-    expect(await screen.findByText("Fix the login redirect")).toBeInTheDocument();
+    await user.click(
+      await screen.findByRole("button", { name: /open details for fix the login redirect/i }),
+    );
+
+    expect(
+      await screen.findByText(/touches one file and has clear acceptance criteria/i),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("approve-task-task-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("reject-task-task-1")).not.toBeInTheDocument();
   });
@@ -167,6 +194,39 @@ describe("StarterWorkSection", () => {
 
     await screen.findByTestId("starter-work-pool");
     expect(screen.queryByTestId("unreviewed-hint")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("open-triage")).not.toBeInTheDocument();
+  });
+
+  it("goes through the unreviewed queue via the triage modal, keeping only decided tasks in the tally", async () => {
+    const user = userEvent.setup();
+    const secondTask = { ...task, id: "task-2", title: "Second task" };
+    const thirdTask = { ...task, id: "task-3", title: "Third task" };
+    vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({
+      tasks: [task, secondTask, thirdTask],
+    });
+    const approve = vi
+      .spyOn(starterWorkService, "markReviewed")
+      .mockResolvedValue({ ...task, reviewed: true });
+    const reject = vi.spyOn(starterWorkService, "reject").mockResolvedValue(thirdTask);
+    render(<StarterWorkSection />);
+
+    await user.click(await screen.findByTestId("open-triage"));
+    const triage = await screen.findByTestId("starter-work-triage");
+    expect(within(triage).getByText("Fix the login redirect")).toBeInTheDocument();
+
+    // Skipping the first task does not decide it, and does not count toward the closing tally.
+    await user.click(within(triage).getByTestId("triage-later"));
+    expect(await within(triage).findByText("Second task")).toBeInTheDocument();
+
+    await user.click(within(triage).getByTestId("triage-approve"));
+    await waitFor(() => expect(approve).toHaveBeenCalledWith("task-2"));
+    expect(await within(triage).findByText("Third task")).toBeInTheDocument();
+
+    await user.click(within(triage).getByTestId("triage-remove"));
+    await waitFor(() => expect(reject).toHaveBeenCalledWith("task-3", undefined));
+
+    expect(await within(triage).findByText("All caught up")).toBeInTheDocument();
+    expect(within(triage).getByText(/you looked at 2 tasks/i)).toBeInTheDocument();
   });
 
   it("shows generated work as a success toast", async () => {

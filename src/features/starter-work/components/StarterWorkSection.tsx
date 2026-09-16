@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Sparkles, Target } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
-import { Badge } from "../../../components/ui/Badge";
+import { Button } from "../../../components/ui/Button";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
-import { InfoHint } from "../../../components/ui/InfoHint";
 import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { useAuth } from "../../../context/useAuth";
@@ -12,8 +11,8 @@ import { useToast } from "../../../context/useToast";
 import { queryKeys } from "../../../services/queryKeys";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { PermissionGroup } from "../../../services/types";
-import { StarterWorkTaskCard } from "./StarterWorkTaskCard";
 import { StarterWorkTaskDetails } from "./StarterWorkTaskDetails";
+import { StarterWorkTriage } from "./StarterWorkTriage";
 import { NewStarterTaskModal } from "./NewStarterTaskModal";
 import { CorpusIssueBrowser } from "./CorpusIssueBrowser";
 import { StarterWorkPoolCloud } from "./StarterWorkPoolCloud";
@@ -23,27 +22,25 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { useStarterWorkReview } from "../hooks/useStarterWorkReview";
 import { useStarterWorkPool } from "../hooks/useStarterWorkPool";
 import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
-import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
-import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../types";
 
 /**
  * The sections this page holds, and the order they sit in the section filter.
  *
  * `overview` is the dashboard: it shows every section at once. The others narrow to one of the
- * sections the overview stacks up, mirroring the Data Ingestion page. There is no orientation
- * section any more: a task's orientation is authored inline from its pool card.
+ * sections the overview stacks up, mirroring the Data Ingestion page. There is no separate review
+ * section any more — going through the unreviewed queue is the "Go through them" triage modal, and
+ * a task's orientation is authored from its detail drawer.
  */
-type StarterWorkSection = "overview" | "review" | "pool" | "browse";
+type StarterWorkSection = "overview" | "pool" | "browse";
 
 const SECTION_LABELS: Record<StarterWorkSection, string> = {
   overview: "Overview",
-  review: "Review",
   pool: "Pool",
   browse: "Issues",
 };
 
-const SECTION_ORDER: StarterWorkSection[] = ["overview", "review", "pool", "browse"];
+const SECTION_ORDER: StarterWorkSection[] = ["overview", "pool", "browse"];
 
 function compactToastDetail(value: string, maxLength: number): string {
   const compact = value.replace(/\s+/g, " ").trim();
@@ -71,7 +68,6 @@ export function StarterWorkSection() {
   const { selectedProjectId } = useProjectContext();
   const {
     tasks,
-    isLoading,
     isGenerating,
     error,
     generateResult,
@@ -103,6 +99,7 @@ export function StarterWorkSection() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isTriageOpen, setIsTriageOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<StarterWorkSection>("overview");
   // The task whose detail drawer is open, or null. Held as the object so the
   // drawer can animate itself out after the task has left the queue.
@@ -208,6 +205,34 @@ export function StarterWorkSection() {
     [reject, reloadPool, toast],
   );
 
+  // The triage modal makes its own decisions rapidly, one card at a time — a toast per card would
+  // just stack up, so these skip it (the raw hook actions, not `handleApprove`/`handleReject`) and
+  // instead reload the pool once the modal closes, via its own `onClose`.
+  const handleTriageApprove = useCallback((id: string) => approve(id), [approve]);
+  const handleTriageReject = useCallback((id: string) => reject(id), [reject]);
+  const closeTriage = useCallback(() => {
+    setIsTriageOpen(false);
+    void reloadPool();
+  }, [reloadPool]);
+
+  // Task 0 is flagged from the drawer, on any pool task; the drawer keeps showing the task it has,
+  // so it is updated in place with what the service actually saved rather than an optimistic guess.
+  const handleToggleTaskZero = useCallback(
+    async (task: StarterWorkTask, eligible: boolean) => {
+      try {
+        const updated = await starterWorkService.setTaskZero(task.id, eligible);
+        setSelectedTask((current) => (current?.id === updated.id ? updated : current));
+        void reloadPool();
+      } catch (err) {
+        toast.error("Could not update Task 0", {
+          description: err instanceof Error ? err.message : "Please try again.",
+        });
+        throw err;
+      }
+    },
+    [reloadPool, toast],
+  );
+
   // Brings the pool back in line with its trackers right now, rather than waiting for the next
   // scheduled or event-driven pass. Every affected surface reads from the same three query keys,
   // so invalidating them is what makes the pool, the review queue and the corpus browser agree
@@ -251,13 +276,12 @@ export function StarterWorkSection() {
   const tabOptions: SegmentedTabOption<StarterWorkSection>[] = SECTION_ORDER.map((key) => ({
     value: key,
     label: SECTION_LABELS[key],
-    // The review queue and the pool each carry a page-level count; the other sections own their own
-    // data, so their tabs stay countless rather than showing a wrong number.
-    count: key === "review" ? tasks.length : key === "pool" ? pool.length : undefined,
+    // The pool carries a page-level count; the other sections own their own data, so their tabs
+    // stay countless rather than showing a wrong number.
+    count: key === "pool" ? pool.length : undefined,
   }));
 
   const showOverview = activeSection === "overview";
-  const showReviewTab = activeSection === "review";
   const showPoolTab = activeSection === "pool";
   const showBrowse = activeSection === "overview" || activeSection === "browse";
 
@@ -345,9 +369,19 @@ export function StarterWorkSection() {
               {tasks.length > 0 && (
                 <div
                   data-testid="unreviewed-hint"
-                  className="rounded-2xl border border-app-border bg-app-surface px-5 py-4 text-sm text-app-text"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-app-brand-border bg-app-brand-soft px-5 py-4 text-sm text-app-text"
                 >
-                  {tasks.length} {tasks.length === 1 ? "task" : "tasks"} nobody has looked at yet
+                  <span>
+                    {tasks.length} {tasks.length === 1 ? "task" : "tasks"} nobody has looked at yet
+                  </span>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    data-testid="open-triage"
+                    onClick={() => setIsTriageOpen(true)}
+                  >
+                    Go through them
+                  </Button>
                 </div>
               )}
 
@@ -360,20 +394,9 @@ export function StarterWorkSection() {
                 fullWidth
                 onSync={() => void handleSync()}
                 isSyncing={isSyncing}
+                onOpenTask={toggleSelectedTask}
               />
             </>
-          )}
-
-          {showReviewTab && (
-            <ReviewQueue
-              tasks={tasks}
-              isLoading={isLoading}
-              canAct={canAct}
-              selectedTaskId={selectedTask?.id ?? null}
-              onToggle={toggleSelectedTask}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
           )}
 
           {/* The picker beside the blank form: the same action with a better input than an
@@ -387,8 +410,8 @@ export function StarterWorkSection() {
             />
           )}
 
-          {/* The pool on its own, the same surface the overview shows above. PM/ADMIN edit a
-              task's orientation inline from its card here; HR reads it. */}
+          {/* The pool on its own, the same surface the overview shows above. Its cards open the
+              same detail drawer the overview's do. */}
           {showPoolTab && (
             <StarterWorkPoolCloud
               tasks={pool}
@@ -399,6 +422,7 @@ export function StarterWorkSection() {
               fullWidth
               onSync={() => void handleSync()}
               isSyncing={isSyncing}
+              onOpenTask={toggleSelectedTask}
             />
           )}
         </SlidingTabPanel>
@@ -408,9 +432,12 @@ export function StarterWorkSection() {
         {(task) => (
           <StarterWorkTaskDetails
             task={task}
+            unseen={unseenIds.has(task.id)}
+            projectId={selectedProjectId}
             canAct={canAct}
             onApprove={handleApprove}
             onReject={handleReject}
+            onToggleTaskZero={handleToggleTaskZero}
             onClose={() => setSelectedTask(null)}
           />
         )}
@@ -424,109 +451,18 @@ export function StarterWorkSection() {
         />
       )}
 
+      {isTriageOpen && (
+        <StarterWorkTriage
+          tasks={tasks}
+          onApprove={handleTriageApprove}
+          onReject={handleTriageReject}
+          onClose={closeTriage}
+        />
+      )}
+
       {poolFlight && (
         <PoolTaskFlight key={poolFlight.id} flight={poolFlight} onComplete={clearPoolFlight} />
       )}
-    </div>
-  );
-}
-
-/** Placeholder for one `StarterWorkTaskCard`, matching its title, summary and meta-badge rows. */
-function StarterWorkTaskCardSkeleton() {
-  return (
-    <div className="rounded-2xl border border-app-border bg-app-surface p-4">
-      <SkeletonLine className="w-3/4" />
-      <SkeletonLine className="mt-2 w-1/2" />
-      <SkeletonLine className="mt-2 h-5 w-20" />
-    </div>
-  );
-}
-
-/** The review queue shared by the overview column and its full-width tab. */
-function ReviewQueue({
-  tasks,
-  isLoading,
-  canAct,
-  selectedTaskId,
-  onToggle,
-  onApprove,
-  onReject,
-}: {
-  tasks: StarterWorkTask[];
-  isLoading: boolean;
-  canAct: boolean;
-  selectedTaskId: string | null;
-  onToggle: (task: StarterWorkTask) => void;
-  onApprove: (id: string, origin?: PoolFlightRect) => Promise<void>;
-  onReject: (id: string, reason?: string) => Promise<void>;
-}) {
-  const showLoadingSkeleton = useDelayedFlag(isLoading);
-
-  return (
-    <section aria-label="Awaiting your review">
-      <SectionHeading
-        title="Awaiting your review"
-        description="Vouch to lift a task's rank. Removal is permanent."
-        count={tasks.length}
-      />
-      {showLoadingSkeleton ? (
-        <SkeletonGroup label="Loading tasks awaiting review" className="space-y-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <StarterWorkTaskCardSkeleton key={index} />
-          ))}
-        </SkeletonGroup>
-      ) : isLoading ? null : tasks.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-app-border p-10 text-center">
-          <Target className="mx-auto mb-3 h-8 w-8 text-app-text-disabled" aria-hidden="true" />
-          <p className="mx-auto max-w-md text-sm text-app-text-muted">
-            Nothing to review right now. Fresh tasks land here after each crawl.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3" data-testid="starter-work-unreviewed">
-          {tasks.map((task) => (
-            <StarterWorkTaskCard
-              key={task.id}
-              task={task}
-              canAct={canAct}
-              isOpen={selectedTaskId === task.id}
-              onSelect={onToggle}
-              onApprove={onApprove}
-              onReject={onReject}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-/**
- * A flat section header — title, an optional count badge and a one-line
- * description — matching the Data Ingestion page. No card, no icon chip: the
- * content below sits straight on the page so the sections read as one surface
- * rather than a stack of boxes.
- */
-function SectionHeading({
-  title,
-  description,
-  count,
-}: {
-  title: string;
-  description: string;
-  count?: number;
-}) {
-  return (
-    <div className="mb-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-lg font-semibold tracking-tight text-app-text">{title}</h2>
-        {typeof count === "number" && count > 0 && (
-          <Badge variant="neutral" size="sm" className="tabular-nums">
-            {count}
-          </Badge>
-        )}
-        <InfoHint text={description} label={`About ${title}`} />
-      </div>
     </div>
   );
 }
