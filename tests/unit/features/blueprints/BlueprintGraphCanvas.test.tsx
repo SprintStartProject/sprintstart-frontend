@@ -37,7 +37,6 @@ function renderCanvas(
     editable: true,
     onNodeClick: vi.fn(),
     onPositionChange: noop,
-    onRemoveNode: noop,
     onAddBlocker: noop,
     onRemoveBlocker: noop,
     renderNode: (
