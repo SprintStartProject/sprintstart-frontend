@@ -36,12 +36,14 @@ export function MemberReviewPoolPanel({ userId }: MemberReviewPoolPanelProps) {
   }, [userId]);
 
   return (
-    <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+    <div className="rounded-2xl border border-app-border bg-app-surface p-5 sm:p-6">
       <div className="flex items-center gap-2">
-        <RotateCcw className="h-5 w-5 text-app-brand" />
-        <h2 className="text-lg font-semibold text-app-text">Review questions</h2>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
+          <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+        </span>
+        <h2 className="text-sm font-semibold text-app-text">Review questions</h2>
       </div>
-      <p className="mt-1 text-sm text-app-text-muted">
+      <p className="mt-3 text-sm text-app-text-muted">
         Questions missed in earlier phases. They have to be answered correctly before the onboarding
         counts as finished.
       </p>

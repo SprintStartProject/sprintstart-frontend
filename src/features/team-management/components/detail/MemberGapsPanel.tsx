@@ -1,7 +1,8 @@
 import { Badge } from "../../../../components/ui/Badge";
 import type { KnowledgeGap } from "../../../knowledge-gaps/types";
 import type { UserSkillLevel } from "../../../../services/teamManagementService";
-import { SpotlightCard } from "../../../../components/ui/SpotlightCard";
+import { GraduationCap, SearchX } from "lucide-react";
+import { PmCard, PmCardHeader } from "../../../pm-area/components/PmCard";
 
 type MemberGapsPanelProps = {
   skillLevels: UserSkillLevel[];
@@ -32,13 +33,13 @@ export function MemberGapsPanel({
 
   return (
     <>
-      <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
-        <h2 className="text-lg font-semibold text-app-text">Skill Assessment</h2>
+      <PmCard aria-label="Skill assessment">
+        <PmCardHeader icon={GraduationCap} title="Skill assessment" />
 
         {skillLevels.length === 0 ? (
-          <p className="mt-3 text-sm text-app-text-muted">No completed skill assessment.</p>
+          <p className="text-sm text-app-text-muted">No completed skill assessment.</p>
         ) : (
-          <div className="mt-4 space-y-4">
+          <div className="space-y-4">
             {Object.entries(skillsByRole).map(([roleName, skills]) => (
               <div key={roleName}>
                 <p className="mb-2 text-xs font-medium tracking-wide text-app-text-muted uppercase">
@@ -54,12 +55,12 @@ export function MemberGapsPanel({
             ))}
           </div>
         )}
-      </SpotlightCard>
+      </PmCard>
 
-      <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
-        <h2 className="text-lg font-semibold text-app-text">Gaps</h2>
+      <PmCard aria-label="Gaps">
+        <PmCardHeader icon={SearchX} title="Gaps" />
 
-        <div className="mt-4 space-y-4">
+        <div className="space-y-4">
           <SkillGapsSection skillGaps={skillGaps} />
 
           <KnowledgeGapsSection
@@ -67,7 +68,7 @@ export function MemberGapsPanel({
             onOpenKnowledgeGap={onOpenKnowledgeGap}
           />
         </div>
-      </SpotlightCard>
+      </PmCard>
     </>
   );
 }

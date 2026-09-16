@@ -1,4 +1,4 @@
-import { Check, MessageSquareText, Pencil, Plus, SkipForward, Users, X } from "lucide-react";
+import { Inbox, Plus, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
@@ -17,10 +17,6 @@ import {
   getTeamMember,
   unassignProjectRoleFromUser,
   getUserSkillLevels,
-  acceptOnboardingSkipRequest,
-  denyOnboardingSkipRequest,
-  getUserOnboardingFeedback,
-  markOnboardingFeedbackRead,
   getUserOnboardingPath,
   createOnboardingStepForPhase,
   createOnboardingTaskForStep,
@@ -29,7 +25,6 @@ import {
   getOnboardingTasksByStep,
   updateOnboardingStep,
   updateOnboardingTask,
-  type OnboardingFeedback,
   type UserSkillLevel,
 } from "../services/teamManagementService";
 
@@ -43,15 +38,16 @@ type DetailOnboardingStep = OnboardingStepEndpoint & {
   } | null;
 };
 
-function getElapsedDays(startedAt: string): number {
-  const started = new Date(startedAt).getTime();
-
-  return Math.max(0, Math.floor((Date.now() - started) / (1000 * 60 * 60 * 24)));
-}
-
-import { UserAvatar } from "../components/common/UserAvatar";
+import { Button } from "../components/ui/Button";
+import { FilterSelect } from "../components/ui/FilterSelect";
 import { Modal } from "../components/ui/Modal";
-import { PageShell } from "../components/layout/PageShell";
+import { MemberHero } from "../features/pm-area/components/MemberHero";
+import { MemberOpenItems } from "../features/pm-area/components/MemberOpenItems";
+import { PmCard, PmCardHeader } from "../features/pm-area/components/PmCard";
+import { PmPageShell } from "../features/pm-area/components/PmPageShell";
+import { waitingOn } from "../features/pm-area/memberStatus";
+import { useMemberOpenItems } from "../features/pm-area/useMemberOpenItems";
+import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { PanelPresence } from "../components/ui/PanelPresence";
 import { AddCustomStepModal } from "../features/team-management/components/detail/AddCustomStepModal";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
@@ -119,7 +115,6 @@ export function TeamMemberDetailPage() {
   const [roleToRemove, setRoleToRemove] = useState<ProjectRole | null>(null);
   const [skillLevels, setSkillLevels] = useState<UserSkillLevel[]>([]);
   const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
-  const [feedbackItems, setFeedbackItems] = useState<OnboardingFeedback[]>([]);
   const [onboardingPath, setOnboardingPath] = useState<OnboardingPathEndpoint | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState("");
   const [selectedStepId, setSelectedStepId] = useState("");
@@ -152,13 +147,13 @@ export function TeamMemberDetailPage() {
     Record<string, { done: number; total: number }>
   >({});
   const [stepTasksById, setStepTasksById] = useState<Record<string, OnboardingTaskEndpoint[]>>({});
-  const [loadingFeedback, setLoadingFeedback] = useState(false);
-  const [markingFeedbackId, setMarkingFeedbackId] = useState<string | null>(null);
-  const [reviewingSkipAction, setReviewingSkipAction] = useState<"accept" | "deny" | null>(null);
-  // `feedbackError` stays for the feedback *load* failure (shown inline where the
-  // list would be); every action outcome on this page is a toast instead.
-  const [feedbackError, setFeedbackError] = useState("");
   const toast = useToast();
+  const { data: roster } = useTeamRoster();
+  // Skip decisions and feedback, shared with the member side panel. This page reads its member
+  // through `getTeamMember` rather than the roster, so it reloads both itself after an answer.
+  const openItems = useMemberOpenItems(userId ?? null, () =>
+    Promise.all([refreshMember(), refreshOnboardingPath()]),
+  );
 
   useEffect(() => {
     async function loadMember() {
@@ -167,8 +162,6 @@ export function TeamMemberDetailPage() {
         return;
       }
 
-      setLoadingFeedback(true);
-
       const [memberData, rolesData, skills, path, knowledgeGapOverview] = await Promise.all([
         getTeamMember(userId),
         getProjectRoles(),
@@ -176,13 +169,6 @@ export function TeamMemberDetailPage() {
         getUserOnboardingPath(userId),
         knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
       ]);
-      let feedback: OnboardingFeedback[] = [];
-      try {
-        feedback = await getUserOnboardingFeedback(userId);
-      } catch (error) {
-        setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
-      }
-
       setUser(memberData);
       setAvailableRoles(rolesData);
       setSkillLevels(skills);
@@ -191,14 +177,12 @@ export function TeamMemberDetailPage() {
       // and counting repositories that are missing nothing would overstate
       // what the member has to answer for.
       setKnowledgeGaps(knowledgeGapOverview.gaps.filter((gap) => gap.severity !== "covered"));
-      setFeedbackItems(feedback);
       setOnboardingPath(path);
       // Open on the phase the member is actually working on. Phase 1 is almost never
       // the interesting one for a reviewer, and it hides how far along they really are.
       const activePhase = path?.phases?.[findActivePhaseIndex(path)];
       setSelectedPhaseId(activePhase?.id ?? "");
       setSelectedStepId(memberData?.currentStep?.id ?? activePhase?.steps?.[0]?.id ?? "");
-      setLoadingFeedback(false);
       setLoading(false);
     }
 
@@ -246,22 +230,6 @@ export function TeamMemberDetailPage() {
 
     const memberData = await getTeamMember(userId);
     setUser(memberData);
-  }
-
-  async function refreshFeedback() {
-    if (!userId) return;
-
-    setLoadingFeedback(true);
-    setFeedbackError("");
-
-    try {
-      const feedback = await getUserOnboardingFeedback(userId);
-      setFeedbackItems(feedback);
-    } catch (error) {
-      setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
-    } finally {
-      setLoadingFeedback(false);
-    }
   }
 
   async function refreshOnboardingPath() {
@@ -330,28 +298,6 @@ export function TeamMemberDetailPage() {
       toast.error(error instanceof Error ? error.message : "Couldn't remove the role.");
     } finally {
       setSavingRoleId(null);
-    }
-  }
-
-  async function handleSkipReview(action: "accept" | "deny") {
-    const skipId = user?.currentStep?.skip?.id;
-    if (!skipId) return;
-
-    setReviewingSkipAction(action);
-
-    try {
-      if (action === "accept") {
-        await acceptOnboardingSkipRequest(skipId);
-      } else {
-        await denyOnboardingSkipRequest(skipId);
-      }
-
-      await Promise.all([refreshMember(), refreshOnboardingPath()]);
-      toast.success(action === "accept" ? "Skip request approved" : "Skip request denied");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
-    } finally {
-      setReviewingSkipAction(null);
     }
   }
 
@@ -548,24 +494,6 @@ export function TeamMemberDetailPage() {
     }
   }
 
-  async function handleMarkFeedbackRead(feedbackId: string) {
-    setMarkingFeedbackId(feedbackId);
-
-    try {
-      await markOnboardingFeedbackRead(feedbackId);
-      setFeedbackItems((current) =>
-        current.map((feedback) =>
-          feedback.id === feedbackId ? { ...feedback, read: true } : feedback,
-        ),
-      );
-      await Promise.all([refreshFeedback(), refreshMember()]);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't mark the feedback as read.");
-    } finally {
-      setMarkingFeedbackId(null);
-    }
-  }
-
   async function handleCreateCustomStep() {
     const targetPhaseId = stepInsertTarget?.phaseId ?? selectedPhaseId;
 
@@ -636,42 +564,25 @@ export function TeamMemberDetailPage() {
     }
   }
 
-  // Loading and not-found share PageShell with the success render below, so the band
-  // (and the back button in it) never disappears and reappears while the member loads.
-  if (loading) {
+  // Loading and not-found share the shell with the success render below, so the band (and the
+  // section bar in it) never disappears and reappears while the member loads.
+  if (loading || !user) {
     return (
-      <PageShell
-        icon={Users}
-        title="Team member"
-        subtitle=""
-        back={{ label: "Back", onClick: goBack }}
-      >
-        <div className="flex min-h-96 items-center justify-center">
-          <p className="text-sm text-app-text-muted">Loading team member...</p>
-        </div>
-      </PageShell>
+      <PmPageShell icon={Users} title="Team member" subtitle="">
+        {loading ? (
+          <div className="flex min-h-96 items-center justify-center">
+            <p className="text-sm text-app-text-muted">Loading team member...</p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-app-border bg-app-surface p-8">
+            <p className="text-sm text-app-text">Team member not found.</p>
+          </div>
+        )}
+      </PmPageShell>
     );
   }
 
-  if (!user) {
-    return (
-      <PageShell
-        icon={Users}
-        title="Team member"
-        subtitle=""
-        back={{ label: "Back", onClick: goBack }}
-      >
-        <div className="rounded-3xl border border-app-border bg-app-surface p-8">
-          <p className="text-sm text-app-text">Team member not found.</p>
-        </div>
-      </PageShell>
-    );
-  }
-
-  const elapsedDays = user.currentStep?.startedAt ? getElapsedDays(user.currentStep.startedAt) : 0;
-  const progressPercentage = Math.round(user.progressPercentage * 100);
-  const pendingSkip = user.currentStep?.skip?.status === "PENDING" ? user.currentStep.skip : null;
-  const unreadFeedback = feedbackItems.filter((item) => item.read !== true && !item.readAt);
+  const openItemCount = waitingOn(user).length;
   const phases = [...(onboardingPath?.phases ?? [])].sort((a, b) => a.position - b.position);
   const allSteps = phases.flatMap((phase) =>
     [...(phase.steps ?? [])]
@@ -695,7 +606,7 @@ export function TeamMemberDetailPage() {
   const detailStepActualMinutes = detailStep ? getActualMinutes(detailStep) : null;
 
   const detailStepFeedback = detailStep
-    ? feedbackItems
+    ? openItems.feedback
         .filter((feedback) => feedback.stepId === detailStep.id)
         .map((feedback) => ({
           ...feedback,
@@ -734,91 +645,42 @@ export function TeamMemberDetailPage() {
 
   return (
     <>
-      <PageShell
+      <PmPageShell
         icon={Users}
         title={`${user.firstname} ${user.lastname}`}
-        subtitle={user.currentStep?.title || "Onboarding completed"}
-        frame="content"
+        subtitle={
+          user.roles.length > 0
+            ? `${user.roles.map((role) => role.name).join(", ")} · full profile`
+            : "Full profile"
+        }
         back={{ label: "Back", onClick: goBack }}
-        mainClassName="pt-8 pb-24"
         bandExtra={
-          <div>
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex shrink-0 items-center justify-center">
-                  <UserAvatar
-                    profileIcon={user.profileIcon}
-                    fallbackName={`${user.firstname} ${user.lastname}`.trim()}
-                    seed={user.userId}
-                    size={56}
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {user.roles.length > 0 ? (
-                    user.roles.map((role) => (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => setRolesModalOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-3 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand hover:text-app-brand"
-                        title="Edit roles"
-                      >
-                        <span>{role.name}</span>
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    ))
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setRolesModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-app-border px-3 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand hover:text-app-brand"
-                      title="Choose role"
-                    >
-                      <span>Choose role</span>
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="lg:text-right">
-                <p className="text-xs font-medium tracking-wide text-app-text-muted uppercase">
-                  Current Step
-                  {user.currentStep?.startedAt && (
-                    <span className="ml-2 font-normal normal-case">
-                      · {elapsedDays} {elapsedDays === 1 ? "day" : "days"} ago
-                    </span>
-                  )}
-                </p>
-
-                <p className="mt-2 text-sm font-medium text-app-text">
-                  {user.currentStep?.title || "Onboarding Completed"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center gap-3">
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-app-border-muted">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
-                  style={{
-                    width: `${progressPercentage}%`,
-                  }}
-                />
-              </div>
-
-              <span className="text-sm font-medium text-app-text tabular-nums">
-                {progressPercentage}%
-              </span>
-            </div>
-          </div>
+          <MemberHero
+            member={user}
+            roster={roster ?? []}
+            onEditRoles={() => setRolesModalOpen(true)}
+          />
         }
       >
-        {/* items-start keeps both columns at their own height: without it the grid
-                    stretches the onboarding card to match the insights column, which grows
-                    when the review questions are expanded. */}
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
+        <div className="space-y-5">
+          {/* Only while something is open: an empty "waiting on you" card at the top of every
+              profile would push the path down to say nothing. */}
+          {openItemCount > 0 && (
+            <PmCard aria-label="Waiting on you">
+              <PmCardHeader icon={Inbox} title="Waiting on you" meta={`${openItemCount} open`} />
+              <MemberOpenItems
+                member={user}
+                feedback={openItems.feedback}
+                feedbackLoading={openItems.feedbackLoading}
+                feedbackError={openItems.feedbackError}
+                reviewingSkip={openItems.reviewingSkip}
+                markingFeedbackId={openItems.markingFeedbackId}
+                onReviewSkip={(skipId, decision) => void openItems.reviewSkip(skipId, decision)}
+                onMarkRead={(feedbackId) => void openItems.markRead(feedbackId)}
+              />
+            </PmCard>
+          )}
+
           <MemberOnboardingSection
             phases={phases}
             selectedPhase={selectedPhase}
@@ -848,182 +710,11 @@ export function TeamMemberDetailPage() {
             getActualMinutes={getActualMinutes}
             getStepStatusStyles={getStepStatusStyles}
           />
-          <aside aria-label="Member insights" className="space-y-4">
+
+          {/* Below the path rather than beside it: the path needs the width, and these read
+              fine as a row of cards. items-start keeps each card at its own height. */}
+          <aside aria-label="Member insights" className="grid items-start gap-5 lg:grid-cols-3">
             {userId && <MemberReviewPoolPanel userId={userId} />}
-            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
-              <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
-
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquareText className="h-4 w-4 text-app-text-muted" />
-                    <p className="text-sm font-semibold text-app-text">Open items</p>
-                  </div>
-
-                  {(unreadFeedback.length > 0 || pendingSkip) && (
-                    <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
-                      {unreadFeedback.length + (pendingSkip ? 1 : 0)} open
-                    </span>
-                  )}
-                </div>
-
-                {pendingSkip && (
-                  <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 gap-3">
-                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                          <SkipForward className="h-4 w-4" />
-                        </span>
-
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-app-text">Skip request</p>
-                            <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                              Pending
-                            </span>
-                          </div>
-
-                          {user.currentStep?.title && (
-                            <p className="mt-1 text-xs text-app-text-muted">
-                              {user.currentStep.title}
-                            </p>
-                          )}
-
-                          <p className="mt-2 text-sm text-app-text">{pendingSkip.reason}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void handleSkipReview("accept")}
-                          disabled={reviewingSkipAction !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-app-success-solid px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-app-success-solid/90 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          {reviewingSkipAction === "accept" ? "Accepting..." : "Accept"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void handleSkipReview("deny")}
-                          disabled={reviewingSkipAction !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          {reviewingSkipAction === "deny" ? "Denying..." : "Deny"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {loadingFeedback ? (
-                  <p className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                    Loading feedback...
-                  </p>
-                ) : unreadFeedback.length > 0 ? (
-                  unreadFeedback.map((feedback) => {
-                    const isUnread = feedback.read !== true && !feedback.readAt;
-
-                    return (
-                      <div
-                        key={feedback.id}
-                        className={`rounded-2xl border p-4 ${
-                          isUnread
-                            ? "border-app-warning-border bg-app-warning-bg"
-                            : "border-app-border bg-app-surface-muted"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex min-w-0 gap-3">
-                            <span
-                              className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                isUnread
-                                  ? "bg-app-surface text-app-warning-text"
-                                  : "bg-app-surface text-app-text-muted"
-                              }`}
-                            >
-                              <MessageSquareText className="h-4 w-4" />
-                            </span>
-
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-app-text">Feedback</p>
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                                    isUnread
-                                      ? "bg-app-surface text-app-warning-text"
-                                      : "bg-app-border-muted text-app-text-muted"
-                                  }`}
-                                >
-                                  {isUnread ? "Unread" : "Read"}
-                                </span>
-                              </div>
-
-                              <p className="mt-2 text-sm text-app-text">{feedback.message}</p>
-
-                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-app-text-muted">
-                                {feedback.stepTitle && (
-                                  <span className="rounded-full bg-app-surface px-2 py-0.5">
-                                    {feedback.stepTitle}
-                                  </span>
-                                )}
-                                {feedback.createdAt && (
-                                  <span>
-                                    {new Date(feedback.createdAt).toLocaleDateString("en-US", {
-                                      year: "numeric",
-                                      month: "short",
-                                      day: "numeric",
-                                    })}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {isUnread && (
-                            <button
-                              type="button"
-                              onClick={() => void handleMarkFeedbackRead(feedback.id)}
-                              disabled={markingFeedbackId === feedback.id}
-                              className="shrink-0 rounded-lg border border-app-warning-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-warning-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {markingFeedbackId === feedback.id ? "Marking..." : "Mark read"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : user.hasFeedback && feedbackItems.length === 0 ? (
-                  <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                        <MessageSquareText className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-app-text">Feedback</p>
-                          <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                            Unread
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-app-text">
-                          {user.firstname} has left feedback on their onboarding path.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : !pendingSkip ? (
-                  <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                    No open feedback or skip requests.
-                  </p>
-                ) : null}
-
-                {feedbackError && <p className="text-xs text-app-danger-text">{feedbackError}</p>}
-              </div>
-            </div>
             <MemberGapsPanel
               skillLevels={skillLevels}
               skillGaps={skillGaps}
@@ -1034,65 +725,58 @@ export function TeamMemberDetailPage() {
             />
           </aside>
         </div>
-      </PageShell>
+      </PmPageShell>
       <Modal
         isOpen={rolesModalOpen}
-        title="Manage Roles"
+        title="Manage roles"
         description={`Add or remove roles for ${user.firstname}.`}
         closeLabel="Close roles modal"
         onClose={() => setRolesModalOpen(false)}
       >
-        <div className="space-y-2">
+        <ul className="divide-y divide-app-border-muted rounded-2xl border border-app-border">
           {user.roles.length > 0 ? (
             user.roles.map((role) => (
-              <div
-                key={role.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3"
-              >
+              <li key={role.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <span className="text-sm font-medium text-app-text">{role.name}</span>
-
-                <button
-                  type="button"
+                <Button
+                  variant="dangerGhost"
+                  size="sm"
+                  iconOnly
                   onClick={() => setRoleToRemove(role)}
                   disabled={savingRoleId === role.id}
-                  className="rounded-lg p-1.5 text-app-text-muted hover:bg-app-surface-hover hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label={`Remove ${role.name}`}
                 >
                   <X className="h-4 w-4" />
-                </button>
-              </div>
+                </Button>
+              </li>
             ))
           ) : (
-            <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
+            <li className="px-4 py-3 text-sm text-app-text-muted">
               No role assigned yet. Choose a role below.
-            </p>
+            </li>
           )}
-        </div>
+        </ul>
 
-        <div className="mt-6 flex gap-2">
-          <select
+        <div className="mt-5 flex gap-2">
+          <FilterSelect
+            label="Choose a role to add"
             value={selectedRoleId}
-            onChange={(event) => setSelectedRoleId(event.target.value)}
-            className="min-w-0 flex-1 rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
-          >
-            <option value="">Choose role</option>
-
-            {unassignedRoles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
+            options={[
+              { value: "", label: "Choose role" },
+              ...unassignedRoles.map((role) => ({ value: role.id, label: role.name })),
+            ]}
+            onChange={setSelectedRoleId}
+            disabled={unassignedRoles.length === 0}
+            className="min-w-0 flex-1"
+          />
+          <Button
+            variant="primary"
             onClick={() => void handleAddRole()}
             disabled={!selectedRoleId || savingRoleId !== null}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+            icon={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" />
             Add
-          </button>
+          </Button>
         </div>
 
         {unassignedRoles.length === 0 && (

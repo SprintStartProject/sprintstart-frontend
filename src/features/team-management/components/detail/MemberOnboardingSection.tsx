@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useState, type DragEvent } from "react";
 import { DragHandle } from "../../../../components/ui/DragHandle";
-import { SpotlightCard } from "../../../../components/ui/SpotlightCard";
 import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
 import type {
   OnboardingPhaseEndpoint,
@@ -83,13 +82,15 @@ export function MemberOnboardingSection({
   getStepStatusStyles,
 }: MemberOnboardingSectionProps) {
   return (
-    <SpotlightCard roundedClassName="rounded-3xl">
-      <div className="rounded-3xl p-6">
+    <section aria-label="Member onboarding">
+      <div className="rounded-2xl border border-app-border bg-app-surface p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-app-brand" />
-              <h2 className="text-lg font-semibold text-app-text">Member onboarding</h2>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
+                <ClipboardList aria-hidden="true" className="h-3.5 w-3.5" />
+              </span>
+              <h2 className="text-sm font-semibold text-app-text">Member onboarding</h2>
             </div>
 
             <p className="mt-1 text-sm text-app-text-muted">
@@ -156,7 +157,7 @@ export function MemberOnboardingSection({
           </>
         )}
       </div>
-    </SpotlightCard>
+    </section>
   );
 }
 
