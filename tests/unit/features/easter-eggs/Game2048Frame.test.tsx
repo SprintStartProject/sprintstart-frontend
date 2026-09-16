@@ -10,7 +10,7 @@ describe("Game2048Frame", () => {
     expect(iframe).toHaveAttribute("src", "/easter-eggs/2048.html");
   });
 
-  it("calls onExit when an EGG_EXIT window message is received", () => {
+  it("calls onExit when the game page reports EGG_EXIT", () => {
     const onExit = vi.fn();
     render(<Game2048Frame onExit={onExit} />);
 
@@ -18,9 +18,25 @@ describe("Game2048Frame", () => {
       window,
       new MessageEvent("message", {
         data: { type: "EGG_EXIT" },
+        origin: window.location.origin,
       }),
     );
 
     expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores an EGG_EXIT report from another origin", () => {
+    const onExit = vi.fn();
+    render(<Game2048Frame onExit={onExit} />);
+
+    fireEvent(
+      window,
+      new MessageEvent("message", {
+        data: { type: "EGG_EXIT" },
+        origin: "https://somewhere-else.example",
+      }),
+    );
+
+    expect(onExit).not.toHaveBeenCalled();
   });
 });

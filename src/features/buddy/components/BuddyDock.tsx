@@ -370,6 +370,7 @@ export function BuddyDock({
             handleSubmit={handleSubmit}
             compact
             focusOnMount
+            busy={isBusy}
           />
         </div>
       </motion.div>

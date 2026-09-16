@@ -50,6 +50,17 @@ type BuddyConversationProps = {
   hasFloatingControl?: boolean;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
+  /**
+   * Whether the buddy's reply is actively streaming in.
+   *
+   * Read by the composer's focus dance only: together with `isThinking` this is
+   * "the buddy is still writing", and the caret returns to the box when that
+   * ends. Kept separate from `isThinking` because they are genuinely different
+   * states — the thinking dots stop at the first token while the answer keeps
+   * arriving — and folding streaming into `isThinking` would change what the
+   * thread draws.
+   */
+  isStreaming?: boolean;
   /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
   dinoGameActive?: boolean;
   /** Called when the player leaves the dino waiting-game. */
@@ -96,6 +107,7 @@ export function BuddyConversation({
   freshVisitShortcut,
   hasFloatingControl = false,
   focusComposerOnMount = false,
+  isStreaming = false,
   dinoGameActive = false,
   onDinoGameExit,
 }: BuddyConversationProps) {
@@ -177,6 +189,7 @@ export function BuddyConversation({
             handleSubmit={handleSubmit}
             placeholder={placeholder}
             focusOnMount={focusComposerOnMount}
+            busy={isThinking || isStreaming}
           />
         </div>
       </div>

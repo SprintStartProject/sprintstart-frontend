@@ -65,6 +65,12 @@ const CANNON_ANGLES = {
  * - Re-fire while running (the bus's `seq`) simply remounts this
  *   component via EggEffectsLayer's key, respawning the world.
  * - Reduced motion renders no particles at all — see ReducedPartyChip.
+ * - The repo has two other components called `ConfettiBurst`
+ *   (`moments/` and `onboarding/`): those radiate outward from a point and
+ *   are drawn with framer-motion elements, which is fine for a burst that
+ *   belongs to one card or modal. This one is the app-wide `party` effect,
+ *   so it takes the whole viewport, runs 150 particles on one canvas, and
+ *   ends itself through the egg bus — a different job, not a copy.
  */
 export function ConfettiBurst() {
   const canvasRef = useRef<HTMLCanvasElement>(null);

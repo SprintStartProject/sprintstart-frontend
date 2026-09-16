@@ -34,14 +34,18 @@ export function NotFoundPage() {
 
         {/* Easter-egg teaser, styled to blend into the page: only people who
             read the copy closely will think of clicking it. The whole row is
-            the button (text + rocket) so the target is generous. */}
+            the button (text + rocket) so the target is generous.
+            The accessible name starts with the words on screen (WCAG 2.5.3):
+            an aria-label that replaced them would leave voice control with
+            nothing to say that it can see. The hint rides along as a suffix
+            inside the name instead. */}
         <button
           type="button"
           onClick={() => setInvadersOpen(true)}
           className="mt-4 flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-app-text-subtle transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-          aria-label="Open Space Invaders"
         >
           While you wait for your manager&apos;s approval&hellip;
+          <span className="sr-only"> — open Space Invaders</span>
           <span aria-hidden="true">🚀</span>
         </button>
 

@@ -11,17 +11,12 @@ import { lazy } from "react";
  * file; every trigger, page and test keeps addressing eggs by id.
  */
 
-/** Lazy-loaded: the endless runner (chunk fetched on first open). */
-const DinoGame = lazy(() =>
-  import("../chatbot/components/DinoGame").then((m) => ({ default: m.DinoGame })),
-);
-
 /** Lazy-loaded: Space Invaders (chunk fetched on first open). */
 const SpaceInvaders = lazy(() =>
   import("./components/SpaceInvaders").then((m) => ({ default: m.SpaceInvaders })),
 );
 
-export type EggId = "dino" | "game-2048" | "space-invaders";
+export type EggId = "game-2048" | "space-invaders";
 
 type EggDefinition = {
   /** Human-readable name for aria labels and visible chrome. */
@@ -32,18 +27,15 @@ type EggDefinition = {
    * in an iframe; `EggModalShell` adds a header bar and Escape handling.
    */
   kind: "canvas" | "iframe";
-  /** Where an iframe game lives under `public/`. */
-  iframeSrc?: string;
   component: LazyExoticComponent<ComponentType<{ onExit: () => void }>>;
 };
 
 export const EGG_REGISTRY: Record<EggId, EggDefinition> = {
-  dino: { label: "Dino game", kind: "canvas", component: DinoGame },
   "game-2048": {
     label: "2048",
     kind: "iframe",
-    iframeSrc: "/easter-eggs/2048.html",
     // Thin wrapper so the vanilla-JS page satisfies the shared game shape.
+    // The page's own path lives in that wrapper, not here.
     component: lazy(() =>
       import("./components/Game2048Frame").then((m) => ({ default: m.Game2048Frame })),
     ),

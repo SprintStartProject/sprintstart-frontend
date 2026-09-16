@@ -101,14 +101,12 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
                 <>
                   {/* Header bar for the iframe game (canvas games draw their own chrome). */}
                   <div className="flex items-center justify-between border-b border-app-border px-4 py-3">
-                    <h2 id={`${eggId}-title`} className="text-lg font-semibold text-app-text">
-                      {egg.label}
-                    </h2>
+                    <h2 className="text-lg font-semibold text-app-text">{egg.label}</h2>
                     <button
                       type="button"
                       onClick={onClose}
                       aria-label={`Close ${egg.label}`}
-                      data-testid="game2048-close"
+                      data-testid={`${eggId}-close`}
                       className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                     >
                       <X size={20} />

@@ -52,7 +52,7 @@ self-contained under `src/features/` and surfaced through dedicated routes:
 - **Insights — Knowledge Gaps** — AI-detected missing documentation per component, with severity (high / medium / low), component owners, and refresh tracking.
 - **Insights — FAQ** — AI-generated clusters of frequently asked questions and the documents that answer them.
 - **Settings & Profile** — Central configuration hub with tabs for user profile management (avatar, display name, password update), appearance (light/dark/system theme), chat preferences, moments toggles, and access tokens (GitHub PAT / Jira credential management for authorized roles).
-- **Moments & Easter Eggs** — Gamified celebrations (confetti, achievement moments, sound effects) and interactive easter eggs (`dino`, `game2048`, `space-invaders`).
+- **Moments & Easter Eggs** — Gamified celebrations (confetti, achievement moments, sound effects) and interactive easter eggs (the dino waiting-game, `2048` behind the dashboard header icon, Space Invaders behind the 404 page's rocket).
 
 ---
 
@@ -70,10 +70,9 @@ src/
 │   ├── connectors/      # Connector + source allow/deny management
 │   ├── dashboard/       # Dashboard hero & NextStepWidget
 │   ├── data-ingestion/  # Sources, ingestion runs, artifact tables
-│   ├── dino/            # Dino easter-egg mini game
-│   ├── easter-eggs/     # Easter-egg trigger hooks & modals
+│   ├── easter-eggs/     # Easter eggs: egg shell + game registry, the
+│   │                    # effect bus, phrases and the dino waiting-game
 │   ├── faq/             # AI FAQ clusters (insights)
-│   ├── game2048/        # 2048 easter-egg mini game
 │   ├── knowledge-base/  # Artifact browsing + streamed summaries + file upload
 │   ├── knowledge-gaps/  # AI-detected documentation gaps (insights)
 │   ├── moments/         # Celebrations, confetti, rocket animations
@@ -81,7 +80,6 @@ src/
 │   ├── profile/         # Profile form components
 │   ├── projects/        # Multi-project switching & global ProjectContext
 │   ├── settings/        # User settings tabs, themes & credentials
-│   ├── space-invaders/  # Space Invaders easter-egg mini game
 │   └── team-management/ # Team overview, member detail, Skill Wizard
 ├── pages/               # Route-level views (one per user-facing flow)
 ├── router/              # React Router v7 config + AuthGuard

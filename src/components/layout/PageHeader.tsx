@@ -41,6 +41,7 @@ export function PageHeader({
           <div className="flex min-w-0 items-center gap-3">
             {onIconClick ? (
               <button
+                type="button"
                 onClick={onIconClick}
                 data-egg-hint={eggHint ? "true" : undefined}
                 className="page-header-icon-button rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand"

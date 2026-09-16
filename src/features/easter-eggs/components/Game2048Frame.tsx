@@ -1,18 +1,22 @@
 /**
  * Renders the self-contained vanilla-JS 2048 page (public/easter-eggs/
  * 2048.html) inside an iframe so it fits the registry's shared
- * `{ onExit }` game shape. All keyboard wiring lives in
- * {@link EggModalShell} — focusing the frame here just makes arrow keys
- * work immediately, without a click first.
+ * `{ onExit }` game shape.
+ *
+ * Keyboard wiring is split by who can hear the press: focusing the frame
+ * after load makes arrow keys drive the board immediately, without a click
+ * first; Escape pressed in the parent chrome is the shell's own window
+ * listener; Escape pressed *inside* the frame is reported back by the page
+ * itself as an EGG_EXIT message. Nothing here listens for keys, so one
+ * press is never counted twice.
  */
 import { useEffect, useRef } from "react";
 
 type Game2048FrameProps = {
   /**
-   * Called when the user presses Escape *outside* the iframe (header,
-   * close button, before load). Keydowns inside a focused iframe don't
-   * bubble out to the parent document, so the frame installs its own
-   * same-origin listener after loading; the two never double-fire.
+   * Called when the player leaves the game: Escape in the parent chrome
+   * (the shell) or the frame's own EGG_EXIT report. Mainly the callback
+   * the registry's shared game shape requires.
    */
   onExit: () => void;
 };
@@ -35,6 +39,10 @@ export function Game2048Frame({ onExit }: Game2048FrameProps) {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<unknown>) => {
+      // Same origin only: the game page is served by this app, so a message
+      // from anywhere else can only be somebody else's frame closing a modal
+      // that is not its business.
+      if (event.origin !== window.location.origin) return;
       if (isEggExitMessage(event.data)) {
         onExitRef.current();
       }
@@ -47,42 +55,26 @@ export function Game2048Frame({ onExit }: Game2048FrameProps) {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onExitRef.current();
-      }
-    };
-
-    const attachListener = () => {
+    // Put the caret in the frame once it has loaded, so arrow keys drive the
+    // board immediately rather than the first press scrolling the page behind
+    // the modal. Escape needs nothing here: the frame's own page reports it
+    // through the message above, and presses that land outside the frame are
+    // the shell's window listener. One mechanism per press, so none of them
+    // is counted twice.
+    const focusFrame = () => {
       try {
-        const win = iframe.contentWindow;
-        const doc = iframe.contentDocument;
-        if (win) {
-          win.focus();
-          win.addEventListener("keydown", handleKeyDown);
-        }
-        if (doc) {
-          doc.addEventListener("keydown", handleKeyDown);
-        }
+        iframe.contentWindow?.focus();
       } catch {
-        // Fallback to window message listener if cross-origin
+        // Cross-origin frame: nothing to focus into; the message path stands.
       }
     };
 
     if (iframe.contentDocument?.readyState === "complete") {
-      attachListener();
+      focusFrame();
     }
-    iframe.addEventListener("load", attachListener);
+    iframe.addEventListener("load", focusFrame);
 
-    return () => {
-      iframe.removeEventListener("load", attachListener);
-      try {
-        iframe.contentWindow?.removeEventListener("keydown", handleKeyDown);
-        iframe.contentDocument?.removeEventListener("keydown", handleKeyDown);
-      } catch {
-        // Ignore
-      }
-    };
+    return () => iframe.removeEventListener("load", focusFrame);
   }, []);
 
   return (

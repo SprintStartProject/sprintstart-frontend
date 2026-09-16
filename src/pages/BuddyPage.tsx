@@ -329,6 +329,7 @@ function BuddyMentorHome() {
       <BuddyConversation
         messages={greeting.messages}
         isThinking={isThinking || isOpening || greeting.isThinking}
+        isStreaming={isStreaming}
         activeTool={activeTool}
         draft={draft}
         setDraft={setDraft}
