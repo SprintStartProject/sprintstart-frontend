@@ -13,7 +13,6 @@ import { usePmAttentionFlag } from "../../features/team-management/usePmAttentio
 import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
 import {
   AdminIcon,
-  ArrivalStepsIcon,
   BoardIcon,
   ChatIcon,
   DashboardIcon,
@@ -113,17 +112,12 @@ const projectManagerNavItems: SidebarNavItem[] = [
     path: "/data-ingestion",
     icon: DataIngestionIcon,
   },
-  // The steps a new hire is walked through on arrival — set up here by the PM,
-  // which is why it sits with the other things a PM prepares rather than in the
-  // hire's own list. `canAccessRoute` keeps it off a hire's sidebar.
+  // Arrival authoring and Starter Work review, as tabs of one page — set up here by the PM,
+  // which is why it sits with the other things a PM prepares rather than in the hire's own list.
+  // `canAccessRoute` keeps it off a hire's sidebar.
   {
-    label: "Arrival Steps",
-    path: "/arrival-steps",
-    icon: ArrivalStepsIcon,
-  },
-  {
-    label: "Starter Work",
-    path: "/starter-work",
+    label: "First Week",
+    path: "/first-week",
     icon: StarterWorkIcon,
   },
   // The escalation inbox, surfaced as its own entry while it is being evaluated

@@ -39,11 +39,8 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
 vi.mock("../../../src/router/AuthGuard", () => ({
   AuthGuard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock("../../../src/pages/StarterWorkPage", () => ({
-  StarterWorkPage: () => <div>starter work page</div>,
-}));
-vi.mock("../../../src/pages/ArrivalStepsPage", () => ({
-  ArrivalStepsPage: () => <div>arrival steps page</div>,
+vi.mock("../../../src/pages/FirstWeekPage", () => ({
+  FirstWeekPage: () => <div>first week page</div>,
 }));
 vi.mock("../../../src/features/onboarding-metrics/components/OnboardingMetricsPage", () => ({
   OnboardingMetricsPage: () => <div>onboarding metrics page</div>,
@@ -67,8 +64,7 @@ function renderAt(path: string) {
  */
 describe("manager-area routes", () => {
   const managerRoutes = [
-    ["/starter-work", "starter work page"],
-    ["/arrival-steps", "arrival steps page"],
+    ["/first-week", "first week page"],
     ["/insights/onboarding", "onboarding metrics page"],
   ] as const;
 
@@ -97,7 +93,7 @@ describe("manager-area routes", () => {
 
   /**
    * Only the routes in `MANAGER_ASSIGNMENT_ROUTES` additionally require managing the selected
-   * project — the onboarding metrics are one of them, the two authoring pages are not.
+   * project — the onboarding metrics are one of them, First Week is not.
    */
   it("keeps a PM who only takes part in the project off the onboarding metrics", async () => {
     auth.permissionGroup = "PM";
@@ -109,5 +105,24 @@ describe("manager-area routes", () => {
       expect(screen.getByText("dashboard page")).toBeInTheDocument();
     });
     expect(screen.queryByText("onboarding metrics page")).not.toBeInTheDocument();
+  });
+
+  /**
+   * `/arrival-steps` and `/starter-work` used to be their own guarded pages; they are now plain
+   * redirects onto the corresponding `/first-week` tab, so old links and bookmarks still land
+   * somewhere useful rather than a 404.
+   */
+  it.each([
+    ["/arrival-steps", "/first-week?tab=arrival"],
+    ["/starter-work", "/first-week?tab=starter"],
+  ] as const)("redirects %s onto %s", async (oldPath, _target) => {
+    auth.permissionGroup = "PM";
+    auth.canManageSelected = true;
+
+    renderAt(oldPath);
+
+    await waitFor(() => {
+      expect(screen.getByText("first week page")).toBeInTheDocument();
+    });
   });
 });

@@ -115,6 +115,11 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
       }
 
       event.preventDefault();
+      // Claims the gesture: a page that nests one swipeable region inside another (First Week's
+      // Arrival/Starter work tabs around Arrival's own scope tabs, say) would otherwise have both
+      // levels react to the same flick, since the event still bubbles to the outer listener after
+      // the inner one has already turned it into a navigation.
+      event.stopPropagation();
 
       window.clearTimeout(endTimer);
       endTimer = window.setTimeout(() => {

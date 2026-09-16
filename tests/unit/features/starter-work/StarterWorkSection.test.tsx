@@ -2,7 +2,7 @@ import { render as testingRender, screen, waitFor, within } from "@testing-libra
 import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StarterWorkPage } from "../../../../src/pages/StarterWorkPage";
+import { StarterWorkSection } from "../../../../src/features/starter-work/components/StarterWorkSection";
 import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../../src/services/starterWorkService";
 import { userService } from "../../../../src/services/userService";
@@ -45,7 +45,7 @@ const task: StarterWorkTask = {
   reviewed: false,
 };
 
-describe("StarterWorkPage", () => {
+describe("StarterWorkSection", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     permissionGroup.current = "PM";
@@ -65,7 +65,7 @@ describe("StarterWorkPage", () => {
       task,
       { ...task, id: "task-2", title: "Document the auth flow", reviewed: true },
     ]);
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     // The KPI cards render on the very first pass regardless of load state (their value defaults
     // to 0), so the count itself — not just the static label — has to be the awaited condition;
@@ -83,7 +83,7 @@ describe("StarterWorkPage", () => {
 
   it("shows the AI scope-safety rationale in the task detail", async () => {
     const user = userEvent.setup();
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     // The list stays compact; the rationale — the claim a PM is checking — opens with the detail.
     await user.click(
@@ -102,7 +102,7 @@ describe("StarterWorkPage", () => {
   });
 
   it("lists the competencies that become prerequisites", async () => {
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await screen.findByText("Fix the login redirect");
     expect(screen.getByText("kotlin")).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe("StarterWorkPage", () => {
     const approve = vi
       .spyOn(starterWorkService, "markReviewed")
       .mockResolvedValue({ ...task, status: "LIVE", reviewed: true });
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await user.click(await screen.findByTestId("approve-task-task-1"));
 
@@ -126,7 +126,7 @@ describe("StarterWorkPage", () => {
 
   it("offers the overview, review, pool and issues sections and no orientation tab", async () => {
     const user = userEvent.setup();
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     const tabs = await screen.findByRole("group", { name: "Filter sections" });
     expect(within(tabs).getByText("Overview")).toBeInTheDocument();
@@ -145,7 +145,7 @@ describe("StarterWorkPage", () => {
 
   it("lets HR read the queue but not decide on it", async () => {
     permissionGroup.current = "HR";
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     expect(await screen.findByText("Fix the login redirect")).toBeInTheDocument();
     expect(screen.queryByTestId("approve-task-task-1")).not.toBeInTheDocument();
@@ -154,7 +154,7 @@ describe("StarterWorkPage", () => {
 
   it("hides the overview review section and expands the pool when no reviews are open", async () => {
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({ tasks: [] });
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await waitFor(() =>
       expect(screen.queryByTestId("overview-review-column")).not.toBeInTheDocument(),
@@ -165,7 +165,7 @@ describe("StarterWorkPage", () => {
 
   it("fills the gap under a single review with two dashed placeholder slots", async () => {
     // Default mock is a single review, so the column tops up to three slots: one card, two dashes.
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await screen.findByText("Fix the login redirect");
     const filler = screen.getByTestId("overview-review-filler");
@@ -179,7 +179,7 @@ describe("StarterWorkPage", () => {
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({
       tasks: [task, { ...task, id: "task-2", title: "Document the auth flow" }],
     });
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await screen.findByText("Document the auth flow");
     expect(screen.getByTestId("overview-review-filler").children).toHaveLength(1);
@@ -193,7 +193,7 @@ describe("StarterWorkPage", () => {
         { ...task, id: "task-3", title: "Tidy the onboarding README" },
       ],
     });
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await screen.findByText("Fix the login redirect");
     expect(screen.queryByTestId("overview-review-filler")).not.toBeInTheDocument();
@@ -206,7 +206,7 @@ describe("StarterWorkPage", () => {
       notes: [],
     });
     const user = userEvent.setup();
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await user.click(await screen.findByTestId("generate-starter-work"));
 
@@ -216,14 +216,14 @@ describe("StarterWorkPage", () => {
 
   it("disables mining without a selected project", async () => {
     selectedProjectId.current = "";
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     expect(await screen.findByTestId("generate-starter-work")).toBeDisabled();
   });
 
   it("surfaces a failed load", async () => {
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockRejectedValue(new Error("boom"));
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     expect(await screen.findByText("boom")).toBeInTheDocument();
   });
@@ -237,7 +237,7 @@ describe("StarterWorkPage", () => {
       status: "LIVE",
       reviewed: true,
     });
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await user.click(await screen.findByTestId("add-starter-task"));
     await user.type(screen.getByLabelText("Title"), "Add a dark-mode toggle");
@@ -278,7 +278,7 @@ describe("StarterWorkPage", () => {
       reviewed: true,
     });
     const user = userEvent.setup();
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     // The row is compact and opens a drawer; the add action lives in that drawer's footer.
     await user.click(
@@ -306,7 +306,7 @@ describe("StarterWorkPage", () => {
         updatedAtSource: null,
       },
     ]);
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     expect(await screen.findByText("Tidy the onboarding README")).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:7")).not.toBeInTheDocument();
@@ -314,7 +314,7 @@ describe("StarterWorkPage", () => {
 
   it("does not offer hand-authoring to HR", async () => {
     permissionGroup.current = "HR";
-    render(<StarterWorkPage />);
+    render(<StarterWorkSection />);
 
     await screen.findByText("Fix the login redirect");
     expect(screen.queryByTestId("add-starter-task")).not.toBeInTheDocument();

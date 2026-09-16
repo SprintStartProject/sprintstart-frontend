@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { axe } from "vitest-axe";
-import { ArrivalStepsPage } from "../../../src/pages/ArrivalStepsPage";
+import { ArrivalSection } from "../../../src/features/arrival/components/ArrivalSection";
 import { arrivalService } from "../../../src/services/arrivalService";
 import type { ArrivalStep, DerivableArrivalStep } from "../../../src/features/arrival/types";
 
@@ -61,16 +61,16 @@ const derivable: DerivableArrivalStep = {
  * HR reads the same page without them, which is a different tree; the authoring one is scanned
  * because it is the one carrying the interactive controls.
  */
-describe("ArrivalStepsPage Accessibility", () => {
+describe("ArrivalSection Accessibility", () => {
   beforeEach(() => {
     vi.mocked(arrivalService.listSteps).mockResolvedValue([step]);
     vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable]);
   });
 
   it("should not have any a11y violations", async () => {
-    // The page brings its own landmarks; see `StarterWorkPage.a11y` for why the scan is scoped
-    // to the rendered container.
-    const { container } = render(<ArrivalStepsPage />);
+    // The section brings its own landmarks; see `StarterWorkSection.a11y` for why the scan is
+    // scoped to the rendered container.
+    const { container } = render(<ArrivalSection />);
 
     await waitFor(() => {
       expect(screen.getByText("Request VPN access")).toBeInTheDocument();

@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { PlaneLanding } from "lucide-react";
-import { PageHeader } from "../components/layout/PageHeader";
-import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs";
-import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
-import { ArrivalStepAuthoring } from "../features/arrival/components/ArrivalStepAuthoring";
-import { useProjectContext } from "../features/projects/useProjectContext";
-import { useAuth } from "../context/useAuth";
-import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
-import { PermissionGroup } from "../services/types";
+import { PageHeader } from "../../../components/layout/PageHeader";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
+import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
+import { ArrivalStepAuthoring } from "./ArrivalStepAuthoring";
+import { useProjectContext } from "../../projects/useProjectContext";
+import { useAuth } from "../../../context/useAuth";
+import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
+import { PermissionGroup } from "../../../services/types";
 
 /** The company-wide scope, as a tab value. Null is the scope; this is only how a tab spells it. */
 const COMPANY = "__company__";
@@ -28,7 +28,7 @@ const COMPANY = "__company__";
  * sliding pill, same swipe between sections and same page shell as Starter Work, so moving between
  * the two surfaces does not feel like moving between two apps.
  */
-export function ArrivalStepsPage() {
+export function ArrivalSection() {
   const { profile } = useAuth();
   const { projects } = useProjectContext();
   const [scope, setScope] = useState<string>(COMPANY);

@@ -9,32 +9,29 @@ import {
   Target,
   type LucideIcon,
 } from "lucide-react";
-import { PageHeader } from "../components/layout/PageHeader";
-import { Badge } from "../components/ui/Badge";
-import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs";
-import { InfoHint } from "../components/ui/InfoHint";
-import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
-import { PanelPresence } from "../components/ui/PanelPresence";
-import { useAuth } from "../context/useAuth";
-import { useToast } from "../context/useToast";
-import { PermissionGroup } from "../services/types";
-import { StarterWorkTaskCard } from "../features/starter-work/components/StarterWorkTaskCard";
-import { StarterWorkTaskDetails } from "../features/starter-work/components/StarterWorkTaskDetails";
-import { NewStarterTaskModal } from "../features/starter-work/components/NewStarterTaskModal";
-import { CorpusIssueBrowser } from "../features/starter-work/components/CorpusIssueBrowser";
-import { StarterWorkPoolCloud } from "../features/starter-work/components/StarterWorkPoolCloud";
-import { PoolTaskFlight } from "../features/starter-work/components/PoolTaskFlight";
-import type {
-  PoolFlightItem,
-  PoolFlightRect,
-} from "../features/starter-work/components/poolFlight";
-import { useProjectContext } from "../features/projects/useProjectContext";
-import { useStarterWorkReview } from "../features/starter-work/hooks/useStarterWorkReview";
-import { useStarterWorkPool } from "../features/starter-work/hooks/useStarterWorkPool";
-import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
-import { useDelayedFlag } from "../hooks/useDelayedFlag";
-import { SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
-import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../features/starter-work/types";
+import { PageHeader } from "../../../components/layout/PageHeader";
+import { Badge } from "../../../components/ui/Badge";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
+import { InfoHint } from "../../../components/ui/InfoHint";
+import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
+import { PanelPresence } from "../../../components/ui/PanelPresence";
+import { useAuth } from "../../../context/useAuth";
+import { useToast } from "../../../context/useToast";
+import { PermissionGroup } from "../../../services/types";
+import { StarterWorkTaskCard } from "./StarterWorkTaskCard";
+import { StarterWorkTaskDetails } from "./StarterWorkTaskDetails";
+import { NewStarterTaskModal } from "./NewStarterTaskModal";
+import { CorpusIssueBrowser } from "./CorpusIssueBrowser";
+import { StarterWorkPoolCloud } from "./StarterWorkPoolCloud";
+import { PoolTaskFlight } from "./PoolTaskFlight";
+import type { PoolFlightItem, PoolFlightRect } from "./poolFlight";
+import { useProjectContext } from "../../projects/useProjectContext";
+import { useStarterWorkReview } from "../hooks/useStarterWorkReview";
+import { useStarterWorkPool } from "../hooks/useStarterWorkPool";
+import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
+import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
+import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../types";
 
 /**
  * The sections this page holds, and the order they sit in the section filter.
@@ -71,7 +68,7 @@ function compactToastDetail(value: string, maxLength: number): string {
  *
  * HR reads, `ADMIN`/`PM` act, matching the backend's role split.
  */
-export function StarterWorkPage() {
+export function StarterWorkSection() {
   const { profile } = useAuth();
   const toast = useToast();
   const canAct = profile?.permissionGroup !== PermissionGroup.HR;
