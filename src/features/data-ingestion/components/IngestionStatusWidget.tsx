@@ -1,21 +1,21 @@
 // ============================================================
 // IngestionStatusWidget.tsx
-// Dashboard widget — surfaces ingestion sync health (last run,
-// ingested/updated/failed counts, per-source errors) using the
-// same `/api/v1/ingestion-status` + `/api/v1/ingestion-runs`
-// endpoints and merge logic as the Data Ingestion page, so the
-// PM Dashboard never re-implements ingestion status handling.
+// PM overview card — surfaces ingestion sync health (synced
+// sources, ingested artifacts, errors) using the same
+// `/api/v1/ingestion-status` endpoint and merge logic as the
+// Data Ingestion page, so the PM area never re-implements
+// ingestion status handling.
 // ============================================================
 
-import { ArrowRight, Database } from "lucide-react";
+import { Database } from "lucide-react";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { Spinner } from "../../../components/ui/Spinner";
-import { useNavigate } from "react-router-dom";
 import { createSourceFromInstance } from "../data.ts";
 import { getIngestionSourceStatuses } from "../../../services/ingestionService.ts";
 import { useQueryFetch } from "../../../hooks/useQueryFetch.ts";
 import { queryKeys } from "../../../services/queryKeys.ts";
 import { useProjectContext } from "../../projects/useProjectContext.ts";
-import { ClickableCard } from "../../../components/common/ClickableCard.tsx";
+import { PmCard, PmCardHeader, PmCardLink } from "../../pm-area/components/PmCard";
 import { IngestionMetrics } from "./IngestionMetrics.tsx";
 
 /**
@@ -31,13 +31,12 @@ async function fetchIngestionSources(projectId: string) {
 }
 
 /**
- * PM Dashboard strip showing ingestion sync health at a glance.
+ * PM overview card showing ingestion sync health at a glance.
  * Reuses {@link IngestionMetrics} in its compact/inline mode so the
- * dashboard and the full Data Ingestion page always render identical
+ * overview and the full Data Ingestion page always render identical
  * numbers computed from the same source data.
  */
 export function IngestionStatusWidget() {
-  const navigate = useNavigate();
   const { selectedProjectId } = useProjectContext();
   const {
     data: sources,
@@ -47,46 +46,26 @@ export function IngestionStatusWidget() {
     fetchIngestionSources(selectedProjectId),
   );
 
-  // ── LOADING ──────────────────────────────────────────────
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center rounded-2xl p-4">
-        <Spinner size="lg" label="Loading" />
-      </div>
-    );
-  }
-
-  // ── ERROR ────────────────────────────────────────────────
-
-  if (error || !sources) {
-    return (
-      <div className="flex items-center justify-center gap-2 rounded-2xl p-4 text-center">
-        <Database className="h-4 w-4 text-app-text-muted" />
-        <p className="text-sm text-app-text-muted">Could not load ingestion status.</p>
-      </div>
-    );
-  }
-
-  // ── RENDER ───────────────────────────────────────────────
-
   return (
-    <ClickableCard
-      onClick={() => void navigate("/data-ingestion")}
-      aria-label="View data ingestion details"
-      className="flex cursor-pointer flex-wrap items-center gap-4 rounded-2xl p-4 transition-colors hover:bg-app-surface-hover sm:justify-between"
-    >
-      <div className="flex shrink-0 items-center gap-2">
-        <Database className="h-4 w-4 text-app-brand" />
-        <span className="text-sm font-semibold text-app-text">Data ingestion</span>
-      </div>
+    <PmCard aria-label="Data ingestion" className="h-full">
+      <PmCardHeader
+        icon={Database}
+        title="Data ingestion"
+        meta={sources ? `${sources.length} sources` : undefined}
+        action={<PmCardLink to="/data-ingestion">Manage</PmCardLink>}
+      />
 
-      <IngestionMetrics sources={sources} compact />
-
-      <span className="flex shrink-0 items-center gap-1 text-xs text-app-text-muted">
-        View details
-        <ArrowRight className="h-3.5 w-3.5" />
-      </span>
-    </ClickableCard>
+      {loading ? (
+        <div className="flex flex-1 items-center justify-center py-4">
+          <Spinner size="lg" label="Loading" />
+        </div>
+      ) : error || !sources ? (
+        <EmptyState size="sm">Could not load ingestion status.</EmptyState>
+      ) : sources.length === 0 ? (
+        <EmptyState size="sm">No sources connected yet.</EmptyState>
+      ) : (
+        <IngestionMetrics sources={sources} compact />
+      )}
+    </PmCard>
   );
 }

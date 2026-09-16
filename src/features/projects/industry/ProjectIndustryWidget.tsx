@@ -7,9 +7,10 @@ import { parseApiError } from "../../../services/apiError";
 import { projectService, type AdminProjectDetails } from "../../../services/projectService";
 import { useProjectContext } from "../useProjectContext";
 import { ProjectIndustryPanel } from "./ProjectIndustryPanel";
+import { PmCard, PmCardHeader } from "../../pm-area/components/PmCard";
 
 /**
- * PM Dashboard card showing the selected project's detected industry.
+ * PM overview card showing the selected project's detected industry.
  *
  * Loads through the project-scoped endpoint (not the admin-only one used by
  * the admin drawer), so it works for a plain member too — both re-evaluating
@@ -105,11 +106,8 @@ export function ProjectIndustryWidget() {
   if (!selectedProjectId) return null;
 
   return (
-    <div className="p-5">
-      <div className="mb-4 flex items-center gap-2">
-        <Tag className="h-4 w-4 text-app-brand" />
-        <h2 className="text-sm font-semibold text-app-text">Industry</h2>
-      </div>
+    <PmCard aria-label="Industry" className="h-full">
+      <PmCardHeader icon={Tag} title="Industry" />
 
       {error ? (
         <p className="text-sm text-app-text-muted">{error}</p>
@@ -131,6 +129,6 @@ export function ProjectIndustryWidget() {
           onEvaluated={() => void handleEvaluated()}
         />
       )}
-    </div>
+    </PmCard>
   );
 }

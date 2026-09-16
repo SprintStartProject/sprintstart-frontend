@@ -1,78 +1,126 @@
-import { BriefcaseBusiness } from "lucide-react";
-import { PageHeader } from "../components/layout/PageHeader";
+import { useMemo } from "react";
+import { BriefcaseBusiness, Clock, Inbox, Rocket, Users } from "lucide-react";
 import { IngestionStatusWidget } from "../features/data-ingestion/components/IngestionStatusWidget";
-import { FaqWidget } from "../features/faq/components/FaqWidget";
-import { KnowledgeGapWidget } from "../features/knowledge-gaps/components/KnowledgeGapWidget";
-import { OnboardingMetricsWidget } from "../features/onboarding-metrics/components/OnboardingMetricsWidget";
+import { useAttention } from "../features/onboarding-metrics/hooks/useAttention";
+import { formatDuration } from "../features/onboarding-metrics/format";
+import { buildAttentionQueue } from "../features/pm-area/attentionQueue";
+import { PmPageShell } from "../features/pm-area/components/PmPageShell";
+import { PmStat } from "../features/pm-area/components/PmCard";
+import {
+  KnowledgeGapsCard,
+  OnboardingHealthCard,
+  QuestionsCard,
+} from "../features/pm-area/components/overview/InsightCards";
+import { NeedsYouCard } from "../features/pm-area/components/overview/NeedsYouCard";
+import { TeamPulseCard } from "../features/pm-area/components/overview/TeamPulseCard";
+import { isAtRisk, memberStage, waitingOn } from "../features/pm-area/memberStatus";
+import { useMemberPeek } from "../features/pm-area/useMemberPeek";
+import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { ProjectIndustryWidget } from "../features/projects/industry/ProjectIndustryWidget";
 import { useProjectContext } from "../features/projects/useProjectContext";
-import { TeamManagementWidget } from "../features/team-management/components/TeamManagementWidget";
-import { SpotlightCard } from "../components/ui/SpotlightCard";
+import { useQueryFetch } from "../hooks/useQueryFetch";
+import { onboardingMetricsService } from "../services/onboardingMetricsService";
+import { queryKeys } from "../services/queryKeys";
 
 /**
- * Landing page for PM/HR/Admin users. Surfaces at-a-glance widgets for
- * ingestion health, team onboarding progress, recurring FAQ questions, and
- * knowledge gaps, each linking to its full detail page.
+ * Landing page of the PM area: what needs the manager today, how the team is doing, and the
+ * three insight readouts — each a click from the section it summarizes.
+ *
+ * Built around one queue ("Needs you") rather than a column of equal widgets. The old page gave
+ * ingestion health the top row and made a manager scroll past it to find a skip request; the
+ * first question a manager brings to this page is "does anybody need me", so that answer leads,
+ * and every person in it opens in the side panel where it can be acted on.
  */
 export function PmDashboardPage() {
-  // The project is chosen globally in the sidebar switcher.
   const { selectedProjectId } = useProjectContext();
+  const { openMember } = useMemberPeek();
+
+  const { data: roster, loading: rosterLoading, error: rosterError } = useTeamRoster();
+  const { attention, isLoading: attentionLoading } = useAttention(selectedProjectId);
+  const { data: metrics } = useQueryFetch(
+    queryKeys.onboardingMetrics.project(selectedProjectId),
+    () =>
+      selectedProjectId
+        ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
+        : Promise.resolve(null),
+  );
+
+  const members = useMemo(() => roster ?? [], [roster]);
+  const queue = useMemo(
+    () => buildAttentionQueue(members, attention?.items ?? []),
+    [members, attention],
+  );
+
+  const doneCount = members.filter((member) => memberStage(member) === "done").length;
+  const waitingCount = members.filter((member) => waitingOn(member).length > 0).length;
+  const stuckCount = members.filter(isAtRisk).length;
+  const figuresReady = !rosterLoading && !rosterError;
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-app-border bg-app-bg">
-        <div className="app-page-frame py-6">
-          <PageHeader
-            icon={BriefcaseBusiness}
-            title="PM Dashboard"
-            subtitle="Track team onboarding, spot recurring questions and keep knowledge gaps visible."
+    <PmPageShell
+      icon={BriefcaseBusiness}
+      title="PM Dashboard"
+      subtitle="Track team onboarding, answer what is waiting on you, and keep an eye on recurring questions and knowledge gaps."
+    >
+      <div className="space-y-5">
+        <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <PmStat
+            icon={Users}
+            label="Team members"
+            value={figuresReady ? members.length : "—"}
+            hint={figuresReady ? `${doneCount} through onboarding` : "Loading the team"}
+            to="/team-management"
+          />
+          <PmStat
+            icon={Inbox}
+            label="Waiting on you"
+            value={figuresReady ? waitingCount : "—"}
+            hint={waitingCount > 0 ? "Skip requests or feedback" : "Nothing to answer"}
+            attention={waitingCount > 0}
+            to="/team-management?filter=waiting"
+          />
+          <PmStat
+            icon={Clock}
+            label="Long on a step"
+            value={figuresReady ? stuckCount : "—"}
+            hint={stuckCount > 0 ? "Over five days on one step" : "Everybody is moving"}
+            attention={stuckCount > 0}
+            to="/team-management?filter=stuck"
+          />
+          <PmStat
+            icon={Rocket}
+            label="To first accepted work"
+            value={metrics ? formatDuration(metrics.medianHoursToFirstAcceptedContribution) : "—"}
+            hint="Median, joined → accepted"
+            to="/insights/onboarding"
+          />
+        </section>
+
+        <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <NeedsYouCard
+            entries={queue}
+            loading={rosterLoading || attentionLoading}
+            onOpenMember={openMember}
+          />
+          <TeamPulseCard
+            roster={members}
+            loading={rosterLoading}
+            error={rosterError}
+            onOpenMember={openMember}
           />
         </div>
-      </header>
 
-      <main className="app-page-frame space-y-5 py-6 lg:py-8">
-        <SpotlightCard roundedClassName="rounded-2xl">
-          <IngestionStatusWidget />
-        </SpotlightCard>
-
-        <SpotlightCard roundedClassName="rounded-3xl">
-          <section className="p-4">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-app-text">Team overview</h2>
-              <p className="text-sm text-app-text-muted">
-                Track the current status of your team and onboarding progress.
-              </p>
-            </div>
-
-            <TeamManagementWidget projectId={selectedProjectId} />
-          </section>
-        </SpotlightCard>
-
-        <SpotlightCard roundedClassName="rounded-3xl">
-          <section className="p-4">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-app-text">Insights</h2>
-              <p className="text-sm text-app-text-muted">
-                Onboarding health, recurring questions and knowledge gaps.
-              </p>
-            </div>
-
-            {/* Two-up. Onboarding metrics sits on its own row at half width;
-                the empty half is reserved for the coming knowledge-requests widget. */}
-            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-              <FaqWidget />
-              <KnowledgeGapWidget />
-              <OnboardingMetricsWidget />
-            </div>
-          </section>
-        </SpotlightCard>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2">
-          <SpotlightCard roundedClassName="rounded-2xl">
-            <ProjectIndustryWidget />
-          </SpotlightCard>
+        <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <OnboardingHealthCard />
+          <QuestionsCard />
+          <KnowledgeGapsCard />
         </div>
-      </main>
-    </div>
+
+        <div className="grid items-stretch gap-5 lg:grid-cols-2">
+          <IngestionStatusWidget />
+          <ProjectIndustryWidget />
+        </div>
+      </div>
+    </PmPageShell>
   );
 }

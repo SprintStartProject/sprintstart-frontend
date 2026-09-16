@@ -90,4 +90,12 @@ export const queryKeys = {
   onboardingMetrics: {
     project: (projectId: string) => ["onboarding-metrics", "project", projectId] as const,
   },
+  memberFeedback: {
+    // Not project-scoped: feedback belongs to the member's path, and the admin endpoint answers
+    // for the member across projects.
+    byUser: (userId: string) => ["member-feedback", userId] as const,
+  },
+  memberSkills: {
+    byUser: (userId: string) => ["member-skills", userId] as const,
+  },
 } as const;
