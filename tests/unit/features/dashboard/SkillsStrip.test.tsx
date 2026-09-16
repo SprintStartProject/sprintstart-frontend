@@ -105,4 +105,18 @@ describe("SkillsStrip", () => {
     // Empty roles mean the labels degrade to "Unknown role" — not a failed load.
     expect(vi.mocked(getMySkillLevels)).toHaveBeenCalledWith([]);
   });
+
+  it("badges the user's own roles when their team overview is not readable", async () => {
+    // `/me/team-overview` is gated on the USER role, so a PM, HR or admin account gets a 403
+    // here. The overview names "Frontend"; only the profile roles carry "Backend", so seeing it
+    // proves the badges came from the profile rather than from the failed request.
+    vi.mocked(getMyTeamOverview).mockRejectedValue(new Error("403 Forbidden"));
+
+    render(<SkillsStrip size="wide" />);
+
+    await waitFor(() => expect(screen.getByText("TypeScript")).toBeInTheDocument());
+
+    expect(screen.getByText("Backend")).toBeInTheDocument();
+    expect(screen.getByText("Frontend")).toBeInTheDocument();
+  });
 });
