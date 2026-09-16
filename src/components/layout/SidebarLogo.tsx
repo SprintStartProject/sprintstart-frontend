@@ -173,6 +173,11 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
       // pure whimsy with no function, and making it tab-focusable on all
       // three surfaces (including the login page's focus order) would
       // worsen keyboard navigation for everyone to serve a secret.
+      //
+      // The pointer cursor stays: unlike a plain decorative wrapper this one
+      // does answer clicks (that is the whole egg), and it is the only hint
+      // anybody gets that the badge is worth touching. It is not a home link
+      // on any surface, so it promises no navigation.
       style={{ width: BADGE_SIZE, height: BADGE_SIZE }}
       className={`relative flex shrink-0 cursor-pointer items-center justify-center rounded-[12px] bg-app-brand shadow-lg select-none ${className}`}
     >
