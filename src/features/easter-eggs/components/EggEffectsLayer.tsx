@@ -38,8 +38,10 @@ export function EggEffectsLayer() {
       return;
     }
     document.body.classList.add("barrel-roll-active");
-    // `seq` in the closure is fine: the class is idempotent, and clearing
-    // on unmount covers the re-fire-while-running case.
+    // `seq` is a dependency, not just the id: firing the roll again while it
+    // is running must give it its full time again instead of letting the
+    // first trigger's timer cut the second roll short. The class itself is
+    // idempotent — cleanup drops it, the effect puts it straight back.
     const timeout = setTimeout(() => {
       if (document.body.classList.contains("barrel-roll-active")) {
         document.body.classList.remove("barrel-roll-active");
@@ -50,7 +52,7 @@ export function EggEffectsLayer() {
       clearTimeout(timeout);
       document.body.classList.remove("barrel-roll-active");
     };
-  }, [effect?.id, prefersReducedMotion]);
+  }, [effect?.id, effect?.seq, prefersReducedMotion]);
 
   if (!effect) return null;
 
@@ -58,7 +60,9 @@ export function EggEffectsLayer() {
   if (effect.id === "party") return <ConfettiBurst key={effect.seq} />;
 
   if (effect.id === "matrix") {
-    return <MatrixRain onClose={clearEggEffect} />;
+    // Same key contract: the rain ends itself on a timer from its own mount,
+    // so without a remount a second "matrix" would just cut the first short.
+    return <MatrixRain key={effect.seq} onClose={clearEggEffect} />;
   }
 
   // The barrel roll needs no DOM of its own — the body class is the effect.

@@ -110,4 +110,34 @@ describe("ConfettiBurst (via EggEffectsLayer)", () => {
 
     expect(screen.queryByRole("status")).toBeNull();
   });
+
+  it("re-firing during the fade-out is not killed by the finished burst's timer", async () => {
+    render(<EggEffectsLayer />);
+    act(() => playEggEffect("party"));
+
+    // Walk the burst to the frame it starts fading: the canvas is told to
+    // fade, and a timer goes out ~280ms later to clear the bus.
+    await act(async () => {
+      for (let i = 0; i < 200; i++) {
+        const canvas = document.querySelector("canvas");
+        if (canvas && canvas.style.opacity === "0") return;
+        await vi.advanceTimersByTimeAsync(50);
+      }
+    });
+    expect(document.querySelector("canvas")?.style.opacity).toBe("0");
+
+    // Re-fired while that fade is still running: a fresh burst replaces it.
+    act(() => playEggEffect("party"));
+
+    // Past the old timer's deadline. It belongs to the unmounted instance, so
+    // it must have been cancelled with it — otherwise it clears the new burst
+    // here and the screen goes empty mid-celebration.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    const canvas = document.querySelector("canvas");
+    expect(canvas).not.toBeNull();
+    expect(canvas?.style.opacity).not.toBe("0");
+  });
 });

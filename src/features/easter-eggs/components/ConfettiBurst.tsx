@@ -76,6 +76,12 @@ export function ConfettiBurst() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const prefersReducedMotion = useReducedMotion();
 
+  // The fade-out's own timer, held so unmounting can cancel it. It fires
+  // into the bus rather than into this component, so a burst that was
+  // remounted (or replaced by another effect) would otherwise have the old
+  // instance's timer clear the *new* effect a few hundred ms in.
+  const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Reduced motion: particle animation IS the effect, so there is no
   // honest way to keep it — show a static celebratory chip instead
   // (opacity-only fade), so typing "party" never disappears into a void.
@@ -217,7 +223,7 @@ export function ConfettiBurst() {
           }
           el.style.transition = "opacity 250ms ease-out";
           el.style.opacity = "0";
-          setTimeout(() => clearEggEffect(), 280);
+          fadeTimeoutRef.current = setTimeout(() => clearEggEffect(), 280);
           return; // stop scheduling; fade runs on its own
         }
         return;
@@ -232,6 +238,7 @@ export function ConfettiBurst() {
       cancelAnimationFrame(rafId);
       clearTimeout(leftTimer);
       clearTimeout(rightTimer);
+      if (fadeTimeoutRef.current !== null) clearTimeout(fadeTimeoutRef.current);
       window.removeEventListener("resize", resize);
     };
   }, [prefersReducedMotion]);
