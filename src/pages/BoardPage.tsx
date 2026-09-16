@@ -25,7 +25,7 @@ import { useGeneratedPathCards } from "../features/board/hooks/useGeneratedPathC
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
-import { BoardPathRail } from "../features/board/components/BoardPathRail";
+import { BoardPathWindow } from "../features/board/components/BoardPathWindow";
 import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
 import { BoardFilterTriggers } from "../features/board/components/BoardFilterTriggers";
 import { NewAreaForm } from "../features/board/components/NewAreaForm";
@@ -965,15 +965,16 @@ export function BoardPage() {
                 )
               }
             />
-
-            {pathCard && pathCard.content.kind === "PATH_TO_FIRST_CONTRIBUTION" && (
-              <BoardPathRail content={pathCard.content} />
-            )}
           </div>
         </header>
       )}
 
       <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
+        {/*
+          On the board rather than in the header. The header was a place for furniture about the
+          page; this is about the work, and it belongs where the work is.
+        */}
+        <BoardPathWindow />
         {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
             space: the board is a column of cards and the margin is where a hand rests. So the
             offers live there — always in reach, never in the way, and out of the row above the
