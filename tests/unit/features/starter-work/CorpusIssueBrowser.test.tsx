@@ -1,4 +1,4 @@
-import { render as testingRender, screen, waitFor, within } from "@testing-library/react";
+import { render as testingRender, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -27,7 +27,7 @@ function candidate(overrides: Partial<StarterWorkCandidate> = {}): StarterWorkCa
   };
 }
 
-/** Open a compact issue row to reveal its detail drawer. */
+/** Expand a compact issue row to reveal its body inline. */
 async function openRow(user: ReturnType<typeof userEvent.setup>, title: string) {
   await user.click(await screen.findByRole("button", { name: new RegExp(`open ${title}`, "i") }));
 }
@@ -43,7 +43,7 @@ describe("CorpusIssueBrowser", () => {
     vi.restoreAllMocks();
   });
 
-  it("lists the project’s open issues and shows the body when a row is opened", async () => {
+  it("lists the project’s open issues and shows the body when a row is expanded", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
     const user = userEvent.setup();
     render(<CorpusIssueBrowser projectId="p1" canAct onPromoted={vi.fn()} />);
@@ -60,12 +60,9 @@ describe("CorpusIssueBrowser", () => {
     expect(
       await screen.findByText(/users land on the wrong page after signing in/i),
     ).toBeInTheDocument();
-
-    const dialog = screen.getByRole("dialog");
-    const overlay = screen
-      .getAllByRole("button", { name: "Close details" })
-      .find((button) => !dialog.contains(button));
-    expect(overlay).toHaveClass("bg-app-overlay", "opacity-100");
+    expect(
+      screen.getByRole("button", { name: /close fix the login redirect/i }),
+    ).toBeInTheDocument();
   });
 
   /**
@@ -141,8 +138,8 @@ describe("CorpusIssueBrowser", () => {
     await screen.findByTestId("corpus-issue-empty");
     await selectPoolFilter(user, "All issues");
 
-    // It shows on the list, and opening it offers no way to add it again — the footer marks it
-    // pooled instead ("Already in the pool" is unique to the drawer footer).
+    // It shows on the list, and expanding it offers no way to add it again — the body marks it
+    // pooled instead ("Already in the pool." is unique to the expanded body).
     await openRow(user, "Fix the login redirect");
     expect(await screen.findByText(/already in the pool/i)).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:1")).not.toBeInTheDocument();
@@ -165,10 +162,9 @@ describe("CorpusIssueBrowser", () => {
 
     await openRow(user, "Fix the login redirect");
 
-    // Both the list row and the drawer's Pool status now carry a "Taken out" badge, so scope
-    // the assertion to the drawer to prove it is the detail view that marks the removed state.
-    const drawer = await screen.findByRole("dialog");
-    expect(within(drawer).getByText(/taken out/i)).toBeInTheDocument();
+    // Both the row badge and the expanded body now carry a "taken out" state, so match the
+    // expanded body's own sentence to prove it is the detail that marks the removed state.
+    expect(await screen.findByText(/reopen the issue at the source/i)).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:1")).not.toBeInTheDocument();
   });
 
@@ -189,7 +185,7 @@ describe("CorpusIssueBrowser", () => {
     expect(starterWorkService.fetchCandidates).toHaveBeenCalledTimes(1);
   });
 
-  it("promotes an issue from its drawer and flips it to pooled without refetching", async () => {
+  it("promotes an issue from its expanded row and flips it to pooled without refetching", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
     const promote = vi.spyOn(starterWorkService, "promoteCandidate").mockResolvedValue({
       id: "task-1",
@@ -219,12 +215,12 @@ describe("CorpusIssueBrowser", () => {
       width: 0,
       height: 0,
     });
-    // The row badge and the drawer footer both say it now, so match either.
+    // The row badge and the expanded body both say it now, so match either.
     expect((await screen.findAllByText(/already in the pool/i)).length).toBeGreaterThan(0);
     expect(starterWorkService.fetchCandidates).toHaveBeenCalledTimes(1);
   });
 
-  it("adds an issue straight from its row, without opening the drawer", async () => {
+  it("adds an issue straight from its row, without expanding it", async () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([candidate()]);
     const promote = vi.spyOn(starterWorkService, "promoteCandidate").mockResolvedValue({
       id: "task-1",

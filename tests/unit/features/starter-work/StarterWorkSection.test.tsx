@@ -34,6 +34,11 @@ function render(ui: ReactElement) {
   return testingRender(<ToastProvider>{ui}</ToastProvider>);
 }
 
+/** Opens the header's "Add tasks" menu, where mining, hand-authoring and the issues sheet all live. */
+async function openAddMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByTestId("add-tasks-menu"));
+}
+
 const emptyOrientation = {
   taskId: "task-1",
   taskTitle: "Fix the login redirect",
@@ -153,23 +158,21 @@ describe("StarterWorkSection", () => {
     expect(await screen.findByTestId("orientation-editor")).toBeInTheDocument();
   });
 
-  it("offers the overview, pool and issues sections and no orientation or review tab", async () => {
+  it("offers only the overview and pool sections — no review, issues or orientation tab", async () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
 
     const tabs = await screen.findByRole("group", { name: "Filter sections" });
     expect(within(tabs).getByText("Overview")).toBeInTheDocument();
     expect(within(tabs).getByText("Pool")).toBeInTheDocument();
-    expect(within(tabs).getByText("Issues")).toBeInTheDocument();
+    expect(within(tabs).queryByText("Issues")).not.toBeInTheDocument();
     expect(within(tabs).queryByText("Review")).not.toBeInTheDocument();
     expect(within(tabs).queryByText("Orientation")).not.toBeInTheDocument();
 
-    // The pool section stands on its own under the Pool tab, without the issue browser beside it.
+    // The pool section stands on its own under the Pool tab.
     await user.click(within(tabs).getByText("Pool"));
     expect(await screen.findByTestId("starter-work-pool")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.queryByTestId("corpus-issue-browser")).not.toBeInTheDocument(),
-    );
+    expect(screen.queryByTestId("corpus-issue-browser")).not.toBeInTheDocument();
   });
 
   it("lets HR read a task's drawer but not decide on it", async () => {
@@ -238,6 +241,7 @@ describe("StarterWorkSection", () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
 
+    await openAddMenu(user);
     await user.click(await screen.findByTestId("generate-starter-work"));
 
     expect(await screen.findByText("2 tasks added")).toBeInTheDocument();
@@ -246,8 +250,10 @@ describe("StarterWorkSection", () => {
 
   it("disables mining without a selected project", async () => {
     selectedProjectId.current = "";
+    const user = userEvent.setup();
     render(<StarterWorkSection />);
 
+    await openAddMenu(user);
     expect(await screen.findByTestId("generate-starter-work")).toBeDisabled();
   });
 
@@ -269,6 +275,7 @@ describe("StarterWorkSection", () => {
     });
     render(<StarterWorkSection />);
 
+    await openAddMenu(user);
     await user.click(await screen.findByTestId("add-starter-task"));
     await user.type(screen.getByLabelText("Title"), "Add a dark-mode toggle");
     await user.click(screen.getByTestId("create-starter-task"));
@@ -310,7 +317,10 @@ describe("StarterWorkSection", () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
 
-    // The row is compact and opens a drawer; the add action lives in that drawer's footer.
+    // "Pick from issues" opens the corpus browser in its own sheet; the row expands in place and
+    // the add action lives in that expanded body.
+    await openAddMenu(user);
+    await user.click(await screen.findByTestId("pick-from-issues"));
     await user.click(
       await screen.findByRole("button", { name: /open tidy the onboarding readme/i }),
     );
@@ -336,17 +346,25 @@ describe("StarterWorkSection", () => {
         updatedAtSource: null,
       },
     ]);
+    const user = userEvent.setup();
     render(<StarterWorkSection />);
+
+    await openAddMenu(user);
+    await user.click(await screen.findByTestId("pick-from-issues"));
 
     expect(await screen.findByText("Tidy the onboarding README")).toBeInTheDocument();
     expect(screen.queryByTestId("promote-issue-github:acme/repo:ISSUE:7")).not.toBeInTheDocument();
   });
 
-  it("does not offer hand-authoring to HR", async () => {
+  it("does not offer mining or hand-authoring to HR, but still offers picking from issues", async () => {
     permissionGroup.current = "HR";
+    const user = userEvent.setup();
     render(<StarterWorkSection />);
 
     await screen.findByTestId("starter-work-pool");
+    await openAddMenu(user);
+    expect(screen.queryByTestId("generate-starter-work")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-starter-task")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pick-from-issues")).toBeInTheDocument();
   });
 });

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Sparkles, Target } from "lucide-react";
+import { Target } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
 import { Button } from "../../../components/ui/Button";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
+import { SidePanel } from "../../../components/ui/SidePanel";
 import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { useAuth } from "../../../context/useAuth";
@@ -11,6 +12,7 @@ import { useToast } from "../../../context/useToast";
 import { queryKeys } from "../../../services/queryKeys";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { PermissionGroup } from "../../../services/types";
+import { StarterWorkAddMenu } from "./StarterWorkAddMenu";
 import { StarterWorkTaskDetails } from "./StarterWorkTaskDetails";
 import { StarterWorkTriage } from "./StarterWorkTriage";
 import { NewStarterTaskModal } from "./NewStarterTaskModal";
@@ -27,20 +29,19 @@ import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../types";
 /**
  * The sections this page holds, and the order they sit in the section filter.
  *
- * `overview` is the dashboard: it shows every section at once. The others narrow to one of the
- * sections the overview stacks up, mirroring the Data Ingestion page. There is no separate review
- * section any more — going through the unreviewed queue is the "Go through them" triage modal, and
- * a task's orientation is authored from its detail drawer.
+ * `overview` is the dashboard: it shows every section at once. `pool` narrows to the same pool on
+ * its own tab, mirroring the Data Ingestion page. There is no separate review section any more —
+ * going through the unreviewed queue is the "Go through them" triage modal — and no Issues tab: the
+ * corpus browser opens from the header's "Add tasks" menu, in its own sheet.
  */
-type StarterWorkSection = "overview" | "pool" | "browse";
+type StarterWorkSection = "overview" | "pool";
 
 const SECTION_LABELS: Record<StarterWorkSection, string> = {
   overview: "Overview",
   pool: "Pool",
-  browse: "Issues",
 };
 
-const SECTION_ORDER: StarterWorkSection[] = ["overview", "pool", "browse"];
+const SECTION_ORDER: StarterWorkSection[] = ["overview", "pool"];
 
 function compactToastDetail(value: string, maxLength: number): string {
   const compact = value.replace(/\s+/g, " ").trim();
@@ -100,6 +101,7 @@ export function StarterWorkSection() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isTriageOpen, setIsTriageOpen] = useState(false);
+  const [isIssuesSheetOpen, setIsIssuesSheetOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<StarterWorkSection>("overview");
   // The task whose detail drawer is open, or null. Held as the object so the
   // drawer can animate itself out after the task has left the queue.
@@ -283,7 +285,6 @@ export function StarterWorkSection() {
 
   const showOverview = activeSection === "overview";
   const showPoolTab = activeSection === "pool";
-  const showBrowse = activeSection === "overview" || activeSection === "browse";
 
   const handleCreate = async (
     input: CreateStarterWorkTaskInput,
@@ -317,34 +318,13 @@ export function StarterWorkSection() {
             title="Starter Work"
             subtitle="First tasks mined from your corpus, ready for new hires to pick up. Reviewing one lifts it up the list."
             actions={
-              <div className="flex flex-wrap items-center gap-2">
-                {canAct && (
-                  <button
-                    type="button"
-                    data-testid="add-starter-task"
-                    onClick={() => setIsCreateOpen(true)}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-app-border px-5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add a task
-                  </button>
-                )}
-                <button
-                  type="button"
-                  data-testid="generate-starter-work"
-                  onClick={() => void generate(selectedProjectId)}
-                  disabled={isGenerating || !selectedProjectId}
-                  title={!selectedProjectId ? "Pick a project first" : undefined}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-app-brand px-5 text-sm font-medium text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isGenerating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4" />
-                  )}
-                  {isGenerating ? "Mining..." : "Find starter tasks"}
-                </button>
-              </div>
+              <StarterWorkAddMenu
+                canAct={canAct}
+                canFindWithAi={Boolean(selectedProjectId) && !isGenerating}
+                onFindWithAi={() => void generate(selectedProjectId)}
+                onPickFromIssues={() => setIsIssuesSheetOpen(true)}
+                onWriteOne={() => setIsCreateOpen(true)}
+              />
             }
           />
         </div>
@@ -399,17 +379,6 @@ export function StarterWorkSection() {
             </>
           )}
 
-          {/* The picker beside the blank form: the same action with a better input than an
-              empty box. HR reads it, matching the rest of the page. It is a second way to
-              add work, never a filter in front of mining — the pool above stays live. */}
-          {showBrowse && (
-            <CorpusIssueBrowser
-              projectId={selectedProjectId}
-              canAct={canAct}
-              onPromoted={handlePromoted}
-            />
-          )}
-
           {/* The pool on its own, the same surface the overview shows above. Its cards open the
               same detail drawer the overview's do. */}
           {showPoolTab && (
@@ -459,6 +428,27 @@ export function StarterWorkSection() {
           onClose={closeTriage}
         />
       )}
+
+      {/* Mounted only while open (and while its slide-out plays), so the corpus is never fetched
+          before a PM actually opens the sheet. Page-level, like the task drawer above, so it needs
+          no extra AnimatePresence reset for SlidingTabPanel's `initial={false}` context. */}
+      <PanelPresence value={isIssuesSheetOpen ? true : null}>
+        {() => (
+          <SidePanel
+            isOpen={isIssuesSheetOpen}
+            onClose={() => setIsIssuesSheetOpen(false)}
+            title="Pick from issues"
+            showOverlay
+            widthClassName="w-full sm:w-[36rem] lg:w-[42rem]"
+          >
+            <CorpusIssueBrowser
+              projectId={selectedProjectId}
+              canAct={canAct}
+              onPromoted={handlePromoted}
+            />
+          </SidePanel>
+        )}
+      </PanelPresence>
 
       {poolFlight && (
         <PoolTaskFlight key={poolFlight.id} flight={poolFlight} onComplete={clearPoolFlight} />
