@@ -11,6 +11,7 @@ vi.mock("../../../src/services/arrivalService", () => ({
     listSteps: vi.fn(),
     listDerivableSteps: vi.fn(),
     createStep: vi.fn(),
+    updateStep: vi.fn(),
     reorderSteps: vi.fn(),
     deleteStep: vi.fn(),
   },
@@ -76,47 +77,6 @@ describe("FirstWeekPage tab switching", () => {
     fireEvent.click(screen.getByRole("button", { name: "Starter work" }));
 
     expect(await screen.findByRole("heading", { name: "Starter Work" })).toBeInTheDocument();
-  });
-});
-
-describe("Arrival tab scope swipe", () => {
-  beforeEach(() => {
-    vi.mocked(arrivalService.listSteps).mockResolvedValue([]);
-    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([]);
-  });
-
-  /**
-   * The listener sits on the Arrival section's own wrapper, not `<main>`, which is only as tall
-   * as its content -- see the note in `ArrivalSection`. Fired on the section's own header for the
-   * same reason the inbox's test does: jsdom has no layout, so the empty band below the content
-   * cannot be aimed at, but the header is the same case -- outside its `<main>`, inside the
-   * section -- and it fails if the ref ever moves back to the panel.
-   */
-  it("moves between scopes from anywhere on the section, not just over the list", async () => {
-    renderTab("arrival");
-    await screen.findByRole("button", { name: "Everyone" });
-    const sectionHeader = screen.getByRole("heading", { name: "Arrival" }).closest("header")!;
-
-    // Rightwards past the hook's threshold: on to the scope after "Everyone".
-    fireEvent.wheel(sectionHeader, { deltaX: 60, deltaY: 0 });
-
-    expect(await screen.findByRole("button", { name: "Project One" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-  });
-
-  it("leaves a vertical scroll alone", async () => {
-    renderTab("arrival");
-    await screen.findByRole("button", { name: "Everyone" });
-    const sectionHeader = screen.getByRole("heading", { name: "Arrival" }).closest("header")!;
-
-    fireEvent.wheel(sectionHeader, { deltaX: 4, deltaY: 80 });
-
-    expect(screen.getByRole("button", { name: "Everyone" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
   });
 });
 

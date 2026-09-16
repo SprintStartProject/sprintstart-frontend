@@ -1,64 +1,29 @@
-import { useMemo, useState } from "react";
 import { PlaneLanding } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
-import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
-import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { ArrivalStepAuthoring } from "./ArrivalStepAuthoring";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useAuth } from "../../../context/useAuth";
-import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
 import { PermissionGroup } from "../../../services/types";
-
-/** The company-wide scope, as a tab value. Null is the scope; this is only how a tab spells it. */
-const COMPANY = "__company__";
 
 /**
  * Authoring the arrival list: what a new joiner needs before they can work.
  *
- * Company-wide is the default tab; a project tab is what that project needs on top, and a
- * hire's own list is the union of the two.
- *
- * A project step reusing a company step's key replaces its wording rather than adding a second
- * row — the key is what state is stored against, so sharpening a sentence costs nobody their
- * record of having done it.
+ * The project comes from the app's global project switcher rather than a tab bar of its own —
+ * `ArrivalStepAuthoring` shows the company-wide list and, when there is a selected project, that
+ * project's additions together, with its own scope switch between the two.
  *
  * HR reads but does not write, matching the backend.
- *
- * The scopes are the app's shared `SegmentedTabs` rather than a tab bar of this page's own: same
- * sliding pill, same swipe between sections and same page shell as Starter Work, so moving between
- * the two surfaces does not feel like moving between two apps.
  */
 export function ArrivalSection() {
   const { profile } = useAuth();
-  const { projects } = useProjectContext();
-  const [scope, setScope] = useState<string>(COMPANY);
+  const { selectedProjectId, selectedProject } = useProjectContext();
 
   const canAuthor =
     profile?.permissionGroup === PermissionGroup.PM ||
     profile?.permissionGroup === PermissionGroup.ADMIN;
 
-  const selected = projects.find((project) => project.id === scope) ?? null;
-
-  // Company-wide first, then one tab per project — the order the swipe steps through.
-  const scopeOrder = useMemo(() => [COMPANY, ...projects.map((project) => project.id)], [projects]);
-
-  const tabOptions: SegmentedTabOption<string>[] = scopeOrder.map((value) => ({
-    value,
-    label: value === COMPANY ? "Everyone" : (projects.find((p) => p.id === value)?.name ?? value),
-  }));
-
-  // The ref goes on the page rather than on `<main>` -- AdminPage's reasoning, and the escalation
-  // inbox's: `<main>` is only as tall as its content, so a short list leaves the bottom of the
-  // viewport dead, and a gesture that works two centimetres higher up reads as broken rather
-  // than as absent.
-  const swipeRef = useSwipeableTabs<string, HTMLElement>({
-    order: scopeOrder,
-    value: scope,
-    onChange: setScope,
-  });
-
   return (
-    <div ref={swipeRef} className="min-h-screen">
+    <div className="min-h-screen">
       <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-frame py-6">
           <PageHeader
@@ -70,34 +35,11 @@ export function ArrivalSection() {
       </header>
 
       <main className="app-page-frame space-y-5 py-6 lg:py-8">
-        {/*
-              Rendered only when there is a second scope to switch to. A lone "Everyone" tab on an
-              installation with no projects is a control that cannot do anything.
-            */}
-        {projects.length > 0 && (
-          <SegmentedTabs
-            value={scope}
-            options={tabOptions}
-            onChange={setScope}
-            layoutId="arrival-scope-pill"
-            ariaLabel="Which list to author"
-          />
-        )}
-
-        <SlidingTabPanel activeKey={scope} index={scopeOrder.indexOf(scope)}>
-          {/*
-                HR reads the real list rather than a notice standing in for it: they are often the
-                person who knows what it should say, and the backend already serves them the read.
-              */}
-          <ArrivalStepAuthoring
-            // Remounted on a scope change rather than reusing state: an "add a step" form left
-            // open in one scope would otherwise still be open, and submit, into the next.
-            key={scope}
-            readOnly={!canAuthor}
-            projectId={selected?.id ?? null}
-            projectName={selected?.name ?? null}
-          />
-        </SlidingTabPanel>
+        <ArrivalStepAuthoring
+          readOnly={!canAuthor}
+          projectId={selectedProjectId || null}
+          projectName={selectedProject?.name ?? null}
+        />
       </main>
     </div>
   );

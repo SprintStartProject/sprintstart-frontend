@@ -1,32 +1,43 @@
-import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, Eye, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState, type DragEvent } from "react";
+import { Check, ChevronDown, ChevronUp, CornerDownRight, Eye, Pencil, Plus } from "lucide-react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
+import { DragHandle } from "../../../components/ui/DragHandle";
+import { DrawerCard } from "../../admin/components/DrawerCard";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
+import { SegmentedTabs } from "../../../components/ui/SegmentedTabs";
 import { Spinner } from "../../../components/ui/Spinner";
+import { Textarea } from "../../../components/ui/Textarea";
 import { useToast } from "../../../context/useToast";
 import { useArrivalAuthoring } from "../hooks/useArrivalAuthoring";
-import type { ArrivalStep, DerivableArrivalStep } from "../types";
+import { slugifyStepKey } from "../slug";
+import type {
+  ArrivalScope,
+  ArrivalStep,
+  DerivableArrivalStep,
+  UpdateArrivalStepRequest,
+} from "../types";
 
 /**
- * Authoring the company-wide arrival list — the things a new joiner has to get done before they can
- * work.
+ * Authoring both arrival lists at once — the company-wide list every new hire gets, and (when
+ * there is a project in context) what that project adds on top.
  *
- * This list orders attention; it gates nothing. An outstanding step is shown to the hire
- * and raised by their buddy, and that is the whole of its effect.
+ * Both blocks render together rather than behind separate tabs, because the thing a PM actually
+ * needs to see is how they combine: a project step that reuses a company step's key replaces its
+ * wording in place, and that relationship only reads clearly with both lists on screen.
  *
  * Two kinds of step, recorded separately and never blended: one written here is settled by
- * the hire saying so, one taken from the catalog below is checked by the system. That is why the
+ * the hire saying so, one taken from the catalog above is checked by the system. That is why the
  * board card counts them apart rather than showing one figure.
  *
  * Nothing is seeded, the checkable ones included.
  *
- * Every control here is a shared primitive — `Button`, `Field`/`Input`, `EmptyState`, `Badge` — and
- * the removal goes through the app's one `AlertDialog` rather than an inline confirm of its own, so
- * a destructive step here behaves exactly like a destructive step anywhere else in the app.
+ * HR reads but does not write, matching the backend — `readOnly` strips every control down to the
+ * list itself.
  */
 export function ArrivalStepAuthoring({
   readOnly = false,
@@ -34,21 +45,41 @@ export function ArrivalStepAuthoring({
   projectName = null,
 }: {
   readOnly?: boolean;
-  /** The scope being authored. Null means company-wide, as everywhere else in this model. */
   projectId?: string | null;
   projectName?: string | null;
 }) {
-  const { steps, derivable, loading, error, writeError, create, addDerivable, move, remove } =
-    useArrivalAuthoring(projectId);
+  const {
+    company,
+    project,
+    derivable,
+    loading,
+    error,
+    writeError,
+    create,
+    addDerivable,
+    update,
+    move,
+    reorder,
+    remove,
+  } = useArrivalAuthoring(projectId);
+
+  const hasProject = projectId !== null;
+  const [scope, setScope] = useState<ArrivalScope>(hasProject ? "project" : "company");
+  const showingProject = hasProject && scope === "project";
+
   const [adding, setAdding] = useState(false);
   // Held on the list rather than on the row: one dialog at a time, and the row that opened it may
   // be gone by the time the removal lands.
-  const [confirming, setConfirming] = useState<ArrivalStep | null>(null);
+  const [confirming, setConfirming] = useState<{ step: ArrivalStep; scope: ArrivalScope } | null>(
+    null,
+  );
+  const [editing, setEditing] = useState<{ step: ArrivalStep; scope: ArrivalScope } | null>(null);
 
   // A refused write is a toast, like every other refused write in the app — the list below is
   // still the list the server has, so the message belongs to the attempt rather than to the page.
   const toast = useToast();
   const showErrorToast = toast.error;
+  const showSuccessToast = toast.success;
 
   useEffect(() => {
     if (!writeError) return;
@@ -58,7 +89,7 @@ export function ArrivalStepAuthoring({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Spinner size="lg" label="Loading the arrival list" />
+        <Spinner size="lg" label="Loading the arrival lists" />
       </div>
     );
   }
@@ -69,58 +100,80 @@ export function ArrivalStepAuthoring({
         role="alert"
         className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
       >
-        The arrival list could not be loaded. Refresh to try again.
+        The arrival lists could not be loaded. Refresh to try again.
       </p>
     );
   }
 
+  const companySteps = company ?? [];
+  const projectSteps = project ?? [];
+  const companyKeys = new Set(companySteps.map((step) => step.key));
+  const overriddenKeys = new Set(projectSteps.map((step) => step.key));
+
   return (
-    <section className="space-y-4">
+    <section className="space-y-5">
       <header className="space-y-1">
         <h2 className="text-lg font-semibold tracking-tight text-app-text">
-          {projectName ? `Arrival steps for ${projectName}` : "Arrival steps"}
+          Before they can start
         </h2>
         <p className="max-w-2xl text-sm text-app-text-muted">
-          {projectName ? (
+          {showingProject ? (
             <>
-              Extra steps for people on{" "}
-              <strong className="font-medium text-app-text">{projectName}</strong>, on top of the
-              company-wide list. A step here that reuses a company step&apos;s key replaces its
-              wording without losing anyone&apos;s record of having done it.
+              What a new hire on{" "}
+              <strong className="font-medium text-app-text">{projectName}</strong> gets, in the
+              order they see it: everyone&apos;s steps first, then what {projectName} adds.
             </>
           ) : (
-            <>
-              What somebody needs before they can start — accounts, access, a machine that builds.
-              These appear on every new joiner&apos;s board, whichever project they are on.
-            </>
+            "The steps every new hire gets, whichever project they join."
           )}{" "}
           <strong className="font-medium text-app-text">Nothing here blocks anyone</strong>: an
           outstanding step is shown and raised by their buddy, never enforced.
         </p>
       </header>
 
-      {steps && steps.length === 0 ? (
-        <EmptyState size="sm">
-          {projectName
-            ? `No steps specific to ${projectName}. People here still get the ` +
-              "company-wide list — add something only if this project needs it on top."
-            : "No arrival steps yet, so nobody sees this card at all. Add the first " +
-              "thing a new joiner has to do before they can work."}
-        </EmptyState>
-      ) : (
-        <ul className="space-y-2">
-          {steps?.map((step, index) => (
-            <StepRow
-              key={step.key}
-              step={step}
-              readOnly={readOnly}
-              canMoveUp={index > 0}
-              canMoveDown={index < steps.length - 1}
-              onMove={move}
-              onRequestRemove={setConfirming}
-            />
-          ))}
-        </ul>
+      {hasProject && (
+        <SegmentedTabs
+          value={scope}
+          onChange={setScope}
+          layoutId="arrival-scope-pill"
+          ariaLabel="Which list to show"
+          options={[
+            { value: "project", label: projectName ?? "This project" },
+            { value: "company", label: "Company-wide only" },
+          ]}
+        />
+      )}
+
+      <SuggestionChips derivable={derivable} readOnly={readOnly} onAdd={addDerivable} />
+
+      <StepBlock
+        heading="Everyone"
+        description="Every new hire, any project."
+        badgeVariant="neutral"
+        steps={companySteps}
+        readOnly={readOnly}
+        replacedKeys={showingProject ? overriddenKeys : EMPTY_SET}
+        overrideKeys={EMPTY_SET}
+        projectName={projectName}
+        onMove={(key, direction) => void move(key, direction, "company")}
+        onReorder={(orderedKeys) => void reorder(orderedKeys, "company")}
+        onEdit={(step) => setEditing({ step, scope: "company" })}
+      />
+
+      {showingProject && (
+        <StepBlock
+          heading={projectName ?? "This project"}
+          description={`Added on top for people on ${projectName ?? "this project"}.`}
+          badgeVariant="brand"
+          steps={projectSteps}
+          readOnly={readOnly}
+          replacedKeys={EMPTY_SET}
+          overrideKeys={companyKeys}
+          projectName={projectName}
+          onMove={(key, direction) => void move(key, direction, "project")}
+          onReorder={(orderedKeys) => void reorder(orderedKeys, "project")}
+          onEdit={(step) => setEditing({ step, scope: "project" })}
+        />
       )}
 
       {readOnly ? (
@@ -130,9 +183,12 @@ export function ArrivalStepAuthoring({
         </EmptyState>
       ) : adding ? (
         <AddStepForm
+          hasProject={hasProject}
+          projectName={projectName}
+          defaultWho={scope}
           onCancel={() => setAdding(false)}
-          onCreate={async (request) => {
-            if (await create(request)) setAdding(false);
+          onCreate={async (request, who) => {
+            if (await create(request, who)) setAdding(false);
           }}
         />
       ) : (
@@ -146,33 +202,25 @@ export function ArrivalStepAuthoring({
       )}
 
       {/*
-              Company scope only. A derivation is code bound to one key, so a checkable step is the
-              same step everywhere and belongs on the list everybody gets — and the catalog's
-              `added` flags describe that list, so in a project scope they would advertise as
-              available something already on the company list.
-            */}
-      {projectId === null && (
-        <DerivableCatalog derivable={derivable} readOnly={readOnly} onAdd={addDerivable} />
-      )}
-
-      {/*
               What a PM cannot guess is what survives. State is keyed by the step key, not by a row
-              id, so removing this takes it off everyone's board without destroying who already did
-              it -- and re-adding the same key brings those records back.
+              id, so removing this takes it off the list without destroying who already did it --
+              and re-adding the same key brings those records back.
             */}
       <AlertDialog
         isOpen={confirming !== null}
         variant="danger"
         title={
           confirming
-            ? `Remove “${confirming.title}” from everyone’s board?`
-            : "Remove this step from everyone’s board?"
+            ? confirming.scope === "company"
+              ? `Remove “${confirming.step.title}” from everyone’s board?`
+              : `Remove “${confirming.step.title}” from ${projectName ?? "this project"}’s board?`
+            : "Remove this step?"
         }
         description={
           confirming ? (
             <p>
               Records of people who already did it are kept. Adding a step with the key{" "}
-              <span className="font-mono">{confirming.key}</span> again restores them.
+              <span className="font-mono">{confirming.step.key}</span> again restores them.
             </p>
           ) : undefined
         }
@@ -180,26 +228,86 @@ export function ArrivalStepAuthoring({
         cancelLabel="Keep it"
         onClose={() => setConfirming(null)}
         onConfirm={() => {
-          const step = confirming;
-          if (!step) return;
+          const target = confirming;
+          if (!target) return;
           void (async () => {
-            if (await remove(step.key)) setConfirming(null);
+            if (await remove(target.step.key, target.scope)) setConfirming(null);
           })();
         }}
       />
+
+      {editing &&
+        (() => {
+          const companyStep = companySteps.find((step) => step.key === editing.step.key);
+          const isOverride = editing.scope === "project" && companyKeys.has(editing.step.key);
+          const replacedForProject =
+            editing.scope === "company" && showingProject && overriddenKeys.has(editing.step.key);
+          const askScope = editing.scope === "company" && showingProject && !replacedForProject;
+
+          return (
+            <EditStepDrawer
+              step={editing.step}
+              scope={editing.scope}
+              askScope={askScope}
+              isOverride={isOverride}
+              replacedForProject={replacedForProject}
+              companyStepTitle={companyStep?.title}
+              projectName={projectName}
+              onClose={() => setEditing(null)}
+              onSaveCompany={(request) => update(editing.step.key, request, "company")}
+              onSaveProject={(request) => update(editing.step.key, request, "project")}
+              onCreateOverride={(request) =>
+                create({ key: editing.step.key, ...request }, "project")
+              }
+              onDelete={() => {
+                setConfirming({ step: editing.step, scope: editing.scope });
+                setEditing(null);
+              }}
+              onRevert={
+                isOverride
+                  ? () => {
+                      void (async () => {
+                        if (await remove(editing.step.key, "project")) {
+                          setEditing(null);
+                          showSuccessToast(
+                            "Company wording restored",
+                            projectName
+                              ? {
+                                  description: `People on ${projectName} see the step everyone gets.`,
+                                }
+                              : undefined,
+                          );
+                        }
+                      })();
+                    }
+                  : undefined
+              }
+            />
+          );
+        })()}
     </section>
   );
 }
 
+const EMPTY_SET = new Set<string>();
+
+function radioCardClassName(active: boolean): string {
+  return `rounded-xl border p-3 text-left transition-colors ${
+    active
+      ? "border-app-brand bg-app-brand-soft ring-2 ring-app-brand-glow"
+      : "border-app-border bg-app-bg hover:border-app-border-strong"
+  }`;
+}
+
 /**
- * The steps the system can check for itself, offered by name.
+ * The steps the system can check for itself, offered by name, as chips rather than a boxed
+ * catalog — the backend binds a step to its derivation by its key, so tapping one silently
+ * produces a derived step. This is the discoverable way to add one.
  *
- * The backend binds a step to its derivation by its key, so typing one of these into the form
- * above silently produces a derived step. This is the discoverable way to add them.
- *
- * Shown to a read-only reader too, without buttons.
+ * Always company-wide: a derivation is code, so the same key can only be derived once, and
+ * `added` here always describes the company-wide list regardless of which block is showing.
  */
-function DerivableCatalog({
+function SuggestionChips({
   derivable,
   readOnly,
   onAdd,
@@ -208,64 +316,166 @@ function DerivableCatalog({
   readOnly: boolean;
   onAdd: (derivation: DerivableArrivalStep) => Promise<boolean>;
 }) {
-  if (derivable.length === 0) {
-    return null;
-  }
+  if (derivable.length === 0) return null;
 
   return (
-    <section className="space-y-3 rounded-2xl border border-dashed border-app-border p-4">
-      <header className="space-y-1">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-app-text">
-          <Eye className="h-4 w-4 text-app-text-muted" aria-hidden="true" />
-          Steps we can check ourselves
-        </h3>
-        <p className="text-xs text-app-text-muted">
-          These settle when the system sees them done, rather than when somebody ticks them —
-          recorded separately from anybody&apos;s word for it. Add the ones that apply to your
-          organisation; none are added for you.
-        </p>
-      </header>
-
-      <ul className="space-y-2">
-        {derivable.map((derivation) => (
-          <li
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-app-text-subtle">
+        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+        We can check these ourselves:
+      </span>
+      {derivable.map((derivation) =>
+        derivation.added ? (
+          <span
             key={derivation.key}
-            className="flex items-start justify-between gap-3 rounded-xl border border-app-border bg-app-surface p-3"
+            title={derivation.suggestedDescription}
+            className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text-subtle"
           >
-            <div className="min-w-0">
-              <p className="text-sm text-app-text">{derivation.suggestedTitle}</p>
-              <p className="mt-1 text-xs text-app-text-muted">{derivation.suggestedDescription}</p>
-              {/*
-                              Said before adding, not discovered afterwards: whether the hire can
-                              also claim it is fixed by the derivation and cannot be edited later,
-                              unlike the wording.
-                            */}
-              <p className="mt-1 text-xs text-app-text-muted">
-                {derivation.selfConfirmable
-                  ? "The hire can also mark this done themselves."
-                  : "Only the check settles this — the hire cannot mark it done."}
-              </p>
-            </div>
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            {derivation.suggestedTitle}
+          </span>
+        ) : readOnly ? (
+          <span
+            key={derivation.key}
+            title={derivation.suggestedDescription}
+            className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-app-brand-border bg-app-brand-soft px-3 py-1.5 text-xs font-medium text-app-brand-text"
+          >
+            {derivation.suggestedTitle}
+          </span>
+        ) : (
+          <button
+            key={derivation.key}
+            type="button"
+            title={derivation.suggestedDescription}
+            onClick={() => void onAdd(derivation)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-app-brand-border bg-app-brand-soft px-3 py-1.5 text-xs font-medium text-app-brand-text transition-colors hover:border-solid"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            {derivation.suggestedTitle}
+          </button>
+        ),
+      )}
+    </div>
+  );
+}
 
-            {derivation.added ? (
-              <Badge variant="neutral" size="sm" className="shrink-0">
-                On the list
-              </Badge>
-            ) : (
-              !readOnly && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => void onAdd(derivation)}
+/**
+ * One scope's steps as a timeline: numbered, draggable via `DragHandle`, and reorderable with
+ * the up/down buttons for anyone who cannot drag. `replacedKeys` and `overrideKeys` are always
+ * one or the other, never both — a block shows either the company list (where a project override
+ * can shadow a row) or a project list (where a row can itself be that override).
+ */
+function StepBlock({
+  heading,
+  description,
+  badgeVariant,
+  steps,
+  readOnly,
+  replacedKeys,
+  overrideKeys,
+  projectName,
+  onMove,
+  onReorder,
+  onEdit,
+}: {
+  heading: string;
+  description: string;
+  badgeVariant: "neutral" | "brand";
+  steps: ArrivalStep[];
+  readOnly: boolean;
+  replacedKeys: Set<string>;
+  overrideKeys: Set<string>;
+  projectName: string | null;
+  onMove: (key: string, direction: "up" | "down") => void;
+  onReorder: (orderedKeys: string[]) => void;
+  onEdit: (step: ArrivalStep) => void;
+}) {
+  const [draggedKey, setDraggedKey] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold text-app-text">{heading}</h3>
+        <Badge variant={badgeVariant} size="sm">
+          {steps.length}
+        </Badge>
+        <span className="text-xs text-app-text-muted">{description}</span>
+      </div>
+
+      {steps.length === 0 ? (
+        <EmptyState size="sm">No steps here yet.</EmptyState>
+      ) : (
+        <ol className="space-y-2">
+          {steps.map((step, index) => {
+            const replaced = replacedKeys.has(step.key);
+            const isOverride = overrideKeys.has(step.key);
+            const draggable = !readOnly && !replaced;
+
+            return (
+              <li
+                key={step.key}
+                draggable={draggable}
+                onDragStart={(event: DragEvent<HTMLLIElement>) => {
+                  if (!draggable) return;
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", step.key);
+                  setDraggedKey(step.key);
+                }}
+                onDragEnd={() => {
+                  setDraggedKey(null);
+                  setDragOverKey(null);
+                }}
+                onDragOver={(event: DragEvent<HTMLLIElement>) => {
+                  if (!draggedKey || draggedKey === step.key) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragOverKey(step.key);
+                }}
+                onDragLeave={(event: DragEvent<HTMLLIElement>) => {
+                  const next = event.relatedTarget;
+                  if (next instanceof Node && event.currentTarget.contains(next)) return;
+                  setDragOverKey((current) => (current === step.key ? null : current));
+                }}
+                onDrop={(event: DragEvent<HTMLLIElement>) => {
+                  event.preventDefault();
+                  if (!draggedKey || draggedKey === step.key) return;
+                  const from = steps.findIndex((candidate) => candidate.key === draggedKey);
+                  const to = steps.findIndex((candidate) => candidate.key === step.key);
+                  setDraggedKey(null);
+                  setDragOverKey(null);
+                  if (from === -1 || to === -1) return;
+                  const reordered = [...steps];
+                  const [moved] = reordered.splice(from, 1);
+                  reordered.splice(to, 0, moved);
+                  onReorder(reordered.map((candidate) => candidate.key));
+                }}
+                className="flex items-start gap-2"
+              >
+                <span
+                  aria-hidden="true"
+                  className="mt-2.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-app-border bg-app-surface text-[11px] font-bold text-app-text-muted"
                 >
-                  Add
-                </Button>
-              )
-            )}
-          </li>
-        ))}
-      </ul>
+                  {replaced ? "·" : index + 1}
+                </span>
+                <StepRow
+                  step={step}
+                  readOnly={readOnly}
+                  replaced={replaced}
+                  isOverride={isOverride}
+                  projectName={projectName}
+                  draggable={draggable}
+                  isDragTarget={dragOverKey === step.key && draggedKey !== step.key}
+                  canMoveUp={!replaced && index > 0}
+                  canMoveDown={!replaced && index < steps.length - 1}
+                  onMove={(direction) => onMove(step.key, direction)}
+                  onEdit={() => onEdit(step)}
+                />
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }
@@ -273,102 +483,140 @@ function DerivableCatalog({
 function StepRow({
   step,
   readOnly,
+  replaced,
+  isOverride,
+  projectName,
+  draggable,
+  isDragTarget,
   canMoveUp,
   canMoveDown,
   onMove,
-  onRequestRemove,
+  onEdit,
 }: {
   step: ArrivalStep;
   readOnly: boolean;
+  replaced: boolean;
+  isOverride: boolean;
+  projectName: string | null;
+  draggable: boolean;
+  isDragTarget: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
-  onMove: (key: string, direction: "up" | "down") => Promise<boolean>;
-  onRequestRemove: (step: ArrivalStep) => void;
+  onMove: (direction: "up" | "down") => void;
+  onEdit: () => void;
 }) {
   return (
-    <li className="rounded-2xl border border-app-border bg-app-surface p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm text-app-text">{step.title}</p>
-          {step.description && (
-            <p className="mt-1 text-xs text-app-text-muted">{step.description}</p>
+    <div
+      className={`group/step flex flex-1 items-start gap-2 rounded-2xl border p-3 transition-colors ${
+        replaced
+          ? "border-dashed border-app-border bg-app-surface-muted"
+          : "border-app-border bg-app-surface"
+      } ${isDragTarget ? "border-app-brand ring-2 ring-app-brand-glow" : ""}`}
+    >
+      {draggable && (
+        <DragHandle visibleClassName="group-hover/step:mr-1 group-hover/step:w-4 group-hover/step:opacity-100 group-hover/step:text-app-text-muted" />
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p
+          className={`text-sm ${replaced ? "text-app-text-subtle line-through" : "text-app-text"}`}
+        >
+          {step.title}
+        </p>
+        {step.description && <p className="mt-1 text-xs text-app-text-muted">{step.description}</p>}
+
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {replaced && (
+            <Badge variant="brand" size="sm">
+              <CornerDownRight className="h-3 w-3" aria-hidden="true" />
+              Replaced for {projectName ?? "this project"}
+            </Badge>
           )}
-          <p className="mt-1 font-mono text-xs text-app-text-subtle">{step.key}</p>
-          {/*
-                      Which steps the system checks is not visible from their wording, and it is the
-                      difference between a list somebody has to work through and one that partly
-                      settles itself. Said on the row rather than only in the catalog below, since
-                      that is where the list is actually read.
-                    */}
+          {isOverride && (
+            <Badge variant="brand" size="sm">
+              <CornerDownRight className="h-3 w-3" aria-hidden="true" />
+              Replaces the company wording
+            </Badge>
+          )}
           {step.settledBy === "OBSERVED" && (
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-app-text-muted">
+            <Badge variant="success" size="sm">
               <Eye className="h-3 w-3" aria-hidden="true" />
-              We check this one
-              {!step.selfConfirmable && " — the hire cannot mark it done"}
-            </p>
+              We check this
+            </Badge>
+          )}
+          {step.settledBy === "OBSERVED" && !step.selfConfirmable && (
+            <Badge variant="neutral" size="sm">
+              Hire can&apos;t tick it
+            </Badge>
           )}
         </div>
-
-        {/*
-                  Not rendered at all rather than hidden with a class: a control that only CSS keeps
-                  out of reach is still focusable, still in the accessibility tree, and still there
-                  if a stylesheet fails to load.
-                */}
-        {!readOnly && (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={() => void onMove(step.key, "up")}
-              disabled={!canMoveUp}
-              aria-label={`Move "${step.title}" earlier`}
-            >
-              <ChevronUp className="h-4 w-4" aria-hidden="true" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={() => void onMove(step.key, "down")}
-              disabled={!canMoveDown}
-              aria-label={`Move "${step.title}" later`}
-            >
-              <ChevronDown className="h-4 w-4" aria-hidden="true" />
-            </Button>
-            <Button
-              variant="dangerGhost"
-              size="sm"
-              iconOnly
-              onClick={() => onRequestRemove(step)}
-              aria-label={`Remove "${step.title}"`}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </div>
-        )}
       </div>
-    </li>
+
+      {!readOnly && !replaced && (
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={() => onMove("up")}
+            disabled={!canMoveUp}
+            aria-label={`Move "${step.title}" earlier`}
+          >
+            <ChevronUp className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={() => onMove("down")}
+            disabled={!canMoveDown}
+            aria-label={`Move "${step.title}" later`}
+          >
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      )}
+
+      {!readOnly && (
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          onClick={onEdit}
+          aria-label={`Edit "${step.title}"`}
+        >
+          <Pencil className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      )}
+    </div>
   );
 }
 
 function AddStepForm({
+  hasProject,
+  projectName,
+  defaultWho,
   onCreate,
   onCancel,
 }: {
-  onCreate: (request: {
-    key: string;
-    title: string;
-    description?: string;
-    href?: string;
-  }) => Promise<void>;
+  hasProject: boolean;
+  projectName: string | null;
+  defaultWho: ArrivalScope;
+  onCreate: (
+    request: { key: string; title: string; description?: string; href?: string },
+    who: ArrivalScope,
+  ) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [key, setKey] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [href, setHref] = useState("");
+  // `null` while the key follows the title; set the moment somebody types into the key field
+  // themselves, so a later title edit does not overwrite what they just chose.
+  const [manualKey, setManualKey] = useState<string | null>(null);
+  const [who, setWho] = useState<ArrivalScope>(defaultWho);
 
+  const key = manualKey ?? slugifyStepKey(title);
   const canSubmit = key.trim().length > 0 && title.trim().length > 0;
 
   return (
@@ -377,15 +625,18 @@ function AddStepForm({
       onSubmit={(event) => {
         event.preventDefault();
         if (!canSubmit) return;
-        void onCreate({
-          key: key.trim(),
-          title: title.trim(),
-          description: description.trim() || undefined,
-          href: href.trim() || undefined,
-        });
+        void onCreate(
+          {
+            key: key.trim(),
+            title: title.trim(),
+            description: description.trim() || undefined,
+            href: href.trim() || undefined,
+          },
+          hasProject ? who : "company",
+        );
       }}
     >
-      <Field label="Title" hint="What the person has to do, in their words.">
+      <Field label="What needs to be done">
         <Input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -393,34 +644,72 @@ function AddStepForm({
         />
       </Field>
 
-      {/* The key is immutable because state points at it; saying so at the point of
-                choosing is cheaper than explaining it after somebody wants to change one. */}
-      <Field
-        label="Key"
-        hint="A short id, fixed once saved — it is what people's records point at."
-      >
-        <Input
-          value={key}
-          onChange={(event) => setKey(event.target.value)}
-          placeholder="vpn-access"
-        />
-      </Field>
-
-      <Field label="Description" hint="Optional. Anything they need to know before starting.">
-        <Input
+      <Field label="How to do it" hint="Optional. Anything they need to know before starting.">
+        <Textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
+          minRows={2}
           placeholder="Ask in #it-helpdesk; usually same-day."
         />
       </Field>
 
-      <Field label="Link" hint="Optional. Where to go to actually do it.">
+      <Field label="Where to do it" hint="Optional link.">
         <Input
           value={href}
           onChange={(event) => setHref(event.target.value)}
           placeholder="https://…"
         />
       </Field>
+
+      {hasProject && (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-app-text">Who gets it</legend>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              aria-pressed={who === "project"}
+              aria-label={projectName ?? "This project"}
+              onClick={() => setWho("project")}
+              className={radioCardClassName(who === "project")}
+            >
+              <span className="block text-sm font-semibold text-app-text">
+                {projectName ?? "This project"}
+              </span>
+              <span className="block text-xs text-app-text-muted">
+                Only people on this project.
+              </span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={who === "company"}
+              aria-label="Everyone"
+              onClick={() => setWho("company")}
+              className={radioCardClassName(who === "company")}
+            >
+              <span className="block text-sm font-semibold text-app-text">Everyone</span>
+              <span className="block text-xs text-app-text-muted">
+                Every new hire, any project.
+              </span>
+            </button>
+          </div>
+        </fieldset>
+      )}
+
+      <details className="text-xs text-app-text-subtle">
+        <summary className="cursor-pointer font-medium">Advanced</summary>
+        <div className="mt-2">
+          <Field
+            label="Key"
+            hint="A short id, fixed once saved — it is what people's records point at."
+          >
+            <Input
+              value={key}
+              onChange={(event) => setManualKey(event.target.value)}
+              placeholder="vpn-access"
+            />
+          </Field>
+        </div>
+      </details>
 
       <div className="flex gap-2">
         <Button type="submit" variant="primary" disabled={!canSubmit}>
@@ -431,5 +720,205 @@ function AddStepForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function EditStepDrawer({
+  step,
+  scope,
+  askScope,
+  isOverride,
+  replacedForProject,
+  companyStepTitle,
+  projectName,
+  onClose,
+  onSaveCompany,
+  onSaveProject,
+  onCreateOverride,
+  onDelete,
+  onRevert,
+}: {
+  step: ArrivalStep;
+  scope: ArrivalScope;
+  /** Whether to ask "everyone vs only this project" before saving. */
+  askScope: boolean;
+  /** A project step that shadows a company step of the same key. */
+  isOverride: boolean;
+  /** A company step, seen from a project view, that a project override already shadows. */
+  replacedForProject: boolean;
+  companyStepTitle?: string;
+  projectName: string | null;
+  onClose: () => void;
+  onSaveCompany: (request: UpdateArrivalStepRequest) => Promise<boolean>;
+  onSaveProject: (request: UpdateArrivalStepRequest) => Promise<boolean>;
+  onCreateOverride: (request: {
+    title: string;
+    description?: string;
+    href?: string;
+  }) => Promise<boolean>;
+  onDelete: () => void;
+  onRevert?: () => void;
+}) {
+  const [title, setTitle] = useState(step.title);
+  const [description, setDescription] = useState(step.description ?? "");
+  const [href, setHref] = useState(step.href ?? "");
+  // Defaults to "only this project": the reader is looking at this project's list, so that is
+  // the least surprising place for their change to land.
+  const [answer, setAnswer] = useState<ArrivalScope>("project");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const trimmedTitle = title.trim();
+      const trimmedDescription = description.trim();
+      const trimmedHref = href.trim();
+
+      let ok: boolean;
+      if (askScope && answer === "project") {
+        ok = await onCreateOverride({
+          title: trimmedTitle,
+          description: trimmedDescription || undefined,
+          href: trimmedHref || undefined,
+        });
+      } else {
+        const request: UpdateArrivalStepRequest = {
+          title: trimmedTitle,
+          description: trimmedDescription || null,
+          href: trimmedHref || null,
+        };
+        ok = scope === "project" ? await onSaveProject(request) : await onSaveCompany(request);
+      }
+      if (ok) onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <DetailsSideDrawer
+      isOpen
+      onClose={onClose}
+      showOverlay
+      title="Edit step"
+      leading={
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand-text">
+          <Pencil className="h-5 w-5" aria-hidden="true" />
+        </span>
+      }
+      footer={
+        <div className="flex w-full gap-2">
+          {!isOverride && (
+            <Button variant="dangerGhost" onClick={onDelete}>
+              Remove step
+            </Button>
+          )}
+          <Button
+            variant="primary"
+            className="ml-auto"
+            loading={saving}
+            onClick={() => void handleSave()}
+          >
+            Save
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        {replacedForProject && (
+          <DrawerCard index={0}>
+            <p className="text-sm text-app-text-muted">
+              People on {projectName ?? "this project"} see their own version of this step. Changes
+              here only reach everyone else.
+            </p>
+          </DrawerCard>
+        )}
+
+        {askScope && (
+          <DrawerCard index={0}>
+            <p className="mb-3 text-sm text-app-text-muted">
+              Everyone gets this step. Where should your change apply?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={answer === "company"}
+                aria-label="Everyone"
+                onClick={() => setAnswer("company")}
+                className={radioCardClassName(answer === "company")}
+              >
+                <span className="block text-sm font-semibold text-app-text">Everyone</span>
+                <span className="block text-xs text-app-text-muted">
+                  Changes the wording for all projects.
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={answer === "project"}
+                aria-label={`Only ${projectName ?? "this project"}`}
+                onClick={() => setAnswer("project")}
+                className={radioCardClassName(answer === "project")}
+              >
+                <span className="block text-sm font-semibold text-app-text">
+                  Only {projectName ?? "this project"}
+                </span>
+                <span className="block text-xs text-app-text-muted">
+                  Everyone else keeps the original. Nobody loses what they already ticked.
+                </span>
+              </button>
+            </div>
+          </DrawerCard>
+        )}
+
+        {isOverride && (
+          <DrawerCard label="Replaces the company wording" index={1}>
+            <p className="text-sm text-app-text-muted">
+              &ldquo;{companyStepTitle}&rdquo; is what everyone else sees. Hires who already did it
+              keep that.
+            </p>
+            {onRevert && (
+              <Button variant="secondary" size="sm" className="mt-3" onClick={onRevert}>
+                Use the company wording again
+              </Button>
+            )}
+          </DrawerCard>
+        )}
+
+        <Field label="What needs to be done">
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+        </Field>
+        <Field label="How to do it">
+          <Textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            minRows={2}
+          />
+        </Field>
+        <Field label="Where to do it">
+          <Input
+            value={href}
+            onChange={(event) => setHref(event.target.value)}
+            placeholder="https://…"
+          />
+        </Field>
+
+        <div className="rounded-xl border border-app-border bg-app-surface-muted p-3 text-xs text-app-text-muted">
+          {step.settledBy === "OBSERVED" ? (
+            <>
+              We check this automatically.{" "}
+              {step.selfConfirmable
+                ? "The hire can also tick it off themselves."
+                : "Only the check can settle it, the hire can't tick it off."}
+            </>
+          ) : (
+            "The hire ticks this off themselves."
+          )}
+        </div>
+
+        <p className="font-mono text-xs text-app-text-subtle">
+          key: {step.key} · fixed, what hires ticked is stored against it
+        </p>
+      </div>
+    </DetailsSideDrawer>
   );
 }
