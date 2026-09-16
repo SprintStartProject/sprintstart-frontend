@@ -24,6 +24,7 @@ vi.mock("../../../../src/features/projects/useProjectContext", () => ({
   useProjectContext: () => ({
     selectedProjectId: mocks.projectId,
     selectedProject: mocks.selected && mocks.projectId ? { id: mocks.projectId } : null,
+    hasSelectedProject: mocks.selected && !!mocks.projectId,
   }),
 }));
 

@@ -23,13 +23,10 @@ import { readSeenComponents, storeSeenComponents } from "./ownerAnnouncement";
  */
 export function MyKnowledgeGapsProvider({ children }: { children: ReactNode }) {
   const { status, profile } = useAuth();
-  const { selectedProject, selectedProjectId } = useProjectContext();
+  const { hasSelectedProject, selectedProjectId } = useProjectContext();
 
   const userId = profile?.id ?? "";
 
-  // Asks only about a selection the loaded project list confirms: a `?projectId=` deep link can
-  // name a project this user has no access to.
-  const hasSelectedProject = selectedProject !== null;
   const canAsk = status === "authenticated" && hasSelectedProject;
 
   const { data, loading, error } = useQueryFetch(

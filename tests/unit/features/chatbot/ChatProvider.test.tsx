@@ -17,6 +17,7 @@ vi.mock("../../../../src/features/projects/useProjectContext", () => ({
   useProjectContext: () => ({
     selectedProjectId: project.id,
     selectedProject: project.selected ? { id: project.id, name: "Alpha" } : null,
+    hasSelectedProject: project.selected,
   }),
 }));
 
