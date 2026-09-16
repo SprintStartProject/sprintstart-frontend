@@ -473,6 +473,11 @@ export function useBuddyConversation() {
     [patchAction],
   );
 
+  /**
+   * Handles a composer submission: an egg phrase plays its effect and is swallowed, anything
+   * else is sent. Returns whether a turn was started — `false` means the submission went
+   * nowhere, which the composer uses to decide whether the caret should be handed off.
+   */
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
@@ -484,14 +489,15 @@ export function useBuddyConversation() {
       if (eggEffect) {
         setDraft("");
         playEggEffect(eggEffect);
-        return;
+        return false;
       }
 
       const text = draft;
-      if (!text.trim()) return;
+      if (!text.trim()) return false;
 
       setDraft("");
       void sendMessage(text);
+      return true;
     },
     [draft, sendMessage, setDraft],
   );

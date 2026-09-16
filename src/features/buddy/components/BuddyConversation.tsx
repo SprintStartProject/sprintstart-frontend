@@ -16,7 +16,11 @@ type BuddyConversationProps = {
   activeTool: string | null;
   draft: string;
   setDraft: (value: string) => void;
-  handleSubmit: (event: React.FormEvent) => void;
+  /**
+   * Submits the composer. Returns whether a turn started — an egg phrase comes back `false`,
+   * because nothing was sent for it.
+   */
+  handleSubmit: (event: React.FormEvent) => boolean;
   /** Confirms a buddy-proposed action (the only path that mutates). */
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */

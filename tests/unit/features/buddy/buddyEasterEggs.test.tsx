@@ -74,22 +74,29 @@ describe("buddy easter eggs", () => {
     act(() => {
       result.current.setDraft("Do a barrel roll");
     });
+    let eggHandled: boolean | undefined;
     act(() => {
-      result.current.handleSubmit(new Event("submit") as unknown as React.FormEvent);
+      eggHandled = result.current.handleSubmit(new Event("submit") as unknown as React.FormEvent);
     });
 
     // The draft is cleared, nothing is sent, and no reply arrives.
     expect(result.current.draft).toBe("");
     expect(sendSpy).not.toHaveBeenCalled();
     expect(messagePosted).toBe(false);
+    // Reported as "no turn started", which is what keeps the composer's caret
+    // where it was instead of handing it to the page on a send that never
+    // happened.
+    expect(eggHandled).toBe(false);
 
     // A normal word goes through the normal path.
     act(() => {
       result.current.setDraft("what is my next step?");
     });
+    let sent: boolean | undefined;
     act(() => {
-      result.current.handleSubmit(new Event("submit") as unknown as React.FormEvent);
+      sent = result.current.handleSubmit(new Event("submit") as unknown as React.FormEvent);
     });
+    expect(sent).toBe(true);
     await waitFor(() => {
       expect(messagePosted).toBe(true);
     });

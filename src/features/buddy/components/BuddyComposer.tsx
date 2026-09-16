@@ -7,7 +7,12 @@ import { useAutoResize } from "../../../components/ui/useAutoResize";
 type BuddyComposerProps = {
   draft: string;
   setDraft: (value: string) => void;
-  handleSubmit: (event: React.FormEvent) => void;
+  /**
+   * Submits the box. Returns whether a turn was actually started: `false` when the caller
+   * swallowed the submission (an easter-egg phrase, an empty draft), which is what keeps the
+   * caret here instead of handing it off on a send that never happened — see `submit`.
+   */
+  handleSubmit: (event: React.FormEvent) => boolean;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
   /** Drops the keyboard hint under the box, for the dock where the room is better spent. */
@@ -97,9 +102,14 @@ export function BuddyComposer({
    * this by blurring its composer on submit; this box said nothing about focus, so the game was
    * only reachable after clicking away from it. Pressing Escape or clicking the thread still
    * works too: this only makes the documented gesture (just press Space) true here.
+   *
+   * Only a submission that started a turn counts. An egg phrase is swallowed by the caller —
+   * there is no turn to play a game under, and the caret belongs in the box the hire is still
+   * typing in, not handed away and left to come back on its own (which it never would: the
+   * refocus below hangs off `busy` flipping, and nothing ever became busy).
    */
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
-    handleSubmit(event);
+    if (!handleSubmit(event)) return;
     const field = fieldRef.current;
     if (field && document.activeElement === field) {
       handedOffCaretRef.current = true;
