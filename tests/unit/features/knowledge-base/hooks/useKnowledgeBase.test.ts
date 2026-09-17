@@ -401,4 +401,148 @@ describe("useKnowledgeBase", () => {
     expect(result.current.currentPage).toBe(2);
     expect(result.current.paginatedArtifacts).toHaveLength(5);
   });
+
+  it("filters by connector and contextual subfilters independently", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+      { ...makeArtifact("gh-pr", "Add feature", "PULL_REQUEST"), sourceSystem: "GITHUB" as const },
+      { ...makeArtifact("gh-issue", "Bug report", "ISSUE"), sourceSystem: "GITHUB" as const },
+      { ...makeArtifact("jira-issue", "Task ticket", "ISSUE"), sourceSystem: "JIRA" as const },
+      {
+        ...makeArtifact("conf-page", "Onboarding Runbook", "PAGE"),
+        sourceSystem: "CONFLUENCE" as const,
+      },
+      {
+        ...makeArtifact("up-pdf", "manual.pdf", "FILE"),
+        sourceSystem: "UPLOAD" as const,
+        mime: "application/pdf",
+      },
+    ]);
+
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(5);
+    });
+
+    // Check connector counts across all items
+    expect(result.current.connectorCounts.ALL).toBe(5);
+    expect(result.current.connectorCounts.GITHUB).toBe(2);
+    expect(result.current.connectorCounts.JIRA).toBe(1);
+    expect(result.current.connectorCounts.CONFLUENCE).toBe(1);
+    expect(result.current.connectorCounts.UPLOAD).toBe(1);
+
+    // Switch to GitHub connector
+    act(() => {
+      result.current.handleConnectorChange("GITHUB");
+    });
+    expect(result.current.activeConnector).toBe("GITHUB");
+    expect(result.current.activeSubfilter).toBe("ALL");
+    expect(result.current.filteredArtifacts).toHaveLength(2);
+
+    // Filter GitHub to PR only
+    act(() => {
+      result.current.handleSubfilterChange("PR");
+    });
+    expect(result.current.activeSubfilter).toBe("PR");
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].id).toBe("gh-pr");
+
+    // Switching connector to JIRA should reset subfilter to ALL
+    act(() => {
+      result.current.handleConnectorChange("JIRA");
+    });
+    expect(result.current.activeConnector).toBe("JIRA");
+    expect(result.current.activeSubfilter).toBe("ALL");
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].id).toBe("jira-issue");
+
+    // Switch to CONFLUENCE connector
+    act(() => {
+      result.current.handleConnectorChange("CONFLUENCE");
+    });
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].id).toBe("conf-page");
+
+    // Switch to UPLOAD connector and filter by PDF
+    act(() => {
+      result.current.handleConnectorChange("UPLOAD");
+      result.current.handleSubfilterChange("PDF");
+    });
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].id).toBe("up-pdf");
+
+    // Clear filters
+    act(() => {
+      result.current.handleClearFilters();
+    });
+    expect(result.current.activeConnector).toBe("ALL");
+    expect(result.current.activeSubfilter).toBe("ALL");
+    expect(result.current.filteredArtifacts).toHaveLength(5);
+  });
+
+  it("correctly identifies uploaded PDFs and Markdown files with UUID sourceId and no mime", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+      {
+        ...makeArtifact("art-1", "specification.pdf", "FILE"),
+        sourceSystem: "UPLOAD" as const,
+        sourceId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        mime: null,
+      },
+      {
+        ...makeArtifact("art-2", "notes.md", "FILE"),
+        sourceSystem: "UPLOAD" as const,
+        sourceId: "9c8b7a6d-4e3f-2a1b-0c9d-8e7f6a5b4c3d",
+        mime: null,
+      },
+      {
+        ...makeArtifact("art-3", "archive.tar.gz", "FILE"),
+        sourceSystem: "UPLOAD" as const,
+        sourceId: "12345678-1234-1234-1234-123456789abc",
+        mime: null,
+      },
+    ]);
+
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(3);
+    });
+
+    // Switch to UPLOAD connector
+    act(() => {
+      result.current.handleConnectorChange("UPLOAD");
+    });
+
+    // Subfilter options should have 1 PDF, 1 Markdown, 1 Other
+    const pdfOption = result.current.subfilterOptions.find((opt) => opt.id === "PDF");
+    const mdOption = result.current.subfilterOptions.find((opt) => opt.id === "MARKDOWN");
+    const otherOption = result.current.subfilterOptions.find((opt) => opt.id === "OTHER");
+
+    expect(pdfOption?.count).toBe(1);
+    expect(mdOption?.count).toBe(1);
+    expect(otherOption?.count).toBe(1);
+
+    // Filtering by PDF returns specification.pdf
+    act(() => {
+      result.current.handleSubfilterChange("PDF");
+    });
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].title).toBe("specification.pdf");
+
+    // Filtering by Markdown returns notes.md
+    act(() => {
+      result.current.handleSubfilterChange("MARKDOWN");
+    });
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].title).toBe("notes.md");
+
+    // Filtering by Other returns archive.tar.gz
+    act(() => {
+      result.current.handleSubfilterChange("OTHER");
+    });
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].title).toBe("archive.tar.gz");
+  });
 });

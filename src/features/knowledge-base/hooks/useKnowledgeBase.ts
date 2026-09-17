@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { queryKeys } from "../../../services/queryKeys";
 import type { Artifact } from "../types";
-import type { KnowledgeTab } from "../tabs";
+import { CONNECTOR_SUBFILTERS, DEFAULT_CONNECTOR_ORDER, type ConnectorTab } from "../tabs";
 
 const ITEMS_PER_PAGE = 20;
 const NO_ARTIFACTS: Artifact[] = [];
@@ -16,8 +16,8 @@ export function loadKnowledgeBaseArtifacts(projectId: string): Promise<Artifact[
 /**
  * State + data layer for the Knowledge Base page.
  *
- * Owns artifact fetching, client-side filtering (search + tab), and
- * pagination. UI-only state (which drawer is open, which modal is open) stays
+ * Owns artifact fetching, client-side two-tier filtering (search + connector + underfilter),
+ * and pagination. UI-only state (which drawer is open, which modal is open) stays
  * in the page.
  *
  * @param projectId The project to scope artifact fetching to. When null, no
@@ -56,63 +56,103 @@ export function useKnowledgeBase(projectId: string | null) {
   // Deferred so rapid typing doesn't re-filter the whole list on every keystroke;
   // React batches the filter to a lower-priority render.
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const [activeTab, setActiveTab] = useState<KnowledgeTab>("ALL");
+
+  const [activeConnector, setActiveConnector] = useState<ConnectorTab>("ALL");
+  const [activeSubfilter, setActiveSubfilter] = useState<string>("ALL");
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Paging resets when the project scope changes. This deliberately does not live
-  // in `fetchArtifacts`: that function doubles as the Refresh handler, and hitting
-  // Refresh on page 3 should leave the reader on page 3 rather than snapping back.
+  // Available connectors dynamically derived from loaded artifacts
+  const availableConnectors = useMemo<ConnectorTab[]>(() => {
+    const systems = new Set<string>(artifacts.map((a) => a.sourceSystem));
+    return DEFAULT_CONNECTOR_ORDER.filter(
+      (c) => c === "ALL" || c === activeConnector || systems.has(c),
+    );
+  }, [artifacts, activeConnector]);
+
+  // Helper to match text search across title, sourceId, and sourceUrl
+  const matchesSearch = useCallback((artifact: Artifact, query: string): boolean => {
+    if (!query) return true;
+    const searchableText = [artifact.title ?? "", artifact.sourceId, artifact.sourceUrl ?? ""]
+      .join(" ")
+      .toLowerCase();
+    return searchableText.includes(query.toLowerCase());
+  }, []);
+
+  // Connector counts taking the current search query into account
+  const connectorCounts = useMemo<Record<ConnectorTab, number>>(() => {
+    const counts: Record<ConnectorTab, number> = {
+      ALL: 0,
+      GITHUB: 0,
+      JIRA: 0,
+      CONFLUENCE: 0,
+      UPLOAD: 0,
+    };
+    for (const artifact of artifacts) {
+      if (matchesSearch(artifact, deferredSearchQuery)) {
+        counts.ALL += 1;
+        if (artifact.sourceSystem && artifact.sourceSystem in counts) {
+          counts[artifact.sourceSystem] += 1;
+        }
+      }
+    }
+    return counts;
+  }, [artifacts, deferredSearchQuery, matchesSearch]);
+
+  // Subfilter options and dynamic counts for the currently active connector
+  const subfilterOptions = useMemo(() => {
+    const definitions = CONNECTOR_SUBFILTERS[activeConnector] ?? CONNECTOR_SUBFILTERS.ALL;
+    const connectorArtifacts = artifacts.filter(
+      (a) =>
+        (activeConnector === "ALL" || a.sourceSystem === activeConnector) &&
+        matchesSearch(a, deferredSearchQuery),
+    );
+
+    return definitions.map((def) => {
+      const count =
+        def.id === "ALL"
+          ? connectorArtifacts.length
+          : connectorArtifacts.filter((a) => def.matches(a)).length;
+      return {
+        id: def.id,
+        label: def.label,
+        count,
+      };
+    });
+  }, [artifacts, activeConnector, deferredSearchQuery, matchesSearch]);
+
+  // Paging and filter state resets when the project scope changes.
   const [pagedProjectId, setPagedProjectId] = useState(projectId);
   if (pagedProjectId !== projectId) {
     setPagedProjectId(projectId);
     setCurrentPage(1);
+    setActiveConnector("ALL");
+    setActiveSubfilter("ALL");
   }
 
   const filteredArtifacts = useMemo(() => {
+    const definitions = CONNECTOR_SUBFILTERS[activeConnector] ?? CONNECTOR_SUBFILTERS.ALL;
+    const currentSubfilterDef =
+      definitions.find((d) => d.id === activeSubfilter) ??
+      CONNECTOR_SUBFILTERS.ALL.find((d) => d.id === activeSubfilter);
+
     return artifacts.filter((artifact) => {
-      const searchableText = [artifact.title ?? "", artifact.sourceId, artifact.sourceUrl ?? ""]
-        .join(" ")
-        .toLowerCase();
+      const searchMatch = matchesSearch(artifact, deferredSearchQuery);
+      if (!searchMatch) return false;
 
-      const matchesSearch =
-        !deferredSearchQuery || searchableText.includes(deferredSearchQuery.toLowerCase());
+      const connectorMatch = activeConnector === "ALL" || artifact.sourceSystem === activeConnector;
+      if (!connectorMatch) return false;
 
-      let matchesTab = false;
-      switch (activeTab) {
-        case "ALL":
-          matchesTab = true;
-          break;
-        case "UPLOADS":
-          matchesTab = artifact.sourceSystem === "UPLOAD";
-          break;
-        case "PR":
-          matchesTab = artifact.artifactType === "PULL_REQUEST";
-          break;
-        case "ISSUES":
-          matchesTab = artifact.artifactType === "ISSUE";
-          break;
-        case "FILES":
-          matchesTab = artifact.sourceSystem === "GITHUB" && artifact.artifactType === "FILE";
-          break;
-        case "COMMITS":
-          matchesTab = artifact.artifactType === "COMMIT";
-          break;
-        case "ORGANIZATIONS":
-          matchesTab = artifact.artifactType === "ORG_METADATA";
-          break;
+      if (!currentSubfilterDef || currentSubfilterDef.id === "ALL") {
+        return true;
       }
 
-      return matchesSearch && matchesTab;
+      return currentSubfilterDef.matches(artifact);
     });
-  }, [artifacts, deferredSearchQuery, activeTab]);
+  }, [artifacts, activeConnector, activeSubfilter, deferredSearchQuery, matchesSearch]);
 
   const totalPages = Math.max(1, Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE));
 
-  // Pull the page back into range when the result set shrinks -- deleting the last
-  // artifact on a page, or a filter narrowing while the reader is deep in the list.
-  // Without this the control keeps advertising a page the list no longer has, while
-  // the clamped slice below quietly shows a different one.
   if (currentPage > totalPages) {
     setCurrentPage(totalPages);
   }
@@ -128,17 +168,75 @@ export function useKnowledgeBase(projectId: string | null) {
     setCurrentPage(1);
   }, []);
 
-  const handleTabChange = useCallback((tab: KnowledgeTab) => {
-    setActiveTab(tab);
+  const handleConnectorChange = useCallback((connector: ConnectorTab) => {
+    const target = (connector as string) === "UPLOADS" ? "UPLOAD" : connector;
+    setActiveConnector(target);
+    setActiveSubfilter("ALL");
+    setCurrentPage(1);
+  }, []);
+
+  const handleSubfilterChange = useCallback((subfilter: string) => {
+    setActiveSubfilter(subfilter);
     setCurrentPage(1);
   }, []);
 
   const handleClearFilters = useCallback(() => {
     setSearchQuery("");
-    setActiveTab("ALL");
+    setActiveConnector("ALL");
+    setActiveSubfilter("ALL");
+    setCurrentPage(1);
   }, []);
 
-  const hasActiveFilters = searchQuery !== "" || activeTab !== "ALL";
+  // Backward-compatibility handler for legacy flat tab changes
+  const handleTabChange = useCallback((tab: string) => {
+    setCurrentPage(1);
+    switch (tab) {
+      case "ALL":
+        setActiveConnector("ALL");
+        setActiveSubfilter("ALL");
+        break;
+      case "UPLOADS":
+      case "UPLOAD":
+        setActiveConnector("UPLOAD");
+        setActiveSubfilter("ALL");
+        break;
+      case "GITHUB":
+      case "JIRA":
+      case "CONFLUENCE":
+        setActiveConnector(tab);
+        setActiveSubfilter("ALL");
+        break;
+      case "PR":
+      case "ISSUES":
+      case "FILES":
+      case "COMMITS":
+      case "ORGANIZATIONS":
+      case "PAGE":
+      case "DOCS":
+      case "PDF":
+      case "MARKDOWN":
+        setActiveConnector("ALL");
+        setActiveSubfilter(tab);
+        break;
+      default:
+        setActiveConnector("ALL");
+        setActiveSubfilter("ALL");
+    }
+  }, []);
+
+  const hasActiveFilters =
+    searchQuery !== "" || activeConnector !== "ALL" || activeSubfilter !== "ALL";
+
+  // Backward-compatibility alias reflecting active tab
+  const activeTab = useMemo(() => {
+    if (activeSubfilter !== "ALL") {
+      return activeSubfilter;
+    }
+    if (activeConnector === "UPLOAD") {
+      return "UPLOADS";
+    }
+    return activeConnector;
+  }, [activeConnector, activeSubfilter]);
 
   return {
     artifacts,
@@ -146,12 +244,19 @@ export function useKnowledgeBase(projectId: string | null) {
     fetchError,
     fetchArtifacts,
     searchQuery,
+    activeConnector,
+    activeSubfilter,
+    availableConnectors,
+    connectorCounts,
+    subfilterOptions,
     activeTab,
     currentPage,
     totalPages,
     filteredArtifacts,
     paginatedArtifacts,
     handleSearchChange,
+    handleConnectorChange,
+    handleSubfilterChange,
     handleTabChange,
     setCurrentPage,
     handleClearFilters,

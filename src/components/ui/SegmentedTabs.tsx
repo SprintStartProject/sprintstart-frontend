@@ -34,6 +34,8 @@ type SegmentedTabsProps<TValue extends string> = {
   ariaLabel: string;
   /** Stretch options to fill the row instead of sizing them to their label. */
   fullWidth?: boolean;
+  /** Allow options to wrap into multiple rows when they exceed container width. */
+  wrap?: boolean;
   className?: string;
 };
 
@@ -79,6 +81,7 @@ export function SegmentedTabs<TValue extends string>({
   layoutId,
   ariaLabel,
   fullWidth = false,
+  wrap = false,
   className = "",
 }: SegmentedTabsProps<TValue>) {
   const [hovered, setHovered] = useState<TValue | null>(null);
@@ -89,6 +92,7 @@ export function SegmentedTabs<TValue extends string>({
   // Brings the selected option back into the row when it is off either edge, and does nothing
   // when it is already visible -- so an ordinary click on a visible tab never scrolls anything.
   useEffect(() => {
+    if (wrap) return;
     const row = rowRef.current;
     const active = activeRef.current;
     if (!row || !active) return;
@@ -116,7 +120,7 @@ export function SegmentedTabs<TValue extends string>({
     } else {
       row.scrollLeft = target;
     }
-  }, [value, prefersReducedMotion]);
+  }, [value, prefersReducedMotion, wrap]);
 
   return (
     <div
@@ -126,8 +130,12 @@ export function SegmentedTabs<TValue extends string>({
       // `p-1` is what a magnified option grows into: the row may scroll
       // horizontally, and overflow clips at the padding box.
       className={`${
-        fullWidth ? "flex w-full" : "inline-flex max-w-full"
-      } [scrollbar-width:none]! gap-1 overflow-x-auto rounded-2xl border border-app-border/70 bg-app-bg-soft/70 p-1 backdrop-blur-md [&::-webkit-scrollbar]:hidden ${className}`}
+        wrap
+          ? "flex w-full flex-wrap"
+          : fullWidth
+            ? "flex w-full [scrollbar-width:none]! overflow-x-auto [&::-webkit-scrollbar]:hidden"
+            : "inline-flex max-w-full [scrollbar-width:none]! overflow-x-auto [&::-webkit-scrollbar]:hidden"
+      } gap-1 rounded-2xl border border-app-border/70 bg-app-bg-soft/70 p-1 backdrop-blur-md ${className}`}
     >
       {options.map((option) => {
         const isActive = value === option.value;
@@ -145,7 +153,9 @@ export function SegmentedTabs<TValue extends string>({
             onHoverEnd={() => setHovered((current) => (current === option.value ? null : current))}
             animate={{ scale: isMagnified ? TAB_HOVER_SCALE : 1 }}
             transition={dockMagnifySpringToken}
-            className={`group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+            className={`group relative inline-flex ${
+              wrap ? "min-w-fit" : "shrink-0"
+            } items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
               fullWidth ? "flex-1" : ""
             } ${isActive ? "text-white" : "text-app-text-muted hover:text-app-text"}`}
           >
