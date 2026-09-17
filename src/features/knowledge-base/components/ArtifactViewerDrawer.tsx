@@ -14,6 +14,7 @@ import {
   Users,
   Hash,
   Link2,
+  ExternalLink,
 } from "lucide-react";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -679,6 +680,29 @@ function OrgMetadataView({
         </div>
       </header>
 
+      <div className="flex flex-wrap gap-2" data-testid="org-quick-links">
+        <a
+          href={`https://github.com/orgs/${metadata.login}/repositories`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
+        >
+          <Hash className="h-3.5 w-3.5" />
+          <span>Repositories</span>
+          <ExternalLink className="h-3 w-3 opacity-60" />
+        </a>
+        <a
+          href={`https://github.com/orgs/${metadata.login}/people`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
+        >
+          <Users className="h-3.5 w-3.5" />
+          <span>People</span>
+          <ExternalLink className="h-3 w-3 opacity-60" />
+        </a>
+      </div>
+
       <dl className="grid gap-3 sm:grid-cols-2">
         {metadata.location && (
           <OrgProfileRow icon={<MapPin className="h-4 w-4" />} label="Location">
@@ -715,18 +739,20 @@ function OrgMetadataView({
             <>
               {metadata.publicRepos} public · {metadata.privateRepos} private
             </>
+          ) : metadata.publicRepos !== null ? (
+            <>{metadata.publicRepos} public</>
           ) : (
             "N/A"
           )}
         </OrgProfileRow>
       </dl>
 
-      {metadata.teams && metadata.teams.length > 0 && (
-        <section aria-label="Teams">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
-            <Users className="h-4 w-4 text-app-text-subtle" />
-            Teams
-          </h3>
+      <section aria-label="Teams">
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
+          <Users className="h-4 w-4 text-app-text-subtle" />
+          Teams
+        </h3>
+        {metadata.teams && metadata.teams.length > 0 ? (
           <div className="space-y-3">
             {metadata.teams.map((team: OrgMetadataTeam) => (
               <div
@@ -749,18 +775,30 @@ function OrgMetadataView({
               </div>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <p className="text-xs text-app-text-muted">
+            No teams configured or visible in this organization.
+          </p>
+        )}
+      </section>
 
-      {metadata.members.length > 0 && (
-        <section aria-label="Members">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
+      <section aria-label="Members">
+        <div className="mb-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-app-text">
             <Users className="h-4 w-4 text-app-text-subtle" />
             Members
-            <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-bold text-app-text-subtle">
-              {metadata.members.length}
-            </span>
+            {metadata.members.length > 0 && (
+              <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-bold text-app-text-subtle">
+                {metadata.members.length}
+              </span>
+            )}
           </h3>
+          <p className="mt-1 text-xs text-app-text-muted">
+            Only members with public organization visibility on GitHub are listed.
+          </p>
+        </div>
+
+        {metadata.members.length > 0 ? (
           <ul className="flex flex-wrap gap-1.5">
             {metadata.members.map((member) => (
               <li key={member.login}>
@@ -776,8 +814,13 @@ function OrgMetadataView({
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        ) : (
+          <p className="text-xs text-app-text-muted">
+            No public members visible. Members can set their organization membership to public on
+            GitHub.
+          </p>
+        )}
+      </section>
     </div>
   );
 }

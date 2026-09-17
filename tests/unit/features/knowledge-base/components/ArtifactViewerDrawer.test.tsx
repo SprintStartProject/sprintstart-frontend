@@ -685,6 +685,15 @@ describe("ArtifactViewerDrawer", () => {
       // Teams + members come from the metadata, not from a fetched body.
       expect(screen.getByText("Platform")).toBeInTheDocument();
       expect(screen.getAllByText("alice").length).toBe(2);
+      expect(
+        screen.getByText(/only members with public organization visibility on github are listed/i),
+      ).toBeInTheDocument();
+
+      // Quick action links
+      const repoLink = screen.getByRole("link", { name: /repositories/i });
+      expect(repoLink).toHaveAttribute("href", "https://github.com/orgs/sprintstart/repositories");
+      const peopleLink = screen.getByRole("link", { name: /people/i });
+      expect(peopleLink).toHaveAttribute("href", "https://github.com/orgs/sprintstart/people");
 
       // The content endpoint 302-redirects for this type; the drawer must not
       // follow it into GitHub's HTML.
@@ -692,6 +701,42 @@ describe("ArtifactViewerDrawer", () => {
       // No summarise (nothing summarisable) and no delete (not an UPLOAD artifact).
       expect(screen.queryByTestId("summarise-btn")).not.toBeInTheDocument();
       expect(screen.queryByTestId("delete-artifact-btn")).not.toBeInTheDocument();
+    });
+
+    it("renders public-only repos and empty states when private repos and teams are omitted", async () => {
+      const partialOrgMetadata = JSON.stringify({
+        login: "sprintstart",
+        name: "SprintStart",
+        description: null,
+        company: null,
+        blog: null,
+        location: null,
+        email: null,
+        publicRepos: 7,
+        privateRepos: null,
+        teams: [],
+        members: [],
+      });
+
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "SprintStart",
+          sourceSystem: "GITHUB",
+          metadata: partialOrgMetadata,
+        }),
+      );
+
+      expect(await screen.findByTestId("org-metadata-view")).toBeInTheDocument();
+      expect(screen.getByText("7 public")).toBeInTheDocument();
+      expect(
+        screen.getByText("No teams configured or visible in this organization."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "No public members visible. Members can set their organization membership to public on GitHub.",
+        ),
+      ).toBeInTheDocument();
     });
 
     it("shows a quiet empty state when the metadata JSON is unusable", async () => {
