@@ -268,7 +268,7 @@ export function StepDetailsPanel({
         {skipReason && skipAwaitsReview && onReviewSkip ? (
           <SkipReview
             reason={skipReason}
-            onReview={(action, comment) => onReviewSkip(step.skip!.id!, action, comment)}
+            onReview={(action, comment) => onReviewSkip(step.skip!.id, action, comment)}
           />
         ) : null}
 
