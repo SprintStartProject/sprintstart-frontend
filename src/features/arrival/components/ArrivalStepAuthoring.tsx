@@ -10,6 +10,7 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { Textarea } from "../../../components/ui/Textarea";
 import { useToast } from "../../../context/useToast";
 import { useArrivalAuthoring } from "../hooks/useArrivalAuthoring";
+import { howStepGetsDone } from "../howItsDone";
 import { slugifyStepKey } from "../slug";
 import { ArrivalStepThread } from "./ArrivalStepThread";
 import type {
@@ -495,6 +496,9 @@ function EditStepDrawer({
   const [answer, setAnswer] = useState<ArrivalScope>("project");
   const [saving, setSaving] = useState(false);
 
+  const howItsDone = howStepGetsDone(step);
+  const HowItsDoneIcon = howItsDone.icon;
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -630,17 +634,9 @@ function EditStepDrawer({
           />
         </Field>
 
-        <div className="rounded-xl border border-app-border bg-app-surface-muted p-3 text-xs text-app-text-muted">
-          {step.settledBy === "OBSERVED" ? (
-            <>
-              We check this automatically.{" "}
-              {step.selfConfirmable
-                ? "The hire can also tick it off themselves."
-                : "Only the check can settle it, the hire can't tick it off."}
-            </>
-          ) : (
-            "The hire ticks this off themselves."
-          )}
+        <div className="flex items-center gap-1.5 rounded-xl border border-app-border bg-app-surface-muted p-3 text-xs text-app-text-muted">
+          <HowItsDoneIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {howItsDone.label}
         </div>
 
         <p className="font-mono text-xs text-app-text-subtle">

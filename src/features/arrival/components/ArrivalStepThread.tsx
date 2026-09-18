@@ -1,9 +1,10 @@
 import { useState, type DragEvent } from "react";
-import { ChevronDown, ChevronUp, CornerDownRight, Eye, Pencil } from "lucide-react";
+import { ChevronDown, ChevronUp, CornerDownRight, Pencil } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { DragHandle } from "../../../components/ui/DragHandle";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { howStepGetsDone } from "../howItsDone";
 import type { ArrivalScope, ArrivalStep } from "../types";
 
 const EMPTY_SET = new Set<string>();
@@ -271,6 +272,9 @@ function StepRow({
   onMove: (direction: "up" | "down") => void;
   onEdit: () => void;
 }) {
+  const howItsDone = howStepGetsDone(step);
+  const HowItsDoneIcon = howItsDone.icon;
+
   return (
     <div
       className={`group/step flex flex-1 items-start gap-2 rounded-2xl border p-3 transition-colors ${
@@ -293,28 +297,21 @@ function StepRow({
 
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {replaced && (
-            <Badge variant="brand" size="sm">
-              <CornerDownRight className="h-3 w-3" aria-hidden="true" />
-              Replaced for {projectName ?? "this project"}
+            <Badge variant="brand" size="md">
+              <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+              {projectName ?? "This project"} uses its own version
             </Badge>
           )}
           {isOverride && (
-            <Badge variant="brand" size="sm">
-              <CornerDownRight className="h-3 w-3" aria-hidden="true" />
-              Replaces the company wording
+            <Badge variant="brand" size="md">
+              <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+              Own version of a company step
             </Badge>
           )}
-          {step.settledBy === "OBSERVED" && (
-            <Badge variant="success" size="sm">
-              <Eye className="h-3 w-3" aria-hidden="true" />
-              We check this
-            </Badge>
-          )}
-          {step.settledBy === "OBSERVED" && !step.selfConfirmable && (
-            <Badge variant="neutral" size="sm">
-              Hire can&apos;t tick it
-            </Badge>
-          )}
+          <Badge variant={step.settledBy === "OBSERVED" ? "success" : "neutral"} size="md">
+            <HowItsDoneIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            {howItsDone.label}
+          </Badge>
         </div>
       </div>
 

@@ -103,7 +103,7 @@ describe("ArrivalStepAuthoring", () => {
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
     await screen.findByText("Request VPN access with the staging profile");
 
-    expect(screen.getByText(/Replaced for Apollo/i)).toBeInTheDocument();
+    expect(screen.getByText("Apollo uses its own version")).toBeInTheDocument();
     // A shadowed company row cannot be reordered — the project's own version is what matters here.
     expect(
       screen.queryByRole("button", { name: /Move "Request VPN access" earlier/ }),
@@ -119,7 +119,7 @@ describe("ArrivalStepAuthoring", () => {
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
     await screen.findByText("Request VPN access with the staging profile");
 
-    expect(screen.getByText(/Replaces the company wording/i)).toBeInTheDocument();
+    expect(screen.getByText("Own version of a company step")).toBeInTheDocument();
   });
 
   it("says what survives a removal before removing it", async () => {
@@ -312,7 +312,7 @@ describe("ArrivalStepAuthoring", () => {
     );
 
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
-    await screen.findByText(/Replaced for Apollo/i);
+    await screen.findByText("Apollo uses its own version");
     fireEvent.click(screen.getByRole("button", { name: /Edit "Request VPN access"/ }));
 
     expect(
