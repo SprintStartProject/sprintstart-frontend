@@ -100,7 +100,13 @@ export function BoardPathWindow() {
         with the eleven cards below; what it is is a few nodes drawn on the board's own surface,
         and the nodes are the thing with edges on them.
       */}
-      <div className="h-48">
+      {/*
+        Tall enough for the graph to be a graph. A chain of three phases is three rows on a canvas
+        that lays prerequisites out downwards, and in the twelve-rem strip this used to be, the fit
+        landed under a third — three cards nobody could read the titles of, which is a worse answer
+        to "where am I" than the sentence above it alone.
+      */}
+      <div className="h-[26rem]">
         <BlueprintGraphCanvas<PathWindowNode>
           nodes={window.nodes}
           title=""
@@ -113,6 +119,15 @@ export function BoardPathWindow() {
           onPositionChange={() => Promise.resolve()}
           onAddBlocker={() => Promise.resolve()}
           onRemoveBlocker={() => Promise.resolve()}
+          // A finished phase's arrow is satisfied and says so; the one into where the hire actually
+          // is, is the live one; everything past that is still shut. The strip is about standing
+          // somewhere in a path, and an arrow that does not say which side of "here" it is on has
+          // left out the only thing being asked.
+          edgeTone={(node, blockerId) => {
+            const blocker = window.nodes.find((candidate) => candidate.id === blockerId);
+            if (blocker?.state !== "done") return "waiting";
+            return node.state === "locked" ? "waiting" : "active";
+          }}
           renderNode={(node, cardProps) => {
             const state = STATES[node.state];
             return (
