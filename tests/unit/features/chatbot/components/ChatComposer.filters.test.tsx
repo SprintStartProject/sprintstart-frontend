@@ -79,13 +79,13 @@ describe("ChatComposer filter interactions", () => {
 
     // Source chip
     expect(screen.getByText("GitHub")).toBeInTheDocument();
-    const removeGithub = screen.getByTitle("Remove GitHub filter");
+    const removeGithub = screen.getByRole("button", { name: "Remove GitHub filter" });
     await user.click(removeGithub);
     expect(toggleSourceSystem).toHaveBeenCalledWith("GITHUB");
 
     // Date chip
     expect(screen.getByText("2026-09-01 → 2026-09-10")).toBeInTheDocument();
-    const removeDate = screen.getByTitle("Clear date filter");
+    const removeDate = screen.getByRole("button", { name: "Clear date filter" });
     await user.click(removeDate);
     expect(setFrom).toHaveBeenCalledWith("");
     expect(setTo).toHaveBeenCalledWith("");
@@ -129,15 +129,71 @@ describe("ChatComposer filter interactions", () => {
     expect(toggleSourceSystem).toHaveBeenCalledWith("JIRA");
 
     // Date presets
+    const allTimeBtn = screen.getByRole("button", { name: "All time" });
+    expect(allTimeBtn).toHaveAttribute("aria-pressed", "true");
+
     const past7Btn = screen.getByRole("button", { name: "Past 7 days" });
+    expect(past7Btn).toHaveAttribute("aria-pressed", "false");
+
     await user.click(past7Btn);
     expect(setFrom).toHaveBeenCalled();
     expect(setTo).toHaveBeenCalled();
 
-    const allTimeBtn = screen.getByRole("button", { name: "All time" });
     await user.click(allTimeBtn);
     expect(setFrom).toHaveBeenCalledWith("");
     expect(setTo).toHaveBeenCalledWith("");
+  });
+
+  it("does not highlight presets when a 7-day range is historical and does not end today", () => {
+    render(<ChatComposer {...defaultProps} showFilters={true} from="2026-01-01" to="2026-01-08" />);
+
+    const past7Btn = screen.getByRole("button", { name: "Past 7 days" });
+    expect(past7Btn).toHaveAttribute("aria-pressed", "false");
+
+    const allTimeBtn = screen.getByRole("button", { name: "All time" });
+    expect(allTimeBtn).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("prevents form submission when Enter is pressed inside date inputs", () => {
+    const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault());
+
+    render(
+      <ChatComposer
+        {...defaultProps}
+        value="Draft message"
+        showFilters={true}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    const fromInput = screen.getByLabelText("Earliest date");
+    const toInput = screen.getByLabelText("Latest date");
+
+    fireEvent.keyDown(fromInput, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(toInput, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("allows keyboard activation on preset buttons with Enter", async () => {
+    const setPastDaysFn = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <ChatComposer
+        {...defaultProps}
+        showFilters={true}
+        setFrom={setPastDaysFn}
+        setTo={setPastDaysFn}
+      />,
+    );
+
+    const past7Btn = screen.getByRole("button", { name: "Past 7 days" });
+    past7Btn.focus();
+    await user.keyboard("{Enter}");
+
+    expect(setPastDaysFn).toHaveBeenCalled();
   });
 
   it("updates custom date range inputs in popover", () => {
@@ -165,10 +221,15 @@ describe("ChatComposer filter interactions", () => {
     expect(setTo).toHaveBeenCalledWith("2026-09-15");
   });
 
-  it("shows error alert when date range is inverted", () => {
+  it("shows error alert and styles input borders with danger color when date range is inverted", () => {
     render(<ChatComposer {...defaultProps} showFilters={true} from="2026-09-20" to="2026-09-10" />);
 
     expect(screen.getByRole("alert")).toHaveTextContent("Start date cannot be after end date.");
+
+    const fromInput = screen.getByLabelText("Earliest date");
+    const toInput = screen.getByLabelText("Latest date");
+    expect(fromInput.closest("div")).toHaveClass("border-app-danger-border");
+    expect(toInput.closest("div")).toHaveClass("border-app-danger-border");
   });
 
   it("closes popover when pressing Escape", () => {
