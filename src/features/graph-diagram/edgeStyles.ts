@@ -39,4 +39,5 @@ export const EDGE_STYLE_SWATCH: Record<
   active: { className: "stroke-app-brand", dash: "10 8", width: 2 },
   waiting: { className: "stroke-app-text-subtle/50", dash: "6 6", width: 2 },
   upstream: { className: "stroke-app-orange-text", width: 2 },
+  rule: { className: "stroke-app-brand", width: 2 },
 };

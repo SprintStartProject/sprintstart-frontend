@@ -49,7 +49,7 @@ export type JourneyCameraHandle = {
  * drawn apart from the other three so that the two halves of a lit run can be told apart at a
  * glance instead of by following arrowheads.
  */
-export type JourneyEdgeTone = "done" | "active" | "waiting" | "upstream";
+export type JourneyEdgeTone = "done" | "active" | "waiting" | "upstream" | "rule";
 
 /** How a node relates to the one under the pointer or selected. */
 export type JourneyNodeEmphasis = "focus" | "related" | "dimmed" | "none";
@@ -122,16 +122,41 @@ const SNAP = 10;
 
 const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
 
-/** The S-curve from the bottom of a blocker to the top of what waits on it. */
-function edgePath(from: GraphPoint, to: GraphPoint, waypoints: readonly GraphPoint[] = []): string {
+/**
+ * Which way an edge leaves its blocker and enters what waits on it.
+ *
+ * `"down"` is the ordinary case and the only one the layered layout ever produces: the blocker is a
+ * row above, so the curve leaves its bottom edge and enters the other's top.
+ *
+ * `"across"` is for everything else. Nodes can be dragged, and a graph can arrive with coordinates
+ * that were authored on a free canvas, so what a node waits on may sit level with it or below it.
+ * A downward curve between those two ends doubles back on itself and runs underneath both cards —
+ * cards are drawn over the edges — and all that is left on screen is an arrowhead floating beside a
+ * card with no line attached to it.
+ */
+type EdgeAxis = "down" | "across";
+
+/** The curve from a blocker to what waits on it. */
+function edgePath(
+  from: GraphPoint,
+  to: GraphPoint,
+  waypoints: readonly GraphPoint[] = [],
+  axis: EdgeAxis = "down",
+): string {
   const points = [from, ...waypoints, to];
   let d = `M ${from.x} ${from.y}`;
   for (let index = 1; index < points.length; index += 1) {
     const start = points[index - 1];
     const end = points[index];
-    // Vertical tangents at every point: the curve leaves and enters each row straight, which keeps it
+    // Straight tangents at every point: the curve leaves and enters each row straight, which keeps it
     // inside the gap a waypoint was put in.
     const minimum = index === 1 || index === points.length - 1 ? 56 : 24;
+    if (axis === "across") {
+      const bend = Math.max(minimum, Math.abs(end.x - start.x) / 2);
+      const direction = end.x >= start.x ? 1 : -1;
+      d += ` C ${start.x + bend * direction} ${start.y}, ${end.x - bend * direction} ${end.y}, ${end.x} ${end.y}`;
+      continue;
+    }
     const bend = Math.max(minimum, Math.abs(end.y - start.y) / 2);
     d += ` C ${start.x} ${start.y + bend}, ${end.x} ${end.y - bend}, ${end.x} ${end.y}`;
   }
@@ -681,15 +706,26 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         const blockerPosition = positionOf(blockerId);
         const nodePosition = positionOf(node.id);
         if (!blockerPosition || !nodePosition) return null;
-        const from = { x: blockerPosition.x, y: blockerPosition.y + nodeSize.height / 2 };
-        const to = { x: nodePosition.x, y: nodePosition.y - nodeSize.height / 2 - 6 };
+        // Bottom to top while the blocker really is above; side to side otherwise. See EdgeAxis.
+        const axis: EdgeAxis =
+          nodePosition.y - blockerPosition.y > nodeSize.height * 0.75 ? "down" : "across";
+        const sideways = nodePosition.x >= blockerPosition.x ? 1 : -1;
+        const from =
+          axis === "down"
+            ? { x: blockerPosition.x, y: blockerPosition.y + nodeSize.height / 2 }
+            : { x: blockerPosition.x + (sideways * nodeSize.width) / 2, y: blockerPosition.y };
+        const to =
+          axis === "down"
+            ? { x: nodePosition.x, y: nodePosition.y - nodeSize.height / 2 - 6 }
+            : { x: nodePosition.x - sideways * (nodeSize.width / 2 + 6), y: nodePosition.y };
         const tone = edgeTone?.(nodeById.get(blockerId)!, node) ?? "waiting";
         const inChain =
           !!emphasisSourceId &&
           (blockerId === emphasisSourceId || related?.has(blockerId) || false) &&
           (node.id === emphasisSourceId || related?.has(node.id) || false);
-        const waypoints = routes.get(edgeKey(blockerId, node.id)) ?? [];
-        return { blockerId, nodeId: node.id, from, to, waypoints, tone, inChain };
+        // Waypoints are only ever produced for an edge that spans rows, which is the "down" case.
+        const waypoints = axis === "down" ? (routes.get(edgeKey(blockerId, node.id)) ?? []) : [];
+        return { blockerId, nodeId: node.id, from, to, waypoints, tone, inChain, axis };
       })
       .filter((edge): edge is NonNullable<typeof edge> => edge !== null),
   );
@@ -764,7 +800,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
             aria-hidden="true"
           >
             <defs>
-              {(["done", "active", "waiting", "upstream"] as const).map((tone) => (
+              {(["done", "active", "waiting", "upstream", "rule"] as const).map((tone) => (
                 <marker
                   key={tone}
                   id={`${markerId}-${tone}`}
@@ -780,7 +816,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               ))}
             </defs>
             {edges.map((edge) => {
-              const d = edgePath(edge.from, edge.to, edge.waypoints);
+              const d = edgePath(edge.from, edge.to, edge.waypoints, edge.axis);
               const isSelected =
                 selectedEdge?.blockerId === edge.blockerId && selectedEdge?.nodeId === edge.nodeId;
               const dimmed = !!spotlightId || (!!emphasisSourceId && !edge.inChain);
@@ -1052,6 +1088,7 @@ const toneStroke: Record<JourneyEdgeTone, string> = {
   active: "stroke-app-brand",
   waiting: "stroke-app-text-subtle/50",
   upstream: "stroke-app-orange-text",
+  rule: "stroke-app-brand",
 };
 
 const toneFill: Record<JourneyEdgeTone, string> = {
@@ -1059,6 +1096,7 @@ const toneFill: Record<JourneyEdgeTone, string> = {
   active: "fill-app-brand",
   waiting: "fill-app-text-subtle/50",
   upstream: "fill-app-orange-text",
+  rule: "fill-app-brand",
 };
 
 export function CanvasButton({

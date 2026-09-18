@@ -182,11 +182,15 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   /**
    * How firm or how far along this arrow is, where that is a question the graph can answer.
    *
-   * Left out by every Blueprint surface: a blueprint is a template, so no arrow on one has been
-   * satisfied by anybody and three line styles for one kind of thing would be three claims where
-   * there is one. The board's two surfaces do have something to say — one about who set the arrow
-   * (see {@link EDGE_TONE_STYLE}), one about whether it is satisfied — and both say it in the
-   * canvas's own three styles rather than in a fourth vocabulary.
+   * Left out by every Blueprint surface, which draws every arrow as the rule it is: a solid line,
+   * because a blueprint is a template and nothing on one has been satisfied by anybody. The dashed
+   * "still waiting" style it used before was both a claim it could not make and the faintest thing
+   * on the canvas — and a dash that happens to end in a gap leaves the arrowhead floating a few
+   * pixels clear of its own line.
+   *
+   * The board's two surfaces do have something to say — one about who set the arrow (see
+   * {@link EDGE_TONE_STYLE}), one about whether it is satisfied — and both say it in the canvas's
+   * own styles rather than in a vocabulary of their own.
    */
   edgeTone?: (node: TNode, blockerId: string) => JourneyEdgeTone;
 };
@@ -344,6 +348,9 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
   const [preview, setPreview] = useState<Record<string, GraphPoint> | null>(null);
   /** Bumped whenever every card has moved, so the view is framed around the new arrangement. */
   const [arrangement, setArrangement] = useState(0);
+
+  /** What the view is framed around: a different set of nodes is a different picture. */
+  const fitSubject = useMemo(() => nodes.map((node) => node.id).join(","), [nodes]);
 
   const positions = useMemo(() => {
     const merged = new Map(layout.positions);
@@ -760,7 +767,11 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
             nodeSize={NODE_SIZE}
             ariaLabel={ariaLabel}
             heightClassName="h-full"
-            fitKey={`${nodes.length}|${arrangement}|${chainOnly ? "chain" : "all"}`}
+            // The nodes themselves, not how many there are. Opening a draft replaces every id while
+            // leaving the count alone, and a count-only key told the canvas nothing had changed —
+            // so it kept the view it had framed around the version before, which is how landing on
+            // a draft looked like being dropped in zoomed on one card.
+            fitKey={`${fitSubject}|${arrangement}|${chainOnly ? "chain" : "all"}`}
             // Everything, every time the graph is opened. The canvas can also open on one node at a
             // readable zoom when the whole thing would be too small, and for a hire working through
             // their own path that is the right answer — but an author switching to the graph is
@@ -806,7 +817,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
               // the second is on the card and in the legend either way.
               const half = halfOfEdge(blocker.id, node.id);
               if (half) return HALF_EDGE[half];
-              return edgeTone?.(node, blocker.id) ?? "waiting";
+              return edgeTone?.(node, blocker.id) ?? "rule";
             }}
             canMove={editable}
             onMove={handleMove}

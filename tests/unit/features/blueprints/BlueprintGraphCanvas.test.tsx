@@ -24,6 +24,19 @@ function node(id: string, blockerIds: string[] = [], placed = true): BlueprintGr
   };
 }
 
+/** A node at a coordinate of its own, the way a blueprint authored on a free canvas stores them. */
+function at(id: string, x: number, y: number, blockerIds: string[] = []): BlueprintGraphCanvasNode {
+  return { ...node(id, blockerIds), graphX: x, graphY: y };
+}
+
+/** Where every drawn arrow starts, read off the paths that carry an arrowhead. */
+function edgeStarts(): { x: number; y: number }[] {
+  return [...document.querySelectorAll("path[marker-end]")]
+    .map((path) => /^M (-?[\d.]+) (-?[\d.]+)/.exec(path.getAttribute("d") ?? ""))
+    .filter((match): match is RegExpExecArray => match !== null)
+    .map((match) => ({ x: Number(match[1]), y: Number(match[2]) }));
+}
+
 const noop = () => Promise.resolve();
 
 /**
@@ -377,6 +390,24 @@ describe("BlueprintGraphCanvas", () => {
     expect(
       screen.queryByRole("navigation", { name: "Steps either side of this one" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("leaves sideways when what a node waits on is not above it", () => {
+    // Stored coordinates come off a free canvas, so a phase can sit above the thing it waits on. A
+    // downward curve between those two ends doubles back and runs under both cards — cards are
+    // drawn over edges — and all that is left on screen is an arrowhead beside a card with no line
+    // attached to it, which is what this looked like.
+    renderCanvas([at("a", 0, 300), at("b", 0, 0, ["a"])]);
+
+    // Level with the blocker's middle, not below its bottom edge: the arrow goes out of its side.
+    expect(edgeStarts()).toContainEqual(expect.objectContaining({ y: 300 }));
+  });
+
+  it("still drops out of the bottom of a node that really is above", () => {
+    renderCanvas([at("a", 0, 0), at("b", 0, 300, ["a"])]);
+
+    // Half a card below the blocker's middle, which is its bottom edge.
+    expect(edgeStarts()).toContainEqual({ x: 0, y: 54 });
   });
 
   it("says an empty canvas is empty, not broken, and says what to do about it", () => {
