@@ -42,6 +42,12 @@ function section(name: string) {
   return screen.getByRole("heading", { name }).parentElement as HTMLElement;
 }
 
+/** Opens one of the two pickers and hands back its list. The house dropdown portals its menu. */
+function openPicker(name: string) {
+  fireEvent.click(screen.getByRole("combobox", { name }));
+  return screen.getByRole("listbox", { name });
+}
+
 describe("PhasePrerequisites", () => {
   it("answers both halves of the question, not only the first", () => {
     // "What has to happen before this" decides whether a phase can be moved; "what opens when it is
@@ -63,12 +69,10 @@ describe("PhasePrerequisites", () => {
     // From "opens up", the edge belongs to the *other* phase — which is what somebody working down
     // a list expects when they have this phase in front of them and the next one in mind.
     const onAdd = vi.fn(() => Promise.resolve());
-    const phases = chain();
-    renderFor(phases, "a", { onAdd });
+    renderFor(chain(), "a", { onAdd });
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Add something Phase a opens up" }), {
-      target: { value: "loner" },
-    });
+    const list = openPicker("Add something Phase a opens up");
+    fireEvent.click(within(list).getByRole("option", { name: "Phase loner" }));
 
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
     expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ id: "loner" }), "a");
@@ -79,9 +83,9 @@ describe("PhasePrerequisites", () => {
     // a ring, which nothing in it could ever start.
     renderFor(chain(), "a");
 
-    const waitsFor = screen.getByRole("combobox", { name: "Add something Phase a waits for" });
-    expect(within(waitsFor).queryByRole("option", { name: "Phase c" })).not.toBeInTheDocument();
-    expect(within(waitsFor).getByRole("option", { name: "Phase loner" })).toBeInTheDocument();
+    const list = openPicker("Add something Phase a waits for");
+    expect(within(list).queryByRole("option", { name: "Phase c" })).not.toBeInTheDocument();
+    expect(within(list).getByRole("option", { name: "Phase loner" })).toBeInTheDocument();
   });
 
   it("shows the arrows on a version nobody can change, without offering to change them", () => {

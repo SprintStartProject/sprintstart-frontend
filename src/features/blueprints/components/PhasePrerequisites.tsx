@@ -1,10 +1,22 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
-import { Select } from "../../../components/ui/Select.tsx";
+import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { canConnect } from "../../graph-diagram/graphLayout.ts";
 import { LOCK_SENTENCE } from "../../graph-diagram/lockWords.ts";
 import type { BlueprintPhase } from "../types.ts";
+
+/**
+ * The resting state of both pickers: nothing chosen, and the control saying what choosing one
+ * would do rather than showing a blank.
+ *
+ * These are the house dropdown rather than a native `<select>`, which is what the rest of this
+ * page's controls are. A native list is the OS's, not the product's — it arrives in a different
+ * typeface with different corners, and next to the chips it sits under it read as two kits.
+ */
+const ADD_ONE = { value: "", label: "Add one…" };
+
+const asOption = (phase: BlueprintPhase) => ({ value: phase.id, label: phase.title });
 
 /**
  * What a phase waits for, and what waits on it — the graph's one relation, in words.
@@ -96,23 +108,17 @@ export function PhasePrerequisites({
         )}
 
         {editable && canWaitFor.length > 0 ? (
-          <Select
-            size="sm"
-            value=""
-            aria-label={`Add something ${phase.title} waits for`}
-            disabled={isSaving}
-            onChange={(event) => {
-              const blockerId = event.target.value;
-              if (blockerId) void run(() => onAdd(phase, blockerId));
-            }}
-          >
-            <option value="">Add one…</option>
-            {canWaitFor.map((other) => (
-              <option key={other.id} value={other.id}>
-                {other.title}
-              </option>
-            ))}
-          </Select>
+          <div className="max-w-64">
+            <DropdownSelect
+              label={`Add something ${phase.title} waits for`}
+              value=""
+              disabled={isSaving}
+              options={[ADD_ONE, ...canWaitFor.map(asOption)]}
+              onChange={(blockerId) => {
+                if (blockerId) void run(() => onAdd(phase, blockerId));
+              }}
+            />
+          </div>
         ) : null}
       </section>
 
@@ -150,24 +156,18 @@ export function PhasePrerequisites({
         )}
 
         {editable && canOpen.length > 0 ? (
-          <Select
-            size="sm"
-            value=""
-            aria-label={`Add something ${phase.title} opens up`}
-            disabled={isSaving}
-            onChange={(event) => {
-              const blockedId = event.target.value;
-              const blocked = byId.get(blockedId);
-              if (blocked) void run(() => onAdd(blocked, phase.id));
-            }}
-          >
-            <option value="">Add one…</option>
-            {canOpen.map((other) => (
-              <option key={other.id} value={other.id}>
-                {other.title}
-              </option>
-            ))}
-          </Select>
+          <div className="max-w-64">
+            <DropdownSelect
+              label={`Add something ${phase.title} opens up`}
+              value=""
+              disabled={isSaving}
+              options={[ADD_ONE, ...canOpen.map(asOption)]}
+              onChange={(blockedId) => {
+                const blocked = byId.get(blockedId);
+                if (blocked) void run(() => onAdd(blocked, phase.id));
+              }}
+            />
+          </div>
         ) : null}
       </section>
     </div>
