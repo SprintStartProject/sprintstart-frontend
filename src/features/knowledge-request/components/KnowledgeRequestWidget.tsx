@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Inbox, Loader2 } from "lucide-react";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
+import { queryKeys } from "../../../services/queryKeys";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { formatWaiting } from "../format";
 
@@ -16,9 +17,8 @@ type KnowledgeRequestWidgetProps = {
  */
 export function KnowledgeRequestWidget({ projectId }: KnowledgeRequestWidgetProps) {
   const navigate = useNavigate();
-  const { data: open, loading } = useFetch(
-    () => (projectId ? knowledgeRequestService.listOpen(projectId) : Promise.resolve([])),
-    [projectId],
+  const { data: open, loading } = useQueryFetch(queryKeys.knowledgeRequest.open(projectId), () =>
+    projectId ? knowledgeRequestService.listOpen(projectId) : Promise.resolve([]),
   );
 
   const go = () => void navigate("/insights/knowledge-requests");

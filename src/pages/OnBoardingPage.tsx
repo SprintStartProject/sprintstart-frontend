@@ -21,8 +21,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
+import { PageShell } from "../components/layout/PageShell";
 import { AlertDialog } from "../components/ui/AlertDialog";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
@@ -68,6 +70,7 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
 import { onboardingService } from "../services/onboardingService";
+import { queryKeys } from "../services/queryKeys";
 import { GenerationIssueSummary } from "../features/onboarding/components/GenerationIssueSummary";
 import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues";
 import {
@@ -182,9 +185,12 @@ export function OnBoardingPage() {
 
   const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
 
+  const queryClient = useQueryClient();
   const applyPath = useCallback(
     (next: OnboardingPathEndpoint, { keepSelection }: { keepSelection: boolean }) => {
       setPath(next);
+      // The dashboard's "next step" card reads the same path through the query cache.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
       setSelectedPhaseId((current) => {
         const ordered = sortedPhases(next);
         if (keepSelection && ordered.some((phase) => phase.id === current)) return current;
@@ -192,7 +198,7 @@ export function OnBoardingPage() {
       });
       setLoadingState("success");
     },
-    [focusItemId, openPhaseId],
+    [focusItemId, openPhaseId, queryClient],
   );
 
   // ── Loading ─────────────────────────────────────────────────
@@ -798,11 +804,18 @@ export function OnBoardingPage() {
 // Pieces
 // ─────────────────────────────────────────────────────────────
 
+/** Loading, error and empty states: inside the page's own chrome, so the header never blinks away. */
 function CenteredState({ children }: { children: ReactNode }) {
   return (
-    <div className="app-page-frame flex min-h-screen flex-col items-center justify-center py-12 text-center">
-      {children}
-    </div>
+    <PageShell
+      icon={Rocket}
+      title="Onboarding"
+      subtitle="Your path into the project. Phases that are open can be done in any order."
+    >
+      <div className="flex min-h-96 flex-col items-center justify-center py-12 text-center">
+        {children}
+      </div>
+    </PageShell>
   );
 }
 

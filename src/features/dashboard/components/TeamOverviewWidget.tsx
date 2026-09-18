@@ -1,6 +1,7 @@
 import { MessageSquareText, SkipForward, Users } from "lucide-react";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { getTeamOverview } from "../../../services/teamManagementService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import type { TeamOverviewUser } from "../../team-management/types";
 import type { DashboardWidgetSize } from "../layout/types";
@@ -95,12 +96,17 @@ function metricsFor(summary: TeamSummary): WidgetMetric[] {
  * two names is a task.
  */
 export function TeamOverviewWidget({ size }: { size: DashboardWidgetSize }) {
-  const { selectedProjectId } = useProjectContext();
+  const { hasSelectedProject, selectedProjectId } = useProjectContext();
 
-  const { data, loading, error } = useFetch(
+  // Gated on a confirmed project like every widget scoped to one: before the project list
+  // confirms a selection there is nothing to ask about, and firing then would send no filter
+  // at all (a cross-project overview this user never chose to look at) or — with a
+  // `?projectId=` deep link — ask about a project before any list has said it is reachable.
+  const { data, loading, error } = useQueryFetch(
+    queryKeys.teamOverview.filtered(selectedProjectId || null),
     () =>
       getTeamOverview(undefined, undefined, selectedProjectId ? [selectedProjectId] : undefined),
-    [selectedProjectId],
+    { enabled: hasSelectedProject },
   );
 
   const summary = summarize(data ?? []);
@@ -113,8 +119,12 @@ export function TeamOverviewWidget({ size }: { size: DashboardWidgetSize }) {
       title="Team overview"
       actionLabel="Open team management"
       to="/team-management"
-      isLoading={loading}
-      errorMessage={error || !data ? "Could not load the team overview." : null}
+      // Waiting for the project context is loading, not an empty answer — the zeros of an
+      // unanswered request must not flash as the card's figures.
+      isLoading={loading || !hasSelectedProject}
+      errorMessage={
+        hasSelectedProject && (error || !data) ? "Could not load the team overview." : null
+      }
     >
       {size === "small" ? (
         <WidgetMetrics icon={Users} metrics={metricsFor(summary)} />

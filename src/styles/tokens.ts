@@ -264,3 +264,30 @@ export const enterTransition: Transition = {
   duration: 0.5,
   ease: [0.22, 1, 0.36, 1],
 };
+
+/**
+ * How long a fetch has to stay pending before {@link useDelayedFlag} admits a
+ * loading indicator (skeleton or spinner) onto the screen, in milliseconds.
+ * A cache hit or a fast local backend resolves well within this window, so
+ * the indicator never gets a chance to flash on and immediately off.
+ */
+export const SKELETON_APPEAR_DELAY_MS = 200;
+
+/**
+ * Once {@link useDelayedFlag} has shown a loading indicator, the minimum
+ * stretch it stays up for, in milliseconds — independent of how quickly the
+ * fetch finishes after that. Without this floor, a fetch that resolves just
+ * after the appear delay flickers the indicator on and off in the same frame
+ * budget it took to appear.
+ */
+export const SKELETON_MIN_VISIBLE_MS = 350;
+
+/**
+ * Enter transition for a route change (`PageTransition`). Short and simple on
+ * purpose: it runs on every navigation, so anything heavier would make the app
+ * feel slower to move around in rather than smoother.
+ */
+export const pageTransitionToken: Transition = {
+  duration: 0.18,
+  ease: "easeOut",
+};

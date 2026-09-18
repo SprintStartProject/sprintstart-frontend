@@ -180,7 +180,7 @@ function MessageRowImpl({
           {/* Under a finished answer only. A half-streamed reply is not a thing to keep — the
               card would hold whatever had arrived by the moment somebody pressed it. */}
           {!isRequest && !showStreamingCaret && message.content !== "" && (
-            <div className="flex items-center gap-1">
+            <div className="-ml-2 flex items-center gap-0.5 pt-1">
               <CopyButton text={message.content} />
 
               <SaveToBoard
@@ -195,7 +195,8 @@ function MessageRowImpl({
                 label="Keep on my board"
                 savedLabel="On your board"
                 description="The answer, as a note you can edit."
-                icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
+                icon={<BookmarkPlus className="h-3.5 w-3.5" aria-hidden="true" />}
+                size="xs"
               />
             </div>
           )}

@@ -3,8 +3,14 @@ import type { UserProfile } from "../services/types";
 
 /**
  * Represents the current authentication state of the application.
+ *
+ * `signingOut` is the initial state for a boot the app already knows will not show
+ * a signed-in UI -- a logout return, or a failed silent SSO check -- before it has
+ * even asked Keycloak (see `AuthProvider`'s `window.__bootSigningOut` check). It
+ * settles into `authenticated`/`unauthenticated` exactly like `loading` does, but
+ * lets `AuthGuard` keep that load blank instead of flashing its loading skeleton.
  */
-export type AuthStatus = "loading" | "unauthenticated" | "authenticated";
+export type AuthStatus = "loading" | "signingOut" | "unauthenticated" | "authenticated";
 
 /**
  * Options for configuring the login flow.

@@ -5,6 +5,17 @@ import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
 import { AppearanceSection } from "../../../../src/features/settings/components/AppearanceSection";
 
+const { setShowRocketPet } = vi.hoisted(() => ({ setShowRocketPet: vi.fn() }));
+
+// The rocket pet toggle reads the celebratory layer, which lives behind its own
+// provider. Only the preference is under test here, so the hook is stubbed.
+vi.mock("../../../../src/features/moments", () => ({
+  useMoments: () => ({
+    showRocketPet: false,
+    setShowRocketPet,
+  }),
+}));
+
 function setSystemPrefersDark(prefersDark: boolean) {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
@@ -110,5 +121,25 @@ describe("AppearanceSection", () => {
 
     expect(window.localStorage.getItem("sprintstart:glow-intensity")).toBe("70");
     expect(screen.getByText("70%")).toBeInTheDocument();
+  });
+
+  it("groups the controls under Theme, Effects & animations and Extras", () => {
+    renderWithProviders();
+
+    expect(screen.getByRole("group", { name: "Theme" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Effects & animations" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Extras" })).toBeInTheDocument();
+  });
+
+  it("turns the rocket pet on from the Extras group", async () => {
+    const user = userEvent.setup();
+    renderWithProviders();
+
+    const toggle = screen.getByRole("switch", { name: "Rocket Pet" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await user.click(toggle);
+
+    expect(setShowRocketPet).toHaveBeenCalledWith(true);
   });
 });

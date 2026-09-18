@@ -56,14 +56,16 @@ export function SaveReplyToBoard({ content }: SaveReplyToBoardProps) {
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size="xs"
       onClick={() => void save()}
       loading={saving}
       // Not hidden once used. A hire who keeps a list, dismisses it and wants it back should find
       // the same button where it was, rather than having to make the buddy say it again.
-      icon={<ListPlus className="h-4 w-4" aria-hidden="true" />}
+      icon={<ListPlus className="h-3.5 w-3.5" aria-hidden="true" />}
     >
-      {saved ? "On your board" : "Keep this on my board"}
+      {/* Says *what* it keeps. It used to say "Keep this on my board", right next to "Keep this
+          answer" — two buttons whose words could not tell you which one made the checklist. */}
+      {saved ? "Checklist on your board" : "Keep as checklist"}
     </Button>
   );
 }

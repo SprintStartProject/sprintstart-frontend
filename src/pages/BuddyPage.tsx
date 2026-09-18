@@ -14,6 +14,7 @@ import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
+import { useGreetingReveal } from "../features/buddy/hooks/useGreetingReveal";
 import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { announceBuddyPageReady } from "../features/buddy/aiBuddyBus";
 import {
@@ -168,7 +169,18 @@ function BuddyMentorHome() {
     ensureOpened,
     retryOpen,
     startFreshVisit,
+    presentedGreetingId,
+    markGreetingPresented,
   } = useBuddySession();
+
+  // A greeting written while the hire was somewhere else still gets the buddy thinking and
+  // writing it, the first time it is on screen — the same as in the dock.
+  const greeting = useGreetingReveal({
+    messages,
+    active: true,
+    presentedGreetingId,
+    markGreetingPresented,
+  });
 
   // The same conversation the dock shows, brought on screen the same way. It used to open a
   // *new* visit here, which is what threw away whatever the hire had already asked.
@@ -313,8 +325,8 @@ function BuddyMentorHome() {
       }
     >
       <BuddyConversation
-        messages={messages}
-        isThinking={isThinking || isOpening}
+        messages={greeting.messages}
+        isThinking={isThinking || isOpening || greeting.isThinking}
         activeTool={activeTool}
         draft={draft}
         setDraft={setDraft}
@@ -327,7 +339,7 @@ function BuddyMentorHome() {
         // sends on one click, unlike the chips, because accepting something the mentor just
         // offered is not composing a question of your own.
         lastMessageFooter={
-          !hasUserMessage && openerAction ? (
+          !hasUserMessage && openerAction && !greeting.isRevealing ? (
             <Button
               variant="primary"
               size="sm"

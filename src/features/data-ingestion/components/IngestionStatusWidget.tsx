@@ -12,7 +12,8 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
 import { createSourceFromInstance } from "../data.ts";
 import { getIngestionSourceStatuses } from "../../../services/ingestionService.ts";
-import { useFetch } from "../../../hooks/useFetch.ts";
+import { useQueryFetch } from "../../../hooks/useQueryFetch.ts";
+import { queryKeys } from "../../../services/queryKeys.ts";
 import { useProjectContext } from "../../projects/useProjectContext.ts";
 import { ClickableCard } from "../../../components/common/ClickableCard.tsx";
 import { IngestionMetrics } from "./IngestionMetrics.tsx";
@@ -42,7 +43,9 @@ export function IngestionStatusWidget() {
     data: sources,
     loading,
     error,
-  } = useFetch(() => fetchIngestionSources(selectedProjectId), [selectedProjectId]);
+  } = useQueryFetch(queryKeys.ingestion.sourceStatuses(selectedProjectId), () =>
+    fetchIngestionSources(selectedProjectId),
+  );
 
   // ── LOADING ──────────────────────────────────────────────
 

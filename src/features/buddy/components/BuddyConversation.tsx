@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
-import { SaveReplyToBoard } from "./SaveReplyToBoard";
-import { BookmarkPlus, MessagesSquare } from "lucide-react";
+import { BuddyReplyActions } from "./BuddyReplyActions";
+import { MessagesSquare } from "lucide-react";
 import { SaveToBoard } from "../../board/save/SaveToBoard";
-import { buddyReplyNote, transcriptNote } from "../../board/generation/chatToCard";
+import { transcriptNote } from "../../board/generation/chatToCard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
 import { RAIL_TOGGLE_CLEARANCE } from "../../../components/layout/ConversationRail";
 
@@ -139,22 +139,7 @@ export function BuddyConversation({
           )}
 
           <BuddyThread
-            renderReplyAction={(reply) => (
-              <div className="flex flex-wrap items-center gap-1">
-                {/* Two different things, and the order says which is the better one. A list the
-                    buddy wrote becomes a checklist you can tick; anything else can still be kept,
-                    but only as the words it was. `SaveReplyToBoard` draws nothing when the reply
-                    holds no list, so most replies show one button. */}
-                <SaveReplyToBoard content={reply} />
-                <SaveToBoard
-                  request={() => buddyReplyNote(reply)}
-                  label="Keep this answer"
-                  savedLabel="On your board"
-                  description="The reply, frozen as a note."
-                  icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
-                />
-              </div>
-            )}
+            renderReplyAction={(reply) => <BuddyReplyActions reply={reply} />}
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}

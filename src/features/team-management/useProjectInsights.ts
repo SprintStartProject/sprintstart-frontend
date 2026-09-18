@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { getTeamOverview } from "../../services/teamManagementService";
 import { getIngestionSourceStatuses, getProjectArtifacts } from "../../services/ingestionService";
+import { queryKeys } from "../../services/queryKeys";
 import type { SourceInstanceIngestionStatus } from "../data-ingestion/types";
 import type { TeamOverviewUser } from "./types";
 
@@ -63,6 +64,33 @@ function toAttentionItems(users: TeamOverviewUser[]): AttentionItem[] {
     );
 }
 
+async function loadOne(queryClient: QueryClient, projectId: string): Promise<ProjectInsights> {
+  const [sources, users, artifacts] = await Promise.all([
+    getIngestionSourceStatuses(projectId).catch(() => null),
+    // Shares the cache entry `TeamOverviewWidget` and `usePmAttentionFlag` read the same
+    // project's overview under, instead of firing a fourth independent request for it.
+    queryClient
+      .fetchQuery({
+        queryKey: queryKeys.teamOverview.filtered(projectId),
+        queryFn: () => getTeamOverview(undefined, undefined, [projectId]),
+      })
+      .catch(() => null),
+    getProjectArtifacts(projectId, { page: 1, size: 1 })
+      .then((page) => page.page.totalElements)
+      .catch(() => null),
+  ]);
+
+  return {
+    sources,
+    attention: users ? toAttentionItems(users) : null,
+    averageProgress:
+      users && users.length > 0
+        ? users.reduce((sum, user) => sum + user.progressPercentage, 0) / users.length
+        : null,
+    artifactCount: artifacts,
+  };
+}
+
 /**
  * Loads the extra project figures shown on `ProjectInsightsCard`.
  *
@@ -76,51 +104,24 @@ function toAttentionItems(users: TeamOverviewUser[]): AttentionItem[] {
  * so asking for it twice would buy nothing.
  *
  * @param projectIds Projects to load, as a comma-joined string so a new array
- * with the same ids does not retrigger the effect.
+ * with the same ids does not retrigger the fetch.
  */
 export function useProjectInsights(projectIds: string): Record<string, ProjectInsights> {
-  const [insights, setInsights] = useState<Record<string, ProjectInsights>>({});
+  const queryClient = useQueryClient();
+  const ids = projectIds.split(",").filter(Boolean);
 
-  const load = useCallback(async (projectId: string) => {
-    const [sources, users, artifacts] = await Promise.all([
-      getIngestionSourceStatuses(projectId).catch(() => null),
-      getTeamOverview(undefined, undefined, [projectId]).catch(() => null),
-      getProjectArtifacts(projectId, { page: 1, size: 1 })
-        .then((page) => page.page.totalElements)
-        .catch(() => null),
-    ]);
+  const { data } = useQuery({
+    queryKey: queryKeys.projectInsights.byProjectIds(projectIds),
+    queryFn: async () => {
+      const entries = await Promise.all(
+        ids.map(async (projectId) => [projectId, await loadOne(queryClient, projectId)] as const),
+      );
+      return Object.fromEntries(entries);
+    },
+    enabled: ids.length > 0,
+  });
 
-    const result: ProjectInsights = {
-      sources,
-      attention: users ? toAttentionItems(users) : null,
-      averageProgress:
-        users && users.length > 0
-          ? users.reduce((sum, user) => sum + user.progressPercentage, 0) / users.length
-          : null,
-      artifactCount: artifacts,
-    };
-
-    return { projectId, result };
-  }, []);
-
-  useEffect(() => {
-    const ids = projectIds.split(",").filter(Boolean);
-    if (ids.length === 0) return;
-
-    let active = true;
-
-    void Promise.all(ids.map(load)).then((entries) => {
-      if (!active) return;
-
-      setInsights(Object.fromEntries(entries.map(({ projectId, result }) => [projectId, result])));
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [load, projectIds]);
-
-  return insights;
+  return data ?? {};
 }
 
 export { EMPTY_INSIGHTS };

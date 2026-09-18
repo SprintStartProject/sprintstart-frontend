@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMyAtlassianCredentials } from "../../../services/sources/atlassianService";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
+import { queryKeys } from "../../../services/queryKeys";
 
 type UseAtlassianCredentialsResult = {
   credentials: AtlassianCredentialDto[];
@@ -22,78 +23,45 @@ type UseAtlassianCredentialsResult = {
  * the Jira and Confluence connectors.
  *
  * When disabled, the hook settles into a loaded-empty state without fetching.
- * Reloads abort any in-flight request so stale data cannot win a race.
+ * Out-of-order responses (an explicit `reload` outrunning a slower, earlier
+ * fetch) are react-query's own: it only ever applies the result of the most
+ * recently started fetch for this key.
  */
 export function useAtlassianCredentials(enabled = true): UseAtlassianCredentialsResult {
-  const [credentials, setCredentials] = useState<AtlassianCredentialDto[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
-  const requestIdRef = useRef(0);
-  const inflightRef = useRef<AbortController | null>(null);
-  const mountedRef = useRef(true);
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: queryKeys.atlassianCredentials.mine(),
+    queryFn: ({ signal }) => getMyAtlassianCredentials(signal),
+    enabled,
+  });
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      inflightRef.current?.abort();
-    };
-  }, []);
-
-  const reload = useCallback(async () => {
-    const id = ++requestIdRef.current;
-    inflightRef.current?.abort();
-
-    if (!enabled) {
-      if (mountedRef.current) {
-        setCredentials([]);
-        setLoaded(true);
-        setError(null);
-        setIsRefreshing(false);
-      }
-      return;
-    }
-
-    const controller = new AbortController();
-    inflightRef.current = controller;
-
-    setIsRefreshing(true);
-    try {
-      const list = await getMyAtlassianCredentials(controller.signal);
-      if (id === requestIdRef.current && mountedRef.current) {
-        setCredentials(list);
-        setLoaded(true);
-        setError(null);
-      }
-    } catch (loadError) {
-      if (loadError instanceof Error && loadError.name === "AbortError") return;
-      if (id === requestIdRef.current && mountedRef.current) {
-        setLoaded(true);
-        setError(
-          loadError instanceof Error ? loadError.message : "Failed to load Atlassian credentials.",
-        );
-      }
-    } finally {
-      if (id === requestIdRef.current && mountedRef.current) {
-        setIsRefreshing(false);
-      }
-    }
-  }, [enabled]);
-
-  const addCredentialLocally = useCallback((credential: AtlassianCredentialDto) => {
-    setCredentials((prev) =>
-      prev.some((existing) => existing.displayName === credential.displayName)
-        ? prev
-        : [...prev, credential],
+  const addCredentialLocally = (credential: AtlassianCredentialDto) => {
+    queryClient.setQueryData(
+      queryKeys.atlassianCredentials.mine(),
+      (prev: AtlassianCredentialDto[] | undefined) =>
+        prev?.some((existing) => existing.displayName === credential.displayName)
+          ? prev
+          : [...(prev ?? []), credential],
     );
-    setLoaded(true);
-  }, []);
+  };
 
-  useEffect(() => {
-    void Promise.resolve().then(reload);
-  }, [reload]);
-
-  return { credentials, loaded, error, isRefreshing, reload, addCredentialLocally };
+  return {
+    credentials: enabled ? (data ?? []) : [],
+    loaded: !enabled || !isLoading,
+    error: isError
+      ? error instanceof Error
+        ? error.message
+        : "Failed to load Atlassian credentials."
+      : null,
+    isRefreshing: isFetching,
+    // Cancels any in-flight fetch first (react-query only supersedes one on
+    // its own once a query has data, and the very first load never does),
+    // so an explicit reload always wins over a slow one already in flight.
+    reload: async () => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.atlassianCredentials.mine() });
+      await refetch();
+    },
+    addCredentialLocally,
+  };
 }

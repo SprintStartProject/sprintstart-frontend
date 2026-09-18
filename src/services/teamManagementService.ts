@@ -755,6 +755,36 @@ async function getCompletedSkillAssessments(userId: string): Promise<SkillAssess
   );
 }
 
+/**
+ * Turns completed assessments into the rows both skill-level readers return.
+ *
+ * An assessment carries a skill ID and nothing else, so the skill name comes from the
+ * skill list and the role label from whatever role names the caller has to hand: the
+ * admin role list on the team-management side, the signed-in user's own profile roles
+ * on the dashboard side.
+ */
+function joinSkillLevels(
+  assessments: SkillAssessmentResponseDto[],
+  skills: Skill[],
+  roles: readonly { id: string; name: string }[],
+  idFor: (assessment: SkillAssessmentResponseDto) => string,
+): UserSkillLevel[] {
+  return assessments.map((assessment) => {
+    const skill = skills.find((s) => s.id === assessment.skillId);
+    const roleNames = roles
+      .filter((role) => skill?.roleIds.includes(role.id))
+      .map((role) => role.name);
+
+    return {
+      id: idFor(assessment),
+      skillId: assessment.skillId,
+      skillName: skill?.name ?? "Unknown skill",
+      roleName: roleNames.length > 0 ? roleNames.join(", ") : "Unknown role",
+      level: assessment.level,
+    };
+  });
+}
+
 export async function getUserSkillLevels(userId: string): Promise<UserSkillLevel[]> {
   try {
     const [assessments, skills, roles] = await Promise.all([
@@ -763,20 +793,12 @@ export async function getUserSkillLevels(userId: string): Promise<UserSkillLevel
       getProjectRoles(),
     ]);
 
-    return assessments.map((assessment) => {
-      const skill = skills.find((s) => s.id === assessment.skillId);
-      const roleNames = roles
-        .filter((role) => skill?.roleIds.includes(role.id))
-        .map((role) => role.name);
-
-      return {
-        id: `${userId}-${assessment.skillId}`,
-        skillId: assessment.skillId,
-        skillName: skill?.name ?? "Unknown skill",
-        roleName: roleNames.length > 0 ? roleNames.join(", ") : "Unknown role",
-        level: assessment.level,
-      };
-    });
+    return joinSkillLevels(
+      assessments,
+      skills,
+      roles,
+      (assessment) => `${userId}-${assessment.skillId}`,
+    );
   } catch {
     return [];
   }
@@ -785,34 +807,31 @@ export async function getUserSkillLevels(userId: string): Promise<UserSkillLevel
 /**
  * Skill levels for the *currently authenticated* user.
  *
- * Mirrors {@link getUserSkillLevels} but reads `/api/v1/me/skills`, which is
- * open to the USER role — the admin endpoint behind `getUserSkillLevels`
- * would 403 for a regular user looking at their own dashboard. The raw
- * assessments only carry skill IDs, so names and roles are joined in from
- * the skill and project-role lists.
+ * Reads `/api/v1/me/skills`, which is open to the USER role — the admin endpoint behind
+ * `getUserSkillLevels` 403s for a regular user looking at their own dashboard, and so
+ * does `/api/v1/projectRoles`. That is why the role names are passed in rather than
+ * looked up: the caller already holds the user's own profile roles from `/users/me`, so
+ * no request is spent on resolving them. A skill pointing at a role the user does not
+ * hold labels itself "Unknown role" rather than borrowing another project's list.
+ *
+ * @param roles The signed-in user's own project roles, used to label each skill. Pass an
+ *   empty list when they are not known yet — the labels degrade, the call does not fail.
  */
-export async function getMySkillLevels(): Promise<UserSkillLevel[]> {
+export async function getMySkillLevels(
+  roles: readonly { id: string; name: string }[],
+): Promise<UserSkillLevel[]> {
   try {
-    const [assessments, skills, roles] = await Promise.all([
+    const [assessments, skills] = await Promise.all([
       apiClient.fetch<SkillAssessmentResponseDto[]>("/api/v1/me/skills"),
       getSkills(),
-      getProjectRoles(),
     ]);
 
-    return assessments.map((assessment) => {
-      const skill = skills.find((s) => s.id === assessment.skillId);
-      const roleNames = roles
-        .filter((role) => skill?.roleIds.includes(role.id))
-        .map((role) => role.name);
-
-      return {
-        id: `${assessment.userId}-${assessment.skillId}`,
-        skillId: assessment.skillId,
-        skillName: skill?.name ?? "Unknown skill",
-        roleName: roleNames.length > 0 ? roleNames.join(", ") : "Unknown role",
-        level: assessment.level,
-      };
-    });
+    return joinSkillLevels(
+      assessments,
+      skills,
+      roles,
+      (assessment) => `${assessment.userId}-${assessment.skillId}`,
+    );
   } catch {
     return [];
   }

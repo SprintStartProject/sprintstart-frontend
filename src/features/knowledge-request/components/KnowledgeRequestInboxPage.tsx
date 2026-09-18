@@ -6,10 +6,11 @@ import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/S
 import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuth } from "../../../context/useAuth";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
 import { PermissionGroup } from "../../../services/types";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { RequestCard } from "./RequestCard";
 import { CanonicalAnswerCard } from "./CanonicalAnswerCard";
@@ -36,32 +37,33 @@ export function KnowledgeRequestInboxPage() {
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjectContext();
 
   const [tab, setTab] = useState<Tab>("open");
-  // Bumped after any mutation so both lists reload against the server, keeping the queue and the
-  // durable-answers view honest (an answered request leaves the queue and appears as knowledge).
-  const [refreshKey, setRefreshKey] = useState(0);
-  const reload = () => setRefreshKey((key) => key + 1);
 
   const {
     data: openRequests,
     loading: openLoading,
     error: openError,
-  } = useFetch(
-    () =>
-      selectedProjectId ? knowledgeRequestService.listOpen(selectedProjectId) : Promise.resolve([]),
-    [selectedProjectId, refreshKey],
+    refetch: refetchOpen,
+  } = useQueryFetch(queryKeys.knowledgeRequest.open(selectedProjectId), () =>
+    selectedProjectId ? knowledgeRequestService.listOpen(selectedProjectId) : Promise.resolve([]),
   );
 
   const {
     data: answers,
     loading: answersLoading,
     error: answersError,
-  } = useFetch(
-    () =>
-      selectedProjectId
-        ? knowledgeRequestService.listAnswers(selectedProjectId)
-        : Promise.resolve([]),
-    [selectedProjectId, refreshKey],
+    refetch: refetchAnswers,
+  } = useQueryFetch(queryKeys.knowledgeRequest.answers(selectedProjectId), () =>
+    selectedProjectId
+      ? knowledgeRequestService.listAnswers(selectedProjectId)
+      : Promise.resolve([]),
   );
+
+  // After any mutation, so both lists reload against the server, keeping the queue and the
+  // durable-answers view honest (an answered request leaves the queue and appears as knowledge).
+  const reload = () => {
+    refetchOpen();
+    refetchAnswers();
+  };
 
   // Longest-waiting first — the backend orders this way, but sorting here keeps it true if a
   // future caller doesn't. Oldest createdAt = waited longest.

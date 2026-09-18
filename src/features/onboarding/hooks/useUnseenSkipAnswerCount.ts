@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useRateLimitedRead } from "../../../hooks/useRateLimitedRead";
 import { onboardingService } from "../../../services/onboardingService";
+import { queryKeys } from "../../../services/queryKeys";
 import { onSkipAnswerSeen, unseenSkipAnswerCount } from "../skipAnswers";
 
 /**
@@ -18,12 +20,21 @@ export function useUnseenSkipAnswerCount(
   enabled: boolean,
   refreshKey?: string,
 ): number {
-  const [seenNonce, setSeenNonce] = useState(0);
-  useEffect(() => onSkipAnswerSeen(() => setSeenNonce((current) => current + 1)), []);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!userId) return;
+    return onSkipAnswerSeen(() => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.onboarding.unseenSkipAnswers(userId),
+      });
+    });
+  }, [queryClient, userId]);
 
   return useRateLimitedRead(
+    queryKeys.onboarding.unseenSkipAnswers(userId ?? ""),
     async () => unseenSkipAnswerCount((await onboardingService.fetchPath()).phases),
     0,
-    { key: userId, enabled, refreshKey, nonce: seenNonce },
+    { enabled: enabled && Boolean(userId), refreshKey },
   );
 }

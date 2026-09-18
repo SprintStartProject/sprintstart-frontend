@@ -1,7 +1,5 @@
-import { Users, ArrowLeft } from "lucide-react";
+import { Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "../components/ui/Button";
 import { TeamMemberFilters } from "../features/team-management/components/TeamMemberFilters";
 import { TeamMemberCard } from "../features/team-management/components/TeamMemberCard";
 import { RoleManagementTab } from "../features/team-management/components/RoleManagementTab";
@@ -15,12 +13,54 @@ import {
 } from "../features/team-management/types";
 import { getTeamOverview, getProjectRoles } from "../services/teamManagementService";
 import { ApiError } from "../services/apiClient";
-import { PageHeader } from "../components/layout/PageHeader";
+import { PageShell } from "../components/layout/PageShell";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import {
+  SkeletonBlock,
+  SkeletonCard,
+  SkeletonGroup,
+  SkeletonLine,
+} from "../components/ui/Skeleton";
+import { useDelayedFlag } from "../hooks/useDelayedFlag";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 
+/** Placeholder for one `TeamMemberCard`, matching its avatar row, status badge and progress bar. */
+function TeamMemberCardSkeleton() {
+  return (
+    <SkeletonCard className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <SkeletonBlock className="h-10 w-10 shrink-0 rounded-full" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <SkeletonLine className="w-2/3" />
+          <SkeletonLine className="w-1/3" />
+        </div>
+      </div>
+      <SkeletonLine className="h-5 w-24 rounded-full" />
+      <div className="space-y-2">
+        <SkeletonLine className="w-full" />
+        <SkeletonLine className="w-3/4" />
+      </div>
+      <SkeletonBlock className="h-2 w-full rounded-full" />
+    </SkeletonCard>
+  );
+}
+
+function TeamOverviewSkeleton() {
+  return (
+    <SkeletonGroup
+      label="Loading team overview"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+    >
+      {Array.from({ length: 6 }).map((_, index) => (
+        <TeamMemberCardSkeleton key={index} />
+      ))}
+    </SkeletonGroup>
+  );
+}
+
+const FRAME_CLASS_NAME = "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8";
+
 export function TeamManagementPage() {
-  const navigate = useNavigate();
   const [users, setUsers] = useState<TeamOverviewUser[]>([]);
   const [roles, setRoles] = useState<ProjectRole[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +96,8 @@ export function TeamManagementPage() {
 
     void loadInitialData();
   }, [loadTeamOverview]);
+
+  const showLoadingSkeleton = useDelayedFlag(loading);
 
   // Two-finger swipe between the tabs, for people who would rather not aim
   // at the bar.
@@ -107,89 +149,79 @@ export function TeamManagementPage() {
       ? ([filteredUsers.length, "members"] as const)
       : ([roles.length, roles.length === 1 ? "role" : "roles"] as const);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-app-text-muted">Loading team overview...</p>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg px-6">
-        <p className="text-sm text-app-danger-text">{loadError}</p>
-      </div>
-    );
-  }
+  const headerActions = !showLoadingSkeleton && !loadError && (
+    <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
+      <div className="text-3xl font-bold text-app-brand">{headerCount}</div>
+      <div className="text-xs font-medium text-app-brand-text">{headerLabel}</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      <header className="relative z-40 border-b border-app-border bg-app-bg">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <Button
-            variant="ghost"
-            onClick={() => void navigate("/pm-dashboard")}
-            icon={<ArrowLeft className="h-4 w-4" />}
-            className="mb-4"
+    <PageShell
+      icon={Users}
+      title="Team Management"
+      subtitle="Monitor onboarding progress across team members and manage project roles."
+      back={{ label: "Back to PM-Dashboard", to: "/pm-dashboard" }}
+      frameClassName={FRAME_CLASS_NAME}
+      actions={headerActions || undefined}
+      mainClassName="py-6 pt-8 pb-24"
+      mainRef={loading || loadError ? undefined : swipeRef}
+    >
+      {showLoadingSkeleton ? (
+        <TeamOverviewSkeleton />
+      ) : loading ? null : loadError ? (
+        <div className="flex min-h-96 items-center justify-center px-6">
+          <p className="text-sm text-app-danger-text">{loadError}</p>
+        </div>
+      ) : (
+        <>
+          <div className="mb-6">
+            <TeamManagementTabSwitcher activeTab={activeTab} onChange={setActiveTab} />
+          </div>
+
+          <SlidingTabPanel
+            activeKey={activeTab}
+            index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}
           >
-            Back to PM-Dashboard
-          </Button>
+            {activeTab === "members" ? (
+              <div className="min-w-0">
+                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-app-text">Team members</h2>
+                    <p className="text-sm text-app-text-muted">
+                      {filteredUsers.length} of {users.length} members shown
+                    </p>
+                  </div>
 
-          <PageHeader
-            icon={Users}
-            title="Team Management"
-            subtitle="Monitor onboarding progress across team members and manage project roles."
-            actions={
-              <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
-                <div className="text-3xl font-bold text-app-brand">{headerCount}</div>
-                <div className="text-xs font-medium text-app-brand-text">{headerLabel}</div>
+                  <div className="flex flex-col items-end gap-2">
+                    <TeamMemberFilters
+                      roles={roles}
+                      filters={filters}
+                      onFiltersChange={setFilters}
+                    />
+                  </div>
+                </div>
+
+                {filteredUsers.length === 0 ? (
+                  <div className="rounded-2xl border border-app-border bg-app-surface p-8 text-center">
+                    <p className="text-sm text-app-text-muted">
+                      No team members found for this filter.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {filteredUsers.map((user) => (
+                      <TeamMemberCard key={user.userId} user={user} />
+                    ))}
+                  </div>
+                )}
               </div>
-            }
-          />
-        </div>
-      </header>
-
-      <main ref={swipeRef} className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <TeamManagementTabSwitcher activeTab={activeTab} onChange={setActiveTab} />
-        </div>
-
-        <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
-          {activeTab === "members" ? (
-            <div className="min-w-0">
-              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-app-text">Team members</h2>
-                  <p className="text-sm text-app-text-muted">
-                    {filteredUsers.length} of {users.length} members shown
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-end gap-2">
-                  <TeamMemberFilters roles={roles} filters={filters} onFiltersChange={setFilters} />
-                </div>
-              </div>
-
-              {filteredUsers.length === 0 ? (
-                <div className="rounded-2xl border border-app-border bg-app-surface p-8 text-center">
-                  <p className="text-sm text-app-text-muted">
-                    No team members found for this filter.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {filteredUsers.map((user) => (
-                    <TeamMemberCard key={user.userId} user={user} />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <RoleManagementTab roles={roles} users={users} onDataChanged={loadTeamOverview} />
-          )}
-        </SlidingTabPanel>
-      </main>
-    </div>
+            ) : (
+              <RoleManagementTab roles={roles} users={users} onDataChanged={loadTeamOverview} />
+            )}
+          </SlidingTabPanel>
+        </>
+      )}
+    </PageShell>
   );
 }

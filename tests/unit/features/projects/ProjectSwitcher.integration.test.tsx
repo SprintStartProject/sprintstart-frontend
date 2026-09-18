@@ -20,7 +20,17 @@ vi.mock("../../../../src/services/projectService", async (importOriginal) => {
 });
 
 function project(id: string, name: string): AdminProject {
-  return { id, name, description: "", manager: null, sources: [], users: [] };
+  return {
+    id,
+    name,
+    description: "",
+    manager: null,
+    sources: [],
+    users: [],
+    industry: "",
+    industryConfidence: null,
+    industryCustom: false,
+  };
 }
 
 describe("ProjectSwitcher end to end with the real provider", () => {

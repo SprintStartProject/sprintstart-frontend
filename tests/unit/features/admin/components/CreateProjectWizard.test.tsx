@@ -71,6 +71,9 @@ const createdProject: AdminProjectDetails = {
   manager: null,
   sources: [],
   users: [],
+  industry: "",
+  industryConfidence: null,
+  industryCustom: false,
 };
 
 function adminUser(id: string, firstName: string): AdminUser {
@@ -367,11 +370,66 @@ describe("CreateProjectWizard", () => {
       expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
         name: "Apollo",
         description: undefined,
+        industry: undefined,
       }),
     );
     expect(vi.mocked(connectGithubRepository)).not.toHaveBeenCalled();
     expect(onProjectCreated).toHaveBeenCalledWith(createdProject);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("sends the entered industry when set", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await settleModalFocus();
+
+    await user.type(screen.getByLabelText(/^Name/), "Apollo");
+    await user.type(screen.getByLabelText("Industry"), "Fintech");
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create without sources/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(projectService.createProject)).toHaveBeenCalledWith({
+        name: "Apollo",
+        description: undefined,
+        industry: "Fintech",
+      }),
+    );
+  });
+
+  it("does not send an industry when the field is left empty", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /create without sources/i }));
+
+    await waitFor(() => expect(vi.mocked(projectService.createProject)).toHaveBeenCalled());
+    const [payload] = vi.mocked(projectService.createProject).mock.calls[0];
+    expect(payload.industry).toBeUndefined();
+  });
+
+  it("shows the entered industry on the review step, or 'Not set' when empty", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await settleModalFocus();
+
+    await user.type(screen.getByLabelText(/^Name/), "Apollo");
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(await screen.findByText("Not set")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Go to Details" }));
+    await user.type(screen.getByLabelText("Industry"), "Fintech");
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(await screen.findByText("Fintech")).toBeInTheDocument();
   });
 
   it("assigns the chosen manager, picked on the details step", async () => {

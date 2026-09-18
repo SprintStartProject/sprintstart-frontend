@@ -9,7 +9,6 @@ import {
   Hourglass,
   Inbox,
   LayoutGrid,
-  Loader2,
   RefreshCw,
   Rocket,
   Search,
@@ -21,9 +20,12 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { Input } from "../../../components/ui/Input";
 import { Pagination } from "../../../components/ui/Pagination";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
+import { queryKeys } from "../../../services/queryKeys";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
 import { StatTile } from "./StatTile";
@@ -68,6 +70,60 @@ function hasActivity(hires: HireTimeline[]): boolean {
   );
 }
 
+/** Matches the `grid grid-cols-2 gap-3 lg:grid-cols-4` layout of {@link StatTile}. */
+function StatTileSkeleton() {
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-app-border bg-app-surface p-4 sm:p-[18px]">
+      <div className="flex items-center justify-between">
+        <SkeletonLine className="w-24" />
+        <SkeletonBlock className="h-[18px] w-[18px]" />
+      </div>
+      <SkeletonLine className="mt-auto h-8 w-16" />
+      <SkeletonLine className="mt-1 w-20" />
+    </div>
+  );
+}
+
+/** Matches {@link HireTimelineCard}'s avatar row and five-step moment rail. */
+function HireTimelineCardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-app-border bg-app-surface p-5">
+      <div className="flex flex-1 items-center gap-3">
+        <SkeletonBlock className="h-10 w-10 shrink-0 rounded-full" />
+        <div className="flex-1 space-y-2">
+          <SkeletonLine className="w-1/3" />
+          <SkeletonLine className="w-1/4" />
+        </div>
+      </div>
+      <div className="mt-4 flex items-start gap-4 overflow-x-hidden">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="flex w-20 shrink-0 flex-col items-center gap-2">
+            <SkeletonBlock className="h-9 w-9 rounded-full" />
+            <SkeletonLine className="w-14" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OnboardingMetricsSkeleton() {
+  return (
+    <SkeletonGroup label="Loading onboarding metrics" className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <StatTileSkeleton key={index} />
+        ))}
+      </div>
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <HireTimelineCardSkeleton key={index} />
+        ))}
+      </div>
+    </SkeletonGroup>
+  );
+}
+
 /**
  * The PM readout for the numbers the onboarding redesign is judged on:
  * time-to-first-accepted-work, response latency, and who is stalled. The
@@ -89,7 +145,6 @@ export function OnboardingMetricsPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [hireFilter, setHireFilter] = useState<HireFilter>("all");
   const [search, setSearch] = useState("");
@@ -107,28 +162,31 @@ export function OnboardingMetricsPage() {
     data: metrics,
     loading,
     error,
-  } = useFetch(
-    () =>
-      selectedProjectId
-        ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
-        : Promise.resolve(null),
-    [selectedProjectId, refreshKey],
+    refetchError,
+    isFetching,
+    refetch,
+  } = useQueryFetch(queryKeys.onboardingMetrics.project(selectedProjectId), () =>
+    selectedProjectId
+      ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
+      : Promise.resolve(null),
   );
+
+  const showLoadingSkeleton = useDelayedFlag(loading);
 
   const handleRefresh = () => {
     if (!selectedProjectId) return;
     pendingRefreshRef.current = true;
     setRefreshing(true);
-    setRefreshKey((key) => key + 1);
+    refetch();
   };
 
   // After a manual refresh settles, say what it found. The empty states below
   // already carry the "no hires" case, so this only speaks up for real outcomes.
   useEffect(() => {
-    if (loading || !pendingRefreshRef.current) return;
+    if (isFetching || !pendingRefreshRef.current) return;
     pendingRefreshRef.current = false;
     setRefreshing(false);
-    if (error) {
+    if (error || refetchError) {
       toast.error("Couldn't refresh onboarding metrics", { description: "Try again shortly." });
       return;
     }
@@ -141,11 +199,11 @@ export function OnboardingMetricsPage() {
     } else {
       toast.success("Metrics refreshed");
     }
-  }, [loading, error, metrics, toast]);
+  }, [isFetching, error, refetchError, metrics, toast]);
 
   // A load failure that wasn't a manual refresh still deserves a toast, once.
   useEffect(() => {
-    if (loading) return;
+    if (isFetching) return;
     if (!error) {
       errorToastRef.current = false;
       return;
@@ -156,12 +214,12 @@ export function OnboardingMetricsPage() {
         description: "The onboarding metrics couldn't be loaded. Try again shortly.",
       });
     }
-  }, [loading, error, toast]);
+  }, [isFetching, error, toast]);
 
   // Warn once per project when some hires have no GitHub login, since their work
   // can't be attributed and the numbers below quietly exclude it.
   useEffect(() => {
-    if (loading || error || !metrics) return;
+    if (isFetching || error || !metrics) return;
     if (metrics.unattributableMemberCount > 0 && warnedProjectRef.current !== metrics.projectId) {
       warnedProjectRef.current = metrics.projectId;
       toast.warning(
@@ -171,7 +229,7 @@ export function OnboardingMetricsPage() {
         { description: "They have no GitHub login, so their work is left out of these numbers." },
       );
     }
-  }, [loading, error, metrics, toast]);
+  }, [isFetching, error, metrics, toast]);
 
   // Stalled hires lead the per-hire list — they are what a PM should act on today.
   const orderedHires = useMemo(() => {
@@ -257,11 +315,9 @@ export function OnboardingMetricsPage() {
           <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No projects">
             There are no projects to report on yet.
           </EmptyState>
-        ) : loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-app-brand" aria-hidden="true" />
-          </div>
-        ) : error ? (
+        ) : showLoadingSkeleton ? (
+          <OnboardingMetricsSkeleton />
+        ) : loading ? null : error ? (
           <EmptyState
             icon={<AlertCircle className="h-8 w-8 text-app-danger-solid" />}
             title="Couldn't load metrics"

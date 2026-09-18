@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Check,
   MessageSquareText,
   Pencil,
@@ -7,6 +6,7 @@ import {
   SkipForward,
   ThumbsDown,
   ThumbsUp,
+  Users,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -58,6 +58,7 @@ function getElapsedDays(startedAt: string): number {
 
 import { UserAvatar } from "../components/common/UserAvatar";
 import { Modal } from "../components/ui/Modal";
+import { PageShell } from "../components/layout/PageShell";
 import { PanelPresence } from "../components/ui/PanelPresence";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
@@ -500,14 +501,6 @@ export function TeamMemberDetailPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-app-text-muted">Loading team member...</p>
-      </div>
-    );
-  }
-
   function goBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
       void navigate(-1);
@@ -516,23 +509,35 @@ export function TeamMemberDetailPage() {
     }
   }
 
+  // Loading and not-found share PageShell with the success render below, so the band
+  // (and the back button in it) never disappears and reappears while the member loads.
+  if (loading) {
+    return (
+      <PageShell
+        icon={Users}
+        title="Team member"
+        subtitle=""
+        back={{ label: "Back", onClick: goBack }}
+      >
+        <div className="flex min-h-96 items-center justify-center">
+          <p className="text-sm text-app-text-muted">Loading team member...</p>
+        </div>
+      </PageShell>
+    );
+  }
+
   if (!user) {
     return (
-      <div className="min-h-screen bg-app-bg">
-        <main className="app-page-frame py-8">
-          <button
-            onClick={goBack}
-            className="inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-
-          <div className="mt-6 rounded-3xl border border-app-border bg-app-surface p-8">
-            <p className="text-sm text-app-text">Team member not found.</p>
-          </div>
-        </main>
-      </div>
+      <PageShell
+        icon={Users}
+        title="Team member"
+        subtitle=""
+        back={{ label: "Back", onClick: goBack }}
+      >
+        <div className="rounded-3xl border border-app-border bg-app-surface p-8">
+          <p className="text-sm text-app-text">Team member not found.</p>
+        </div>
+      </PageShell>
     );
   }
 
@@ -592,34 +597,27 @@ export function TeamMemberDetailPage() {
     .slice(0, 3);
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      <header className="border-b border-app-border bg-app-bg">
-        <div className="app-page-frame py-6">
-          <button
-            onClick={goBack}
-            className="mb-4 inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
+    <>
+      <PageShell
+        icon={Users}
+        title={`${user.firstname} ${user.lastname}`}
+        subtitle={user.currentStep?.title || "Onboarding completed"}
+        back={{ label: "Back", onClick: goBack }}
+        mainClassName="pt-6 pb-24 lg:pt-8"
+        bandExtra={
+          <div>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center justify-center">
+                  <UserAvatar
+                    profileIcon={user.profileIcon}
+                    fallbackName={`${user.firstname} ${user.lastname}`.trim()}
+                    seed={user.userId}
+                    size={56}
+                  />
+                </div>
 
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex shrink-0 items-center justify-center">
-                <UserAvatar
-                  profileIcon={user.profileIcon}
-                  fallbackName={`${user.firstname} ${user.lastname}`.trim()}
-                  seed={user.userId}
-                  size={56}
-                />
-              </div>
-
-              <div>
-                <h1 className="text-2xl font-bold text-app-text">
-                  {user.firstname} {user.lastname}
-                </h1>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {user.roles.length > 0 ? (
                     user.roles.map((role) => (
                       <button
@@ -646,42 +644,40 @@ export function TeamMemberDetailPage() {
                   )}
                 </div>
               </div>
+
+              <div className="lg:text-right">
+                <p className="text-xs font-medium tracking-wide text-app-text-muted uppercase">
+                  Current Step
+                  {user.currentStep?.startedAt && (
+                    <span className="ml-2 font-normal normal-case">
+                      · {elapsedDays} {elapsedDays === 1 ? "day" : "days"} ago
+                    </span>
+                  )}
+                </p>
+
+                <p className="mt-2 text-sm font-medium text-app-text">
+                  {user.currentStep?.title || "Onboarding Completed"}
+                </p>
+              </div>
             </div>
 
-            <div className="lg:text-right">
-              <p className="text-xs font-medium tracking-wide text-app-text-muted uppercase">
-                Current Step
-                {user.currentStep?.startedAt && (
-                  <span className="ml-2 font-normal normal-case">
-                    · {elapsedDays} {elapsedDays === 1 ? "day" : "days"} ago
-                  </span>
-                )}
-              </p>
+            <div className="mt-6 flex items-center gap-3">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-app-border-muted">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
+                  style={{
+                    width: `${progressPercentage}%`,
+                  }}
+                />
+              </div>
 
-              <p className="mt-2 text-sm font-medium text-app-text">
-                {user.currentStep?.title || "Onboarding Completed"}
-              </p>
+              <span className="text-sm font-medium text-app-text tabular-nums">
+                {progressPercentage}%
+              </span>
             </div>
           </div>
-
-          <div className="mt-6 flex items-center gap-3">
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-app-border-muted">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
-                style={{
-                  width: `${progressPercentage}%`,
-                }}
-              />
-            </div>
-
-            <span className="text-sm font-medium text-app-text tabular-nums">
-              {progressPercentage}%
-            </span>
-          </div>
-        </div>
-      </header>
-
-      <main className="app-page-frame py-6 pb-24 lg:py-8">
+        }
+      >
         <MemberJourneySection
           userId={user.userId}
           memberName={`${user.firstname} ${user.lastname}`.trim()}
@@ -901,7 +897,7 @@ export function TeamMemberDetailPage() {
             }}
           />
         </aside>
-      </main>
+      </PageShell>
 
       <Modal
         isOpen={rolesModalOpen}
@@ -1041,6 +1037,6 @@ export function TeamMemberDetailPage() {
           />
         )}
       </PanelPresence>
-    </div>
+    </>
   );
 }

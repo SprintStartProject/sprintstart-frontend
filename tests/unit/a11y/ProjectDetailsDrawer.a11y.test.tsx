@@ -13,6 +13,8 @@ vi.mock("../../../src/services/projectService", () => ({
       description: "Main application",
       manager: null,
       tags: [],
+      industry: "",
+      industryConfidence: null,
       sources: [{ id: "s1", name: "GitHub", type: "GITHUB", status: "CONNECTED" }],
       users: [
         {
@@ -37,6 +39,9 @@ const project: ProjectOverview = {
   manager: null,
   sources: [],
   users: [],
+  industry: "",
+  industryConfidence: null,
+  industryCustom: false,
 };
 
 describe("ProjectDetailsDrawer Accessibility", () => {

@@ -3,7 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
-import { Spinner } from "../../../components/ui/Spinner";
+import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
+
+/**
+ * A generic stand-in for a widget's own figures — every widget shows something different, so
+ * this is deliberately not shaped like any one of them, just enough rows to fill the card.
+ */
+function WidgetBodySkeleton() {
+  return (
+    <SkeletonGroup label="Loading" className="flex flex-1 flex-col justify-center gap-3">
+      <SkeletonLine className="w-3/4" />
+      <SkeletonLine className="w-1/2" />
+      <SkeletonLine className="w-2/3" />
+    </SkeletonGroup>
+  );
+}
 
 export type WidgetShellProps = {
   icon: LucideIcon;
@@ -69,6 +84,7 @@ export function WidgetShell({
   children,
 }: WidgetShellProps) {
   const navigate = useNavigate();
+  const showLoadingSkeleton = useDelayedFlag(isLoading);
 
   const isInteractive = to !== undefined || onActivate !== undefined;
 
@@ -113,11 +129,9 @@ export function WidgetShell({
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="relative flex flex-1 items-center justify-center">
-          <Spinner size="lg" label="Loading" />
-        </div>
-      ) : errorMessage ? (
+      {showLoadingSkeleton ? (
+        <WidgetBodySkeleton />
+      ) : isLoading ? null : errorMessage ? (
         <div className="relative flex flex-1 flex-col items-center justify-center gap-2 text-center">
           <AlertTriangle aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
           <p className="text-sm text-app-text-muted">{errorMessage}</p>

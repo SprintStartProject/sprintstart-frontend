@@ -101,6 +101,15 @@ export type BuddyMessageView = BuddyMessage & {
    */
   startsVisit?: boolean;
   /**
+   * True for the buddy's opening greeting, whether it was streamed here or read back as the only
+   * message of an unanswered visit.
+   *
+   * The greeting is written before the hire ever opens a surface (see `useBuddy`), so it is the
+   * one message that can already be finished the first time anybody sees it. Marking it is what
+   * lets `useGreetingReveal` give it the thinking beat it would have had if it had been watched.
+   */
+  isGreeting?: boolean;
+  /**
    * Why this turn has no answer in it, when a stream failed rather than finished.
    *
    * The same shape the chat feature uses, and for the same reason: whatever streamed before the

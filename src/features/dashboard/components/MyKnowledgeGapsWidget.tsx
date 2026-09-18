@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { Clock, FileWarning, FolderOpen, ShieldCheck } from "lucide-react";
 import { canAccessRoute } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
+import { queryKeys } from "../../../services/queryKeys";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { MyKnowledgeGapsDrawer } from "../../knowledge-gaps/components/MyKnowledgeGapsDrawer";
@@ -413,27 +414,23 @@ function HiddenCount({ hidden }: { hidden: number }) {
  */
 export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
   const { profile } = useAuth();
-  const { selectedProjectId, canManageSelected } = useProjectContext();
+  const { hasSelectedProject, selectedProjectId, canManageSelected } = useProjectContext();
   // Only the unread flag comes from the shared provider; the figures below stay this widget's
   // own request, so the card still works wherever it is rendered.
   const { unseenComponents, markAllSeen } = useMyKnowledgeGaps();
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
   /*
-    The project context starts empty and only fills in once the project list has loaded — and
-    it stays empty for a user who belongs to no project at all. Asking for `?projectId=` is a
-    400 the moment it leaves the browser, so the request is not made until there is something
-    to ask about. Skipping it also keeps that case out of the error state, which is not what
-    "the request failed" should mean.
+    The request waits for a confirmed project, the same gate the shared provider uses. The
+    project context starts empty and only fills in once the project list has loaded — and it
+    stays empty for a user who belongs to no project at all. Asking before a project is
+    confirmed either sends an empty `projectId` (a guaranteed 400) or, with a `?projectId=`
+    deep link, asks about a project no loaded list has called reachable.
   */
-  const hasProject = selectedProjectId !== "";
-
-  const { data, loading, error } = useFetch(
-    () =>
-      hasProject
-        ? knowledgeGapService.fetchMyKnowledgeGaps(selectedProjectId)
-        : Promise.resolve({ gaps: [] }),
-    [selectedProjectId],
+  const { data, loading, error } = useQueryFetch(
+    queryKeys.knowledgeGaps.mine(selectedProjectId),
+    () => knowledgeGapService.fetchMyKnowledgeGaps(selectedProjectId),
+    { enabled: hasSelectedProject },
   );
 
   const canOpenPage = canAccessRoute(profile, "/insights/knowledge-gaps", canManageSelected);
@@ -542,7 +539,7 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
         // gets the empty state below — the two must never be told apart by guesswork.
         errorMessage={error ? "Could not load your knowledge gaps." : null}
       >
-        {!hasProject ? (
+        {!hasSelectedProject ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
             <FolderOpen aria-hidden="true" className="h-5 w-5 text-app-text-muted" />
             <p className="text-sm font-medium text-app-text">No project selected.</p>

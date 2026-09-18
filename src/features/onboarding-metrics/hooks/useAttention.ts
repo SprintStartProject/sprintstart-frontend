@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
+import { queryKeys } from "../../../services/queryKeys";
 import type { ProjectAttention } from "../types";
 
 type UseAttentionResult = {
@@ -20,34 +21,35 @@ type UseAttentionResult = {
  * @param projectId The selected project, or empty string when none is chosen.
  */
 export function useAttention(projectId: string): UseAttentionResult {
-  const [attention, setAttention] = useState<ProjectAttention | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.attention.byProject(projectId);
 
-  const reload = useCallback(async () => {
-    if (!projectId) {
-      setAttention(null);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      setAttention(await onboardingMetricsService.fetchAttention(projectId));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the attention list.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [projectId]);
+  const {
+    data,
+    isLoading: isQueryLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: () => onboardingMetricsService.fetchAttention(projectId),
+    enabled: Boolean(projectId),
+  });
 
-  useEffect(() => {
-    // Deferred through a microtask so the first setState isn't synchronous in
-    // the effect body (React 19 cascading-render guard).
-    void (async () => {
-      await reload();
-    })();
-  }, [reload]);
-
-  return { attention, isLoading, error, reload };
+  return {
+    attention: projectId ? (data ?? null) : null,
+    isLoading: Boolean(projectId) && isQueryLoading,
+    error: isError
+      ? error instanceof Error
+        ? error.message
+        : "Could not load the attention list."
+      : null,
+    // Cancels any in-flight fetch first (react-query only supersedes one on its
+    // own once the query has data, and the very first load never does), so an
+    // explicit reload always wins over a slow one already in flight.
+    reload: async () => {
+      await queryClient.cancelQueries({ queryKey });
+      await refetch();
+    },
+  };
 }

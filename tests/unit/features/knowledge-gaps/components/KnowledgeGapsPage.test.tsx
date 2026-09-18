@@ -115,16 +115,17 @@ describe("KnowledgeGapsPage", () => {
     expect(card.getByText(/all expected documentation present \(2\)/i)).toBeInTheDocument();
   });
 
-  it("shows loading state", () => {
-    vi.mocked(useLiveFetch).mockReturnValueOnce({
+  it("shows loading state", async () => {
+    vi.mocked(useLiveFetch).mockReturnValue({
       data: null,
       loading: true,
       revalidating: false,
       error: false,
       refresh: () => {},
     });
-    const { container } = renderPage();
-    expect(container.querySelector(".animate-spin")).toBeInTheDocument();
+    renderPage();
+    // The skeleton only appears after a short delay, so it never flashes on a fast load.
+    expect(await screen.findByText("Loading knowledge gaps")).toBeInTheDocument();
   });
 
   // The four no-gaps-to-show outcomes below used to render one shared message.

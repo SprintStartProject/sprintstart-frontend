@@ -58,7 +58,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // in it. Switching projects therefore has to reset chat state the same way a user
   // change does — otherwise the previous project's chats and cached messages stay on
   // screen while the sidebar has already moved on.
-  const { selectedProjectId } = useProjectContext();
+  const { hasSelectedProject, selectedProjectId } = useProjectContext();
+
+  // Chats are asked for only once a project is confirmed. The provider never publishes an
+  // unconfirmed ID (a stored one or a `?projectId=` deep link is held back until the loaded
+  // list vouches for it), so this gate is false exactly while the list is still loading —
+  // which is when asking about a selection would be premature.
 
   const [chats, setChats] = useState<Chat[]>([]);
   // The project `chats` was last loaded for. Consumers need it to tell "this project has no
@@ -212,12 +217,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
    * Loads the user's chats for the selected project once auth is ready.
    * Gated on `userId` so the fetch doesn't fire before Keycloak has
    * initialized — which would 401 and trigger a login redirect loop — and on
-   * `selectedProjectId` because the listing is project-scoped.
+   * `hasSelectedProject`, because the listing is project-scoped and only a
+   * project the loaded list contains is known to be one this user reaches.
    * Resets all chat state when either changes, so neither a previous user's nor
    * a previous project's messages are ever visible afterwards.
    */
   useEffect(() => {
-    if (!userId || !selectedProjectId) return;
+    if (!userId || !hasSelectedProject) return;
 
     // Reset + fetch run inside an async callback so the synchronous resets
     // (before the first await) don't trip the "setState in effect body"
@@ -266,7 +272,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setChatsProjectId(selectedProjectId);
       }
     })();
-  }, [userId, selectedProjectId, clearStreamTimeout]);
+  }, [userId, hasSelectedProject, selectedProjectId, clearStreamTimeout]);
 
   const sortedChats = useMemo(
     () =>

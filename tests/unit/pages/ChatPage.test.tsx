@@ -12,7 +12,11 @@ vi.mock("../../../src/context/useAuth", () => ({
 }));
 
 vi.mock("../../../src/features/projects/useProjectContext", () => ({
-  useProjectContext: () => ({ selectedProjectId: "project1" }),
+  useProjectContext: () => ({
+    selectedProjectId: "project1",
+    selectedProject: { id: "project1", name: "Project Alpha" },
+    hasSelectedProject: true,
+  }),
 }));
 
 const mockHandleSubmit = vi.fn();
