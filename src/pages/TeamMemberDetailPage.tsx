@@ -691,6 +691,9 @@ export function TeamMemberDetailPage() {
           onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
           onDeleteStep={setGraphStepToDelete}
           onReviewSkip={reviewSkip}
+          feedbackItems={feedbackItems}
+          onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+          markingFeedbackId={markingFeedbackId}
           onPathChanged={refreshOnboardingPath}
         />
 

@@ -47,6 +47,8 @@ import {
 } from "../../../onboarding/journey";
 import { resolveNextAction } from "../../../onboarding/nextAction";
 import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "../../../onboarding/types";
+import type { OnboardingFeedback } from "../../../../services/teamManagementService";
+import { FeedbackNote } from "./FeedbackNote";
 import { SkipReview, type SkipReviewAction } from "./SkipReview";
 import { StepQuickEdit } from "./StepQuickEdit";
 
@@ -65,6 +67,10 @@ type Props = {
   onDeleteStep: (stepId: string) => void;
   /** Answers a step's pending skip request. */
   onReviewSkip?: (skipId: string, action: SkipReviewAction, comment: string) => Promise<void>;
+  /** The member's feedback, shown with the step it is about. */
+  feedbackItems?: OnboardingFeedback[];
+  onMarkFeedbackRead?: (feedbackId: string) => void;
+  markingFeedbackId?: string | null;
   /** Re-reads the path after a change. */
   onPathChanged: () => Promise<void>;
 };
@@ -100,6 +106,9 @@ export function MemberJourneySection({
   onOpenQuestions,
   onDeleteStep,
   onReviewSkip,
+  feedbackItems = [],
+  onMarkFeedbackRead,
+  markingFeedbackId = null,
   onPathChanged,
 }: Props) {
   const toast = useToast();
@@ -468,6 +477,16 @@ export function MemberJourneySection({
                             }
                           />
                         ) : null}
+                        {feedbackItems
+                          .filter((feedback) => feedback.stepId === item.id)
+                          .map((feedback) => (
+                            <FeedbackNote
+                              key={feedback.id}
+                              feedback={feedback}
+                              marking={markingFeedbackId === feedback.id}
+                              onMarkRead={onMarkFeedbackRead}
+                            />
+                          ))}
                         <StepQuickEdit
                           key={`${item.step.id}:${item.step.title}:${item.step.description}`}
                           step={item.step}
