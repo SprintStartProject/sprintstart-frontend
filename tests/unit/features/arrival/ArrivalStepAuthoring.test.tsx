@@ -58,18 +58,18 @@ describe("ArrivalStepAuthoring", () => {
     mockLists([step()]);
   });
 
-  it("shows only the company-wide block without a project in context", async () => {
+  it("shows just the steps, with no section marks, without a project in context", async () => {
     render(<ArrivalStepAuthoring />);
 
-    expect(await screen.findByText("Everyone")).toBeInTheDocument();
     expect(await screen.findByText("Request VPN access")).toBeInTheDocument();
-    // No scope to switch between, so no switcher and one `listSteps` call.
+    // Nothing to mark a company step against without a second list, so no section labels either.
+    expect(screen.queryByText("For everyone")).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Which list to show" })).not.toBeInTheDocument();
     expect(arrivalService.listSteps).toHaveBeenCalledTimes(1);
     expect(arrivalService.listSteps).toHaveBeenCalledWith(null);
   });
 
-  it("loads and shows both blocks together when a project is in context", async () => {
+  it("shows both sections with marks when a project is in context", async () => {
     mockLists(
       [step({ key: "vpn", title: "Request VPN access" })],
       [step({ key: "staging-db", title: "Get staging DB access", projectId: "p1" })],
@@ -77,26 +77,21 @@ describe("ArrivalStepAuthoring", () => {
 
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
 
-    expect(await screen.findByText("Everyone")).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Apollo" })).toBeInTheDocument();
+    expect(await screen.findByText("For everyone")).toBeInTheDocument();
+    expect(await screen.findByText("Only in Apollo")).toBeInTheDocument();
     expect(screen.getByText("Request VPN access")).toBeInTheDocument();
     expect(screen.getByText("Get staging DB access")).toBeInTheDocument();
     expect(arrivalService.listSteps).toHaveBeenCalledWith(null);
     expect(arrivalService.listSteps).toHaveBeenCalledWith("p1");
   });
 
-  it("hides the project block behind 'Company-wide only'", async () => {
-    mockLists(
-      [step({ key: "vpn" })],
-      [step({ key: "staging-db", title: "Get staging DB access", projectId: "p1" })],
-    );
+  it("shows a subdued line instead of a mark when the project has nothing of its own", async () => {
+    mockLists([step({ key: "vpn" })], []);
 
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
-    await screen.findByText("Get staging DB access");
 
-    fireEvent.click(screen.getByRole("button", { name: "Company-wide only" }));
-
-    expect(screen.queryByText("Get staging DB access")).not.toBeInTheDocument();
+    expect(await screen.findByText("Nothing extra for Apollo yet")).toBeInTheDocument();
+    expect(screen.queryByText("Only in Apollo")).not.toBeInTheDocument();
   });
 
   it("marks a company step that a project overrides, without touching its controls", async () => {
@@ -180,7 +175,7 @@ describe("ArrivalStepAuthoring", () => {
     expect(
       screen.queryByRole("button", { name: /Edit "Request VPN access"/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/a PM or an admin can/i)).toBeInTheDocument();
+    expect(screen.getByText("Only PMs and admins can change this list.")).toBeInTheDocument();
   });
 
   it("creates into the company scope by default without a project in context", async () => {

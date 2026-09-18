@@ -1,20 +1,17 @@
-import { useEffect, useState, type DragEvent, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronUp, CornerDownRight, Eye, Pencil, Plus } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Check, Eye, Pencil, Plus } from "lucide-react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
-import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
-import { DragHandle } from "../../../components/ui/DragHandle";
 import { DrawerCard } from "../../admin/components/DrawerCard";
-import { EmptyState } from "../../../components/ui/EmptyState";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
-import { SegmentedTabs } from "../../../components/ui/SegmentedTabs";
 import { Spinner } from "../../../components/ui/Spinner";
 import { Textarea } from "../../../components/ui/Textarea";
 import { useToast } from "../../../context/useToast";
 import { useArrivalAuthoring } from "../hooks/useArrivalAuthoring";
 import { slugifyStepKey } from "../slug";
+import { ArrivalStepThread } from "./ArrivalStepThread";
 import type {
   ArrivalScope,
   ArrivalStep,
@@ -67,8 +64,6 @@ export function ArrivalStepAuthoring({
   } = useArrivalAuthoring(projectId);
 
   const hasProject = projectId !== null;
-  const [scope, setScope] = useState<ArrivalScope>(hasProject ? "project" : "company");
-  const showingProject = hasProject && scope === "project";
 
   const [adding, setAdding] = useState(false);
   // Held on the list rather than on the row: one dialog at a time, and the row that opened it may
@@ -112,78 +107,55 @@ export function ArrivalStepAuthoring({
   const projectSteps = project ?? [];
   const companyKeys = new Set(companySteps.map((step) => step.key));
   const overriddenKeys = new Set(projectSteps.map((step) => step.key));
+  // A step a project overrides is still one entry on the hire's list, not two — it is a
+  // replacement, not an addition. Same calculation as the Overview tab's Arrive card.
+  const mergedStepCount =
+    companySteps.filter((step) => !overriddenKeys.has(step.key)).length + projectSteps.length;
+  const countLabel = hasProject
+    ? `${mergedStepCount} ${mergedStepCount === 1 ? "step" : "steps"} for a new hire on ${
+        projectName ?? "this project"
+      }`
+    : `${mergedStepCount} ${mergedStepCount === 1 ? "step" : "steps"} for every new hire`;
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {!readOnly && !adding && (
-          <Button
-            variant="secondary"
-            onClick={() => setAdding(true)}
-            icon={<Plus className="h-4 w-4" aria-hidden="true" />}
-          >
-            Add a step
-          </Button>
-        )}
-        {actions}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-app-text-muted">{countLabel}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {!readOnly && !adding && (
+            <Button
+              variant="secondary"
+              onClick={() => setAdding(true)}
+              icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+            >
+              Add a step
+            </Button>
+          )}
+          {actions}
+        </div>
       </div>
-
-      {hasProject && (
-        <SegmentedTabs
-          value={scope}
-          onChange={setScope}
-          layoutId="arrival-scope-pill"
-          ariaLabel="Which list to show"
-          options={[
-            { value: "project", label: projectName ?? "This project" },
-            { value: "company", label: "Company-wide only" },
-          ]}
-        />
-      )}
 
       <SuggestionChips derivable={derivable} readOnly={readOnly} onAdd={addDerivable} />
 
-      <StepBlock
-        heading="Everyone"
-        description="Every new hire, any project."
-        badgeVariant="neutral"
-        steps={companySteps}
-        readOnly={readOnly}
-        replacedKeys={showingProject ? overriddenKeys : EMPTY_SET}
-        overrideKeys={EMPTY_SET}
+      <ArrivalStepThread
+        companySteps={companySteps}
+        projectSteps={projectSteps}
+        hasProject={hasProject}
         projectName={projectName}
-        onMove={(key, direction) => void move(key, direction, "company")}
-        onReorder={(orderedKeys) => void reorder(orderedKeys, "company")}
-        onEdit={(step) => setEditing({ step, scope: "company" })}
+        readOnly={readOnly}
+        onMove={(key, direction, scope) => void move(key, direction, scope)}
+        onReorder={(orderedKeys, scope) => void reorder(orderedKeys, scope)}
+        onEdit={(step, scope) => setEditing({ step, scope })}
       />
 
-      {showingProject && (
-        <StepBlock
-          heading={projectName ?? "This project"}
-          description={`Added on top for people on ${projectName ?? "this project"}.`}
-          badgeVariant="brand"
-          steps={projectSteps}
-          readOnly={readOnly}
-          replacedKeys={EMPTY_SET}
-          overrideKeys={companyKeys}
-          projectName={projectName}
-          onMove={(key, direction) => void move(key, direction, "project")}
-          onReorder={(orderedKeys) => void reorder(orderedKeys, "project")}
-          onEdit={(step) => setEditing({ step, scope: "project" })}
-        />
-      )}
-
       {readOnly ? (
-        <EmptyState size="sm">
-          You can see this list but not change it — a PM or an admin can. If something here is wrong
-          or missing, that is who to tell.
-        </EmptyState>
+        <p className="text-sm text-app-text-subtle">Only PMs and admins can change this list.</p>
       ) : (
         adding && (
           <AddStepForm
             hasProject={hasProject}
             projectName={projectName}
-            defaultWho={scope}
+            defaultWho={hasProject ? "project" : "company"}
             onCancel={() => setAdding(false)}
             onCreate={async (request, who) => {
               if (await create(request, who)) setAdding(false);
@@ -232,8 +204,8 @@ export function ArrivalStepAuthoring({
           const companyStep = companySteps.find((step) => step.key === editing.step.key);
           const isOverride = editing.scope === "project" && companyKeys.has(editing.step.key);
           const replacedForProject =
-            editing.scope === "company" && showingProject && overriddenKeys.has(editing.step.key);
-          const askScope = editing.scope === "company" && showingProject && !replacedForProject;
+            editing.scope === "company" && hasProject && overriddenKeys.has(editing.step.key);
+          const askScope = editing.scope === "company" && hasProject && !replacedForProject;
 
           return (
             <EditStepDrawer
@@ -279,8 +251,6 @@ export function ArrivalStepAuthoring({
     </section>
   );
 }
-
-const EMPTY_SET = new Set<string>();
 
 function radioCardClassName(active: boolean): string {
   return `rounded-xl border p-3 text-left transition-colors ${
@@ -345,239 +315,6 @@ function SuggestionChips({
             {derivation.suggestedTitle}
           </button>
         ),
-      )}
-    </div>
-  );
-}
-
-/**
- * One scope's steps as a timeline: numbered, draggable via `DragHandle`, and reorderable with
- * the up/down buttons for anyone who cannot drag. `replacedKeys` and `overrideKeys` are always
- * one or the other, never both — a block shows either the company list (where a project override
- * can shadow a row) or a project list (where a row can itself be that override).
- */
-function StepBlock({
-  heading,
-  description,
-  badgeVariant,
-  steps,
-  readOnly,
-  replacedKeys,
-  overrideKeys,
-  projectName,
-  onMove,
-  onReorder,
-  onEdit,
-}: {
-  heading: string;
-  description: string;
-  badgeVariant: "neutral" | "brand";
-  steps: ArrivalStep[];
-  readOnly: boolean;
-  replacedKeys: Set<string>;
-  overrideKeys: Set<string>;
-  projectName: string | null;
-  onMove: (key: string, direction: "up" | "down") => void;
-  onReorder: (orderedKeys: string[]) => void;
-  onEdit: (step: ArrivalStep) => void;
-}) {
-  const [draggedKey, setDraggedKey] = useState<string | null>(null);
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-
-  return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold text-app-text">{heading}</h3>
-        <Badge variant={badgeVariant} size="sm">
-          {steps.length}
-        </Badge>
-        <span className="text-xs text-app-text-muted">{description}</span>
-      </div>
-
-      {steps.length === 0 ? (
-        <EmptyState size="sm">No steps here yet.</EmptyState>
-      ) : (
-        <ol className="space-y-2">
-          {steps.map((step, index) => {
-            const replaced = replacedKeys.has(step.key);
-            const isOverride = overrideKeys.has(step.key);
-            const draggable = !readOnly && !replaced;
-
-            return (
-              <li
-                key={step.key}
-                draggable={draggable}
-                onDragStart={(event: DragEvent<HTMLLIElement>) => {
-                  if (!draggable) return;
-                  event.dataTransfer.effectAllowed = "move";
-                  event.dataTransfer.setData("text/plain", step.key);
-                  setDraggedKey(step.key);
-                }}
-                onDragEnd={() => {
-                  setDraggedKey(null);
-                  setDragOverKey(null);
-                }}
-                onDragOver={(event: DragEvent<HTMLLIElement>) => {
-                  if (!draggedKey || draggedKey === step.key) return;
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                  setDragOverKey(step.key);
-                }}
-                onDragLeave={(event: DragEvent<HTMLLIElement>) => {
-                  const next = event.relatedTarget;
-                  if (next instanceof Node && event.currentTarget.contains(next)) return;
-                  setDragOverKey((current) => (current === step.key ? null : current));
-                }}
-                onDrop={(event: DragEvent<HTMLLIElement>) => {
-                  event.preventDefault();
-                  if (!draggedKey || draggedKey === step.key) return;
-                  const from = steps.findIndex((candidate) => candidate.key === draggedKey);
-                  const to = steps.findIndex((candidate) => candidate.key === step.key);
-                  setDraggedKey(null);
-                  setDragOverKey(null);
-                  if (from === -1 || to === -1) return;
-                  const reordered = [...steps];
-                  const [moved] = reordered.splice(from, 1);
-                  reordered.splice(to, 0, moved);
-                  onReorder(reordered.map((candidate) => candidate.key));
-                }}
-                className="flex items-start gap-2"
-              >
-                <span
-                  aria-hidden="true"
-                  className="mt-2.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-app-border bg-app-surface text-[11px] font-bold text-app-text-muted"
-                >
-                  {replaced ? "·" : index + 1}
-                </span>
-                <StepRow
-                  step={step}
-                  readOnly={readOnly}
-                  replaced={replaced}
-                  isOverride={isOverride}
-                  projectName={projectName}
-                  draggable={draggable}
-                  isDragTarget={dragOverKey === step.key && draggedKey !== step.key}
-                  canMoveUp={!replaced && index > 0}
-                  canMoveDown={!replaced && index < steps.length - 1}
-                  onMove={(direction) => onMove(step.key, direction)}
-                  onEdit={() => onEdit(step)}
-                />
-              </li>
-            );
-          })}
-        </ol>
-      )}
-    </section>
-  );
-}
-
-function StepRow({
-  step,
-  readOnly,
-  replaced,
-  isOverride,
-  projectName,
-  draggable,
-  isDragTarget,
-  canMoveUp,
-  canMoveDown,
-  onMove,
-  onEdit,
-}: {
-  step: ArrivalStep;
-  readOnly: boolean;
-  replaced: boolean;
-  isOverride: boolean;
-  projectName: string | null;
-  draggable: boolean;
-  isDragTarget: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  onMove: (direction: "up" | "down") => void;
-  onEdit: () => void;
-}) {
-  return (
-    <div
-      className={`group/step flex flex-1 items-start gap-2 rounded-2xl border p-3 transition-colors ${
-        replaced
-          ? "border-dashed border-app-border bg-app-surface-muted"
-          : "border-app-border bg-app-surface"
-      } ${isDragTarget ? "border-app-brand ring-2 ring-app-brand-glow" : ""}`}
-    >
-      {draggable && (
-        <DragHandle visibleClassName="group-hover/step:mr-1 group-hover/step:w-4 group-hover/step:opacity-100 group-hover/step:text-app-text-muted" />
-      )}
-
-      <div className="min-w-0 flex-1">
-        <p
-          className={`text-sm ${replaced ? "text-app-text-subtle line-through" : "text-app-text"}`}
-        >
-          {step.title}
-        </p>
-        {step.description && <p className="mt-1 text-xs text-app-text-muted">{step.description}</p>}
-
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {replaced && (
-            <Badge variant="brand" size="sm">
-              <CornerDownRight className="h-3 w-3" aria-hidden="true" />
-              Replaced for {projectName ?? "this project"}
-            </Badge>
-          )}
-          {isOverride && (
-            <Badge variant="brand" size="sm">
-              <CornerDownRight className="h-3 w-3" aria-hidden="true" />
-              Replaces the company wording
-            </Badge>
-          )}
-          {step.settledBy === "OBSERVED" && (
-            <Badge variant="success" size="sm">
-              <Eye className="h-3 w-3" aria-hidden="true" />
-              We check this
-            </Badge>
-          )}
-          {step.settledBy === "OBSERVED" && !step.selfConfirmable && (
-            <Badge variant="neutral" size="sm">
-              Hire can&apos;t tick it
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {!readOnly && !replaced && (
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={() => onMove("up")}
-            disabled={!canMoveUp}
-            aria-label={`Move "${step.title}" earlier`}
-          >
-            <ChevronUp className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={() => onMove("down")}
-            disabled={!canMoveDown}
-            aria-label={`Move "${step.title}" later`}
-          >
-            <ChevronDown className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </div>
-      )}
-
-      {!readOnly && (
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          onClick={onEdit}
-          aria-label={`Edit "${step.title}"`}
-        >
-          <Pencil className="h-4 w-4" aria-hidden="true" />
-        </Button>
       )}
     </div>
   );
