@@ -4,7 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { LogOut, Menu, Settings, X } from "lucide-react";
 import { UserAvatar } from "../common/UserAvatar";
 import { useAuth } from "../../context/useAuth";
-import { canAccessRoute, type AppRoute } from "../../auth/accessPolicy";
+import { canAccessRoute, isOnboardingAccessible, type AppRoute } from "../../auth/accessPolicy";
 import { ProjectSwitcher } from "../../features/projects/components/ProjectSwitcher";
 import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
@@ -12,6 +12,7 @@ import { useOnboardingJourney } from "../../features/onboarding/generation/Onboa
 import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledgeGaps";
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
+import { useUnseenSkipAnswerCount } from "../../features/onboarding/hooks/useUnseenSkipAnswerCount";
 import {
   AdminIcon,
   ArrivalStepsIcon,
@@ -53,6 +54,8 @@ type SidebarContentProps = {
    * same reason as the flag above: this component is mounted twice at once.
    */
   openEscalationCount?: number;
+  /** Skip requests the project manager answered that the member has not looked at yet. */
+  unseenSkipAnswerCount?: number;
 };
 
 /**
@@ -165,6 +168,7 @@ function SidebarContent({
   "aria-label": ariaLabel = "Primary Navigation",
   hasPmAttentionItems = false,
   openEscalationCount = 0,
+  unseenSkipAnswerCount = 0,
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
@@ -308,12 +312,15 @@ function SidebarContent({
                   pointerY={pointerY}
                   hasAttentionMarker={
                     (item.path === "/pm-dashboard" && hasPmAttentionItems) ||
-                    (item.path === "/" && hasUnseenKnowledgeGaps)
+                    (item.path === "/" && hasUnseenKnowledgeGaps) ||
+                    (item.path === "/onboarding" && unseenSkipAnswerCount > 0)
                   }
                   attentionLabel={
                     item.path === "/"
                       ? "A component has been assigned to you"
-                      : "Open skip requests or unread feedback"
+                      : item.path === "/onboarding"
+                        ? "Your project manager answered a skip request"
+                        : "Open skip requests or unread feedback"
                   }
                   count={item.path === ESCALATION_INBOX_PATH ? openEscalationCount : 0}
                   busy={item.path === "/onboarding" && generation.status === "running"}
@@ -439,6 +446,14 @@ export function SideBar() {
     pathname,
   );
 
+  // Owned here for the same reason: read once, handed to both sidebars.
+  const { availability } = useOnboardingJourney();
+  const unseenSkipAnswerCount = useUnseenSkipAnswerCount(
+    profile?.id,
+    isOnboardingAccessible(profile) && availability === "path",
+    pathname,
+  );
+
   const closeMobileSidebar = () => {
     setIsMobileSidebarOpen(false);
   };
@@ -453,6 +468,7 @@ export function SideBar() {
           aria-label="Desktop Navigation"
           hasPmAttentionItems={hasPmAttentionItems}
           openEscalationCount={openEscalationCount}
+          unseenSkipAnswerCount={unseenSkipAnswerCount}
         />
       </aside>
 
@@ -505,6 +521,7 @@ export function SideBar() {
           onNavigate={closeMobileSidebar}
           hasPmAttentionItems={hasPmAttentionItems}
           openEscalationCount={openEscalationCount}
+          unseenSkipAnswerCount={unseenSkipAnswerCount}
         />
       </aside>
     </>

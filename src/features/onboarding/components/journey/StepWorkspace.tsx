@@ -132,6 +132,7 @@ export function StepWorkspace({
   const isBehind = step.status === "FINISHED" || step.status === "SKIPPED";
   const skipPending = !!step.skip && step.skip.accepted === null;
   const skipDeclined = !!step.skip && step.skip.accepted === false && step.status !== "SKIPPED";
+  const skipApproved = !!step.skip && step.skip.accepted === true;
   const isFocus = layout === "focus";
 
   const start = async () => {
@@ -265,6 +266,19 @@ export function StepWorkspace({
             You can keep working on it meanwhile.
             {step.skip?.reason ? (
               <span className="mt-0.5 block text-xs opacity-80">“{step.skip.reason}”</span>
+            ) : null}
+          </span>
+        </div>
+      ) : skipApproved ? (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-app-success-border bg-app-success-bg px-3 py-2.5 text-sm text-app-success-text">
+          <SkipForward className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">Skip approved</span> — your project manager agreed you
+            can leave this one out.
+            {step.skip?.reviewComment ? (
+              <span className="mt-0.5 block text-xs text-app-text-muted">
+                “{step.skip.reviewComment}”
+              </span>
             ) : null}
           </span>
         </div>

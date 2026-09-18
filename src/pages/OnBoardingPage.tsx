@@ -68,6 +68,13 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
 import { onboardingService } from "../services/onboardingService";
+import { useAuth } from "../context/useAuth";
+import { SkipAnswerNotice } from "../features/onboarding/components/journey/SkipAnswerNotice";
+import {
+  markSkipAnswersSeen,
+  readSeenSkipAnswers,
+  skipAnswersOf,
+} from "../features/onboarding/skipAnswers";
 import {
   HIRE_JOURNEY_VIEW_KEY,
   readJourneyView,
@@ -120,6 +127,7 @@ export function OnBoardingPage() {
   // unfolded, so links from the dashboard and the buddy keep landing on the step.
   const { stepId: routeStepId } = useParams<{ stepId?: string }>();
   const toast = useToast();
+  const { profile } = useAuth();
   const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
   const {
     selectedProjectId,
@@ -160,6 +168,19 @@ export function OnBoardingPage() {
   usePathRevealMoment(loadingState === "success" ? path : null);
 
   const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
+
+  // Skip requests the project manager answered since the member last looked.
+  const userId = profile?.id ?? "";
+  const [seenSkipAnswers, setSeenSkipAnswers] = useState(() => readSeenSkipAnswers(userId));
+  const unseenSkipAnswers = useMemo(
+    () => skipAnswersOf(phases).filter((answer) => !seenSkipAnswers.has(answer.skipId)),
+    [phases, seenSkipAnswers],
+  );
+  const markAnswersSeen = (skipIds: string[]) => {
+    if (skipIds.length === 0) return;
+    markSkipAnswersSeen(userId, skipIds);
+    setSeenSkipAnswers(readSeenSkipAnswers(userId));
+  };
 
   const applyPath = useCallback(
     (next: OnboardingPathEndpoint, { keepSelection }: { keepSelection: boolean }) => {
@@ -316,6 +337,10 @@ export function OnBoardingPage() {
 
   /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
   const openItem = (item: PhaseItem) => {
+    if (item.kind === "step" && item.step.skip) {
+      const skipId = item.step.skip.id;
+      if (unseenSkipAnswers.some((answer) => answer.skipId === skipId)) markAnswersSeen([skipId]);
+    }
     const phase = phaseOf(item);
     if (phase) setSelectedPhaseId(phase.id);
     if (viewMode === "graph") {
@@ -646,6 +671,18 @@ export function OnBoardingPage() {
             </div>
           ) : null}
         </div>
+
+        <SkipAnswerNotice
+          answers={unseenSkipAnswers}
+          onOpenStep={(answer) => {
+            const item = phases
+              .flatMap(phaseItems)
+              .find((candidate) => candidate.id === answer.stepId);
+            if (item) openItem(item);
+            else markAnswersSeen([answer.skipId]);
+          }}
+          onDismiss={() => markAnswersSeen(unseenSkipAnswers.map((answer) => answer.skipId))}
+        />
 
         <SlidingTabPanel activeKey={viewMode} index={VIEW_ORDER.indexOf(viewMode)}>
           {viewMode === "list" ? (

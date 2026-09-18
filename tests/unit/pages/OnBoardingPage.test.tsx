@@ -32,6 +32,10 @@ vi.mock("../../../src/features/moments", () => ({
   }),
 }));
 
+vi.mock("../../../src/context/useAuth", () => ({
+  useAuth: () => ({ profile: { id: "user1" } }),
+}));
+
 vi.mock("../../../src/services/userService", () => ({
   userService: {
     getProfile: vi.fn().mockResolvedValue({
@@ -583,6 +587,51 @@ describe("OnBoardingPage", () => {
 
     expect(await screen.findByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
+  });
+
+  it("tells the hire their skip request was answered, until they have looked", async () => {
+    const phase = phaseFixture("phase1", 1, "Phase 1");
+    phase.steps[0] = {
+      ...phase.steps[0],
+      status: "SKIPPED",
+      skip: {
+        id: "skip1",
+        stepId: phase.steps[0].id,
+        reason: "Did this last week",
+        accepted: true,
+        reviewComment: "Makes sense",
+        reviewedAt: "2026-09-18T10:00:00Z",
+      },
+    } as never;
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phase],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    const { unmount } = renderPage();
+
+    const notice = await screen.findByRole("region", { name: "Answers to your skip requests" });
+    expect(within(notice).getByText("Skip approved")).toBeInTheDocument();
+    expect(within(notice).getByText("“Makes sense”")).toBeInTheDocument();
+
+    await user.click(within(notice).getByRole("button", { name: "Got it" }));
+    expect(
+      screen.queryByRole("region", { name: "Answers to your skip requests" }),
+    ).not.toBeInTheDocument();
+
+    unmount();
+    renderPage();
+    await screen.findByRole("heading", { level: 1, name: "Onboarding" });
+    expect(
+      screen.queryByRole("region", { name: "Answers to your skip requests" }),
+    ).not.toBeInTheDocument();
   });
 
   it("lands on a step unfolded when opened by its address", async () => {
