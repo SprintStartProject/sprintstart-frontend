@@ -126,15 +126,37 @@ const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
  * Which way an edge leaves its blocker and enters what waits on it.
  *
  * `"down"` is the ordinary case and the only one the layered layout ever produces: the blocker is a
- * row above, so the curve leaves its bottom edge and enters the other's top.
+ * clear row above, so the curve leaves its bottom edge and enters the other's top.
  *
- * `"across"` is for everything else. Nodes can be dragged, and a graph can arrive with coordinates
- * that were authored on a free canvas, so what a node waits on may sit level with it or below it.
- * A downward curve between those two ends doubles back on itself and runs underneath both cards —
- * cards are drawn over the edges — and all that is left on screen is an arrowhead floating beside a
- * card with no line attached to it.
+ * The other two are for everything else. Nodes can be dragged, and a graph can arrive with
+ * coordinates that were authored on a free canvas, so what a node waits on may sit beside it, level
+ * with it, or below it. A downward curve between those ends doubles back on itself and runs
+ * underneath both cards — cards are drawn over the edges — and the only thing left on screen is an
+ * arrowhead floating beside a card with no line attached to it.
+ *
+ * `"across"` links two cards that stand side by side: out of the near edge of one, into the facing
+ * edge of the other. `"around"` is for the rest — one card nearly above the other, or overlapping
+ * it — where there is no room between them for a line at all, so it bulges out past one side and
+ * comes back in on the same side.
  */
-type EdgeAxis = "down" | "across";
+type EdgeAxis = "down" | "across" | "around";
+
+/** How far past a card an `"around"` edge swings before it comes back. */
+const AROUND_BULGE_PX = 70;
+
+/**
+ * How far the control points are pushed out from each end.
+ *
+ * Never further than the distance being spanned. A fixed minimum is what makes a long edge leave
+ * and arrive straight instead of cutting the corner — but on a *short* one it puts the control
+ * point past the far end, and the curve then overshoots, dips through the card it was aiming at and
+ * comes back out to meet its own arrowhead. Clamping to the span costs a long edge nothing and
+ * makes a short one a plain, monotonic line.
+ */
+function bendFor(span: number, minimum: number): number {
+  const distance = Math.abs(span);
+  return Math.min(Math.max(minimum, distance / 2), distance);
+}
 
 /** The curve from a blocker to what waits on it. */
 function edgePath(
@@ -142,7 +164,17 @@ function edgePath(
   to: GraphPoint,
   waypoints: readonly GraphPoint[] = [],
   axis: EdgeAxis = "down",
+  /** Which side an `"around"` edge swings out on: 1 right, -1 left. */
+  side = 1,
 ): string {
+  if (axis === "around") {
+    const out = AROUND_BULGE_PX * side;
+    return (
+      `M ${from.x} ${from.y}` +
+      ` C ${from.x + out} ${from.y}, ${to.x + out} ${to.y}, ${to.x} ${to.y}`
+    );
+  }
+
   const points = [from, ...waypoints, to];
   let d = `M ${from.x} ${from.y}`;
   for (let index = 1; index < points.length; index += 1) {
@@ -152,12 +184,12 @@ function edgePath(
     // inside the gap a waypoint was put in.
     const minimum = index === 1 || index === points.length - 1 ? 56 : 24;
     if (axis === "across") {
-      const bend = Math.max(minimum, Math.abs(end.x - start.x) / 2);
+      const bend = bendFor(end.x - start.x, minimum);
       const direction = end.x >= start.x ? 1 : -1;
       d += ` C ${start.x + bend * direction} ${start.y}, ${end.x - bend * direction} ${end.y}, ${end.x} ${end.y}`;
       continue;
     }
-    const bend = Math.max(minimum, Math.abs(end.y - start.y) / 2);
+    const bend = bendFor(end.y - start.y, minimum);
     d += ` C ${start.x} ${start.y + bend}, ${end.x} ${end.y - bend}, ${end.x} ${end.y}`;
   }
   return d;
@@ -706,10 +738,18 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         const blockerPosition = positionOf(blockerId);
         const nodePosition = positionOf(node.id);
         if (!blockerPosition || !nodePosition) return null;
-        // Bottom to top while the blocker really is above; side to side otherwise. See EdgeAxis.
+        // See EdgeAxis. "down" needs a clear row between the two cards, not merely a lower centre:
+        // one card 20px under another has nowhere for a line to run and no bottom edge to leave
+        // from that is not already inside the other card.
+        const drop = nodePosition.y - blockerPosition.y;
+        const reach = nodePosition.x - blockerPosition.x;
         const axis: EdgeAxis =
-          nodePosition.y - blockerPosition.y > nodeSize.height * 0.75 ? "down" : "across";
-        const sideways = nodePosition.x >= blockerPosition.x ? 1 : -1;
+          drop > nodeSize.height + 24
+            ? "down"
+            : Math.abs(reach) > nodeSize.width
+              ? "across"
+              : "around";
+        const sideways = reach >= 0 ? 1 : -1;
         const from =
           axis === "down"
             ? { x: blockerPosition.x, y: blockerPosition.y + nodeSize.height / 2 }
@@ -717,7 +757,10 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         const to =
           axis === "down"
             ? { x: nodePosition.x, y: nodePosition.y - nodeSize.height / 2 - 6 }
-            : { x: nodePosition.x - sideways * (nodeSize.width / 2 + 6), y: nodePosition.y };
+            : axis === "across"
+              ? { x: nodePosition.x - sideways * (nodeSize.width / 2 + 6), y: nodePosition.y }
+              : // Back in on the side it went out on, clear of the card rather than into its edge.
+                { x: nodePosition.x + sideways * (nodeSize.width / 2 + 6), y: nodePosition.y };
         const tone = edgeTone?.(nodeById.get(blockerId)!, node) ?? "waiting";
         const inChain =
           !!emphasisSourceId &&
@@ -725,7 +768,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
           (node.id === emphasisSourceId || related?.has(node.id) || false);
         // Waypoints are only ever produced for an edge that spans rows, which is the "down" case.
         const waypoints = axis === "down" ? (routes.get(edgeKey(blockerId, node.id)) ?? []) : [];
-        return { blockerId, nodeId: node.id, from, to, waypoints, tone, inChain, axis };
+        return { blockerId, nodeId: node.id, from, to, waypoints, tone, inChain, axis, sideways };
       })
       .filter((edge): edge is NonNullable<typeof edge> => edge !== null),
   );
@@ -816,7 +859,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               ))}
             </defs>
             {edges.map((edge) => {
-              const d = edgePath(edge.from, edge.to, edge.waypoints, edge.axis);
+              const d = edgePath(edge.from, edge.to, edge.waypoints, edge.axis, edge.sideways);
               const isSelected =
                 selectedEdge?.blockerId === edge.blockerId && selectedEdge?.nodeId === edge.nodeId;
               const dimmed = !!spotlightId || (!!emphasisSourceId && !edge.inChain);

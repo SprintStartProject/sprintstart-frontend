@@ -29,6 +29,29 @@ function at(id: string, x: number, y: number, blockerIds: string[] = []): Bluepr
   return { ...node(id, blockerIds), graphX: x, graphY: y };
 }
 
+/** The one drawn arrow, as its start, its two control points and where it lands. */
+function onlyEdge() {
+  const shape = [...document.querySelectorAll("path[marker-end]")]
+    .map((path) => path.getAttribute("d") ?? "")
+    .map((d) =>
+      /^M (-?[\d.]+) (-?[\d.]+) C (-?[\d.]+) (-?[\d.]+), (-?[\d.]+) (-?[\d.]+), (-?[\d.]+) (-?[\d.]+)/.exec(
+        d,
+      ),
+    )
+    .find((match): match is RegExpExecArray => match !== null);
+  if (!shape) throw new Error("no edge drawn");
+  const [, ...numbers] = shape;
+  const [x, y, c1x, c1y, c2x, c2y, endX, endY] = numbers.map(Number);
+  return {
+    start: { x, y },
+    control: [
+      { x: c1x, y: c1y },
+      { x: c2x, y: c2y },
+    ],
+    end: { x: endX, y: endY },
+  };
+}
+
 /** Where every drawn arrow starts, read off the paths that carry an arrowhead. */
 function edgeStarts(): { x: number; y: number }[] {
   return [...document.querySelectorAll("path[marker-end]")]
@@ -408,6 +431,29 @@ describe("BlueprintGraphCanvas", () => {
 
     // Half a card below the blocker's middle, which is its bottom edge.
     expect(edgeStarts()).toContainEqual({ x: 0, y: 54 });
+  });
+
+  it("never overshoots the end it is aiming at", () => {
+    // A fixed minimum bend makes a long edge leave and arrive straight instead of cutting the
+    // corner. On a short one it puts the control point past the far end, and the curve dips
+    // through the card it was aiming at and comes back out to meet its own arrowhead — which is
+    // what the line disappearing into a card and reappearing under it was.
+    renderCanvas([at("a", 0, 0), at("b", 0, 140, ["a"])]);
+
+    const edge = onlyEdge();
+    expect(edge.control[0].y).toBeLessThanOrEqual(edge.end.y);
+    expect(edge.control[1].y).toBeGreaterThanOrEqual(edge.start.y);
+  });
+
+  it("goes around a card sitting right under another, where no line would fit between them", () => {
+    // 120px apart on 108px-tall cards: a lower centre, but no row between them to run a line
+    // through and no bottom edge to leave from that is not already inside the other card.
+    renderCanvas([at("a", 0, 0), at("b", 0, 120, ["a"])]);
+
+    const edge = onlyEdge();
+    // Out of one side and back in on the same one, level with both cards' middles.
+    expect(edge.start).toEqual({ x: 112, y: 0 });
+    expect(edge.end).toEqual({ x: 118, y: 120 });
   });
 
   it("says an empty canvas is empty, not broken, and says what to do about it", () => {
