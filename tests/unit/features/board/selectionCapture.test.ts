@@ -51,6 +51,23 @@ describe("selectionCapture", () => {
       document.body.innerHTML = "<p id='t'>one\n   two</p>";
       expect(capture("#t").text).toBe("one two");
     });
+
+    it("identifies when selection is inside an AI assistant message", () => {
+      document.body.innerHTML =
+        "<div data-chat-message-role='ASSISTANT'><p id='t'>AI response content</p></div>";
+      expect(capture("#t").isAiMessage).toBe(true);
+    });
+
+    it("identifies when selection is inside a user message", () => {
+      document.body.innerHTML =
+        "<div data-chat-message-role='USER'><p id='t'>User prompt question</p></div>";
+      expect(capture("#t").isAiMessage).toBe(false);
+    });
+
+    it("marks isAiMessage false for generic text outside chat", () => {
+      document.body.innerHTML = "<div class='docs'><p id='t'>Documentation guide</p></div>";
+      expect(capture("#t").isAiMessage).toBe(false);
+    });
   });
 
   describe("links", () => {

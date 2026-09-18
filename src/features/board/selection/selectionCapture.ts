@@ -46,6 +46,8 @@ export type CapturedSelection = {
   inLink: boolean;
   /** Where the toolbar should sit, in viewport coordinates. */
   rect: DOMRect;
+  /** Whether the selection was made inside an AI assistant chat message. */
+  isAiMessage: boolean;
 };
 
 /** Anything shorter is a stray click or a double-click that caught a space, not a selection. */
@@ -76,6 +78,7 @@ export function captureSelection(selection: Selection | null): CapturedSelection
     cardId: elementOf(anchor)?.closest("[data-card-id]")?.getAttribute("data-card-id") ?? null,
     inLink: Boolean(elementOf(anchor)?.closest("a")),
     rect: range.getBoundingClientRect(),
+    isAiMessage: isInsideAiMessage(anchor, range),
   };
 }
 
@@ -190,4 +193,15 @@ function isInsideEditable(node: Node): boolean {
 
 function elementOf(node: Node): Element | null {
   return node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+}
+
+/**
+ * Whether the selection is located within an AI assistant message bubble.
+ */
+function isInsideAiMessage(anchor: Node, range: Range): boolean {
+  const ancestorEl = elementOf(range.commonAncestorContainer);
+  if (ancestorEl?.closest("[data-chat-message-role='ASSISTANT']")) return true;
+
+  const anchorEl = elementOf(anchor);
+  return Boolean(anchorEl?.closest("[data-chat-message-role='ASSISTANT']"));
 }
