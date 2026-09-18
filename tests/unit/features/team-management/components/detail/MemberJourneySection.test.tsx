@@ -140,7 +140,7 @@ describe("MemberJourneySection", () => {
     // Editing turns on the ports edges are drawn from.
     expect(screen.getAllByTitle("Drag to what this unlocks").length).toBe(3);
 
-    await user.click(screen.getByRole("button", { name: "Add a blank step" }));
+    await user.click(screen.getByRole("button", { name: "Add step" }));
 
     await waitFor(() => expect(onboardingGraphService.createConnectedStep).toHaveBeenCalled());
     const [phaseId, request] = vi.mocked(onboardingGraphService.createConnectedStep).mock.calls[0];

@@ -4,6 +4,7 @@ import {
   GitBranch,
   ListChecks,
   Lock,
+  ListPlus,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -352,7 +353,19 @@ export function MemberJourneySection({
                     phases={phases}
                     isFocus={phase.id === focusPhaseId}
                     firstName={firstName}
-                    tools={questionTools(phase)}
+                    tools={
+                      <>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          icon={<ListPlus className="h-4 w-4" />}
+                          onClick={() => void addStepInList(phase, null)}
+                        >
+                          Add step
+                        </Button>
+                        {questionTools(phase)}
+                      </>
+                    }
                   />
                   <MemberItemList
                     phase={phase}
@@ -403,7 +416,6 @@ export function MemberJourneySection({
                     ? onOpenStep(item.id)
                     : onOpenQuestions(item.question.phaseId, "results")
                 }
-                renderPhaseActions={questionTools}
                 renderItemAside={(item, asidePhase) => (
                   <ItemAside
                     key={item.id}
@@ -786,15 +798,24 @@ function MemberItemRow({
       </div>
       {/* In between this row and the next: where a new step goes. Visible on hover and focus, so the
           list stays calm while it is only being read. */}
-      <div className="flex h-3 items-center justify-center">
+      {/* Always there, quiet until pointed at: a small "+" on a dashed line, which names itself on
+          hover. Hidden entirely it was too easy to miss that steps can be put in between. */}
+      <div className="group/insert relative flex h-5 items-center justify-center">
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-10 top-1/2 border-t border-dashed border-app-border opacity-0 transition-opacity group-hover/insert:opacity-100"
+        />
         <button
           type="button"
           onClick={onAddAfter}
           aria-label={`Add a step after ${item.title}`}
-          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-2.5 py-0.5 text-[11px] font-semibold text-app-brand-text opacity-0 shadow-sm transition-opacity group-hover/item:opacity-100 hover:bg-app-brand-soft focus-visible:opacity-100"
+          title={`Add a step after ${item.title}`}
+          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-1.5 py-0.5 text-[11px] font-semibold text-app-brand-text shadow-sm transition-all hover:bg-app-brand-soft hover:px-2.5 focus-visible:px-2.5"
         >
           <Plus className="h-3 w-3" aria-hidden="true" />
-          Add step after
+          <span className="hidden group-focus-within/insert:inline group-hover/insert:inline">
+            Add step here
+          </span>
         </button>
       </div>
     </li>

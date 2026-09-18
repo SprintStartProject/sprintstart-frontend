@@ -7,7 +7,7 @@ import {
   Map as MapIcon,
   Minimize2,
   Move,
-  Plus,
+  ListPlus,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useToast } from "../../../../context/useToast";
@@ -84,8 +84,6 @@ type Props = {
   onOpenItem?: (item: PhaseItem) => void;
   /** Details of the selected item, drawn over the canvas. */
   renderItemAside?: (item: PhaseItem, phase: OnboardingPhaseEndpoint) => ReactNode;
-  /** Extra controls in the phase's title card, e.g. the PM's question tools. */
-  renderPhaseActions?: (phase: OnboardingPhaseEndpoint) => ReactNode;
   /**
    * The item zoomed into until it fills the graph, and how to draw it. Given these, a click on an item
    * flies into it instead of selecting it -- the hire's way of working through a phase on the graph.
@@ -122,7 +120,6 @@ export function JourneyGraph({
   onSelectItem,
   onOpenItem,
   renderItemAside,
-  renderPhaseActions,
   openItemId = null,
   onOpenItemChange,
   renderItemFocus,
@@ -496,26 +493,25 @@ export function JourneyGraph({
                 </span>
               ) : null}
             </div>
-            {renderPhaseActions ? (
-              <div className="mt-2 flex flex-wrap gap-1.5 pl-2">
-                {renderPhaseActions(openPhase)}
+            {editing ? (
+              // Named and up front: as a "+" among the zoom controls it read as "zoom in".
+              <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-app-border/70 pt-2 pl-2">
+                <button
+                  type="button"
+                  onClick={() => addStepAt(phaseCamera.current?.viewCenter() ?? { x: 0, y: 0 })}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-app-brand-hover"
+                >
+                  <ListPlus className="h-4 w-4" aria-hidden="true" />
+                  Add step
+                </button>
+                <span className="text-[11px] text-app-text-subtle">
+                  or double-click the canvas where it should go
+                </span>
               </div>
             ) : null}
           </div>
         }
-        toolbar={
-          <>
-            {editing ? (
-              <CanvasButton
-                label="Add a blank step"
-                onClick={() => addStepAt(phaseCamera.current?.viewCenter() ?? { x: 0, y: 0 })}
-              >
-                <Plus className="h-4 w-4" />
-              </CanvasButton>
-            ) : null}
-            {arrangeTools}
-          </>
-        }
+        toolbar={arrangeTools}
         heightClassName={heightClassName}
         aside={
           !entersItems && selectedItem && renderItemAside
