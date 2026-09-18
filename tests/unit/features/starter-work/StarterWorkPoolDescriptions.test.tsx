@@ -30,6 +30,8 @@ function task(id: string, summary: string | null): StarterWorkTask {
     status: "LIVE",
     reviewed: true,
     taskZeroEligible: false,
+    sourceHasAssignee: null,
+    sourceCheckedAt: null,
   };
 }
 

@@ -34,6 +34,8 @@ function task(index: number): StarterWorkTask {
     status: "LIVE",
     reviewed: true,
     taskZeroEligible: false,
+    sourceHasAssignee: null,
+    sourceCheckedAt: null,
   };
 }
 
@@ -156,8 +158,7 @@ describe("StarterWorkPoolCloud", () => {
   it("sorts unseen tasks first and marks them, leaving seen ones with a checkmark", () => {
     renderWithProviders(
       <StarterWorkPoolCloud
-        tasks={[task(1), task(2), task(3)]}
-        unseenIds={new Set(["task-2"])}
+        tasks={[task(1), { ...task(2), reviewed: false }, task(3)]}
         isLoading={false}
         error={null}
         canAct
@@ -186,12 +187,67 @@ describe("StarterWorkPoolCloud", () => {
     expect(within(screen.getByTestId("pool-task-task-1")).getByText("Task 0")).toBeInTheDocument();
   });
 
+  it("badges a task the tracker shows as assigned, but not one it merely doesn't know about", () => {
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[
+          { ...task(1), sourceHasAssignee: true },
+          { ...task(2), sourceHasAssignee: null },
+        ]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={vi.fn()}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("pool-task-task-1")).getByText("Someone is on this"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("pool-task-task-2")).queryByText("Someone is on this"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows when the pool was last checked against its trackers, using the newest task", () => {
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[
+          { ...task(1), sourceCheckedAt: "2026-08-01T00:00:00.000Z" },
+          { ...task(2), sourceCheckedAt: "2026-09-01T00:00:00.000Z" },
+        ]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={vi.fn()}
+      />,
+    );
+
+    // "2026-09-01" is the newer of the two, so it decides the wording — a month ago from a
+    // fixed "now" the test doesn't control, which is why this asserts the label's shape rather
+    // than pinning an exact relative phrase.
+    expect(screen.getByText(/Last checked against trackers/)).toBeInTheDocument();
+  });
+
+  it("says nothing about being checked when reconciliation has never run", () => {
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/Last checked against trackers/)).not.toBeInTheDocument();
+  });
+
   it("filters to tasks nobody has looked at yet", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
-        tasks={[task(1), task(2)]}
-        unseenIds={new Set(["task-2"])}
+        tasks={[task(1), { ...task(2), reviewed: false }]}
         isLoading={false}
         error={null}
         canAct
@@ -209,8 +265,7 @@ describe("StarterWorkPoolCloud", () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
-        tasks={[task(1), task(2)]}
-        unseenIds={new Set(["task-2"])}
+        tasks={[task(1), { ...task(2), reviewed: false }]}
         isLoading={false}
         error={null}
         canAct

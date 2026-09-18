@@ -31,6 +31,8 @@ function task(index: number): StarterWorkTask {
     status: "LIVE",
     reviewed: true,
     taskZeroEligible: false,
+    sourceHasAssignee: null,
+    sourceCheckedAt: null,
   };
 }
 
@@ -116,8 +118,7 @@ describe("StarterWorkPoolCloud views", () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
-        tasks={[task(1)]}
-        unseenIds={new Set(["task-1"])}
+        tasks={[{ ...task(1), reviewed: false }]}
         isLoading={false}
         error={null}
         canAct

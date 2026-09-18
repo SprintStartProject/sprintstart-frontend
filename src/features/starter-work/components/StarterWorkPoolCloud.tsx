@@ -8,6 +8,7 @@ import {
   List as ListIcon,
   PackageOpen,
   RefreshCw,
+  UserRound,
 } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -23,10 +24,9 @@ import { queryKeys } from "../../../services/queryKeys";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { centralSpringToken } from "../../../styles/tokens";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { formatRelativeDate } from "../format";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { StarterWorkTask } from "../types";
-
-const NO_UNSEEN_IDS: ReadonlySet<string> = new Set();
 
 export type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero";
 
@@ -137,12 +137,6 @@ type CloudSlotStyle = CSSProperties & {
 type StarterWorkPoolCloudProps = {
   /** The whole live pool — reviewed and not. */
   tasks: StarterWorkTask[];
-  /**
-   * Ids of tasks nobody has looked at yet, from the unreviewed queue. Unseen tasks sort first and
-   * are marked; the rest read as looked at. Defaults to empty, so a caller with no queue at hand
-   * (or none of its own concern) still gets a working pool.
-   */
-  unseenIds?: ReadonlySet<string>;
   isLoading: boolean;
   error: string | null;
   /** HR reads the pool; only PM/ADMIN can act from the task's detail drawer. */
@@ -169,7 +163,6 @@ type StarterWorkPoolCloudProps = {
 
 type PoolTaskProps = {
   task: StarterWorkTask;
-  unseen: boolean;
   onOpen: (task: StarterWorkTask) => void;
 };
 
@@ -217,14 +210,20 @@ function PoolTaskMeta({ task }: { task: StarterWorkTask }) {
           Task 0
         </Badge>
       )}
+      {/* Only a definite `true` means somebody has this — `null` is "we don't know", not "nobody". */}
+      {task.sourceHasAssignee === true && (
+        <Badge variant="neutral" size="sm">
+          <UserRound className="h-3 w-3" aria-hidden="true" />
+          Someone is on this
+        </Badge>
+      )}
     </div>
   );
 }
 
 /**
  * Whether nobody has looked at this task yet (a dot) or somebody has (a checkmark). Purely a
- * marker — the pool itself decides who counts as "looked at" by cross-referencing the unreviewed
- * queue, not this component.
+ * marker, driven by the task's own `reviewed` field.
  */
 function PoolTaskStatusMarker({ unseen }: { unseen: boolean }) {
   if (unseen) {
@@ -248,7 +247,8 @@ function PoolTaskStatusMarker({ unseen }: { unseen: boolean }) {
 }
 
 /** A cloud card whose stretched button makes the entire surface open the task's detail drawer. */
-function PoolCloudCard({ task, unseen, onOpen }: PoolTaskProps) {
+function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
+  const unseen = !task.reviewed;
   const description = task.summary?.trim();
 
   return (
@@ -293,7 +293,8 @@ function PoolCloudCard({ task, unseen, onOpen }: PoolTaskProps) {
 }
 
 /** Pool task in the same compact row language as the issue browser directly below it. */
-function PoolListRow({ task, unseen, onOpen }: PoolTaskProps) {
+function PoolListRow({ task, onOpen }: PoolTaskProps) {
+  const unseen = !task.reviewed;
   const description = task.summary?.trim();
 
   return (
@@ -345,7 +346,6 @@ function PoolListRow({ task, unseen, onOpen }: PoolTaskProps) {
  */
 export function StarterWorkPoolCloud({
   tasks,
-  unseenIds = NO_UNSEEN_IDS,
   isLoading,
   error,
   canAct,
@@ -395,18 +395,31 @@ export function StarterWorkPoolCloud({
   const sortedTasks = useMemo(() => {
     const withUnseenFirst = [...tasks];
     withUnseenFirst.sort((a, b) => {
-      const aUnseen = unseenIds.has(a.id);
-      const bUnseen = unseenIds.has(b.id);
+      const aUnseen = !a.reviewed;
+      const bUnseen = !b.reviewed;
       return aUnseen === bUnseen ? 0 : aUnseen ? -1 : 1;
     });
     return withUnseenFirst;
-  }, [tasks, unseenIds]);
+  }, [tasks]);
+
+  // The newest point at which reconciliation compared any of these tasks against its source, for
+  // the "Last checked" line below — null when nothing has ever been checked, which is the normal
+  // state for a pool nobody has synced yet.
+  const lastCheckedAt = useMemo(
+    () =>
+      tasks.reduce<string | null>((latest, current) => {
+        if (!current.sourceCheckedAt) return latest;
+        if (!latest || current.sourceCheckedAt > latest) return current.sourceCheckedAt;
+        return latest;
+      }, null),
+    [tasks],
+  );
 
   const filteredTasks = useMemo(
     () =>
       sortedTasks.filter((task) => {
-        if (statusFilter === "unseen" && !unseenIds.has(task.id)) return false;
-        if (statusFilter === "seen" && unseenIds.has(task.id)) return false;
+        if (statusFilter === "unseen" && task.reviewed) return false;
+        if (statusFilter === "seen" && !task.reviewed) return false;
         if (statusFilter === "taskZero" && !task.taskZeroEligible) return false;
         if (onlyProject) {
           const groupKey = parseCandidateSource(task.sourceId).groupKey;
@@ -414,7 +427,7 @@ export function StarterWorkPoolCloud({
         }
         return true;
       }),
-    [sortedTasks, statusFilter, unseenIds, onlyProject, projectGroupKeys],
+    [sortedTasks, statusFilter, onlyProject, projectGroupKeys],
   );
 
   const listPageSize = fullWidth ? LIST_PAGE_SIZE_WIDE : LIST_PAGE_SIZE;
@@ -466,6 +479,14 @@ export function StarterWorkPoolCloud({
           label="About the pool"
           text="Every pooled task stays claimable. Review lifts its rank; edit orientation to write the guide."
         />
+
+        {/* Nothing to say before the first sync ever runs — a pool that has never been checked
+            is a normal starting state, not a problem worth a line about. */}
+        {lastCheckedAt && (
+          <span className="text-xs text-app-text-subtle">
+            Last checked against trackers {formatRelativeDate(lastCheckedAt)}
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           {canAct && onSync && (
@@ -610,11 +631,7 @@ export function StarterWorkPoolCloud({
                           fullWidth ? "@min-[38rem]:min-w-36" : "@min-[38rem]:min-w-40"
                         }`}
                       >
-                        <PoolCloudCard
-                          task={task}
-                          unseen={unseenIds.has(task.id)}
-                          onOpen={onOpenTask}
-                        />
+                        <PoolCloudCard task={task} onOpen={onOpenTask} />
                       </motion.li>
                     );
                   })}
@@ -630,12 +647,7 @@ export function StarterWorkPoolCloud({
               data-pool-flight-target
             >
               {pageItems.map((task) => (
-                <PoolListRow
-                  key={task.id}
-                  task={task}
-                  unseen={unseenIds.has(task.id)}
-                  onOpen={onOpenTask}
-                />
+                <PoolListRow key={task.id} task={task} onOpen={onOpenTask} />
               ))}
             </ul>
           )}

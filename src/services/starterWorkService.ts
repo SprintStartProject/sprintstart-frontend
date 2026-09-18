@@ -3,6 +3,7 @@ import type {
   CreateStarterWorkTaskInput,
   GenerateStarterWorkResult,
   PromoteStarterWorkCandidateInput,
+  ProposalStatus,
   StarterWorkCandidate,
   StarterWorkReconcileOutcome,
   StarterWorkTask,
@@ -36,9 +37,15 @@ export const starterWorkService = {
     return await apiClient.fetch<UnreviewedStarterWork>(`${BASE_URL}/unreviewed`);
   },
 
-  /** The whole live pool, reviewed or not — what a PM can author orientation for. */
-  async fetchPool(): Promise<StarterWorkTask[]> {
-    return await apiClient.fetch<StarterWorkTask[]>(`${BASE_URL}/pool`);
+  /**
+   * The pool at one status, reviewed or not. Defaults to `LIVE` — what a PM can author
+   * orientation for — but also takes `STALE` for what has since closed at its source.
+   * `REJECTED` is refused by the backend; this client never asks for it.
+   */
+  async fetchPool(status: ProposalStatus = "LIVE"): Promise<StarterWorkTask[]> {
+    return await apiClient.fetch<StarterWorkTask[]>(
+      `${BASE_URL}/pool?status=${encodeURIComponent(status)}`,
+    );
   },
 
   /**

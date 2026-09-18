@@ -39,6 +39,8 @@ const task: StarterWorkTask = {
   status: "LIVE",
   reviewed: false,
   taskZeroEligible: false,
+  sourceHasAssignee: null,
+  sourceCheckedAt: null,
 };
 
 const candidate: StarterWorkCandidate = {

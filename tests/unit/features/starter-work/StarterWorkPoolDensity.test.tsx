@@ -31,6 +31,8 @@ function task(index: number): StarterWorkTask {
     status: "LIVE",
     reviewed: true,
     taskZeroEligible: false,
+    sourceHasAssignee: null,
+    sourceCheckedAt: null,
   };
 }
 

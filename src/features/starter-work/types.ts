@@ -26,15 +26,20 @@ export type StarterWorkTask = {
   /** Competencies the AI judged this task exercises; one of the signals fit-ranking reads. */
   competencyKeys: string[];
   status: ProposalStatus;
-  /**
-   * Whether a person has looked at this task. Unreviewed is claimable, just ranked lower.
-   *
-   * Optional: the backend does not send this field yet, so a task's seen/unseen state is read by
-   * cross-referencing the unreviewed queue instead of this field.
-   */
-  reviewed?: boolean;
+  /** Whether a person has looked at this task. Unreviewed is claimable, just ranked lower. */
+  reviewed: boolean;
   /** Whether a PM has flagged this task as suitable for a hire's automatic first task (Task 0). */
   taskZeroEligible: boolean;
+  /**
+   * Whether the issue had somebody on it when reconciliation last looked. Three-valued: null
+   * means nobody has checked yet, or the tracker never said — only `true` means somebody has this.
+   */
+  sourceHasAssignee: boolean | null;
+  /**
+   * ISO timestamp of when reconciliation last compared this task against its source, or null
+   * before that has ever happened.
+   */
+  sourceCheckedAt: string | null;
 };
 
 /** The live tasks nobody has vouched for yet. */

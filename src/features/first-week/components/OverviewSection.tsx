@@ -32,9 +32,10 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
 
   const { company, project, derivable, loading: isArrivalLoading } = useArrivalAuthoring(projectId);
   const { pool, isLoading: isPoolLoading } = useStarterWorkPool();
+  const { pool: staleTasks, isLoading: isStaleLoading } = useStarterWorkPool("STALE");
   const { tasks: unseenTasks, isLoading: isReviewLoading } = useStarterWorkReview();
 
-  if (isArrivalLoading || isPoolLoading || isReviewLoading) {
+  if (isArrivalLoading || isPoolLoading || isStaleLoading || isReviewLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <Spinner size="lg" label="Loading the overview" />
@@ -151,6 +152,14 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
               unseenCount > 0
                 ? { variant: "brand", label: `${unseenCount} not looked at yet` }
                 : { variant: "success", label: "All looked at", icon: CheckCircle2 },
+              ...(staleTasks.length > 0
+                ? [
+                    {
+                      variant: "neutral" as const,
+                      label: `${staleTasks.length} closed in their tracker`,
+                    },
+                  ]
+                : []),
             ]}
             actionLabel="Open the pool"
             onClick={() => onNavigate("starter")}

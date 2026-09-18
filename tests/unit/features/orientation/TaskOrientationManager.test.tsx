@@ -37,6 +37,8 @@ const approvedTask: StarterWorkTask = {
   status: "LIVE",
   reviewed: true,
   taskZeroEligible: false,
+  sourceHasAssignee: null,
+  sourceCheckedAt: null,
 };
 
 describe("TaskOrientationManager", () => {

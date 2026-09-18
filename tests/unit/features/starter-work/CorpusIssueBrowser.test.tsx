@@ -198,6 +198,8 @@ describe("CorpusIssueBrowser", () => {
       status: "LIVE",
       reviewed: true,
       taskZeroEligible: false,
+      sourceHasAssignee: null,
+      sourceCheckedAt: null,
     });
     const onPromoted = vi.fn();
     const user = userEvent.setup();
@@ -233,6 +235,8 @@ describe("CorpusIssueBrowser", () => {
       status: "LIVE",
       reviewed: true,
       taskZeroEligible: false,
+      sourceHasAssignee: null,
+      sourceCheckedAt: null,
     });
     const onPromoted = vi.fn();
     const user = userEvent.setup();

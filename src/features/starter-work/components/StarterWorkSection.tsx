@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Target } from "lucide-react";
 import { PageHeader } from "../../../components/layout/PageHeader";
@@ -12,6 +12,7 @@ import { useToast } from "../../../context/useToast";
 import { queryKeys } from "../../../services/queryKeys";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { PermissionGroup } from "../../../services/types";
+import { ClosedInTrackerList } from "./ClosedInTrackerList";
 import { StarterWorkAddMenu } from "./StarterWorkAddMenu";
 import { StarterWorkTaskDetails } from "./StarterWorkTaskDetails";
 import { StarterWorkTriage } from "./StarterWorkTriage";
@@ -107,10 +108,6 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
     error: poolError,
     reload: reloadPool,
   } = useStarterWorkPool();
-  // The backend pool response carries no per-task "reviewed" flag, so which pool tasks nobody has
-  // looked at yet is read by cross-referencing the unreviewed queue's ids instead — and reviewing
-  // one drops it from that queue, which is exactly what marks it seen here too.
-  const unseenIds = useMemo(() => new Set(tasks.map((task) => task.id)), [tasks]);
 
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -408,7 +405,6 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
 
               <StarterWorkPoolCloud
                 tasks={pool}
-                unseenIds={unseenIds}
                 isLoading={isPoolLoading}
                 error={poolError}
                 canAct={canAct}
@@ -423,18 +419,20 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
           {/* The pool on its own, the same surface the overview shows above. Its cards open the
               same detail drawer the overview's do. */}
           {showPoolTab && (
-            <StarterWorkPoolCloud
-              tasks={pool}
-              unseenIds={unseenIds}
-              isLoading={isPoolLoading}
-              error={poolError}
-              canAct={canAct}
-              fullWidth
-              onSync={() => void handleSync()}
-              isSyncing={isSyncing}
-              onOpenTask={toggleSelectedTask}
-              initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
-            />
+            <>
+              <StarterWorkPoolCloud
+                tasks={pool}
+                isLoading={isPoolLoading}
+                error={poolError}
+                canAct={canAct}
+                fullWidth
+                onSync={() => void handleSync()}
+                isSyncing={isSyncing}
+                onOpenTask={toggleSelectedTask}
+                initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
+              />
+              <ClosedInTrackerList onOpenTask={toggleSelectedTask} />
+            </>
           )}
         </SlidingTabPanel>
       </main>
@@ -443,7 +441,6 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
         {(task) => (
           <StarterWorkTaskDetails
             task={task}
-            unseen={unseenIds.has(task.id)}
             projectId={selectedProjectId}
             canAct={canAct}
             onApprove={handleApprove}

@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  UserRound,
   X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,8 +28,6 @@ import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type StarterWorkTaskDetailsProps = {
   task: StarterWorkTask;
-  /** Whether nobody has looked at this task yet — read from the unreviewed queue, not the task itself. */
-  unseen: boolean;
   /** Needed to read and write the task's orientation; the section is hidden without one selected. */
   projectId: string | null;
   /** HR reads the drawer but does not decide, write orientation, or flag Task 0. */
@@ -51,7 +50,6 @@ type StarterWorkTaskDetailsProps = {
  */
 export function StarterWorkTaskDetails({
   task,
-  unseen,
   projectId,
   canAct,
   onApprove,
@@ -63,6 +61,11 @@ export function StarterWorkTaskDetails({
   const [isDeciding, setIsDeciding] = useState(false);
   const [isTogglingZero, setIsTogglingZero] = useState(false);
   const [isEditingOrientation, setIsEditingOrientation] = useState(false);
+  const unseen = !task.reviewed;
+  // The two decisions this drawer offers only make sense against a claimable task — a `STALE` row
+  // (closed at its source) refuses both `reject` and `markReviewed` server-side, so offering the
+  // buttons here would be an affordance whose only outcome is an error.
+  const canDecide = task.status === "LIVE";
 
   const orientationQueryKey = queryKeys.starterWork.taskOrientation(task.id, projectId ?? "");
   const orientation = useQueryFetch(
@@ -123,7 +126,7 @@ export function StarterWorkTaskDetails({
         ) : undefined
       }
       footer={
-        canAct ? (
+        canAct && canDecide ? (
           unseen ? (
             <div className="grid w-full grid-cols-2 gap-3">
               <button
@@ -223,6 +226,23 @@ export function StarterWorkTaskDetails({
                 </Badge>
               )}
             </div>
+
+            {/* Only a definite `true` means somebody has this — `null` is "we don't know", not
+                "nobody", so there is nothing to show for it. */}
+            {task.sourceHasAssignee === true && (
+              <div className="flex items-center justify-between gap-3 border-t border-app-border pt-3">
+                <div>
+                  <p className="text-sm font-semibold text-app-text">Someone is on this</p>
+                  <p className="text-xs text-app-text-muted">
+                    The tracker shows somebody assigned when reconciliation last checked.
+                  </p>
+                </div>
+                <Badge variant="neutral" size="sm">
+                  <UserRound className="h-3 w-3" aria-hidden="true" />
+                  Assigned
+                </Badge>
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-3 border-t border-app-border pt-3">
               <div>

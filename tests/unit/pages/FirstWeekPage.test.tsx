@@ -131,6 +131,8 @@ function starterTask(over: Partial<StarterWorkTask> = {}): StarterWorkTask {
     status: "LIVE",
     reviewed: true,
     taskZeroEligible: false,
+    sourceHasAssignee: null,
+    sourceCheckedAt: null,
     ...over,
   };
 }

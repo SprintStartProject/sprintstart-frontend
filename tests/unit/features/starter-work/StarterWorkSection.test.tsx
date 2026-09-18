@@ -58,6 +58,8 @@ const task: StarterWorkTask = {
   status: "LIVE",
   reviewed: false,
   taskZeroEligible: false,
+  sourceHasAssignee: null,
+  sourceCheckedAt: null,
 };
 
 describe("StarterWorkSection", () => {
@@ -189,6 +191,42 @@ describe("StarterWorkSection", () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId("approve-task-task-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("reject-task-task-1")).not.toBeInTheDocument();
+  });
+
+  it("badges a task the tracker shows as assigned, in the drawer", async () => {
+    vi.spyOn(starterWorkService, "fetchPool").mockResolvedValue([
+      { ...task, sourceHasAssignee: true },
+    ]);
+    const user = userEvent.setup();
+    render(<StarterWorkSection />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /open details for fix the login redirect/i }),
+    );
+
+    // The card behind the drawer carries its own "Someone is on this" badge, so this is scoped
+    // to the drawer rather than asserting on the text anywhere on the page.
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Someone is on this")).toBeInTheDocument();
+  });
+
+  it("offers no decision on a task closed at its source, opened from the closed list", async () => {
+    const staleTask: StarterWorkTask = { ...task, id: "task-2", status: "STALE" };
+    vi.spyOn(starterWorkService, "fetchPool").mockImplementation((status = "LIVE") =>
+      Promise.resolve(status === "STALE" ? [staleTask] : [task]),
+    );
+    const user = userEvent.setup();
+    render(<StarterWorkSection />);
+
+    const tabs = await screen.findByRole("group", { name: "Filter sections" });
+    await user.click(within(tabs).getByText("Pool"));
+    await user.click(await screen.findByRole("button", { name: /closed in the tracker/i }));
+    await user.click(await screen.findByRole("button", { name: /open details for/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Fix the login redirect")).toBeInTheDocument();
+    expect(screen.queryByTestId("approve-task-task-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("reject-task-task-2")).not.toBeInTheDocument();
   });
 
   it("hides the hint banner once nothing is unreviewed", async () => {
