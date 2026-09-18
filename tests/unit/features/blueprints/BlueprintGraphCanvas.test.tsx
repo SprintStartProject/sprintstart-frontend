@@ -31,7 +31,7 @@ function at(id: string, x: number, y: number, blockerIds: string[] = []): Bluepr
 
 /** The one drawn arrow, as its start, its two control points and where it lands. */
 function onlyEdge() {
-  const shape = [...document.querySelectorAll("path[marker-end]")]
+  const shape = [...document.querySelectorAll("path[data-edge]")]
     .map((path) => path.getAttribute("d") ?? "")
     .map((d) =>
       /^M (-?[\d.]+) (-?[\d.]+) C (-?[\d.]+) (-?[\d.]+), (-?[\d.]+) (-?[\d.]+), (-?[\d.]+) (-?[\d.]+)/.exec(
@@ -52,9 +52,9 @@ function onlyEdge() {
   };
 }
 
-/** Where every drawn arrow starts, read off the paths that carry an arrowhead. */
+/** Where every drawn arrow starts, read off the edges' own paths. */
 function edgeStarts(): { x: number; y: number }[] {
-  return [...document.querySelectorAll("path[marker-end]")]
+  return [...document.querySelectorAll("path[data-edge]")]
     .map((path) => /^M (-?[\d.]+) (-?[\d.]+)/.exec(path.getAttribute("d") ?? ""))
     .filter((match): match is RegExpExecArray => match !== null)
     .map((match) => ({ x: Number(match[1]), y: Number(match[2]) }));
@@ -439,6 +439,24 @@ describe("BlueprintGraphCanvas", () => {
     // Out of one side and back in on the same one, level with both cards' middles.
     expect(edge.start).toEqual({ x: 112, y: 0 });
     expect(edge.end).toEqual({ x: 118, y: 120 });
+  });
+
+  it("draws the arrowhead in the line's own ink, at its end", () => {
+    // As two strokes of the edge rather than as an SVG marker. A marker is a separate drawing
+    // pinned to the path's end — scaled by the stroke width rather than drawn at it, left floating
+    // clear of the last dash on a dashed line, and on screen with no line under it whenever it and
+    // the path disagree about where the path finishes.
+    renderCanvas([at("a", 0, 0), at("b", 0, 300, ["a"])]);
+
+    const edge = onlyEdge();
+    const heads = [...document.querySelectorAll("svg path:not([data-edge]):not([stroke])")]
+      .map((path) => path.getAttribute("d") ?? "")
+      .filter((d) => /^M .* L .* L /.test(d));
+    expect(heads).toHaveLength(1);
+
+    // Both strokes of the head meet at the point the line stops at.
+    const [, tipX, tipY] = /L (-?[\d.]+) (-?[\d.]+) L/.exec(heads[0])!;
+    expect({ x: Number(tipX), y: Number(tipY) }).toEqual(edge.end);
   });
 
   it("says an empty canvas is empty, not broken, and says what to do about it", () => {

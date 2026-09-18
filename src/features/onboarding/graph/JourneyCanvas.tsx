@@ -2,7 +2,6 @@ import { Maximize2, Minimize2, Minus, Plus, Scan, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
-  useId,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -158,6 +157,35 @@ function bendFor(span: number, minimum: number): number {
   return Math.min(Math.max(minimum, distance / 2), distance);
 }
 
+/**
+ * The arrowhead, as two strokes of the edge's own line rather than as an SVG marker.
+ *
+ * A `<marker>` is a separate drawing pinned to the path's end, and it shows: it is scaled by the
+ * stroke width rather than drawn at it, a dashed line ends wherever its pattern ends so the head
+ * floats clear of the last dash, and any disagreement between where the path really finishes and
+ * where the marker thinks it does puts a head on screen with no line under it. Two line segments
+ * back from the tip cannot come apart from the line they are part of, because they are it.
+ *
+ * `direction` is the way the curve is travelling as it arrives, which every route here knows
+ * exactly: an edge that drops in arrives straight down, one that comes in from a side arrives
+ * along it.
+ */
+function arrowHead(tip: GraphPoint, direction: GraphPoint, size = 9): string {
+  const angle = Math.atan2(direction.y, direction.x);
+  const spread = Math.PI / 7;
+  const left = {
+    x: tip.x - size * Math.cos(angle - spread),
+    y: tip.y - size * Math.sin(angle - spread),
+  };
+  const right = {
+    x: tip.x - size * Math.cos(angle + spread),
+    y: tip.y - size * Math.sin(angle + spread),
+  };
+  return `M ${round(left.x)} ${round(left.y)} L ${round(tip.x)} ${round(tip.y)} L ${round(right.x)} ${round(right.y)}`;
+}
+
+const round = (value: number) => Math.round(value * 100) / 100;
+
 /** The curve from a blocker to what waits on it. */
 function edgePath(
   from: GraphPoint,
@@ -252,7 +280,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   spotlightId = null,
   cover,
 }: Props<TNode>) {
-  const markerId = useId().replace(/:/g, "");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
@@ -768,7 +795,26 @@ export function JourneyCanvas<TNode extends LayoutNode>({
           (node.id === emphasisSourceId || related?.has(node.id) || false);
         // Waypoints are only ever produced for an edge that spans rows, which is the "down" case.
         const waypoints = axis === "down" ? (routes.get(edgeKey(blockerId, node.id)) ?? []) : [];
-        return { blockerId, nodeId: node.id, from, to, waypoints, tone, inChain, axis, sideways };
+        // The way the curve is travelling when it lands, which is what the head is drawn from.
+        // Every route ends on a straight tangent, so this is exact rather than sampled.
+        const approach: GraphPoint =
+          axis === "down"
+            ? { x: 0, y: 1 }
+            : axis === "across"
+              ? { x: sideways, y: 0 }
+              : { x: -sideways, y: 0 };
+        return {
+          blockerId,
+          nodeId: node.id,
+          from,
+          to,
+          waypoints,
+          tone,
+          inChain,
+          axis,
+          sideways,
+          approach,
+        };
       })
       .filter((edge): edge is NonNullable<typeof edge> => edge !== null),
   );
@@ -842,41 +888,41 @@ export function JourneyCanvas<TNode extends LayoutNode>({
             height="1"
             aria-hidden="true"
           >
-            <defs>
-              {(["done", "active", "waiting", "upstream", "rule"] as const).map((tone) => (
-                <marker
-                  key={tone}
-                  id={`${markerId}-${tone}`}
-                  viewBox="0 0 10 10"
-                  refX="8"
-                  refY="5"
-                  markerWidth="7"
-                  markerHeight="7"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" className={toneFill[tone]} />
-                </marker>
-              ))}
-            </defs>
             {edges.map((edge) => {
               const d = edgePath(edge.from, edge.to, edge.waypoints, edge.axis, edge.sideways);
               const isSelected =
                 selectedEdge?.blockerId === edge.blockerId && selectedEdge?.nodeId === edge.nodeId;
               const dimmed = !!spotlightId || (!!emphasisSourceId && !edge.inChain);
+              const width = edge.inChain || isSelected ? 2.75 : 2;
+              const stroke = `${toneStroke[edge.tone]} ${isSelected ? "!stroke-app-danger-solid" : ""}`;
               return (
                 <g key={`${edge.blockerId}->${edge.nodeId}`}>
                   <path
                     d={d}
+                    data-edge={`${edge.blockerId}->${edge.nodeId}`}
                     fill="none"
-                    strokeWidth={edge.inChain || isSelected ? 2.75 : 2}
+                    strokeWidth={width}
                     strokeLinecap="round"
                     strokeDasharray={
                       edge.tone === "waiting" ? "6 6" : edge.tone === "active" ? "10 8" : undefined
                     }
-                    markerEnd={`url(#${markerId}-${edge.tone})`}
-                    className={`transition-opacity duration-200 ${toneStroke[edge.tone]} ${
+                    className={`transition-opacity duration-200 ${stroke} ${
                       edge.tone === "active" ? "journey-edge-flow" : ""
-                    } ${isSelected ? "!stroke-app-danger-solid" : ""}`}
+                    }`}
+                    opacity={dimmed ? 0.18 : 1}
+                  />
+                  {/*
+                    The head, in the same ink and never dashed. Drawn from the direction the curve
+                    is travelling as it arrives, so it points where the line points and sits on its
+                    end rather than beside it.
+                  */}
+                  <path
+                    d={arrowHead(edge.to, edge.approach)}
+                    fill="none"
+                    strokeWidth={width}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`transition-opacity duration-200 ${stroke}`}
                     opacity={dimmed ? 0.18 : 1}
                   />
                   {canConnect ? (
@@ -900,17 +946,26 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               );
             })}
             {connection && connectionSource ? (
-              <path
-                d={edgePath(
-                  { x: connectionSource.x, y: connectionSource.y + nodeSize.height / 2 },
-                  connection.pointer,
-                )}
-                fill="none"
-                strokeWidth={2}
-                strokeDasharray="4 6"
-                className="stroke-app-brand"
-                markerEnd={`url(#${markerId}-active)`}
-              />
+              <>
+                <path
+                  d={edgePath(
+                    { x: connectionSource.x, y: connectionSource.y + nodeSize.height / 2 },
+                    connection.pointer,
+                  )}
+                  fill="none"
+                  strokeWidth={2}
+                  strokeDasharray="4 6"
+                  className="stroke-app-brand"
+                />
+                <path
+                  d={arrowHead(connection.pointer, { x: 0, y: 1 })}
+                  fill="none"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="stroke-app-brand"
+                />
+              </>
             ) : null}
           </svg>
 
@@ -1132,14 +1187,6 @@ const toneStroke: Record<JourneyEdgeTone, string> = {
   waiting: "stroke-app-text-subtle/50",
   upstream: "stroke-app-orange-text",
   rule: "stroke-app-brand",
-};
-
-const toneFill: Record<JourneyEdgeTone, string> = {
-  done: "fill-app-success-solid/70",
-  active: "fill-app-brand",
-  waiting: "fill-app-text-subtle/50",
-  upstream: "fill-app-orange-text",
-  rule: "fill-app-brand",
 };
 
 export function CanvasButton({
