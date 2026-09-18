@@ -58,14 +58,6 @@ describe("ArrivalStepAuthoring", () => {
     mockLists([step()]);
   });
 
-  it("states that the list does not block anyone", async () => {
-    render(<ArrivalStepAuthoring />);
-
-    // "Mandatory steps" reads like a gate, and the previous model was one. The page has to say
-    // otherwise, or a PM will reasonably assume it withholds work until the list is done.
-    expect(await screen.findByText(/Nothing here blocks anyone/i)).toBeInTheDocument();
-  });
-
   it("shows only the company-wide block without a project in context", async () => {
     render(<ArrivalStepAuthoring />);
 

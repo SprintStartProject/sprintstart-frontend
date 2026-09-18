@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Target } from "lucide-react";
-import { PageHeader } from "../../../components/layout/PageHeader";
 import { Button } from "../../../components/ui/Button";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { SidePanel } from "../../../components/ui/SidePanel";
@@ -348,27 +346,8 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
   );
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-frame py-6">
-          <PageHeader
-            icon={Target}
-            title="Starter Work"
-            subtitle="First tasks mined from your corpus, ready for new hires to pick up. Reviewing one lifts it up the list."
-            actions={
-              <StarterWorkAddMenu
-                canAct={canAct}
-                canFindWithAi={Boolean(selectedProjectId) && !isGenerating}
-                onFindWithAi={() => void generate(selectedProjectId)}
-                onPickFromIssues={() => setIsIssuesSheetOpen(true)}
-                onWriteOne={() => setIsCreateOpen(true)}
-              />
-            }
-          />
-        </div>
-      </header>
-
-      <main ref={swipeRef} className="app-page-frame space-y-5 py-6 lg:py-8">
+    <div ref={swipeRef} className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <SegmentedTabs
           value={activeSection}
           options={tabOptions}
@@ -376,66 +355,73 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
           layoutId="starter-work-section-pill"
           ariaLabel="Filter sections"
         />
+        <StarterWorkAddMenu
+          canAct={canAct}
+          canFindWithAi={Boolean(selectedProjectId) && !isGenerating}
+          onFindWithAi={() => void generate(selectedProjectId)}
+          onPickFromIssues={() => setIsIssuesSheetOpen(true)}
+          onWriteOne={() => setIsCreateOpen(true)}
+        />
+      </div>
 
-        <SlidingTabPanel
-          activeKey={activeSection}
-          index={SECTION_ORDER.indexOf(activeSection)}
-          className="space-y-8"
-        >
-          {showOverview && (
-            <>
-              {tasks.length > 0 && (
-                <div
-                  data-testid="unreviewed-hint"
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-app-brand-border bg-app-brand-soft px-5 py-4 text-sm text-app-text"
+      <SlidingTabPanel
+        activeKey={activeSection}
+        index={SECTION_ORDER.indexOf(activeSection)}
+        className="space-y-8"
+      >
+        {showOverview && (
+          <>
+            {tasks.length > 0 && (
+              <div
+                data-testid="unreviewed-hint"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-app-brand-border bg-app-brand-soft px-5 py-4 text-sm text-app-text"
+              >
+                <span>
+                  {tasks.length} {tasks.length === 1 ? "task" : "tasks"} nobody has looked at yet
+                </span>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  data-testid="open-triage"
+                  onClick={() => setIsTriageOpen(true)}
                 >
-                  <span>
-                    {tasks.length} {tasks.length === 1 ? "task" : "tasks"} nobody has looked at yet
-                  </span>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    data-testid="open-triage"
-                    onClick={() => setIsTriageOpen(true)}
-                  >
-                    Go through them
-                  </Button>
-                </div>
-              )}
+                  Go through them
+                </Button>
+              </div>
+            )}
 
-              <StarterWorkPoolCloud
-                tasks={pool}
-                isLoading={isPoolLoading}
-                error={poolError}
-                canAct={canAct}
-                fullWidth
-                onSync={() => void handleSync()}
-                isSyncing={isSyncing}
-                onOpenTask={toggleSelectedTask}
-              />
-            </>
-          )}
+            <StarterWorkPoolCloud
+              tasks={pool}
+              isLoading={isPoolLoading}
+              error={poolError}
+              canAct={canAct}
+              fullWidth
+              onSync={() => void handleSync()}
+              isSyncing={isSyncing}
+              onOpenTask={toggleSelectedTask}
+            />
+          </>
+        )}
 
-          {/* The pool on its own, the same surface the overview shows above. Its cards open the
+        {/* The pool on its own, the same surface the overview shows above. Its cards open the
               same detail drawer the overview's do. */}
-          {showPoolTab && (
-            <>
-              <StarterWorkPoolCloud
-                tasks={pool}
-                isLoading={isPoolLoading}
-                error={poolError}
-                canAct={canAct}
-                fullWidth
-                onSync={() => void handleSync()}
-                isSyncing={isSyncing}
-                onOpenTask={toggleSelectedTask}
-                initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
-              />
-              <ClosedInTrackerList onOpenTask={toggleSelectedTask} />
-            </>
-          )}
-        </SlidingTabPanel>
-      </main>
+        {showPoolTab && (
+          <>
+            <StarterWorkPoolCloud
+              tasks={pool}
+              isLoading={isPoolLoading}
+              error={poolError}
+              canAct={canAct}
+              fullWidth
+              onSync={() => void handleSync()}
+              isSyncing={isSyncing}
+              onOpenTask={toggleSelectedTask}
+              initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
+            />
+            <ClosedInTrackerList onOpenTask={toggleSelectedTask} />
+          </>
+        )}
+      </SlidingTabPanel>
 
       <PanelPresence value={selectedTask}>
         {(task) => (

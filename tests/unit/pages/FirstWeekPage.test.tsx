@@ -71,22 +71,22 @@ describe("FirstWeekPage tab switching", () => {
   it("opens the Arrival tab from a ?tab=arrival deep link", async () => {
     renderTab("arrival");
 
-    expect(await screen.findByRole("heading", { name: "Arrival" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Preview card" })).toBeInTheDocument();
   });
 
   it("opens the Starter work tab from a ?tab=starter deep link", async () => {
     renderTab("starter");
 
-    expect(await screen.findByRole("heading", { name: "Starter Work" })).toBeInTheDocument();
+    expect(await screen.findByTestId("add-tasks-menu")).toBeInTheDocument();
   });
 
   it("switches from Arrival to Starter work through the tab bar", async () => {
     renderTab("arrival");
-    await screen.findByRole("heading", { name: "Arrival" });
+    await screen.findByRole("button", { name: "Preview card" });
 
     fireEvent.click(screen.getByRole("button", { name: "Starter work" }));
 
-    expect(await screen.findByRole("heading", { name: "Starter Work" })).toBeInTheDocument();
+    expect(await screen.findByTestId("add-tasks-menu")).toBeInTheDocument();
   });
 });
 
@@ -238,7 +238,7 @@ describe("FirstWeekPage Overview tab", () => {
       }),
     );
 
-    expect(await screen.findByRole("heading", { name: "Starter Work" })).toBeInTheDocument();
+    expect(await screen.findByTestId("add-tasks-menu")).toBeInTheDocument();
     expect(
       await screen.findByRole("heading", { name: "Go through tasks nobody has looked at" }),
     ).toBeInTheDocument();
@@ -249,7 +249,7 @@ describe("FirstWeekPage Overview tab", () => {
 
     fireEvent.click(await screen.findByTestId("overview-stage-task0"));
 
-    expect(await screen.findByRole("heading", { name: "Starter Work" })).toBeInTheDocument();
+    expect(await screen.findByTestId("add-tasks-menu")).toBeInTheDocument();
     // Landed on the dedicated Pool section (not Overview), filter chips visible with Task 0 pressed.
     expect(
       screen
@@ -267,7 +267,7 @@ describe("FirstWeekPage Overview tab", () => {
       }),
     );
 
-    expect(await screen.findByRole("heading", { name: "Arrival" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Preview card" })).toBeInTheDocument();
   });
 
   it("jumps to the Arrival tab from the Arrive stage card itself", async () => {
@@ -275,27 +275,7 @@ describe("FirstWeekPage Overview tab", () => {
 
     fireEvent.click(await screen.findByTestId("overview-stage-arrival"));
 
-    expect(await screen.findByRole("heading", { name: "Arrival" })).toBeInTheDocument();
-  });
-});
-
-/**
- * Every other page's header rule sits at the same height; Arrival's ran a line lower because its
- * subtitle was the longest in the app and wrapped where the others do not.
- */
-describe("Arrival section header", () => {
-  beforeEach(() => {
-    vi.mocked(arrivalService.listSteps).mockResolvedValue([]);
-    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([]);
-  });
-
-  it("keeps the subtitle inside the band the other pages sit in", async () => {
-    renderTab("arrival");
-
-    // Measured against the built stylesheet: at `max-w-2xl` and `text-sm` the subtitle wraps
-    // past 105 characters, and every other page in the app is under that.
-    const subtitle = await screen.findByText(/What somebody needs before they can start/);
-    expect(subtitle.textContent.length).toBeLessThanOrEqual(105);
+    expect(await screen.findByRole("button", { name: "Preview card" })).toBeInTheDocument();
   });
 });
 
@@ -328,12 +308,12 @@ describe("old First Week routes", () => {
   it("redirects /arrival-steps to the Arrival tab", async () => {
     renderRedirect("/arrival-steps");
 
-    expect(await screen.findByRole("heading", { name: "Arrival" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Preview card" })).toBeInTheDocument();
   });
 
   it("redirects /starter-work to the Starter work tab", async () => {
     renderRedirect("/starter-work");
 
-    expect(await screen.findByRole("heading", { name: "Starter Work" })).toBeInTheDocument();
+    expect(await screen.findByTestId("add-tasks-menu")).toBeInTheDocument();
   });
 });

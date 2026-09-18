@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent } from "react";
+import { useEffect, useState, type DragEvent, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronUp, CornerDownRight, Eye, Pencil, Plus } from "lucide-react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Badge } from "../../../components/ui/Badge";
@@ -43,10 +43,13 @@ export function ArrivalStepAuthoring({
   readOnly = false,
   projectId = null,
   projectName = null,
+  actions = null,
 }: {
   readOnly?: boolean;
   projectId?: string | null;
   projectName?: string | null;
+  /** Rendered in the toolbar row, to the right of "Add a step". */
+  actions?: ReactNode;
 }) {
   const {
     company,
@@ -112,24 +115,18 @@ export function ArrivalStepAuthoring({
 
   return (
     <section className="space-y-5">
-      <header className="space-y-1">
-        <h2 className="text-lg font-semibold tracking-tight text-app-text">
-          Before they can start
-        </h2>
-        <p className="max-w-2xl text-sm text-app-text-muted">
-          {showingProject ? (
-            <>
-              What a new hire on{" "}
-              <strong className="font-medium text-app-text">{projectName}</strong> gets, in the
-              order they see it: everyone&apos;s steps first, then what {projectName} adds.
-            </>
-          ) : (
-            "The steps every new hire gets, whichever project they join."
-          )}{" "}
-          <strong className="font-medium text-app-text">Nothing here blocks anyone</strong>: an
-          outstanding step is shown and raised by their buddy, never enforced.
-        </p>
-      </header>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {!readOnly && !adding && (
+          <Button
+            variant="secondary"
+            onClick={() => setAdding(true)}
+            icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+          >
+            Add a step
+          </Button>
+        )}
+        {actions}
+      </div>
 
       {hasProject && (
         <SegmentedTabs
@@ -181,24 +178,18 @@ export function ArrivalStepAuthoring({
           You can see this list but not change it — a PM or an admin can. If something here is wrong
           or missing, that is who to tell.
         </EmptyState>
-      ) : adding ? (
-        <AddStepForm
-          hasProject={hasProject}
-          projectName={projectName}
-          defaultWho={scope}
-          onCancel={() => setAdding(false)}
-          onCreate={async (request, who) => {
-            if (await create(request, who)) setAdding(false);
-          }}
-        />
       ) : (
-        <Button
-          variant="secondary"
-          onClick={() => setAdding(true)}
-          icon={<Plus className="h-4 w-4" aria-hidden="true" />}
-        >
-          Add a step
-        </Button>
+        adding && (
+          <AddStepForm
+            hasProject={hasProject}
+            projectName={projectName}
+            defaultWho={scope}
+            onCancel={() => setAdding(false)}
+            onCreate={async (request, who) => {
+              if (await create(request, who)) setAdding(false);
+            }}
+          />
+        )
       )}
 
       {/*
