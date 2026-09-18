@@ -1108,13 +1108,20 @@ export function BlueprintPathDetailPage() {
   /**
    * Puts the author back in front of what they were looking at before they were sent here.
    *
-   * The state is cleared first and unconditionally: a reload or a step back through history must
+   * **Not until the path on screen is the one the address names.** Navigating to the draft changes
+   * the URL immediately; the draft itself arrives a request later, and until it does `path` is
+   * still the *published* version this request came from. Its phases carry the same titles — a
+   * draft is a copy — so a title match against it succeeds and reopens a phase whose id exists
+   * only in the version that was just left. The page it opened then vanished the moment the draft
+   * landed, leaving the author looking at the graph and pressing the phase a second time.
+   *
+   * The state is cleared as soon as it is acted on: a reload or a step back through history must
    * not open the same thing again, and a title that no longer matches anything is not a reason to
    * keep asking.
    */
   const reopenRequest = (location.state as { reopen?: BlueprintReopen } | null)?.reopen ?? null;
   useEffect(() => {
-    if (!reopenRequest || !path) return;
+    if (!reopenRequest || !path || path.id !== pathId) return;
     const phase = path.blueprintPhases.find(
       (candidate) => candidate.title === reopenRequest.phaseTitle,
     );
@@ -1135,7 +1142,7 @@ export function BlueprintPathDetailPage() {
     // `openSubGraph` and `openGraphEditor` are declared per render and would restart this on every
     // one; what this effect actually depends on is the request and the path it has to find it in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, location.search, navigate, path, reopenRequest]);
+  }, [location.pathname, location.search, navigate, path, pathId, reopenRequest]);
 
   /** Reloads top-level graph positions, which are not refreshed by subgraph mutations. */
   async function returnToTopLevelGraph() {
