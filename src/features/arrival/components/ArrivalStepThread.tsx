@@ -1,13 +1,22 @@
-import { useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
 import { ChevronDown, ChevronUp, CornerDownRight, Pencil } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { DragHandle } from "../../../components/ui/DragHandle";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { moveTo } from "../../board/layout/boardOrder";
 import { howStepGetsDone } from "../howItsDone";
 import type { ArrivalScope, ArrivalStep } from "../types";
 
 const EMPTY_SET = new Set<string>();
+
+/** Spring used for a row settling into its reordered slot. */
+const LAYOUT_TRANSITION = { type: "spring", stiffness: 500, damping: 40, mass: 0.6 } as const;
+
+/** Below this, two rows swapping on every pointer-move frame would fight each other — the same
+ * fix the board grid uses for the same kind of edge-docking jitter. */
+const MOVE_COOLDOWN_MS = 160;
 
 type StepEntry = {
   step: ArrivalStep;
@@ -22,9 +31,28 @@ type StepEntry = {
   canMoveDown: boolean;
 };
 
-type ThreadNode =
-  | { kind: "label"; id: string; text: string; muted: boolean }
-  | { kind: "step"; id: string; entry: StepEntry };
+function sameKeys(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((key, index) => key === b[index]);
+}
+
+/** Re-reads a list in a given key order; falls back to the original if the two disagree, which
+ * only happens for a moment while a fresh load is still in flight. */
+function reorderByKeys(steps: ArrivalStep[], keys: string[]): ArrivalStep[] {
+  if (keys.length !== steps.length) return steps;
+  const byKey = new Map(steps.map((step) => [step.key, step]));
+  const reordered = keys.map((key) => byKey.get(key));
+  return reordered.every((step): step is ArrivalStep => step !== undefined) ? reordered : steps;
+}
+
+function centerOf(element: HTMLElement): { x: number; y: number } {
+  const rect = element.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+
+function contains(element: HTMLElement, x: number, y: number): boolean {
+  const rect = element.getBoundingClientRect();
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
 
 /**
  * Both arrival lists as the one thread a new hire actually walks down, rather than two separately
@@ -35,9 +63,12 @@ type ThreadNode =
  * relationship between the two still reads clearly) but carries no number of its own, just a small
  * dot on the thread — the project's own version, further down, is what counts.
  *
- * Reordering stays inside one section: the backend sorts each scope separately, so a drag or an
- * up/down press against a company step only ever touches the company order, and the same for a
- * project step.
+ * Reordering stays inside one section: the backend sorts each scope separately, so a drag against a
+ * company step only ever touches the company order, and the same for a project step. A row is
+ * picked up and moved by hand — no ghost image trailing the pointer, the card itself is what moves —
+ * and the rest of its section slides out of the way live as it crosses them, the same way the board
+ * grid re-sorts cards. The numbers stay put until the pointer is actually released; only then does
+ * the new order get written down.
  */
 export function ArrivalStepThread({
   companySteps,
@@ -58,192 +89,394 @@ export function ArrivalStepThread({
   onReorder: (orderedKeys: string[], scope: ArrivalScope) => void;
   onEdit: (step: ArrivalStep, scope: ArrivalScope) => void;
 }) {
-  const [draggedKey, setDraggedKey] = useState<string | null>(null);
-  const [draggedScope, setDraggedScope] = useState<ArrivalScope | null>(null);
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  const [companyOrder, setCompanyOrder] = useState<string[]>(() =>
+    companySteps.map((step) => step.key),
+  );
+  const [projectOrder, setProjectOrder] = useState<string[]>(() =>
+    projectSteps.map((step) => step.key),
+  );
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [draggingScope, setDraggingScope] = useState<ArrivalScope | null>(null);
+  // Briefly rings the row that a drop just settled, cleared on its own after the pulse plays.
+  const [justDroppedKey, setJustDroppedKey] = useState<string | null>(null);
+
+  // Measured on mount/render via each row's ref, read back during a drag to work out which row the
+  // one in hand is currently over.
+  const rowElements = useRef(new Map<string, HTMLElement>());
+  const lastMoveAt = useRef(0);
+  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Read inside the effects below rather than put in their dependency arrays: a drag ending flips
+  // `draggingScope` back to null a beat before the silent reload it triggered actually lands, and
+  // `companySteps`/`projectSteps` are still the pre-drop order at that instant. Depending on
+  // `draggingScope` directly would re-run the sync right then, snapping the row that just settled
+  // back to its old spot and then forward again once the fresh order arrives — the exact
+  // already-there-but-animating-anyway flicker this is guarding against. Keyed only on the steps
+  // themselves, the sync instead waits for that reload to actually finish, by which point the
+  // server's order already matches what the drag left locally, so there is nothing left to animate.
+  const draggingScopeRef = useRef<ArrivalScope | null>(null);
+  useEffect(() => {
+    draggingScopeRef.current = draggingScope;
+  }, [draggingScope]);
+
+  // The local order tracks the server's own at all times, except in whichever scope is currently
+  // being dragged — there the pointer is in charge until it lets go, so a row does not get pulled
+  // out from under the cursor by a refetch landing mid-drag.
+  // Deferred to a microtask so this is not a synchronous setState inside the effect body, which
+  // `react-hooks/set-state-in-effect` rejects.
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      if (draggingScopeRef.current === "company") return;
+      setCompanyOrder(companySteps.map((step) => step.key));
+    });
+  }, [companySteps]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      if (draggingScopeRef.current === "project") return;
+      setProjectOrder(projectSteps.map((step) => step.key));
+    });
+  }, [projectSteps]);
+
+  useEffect(() => {
+    return () => {
+      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+    };
+  }, []);
 
   if (companySteps.length === 0 && projectSteps.length === 0) {
     return <EmptyState size="sm">No steps here yet.</EmptyState>;
   }
 
+  const effectiveCompanySteps = reorderByKeys(companySteps, companyOrder);
+  const effectiveProjectSteps = reorderByKeys(projectSteps, projectOrder);
+
   const companyKeys = new Set(companySteps.map((step) => step.key));
   const overriddenKeys = hasProject ? new Set(projectSteps.map((step) => step.key)) : EMPTY_SET;
 
-  let running = 0;
-  const companyEntries: StepEntry[] = companySteps.map((step, index) => {
+  // Row *position* follows the live order the whole time a drag is in progress, so the section
+  // reorders in real time as the pointer crosses other rows. The *numbers* stay put until the
+  // pointer is actually released: they are read from the order the server still has while that
+  // scope is being dragged, and only pick up the live order again once the drag ends — by then the
+  // final order is already what `company/projectOrder` holds, so the badges jump straight to it.
+  const numberCompanySteps = draggingScope === "company" ? companySteps : effectiveCompanySteps;
+  const numberProjectSteps = draggingScope === "project" ? projectSteps : effectiveProjectSteps;
+
+  const numberByKey = new Map<string, number | null>();
+  {
+    let running = 0;
+    for (const step of numberCompanySteps) {
+      const replaced = overriddenKeys.has(step.key);
+      numberByKey.set(step.key, replaced ? null : ++running);
+    }
+    if (hasProject) {
+      for (const step of numberProjectSteps) {
+        numberByKey.set(step.key, ++running);
+      }
+    }
+  }
+
+  const companyEntries: StepEntry[] = effectiveCompanySteps.map((step, index) => {
     const replaced = overriddenKeys.has(step.key);
     return {
       step,
       scope: "company",
       replaced,
       isOverride: false,
-      number: replaced ? null : ++running,
+      number: numberByKey.get(step.key) ?? null,
       canMoveUp: !replaced && index > 0,
-      canMoveDown: !replaced && index < companySteps.length - 1,
+      canMoveDown: !replaced && index < effectiveCompanySteps.length - 1,
     };
   });
   const projectEntries: StepEntry[] = hasProject
-    ? projectSteps.map((step, index) => ({
+    ? effectiveProjectSteps.map((step, index) => ({
         step,
         scope: "project" as const,
         replaced: false,
         isOverride: companyKeys.has(step.key),
-        number: ++running,
+        number: numberByKey.get(step.key) ?? null,
         canMoveUp: index > 0,
-        canMoveDown: index < projectSteps.length - 1,
+        canMoveDown: index < effectiveProjectSteps.length - 1,
       }))
     : [];
 
-  const projectDisplayName = projectName ?? "this project";
-  const nodes: ThreadNode[] = [];
-  if (hasProject) {
-    nodes.push({ kind: "label", id: "mark-company", text: "For everyone", muted: false });
-  }
-  for (const entry of companyEntries) {
-    nodes.push({ kind: "step", id: `company:${entry.step.key}`, entry });
-  }
-  if (hasProject) {
-    if (projectEntries.length > 0) {
-      nodes.push({
-        kind: "label",
-        id: "mark-project",
-        text: `Only in ${projectDisplayName}`,
-        muted: false,
-      });
-      for (const entry of projectEntries) {
-        nodes.push({ kind: "step", id: `project:${entry.step.key}`, entry });
-      }
-    } else {
-      nodes.push({
-        kind: "label",
-        id: "mark-project-empty",
-        text: `Nothing extra for ${projectDisplayName} yet`,
-        muted: true,
-      });
-    }
-  }
+  const registerRow = (key: string, element: HTMLElement | null) => {
+    if (element) rowElements.current.set(key, element);
+    else rowElements.current.delete(key);
+  };
 
-  const sectionSteps = (scope: ArrivalScope) => (scope === "company" ? companySteps : projectSteps);
+  const settle = (key: string) => {
+    setJustDroppedKey(key);
+    if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+    settleTimeoutRef.current = setTimeout(() => setJustDroppedKey(null), 650);
+  };
+
+  /** Called on every pointer-move frame a drag is live for. Finds which other row in the same
+   * section the one in hand now sits over — by its measured center, not by whichever element the
+   * pointer happens to be over — and, past the cooldown, moves it there. */
+  const handleRowDrag = (key: string, scope: ArrivalScope) => {
+    const dragged = rowElements.current.get(key);
+    if (!dragged) return;
+
+    const now = performance.now();
+    if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
+
+    const { x, y } = centerOf(dragged);
+    const order = scope === "company" ? companyOrder : projectOrder;
+    const setOrder = scope === "company" ? setCompanyOrder : setProjectOrder;
+
+    for (const candidateKey of order) {
+      if (candidateKey === key) continue;
+      const candidate = rowElements.current.get(candidateKey);
+      if (candidate && contains(candidate, x, y)) {
+        setOrder((current) => moveTo(current, key, candidateKey));
+        lastMoveAt.current = now;
+        return;
+      }
+    }
+  };
+
+  const handleRowDragStart = (key: string, scope: ArrivalScope) => {
+    lastMoveAt.current = 0;
+    setDraggingKey(key);
+    setDraggingScope(scope);
+  };
+
+  const handleRowDragEnd = (key: string, scope: ArrivalScope) => {
+    setDraggingKey(null);
+    setDraggingScope(null);
+
+    const finalOrder = scope === "company" ? companyOrder : projectOrder;
+    const serverOrder = (scope === "company" ? companySteps : projectSteps).map((step) => step.key);
+    if (!sameKeys(finalOrder, serverOrder)) {
+      onReorder(finalOrder, scope);
+      settle(key);
+    }
+  };
+
+  const projectDisplayName = projectName ?? "this project";
 
   return (
-    <ol className="list-none">
-      {nodes.map((node, position) => {
-        const isLast = position === nodes.length - 1;
-        const draggable = node.kind === "step" && !readOnly && !node.entry.replaced;
+    <div className="space-y-4">
+      {hasProject && <ThreadSectionLabel text="For everyone" />}
+      <ThreadSection
+        entries={companyEntries}
+        readOnly={readOnly}
+        projectName={projectName}
+        draggingKey={draggingKey}
+        justDroppedKey={justDroppedKey}
+        prefersReducedMotion={Boolean(prefersReducedMotion)}
+        registerRow={registerRow}
+        onDragStartRow={(key) => handleRowDragStart(key, "company")}
+        onDragRow={(key) => handleRowDrag(key, "company")}
+        onDragEndRow={(key) => handleRowDragEnd(key, "company")}
+        onMove={(key, direction) => onMove(key, direction, "company")}
+        onEdit={(step) => onEdit(step, "company")}
+      />
 
-        return (
-          <li
-            key={node.id}
-            draggable={draggable}
-            onDragStart={(event: DragEvent<HTMLLIElement>) => {
-              if (node.kind !== "step" || !draggable) return;
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("text/plain", node.entry.step.key);
-              setDraggedKey(node.entry.step.key);
-              setDraggedScope(node.entry.scope);
-            }}
-            onDragEnd={() => {
-              setDraggedKey(null);
-              setDraggedScope(null);
-              setDragOverKey(null);
-            }}
-            onDragOver={(event: DragEvent<HTMLLIElement>) => {
-              if (node.kind !== "step") return;
-              if (
-                !draggedKey ||
-                draggedScope !== node.entry.scope ||
-                draggedKey === node.entry.step.key
-              ) {
-                return;
-              }
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
-              setDragOverKey(node.entry.step.key);
-            }}
-            onDragLeave={(event: DragEvent<HTMLLIElement>) => {
-              const next = event.relatedTarget;
-              if (next instanceof Node && event.currentTarget.contains(next)) return;
-              if (node.kind === "step") {
-                setDragOverKey((current) => (current === node.entry.step.key ? null : current));
-              }
-            }}
-            onDrop={(event: DragEvent<HTMLLIElement>) => {
-              event.preventDefault();
-              if (node.kind !== "step") return;
-              const scope = node.entry.scope;
-              const targetKey = node.entry.step.key;
-              const activeKey = draggedKey;
-              const activeScope = draggedScope;
-              setDraggedKey(null);
-              setDraggedScope(null);
-              setDragOverKey(null);
-              if (!activeKey || activeScope !== scope || activeKey === targetKey) return;
-              const steps = sectionSteps(scope);
-              const from = steps.findIndex((candidate) => candidate.key === activeKey);
-              const to = steps.findIndex((candidate) => candidate.key === targetKey);
-              if (from === -1 || to === -1) return;
-              const reordered = [...steps];
-              const [moved] = reordered.splice(from, 1);
-              reordered.splice(to, 0, moved);
-              onReorder(
-                reordered.map((candidate) => candidate.key),
-                scope,
-              );
-            }}
-            className={`relative ${isLast ? "" : "pb-3"}`}
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-                {node.kind === "step" && node.entry.number !== null ? (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-app-brand bg-app-surface text-sm font-bold text-app-brand-text">
-                    {node.entry.number}
-                  </span>
-                ) : (
-                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-app-border" />
-                )}
-              </div>
+      {hasProject &&
+        (projectEntries.length > 0 ? (
+          <>
+            <ThreadSectionLabel text={`Only in ${projectDisplayName}`} />
+            <ThreadSection
+              entries={projectEntries}
+              readOnly={readOnly}
+              projectName={projectName}
+              draggingKey={draggingKey}
+              justDroppedKey={justDroppedKey}
+              prefersReducedMotion={Boolean(prefersReducedMotion)}
+              registerRow={registerRow}
+              onDragStartRow={(key) => handleRowDragStart(key, "project")}
+              onDragRow={(key) => handleRowDrag(key, "project")}
+              onDragEndRow={(key) => handleRowDragEnd(key, "project")}
+              onMove={(key, direction) => onMove(key, direction, "project")}
+              onEdit={(step) => onEdit(step, "project")}
+            />
+          </>
+        ) : (
+          <ThreadSectionLabel text={`Nothing extra for ${projectDisplayName} yet`} muted />
+        ))}
+    </div>
+  );
+}
 
-              <div className="min-w-0 flex-1 pt-1.5">
-                {node.kind === "label" ? (
-                  <p
-                    className={
-                      node.muted
-                        ? "text-xs text-app-text-subtle"
-                        : "text-xs font-semibold tracking-wide text-app-text-subtle uppercase"
-                    }
-                  >
-                    {node.text}
-                  </p>
-                ) : (
-                  <StepRow
-                    step={node.entry.step}
-                    readOnly={readOnly}
-                    replaced={node.entry.replaced}
-                    isOverride={node.entry.isOverride}
-                    projectName={projectName}
-                    draggable={draggable}
-                    isDragTarget={
-                      dragOverKey === node.entry.step.key && draggedKey !== node.entry.step.key
-                    }
-                    canMoveUp={node.entry.canMoveUp}
-                    canMoveDown={node.entry.canMoveDown}
-                    onMove={(direction) => onMove(node.entry.step.key, direction, node.entry.scope)}
-                    onEdit={() => onEdit(node.entry.step, node.entry.scope)}
-                  />
-                )}
-              </div>
-            </div>
+function ThreadSectionLabel({ text, muted = false }: { text: string; muted?: boolean }) {
+  return (
+    <p
+      className={
+        muted
+          ? "text-xs text-app-text-subtle"
+          : "text-xs font-semibold tracking-wide text-app-text-subtle uppercase"
+      }
+    >
+      {text}
+    </p>
+  );
+}
 
-            {!isLast && (
-              <span
-                aria-hidden="true"
-                className="absolute top-8 bottom-0 left-4 -ml-px w-0.5 bg-app-border"
-              />
-            )}
-          </li>
-        );
-      })}
+/**
+ * One section's rows, plus the single line that threads through them.
+ *
+ * The line is one static element spanning the section top to bottom, not a segment stitched onto
+ * each row and not measured against where any one card's number happens to sit — a reorder only
+ * ever moves the numbers and cards across it, and the line itself never moves or resizes along
+ * with them.
+ */
+function ThreadSection({
+  entries,
+  readOnly,
+  projectName,
+  draggingKey,
+  justDroppedKey,
+  prefersReducedMotion,
+  registerRow,
+  onDragStartRow,
+  onDragRow,
+  onDragEndRow,
+  onMove,
+  onEdit,
+}: {
+  entries: StepEntry[];
+  readOnly: boolean;
+  projectName: string | null;
+  draggingKey: string | null;
+  justDroppedKey: string | null;
+  prefersReducedMotion: boolean;
+  registerRow: (key: string, element: HTMLElement | null) => void;
+  onDragStartRow: (key: string) => void;
+  onDragRow: (key: string) => void;
+  onDragEndRow: (key: string) => void;
+  onMove: (key: string, direction: "up" | "down") => void;
+  onEdit: (step: ArrivalStep) => void;
+}) {
+  return (
+    <ol className="relative flex list-none flex-col gap-3">
+      {entries.length > 1 && (
+        <>
+          <span
+            aria-hidden="true"
+            className="absolute top-2 bottom-2 left-4 z-0 -ml-px w-0.5 bg-app-border"
+          />
+          {/* A thin line just stops; a small cap at each end says the thread has a start and an
+              end there, rather than being cut off mid-flow. */}
+          <span
+            aria-hidden="true"
+            className="absolute top-2 left-4 z-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-app-border"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute bottom-2 left-4 z-0 h-2 w-2 -translate-x-1/2 translate-y-1/2 rounded-full bg-app-border"
+          />
+        </>
+      )}
+      {entries.map((entry) => (
+        <ThreadRow
+          key={entry.step.key}
+          entry={entry}
+          readOnly={readOnly}
+          projectName={projectName}
+          isDraggingThis={draggingKey === entry.step.key}
+          justDropped={justDroppedKey === entry.step.key}
+          prefersReducedMotion={prefersReducedMotion}
+          registerElement={(element) => registerRow(entry.step.key, element)}
+          onDragStart={() => onDragStartRow(entry.step.key)}
+          onDrag={() => onDragRow(entry.step.key)}
+          onDragEnd={() => onDragEndRow(entry.step.key)}
+          onMove={(direction) => onMove(entry.step.key, direction)}
+          onEdit={() => onEdit(entry.step)}
+        />
+      ))}
     </ol>
+  );
+}
+
+function ThreadRow({
+  entry,
+  readOnly,
+  projectName,
+  isDraggingThis,
+  justDropped,
+  prefersReducedMotion,
+  registerElement,
+  onDragStart,
+  onDrag,
+  onDragEnd,
+  onMove,
+  onEdit,
+}: {
+  entry: StepEntry;
+  readOnly: boolean;
+  projectName: string | null;
+  isDraggingThis: boolean;
+  justDropped: boolean;
+  prefersReducedMotion: boolean;
+  registerElement: (element: HTMLElement | null) => void;
+  onDragStart: () => void;
+  onDrag: () => void;
+  onDragEnd: () => void;
+  onMove: (direction: "up" | "down") => void;
+  onEdit: () => void;
+}) {
+  const dragControls = useDragControls();
+  const draggable = !readOnly && !entry.replaced;
+
+  return (
+    <motion.li
+      ref={registerElement}
+      layout={!prefersReducedMotion}
+      transition={LAYOUT_TRANSITION}
+      drag={draggable ? "y" : false}
+      dragListener={false}
+      dragControls={dragControls}
+      dragSnapToOrigin
+      dragElastic={0}
+      dragMomentum={false}
+      onDragStart={onDragStart}
+      onDrag={onDrag}
+      onDragEnd={onDragEnd}
+      className={`relative z-10 flex gap-3 ${isDraggingThis ? "z-20 cursor-grabbing" : ""}`}
+      style={isDraggingThis ? { touchAction: "none" } : undefined}
+    >
+      <div className="relative flex w-8 shrink-0 items-center justify-center">
+        {entry.number !== null ? (
+          <span className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-app-brand bg-app-surface text-sm font-bold text-app-brand-text">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={entry.number}
+                initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.7 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.7 }}
+                transition={{ duration: 0.16, ease: [0.32, 0.72, 0, 1] }}
+              >
+                {entry.number}
+              </motion.span>
+            </AnimatePresence>
+          </span>
+        ) : (
+          <span aria-hidden="true" className="relative z-10 h-2 w-2 rounded-full bg-app-border" />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <StepRow
+          step={entry.step}
+          readOnly={readOnly}
+          replaced={entry.replaced}
+          isOverride={entry.isOverride}
+          projectName={projectName}
+          draggable={draggable}
+          isDragging={isDraggingThis}
+          justDropped={justDropped}
+          canMoveUp={entry.canMoveUp}
+          canMoveDown={entry.canMoveDown}
+          onMove={onMove}
+          onEdit={onEdit}
+          onHandlePointerDown={(event) => dragControls.start(event)}
+        />
+      </div>
+    </motion.li>
   );
 }
 
@@ -254,11 +487,13 @@ function StepRow({
   isOverride,
   projectName,
   draggable,
-  isDragTarget,
+  isDragging,
+  justDropped,
   canMoveUp,
   canMoveDown,
   onMove,
   onEdit,
+  onHandlePointerDown,
 }: {
   step: ArrivalStep;
   readOnly: boolean;
@@ -266,91 +501,125 @@ function StepRow({
   isOverride: boolean;
   projectName: string | null;
   draggable: boolean;
-  isDragTarget: boolean;
+  /** True for the one row currently being picked up and moved. */
+  isDragging: boolean;
+  /** True for a moment right after this row's drop settles — plays a brief highlight. */
+  justDropped: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMove: (direction: "up" | "down") => void;
   onEdit: () => void;
+  onHandlePointerDown: (event: ReactPointerEvent<HTMLSpanElement>) => void;
 }) {
   const howItsDone = howStepGetsDone(step);
   const HowItsDoneIcon = howItsDone.icon;
 
   return (
     <div
-      className={`group/step flex flex-1 items-start gap-2 rounded-2xl border p-3 transition-colors ${
+      className={`group/step relative flex-1 rounded-2xl border p-3 transition duration-500 ${
         replaced
           ? "border-dashed border-app-border bg-app-surface-muted"
           : "border-app-border bg-app-surface"
-      } ${isDragTarget ? "border-app-brand ring-2 ring-app-brand-glow" : ""}`}
+      } ${isDragging ? "border-app-brand shadow-lg ring-2 ring-app-brand-glow" : ""} ${
+        justDropped ? "border-app-brand ring-2 ring-app-brand-glow" : ""
+      }`}
     >
-      {draggable && (
-        <DragHandle visibleClassName="group-hover/step:mr-1 group-hover/step:w-4 group-hover/step:opacity-100 group-hover/step:text-app-text-muted" />
-      )}
-
-      <div className="min-w-0 flex-1">
-        <p
-          className={`text-sm ${replaced ? "text-app-text-subtle line-through" : "font-medium text-app-text"}`}
-        >
-          {step.title}
-        </p>
-        {step.description && <p className="mt-1 text-xs text-app-text-muted">{step.description}</p>}
-
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {replaced && (
-            <Badge variant="brand" size="md">
-              <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
-              {projectName ?? "This project"} uses its own version
-            </Badge>
-          )}
-          {isOverride && (
-            <Badge variant="brand" size="md">
-              <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
-              Own version of a company step
-            </Badge>
-          )}
-          <Badge variant={step.settledBy === "OBSERVED" ? "success" : "neutral"} size="md">
-            <HowItsDoneIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            {howItsDone.label}
-          </Badge>
-        </div>
-      </div>
-
-      {!readOnly && !replaced && (
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={() => onMove("up")}
-            disabled={!canMoveUp}
-            aria-label={`Move "${step.title}" earlier`}
-          >
-            <ChevronUp className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={() => onMove("down")}
-            disabled={!canMoveDown}
-            aria-label={`Move "${step.title}" later`}
-          >
-            <ChevronDown className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </div>
-      )}
-
+      {/* Covers the whole card so clicking anywhere on it opens the edit drawer; the controls
+          below sit in their own layer (pointer-events-auto) so they still catch their own clicks
+          first. The handle below starts its own drag through `dragControls`, so it keeps working
+          sitting in that same clickable layer above this overlay. */}
       {!readOnly && (
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
+        <button
+          type="button"
           onClick={onEdit}
           aria-label={`Edit "${step.title}"`}
-        >
-          <Pencil className="h-4 w-4" aria-hidden="true" />
-        </Button>
+          className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        />
       )}
+
+      <div className="pointer-events-none relative z-10 flex items-start gap-2">
+        {draggable && (
+          <span
+            onPointerDown={onHandlePointerDown}
+            className="pointer-events-auto touch-none select-none"
+          >
+            <DragHandle visibleClassName="group-hover/step:mr-1 group-hover/step:w-4 group-hover/step:opacity-100 group-hover/step:text-app-text-muted" />
+          </span>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <p
+            className={`text-sm ${replaced ? "text-app-text-subtle line-through" : "font-medium text-app-text"}`}
+          >
+            {step.title}
+          </p>
+          {step.description && (
+            <p className="mt-1 text-xs text-app-text-muted">{step.description}</p>
+          )}
+
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {replaced && (
+              <Badge
+                variant="brand"
+                size="md"
+                title={`${projectName ?? "This project"} uses its own version of this step.`}
+              >
+                <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+                Overridden
+              </Badge>
+            )}
+            {isOverride && (
+              <Badge
+                variant="brand"
+                size="md"
+                title="Replaces the company-wide wording for this project."
+              >
+                <CornerDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+                Override
+              </Badge>
+            )}
+            <Badge
+              variant={step.settledBy === "OBSERVED" ? "success" : "neutral"}
+              size="md"
+              title={howItsDone.label}
+            >
+              <HowItsDoneIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              {howItsDone.badge}
+            </Badge>
+          </div>
+        </div>
+
+        {!readOnly && !replaced && (
+          <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={() => onMove("up")}
+              disabled={!canMoveUp}
+              aria-label={`Move "${step.title}" earlier`}
+            >
+              <ChevronUp className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={() => onMove("down")}
+              disabled={!canMoveDown}
+              aria-label={`Move "${step.title}" later`}
+            >
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        )}
+
+        {!readOnly && (
+          <span className="pointer-events-none flex h-9 w-9 shrink-0 items-center justify-center text-app-text-disabled opacity-0 transition-opacity group-hover/step:opacity-100">
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </span>
+        )}
+      </div>
     </div>
   );
 }

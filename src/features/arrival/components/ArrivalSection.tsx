@@ -1,8 +1,3 @@
-import { useState } from "react";
-import { Eye } from "lucide-react";
-import { Button } from "../../../components/ui/Button";
-import { PanelPresence } from "../../../components/ui/PanelPresence";
-import { ArrivalCardPreviewDrawer } from "./ArrivalCardPreviewDrawer";
 import { ArrivalStepAuthoring } from "./ArrivalStepAuthoring";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useAuth } from "../../../context/useAuth";
@@ -27,38 +22,9 @@ export function ArrivalSection() {
     profile?.permissionGroup === PermissionGroup.PM ||
     profile?.permissionGroup === PermissionGroup.ADMIN;
 
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
   return (
     <div>
-      <ArrivalStepAuthoring
-        readOnly={!canAuthor}
-        projectId={projectId}
-        projectName={projectName}
-        actions={
-          <Button
-            variant="secondary"
-            icon={<Eye className="h-4 w-4" aria-hidden="true" />}
-            onClick={() => setIsPreviewOpen(true)}
-          >
-            Preview card
-          </Button>
-        }
-      />
-
-      {/* Mounted only while open, like the "Pick from issues" sheet on Starter work — the preview
-          reads the arrival lists a second time, and that read should not happen before somebody
-          actually asks to preview. */}
-      <PanelPresence value={isPreviewOpen ? true : null}>
-        {() => (
-          <ArrivalCardPreviewDrawer
-            isOpen={isPreviewOpen}
-            onClose={() => setIsPreviewOpen(false)}
-            projectId={projectId}
-            projectName={projectName}
-          />
-        )}
-      </PanelPresence>
+      <ArrivalStepAuthoring readOnly={!canAuthor} projectId={projectId} projectName={projectName} />
     </div>
   );
 }

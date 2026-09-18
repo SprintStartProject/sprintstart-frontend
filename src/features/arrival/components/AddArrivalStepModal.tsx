@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ArrowLeft, Plus } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowLeft, Building2, FolderKanban, KeyRound, PenLine, Plus, Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
@@ -31,7 +32,8 @@ type AddArrivalStepModalProps = {
  * "Add step" as a two-step wizard: pick a kind first, then either choose one of the steps
  * SprintStart can check for itself or write a custom one. Splitting it this way keeps the
  * common case — picking a suggestion — down to two taps, instead of a form that asks for a
- * title and a key before a reader even knows the suggestion existed.
+ * title and a key before a reader even knows the suggestion existed. Picking a kind advances
+ * immediately, the same way the create-project wizard's own type pickers do.
  *
  * Only ever mounted while open, so nothing here needs to reset itself on close — a fresh mount
  * starts clean the next time it opens.
@@ -44,6 +46,7 @@ export function AddArrivalStepModal({
   onCreate,
   onClose,
 }: AddArrivalStepModalProps) {
+  const prefersReducedMotion = useReducedMotion();
   const [phase, setPhase] = useState<"kind" | "details">("kind");
   const [kind, setKind] = useState<Kind | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -68,8 +71,8 @@ export function AddArrivalStepModal({
 
   const stepIndex = phase === "kind" ? 0 : 1;
 
-  const goNext = () => {
-    if (!kind) return;
+  const selectKind = (next: Kind) => {
+    setKind(next);
     setPhase("details");
   };
 
@@ -101,14 +104,9 @@ export function AddArrivalStepModal({
 
   const footer =
     phase === "kind" ? (
-      <>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={goNext} disabled={!kind}>
-          Next
-        </Button>
-      </>
+      <Button variant="secondary" onClick={onClose}>
+        Cancel
+      </Button>
     ) : (
       <>
         <Button
@@ -131,6 +129,12 @@ export function AddArrivalStepModal({
       </>
     );
 
+  // The kind picker is the left page, its details the right one: advancing slides the incoming
+  // screen in from the right and pushes the outgoing one left, and going back reverses it, so the
+  // transition reads as moving between two pages — the same pattern the create-project wizard's
+  // add-source sub-flow uses.
+  const offset = phase === "kind" ? -24 : 24;
+
   return (
     <Modal
       isOpen
@@ -141,167 +145,208 @@ export function AddArrivalStepModal({
       onClose={onClose}
       footer={footer}
     >
-      {phase === "kind" && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => setKind("suggested")}
-            disabled={!hasFreeSuggestions}
-            className={`${radioCardClassName(kind === "suggested")} ${
-              hasFreeSuggestions ? "" : "cursor-not-allowed opacity-50"
-            }`}
-          >
-            <span className="block text-sm font-semibold text-app-text">Suggested</span>
-            <span className="mt-1 block text-xs text-app-text-muted">
-              Steps SprintStart can check for itself.
-            </span>
-            <span className="mt-2 block text-xs font-medium text-app-brand-text">
-              {hasFreeSuggestions
-                ? `${freeDerivable.length} ${
-                    freeDerivable.length === 1 ? "suggestion" : "suggestions"
-                  } still free`
-                : "All suggestions are already on the list"}
-            </span>
-          </button>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={`${phase}-${kind ?? "none"}`}
+          initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: offset }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: offset }}
+          transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+        >
+          {phase === "kind" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => selectKind("suggested")}
+                disabled={!hasFreeSuggestions}
+                className={`text-left ${radioCardClassName(false)} ${
+                  hasFreeSuggestions ? "" : "cursor-not-allowed opacity-50"
+                }`}
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-app-bg-soft text-app-brand">
+                  <Sparkles className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="mt-3 block text-sm font-semibold text-app-text">Suggested</span>
+                <span className="mt-1 block text-xs leading-relaxed text-app-text-muted">
+                  Steps SprintStart can check for itself.
+                </span>
+                <span className="mt-2 block text-xs font-medium text-app-brand-text">
+                  {hasFreeSuggestions
+                    ? `${freeDerivable.length} ${
+                        freeDerivable.length === 1 ? "suggestion" : "suggestions"
+                      } still free`
+                    : "All suggestions are already on the list"}
+                </span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setKind("custom")}
-            className={radioCardClassName(kind === "custom")}
-          >
-            <span className="block text-sm font-semibold text-app-text">Custom</span>
-            <span className="mt-1 block text-xs text-app-text-muted">Write one yourself.</span>
-          </button>
-        </div>
-      )}
-
-      {phase === "details" && kind === "suggested" && (
-        <div className="space-y-3">
-          <p className="text-xs text-app-text-subtle">
-            Suggestions always apply to every project — a derivation is company-wide.
-          </p>
-
-          <div className="space-y-2">
-            {derivable.map((derivation) => {
-              const isSelected = selectedKey === derivation.key;
-              const howItsDone = howStepGetsDone({
-                key: derivation.key,
-                settledBy: "OBSERVED",
-                selfConfirmable: derivation.selfConfirmable,
-              });
-              const HowItsDoneIcon = howItsDone.icon;
-
-              return (
-                <button
-                  key={derivation.key}
-                  type="button"
-                  disabled={derivation.added}
-                  onClick={() => setSelectedKey(derivation.key)}
-                  className={`w-full ${radioCardClassName(isSelected)} ${
-                    derivation.added ? "cursor-not-allowed opacity-50" : ""
-                  }`}
-                >
-                  <span className="block text-sm font-semibold text-app-text">
-                    {derivation.suggestedTitle}
-                  </span>
-                  <span className="mt-1 block text-xs text-app-text-muted">
-                    {derivation.suggestedDescription}
-                  </span>
-                  <span className="mt-2 flex items-center gap-1.5 text-xs font-medium text-app-text-subtle">
-                    {derivation.added ? (
-                      "Already on the list"
-                    ) : (
-                      <>
-                        <HowItsDoneIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                        {howItsDone.label}
-                      </>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {phase === "details" && kind === "custom" && (
-        <div className="space-y-3">
-          <Field label="What needs to be done">
-            <Input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Request VPN access"
-            />
-          </Field>
-
-          <Field label="How to do it" hint="Optional. Anything they need to know before starting.">
-            <Textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              minRows={2}
-              placeholder="Ask in #it-helpdesk; usually same-day."
-            />
-          </Field>
-
-          <Field label="Where to do it" hint="Optional link.">
-            <Input
-              value={href}
-              onChange={(event) => setHref(event.target.value)}
-              placeholder="https://…"
-            />
-          </Field>
-
-          {hasProject && (
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium text-app-text">Who gets it</legend>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  aria-pressed={who === "project"}
-                  aria-label={projectName ?? "This project"}
-                  onClick={() => setWho("project")}
-                  className={radioCardClassName(who === "project")}
-                >
-                  <span className="block text-sm font-semibold text-app-text">
-                    {projectName ?? "This project"}
-                  </span>
-                  <span className="block text-xs text-app-text-muted">
-                    Only people on this project.
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={who === "company"}
-                  aria-label="Everyone"
-                  onClick={() => setWho("company")}
-                  className={radioCardClassName(who === "company")}
-                >
-                  <span className="block text-sm font-semibold text-app-text">Everyone</span>
-                  <span className="block text-xs text-app-text-muted">
-                    Every new hire, any project.
-                  </span>
-                </button>
-              </div>
-            </fieldset>
+              <button
+                type="button"
+                onClick={() => selectKind("custom")}
+                className={radioCardClassName(false)}
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-app-bg-soft text-app-brand">
+                  <PenLine className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="mt-3 block text-sm font-semibold text-app-text">Custom</span>
+                <span className="mt-1 block text-xs leading-relaxed text-app-text-muted">
+                  Write one yourself.
+                </span>
+              </button>
+            </div>
           )}
 
-          <details className="text-xs text-app-text-subtle">
-            <summary className="cursor-pointer font-medium">Advanced</summary>
-            <div className="mt-2">
-              <Field
-                label="Key"
-                hint="A short id, fixed once saved — it is what people's records point at."
-              >
+          {phase === "details" && kind === "suggested" && (
+            <div className="space-y-3">
+              <p className="flex items-center gap-1.5 text-xs text-app-text-subtle">
+                <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                Suggestions always apply to every project — a derivation is company-wide.
+              </p>
+
+              <div className="space-y-2">
+                {derivable.map((derivation) => {
+                  const isSelected = selectedKey === derivation.key;
+                  const howItsDone = howStepGetsDone({
+                    key: derivation.key,
+                    settledBy: "OBSERVED",
+                    selfConfirmable: derivation.selfConfirmable,
+                  });
+                  const HowItsDoneIcon = howItsDone.icon;
+
+                  return (
+                    <button
+                      key={derivation.key}
+                      type="button"
+                      disabled={derivation.added}
+                      onClick={() => setSelectedKey(derivation.key)}
+                      className={`flex w-full items-start gap-3 ${radioCardClassName(isSelected)} ${
+                        derivation.added ? "cursor-not-allowed opacity-50" : ""
+                      }`}
+                    >
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                          isSelected
+                            ? "bg-app-brand text-white"
+                            : "bg-app-bg-soft text-app-text-muted"
+                        }`}
+                      >
+                        <HowItsDoneIcon className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-app-text">
+                          {derivation.suggestedTitle}
+                        </span>
+                        <span className="mt-1 block text-xs text-app-text-muted">
+                          {derivation.suggestedDescription}
+                        </span>
+                        <span className="mt-2 block text-xs font-medium text-app-text-subtle">
+                          {derivation.added ? "Already on the list" : howItsDone.label}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {phase === "details" && kind === "custom" && (
+            <div className="space-y-3">
+              <Field label="What needs to be done">
                 <Input
-                  value={key}
-                  onChange={(event) => setManualKey(event.target.value)}
-                  placeholder="vpn-access"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Request VPN access"
                 />
               </Field>
+
+              <Field
+                label="How to do it"
+                hint="Optional. Anything they need to know before starting."
+              >
+                <Textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  minRows={2}
+                  placeholder="Ask in #it-helpdesk; usually same-day."
+                />
+              </Field>
+
+              <Field label="Where to do it" hint="Optional link.">
+                <Input
+                  value={href}
+                  onChange={(event) => setHref(event.target.value)}
+                  placeholder="https://…"
+                />
+              </Field>
+
+              {hasProject && (
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium text-app-text">Who gets it</legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={who === "project"}
+                      aria-label={projectName ?? "This project"}
+                      onClick={() => setWho("project")}
+                      className={`flex items-center gap-2.5 ${radioCardClassName(who === "project")}`}
+                    >
+                      <FolderKanban
+                        className={`h-4 w-4 shrink-0 ${who === "project" ? "text-app-brand" : "text-app-text-muted"}`}
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-app-text">
+                          {projectName ?? "This project"}
+                        </span>
+                        <span className="block text-xs text-app-text-muted">
+                          Only people on this project.
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={who === "company"}
+                      aria-label="Everyone"
+                      onClick={() => setWho("company")}
+                      className={`flex items-center gap-2.5 ${radioCardClassName(who === "company")}`}
+                    >
+                      <Building2
+                        className={`h-4 w-4 shrink-0 ${who === "company" ? "text-app-brand" : "text-app-text-muted"}`}
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-app-text">Everyone</span>
+                        <span className="block text-xs text-app-text-muted">
+                          Every new hire, any project.
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                </fieldset>
+              )}
+
+              <details open className="text-xs text-app-text-subtle">
+                <summary className="flex cursor-pointer items-center gap-1.5 font-medium">
+                  <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                  Advanced
+                </summary>
+                <div className="mt-2">
+                  <Field
+                    label="Key"
+                    hint="A short id, fixed once saved — it is what people's records point at."
+                  >
+                    <Input
+                      value={key}
+                      onChange={(event) => setManualKey(event.target.value)}
+                      placeholder="vpn-access"
+                    />
+                  </Field>
+                </div>
+              </details>
             </div>
-          </details>
-        </div>
-      )}
+          )}
+        </motion.div>
+      </AnimatePresence>
     </Modal>
   );
 }

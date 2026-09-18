@@ -71,7 +71,7 @@ describe("FirstWeekPage tab switching", () => {
   it("opens the Arrival tab from a ?tab=arrival deep link", async () => {
     renderTab("arrival");
 
-    expect(await screen.findByRole("button", { name: "Preview card" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Add step" })).toBeInTheDocument();
   });
 
   it("opens the Starter work tab from a ?tab=starter deep link", async () => {
@@ -82,7 +82,7 @@ describe("FirstWeekPage tab switching", () => {
 
   it("switches from Arrival to Starter work through the tab bar", async () => {
     renderTab("arrival");
-    await screen.findByRole("button", { name: "Preview card" });
+    await screen.findByRole("button", { name: "Add step" });
 
     fireEvent.click(screen.getByRole("button", { name: "Starter work" }));
 
@@ -267,7 +267,7 @@ describe("FirstWeekPage Overview tab", () => {
       }),
     );
 
-    expect(await screen.findByRole("button", { name: "Preview card" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Add step" })).toBeInTheDocument();
   });
 
   it("jumps to the Arrival tab from the Arrive stage card itself", async () => {
@@ -275,7 +275,7 @@ describe("FirstWeekPage Overview tab", () => {
 
     fireEvent.click(await screen.findByTestId("overview-stage-arrival"));
 
-    expect(await screen.findByRole("button", { name: "Preview card" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Add step" })).toBeInTheDocument();
   });
 });
 
@@ -308,7 +308,7 @@ describe("old First Week routes", () => {
   it("redirects /arrival-steps to the Arrival tab", async () => {
     renderRedirect("/arrival-steps");
 
-    expect(await screen.findByRole("button", { name: "Preview card" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Add step" })).toBeInTheDocument();
   });
 
   it("redirects /starter-work to the Starter work tab", async () => {

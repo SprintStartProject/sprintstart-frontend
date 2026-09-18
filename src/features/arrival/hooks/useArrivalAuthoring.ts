@@ -33,28 +33,34 @@ export function useArrivalAuthoring(projectId: string | null = null) {
   const [error, setError] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      // Settled separately: the company-wide list is the one block that always renders, and a
-      // project list or catalog that will not load must not take it down too.
-      const [companyResult, projectResult, catalog] = await Promise.allSettled([
-        arrivalService.listSteps(null),
-        projectId ? arrivalService.listSteps(projectId) : Promise.resolve<ArrivalStep[]>([]),
-        arrivalService.listDerivableSteps(),
-      ]);
+  const load = useCallback(
+    async (options?: { silently?: boolean }) => {
+      // A reload after a write happens underneath a list that is already on screen -- swapping it
+      // for the spinner and back would blink the whole thing away for what is otherwise a quiet
+      // background refetch. Only the very first load, with nothing on screen yet, blocks on it.
+      if (!options?.silently) setLoading(true);
+      setError(false);
+      try {
+        // Settled separately: the company-wide list is the one block that always renders, and a
+        // project list or catalog that will not load must not take it down too.
+        const [companyResult, projectResult, catalog] = await Promise.allSettled([
+          arrivalService.listSteps(null),
+          projectId ? arrivalService.listSteps(projectId) : Promise.resolve<ArrivalStep[]>([]),
+          arrivalService.listDerivableSteps(),
+        ]);
 
-      if (companyResult.status === "rejected") throw companyResult.reason;
-      setCompany(companyResult.value);
-      setProject(projectResult.status === "fulfilled" ? projectResult.value : []);
-      setDerivable(catalog.status === "fulfilled" ? catalog.value : []);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
+        if (companyResult.status === "rejected") throw companyResult.reason;
+        setCompany(companyResult.value);
+        setProject(projectResult.status === "fulfilled" ? projectResult.value : []);
+        setDerivable(catalog.status === "fulfilled" ? catalog.value : []);
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [projectId],
+  );
 
   useEffect(() => {
     // Deferred to a microtask: React 19 rejects a synchronous first setState in an effect body,
@@ -70,7 +76,7 @@ export function useArrivalAuthoring(projectId: string | null = null) {
       setWriteError(null);
       try {
         await action();
-        await load();
+        await load({ silently: true });
         return true;
       } catch {
         setWriteError(failureMessage);

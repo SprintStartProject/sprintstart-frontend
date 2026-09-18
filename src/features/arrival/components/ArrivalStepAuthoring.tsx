@@ -1,10 +1,12 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, CornerDownRight, ListChecks, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
+import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { DrawerCard } from "../../admin/components/DrawerCard";
 import { Field } from "../../../components/ui/Field";
+import { InfoHint } from "../../../components/ui/InfoHint";
 import { Input } from "../../../components/ui/Input";
 import { Spinner } from "../../../components/ui/Spinner";
 import { Textarea } from "../../../components/ui/Textarea";
@@ -15,6 +17,16 @@ import { radioCardClassName } from "../radioCard";
 import { AddArrivalStepModal } from "./AddArrivalStepModal";
 import { ArrivalStepThread } from "./ArrivalStepThread";
 import type { ArrivalScope, ArrivalStep, UpdateArrivalStepRequest } from "../types";
+
+/** Spells out every short badge word the thread and the edit drawer use, for the "What the badges
+ * mean" hint next to the step count — the badges themselves stay terse on purpose. */
+const BADGE_LEGEND =
+  "Auto only: only SprintStart can check this, the hire can't tick it themselves. " +
+  "Auto or tick: SprintStart checks it automatically, or the hire can tick it off themselves. " +
+  "Self-tick: the hire ticks it off themselves, nothing is checked. " +
+  "GitHub / First PR: tied to that specific check. " +
+  "Override: a project's own version of a company step. " +
+  "Overridden: the company step that override replaces.";
 
 /**
  * Authoring both arrival lists at once — the company-wide list every new hire gets, and (when
@@ -37,13 +49,10 @@ export function ArrivalStepAuthoring({
   readOnly = false,
   projectId = null,
   projectName = null,
-  actions = null,
 }: {
   readOnly?: boolean;
   projectId?: string | null;
   projectName?: string | null;
-  /** Rendered in the toolbar row, to the right of "Add step". */
-  actions?: ReactNode;
 }) {
   const {
     company,
@@ -117,19 +126,19 @@ export function ArrivalStepAuthoring({
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-app-text-muted">{countLabel}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          {!readOnly && (
-            <Button
-              variant="secondary"
-              onClick={() => setIsAddModalOpen(true)}
-              icon={<Plus className="h-4 w-4" aria-hidden="true" />}
-            >
-              Add step
-            </Button>
-          )}
-          {actions}
-        </div>
+        <p className="flex items-center gap-1.5 text-sm text-app-text-muted">
+          {countLabel}
+          <InfoHint text={BADGE_LEGEND} label="What the badges mean" />
+        </p>
+        {!readOnly && (
+          <Button
+            variant="secondary"
+            onClick={() => setIsAddModalOpen(true)}
+            icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+          >
+            Add step
+          </Button>
+        )}
       </div>
 
       <ArrivalStepThread
@@ -336,14 +345,40 @@ function EditStepDrawer({
       showOverlay
       title="Edit step"
       leading={
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand-text">
-          <Pencil className="h-5 w-5" aria-hidden="true" />
-        </span>
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
+          <Pencil className="h-6 w-6" aria-hidden="true" />
+        </div>
+      }
+      badge={
+        <>
+          {isOverride && (
+            <Badge
+              variant="brand"
+              size="sm"
+              title="Replaces the company-wide wording for this project."
+            >
+              <CornerDownRight className="h-3 w-3" aria-hidden="true" />
+              Override
+            </Badge>
+          )}
+          <Badge
+            variant={step.settledBy === "OBSERVED" ? "success" : "neutral"}
+            size="sm"
+            title={howItsDone.label}
+          >
+            <HowItsDoneIcon className="h-3 w-3" aria-hidden="true" />
+            {howItsDone.badge}
+          </Badge>
+        </>
       }
       footer={
         <div className="flex w-full gap-2">
           {!isOverride && (
-            <Button variant="dangerGhost" onClick={onDelete}>
+            <Button
+              variant="dangerGhost"
+              onClick={onDelete}
+              icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+            >
               Remove step
             </Button>
           )}
@@ -352,15 +387,16 @@ function EditStepDrawer({
             className="ml-auto"
             loading={saving}
             onClick={() => void handleSave()}
+            icon={<Check className="h-4 w-4" aria-hidden="true" />}
           >
             Save
           </Button>
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-4 sm:space-y-5">
         {replacedForProject && (
-          <DrawerCard index={0}>
+          <DrawerCard label="Replaced here" icon={CornerDownRight} index={0}>
             <p className="text-sm text-app-text-muted">
               People on {projectName ?? "this project"} see their own version of this step. Changes
               here only reach everyone else.
@@ -369,7 +405,7 @@ function EditStepDrawer({
         )}
 
         {askScope && (
-          <DrawerCard index={0}>
+          <DrawerCard label="Who does this apply to" icon={Users} index={0}>
             <p className="mb-3 text-sm text-app-text-muted">
               Everyone gets this step. Where should your change apply?
             </p>
@@ -405,7 +441,7 @@ function EditStepDrawer({
         )}
 
         {isOverride && (
-          <DrawerCard label="Replaces the company wording" index={1}>
+          <DrawerCard label="Replaces the company wording" icon={CornerDownRight} index={1}>
             <p className="text-sm text-app-text-muted">
               &ldquo;{companyStepTitle}&rdquo; is what everyone else sees. Hires who already did it
               keep that.
@@ -418,28 +454,31 @@ function EditStepDrawer({
           </DrawerCard>
         )}
 
-        <Field label="What needs to be done">
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} />
-        </Field>
-        <Field label="How to do it">
-          <Textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            minRows={2}
-          />
-        </Field>
-        <Field label="Where to do it">
-          <Input
-            value={href}
-            onChange={(event) => setHref(event.target.value)}
-            placeholder="https://…"
-          />
-        </Field>
+        <DrawerCard label="Step" icon={ListChecks} index={2}>
+          <div className="space-y-4">
+            <Field label="What needs to be done">
+              <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+            </Field>
+            <Field label="How to do it">
+              <Textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                minRows={2}
+              />
+            </Field>
+            <Field label="Where to do it">
+              <Input
+                value={href}
+                onChange={(event) => setHref(event.target.value)}
+                placeholder="https://…"
+              />
+            </Field>
+          </div>
+        </DrawerCard>
 
-        <div className="flex items-center gap-1.5 rounded-xl border border-app-border bg-app-surface-muted p-3 text-xs text-app-text-muted">
-          <HowItsDoneIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          {howItsDone.label}
-        </div>
+        <DrawerCard label="How it settles" icon={HowItsDoneIcon} index={3}>
+          <p className="text-sm text-app-text-muted">{howItsDone.label}</p>
+        </DrawerCard>
 
         <p className="font-mono text-xs text-app-text-subtle">
           key: {step.key} · fixed, what hires ticked is stored against it

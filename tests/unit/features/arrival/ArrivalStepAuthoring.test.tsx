@@ -103,7 +103,7 @@ describe("ArrivalStepAuthoring", () => {
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
     await screen.findByText("Request VPN access with the staging profile");
 
-    expect(screen.getByText("Apollo uses its own version")).toBeInTheDocument();
+    expect(screen.getByText("Overridden")).toBeInTheDocument();
     // A shadowed company row cannot be reordered — the project's own version is what matters here.
     expect(
       screen.queryByRole("button", { name: /Move "Request VPN access" earlier/ }),
@@ -119,7 +119,7 @@ describe("ArrivalStepAuthoring", () => {
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
     await screen.findByText("Request VPN access with the staging profile");
 
-    expect(screen.getByText("Own version of a company step")).toBeInTheDocument();
+    expect(screen.getByText("Override")).toBeInTheDocument();
   });
 
   it("says what survives a removal before removing it", async () => {
@@ -178,12 +178,12 @@ describe("ArrivalStepAuthoring", () => {
     expect(screen.getByText("Only PMs and admins can change this list.")).toBeInTheDocument();
   });
 
-  /** Opens the "Add step" wizard and advances past the Kind step. */
+  /** Opens the "Add step" wizard and advances past the Kind step — picking a kind now advances
+   * immediately, there is no separate "Next" click. */
   async function openAddWizard(kind: "Suggested" | "Custom") {
     fireEvent.click(await screen.findByRole("button", { name: "Add step" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(await within(dialog).findByRole("button", { name: new RegExp(`^${kind}`) }));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Next" }));
     return dialog;
   }
 
@@ -321,7 +321,7 @@ describe("ArrivalStepAuthoring", () => {
     );
 
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
-    await screen.findByText("Apollo uses its own version");
+    await screen.findByText("Overridden");
     fireEvent.click(screen.getByRole("button", { name: /Edit "Request VPN access"/ }));
 
     expect(
