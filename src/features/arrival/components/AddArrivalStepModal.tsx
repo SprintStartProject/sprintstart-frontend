@@ -1,0 +1,307 @@
+import { useState } from "react";
+import { ArrowLeft, Plus } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
+import { Modal } from "../../../components/ui/Modal";
+import { Stepper } from "../../../components/ui/Stepper";
+import { Textarea } from "../../../components/ui/Textarea";
+import { howStepGetsDone } from "../howItsDone";
+import { radioCardClassName } from "../radioCard";
+import { slugifyStepKey } from "../slug";
+import type { ArrivalScope, DerivableArrivalStep } from "../types";
+
+const STEP_LABELS = ["Kind", "Details"];
+
+type Kind = "suggested" | "custom";
+
+type AddArrivalStepModalProps = {
+  hasProject: boolean;
+  projectName: string | null;
+  derivable: DerivableArrivalStep[];
+  onAddDerivable: (derivation: DerivableArrivalStep) => Promise<boolean>;
+  onCreate: (
+    request: { key: string; title: string; description?: string; href?: string },
+    who: ArrivalScope,
+  ) => Promise<boolean>;
+  onClose: () => void;
+};
+
+/**
+ * "Add step" as a two-step wizard: pick a kind first, then either choose one of the steps
+ * SprintStart can check for itself or write a custom one. Splitting it this way keeps the
+ * common case — picking a suggestion — down to two taps, instead of a form that asks for a
+ * title and a key before a reader even knows the suggestion existed.
+ *
+ * Only ever mounted while open, so nothing here needs to reset itself on close — a fresh mount
+ * starts clean the next time it opens.
+ */
+export function AddArrivalStepModal({
+  hasProject,
+  projectName,
+  derivable,
+  onAddDerivable,
+  onCreate,
+  onClose,
+}: AddArrivalStepModalProps) {
+  const [phase, setPhase] = useState<"kind" | "details">("kind");
+  const [kind, setKind] = useState<Kind | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [href, setHref] = useState("");
+  // `null` while the key follows the title; set the moment somebody types into the key field
+  // themselves, so a later title edit does not overwrite what they just chose.
+  const [manualKey, setManualKey] = useState<string | null>(null);
+  // Defaults to the project: the reader opened this from that project's list, so that is the
+  // least surprising place for a new step to land.
+  const [who, setWho] = useState<ArrivalScope>(hasProject ? "project" : "company");
+
+  const freeDerivable = derivable.filter((derivation) => !derivation.added);
+  const hasFreeSuggestions = freeDerivable.length > 0;
+  const selectedDerivation = derivable.find((derivation) => derivation.key === selectedKey) ?? null;
+
+  const key = manualKey ?? slugifyStepKey(title);
+  const canSubmitCustom = key.trim().length > 0 && title.trim().length > 0;
+
+  const stepIndex = phase === "kind" ? 0 : 1;
+
+  const goNext = () => {
+    if (!kind) return;
+    setPhase("details");
+  };
+
+  const goBack = () => setPhase("kind");
+
+  const submitSuggested = async () => {
+    if (!selectedDerivation || submitting) return;
+    setSubmitting(true);
+    const ok = await onAddDerivable(selectedDerivation);
+    setSubmitting(false);
+    if (ok) onClose();
+  };
+
+  const submitCustom = async () => {
+    if (!canSubmitCustom || submitting) return;
+    setSubmitting(true);
+    const ok = await onCreate(
+      {
+        key: key.trim(),
+        title: title.trim(),
+        description: description.trim() || undefined,
+        href: href.trim() || undefined,
+      },
+      hasProject ? who : "company",
+    );
+    setSubmitting(false);
+    if (ok) onClose();
+  };
+
+  const footer =
+    phase === "kind" ? (
+      <>
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button variant="primary" onClick={goNext} disabled={!kind}>
+          Next
+        </Button>
+      </>
+    ) : (
+      <>
+        <Button
+          variant="secondary"
+          onClick={goBack}
+          disabled={submitting}
+          icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
+        >
+          Back
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => void (kind === "suggested" ? submitSuggested() : submitCustom())}
+          disabled={kind === "suggested" ? !selectedDerivation : !canSubmitCustom}
+          loading={submitting}
+          icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+        >
+          Add step
+        </Button>
+      </>
+    );
+
+  return (
+    <Modal
+      isOpen
+      title="Add a step"
+      description={<Stepper steps={STEP_LABELS} current={stepIndex} />}
+      size="lg"
+      isDismissDisabled={submitting}
+      onClose={onClose}
+      footer={footer}
+    >
+      {phase === "kind" && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setKind("suggested")}
+            disabled={!hasFreeSuggestions}
+            className={`${radioCardClassName(kind === "suggested")} ${
+              hasFreeSuggestions ? "" : "cursor-not-allowed opacity-50"
+            }`}
+          >
+            <span className="block text-sm font-semibold text-app-text">Suggested</span>
+            <span className="mt-1 block text-xs text-app-text-muted">
+              Steps SprintStart can check for itself.
+            </span>
+            <span className="mt-2 block text-xs font-medium text-app-brand-text">
+              {hasFreeSuggestions
+                ? `${freeDerivable.length} ${
+                    freeDerivable.length === 1 ? "suggestion" : "suggestions"
+                  } still free`
+                : "All suggestions are already on the list"}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setKind("custom")}
+            className={radioCardClassName(kind === "custom")}
+          >
+            <span className="block text-sm font-semibold text-app-text">Custom</span>
+            <span className="mt-1 block text-xs text-app-text-muted">Write one yourself.</span>
+          </button>
+        </div>
+      )}
+
+      {phase === "details" && kind === "suggested" && (
+        <div className="space-y-3">
+          <p className="text-xs text-app-text-subtle">
+            Suggestions always apply to every project — a derivation is company-wide.
+          </p>
+
+          <div className="space-y-2">
+            {derivable.map((derivation) => {
+              const isSelected = selectedKey === derivation.key;
+              const howItsDone = howStepGetsDone({
+                key: derivation.key,
+                settledBy: "OBSERVED",
+                selfConfirmable: derivation.selfConfirmable,
+              });
+              const HowItsDoneIcon = howItsDone.icon;
+
+              return (
+                <button
+                  key={derivation.key}
+                  type="button"
+                  disabled={derivation.added}
+                  onClick={() => setSelectedKey(derivation.key)}
+                  className={`w-full ${radioCardClassName(isSelected)} ${
+                    derivation.added ? "cursor-not-allowed opacity-50" : ""
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-app-text">
+                    {derivation.suggestedTitle}
+                  </span>
+                  <span className="mt-1 block text-xs text-app-text-muted">
+                    {derivation.suggestedDescription}
+                  </span>
+                  <span className="mt-2 flex items-center gap-1.5 text-xs font-medium text-app-text-subtle">
+                    {derivation.added ? (
+                      "Already on the list"
+                    ) : (
+                      <>
+                        <HowItsDoneIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {howItsDone.label}
+                      </>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {phase === "details" && kind === "custom" && (
+        <div className="space-y-3">
+          <Field label="What needs to be done">
+            <Input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Request VPN access"
+            />
+          </Field>
+
+          <Field label="How to do it" hint="Optional. Anything they need to know before starting.">
+            <Textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              minRows={2}
+              placeholder="Ask in #it-helpdesk; usually same-day."
+            />
+          </Field>
+
+          <Field label="Where to do it" hint="Optional link.">
+            <Input
+              value={href}
+              onChange={(event) => setHref(event.target.value)}
+              placeholder="https://…"
+            />
+          </Field>
+
+          {hasProject && (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-app-text">Who gets it</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  aria-pressed={who === "project"}
+                  aria-label={projectName ?? "This project"}
+                  onClick={() => setWho("project")}
+                  className={radioCardClassName(who === "project")}
+                >
+                  <span className="block text-sm font-semibold text-app-text">
+                    {projectName ?? "This project"}
+                  </span>
+                  <span className="block text-xs text-app-text-muted">
+                    Only people on this project.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={who === "company"}
+                  aria-label="Everyone"
+                  onClick={() => setWho("company")}
+                  className={radioCardClassName(who === "company")}
+                >
+                  <span className="block text-sm font-semibold text-app-text">Everyone</span>
+                  <span className="block text-xs text-app-text-muted">
+                    Every new hire, any project.
+                  </span>
+                </button>
+              </div>
+            </fieldset>
+          )}
+
+          <details className="text-xs text-app-text-subtle">
+            <summary className="cursor-pointer font-medium">Advanced</summary>
+            <div className="mt-2">
+              <Field
+                label="Key"
+                hint="A short id, fixed once saved — it is what people's records point at."
+              >
+                <Input
+                  value={key}
+                  onChange={(event) => setManualKey(event.target.value)}
+                  placeholder="vpn-access"
+                />
+              </Field>
+            </div>
+          </details>
+        </div>
+      )}
+    </Modal>
+  );
+}

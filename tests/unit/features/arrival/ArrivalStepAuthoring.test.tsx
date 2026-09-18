@@ -171,21 +171,30 @@ describe("ArrivalStepAuthoring", () => {
     render(<ArrivalStepAuthoring readOnly />);
 
     expect(await screen.findByText("Request VPN access")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add a step" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add step" })).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Edit "Request VPN access"/ }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Only PMs and admins can change this list.")).toBeInTheDocument();
   });
 
+  /** Opens the "Add step" wizard and advances past the Kind step. */
+  async function openAddWizard(kind: "Suggested" | "Custom") {
+    fireEvent.click(await screen.findByRole("button", { name: "Add step" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(await within(dialog).findByRole("button", { name: new RegExp(`^${kind}`) }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Next" }));
+    return dialog;
+  }
+
   it("creates into the company scope by default without a project in context", async () => {
     render(<ArrivalStepAuthoring />);
-    fireEvent.click(await screen.findByRole("button", { name: "Add a step" }));
+    const dialog = await openAddWizard("Custom");
 
-    fireEvent.change(screen.getByPlaceholderText("Request VPN access"), {
+    fireEvent.change(within(dialog).getByPlaceholderText("Request VPN access"), {
       target: { value: "Collect a laptop" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add step" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
 
     await waitFor(() => {
       expect(arrivalService.createStep).toHaveBeenCalledWith(
@@ -200,18 +209,18 @@ describe("ArrivalStepAuthoring", () => {
 
   it("derives the key from the title, editable under Advanced", async () => {
     render(<ArrivalStepAuthoring />);
-    fireEvent.click(await screen.findByRole("button", { name: "Add a step" }));
+    const dialog = await openAddWizard("Custom");
 
-    fireEvent.change(screen.getByPlaceholderText("Request VPN access"), {
+    fireEvent.change(within(dialog).getByPlaceholderText("Request VPN access"), {
       target: { value: "Get staging DB access" },
     });
-    fireEvent.click(screen.getByText("Advanced"));
-    expect(screen.getByPlaceholderText("vpn-access")).toHaveValue("get-staging-db-access");
+    fireEvent.click(within(dialog).getByText("Advanced"));
+    expect(within(dialog).getByPlaceholderText("vpn-access")).toHaveValue("get-staging-db-access");
 
-    fireEvent.change(screen.getByPlaceholderText("vpn-access"), {
+    fireEvent.change(within(dialog).getByPlaceholderText("vpn-access"), {
       target: { value: "staging-db" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add step" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
 
     await waitFor(() => {
       expect(arrivalService.createStep).toHaveBeenCalledWith(
@@ -224,12 +233,12 @@ describe("ArrivalStepAuthoring", () => {
     mockLists([step({ key: "vpn" })], []);
 
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Add a step" }));
+    const dialog = await openAddWizard("Custom");
 
-    fireEvent.change(screen.getByPlaceholderText("Request VPN access"), {
+    fireEvent.change(within(dialog).getByPlaceholderText("Request VPN access"), {
       target: { value: "Read the ADRs" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add step" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
 
     await waitFor(() => {
       expect(arrivalService.createStep).toHaveBeenCalledWith(
@@ -242,13 +251,13 @@ describe("ArrivalStepAuthoring", () => {
     mockLists([step({ key: "vpn" })], []);
 
     render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Add a step" }));
-    fireEvent.click(screen.getByRole("button", { name: /^Everyone$/ }));
+    const dialog = await openAddWizard("Custom");
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Everyone$/ }));
 
-    fireEvent.change(screen.getByPlaceholderText("Request VPN access"), {
+    fireEvent.change(within(dialog).getByPlaceholderText("Request VPN access"), {
       target: { value: "Join #eng-help" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add step" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
 
     await waitFor(() => {
       expect(arrivalService.createStep).toHaveBeenCalledWith(
@@ -354,13 +363,14 @@ describe("ArrivalStepAuthoring", () => {
     });
   });
 
-  it("offers the steps the system can check, with their wording, as chips", async () => {
+  it("adds a suggested step through the wizard", async () => {
     vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable()]);
 
     render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Suggested");
 
-    expect(await screen.findByText("Add your GitHub username")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Add your GitHub username"));
+    fireEvent.click(within(dialog).getByRole("button", { name: /Add your GitHub username/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
 
     await waitFor(() => {
       expect(arrivalService.createStep).toHaveBeenCalledWith(
@@ -369,13 +379,17 @@ describe("ArrivalStepAuthoring", () => {
     });
   });
 
-  it("does not offer to add a suggestion already on the list", async () => {
+  it("disables the Suggested card once every suggestion is already on the list", async () => {
     vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable({ added: true })]);
 
     render(<ArrivalStepAuthoring />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add step" }));
 
-    const chip = await screen.findByText("Add your GitHub username");
-    expect(chip.closest("button")).toBeNull();
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      await within(dialog).findByText("All suggestions are already on the list"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /^Suggested/ })).toBeDisabled();
   });
 
   it("still shows the lists when the catalog cannot be loaded", async () => {
