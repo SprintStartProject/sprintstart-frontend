@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { HelpHint } from "../../../components/ui/HelpHint";
 
 /**
  * The surface every PM section draws its blocks on.
@@ -39,11 +40,14 @@ export function PmCard({
 export function PmCardHeader({
   icon: Icon,
   title,
+  help,
   meta,
   action,
 }: {
   icon: LucideIcon;
   title: string;
+  /** What the card shows, behind a "?" beside the title, when its name alone does not say. */
+  help?: ReactNode;
   /** A count or a timestamp beside the title — quiet, never a control. */
   meta?: ReactNode;
   /** One control on the right edge: usually a {@link PmCardLink}. */
@@ -56,6 +60,7 @@ export function PmCardHeader({
           <Icon aria-hidden="true" className="h-3.5 w-3.5" />
         </span>
         <h2 className="truncate text-sm font-semibold text-app-text">{title}</h2>
+        {help && <HelpHint topic={title}>{help}</HelpHint>}
         {meta !== undefined && meta !== null && (
           <span className="shrink-0 text-xs text-app-text-muted tabular-nums">{meta}</span>
         )}
@@ -102,6 +107,8 @@ type PmStatProps = {
   label: string;
   value: ReactNode;
   hint: string;
+  /** What the figure measures, behind a "?" beside the label. */
+  help?: ReactNode;
   /** A number somebody has to act on. Tints the icon chip only, never the figure. */
   attention?: boolean;
   /** Makes the tile a link to where the number can be acted on. */
@@ -118,14 +125,36 @@ export function PmStat({
   label,
   value,
   hint,
+  help,
   attention = false,
   to,
   onClick,
 }: PmStatProps) {
+  // With a destination, only the label is the link, stretched over the whole tile by its
+  // `::after`. A link wrapping the tile could not hold the "?" -- a button inside a link is
+  // neither valid nor reachable -- and this keeps the whole tile clickable around it.
+  const stretched =
+    "rounded-sm after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none";
+  const labelClassName = "text-[12.5px] font-medium text-app-text-muted";
+  const labelElement = to ? (
+    <Link to={to} className={`${labelClassName} ${stretched}`}>
+      {label}
+    </Link>
+  ) : onClick ? (
+    <button type="button" onClick={onClick} className={`${labelClassName} text-left ${stretched}`}>
+      {label}
+    </button>
+  ) : (
+    <span className={labelClassName}>{label}</span>
+  );
+
   const body = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 text-[12.5px] font-medium text-app-text-muted">{label}</span>
+        <span className="flex min-w-0 items-center gap-1">
+          {labelElement}
+          {help && <HelpHint topic={label}>{help}</HelpHint>}
+        </span>
         <span
           aria-hidden="true"
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
@@ -145,26 +174,10 @@ export function PmStat({
   );
 
   const className =
-    "flex h-full min-h-28 flex-col rounded-2xl border border-app-border bg-app-surface p-4 text-left sm:p-[18px]";
-  const interactiveClassName = `${className} transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none motion-reduce:hover:translate-y-0`;
+    "relative flex h-full min-h-28 flex-col rounded-2xl border border-app-border bg-app-surface p-4 text-left sm:p-[18px]";
+  const interactiveClassName = `${className} transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-app-focus motion-reduce:hover:translate-y-0`;
 
-  if (to) {
-    return (
-      <Link to={to} className={interactiveClassName}>
-        {body}
-      </Link>
-    );
-  }
-
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className={interactiveClassName}>
-        {body}
-      </button>
-    );
-  }
-
-  return <div className={className}>{body}</div>;
+  return <div className={to || onClick ? interactiveClassName : className}>{body}</div>;
 }
 
 /**
@@ -179,16 +192,22 @@ export function PmStat({
 export function PmSectionHeader({
   title,
   description,
+  help,
   actions,
 }: {
   title: string;
   description: ReactNode;
+  /** The longer story behind the one-line description, behind a "?" beside the title. */
+  help?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
     <div className="mb-5 flex flex-col gap-3 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <h2 className="text-lg leading-tight font-semibold text-app-text">{title}</h2>
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-lg leading-tight font-semibold text-app-text">{title}</h2>
+          {help && <HelpHint topic={title}>{help}</HelpHint>}
+        </div>
         <p className="mt-0.5 text-sm text-app-text-muted">{description}</p>
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}

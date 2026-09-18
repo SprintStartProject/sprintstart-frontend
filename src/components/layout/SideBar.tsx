@@ -9,7 +9,7 @@ import { ProjectSwitcher } from "../../features/projects/components/ProjectSwitc
 import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
 import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledgeGaps";
-import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
+import { usePmWaitingCount } from "../../features/team-management/usePmWaitingCount";
 import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
 import {
   AdminIcon,
@@ -42,13 +42,14 @@ type SidebarContentProps = {
   onNavigate?: () => void;
   "aria-label"?: string;
   /**
-   * Passed in rather than fetched here: this component is mounted twice at
-   * once (desktop and mobile), so owning the request would fire it twice.
+   * How many team members wait on a skip decision or unread feedback. Passed in
+   * rather than fetched here: this component is mounted twice at once (desktop
+   * and mobile), so owning the request would fire it twice.
    */
-  hasPmAttentionItems?: boolean;
+  pmWaitingCount?: number;
   /**
    * How many escalated questions are waiting on a person. Passed in for the
-   * same reason as the flag above: this component is mounted twice at once.
+   * same reason as the count above.
    */
   openEscalationCount?: number;
 };
@@ -61,13 +62,21 @@ type SidebarContentProps = {
 const ESCALATION_INBOX_PATH = "/insights/knowledge-requests" as const;
 
 /**
- * What the number on the inbox entry counts, for a screen reader.
+ * What the number on the PM dashboard entry counts, for a screen reader. The badge adds up two
+ * things a manager answers in different places -- people waiting on a decision and escalated
+ * questions -- so the announcement names both rather than reading out a bare total.
  *
  * Handed only to the PM dashboard entry rather than to every one of them: a future counted
- * entry inheriting it would quietly announce its own total as escalations.
+ * entry inheriting it would quietly announce its own total as the PM's.
  */
-const describeOpenEscalations = (open: number) =>
-  `${open} open ${open === 1 ? "escalation" : "escalations"}`;
+function describePmNotifications(waiting: number, escalations: number): string {
+  const parts: string[] = [];
+  if (waiting > 0) parts.push(`${waiting} ${waiting === 1 ? "person" : "people"} waiting on you`);
+  if (escalations > 0) {
+    parts.push(`${escalations} open ${escalations === 1 ? "escalation" : "escalations"}`);
+  }
+  return parts.join(", ");
+}
 
 const navItems: SidebarNavItem[] = [
   {
@@ -146,7 +155,7 @@ type SidebarSection = {
 function SidebarContent({
   onNavigate,
   "aria-label": ariaLabel = "Primary Navigation",
-  hasPmAttentionItems = false,
+  pmWaitingCount = 0,
   openEscalationCount = 0,
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
@@ -155,7 +164,7 @@ function SidebarContent({
   const location = useLocation();
   /*
     Components put in this user's name that they have not acknowledged yet. Read straight from
-    the shared provider rather than passed down like `hasPmAttentionItems`: that one is passed
+    the shared provider rather than passed down like `pmWaitingCount`: that one is passed
     because owning the request here would fire it twice over (this renders once for desktop and
     once for the mobile drawer), and the provider already solves exactly that.
   */
@@ -288,17 +297,16 @@ function SidebarContent({
                   }
                   indicatorLayoutId={indicatorLayoutId}
                   pointerY={pointerY}
-                  hasAttentionMarker={
-                    (item.path === "/pm-dashboard" && hasPmAttentionItems) ||
-                    (item.path === "/" && hasUnseenKnowledgeGaps)
-                  }
+                  hasAttentionMarker={item.path === "/" && hasUnseenKnowledgeGaps}
                   attentionLabel={
-                    item.path === "/"
-                      ? "A component has been assigned to you"
-                      : "Open skip requests or unread feedback"
+                    item.path === "/" ? "A component has been assigned to you" : undefined
                   }
-                  count={item.path === "/pm-dashboard" ? openEscalationCount : 0}
-                  countLabel={item.path === "/pm-dashboard" ? describeOpenEscalations : undefined}
+                  count={item.path === "/pm-dashboard" ? pmWaitingCount + openEscalationCount : 0}
+                  countLabel={
+                    item.path === "/pm-dashboard"
+                      ? () => describePmNotifications(pmWaitingCount, openEscalationCount)
+                      : undefined
+                  }
                   onNavigate={onNavigate}
                 />
               ))}
@@ -399,15 +407,15 @@ export function SideBar() {
   // hook rate-limits that so quick navigation cannot hammer the backend.
   // Gated on access so a regular member never pays for a request they could
   // not act on anyway.
-  const hasPmAttentionItems = usePmAttentionFlag(
+  const pmWaitingCount = usePmWaitingCount(
     selectedProjectId,
     canAccessRoute(profile, "/pm-dashboard", canManageSelected),
     pathname,
   );
 
-  // Its own read, not a second use of the flag above: that one counts pending
+  // Its own read, not a second use of the count above: that one counts pending
   // skip requests and unread feedback off the team overview, and knows nothing
-  // about escalations. Gated on the inbox route rather than the dashboard --
+  // about escalations. The entry shows the two added up. Gated on the inbox route rather than the dashboard --
   // for a PM it additionally requires managing the selected project, so a PM
   // who is only a member of it neither pays for the request nor sees a badge
   // for an entry their sidebar does not show.
@@ -429,7 +437,7 @@ export function SideBar() {
       >
         <SidebarContent
           aria-label="Desktop Navigation"
-          hasPmAttentionItems={hasPmAttentionItems}
+          pmWaitingCount={pmWaitingCount}
           openEscalationCount={openEscalationCount}
         />
       </aside>
@@ -481,7 +489,7 @@ export function SideBar() {
         <SidebarContent
           aria-label="Mobile Navigation"
           onNavigate={closeMobileSidebar}
-          hasPmAttentionItems={hasPmAttentionItems}
+          pmWaitingCount={pmWaitingCount}
           openEscalationCount={openEscalationCount}
         />
       </aside>

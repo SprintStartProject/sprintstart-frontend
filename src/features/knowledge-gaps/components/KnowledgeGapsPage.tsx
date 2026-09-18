@@ -167,7 +167,12 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
 
   return (
     <section aria-label={PAGE_TITLE}>
-      <PmSectionHeader title={PAGE_TITLE} description={PAGE_SUBTITLE} actions={headerActions} />
+      <PmSectionHeader
+        title={PAGE_TITLE}
+        description={PAGE_SUBTITLE}
+        help="Every component is checked for README, setup, architecture, ADR, API and runbook docs. A missing README or setup guide weighs most, and docs untouched for six months raise the severity one step."
+        actions={headerActions}
+      />
       <div className="space-y-4">
         {gaps.length > 0 && <SeveritySummaryBar gaps={gaps} />}
 

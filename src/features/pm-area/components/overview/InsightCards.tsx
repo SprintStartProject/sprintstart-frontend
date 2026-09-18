@@ -63,6 +63,7 @@ export function QuestionsCard() {
       <PmCardHeader
         icon={MessageSquareMore}
         title="Recurring questions"
+        help="What people keep asking the chat. Different wordings of the same question are grouped and counted together, so the top of this list is where documentation saves the most time."
         meta={
           revalidating ? (
             <Spinner size="sm" label="Updating recurring questions" />
@@ -141,6 +142,7 @@ export function KnowledgeGapsCard() {
       <PmCardHeader
         icon={ShieldAlert}
         title="Knowledge gaps"
+        help="Components of the codebase missing documentation a newcomer relies on: README, setup, architecture, ADRs, API docs, runbooks. A missing README or setup guide, or docs untouched for six months, raise the severity."
         meta={overview ? `${summary.componentCount} components` : undefined}
         action={<PmCardLink to="/insights/knowledge-gaps">All</PmCardLink>}
       />
@@ -236,6 +238,7 @@ export function OnboardingHealthCard() {
       <PmCardHeader
         icon={Gauge}
         title="Onboarding health"
+        help="How quickly hires become productive: time until their first accepted work, how long they wait for a first review, how many are waiting on one now, and how many show no progress at all."
         meta={metrics ? `${metrics.memberCount} hires` : undefined}
         action={<PmCardLink to="/insights/onboarding">Details</PmCardLink>}
       />

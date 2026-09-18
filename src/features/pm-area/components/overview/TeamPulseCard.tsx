@@ -37,6 +37,7 @@ export function TeamPulseCard({ roster, loading, error, onOpenMember }: TeamPuls
       <PmCardHeader
         icon={Users}
         title="Team"
+        help="The bar shows how many members are through their onboarding path, underway, or haven't started. Below it: who is still on the way, longest on their current step first."
         meta={loading || error ? undefined : `${roster.length} members`}
         action={<PmCardLink to="/team-management">All members</PmCardLink>}
       />

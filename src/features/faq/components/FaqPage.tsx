@@ -184,12 +184,18 @@ export function FaqPage({ groupId }: { groupId?: string }) {
 
   return (
     <section aria-label={PAGE_TITLE}>
-      <PmSectionHeader title={PAGE_TITLE} description={PAGE_SUBTITLE} actions={headerActions} />
+      <PmSectionHeader
+        title={PAGE_TITLE}
+        description={PAGE_SUBTITLE}
+        help="Built from the questions people ask the chat. Similar questions are grouped automatically, and each group links the documents that answer it. Rebuilding recomputes the groups from scratch."
+        actions={headerActions}
+      />
       <div className="space-y-5">
         <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <PmStat
             icon={MessageSquareMore}
             label="Questions tracked"
+            help="Distinct questions. Different wordings of the same question count once."
             value={hasData ? totalGroups : "—"}
             hint={hasData ? `${oneOffCount} asked only once` : "Loading"}
           />
@@ -202,6 +208,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
           <PmStat
             icon={TrendingUp}
             label="Picking up"
+            help="Questions asked more often lately than before, often a sign that something changed or a document is missing."
             value={hasData ? risingCount : "—"}
             hint={risingCount > 0 ? "Asked more often lately" : "Nothing on the rise"}
             attention={risingCount > 0}
@@ -209,6 +216,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
           <PmStat
             icon={FileText}
             label="Linked documents"
+            help="Documents from the connected sources that answer these questions, so you can point people to them or improve them."
             value={hasData ? totalDocuments : "—"}
             hint="That answer these questions"
           />

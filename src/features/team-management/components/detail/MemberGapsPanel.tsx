@@ -34,7 +34,11 @@ export function MemberGapsPanel({
   return (
     <>
       <PmCard aria-label="Skill assessment">
-        <PmCardHeader icon={GraduationCap} title="Skill assessment" />
+        <PmCardHeader
+          icon={GraduationCap}
+          title="Skill assessment"
+          help="How the member rated themselves in the skills their roles call for, grouped by role."
+        />
 
         {skillLevels.length === 0 ? (
           <p className="text-sm text-app-text-muted">No completed skill assessment.</p>
@@ -58,7 +62,11 @@ export function MemberGapsPanel({
       </PmCard>
 
       <PmCard aria-label="Gaps">
-        <PmCardHeader icon={SearchX} title="Gaps" />
+        <PmCardHeader
+          icon={SearchX}
+          title="Gaps"
+          help="Skill gaps are skills the member rated as beginner or intermediate. Knowledge gaps are the project's most severe documentation gaps, which they may run into."
+        />
 
         <div className="space-y-4">
           <SkillGapsSection skillGaps={skillGaps} />

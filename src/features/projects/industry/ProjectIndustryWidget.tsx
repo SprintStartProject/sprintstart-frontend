@@ -106,8 +106,12 @@ export function ProjectIndustryWidget() {
   if (!selectedProjectId) return null;
 
   return (
-    <PmCard aria-label="Industry" className="h-full">
-      <PmCardHeader icon={Tag} title="Industry" />
+    <PmCard aria-label="Industry">
+      <PmCardHeader
+        icon={Tag}
+        title="Industry"
+        help="The project's domain, detected by AI from its documents. It is used to suggest the skills each role should assess. Confidence says how clear the evidence was; if it is wrong, set it by hand."
+      />
 
       {error ? (
         <p className="text-sm text-app-text-muted">{error}</p>

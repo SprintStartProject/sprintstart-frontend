@@ -70,6 +70,7 @@ export function PmDashboardPage() {
         <PmStat
           icon={Inbox}
           label="Waiting on you"
+          help="Team members with a skip request you haven't decided or feedback you haven't read. Open one to answer it right there."
           value={figuresReady ? waitingCount : "—"}
           hint={waitingCount > 0 ? "Skip requests or feedback" : "Nothing to answer"}
           attention={waitingCount > 0}
@@ -78,6 +79,7 @@ export function PmDashboardPage() {
         <PmStat
           icon={MessageCircleQuestion}
           label="Open escalations"
+          help="Questions the buddy couldn't answer from the project's knowledge, so it passed them on to you. Your answer is kept and reused for the next person who asks."
           value={openEscalations}
           hint={openEscalations > 0 ? "Questions the buddy couldn't answer" : "Inbox clear"}
           attention={openEscalations > 0}
@@ -86,6 +88,7 @@ export function PmDashboardPage() {
         <PmStat
           icon={Rocket}
           label="To first accepted work"
+          help="The median time from joining the project to a hire's first contribution being accepted, such as a merged pull request. Lower means people get productive sooner."
           value={metrics ? formatDuration(metrics.medianHoursToFirstAcceptedContribution) : "—"}
           hint="Median, joined → accepted"
           to="/insights/onboarding"
@@ -112,7 +115,9 @@ export function PmDashboardPage() {
         <KnowledgeGapsCard />
       </div>
 
-      <div className="grid items-stretch gap-5 lg:grid-cols-2">
+      {/* Top-aligned, not stretched: the industry card grows when its evidence is opened, and
+          the ingestion card beside it has no reason to grow with it. */}
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <IngestionStatusWidget />
         <ProjectIndustryWidget />
       </div>

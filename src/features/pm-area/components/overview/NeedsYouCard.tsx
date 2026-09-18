@@ -63,6 +63,7 @@ export function NeedsYouCard({ entries, loading, onOpenMember }: NeedsYouCardPro
       <PmCardHeader
         icon={Inbox}
         title="Needs you"
+        help="Everyone who needs a move from you, most urgent first: skip requests, unread feedback, work waiting 2+ days for a review, hires with no visible progress yet, and anyone on the same step for 5+ days."
         meta={loading ? undefined : entries.length === 1 ? "1 person" : `${entries.length} people`}
         action={
           <PmCardLink to="/team-management?filter=attention">

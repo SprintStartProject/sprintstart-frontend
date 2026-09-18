@@ -142,6 +142,7 @@ export function KnowledgeRequestInboxPage() {
     <section aria-label="Escalations">
       <PmSectionHeader
         title="Escalations"
+        help="When the buddy can't answer a question from the project's knowledge, it escalates it to you. Open lists the questions still waiting; Durable answers are the ones you gave, which the buddy now uses for everyone."
         description="Questions the buddy could not answer. Answer one and it becomes durable knowledge."
         actions={
           <SegmentedTabs

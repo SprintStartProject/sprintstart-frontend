@@ -271,6 +271,7 @@ export function OnboardingMetricsPage() {
     <section aria-label="Onboarding metrics">
       <PmSectionHeader
         title="Onboarding metrics"
+        help="Measured from the hires' activity on the project, like claimed tasks, pull requests and reviews. Medians are used throughout so one outlier can't move the numbers."
         description="Each hire's path from joining to their first accepted contribution."
         actions={refreshButton}
       />
@@ -308,18 +309,21 @@ export function OnboardingMetricsPage() {
                 <PmStat
                   icon={Rocket}
                   label="Median time to first accepted work"
+                  help="From joining the project to the first contribution being accepted, such as a merged pull request. Half of the hires got there faster."
                   value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
                   hint={`${metrics.hiresWithAcceptedContribution} of ${metrics.memberCount} have had work accepted`}
                 />
                 <PmStat
                   icon={Clock}
                   label="Median first-review wait"
+                  help="How long a hire typically waits from opening a contribution until somebody first responds to it."
                   value={formatDuration(metrics.medianHoursToFirstResponse)}
                   hint="Opened → first response"
                 />
                 <PmStat
                   icon={Hourglass}
                   label="90th-percentile review wait"
+                  help="Nine out of ten first responses come faster than this. It shows the slowest reviews, the ones most likely to stall a new hire."
                   value={formatDuration(metrics.p90HoursToFirstResponse)}
                   hint="The slow tail, where the barrier bites"
                   attention={metrics.p90HoursToFirstResponse !== null}
@@ -327,6 +331,7 @@ export function OnboardingMetricsPage() {
                 <PmStat
                   icon={Inbox}
                   label="Waiting on a review"
+                  help="Contributions from hires that nobody has responded to yet. Hires without a linked GitHub login can't be matched to their pull requests and are counted as unattributable."
                   value={metrics.waitingOnResponseCount}
                   attention={metrics.waitingOnResponseCount > 0}
                   hint={

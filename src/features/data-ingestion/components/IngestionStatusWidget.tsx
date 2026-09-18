@@ -47,10 +47,11 @@ export function IngestionStatusWidget() {
   );
 
   return (
-    <PmCard aria-label="Data ingestion" className="h-full">
+    <PmCard aria-label="Data ingestion">
       <PmCardHeader
         icon={Database}
         title="Data ingestion"
+        help="The connected sources, like repositories, that SprintStart reads to answer questions and find knowledge gaps. A source with errors means the buddy is working from outdated knowledge."
         meta={sources ? `${sources.length} sources` : undefined}
         action={<PmCardLink to="/data-ingestion">Manage</PmCardLink>}
       />

@@ -217,6 +217,7 @@ export function TeamManagementPage() {
     <section aria-label="Team">
       <PmSectionHeader
         title="Team"
+        help="Members shows everyone on the project with their onboarding progress; the tags show a skip request, unread feedback, or more than 5 days on one step. Roles describe what a member does on the project; the skills they assess themselves in follow from them."
         description="Everybody on this project, where they are in their onboarding, and the roles they hold."
         actions={
           <SegmentedTabs

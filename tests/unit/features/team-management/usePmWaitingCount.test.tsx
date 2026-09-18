@@ -3,8 +3,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   MIN_REFRESH_INTERVAL_MS,
-  usePmAttentionFlag,
-} from "../../../../src/features/team-management/usePmAttentionFlag";
+  usePmWaitingCount,
+} from "../../../../src/features/team-management/usePmWaitingCount";
 import type { TeamOverviewUser } from "../../../../src/features/team-management/types";
 
 // The emitter is kept real: the point of these tests is that acting on an item
@@ -59,26 +59,26 @@ const pendingSkip = user({
   },
 });
 
-describe("usePmAttentionFlag", () => {
+describe("usePmWaitingCount", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     attentionListeners.clear();
   });
 
-  it("flags a pending skip request", async () => {
+  it("counts a pending skip request", async () => {
     vi.mocked(getTeamOverview).mockResolvedValue([user({}), pendingSkip]);
 
-    const { result } = renderHook(() => usePmAttentionFlag("proj1", true));
+    const { result } = renderHook(() => usePmWaitingCount("proj1", true));
 
-    await waitFor(() => expect(result.current).toBe(true));
+    await waitFor(() => expect(result.current).toBe(1));
   });
 
-  it("flags unread feedback", async () => {
+  it("counts unread feedback", async () => {
     vi.mocked(getTeamOverview).mockResolvedValue([user({ hasFeedback: true })]);
 
-    const { result } = renderHook(() => usePmAttentionFlag("proj1", true));
+    const { result } = renderHook(() => usePmWaitingCount("proj1", true));
 
-    await waitFor(() => expect(result.current).toBe(true));
+    await waitFor(() => expect(result.current).toBe(1));
   });
 
   it("stays quiet when every skip request is already decided", async () => {
@@ -100,20 +100,20 @@ describe("usePmAttentionFlag", () => {
       }),
     ]);
 
-    const { result } = renderHook(() => usePmAttentionFlag("proj1", true));
+    const { result } = renderHook(() => usePmWaitingCount("proj1", true));
 
     await waitFor(() => expect(getTeamOverview).toHaveBeenCalled());
-    expect(result.current).toBe(false);
+    expect(result.current).toBe(0);
   });
 
   it("does not fetch at all for someone without dashboard access", () => {
-    renderHook(() => usePmAttentionFlag("proj1", false));
+    renderHook(() => usePmWaitingCount("proj1", false));
 
     expect(getTeamOverview).not.toHaveBeenCalled();
   });
 
   it("does not fetch while no project is selected", () => {
-    renderHook(() => usePmAttentionFlag(null, true));
+    renderHook(() => usePmWaitingCount(null, true));
 
     expect(getTeamOverview).not.toHaveBeenCalled();
   });
@@ -121,7 +121,7 @@ describe("usePmAttentionFlag", () => {
   it("refetches when the project changes", async () => {
     vi.mocked(getTeamOverview).mockResolvedValue([]);
 
-    const { rerender } = renderHook(({ projectId }) => usePmAttentionFlag(projectId, true), {
+    const { rerender } = renderHook(({ projectId }) => usePmWaitingCount(projectId, true), {
       initialProps: { projectId: "proj1" },
     });
 
@@ -135,15 +135,15 @@ describe("usePmAttentionFlag", () => {
 
   // Regression: the rate limit used to claim its slot before the request
   // landed. StrictMode discards the first effect's result, and the re-run
-  // then found itself rate limited, so the flag never showed up in dev.
+  // then found itself rate limited, so the count never showed up in dev.
   it("still resolves under StrictMode double-invocation", async () => {
     vi.mocked(getTeamOverview).mockResolvedValue([user({ hasFeedback: true })]);
 
-    const { result } = renderHook(() => usePmAttentionFlag("proj1", true, "/pm-dashboard"), {
+    const { result } = renderHook(() => usePmWaitingCount("proj1", true, "/pm-dashboard"), {
       wrapper: StrictMode,
     });
 
-    await waitFor(() => expect(result.current).toBe(true));
+    await waitFor(() => expect(result.current).toBe(1));
   });
 
   it("rechecks when the view changes", async () => {
@@ -151,7 +151,7 @@ describe("usePmAttentionFlag", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
     try {
-      const { rerender } = renderHook(({ route }) => usePmAttentionFlag("proj1", true, route), {
+      const { rerender } = renderHook(({ route }) => usePmWaitingCount("proj1", true, route), {
         initialProps: { route: "/pm-dashboard" },
       });
 
@@ -170,7 +170,7 @@ describe("usePmAttentionFlag", () => {
   it("does not refetch on rapid navigation within the rate limit", async () => {
     vi.mocked(getTeamOverview).mockResolvedValue([]);
 
-    const { rerender } = renderHook(({ route }) => usePmAttentionFlag("proj1", true, route), {
+    const { rerender } = renderHook(({ route }) => usePmWaitingCount("proj1", true, route), {
       initialProps: { route: "/pm-dashboard" },
     });
 
@@ -187,7 +187,7 @@ describe("usePmAttentionFlag", () => {
     vi.mocked(getTeamOverview).mockResolvedValue([]);
 
     const { rerender } = renderHook(
-      ({ projectId }) => usePmAttentionFlag(projectId, true, "/pm-dashboard"),
+      ({ projectId }) => usePmWaitingCount(projectId, true, "/pm-dashboard"),
       { initialProps: { projectId: "proj1" } },
     );
 
@@ -203,7 +203,7 @@ describe("usePmAttentionFlag", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
     try {
-      renderHook(() => usePmAttentionFlag("proj1", true, "/pm-dashboard"));
+      renderHook(() => usePmWaitingCount("proj1", true, "/pm-dashboard"));
 
       await waitFor(() => expect(getTeamOverview).toHaveBeenCalledTimes(1));
 
@@ -221,7 +221,7 @@ describe("usePmAttentionFlag", () => {
   it("does not recheck on focus while inside the rate limit", async () => {
     vi.mocked(getTeamOverview).mockResolvedValue([]);
 
-    renderHook(() => usePmAttentionFlag("proj1", true, "/pm-dashboard"));
+    renderHook(() => usePmWaitingCount("proj1", true, "/pm-dashboard"));
 
     await waitFor(() => expect(getTeamOverview).toHaveBeenCalledTimes(1));
 
@@ -236,9 +236,9 @@ describe("usePmAttentionFlag", () => {
   it("clears immediately once the item has been handled", async () => {
     vi.mocked(getTeamOverview).mockResolvedValue([user({ hasFeedback: true })]);
 
-    const { result } = renderHook(() => usePmAttentionFlag("proj1", true, "/pm-dashboard"));
+    const { result } = renderHook(() => usePmWaitingCount("proj1", true, "/pm-dashboard"));
 
-    await waitFor(() => expect(result.current).toBe(true));
+    await waitFor(() => expect(result.current).toBe(1));
 
     // The user reads the feedback; the service announces it. This must not
     // wait out the rate limit, even though the last check was just now.
@@ -247,16 +247,16 @@ describe("usePmAttentionFlag", () => {
       emitAttentionChanged();
     });
 
-    await waitFor(() => expect(result.current).toBe(false));
+    await waitFor(() => expect(result.current).toBe(0));
     expect(getTeamOverview).toHaveBeenCalledTimes(2);
   });
 
   it("stays quiet when the request fails", async () => {
     vi.mocked(getTeamOverview).mockRejectedValue(new Error("boom"));
 
-    const { result } = renderHook(() => usePmAttentionFlag("proj1", true));
+    const { result } = renderHook(() => usePmWaitingCount("proj1", true));
 
     await waitFor(() => expect(getTeamOverview).toHaveBeenCalled());
-    expect(result.current).toBe(false);
+    expect(result.current).toBe(0);
   });
 });
