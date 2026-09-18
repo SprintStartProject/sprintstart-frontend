@@ -1,4 +1,4 @@
-import { render as rtlRender, screen } from "@testing-library/react";
+import { act, render as rtlRender, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
@@ -31,6 +31,12 @@ vi.mock("../../../../../src/services/knowledgeService", () => ({
     streamArtifactSummary: vi.fn(),
     deleteUpload: vi.fn().mockResolvedValue(undefined),
   },
+}));
+
+const { mockAskAi } = vi.hoisted(() => ({ mockAskAi: vi.fn((_prompt: string) => true) }));
+
+vi.mock("../../../../../src/hooks/useAskAi", () => ({
+  useAskAi: () => mockAskAi,
 }));
 
 vi.mock("../../../../../src/context/useAuth", () => ({
@@ -907,5 +913,45 @@ describe("ArtifactViewerDrawer", () => {
 
     expect(screen.getByTestId("empty-body-notice")).toBeInTheDocument();
     expect(container.querySelector("pre")).toBeNull();
+  });
+  it("hands the whole artifact to the chat when Ask AI is pressed", async () => {
+    renderDrawer();
+
+    const askAi = await screen.findByTestId("ask-ai-btn");
+    await userEvent.click(askAi);
+
+    expect(mockAskAi).toHaveBeenCalledTimes(1);
+    const prompt = mockAskAi.mock.calls[0][0];
+    expect(prompt).toContain("README.md");
+    expect(prompt).toContain("in the Knowledge Base");
+  });
+  it("quotes the highlighted text when the reader has selected some", async () => {
+    renderDrawer();
+
+    const body = await screen.findByTestId("raw-content");
+    const selected = {
+      isCollapsed: false,
+      rangeCount: 1,
+      toString: () => "  rolls back on its own  ",
+      getRangeAt: () => ({ commonAncestorContainer: body }),
+      removeAllRanges: vi.fn(),
+    };
+    vi.spyOn(window, "getSelection").mockReturnValue(selected as unknown as Selection);
+
+    act(() => {
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    const askAi = screen.getByTestId("ask-ai-btn");
+    expect(askAi).toHaveTextContent("Ask AI about this");
+
+    await userEvent.click(askAi);
+
+    expect(mockAskAi).toHaveBeenCalledTimes(1);
+    expect(mockAskAi.mock.calls[0][0]).toContain("> rolls back on its own");
+    expect(mockAskAi.mock.calls[0][0]).toContain("From README.md");
+    expect(selected.removeAllRanges).toHaveBeenCalledTimes(1);
+
+    vi.restoreAllMocks();
   });
 });

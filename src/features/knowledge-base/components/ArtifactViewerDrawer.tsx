@@ -15,6 +15,7 @@ import {
   Hash,
   Link2,
   ExternalLink,
+  MessageSquare,
 } from "lucide-react";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -24,6 +25,9 @@ import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from "../types";
+import { questionForArtifact, quoteForChat } from "../../../hooks/askAiQuote";
+import { useArtifactSelection } from "../hooks/useArtifactSelection";
+import { useAskAi } from "../../../hooks/useAskAi";
 import { isEmptyContent, summariseBlockReason } from "../summarizability";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { preprocessMarkdown } from "../markdown";
@@ -1145,6 +1149,30 @@ export function ArtifactViewerDrawer({
   // service would index it first and only then answer that there is nothing to
   // summarise. Null while the content is still loading, or for formats that are
   // not text at all -- see summariseBlockReason.
+  const askAi = useAskAi();
+
+  /**
+   * Whatever the reader has highlighted in the document, while they have it.
+   *
+   * The action below quotes it; with nothing selected it asks about the whole
+   * artifact instead. The offer lives here rather than floating over the text,
+   * because a button positioned over a selection covers the lines around it —
+   * and the lines around a selection are usually the next thing being read.
+   */
+  const selection = useArtifactSelection(contentContainerRef);
+
+  const ask = () => {
+    const prompt = selection.text
+      ? quoteForChat({
+          text: selection.text,
+          source: artifact?.title ?? null,
+          url: artifact?.sourceUrl ?? null,
+        })
+      : questionForArtifact({ title: artifact?.title, url: artifact?.sourceUrl });
+
+    if (askAi(prompt)) selection.clear();
+  };
+
   const summariseBlockedReason = summariseBlockReason(content);
 
   const orgMetadata = useMemo(
@@ -1182,6 +1210,15 @@ export function ArtifactViewerDrawer({
           </button>
         </div>
       )}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={ask}
+        data-testid="ask-ai-btn"
+        icon={<MessageSquare className="h-4 w-4" />}
+      >
+        {selection.text ? "Ask AI about this" : "Ask AI"}
+      </Button>
       {/* The wrapper carries the reason, not the button: a disabled control
           receives no pointer events, so its own title would never be shown. */}
       <span title={summariseBlockedReason ?? undefined}>
