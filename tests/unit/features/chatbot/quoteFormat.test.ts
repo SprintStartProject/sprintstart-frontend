@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   formatMarkdownQuote,
   insertQuoteIntoDraft,
@@ -34,17 +34,17 @@ describe("quoteFormat", () => {
       expect(result).toBe("> Quoted message\n\n");
     });
 
-    it("prepends the quote at the top when draft already contains text", () => {
+    it("appends the quote at the bottom when draft already contains text", () => {
       const currentDraft = "What does this mean?";
       const result = insertQuoteIntoDraft(currentDraft, "AI explanation here");
-      expect(result).toBe("> AI explanation here\n\nWhat does this mean?");
+      expect(result).toBe("What does this mean?\n\n> AI explanation here\n\n");
     });
 
-    it("handles multi-line quotes prepended to existing draft", () => {
+    it("handles multi-line quotes appended to existing draft", () => {
       const currentDraft = "My question.";
       const quote = "Line 1\nLine 2";
       const result = insertQuoteIntoDraft(currentDraft, quote);
-      expect(result).toBe("> Line 1\n> Line 2\n\nMy question.");
+      expect(result).toBe("My question.\n\n> Line 1\n> Line 2\n\n");
     });
 
     it("returns current draft untouched if quote text is empty", () => {
