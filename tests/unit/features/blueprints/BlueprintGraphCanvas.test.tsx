@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Layers } from "lucide-react";
 import {
@@ -9,10 +10,9 @@ import { BlueprintNodeCard } from "../../../../src/features/blueprints/component
 import { LOCK_SENTENCE } from "../../../../src/features/graph-diagram/lockWords.ts";
 
 /**
- * React Flow never measures anything in jsdom, so it leaves every node `visibility: hidden`.
- * Testing Library skips hidden elements in role queries, and computes an empty accessible name for
- * them even with `hidden: true` — so nodes are addressed by the test id the canvas puts on each
- * wrapper, and a control inside one by its text or its label attribute.
+ * Nodes are addressed by the test id the canvas puts on each wrapper, and a control inside one by
+ * its text or its label attribute. The canvas draws its own nodes as plain HTML, so they are
+ * visible to role queries — but the test id is what stays true when the card inside changes.
  */
 function node(id: string, blockerIds: string[] = [], placed = true): BlueprintGraphCanvasNode {
   return {
@@ -25,6 +25,18 @@ function node(id: string, blockerIds: string[] = [], placed = true): BlueprintGr
 }
 
 const noop = () => Promise.resolve();
+
+/**
+ * A click on a node, as the canvas hears one.
+ *
+ * The canvas runs on pointer events rather than on `click`, because the same gesture that selects a
+ * node is the one that drags it somewhere — so a plain `fireEvent.click` reaches nothing.
+ */
+function clickNode(id: string) {
+  const element = screen.getByTestId(`graph-node-${id}`);
+  fireEvent.pointerDown(element, { button: 0, pointerId: 1 });
+  fireEvent.pointerUp(element, { button: 0, pointerId: 1 });
+}
 
 function renderCanvas(
   nodes: BlueprintGraphCanvasNode[],
@@ -260,6 +272,60 @@ describe("BlueprintGraphCanvas", () => {
 
     expect(screen.queryByRole("button", { name: "Graph overview" })).not.toBeInTheDocument();
     expect(screen.queryByText(LOCK_SENTENCE)).not.toBeInTheDocument();
+  });
+
+  it("tells the two halves of a lit run apart, rather than lighting them as one blob", async () => {
+    // The question somebody asks by pointing at a node is "what is in my way, and what am I in the
+    // way of". Lighting the whole run answers neither half.
+    renderCanvas([node("a"), node("b", ["a"]), node("c", ["b"]), node("loner")]);
+
+    fireEvent.mouseEnter(screen.getByTestId("graph-node-b"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("graph-node-b")).toHaveAttribute("data-chain-half", "focus"),
+    );
+    expect(screen.getByTestId("graph-node-a")).toHaveAttribute("data-chain-half", "behind");
+    expect(screen.getByTestId("graph-node-c")).toHaveAttribute("data-chain-half", "ahead");
+    expect(screen.getByTestId("graph-node-loner")).not.toHaveAttribute("data-chain-half");
+  });
+
+  it("opens a node into the canvas rather than beside it", async () => {
+    function Harness() {
+      const [openId, setOpenId] = useState<string | null>(null);
+      return (
+        <BlueprintGraphCanvas<BlueprintGraphCanvasNode>
+          nodes={[node("a"), node("b", ["a"])]}
+          title="Path graph"
+          description="Arrange the phases."
+          editable
+          onNodeClick={(clicked) => setOpenId(clicked.id)}
+          onPositionChange={noop}
+          onAddBlocker={noop}
+          onRemoveBlocker={noop}
+          renderNode={(item, cardProps) => (
+            <BlueprintNodeCard
+              {...cardProps}
+              title={item.title}
+              kind={{ label: "Phase", icon: Layers }}
+            />
+          )}
+          openNodeId={openId}
+          onCloseNodeDetail={() => setOpenId(null)}
+          renderNodeDetail={(item) => ({ title: item.title, body: <p>Fields for {item.title}</p> })}
+        />
+      );
+    }
+
+    render(<Harness />);
+    clickNode("a");
+
+    // The camera flies in first, so the page appears once it has landed rather than over a graph
+    // still on its way there.
+    await waitFor(() => expect(screen.getByText("Fields for Node a")).toBeInTheDocument());
+    expect(screen.getByRole("region", { name: "Node a" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByText("Fields for Node a")).not.toBeInTheDocument());
   });
 
   it("says an empty canvas is empty, not broken, and says what to do about it", () => {

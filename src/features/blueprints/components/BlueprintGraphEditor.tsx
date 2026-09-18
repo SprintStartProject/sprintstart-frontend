@@ -15,7 +15,6 @@ import { Button } from "../../../components/ui/Button.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
-import { SidePanel } from "../../../components/ui/SidePanel.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
 import { useToast } from "../../../context/useToast.ts";
 import { canConnect } from "../../graph-diagram/graphLayout.ts";
@@ -176,6 +175,89 @@ export function BlueprintGraphEditor({
         onRemoveBlocker={onRemoveBlocker}
         onCreateNode={(_kindId, graphX, graphY) => onCreateNode(graphX, graphY)}
         renderNode={(phase, graphNodeProps) => <GraphNodeCard phase={phase} {...graphNodeProps} />}
+        openNodeId={isDetailsOpen ? detailsPhaseId : null}
+        onCloseNodeDetail={() => {
+          // Without the mode there is no Cancel, so stepping back out is the only way to walk away
+          // from an edit — and it has to say so rather than dropping the work on the floor.
+          if (isDirty) {
+            setIsDiscardConfirmOpen(true);
+            return;
+          }
+          setIsDetailsOpen(false);
+        }}
+        renderNodeDetail={(phase) => ({
+          title: phase.title,
+          body: (
+            <PhaseDetails
+              phase={phase}
+              phases={phases}
+              isEditing={editable}
+              metadata={metadata}
+              saveError={detailsSaveError}
+              onMetadataChange={setMetadata}
+              onSubmit={savePhaseMetadata}
+              onAddBlocker={onAddBlocker}
+              onRemoveBlocker={onRemoveBlocker}
+            />
+          ),
+          footer: editable ? (
+            /*
+              No edit mode, and so nothing to cancel. The fields are simply live, and the footer
+              says whether what is on screen has reached the server yet. The old arrangement made
+              somebody press Edit to change a field and Cancel to stop — two decisions about a mode,
+              on top of the one decision they actually had, which is what the phase should say.
+            */
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                variant="dangerSoft"
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={() => {
+                  setDeleteError(null);
+                  setIsDeleteConfirmOpen(true);
+                }}
+              >
+                Delete
+              </Button>
+              {isDirty ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setMetadata(metadataOf(phase))}
+                  >
+                    Discard
+                  </Button>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    form="edit-blueprint-phase"
+                    loading={isDetailsSaving}
+                  >
+                    Save changes
+                  </Button>
+                </div>
+              ) : (
+                <p className="flex items-center gap-1.5 text-sm text-app-text-muted">
+                  <Check className="h-4 w-4 text-app-success-solid" aria-hidden="true" />
+                  Saved
+                </p>
+              )}
+            </div>
+          ) : onRequestDraft ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-app-text-muted">
+                This version is published, so it is read-only.
+              </p>
+              <Button
+                variant="primary"
+                icon={<FilePlus2 className="h-4 w-4" />}
+                onClick={onRequestDraft}
+              >
+                Edit as draft
+              </Button>
+            </div>
+          ) : undefined,
+        })}
       />
       <AlertDialog
         isOpen={isDeleteConfirmOpen}
@@ -212,96 +294,6 @@ export function BlueprintGraphEditor({
           setIsDetailsOpen(false);
         }}
       />
-      <SidePanel
-        // Wider than the house default. What this panel holds is not a few fields: it is a form
-        // plus the nested lists the node owns, and at 34rem every one of those wrapped onto three
-        // lines while the canvas behind it kept two thirds of a screen nobody was reading.
-        widthClassName="w-full sm:w-[min(48rem,60vw)] sm:max-w-none"
-        isOpen={isDetailsOpen && detailsPhaseId !== null}
-        onClose={() => {
-          // Without the mode there is no Cancel, so closing is the only way to walk away from an
-          // edit — and it has to say so rather than dropping the work on the floor.
-          if (isDirty) {
-            setIsDiscardConfirmOpen(true);
-            return;
-          }
-          setIsDetailsOpen(false);
-        }}
-        title={detailsPhase?.title ?? "Phase details"}
-        footer={
-          editable && detailsPhase ? (
-            /*
-              No edit mode, and so nothing to cancel. The fields are simply live, and the footer
-              says whether what is on screen has reached the server yet. The old arrangement made
-              somebody press Edit to change a field and Cancel to stop — two decisions about a mode,
-              on top of the one decision they actually had, which is what the phase should say.
-            */
-            <div className="flex items-center justify-between gap-3">
-              <Button
-                variant="dangerSoft"
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={() => {
-                  setDeleteError(null);
-                  setIsDeleteConfirmOpen(true);
-                }}
-              >
-                Delete
-              </Button>
-              {isDirty ? (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => setMetadata(metadataOf(detailsPhase))}
-                  >
-                    Discard
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    form="edit-blueprint-phase"
-                    loading={isDetailsSaving}
-                  >
-                    Save changes
-                  </Button>
-                </div>
-              ) : (
-                <p className="flex items-center gap-1.5 text-sm text-app-text-muted">
-                  <Check className="h-4 w-4 text-app-success-solid" aria-hidden="true" />
-                  Saved
-                </p>
-              )}
-            </div>
-          ) : onRequestDraft ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-app-text-muted">
-                This version is published, so it is read-only.
-              </p>
-              <Button
-                variant="primary"
-                icon={<FilePlus2 className="h-4 w-4" />}
-                onClick={onRequestDraft}
-              >
-                Edit as draft
-              </Button>
-            </div>
-          ) : undefined
-        }
-      >
-        {detailsPhase ? (
-          <PhaseDetails
-            phase={detailsPhase}
-            phases={phases}
-            isEditing={editable}
-            metadata={metadata}
-            saveError={detailsSaveError}
-            onMetadataChange={setMetadata}
-            onSubmit={savePhaseMetadata}
-            onAddBlocker={onAddBlocker}
-            onRemoveBlocker={onRemoveBlocker}
-          />
-        ) : null}
-      </SidePanel>
     </>
   );
 }

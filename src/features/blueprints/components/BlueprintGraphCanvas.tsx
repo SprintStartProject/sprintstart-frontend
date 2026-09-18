@@ -1,5 +1,25 @@
-import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Flag, Info, KeyRound, LayoutGrid, Plus, Search, Waypoints, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { motion } from "framer-motion";
+import {
+  ArrowLeft,
+  Flag,
+  Info,
+  KeyRound,
+  LayoutGrid,
+  Minimize2,
+  Plus,
+  Search,
+  Waypoints,
+  X,
+} from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
@@ -116,6 +136,34 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   onCreateNode?: (kindId: string, x: number, y: number) => Promise<void>;
   renderNode: (node: TNode, props: BlueprintGraphCanvasNodeProps) => ReactNode;
   /**
+   * A node opened up into the canvas itself, instead of into a panel beside it.
+   *
+   * Clicking a node then flies the camera into it until it fills the graph, and the node becomes
+   * the page — the same move the journey makes when a hire opens a step. A panel beside the canvas
+   * put the thing being edited next to a picture of itself, with the picture two thirds of a screen
+   * wide and nobody reading it; flying in spends that room on the editing and keeps the graph as
+   * the place all of it happens.
+   *
+   * Left out on a surface with nothing to open, which falls back to `onNodeClick` alone.
+   */
+  renderNodeDetail?: (node: TNode) => {
+    /** Headline of the opened node. Defaults to the node's own title. */
+    title?: string;
+    body: ReactNode;
+    /** The row along the bottom: whether it is saved, and the destructive way out. */
+    footer?: ReactNode;
+  };
+  /**
+   * Which node is open, and how to shut it.
+   *
+   * Held by the caller rather than here, because closing is not always allowed: an editor with
+   * unsaved fields has to ask first, and a canvas that had already closed would be asking about
+   * something the author can no longer see. Opening goes through `onNodeClick`, which is also
+   * where the caller loads the node into whatever it draws.
+   */
+  openNodeId?: string | null;
+  onCloseNodeDetail?: () => void;
+  /**
    * How firm or how far along this arrow is, where that is a question the graph can answer.
    *
    * Left out by every Blueprint surface: a blueprint is a template, so no arrow on one has been
@@ -206,6 +254,9 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
   createKinds = [],
   onCreateNode,
   renderNode,
+  renderNodeDetail,
+  openNodeId = null,
+  onCloseNodeDetail,
   edgeTone,
 }: Props<TNode>) {
   const camera = useRef<JourneyCameraHandle>(null);
@@ -230,6 +281,8 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
    * leaves forty ghosts, and the run being looked at is still buried in them.
    */
   const [chainOnly, setChainOnly] = useState(false);
+  /** The node the camera is on its way into. Everything else fades while it travels. */
+  const [flyingInto, setFlyingInto] = useState<string | null>(null);
 
   /**
    * The furniture a canvas carries is furniture for a canvas somebody works in.
@@ -514,6 +567,63 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
     [entryPoints, nodes, positions, selectedId],
   );
 
+  const openNode = openNodeId ? (nodeById.get(openNodeId) ?? null) : null;
+  const detail = openNode && renderNodeDetail ? renderNodeDetail(openNode) : null;
+
+  /**
+   * Flies back out when the opened node is shut.
+   *
+   * Only on the way out. Flying in is done before the caller is told the node was clicked, so that
+   * what opens is already what fills the screen — see the select handler below.
+   */
+  const wasOpenRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = wasOpenRef.current;
+    wasOpenRef.current = openNodeId;
+    if (previous && !openNodeId) void camera.current?.flyToFit();
+  }, [openNodeId]);
+
+  /** Escape is how everything in this app that took the screen gives it back. */
+  useEffect(() => {
+    if (!detail || !onCloseNodeDetail) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // Inside a field or a dialog, Escape belongs to that. A confirmation about unsaved work is
+      // the worst possible thing to dismiss by closing the thing it is asking about.
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('input, textarea, select, [role="dialog"]')
+      ) {
+        return;
+      }
+      onCloseNodeDetail();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [detail, onCloseNodeDetail]);
+
+  const openNodeById = useCallback(
+    (id: string) => {
+      const node = nodeById.get(id);
+      if (!node) return;
+      if (!renderNodeDetail) {
+        onNodeClick(node);
+        return;
+      }
+      // The camera lands first and the node opens into what it landed on. Telling the caller first
+      // would open a page over a graph still on its way there, which reads as two things happening
+      // rather than one thing being entered.
+      setFlyingInto(id);
+      void (async () => {
+        await camera.current?.zoomIntoNode(id, 380);
+        setFlyingInto(null);
+        onNodeClick(node);
+      })();
+    },
+    [nodeById, onNodeClick, renderNodeDetail],
+  );
+
   const canAuthor = editable && !isSaving;
   const focusTitle = focus ? nodeById.get(focus.id)?.title : undefined;
 
@@ -587,9 +697,22 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                 return;
               }
               setSelectedId(id);
-              const node = nodeById.get(id);
-              if (node) onNodeClick(node);
+              openNodeById(id);
             }}
+            spotlightId={flyingInto}
+            cover={
+              detail && openNode ? (
+                <NodeCover
+                  key={openNode.id}
+                  title={detail.title ?? openNode.title}
+                  context={title}
+                  footer={detail.footer}
+                  onBack={() => onCloseNodeDetail?.()}
+                >
+                  {detail.body}
+                </NodeCover>
+              ) : undefined
+            }
             edgeTone={(blocker, node) => {
               // While a node is being pointed at, which half of its run an arrow is in outranks
               // where the arrow came from: the first is the question being asked right now, and
@@ -633,6 +756,10 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
               return (
                 <div
                   data-testid={`graph-node-${node.id}`}
+                  // Which half of the lit run this card is in, as an attribute as well as a
+                  // colour: the colour is the answer for a reader, and this is the one thing a
+                  // test can hold on to without asserting a class name.
+                  data-chain-half={half ?? undefined}
                   onMouseEnter={() => setHoveredId(node.id)}
                   onMouseLeave={() =>
                     setHoveredId((current) => (current === node.id ? null : current))
@@ -824,6 +951,85 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
 }
 
 const zero: GraphPoint = { x: 0, y: 0 };
+
+/**
+ * A node zoomed into until it is a page, with the way back out along the top.
+ *
+ * The same move the journey makes when a hire opens a step, and for the same reason: a graph is
+ * where this work happens, so the thing being edited should open *inside* it rather than beside
+ * it. A side panel put a form next to a picture of the very thing the form was about, and spent
+ * two thirds of a screen on the picture nobody was reading while they typed.
+ *
+ * The camera is already inside the node by the time this is drawn, so what is behind the blur is
+ * the node itself — which is what makes closing it read as stepping back out rather than as a
+ * sheet sliding away.
+ */
+function NodeCover({
+  title,
+  context,
+  footer,
+  onBack,
+  children,
+}: {
+  title: string;
+  /** What this node is part of — the path, the phase. Empty on a canvas with no heading of its own. */
+  context?: string;
+  footer?: ReactNode;
+  onBack: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="absolute inset-0 flex items-stretch justify-center bg-app-bg-soft/70 p-3 backdrop-blur-sm sm:p-6">
+      <motion.section
+        aria-label={title}
+        initial={{ opacity: 0, scale: 0.9, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 320, damping: 30 }}
+        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface shadow-2xl"
+      >
+        <header className="border-b border-app-border bg-app-brand-soft/30 px-4 py-3 sm:px-6">
+          <nav
+            aria-label="Where you are"
+            className="flex min-w-0 items-center gap-1 text-xs text-app-text-muted"
+          >
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 hover:bg-app-surface-hover hover:text-app-text"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              {context ? `Back to ${context}` : "Back to the graph"}
+            </button>
+          </nav>
+          <div className="mt-1.5 flex items-start gap-3">
+            <h3 className="min-w-0 flex-1 text-lg leading-snug font-bold text-app-text sm:text-xl">
+              {title}
+            </h3>
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Back to the graph"
+              title="Back to the graph (Esc)"
+              className="rounded-xl p-2 text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+            >
+              <Minimize2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          {children}
+        </div>
+
+        {footer ? (
+          <div className="border-t border-app-border bg-app-surface-muted px-4 py-3 sm:px-6">
+            {footer}
+          </div>
+        ) : null}
+      </motion.section>
+    </div>
+  );
+}
 
 /**
  * What the one relation on this canvas means, spelled out.

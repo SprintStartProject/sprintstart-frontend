@@ -15,7 +15,6 @@ import { Button } from "../../../components/ui/Button.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
-import { SidePanel } from "../../../components/ui/SidePanel.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
 import { useToast } from "../../../context/useToast.ts";
 import {
@@ -282,6 +281,106 @@ export function BlueprintSubGraphEditor({
           onCreateNode(kindId === "question" ? "question" : "step", graphX, graphY)
         }
         renderNode={(node, graphNodeProps) => <SubGraphNodeCard node={node} {...graphNodeProps} />}
+        openNodeId={isDetailsOpen ? detailsNodeId : null}
+        onCloseNodeDetail={() => {
+          // Without the mode there is no Cancel, so stepping back out is the only way to walk away
+          // from an edit — and it has to say so rather than dropping the work on the floor.
+          if ((detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty)) {
+            setIsDiscardConfirmOpen(true);
+            return;
+          }
+          setIsDetailsOpen(false);
+        }}
+        renderNodeDetail={(node) => ({
+          title: node.title,
+          body: (
+            <SubGraphNodeDetails
+              node={node}
+              phase={phase}
+              editable={editable}
+              isQuestionEditing={editable}
+              questionMetadata={questionMetadata}
+              questionSaveError={questionSaveError}
+              onQuestionMetadataChange={setQuestionMetadata}
+              onQuestionSubmit={saveQuestionMetadata}
+              onAddOption={onAddOption}
+              onRemoveOption={onRemoveOption}
+              isStepEditing={editable}
+              stepSaveError={stepSaveError}
+              stepMetadata={stepMetadata}
+              onStepMetadataChange={setStepMetadata}
+              onStepSubmit={saveStepMetadata}
+              onAddTask={onAddTask}
+              onRemoveTask={onRemoveTask}
+              onAddResource={onAddResource}
+              onRemoveResource={onRemoveResource}
+              onEditTask={onEditTask}
+              onEditResource={onEditResource}
+              onEditOption={onEditOption}
+            />
+          ),
+          footer:
+            (detailsStep || detailsQuestion) && editable ? (
+              /*
+                No edit mode, and so nothing to cancel: the fields are live and the footer says
+                whether what is on screen has reached the server. Pressing Edit to change a field and
+                Cancel to stop was two decisions about a mode on top of the one real decision.
+              */
+              <div className="flex items-center justify-between gap-3">
+                <Button
+                  variant="dangerSoft"
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
+                >
+                  Delete
+                </Button>
+                {(detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty) ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => {
+                        if (detailsStep) setStepMetadata(stepMetadataOf(detailsStep));
+                        if (detailsQuestion)
+                          setQuestionMetadata(questionMetadataOf(detailsQuestion));
+                      }}
+                    >
+                      Discard
+                    </Button>
+                    <Button
+                      variant="primary"
+                      type="submit"
+                      form={detailsStep ? "edit-blueprint-step" : "edit-blueprint-question"}
+                      loading={detailsStep ? isStepSaving : isQuestionSaving}
+                    >
+                      Save changes
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="flex items-center gap-1.5 text-sm text-app-text-muted">
+                    <Check className="h-4 w-4 text-app-success-solid" aria-hidden="true" />
+                    Saved
+                  </p>
+                )}
+              </div>
+            ) : onRequestDraft ? (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-app-text-muted">
+                  This version is published, so it is read-only.
+                </p>
+                <Button
+                  variant="primary"
+                  icon={<FilePlus2 className="h-4 w-4" />}
+                  onClick={onRequestDraft}
+                >
+                  Edit as draft
+                </Button>
+              </div>
+            ) : undefined,
+        })}
       />
       <AlertDialog
         isOpen={isDeleteConfirmOpen}
@@ -328,111 +427,6 @@ export function BlueprintSubGraphEditor({
           setIsDetailsOpen(false);
         }}
       />
-      <SidePanel
-        // Wider than the house default. What this panel holds is not a few fields: it is a form
-        // plus the nested lists the node owns, and at 34rem every one of those wrapped onto three
-        // lines while the canvas behind it kept two thirds of a screen nobody was reading.
-        widthClassName="w-full sm:w-[min(48rem,60vw)] sm:max-w-none"
-        isOpen={isDetailsOpen && detailsNode !== null}
-        onClose={() => {
-          // Without the mode there is no Cancel, so closing is the only way to walk away from an
-          // edit — and it has to say so rather than dropping the work on the floor.
-          if ((detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty)) {
-            setIsDiscardConfirmOpen(true);
-            return;
-          }
-          setIsDetailsOpen(false);
-        }}
-        title={detailsNode?.title ?? "Node details"}
-        footer={
-          (detailsStep || detailsQuestion) && editable ? (
-            /*
-              No edit mode, and so nothing to cancel: the fields are live and the footer says
-              whether what is on screen has reached the server. Pressing Edit to change a field and
-              Cancel to stop was two decisions about a mode on top of the one real decision.
-            */
-            <div className="flex items-center justify-between gap-3">
-              <Button
-                variant="dangerSoft"
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={() => {
-                  setDeleteError(null);
-                  setIsDeleteConfirmOpen(true);
-                }}
-              >
-                Delete
-              </Button>
-              {(detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty) ? (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => {
-                      if (detailsStep) setStepMetadata(stepMetadataOf(detailsStep));
-                      if (detailsQuestion) setQuestionMetadata(questionMetadataOf(detailsQuestion));
-                    }}
-                  >
-                    Discard
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    form={detailsStep ? "edit-blueprint-step" : "edit-blueprint-question"}
-                    loading={detailsStep ? isStepSaving : isQuestionSaving}
-                  >
-                    Save changes
-                  </Button>
-                </div>
-              ) : (
-                <p className="flex items-center gap-1.5 text-sm text-app-text-muted">
-                  <Check className="h-4 w-4 text-app-success-solid" aria-hidden="true" />
-                  Saved
-                </p>
-              )}
-            </div>
-          ) : onRequestDraft ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-app-text-muted">
-                This version is published, so it is read-only.
-              </p>
-              <Button
-                variant="primary"
-                icon={<FilePlus2 className="h-4 w-4" />}
-                onClick={onRequestDraft}
-              >
-                Edit as draft
-              </Button>
-            </div>
-          ) : undefined
-        }
-      >
-        {detailsNode ? (
-          <SubGraphNodeDetails
-            node={detailsNode}
-            phase={phase}
-            editable={editable}
-            isQuestionEditing={editable}
-            questionMetadata={questionMetadata}
-            questionSaveError={questionSaveError}
-            onQuestionMetadataChange={setQuestionMetadata}
-            onQuestionSubmit={saveQuestionMetadata}
-            onAddOption={onAddOption}
-            onRemoveOption={onRemoveOption}
-            isStepEditing={editable}
-            stepSaveError={stepSaveError}
-            stepMetadata={stepMetadata}
-            onStepMetadataChange={setStepMetadata}
-            onStepSubmit={saveStepMetadata}
-            onAddTask={onAddTask}
-            onRemoveTask={onRemoveTask}
-            onAddResource={onAddResource}
-            onRemoveResource={onRemoveResource}
-            onEditTask={onEditTask}
-            onEditResource={onEditResource}
-            onEditOption={onEditOption}
-          />
-        ) : null}
-      </SidePanel>
     </>
   );
 }
