@@ -275,5 +275,6 @@ export interface OnboardingPersonalizeHandlers {
   onStage?: (name: string, detail?: string) => void;
   onPath: (path: OnboardingPathEndpoint) => void;
   onDone: () => void;
-  onError?: (message: string) => void;
+  /** `reason` is a code for failures the client can explain, e.g. `not-enough-knowledge`. */
+  onError?: (message: string, reason?: string) => void;
 }

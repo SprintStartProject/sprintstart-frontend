@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ClipboardCheck,
   Clock,
   GitBranch,
@@ -28,7 +27,7 @@ import {
 } from "../../../onboarding/components/journey/JourneyGraph";
 import { PhaseNavigator } from "../../../onboarding/components/journey/PhaseNavigator";
 import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
-import { ItemGlyph, ItemKindIcon } from "../../../onboarding/graph/JourneyNodeCards";
+import { ItemFlags, ItemGlyph, ItemKindIcon } from "../../../onboarding/graph/JourneyNodeCards";
 import { itemKindLabel, itemStateLabel } from "../../../onboarding/graph/nodeLabels";
 import {
   blockingPhases,
@@ -265,8 +264,9 @@ export function MemberJourneySection({
   const overall = path ? pathProgress(path) : null;
   const allSteps = phases.flatMap((candidate) => candidate.steps);
   const skipped = allSteps.filter((step) => step.status === "SKIPPED").length;
+  // `accepted` is null while the PM has not answered yet.
   const pendingSkips = allSteps.filter(
-    (step) => (step.skip as { status?: string } | null)?.status === "PENDING",
+    (step) => !!step.skip && step.skip.accepted === null && step.status !== "SKIPPED",
   ).length;
 
   const questionTools = (target: OnboardingPhaseEndpoint) => (
@@ -551,7 +551,6 @@ function StepFacts({ item, taskCount }: { item: PhaseItem; taskCount?: StepTaskC
   if (item.kind !== "step") return null;
   const actual = actualMinutesOf(item);
   const delta = actual && item.step.estimatedMinutes ? actual - item.step.estimatedMinutes : null;
-  const skip = item.step.skip as { status?: string; reason?: string } | null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">
       <StepOriginBadge step={item.step} />
@@ -572,12 +571,7 @@ function StepFacts({ item, taskCount }: { item: PhaseItem; taskCount?: StepTaskC
           {delta ? ` (${delta > 0 ? "+" : "-"}${formatMinutes(Math.abs(delta))})` : ""}
         </span>
       ) : null}
-      {skip?.reason ? (
-        <span className="inline-flex items-center gap-1 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 font-medium text-app-warning-text">
-          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-          {item.step.status === "SKIPPED" ? "Skipped" : "Skip requested"}
-        </span>
-      ) : null}
+      <ItemFlags item={item} inline />
     </div>
   );
 }

@@ -38,7 +38,10 @@ import { PhaseNavigator } from "../features/onboarding/components/journey/PhaseN
 import { primaryActionLabel } from "../features/onboarding/graph/nodeLabels";
 import { QuestionWorkspace } from "../features/onboarding/components/journey/QuestionWorkspace";
 import { StepWorkspace } from "../features/onboarding/components/journey/StepWorkspace";
-import { useOnboardingJourney } from "../features/onboarding/generation/OnboardingJourneyContext";
+import {
+  useOnboardingJourney,
+  type GenerationFailureReason,
+} from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 import {
@@ -217,6 +220,19 @@ export function OnBoardingPage() {
       cancelled = true;
     };
   }, [applyPath, clearGeneration, generation]);
+
+  // A rebuild that failed leaves the path the member already had in place -- so the failure is said
+  // once, beside it, instead of taking the page over.
+  useEffect(() => {
+    if (generation.status !== "error" || loadingState !== "success" || !path) return;
+    toast.error("Your path could not be rebuilt", {
+      description:
+        generation.reason === "not-enough-knowledge"
+          ? "The project's knowledge base does not cover any phase yet. Your current path is unchanged."
+          : `${generation.message} Your current path is unchanged.`,
+    });
+    clearGeneration();
+  }, [clearGeneration, generation, loadingState, path, toast]);
 
   // Brings the chooser into view when the member was sent to pick a phase, once per visit.
   const hasShownChooserRef = useRef(false);
@@ -515,6 +531,8 @@ export function OnBoardingPage() {
           journey.availability === "unavailable" ? journey.unavailableReason : null
         }
         lastError={generation.status === "error" ? generation.message : null}
+        failureReason={generation.status === "error" ? (generation.reason ?? null) : null}
+        checking={journey.availability === "loading"}
         onStart={requestGeneration}
       />
     );
@@ -936,6 +954,8 @@ function EmptyJourney({
   canManage,
   unavailableReason,
   lastError,
+  failureReason,
+  checking,
   onStart,
 }: {
   hasProject: boolean;
@@ -943,6 +963,10 @@ function EmptyJourney({
   canManage: boolean;
   unavailableReason: "no-project" | "no-blueprint" | "no-content" | null;
   lastError: string | null;
+  /** Why the last generation came back without a path, when the backend could say. */
+  failureReason: GenerationFailureReason | null;
+  /** Whether a start could succeed is still being worked out. */
+  checking: boolean;
   onStart: () => void;
 }) {
   if (!hasProject || unavailableReason === "no-project") {
@@ -994,18 +1018,79 @@ function EmptyJourney({
     );
   }
 
+  // The AI ran and found nothing in the project's knowledge to build a phase from. Usually that is
+  // material that was just added and is still being processed; either way another start right now
+  // would end the same, so it is not the button this page leads with.
+  if (failureReason === "not-enough-knowledge") {
+    return (
+      <CenteredState>
+        <StateIcon tone="warning">
+          <BookOpen className="h-7 w-7" />
+        </StateIcon>
+        <h2 className="mt-5 text-xl font-semibold text-app-text">
+          Not enough project knowledge yet
+        </h2>
+        <p className="mt-2 max-w-md text-sm text-app-text-muted">
+          Your path is written from what the project’s knowledge base covers, and right now that is
+          not enough for any phase. If documents were added just now, they may still be processed —
+          give it a few minutes.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          {canManage ? (
+            <Link
+              to="/data-ingestion"
+              className="inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2 text-sm font-semibold text-white hover:bg-app-brand-hover"
+            >
+              Add knowledge
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          ) : null}
+          <Button variant="secondary" onClick={onStart} icon={<RefreshCw className="h-4 w-4" />}>
+            Check again
+          </Button>
+        </div>
+        {canManage ? null : (
+          <p className="mt-4 max-w-md text-xs text-app-text-subtle">
+            Your project manager can add documentation to the knowledge base.
+          </p>
+        )}
+      </CenteredState>
+    );
+  }
+
+  if (failureReason === "no-phases") {
+    return (
+      <CenteredState>
+        <StateIcon tone="warning">
+          <GitBranch className="h-7 w-7" />
+        </StateIcon>
+        <h2 className="mt-5 text-xl font-semibold text-app-text">
+          The blueprint has nothing for your role yet
+        </h2>
+        <p className="mt-2 max-w-md text-sm text-app-text-muted">
+          Every phase of this project’s blueprint is meant for other roles or skills. Your project
+          manager can open a phase up for you.
+        </p>
+      </CenteredState>
+    );
+  }
+
+  const unreachable = failureReason === "ai-unavailable";
+
   return (
     <CenteredState>
-      <StateIcon tone="brand">
-        <Sparkles className="h-7 w-7" />
+      <StateIcon tone={unreachable ? "warning" : "brand"}>
+        {unreachable ? <AlertTriangle className="h-7 w-7" /> : <Sparkles className="h-7 w-7" />}
       </StateIcon>
-      <h2 className="mt-5 text-2xl font-bold text-app-text">Build your onboarding path</h2>
+      <h2 className="mt-5 text-2xl font-bold text-app-text">
+        {unreachable ? "The onboarding service is not reachable" : "Build your onboarding path"}
+      </h2>
       <p className="mt-2 max-w-md text-sm text-app-text-muted">
-        Your path is put together from your project’s blueprint and knowledge base: phases, steps
-        and a few questions to check what stuck. It takes a few minutes and keeps running in the
-        background.
+        {unreachable
+          ? "Your path could not be put together because the AI service did not answer. Nothing was changed — try again in a moment."
+          : "Your path is put together from your project’s blueprint and knowledge base: phases, steps and a few questions to check what stuck. It takes a few minutes and keeps running in the background."}
       </p>
-      {lastError ? (
+      {lastError && !unreachable ? (
         <div
           role="alert"
           className="mt-5 flex max-w-md items-start gap-2 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-left text-sm text-app-danger-text"
@@ -1019,9 +1104,11 @@ function EmptyJourney({
         variant="primary"
         size="lg"
         onClick={onStart}
+        loading={checking}
+        disabled={checking}
         icon={<PlayCircle className="h-4 w-4" />}
       >
-        {lastError ? "Try again" : "Start personalization"}
+        {checking ? "Checking the project…" : lastError ? "Try again" : "Start personalization"}
       </Button>
     </CenteredState>
   );

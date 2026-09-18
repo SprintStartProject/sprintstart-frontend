@@ -105,19 +105,84 @@ const SNAP = 10;
 const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
 
 /** The S-curve from the bottom of a blocker to the top of what waits on it. */
-function edgePath(from: GraphPoint, to: GraphPoint, waypoints: readonly GraphPoint[] = []): string {
+/** A unit direction an edge leaves or enters a card in. */
+type Direction = { x: number; y: number };
+
+const DOWN: Direction = { x: 0, y: 1 };
+
+/**
+ * One smooth curve from a card's port, through any waypoints, into the next card.
+ *
+ * The ends leave and arrive along the port's direction, pulled out by half the distance they cover
+ * so short hops stay tight and long ones sweep. In between, the curve runs through each waypoint
+ * along the line joining its neighbours (Catmull-Rom), instead of being forced upright at every
+ * point -- that forcing is what made edges wobble through a string of S-bends, and jump about while
+ * a card was being dragged.
+ */
+function edgePath(
+  from: GraphPoint,
+  to: GraphPoint,
+  waypoints: readonly GraphPoint[] = [],
+  startDirection: Direction = DOWN,
+  endDirection: Direction = DOWN,
+): string {
   const points = [from, ...waypoints, to];
+  const tangents = points.map((point, index) => {
+    if (index === 0 || index === points.length - 1) {
+      const neighbour = points[index === 0 ? 1 : index - 1];
+      const reach = Math.max(48, Math.hypot(neighbour.x - point.x, neighbour.y - point.y) * 0.5);
+      const direction = index === 0 ? startDirection : endDirection;
+      return { x: direction.x * reach, y: direction.y * reach };
+    }
+    const previous = points[index - 1];
+    const next = points[index + 1];
+    return { x: (next.x - previous.x) / 4, y: (next.y - previous.y) / 4 };
+  });
   let d = `M ${from.x} ${from.y}`;
   for (let index = 1; index < points.length; index += 1) {
     const start = points[index - 1];
     const end = points[index];
-    // Vertical tangents at every point: the curve leaves and enters each row straight, which keeps it
-    // inside the gap a waypoint was put in.
-    const minimum = index === 1 || index === points.length - 1 ? 56 : 24;
-    const bend = Math.max(minimum, Math.abs(end.y - start.y) / 2);
-    d += ` C ${start.x} ${start.y + bend}, ${end.x} ${end.y - bend}, ${end.x} ${end.y}`;
+    const out = tangents[index - 1];
+    const into = tangents[index];
+    d += ` C ${start.x + out.x} ${start.y + out.y}, ${end.x - into.x} ${end.y - into.y}, ${end.x} ${end.y}`;
   }
   return d;
+}
+
+/**
+ * Where an edge leaves one card and enters the other.
+ *
+ * Top to bottom as long as the target sits below; a card beside its blocker is joined side to side,
+ * and one above it is entered from the side it faces -- rather than a hook that leaves downwards and
+ * turns all the way back up.
+ */
+function edgeAnchors(
+  blocker: GraphPoint,
+  node: GraphPoint,
+  size: { width: number; height: number },
+): { from: GraphPoint; to: GraphPoint; start: Direction; end: Direction } {
+  const dx = node.x - blocker.x;
+  const dy = node.y - blocker.y;
+  const halfWidth = size.width / 2;
+  const halfHeight = size.height / 2;
+  const arrowGap = 6;
+  if (dy > size.height * 0.75 || Math.abs(dx) < size.width * 0.9) {
+    if (dy >= 0 || Math.abs(dx) < size.width * 0.9) {
+      return {
+        from: { x: blocker.x, y: blocker.y + halfHeight },
+        to: { x: node.x, y: node.y - halfHeight - arrowGap },
+        start: DOWN,
+        end: DOWN,
+      };
+    }
+  }
+  const side = dx >= 0 ? 1 : -1;
+  return {
+    from: { x: blocker.x + side * halfWidth, y: blocker.y },
+    to: { x: node.x - side * (halfWidth + arrowGap), y: node.y },
+    start: { x: side, y: 0 },
+    end: { x: side, y: 0 },
+  };
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -663,15 +728,15 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         const blockerPosition = positionOf(blockerId);
         const nodePosition = positionOf(node.id);
         if (!blockerPosition || !nodePosition) return null;
-        const from = { x: blockerPosition.x, y: blockerPosition.y + nodeSize.height / 2 };
-        const to = { x: nodePosition.x, y: nodePosition.y - nodeSize.height / 2 - 6 };
+        const { from, to, start, end } = edgeAnchors(blockerPosition, nodePosition, nodeSize);
         const tone = edgeTone?.(nodeById.get(blockerId)!, node) ?? "waiting";
         const inChain =
           !!emphasisSourceId &&
           (blockerId === emphasisSourceId || related?.has(blockerId) || false) &&
           (node.id === emphasisSourceId || related?.has(node.id) || false);
-        const waypoints = routes.get(edgeKey(blockerId, node.id)) ?? [];
-        return { blockerId, nodeId: node.id, from, to, waypoints, tone, inChain };
+        // Waypoints are for edges running down past other rows; a side-to-side edge needs none.
+        const waypoints = start === DOWN ? (routes.get(edgeKey(blockerId, node.id)) ?? []) : [];
+        return { blockerId, nodeId: node.id, from, to, start, end, waypoints, tone, inChain };
       })
       .filter((edge): edge is NonNullable<typeof edge> => edge !== null),
   );
@@ -762,7 +827,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               ))}
             </defs>
             {edges.map((edge) => {
-              const d = edgePath(edge.from, edge.to, edge.waypoints);
+              const d = edgePath(edge.from, edge.to, edge.waypoints, edge.start, edge.end);
               const isSelected =
                 selectedEdge?.blockerId === edge.blockerId && selectedEdge?.nodeId === edge.nodeId;
               const dimmed = !!spotlightId || (!!emphasisSourceId && !edge.inChain);

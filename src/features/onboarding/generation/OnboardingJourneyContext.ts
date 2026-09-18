@@ -17,7 +17,27 @@ export type OnboardingGeneration =
       phases: GenerationPhaseProgress[];
     }
   | { status: "done"; path: OnboardingPathEndpoint | null }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; reason?: GenerationFailureReason };
+
+/**
+ * Why a generation ended without a path, when the backend could say:
+ *
+ * - `not-enough-knowledge`: the AI ran, but the project's knowledge covers no phase yet -- often
+ *   because material that was just added is still being processed.
+ * - `ai-unavailable`: the AI service could not assemble anything; trying again later can help.
+ * - `no-phases`: the blueprint has no phase for this hire's role and skills.
+ */
+export type GenerationFailureReason = "not-enough-knowledge" | "ai-unavailable" | "no-phases";
+
+const FAILURE_REASONS: readonly GenerationFailureReason[] = [
+  "not-enough-knowledge",
+  "ai-unavailable",
+  "no-phases",
+];
+
+export function asFailureReason(value: string | undefined): GenerationFailureReason | undefined {
+  return FAILURE_REASONS.find((reason) => reason === value);
+}
 
 /**
  * Whether the onboarding entry belongs in the navigation.

@@ -203,6 +203,25 @@ export function unlockedBy(item: PhaseItem, items: readonly PhaseItem[]): PhaseI
   return items.filter((candidate) => candidate.blockerIds.includes(item.id));
 }
 
+/**
+ * Where a step's skip request stands, if it has one: waiting on the PM, or turned down. A granted
+ * request needs no flag -- the step is simply skipped.
+ */
+export function skipRequestOf(item: PhaseItem): "pending" | "declined" | null {
+  if (item.kind !== "step" || !item.step.skip) return null;
+  if (item.step.status === "SKIPPED") return null;
+  if (item.step.skip.accepted === null) return "pending";
+  return item.step.skip.accepted === false ? "declined" : null;
+}
+
+/** What the member said about a step, if anything. */
+export function feedbackOf(item: PhaseItem): "helpful" | "unhelpful" | "comment" | null {
+  if (item.kind !== "step" || !item.step.feedback) return null;
+  if (item.step.feedback.helpful === true) return "helpful";
+  if (item.step.feedback.helpful === false) return "unhelpful";
+  return "comment";
+}
+
 export function formatMinutes(minutes?: number | null): string {
   if (!minutes || minutes <= 0) return "No estimate";
   if (minutes < 60) return `${minutes} min`;

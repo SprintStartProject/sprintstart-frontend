@@ -10,6 +10,7 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import type { OnboardingPathEndpoint } from "../types";
 import { describeGenerationError } from "./generationErrors";
 import {
+  asFailureReason,
   OnboardingJourneyContext,
   type GenerationPhaseProgress,
   type OnboardingAvailability,
@@ -126,9 +127,9 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
               });
             }
           },
-          onError: (message) => {
+          onError: (message, reason) => {
             const readable = describeGenerationError(message);
-            finish({ status: "error", message: readable });
+            finish({ status: "error", message: readable, reason: asFailureReason(reason) });
             if (!pathnameRef.current.startsWith("/onboarding")) {
               toastRef.current.error("Your onboarding path could not be built", {
                 description: readable,

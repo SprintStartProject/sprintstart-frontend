@@ -5,15 +5,25 @@ import {
   FileText,
   Link2,
   Lock,
+  MessageSquare,
   Play,
   RotateCcw,
   SkipForward,
   SquareCheckBig,
+  ThumbsDown,
+  ThumbsUp,
   Video,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ItemState, PhaseItem, PhaseState } from "../journey";
-import { formatMinutes, itemState, phaseItems, phaseProgress } from "../journey";
+import {
+  feedbackOf,
+  formatMinutes,
+  itemState,
+  phaseItems,
+  phaseProgress,
+  skipRequestOf,
+} from "../journey";
 import type { OnboardingPhaseEndpoint } from "../types";
 import { ITEM_NODE_SIZE, itemGraphLayout } from "./graphLayouts";
 import type { JourneyNodeRenderState } from "./JourneyCanvas";
@@ -153,6 +163,78 @@ function emphasisClass({ emphasis, selected, dragging }: JourneyNodeRenderState)
   ].join(" ");
 }
 
+/**
+ * What a step carries beyond its state -- a skip request, the member's feedback -- as small pills on
+ * the card's top edge, so they can be seen without opening anything.
+ */
+export function ItemFlags({ item, inline = false }: { item: PhaseItem; inline?: boolean }) {
+  const skip = skipRequestOf(item);
+  const feedback = feedbackOf(item);
+  if (!skip && !feedback) return null;
+  return (
+    <span
+      className={
+        inline
+          ? "inline-flex flex-wrap items-center gap-1"
+          : "absolute -top-2.5 right-3 z-10 inline-flex items-center gap-1"
+      }
+    >
+      {skip ? (
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
+            skip === "pending"
+              ? "bg-app-warning-solid text-white"
+              : "border border-app-warning-border bg-app-warning-bg text-app-warning-text"
+          }`}
+        >
+          <SkipForward className="h-3 w-3" aria-hidden="true" />
+          {skip === "pending" ? "Skip requested" : "Skip declined"}
+        </span>
+      ) : null}
+      {feedback ? (
+        <span
+          title={
+            feedback === "helpful"
+              ? "Feedback: helpful"
+              : feedback === "unhelpful"
+                ? "Feedback: not helpful"
+                : "Feedback given"
+          }
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
+            feedback === "helpful"
+              ? "bg-app-success-solid text-white"
+              : feedback === "unhelpful"
+                ? "bg-app-danger-solid text-white"
+                : "bg-app-brand text-white"
+          }`}
+        >
+          {feedback === "helpful" ? (
+            <ThumbsUp className="h-3 w-3" aria-hidden="true" />
+          ) : feedback === "unhelpful" ? (
+            <ThumbsDown className="h-3 w-3" aria-hidden="true" />
+          ) : (
+            <MessageSquare className="h-3 w-3" aria-hidden="true" />
+          )}
+          {inline
+            ? feedback === "helpful"
+              ? "Helpful"
+              : feedback === "unhelpful"
+                ? "Not helpful"
+                : "Feedback"
+            : null}
+          <span className="sr-only">
+            {feedback === "helpful"
+              ? "Marked helpful"
+              : feedback === "unhelpful"
+                ? "Marked not helpful"
+                : "Feedback given"}
+          </span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 /** One step or question on a phase graph. */
 export function ItemNodeCard({
   item,
@@ -183,6 +265,7 @@ export function ItemNodeCard({
           Up next
         </span>
       ) : null}
+      <ItemFlags item={item} />
       <div className="flex items-start gap-2.5">
         <ItemGlyph item={item} state={state} size="sm" />
         <p

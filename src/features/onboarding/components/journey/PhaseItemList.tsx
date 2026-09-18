@@ -9,7 +9,7 @@ import {
   waitingOn,
   type PhaseItem,
 } from "../../journey";
-import { ItemGlyph } from "../../graph/JourneyNodeCards";
+import { ItemFlags, ItemGlyph } from "../../graph/JourneyNodeCards";
 import { itemKindLabel, itemStateLabel, primaryActionLabel } from "../../graph/nodeLabels";
 import type { OnboardingPhaseEndpoint } from "../../types";
 
@@ -126,6 +126,7 @@ export function PhaseItemList({
                     <span className={state === "retry" ? "font-medium text-app-warning-text" : ""}>
                       {itemStateLabel[state]}
                     </span>
+                    <ItemFlags item={item} inline />
                     {blockers.length > 0 ? (
                       <span className="text-app-text-muted">
                         Waits on{" "}
