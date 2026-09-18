@@ -14,7 +14,18 @@ import type {
 vi.mock("../../../../../src/services/knowledgeService", () => ({
   knowledgeService: {
     getArtifactContent: vi.fn().mockResolvedValue({
-      content: "# Test content",
+      // Long enough to be worth summarising: the drawer refuses the action for
+      // empty or near-empty content, and every test below assumes it is offered.
+      content: [
+        "# Test content",
+        "",
+        "A paragraph long enough that summarising it is a sensible thing to ask for.",
+        "",
+        "## Section",
+        "",
+        "- a bullet",
+        "- another bullet",
+      ].join("\n"),
       mimeType: "text/markdown",
     }),
     streamArtifactSummary: vi.fn(),
@@ -790,5 +801,111 @@ describe("ArtifactViewerDrawer", () => {
         "https://github.com/orgs/special%20login%2Ftest/people",
       );
     });
+  });
+  it("refuses an empty artifact instead of asking the AI", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "   \n\n  \n",
+      mimeType: "text/plain",
+      isObjectUrl: false,
+    });
+
+    renderDrawer();
+
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    expect(summariseBtn).toBeDisabled();
+    expect(summariseBtn).toHaveAccessibleName(/nothing to summarise/i);
+    expect(summariseBtn.parentElement).toHaveAttribute("title", expect.stringMatching(/empty/i));
+
+    await userEvent.click(summariseBtn);
+    expect(knowledgeService.streamArtifactSummary).not.toHaveBeenCalled();
+  });
+
+  it("refuses a file too short to summarise", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "line one\n\nline two\n",
+      mimeType: "text/plain",
+      isObjectUrl: false,
+    });
+
+    renderDrawer();
+
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    expect(summariseBtn).toBeDisabled();
+    expect(summariseBtn).toHaveAccessibleName(/2 lines of content/i);
+
+    await userEvent.click(summariseBtn);
+    expect(knowledgeService.streamArtifactSummary).not.toHaveBeenCalled();
+  });
+
+  it("offers the summary once there is something to summarise", async () => {
+    renderDrawer();
+
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    expect(summariseBtn).toBeEnabled();
+    expect(summariseBtn.parentElement).not.toHaveAttribute("title");
+  });
+
+  it("still offers the summary for a PDF, whose content is not text to count", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "blob:http://localhost/object-url",
+      mimeType: "application/pdf",
+      isObjectUrl: true,
+    });
+
+    renderDrawer(createArtifact({ title: "spec.pdf", mime: "application/pdf" }));
+
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    expect(summariseBtn).toBeEnabled();
+  });
+  it("says the body is empty instead of showing a blank pane", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "   ",
+      mimeType: "text/markdown",
+      isObjectUrl: false,
+    });
+
+    renderDrawer();
+
+    const notice = await screen.findByTestId("empty-body-notice");
+    expect(notice).toHaveTextContent(/nothing to read here/i);
+    expect(notice).toHaveTextContent(/empty body/i);
+  });
+
+  it("explains an empty pull-request body in the reader's terms", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "",
+      mimeType: "text/markdown",
+      isObjectUrl: false,
+    });
+
+    renderDrawer(createArtifact({ title: "PR #12 Fix the thing", artifactType: "PULL_REQUEST" }));
+
+    const notice = await screen.findByTestId("empty-body-notice");
+    expect(notice).toHaveTextContent(/pull request or issue/i);
+  });
+
+  it("shows the empty-body notice in the source view too", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "",
+      mimeType: "text/markdown",
+      isObjectUrl: false,
+    });
+
+    const { container } = renderDrawer();
+    await screen.findByTestId("empty-body-notice");
+
+    await userEvent.click(screen.getByTestId("view-source-btn"));
+
+    expect(screen.getByTestId("empty-body-notice")).toBeInTheDocument();
+    expect(container.querySelector("pre")).toBeNull();
   });
 });

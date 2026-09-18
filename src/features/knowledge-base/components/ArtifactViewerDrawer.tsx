@@ -24,6 +24,8 @@ import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from "../types";
+import { isEmptyContent, summariseBlockReason } from "../summarizability";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { preprocessMarkdown } from "../markdown";
 import {
   parseOrgMetadata,
@@ -1139,6 +1141,12 @@ export function ArtifactViewerDrawer({
     content?.mimeType === "application/pdf" || (content?.mimeType.startsWith("image/") ?? false);
   const canHighlight = highlightLines && highlightLines.length > 0 && !isPdfOrImage;
 
+  // A known-empty or near-empty artifact is refused before the round trip: the AI
+  // service would index it first and only then answer that there is nothing to
+  // summarise. Null while the content is still loading, or for formats that are
+  // not text at all -- see summariseBlockReason.
+  const summariseBlockedReason = summariseBlockReason(content);
+
   const orgMetadata = useMemo(
     () => (artifact?.artifactType === "ORG_METADATA" ? parseOrgMetadata(artifact.metadata) : null),
     [artifact],
@@ -1174,15 +1182,27 @@ export function ArtifactViewerDrawer({
           </button>
         </div>
       )}
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => void handleSummarize()}
-        data-testid="summarise-btn"
-        icon={<Sparkles className="h-4 w-4" />}
-      >
-        Summarise
-      </Button>
+      {/* The wrapper carries the reason, not the button: a disabled control
+          receives no pointer events, so its own title would never be shown. */}
+      <span title={summariseBlockedReason ?? undefined}>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => void handleSummarize()}
+          disabled={summariseBlockedReason !== null}
+          // Keeps the reason reachable without sight; the accessible name still
+          // begins with the visible label.
+          aria-label={
+            summariseBlockedReason
+              ? `Summarise (unavailable: ${summariseBlockedReason})`
+              : undefined
+          }
+          data-testid="summarise-btn"
+          icon={<Sparkles className="h-4 w-4" />}
+        >
+          Summarise
+        </Button>
+      </span>
       {canDeleteThisArtifact && (
         <button
           onClick={openDeleteConfirm}
@@ -1250,9 +1270,17 @@ export function ArtifactViewerDrawer({
                   </button>
                 </div>
               )}
-              {content &&
-              shouldRenderAsMarkdown(content, artifact) &&
-              markdownViewMode === "rendered" ? (
+              {content && isEmptyContent(content) ? (
+                <div data-testid="empty-body-notice">
+                  <EmptyState size="sm" title="Nothing to read here">
+                    This artifact came in with a title and an empty body — a pull request or issue
+                    whose description was never written, or a file with no content. There is nothing
+                    to read, and nothing to summarise.
+                  </EmptyState>
+                </div>
+              ) : content &&
+                shouldRenderAsMarkdown(content, artifact) &&
+                markdownViewMode === "rendered" ? (
                 <div className="prose prose-sm max-w-none text-app-text dark:prose-invert">
                   <ReactMarkdown
                     remarkPlugins={REMARK_PLUGINS}
