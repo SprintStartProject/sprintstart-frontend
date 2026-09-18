@@ -36,6 +36,7 @@ import {
   itemState,
   orderedPhaseItems,
   pathProgress,
+  skipRequestOf,
   phaseItems,
   phaseProgress,
   phaseState,
@@ -46,6 +47,7 @@ import {
 } from "../../../onboarding/journey";
 import { resolveNextAction } from "../../../onboarding/nextAction";
 import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "../../../onboarding/types";
+import { SkipReview, type SkipReviewAction } from "./SkipReview";
 import { StepQuickEdit } from "./StepQuickEdit";
 
 type ViewMode = "list" | "graph";
@@ -61,6 +63,8 @@ type Props = {
   onOpenStep: (stepId: string) => void;
   onOpenQuestions: (phaseId: string, tab: "results" | "questions") => void;
   onDeleteStep: (stepId: string) => void;
+  /** Answers a step's pending skip request. */
+  onReviewSkip?: (skipId: string, action: SkipReviewAction, comment: string) => Promise<void>;
   /** Re-reads the path after a change. */
   onPathChanged: () => Promise<void>;
 };
@@ -95,6 +99,7 @@ export function MemberJourneySection({
   onOpenStep,
   onOpenQuestions,
   onDeleteStep,
+  onReviewSkip,
   onPathChanged,
 }: Props) {
   const toast = useToast();
@@ -454,6 +459,15 @@ export function MemberJourneySection({
                     {item.kind === "step" ? (
                       <>
                         <StepFacts item={item} taskCount={stepTaskCounts[item.id]} />
+                        {onReviewSkip && skipRequestOf(item) === "pending" && item.step.skip?.id ? (
+                          <SkipReview
+                            key={item.step.skip.id}
+                            reason={item.step.skip.reason}
+                            onReview={(action, comment) =>
+                              onReviewSkip(item.step.skip!.id, action, comment)
+                            }
+                          />
+                        ) : null}
                         <StepQuickEdit
                           key={`${item.step.id}:${item.step.title}:${item.step.description}`}
                           step={item.step}

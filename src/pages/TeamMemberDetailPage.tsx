@@ -312,6 +312,24 @@ export function TeamMemberDetailPage() {
     }
   }
 
+  /**
+   * Answers a skip request -- the current step's from the card below, or any step's from where the
+   * step is shown. Phases run side by side, so the one waiting is not always the current step.
+   */
+  async function reviewSkip(skipId: string, action: "accept" | "deny", comment = "") {
+    try {
+      if (action === "accept") {
+        await acceptOnboardingSkipRequest(skipId, comment);
+      } else {
+        await denyOnboardingSkipRequest(skipId, comment);
+      }
+      await Promise.all([refreshMember(), refreshOnboardingPath()]);
+      toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
+    }
+  }
+
   async function handleSkipReview(action: "accept" | "deny") {
     const skipId = user?.currentStep?.skip?.id;
     if (!skipId) return;
@@ -672,6 +690,7 @@ export function TeamMemberDetailPage() {
           onOpenStep={setDetailStepId}
           onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
           onDeleteStep={setGraphStepToDelete}
+          onReviewSkip={reviewSkip}
           onPathChanged={refreshOnboardingPath}
         />
 
@@ -1010,6 +1029,7 @@ export function TeamMemberDetailPage() {
             onCreateTask={() => void handleCreateTask()}
             formatMinutes={formatMinutes}
             getStepStatusStyles={getStepStatusStyles}
+            onReviewSkip={reviewSkip}
             onReorderTasks={(activeTaskId, overTaskId) =>
               void handleReorderTasks(step.id, activeTaskId, overTaskId)
             }

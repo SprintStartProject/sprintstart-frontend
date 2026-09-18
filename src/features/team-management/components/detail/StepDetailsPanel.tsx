@@ -17,6 +17,7 @@ import { SidePanel } from "../../../../components/ui/SidePanel";
 import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
 import type { OnboardingStepEndpoint, OnboardingTaskEndpoint } from "../../../onboarding/types";
 import type { OnboardingFeedback } from "../../../../services/teamManagementService";
+import { SkipReview, type SkipReviewAction } from "./SkipReview";
 
 type DetailOnboardingStep = OnboardingStepEndpoint & {
   startedAt?: string | null;
@@ -64,6 +65,8 @@ type StepDetailsPanelProps = {
   formatMinutes: (minutes?: number | null) => string;
   getStepStatusStyles: (status: string) => string;
   onReorderTasks?: (activeTaskId: string, overTaskId: string) => void;
+  /** Answers the step's open skip request; the review controls only show when this is given. */
+  onReviewSkip?: (skipId: string, action: SkipReviewAction, comment: string) => Promise<void>;
 };
 
 export function StepDetailsPanel({
@@ -94,10 +97,15 @@ export function StepDetailsPanel({
   formatMinutes,
   getStepStatusStyles,
   onReorderTasks,
+  onReviewSkip,
 }: StepDetailsPanelProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const skipStatus = getSkipStatus(step);
+  const skipAwaitsReview =
+    !!step.skip?.id &&
+    (step.skip.accepted === null || step.skip.accepted === undefined) &&
+    step.status !== "SKIPPED";
   return (
     <SidePanel
       isOpen
@@ -257,7 +265,14 @@ export function StepDetailsPanel({
       <section className="mt-6 space-y-3">
         <h3 className="text-sm font-semibold text-app-text">Requests & feedback</h3>
 
-        {skipReason && (
+        {skipReason && skipAwaitsReview && onReviewSkip ? (
+          <SkipReview
+            reason={skipReason}
+            onReview={(action, comment) => onReviewSkip(step.skip!.id!, action, comment)}
+          />
+        ) : null}
+
+        {skipReason && !(skipAwaitsReview && onReviewSkip) && (
           <div
             className={`rounded-2xl border px-4 py-3 ${
               step.status === "SKIPPED"
