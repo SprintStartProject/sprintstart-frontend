@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -53,37 +53,74 @@ describe("SegmentedTabs", () => {
     expect(onChange).toHaveBeenCalledWith("jira");
   });
 
-  it("applies flex-wrap classes when wrap is enabled", () => {
-    const { container } = render(
+  it("renders compact tabs with size='sm'", () => {
+    render(
+      <SegmentedTabs
+        value="jira"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-sm"
+        ariaLabel="Filter items compact"
+        size="sm"
+      />,
+    );
+
+    const jiraBtn = screen.getByTestId("tab-jira");
+    expect(jiraBtn).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Jira")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("bypasses scroll-into-view adjustments when wrap is enabled", () => {
+    const scrollToMock = vi.fn();
+    const originalScrollTo = Element.prototype.scrollTo;
+    Element.prototype.scrollTo = scrollToMock;
+
+    try {
+      const { rerender } = render(
+        <SegmentedTabs
+          value="all"
+          options={options}
+          onChange={vi.fn()}
+          layoutId="test-tabs-wrap"
+          ariaLabel="Filter items"
+          wrap
+        />,
+      );
+
+      rerender(
+        <SegmentedTabs
+          value="jira"
+          options={options}
+          onChange={vi.fn()}
+          layoutId="test-tabs-wrap"
+          ariaLabel="Filter items"
+          wrap
+        />,
+      );
+
+      expect(scrollToMock).not.toHaveBeenCalled();
+    } finally {
+      Element.prototype.scrollTo = originalScrollTo;
+    }
+  });
+
+  it("renders all options as accessible toggle buttons when wrapping", () => {
+    render(
       <SegmentedTabs
         value="all"
         options={options}
         onChange={vi.fn()}
-        layoutId="test-tabs"
+        layoutId="test-tabs-wrap-buttons"
         ariaLabel="Filter items"
         wrap
       />,
     );
 
-    const group = container.querySelector('[role="group"]');
-    expect(group?.className).toContain("flex-wrap");
-    expect(group?.className).not.toContain("overflow-x-auto");
-  });
-
-  it("applies overflow-x-auto when wrap is false", () => {
-    const { container } = render(
-      <SegmentedTabs
-        value="all"
-        options={options}
-        onChange={vi.fn()}
-        layoutId="test-tabs"
-        ariaLabel="Filter items"
-        wrap={false}
-      />,
-    );
-
-    const group = container.querySelector('[role="group"]');
-    expect(group?.className).toContain("overflow-x-auto");
-    expect(group?.className).not.toContain("flex-wrap");
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(3);
+    expect(buttons[0]).toHaveAttribute("aria-pressed", "true");
+    expect(buttons[1]).toHaveAttribute("aria-pressed", "false");
+    expect(buttons[2]).toHaveAttribute("aria-pressed", "false");
   });
 });

@@ -1,9 +1,9 @@
 import { Search, RefreshCw, Layers, GitBranch, Ticket, BookOpen, Upload } from "lucide-react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
-import { centralSpringToken, slidingIndicatorSpringToken } from "../../../styles/tokens";
+import { centralSpringToken } from "../../../styles/tokens";
 import { CONNECTOR_LABELS, DEFAULT_CONNECTOR_ORDER, type ConnectorTab } from "../tabs";
 
 export type { ConnectorTab };
@@ -34,11 +34,6 @@ export interface ArtifactFiltersProps {
   onRefresh?: () => void;
   /** Whether a refresh is currently in progress. */
   isRefreshing?: boolean;
-
-  /** Legacy alias for activeConnector. */
-  activeTab?: string;
-  /** Legacy alias for onConnectorChange. */
-  onTabChange?: (tab: string) => void;
 }
 
 function getConnectorIcon(connector: ConnectorTab) {
@@ -66,7 +61,7 @@ function getConnectorIcon(connector: ConnectorTab) {
 export function ArtifactFilters({
   searchQuery,
   onSearchChange,
-  activeConnector,
+  activeConnector = "ALL",
   onConnectorChange,
   availableConnectors = DEFAULT_CONNECTOR_ORDER,
   connectorCounts,
@@ -75,15 +70,11 @@ export function ArtifactFilters({
   subfilterOptions = [],
   onRefresh,
   isRefreshing,
-  activeTab,
-  onTabChange,
 }: ArtifactFiltersProps) {
-  const prefersReducedMotion = useReducedMotion();
-  const currentConnector: ConnectorTab = activeConnector ?? ((activeTab as ConnectorTab) || "ALL");
+  const currentConnector: ConnectorTab = activeConnector;
 
   const handleConnectorSelect = (conn: ConnectorTab) => {
     onConnectorChange?.(conn);
-    onTabChange?.(conn);
   };
 
   const connectorOptions: SegmentedTabOption<ConnectorTab>[] = availableConnectors.map((c) => ({
@@ -92,6 +83,13 @@ export function ArtifactFilters({
     icon: getConnectorIcon(c),
     count: connectorCounts ? connectorCounts[c] : undefined,
     testId: `kb-connector-${c.toLowerCase()}`,
+  }));
+
+  const subfilterTabOptions: SegmentedTabOption<string>[] = subfilterOptions.map((opt) => ({
+    value: opt.id,
+    label: opt.label,
+    count: opt.count,
+    testId: `kb-subfilter-${opt.id.toLowerCase()}`,
   }));
 
   return (
@@ -132,7 +130,6 @@ export function ArtifactFilters({
           onChange={handleConnectorSelect}
           layoutId="knowledge-base-connector-pill"
           ariaLabel="Filter artifacts by connector"
-          fullWidth
           wrap
         />
       </div>
@@ -146,48 +143,17 @@ export function ArtifactFilters({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={centralSpringToken}
-            role="group"
-            aria-label={`Filter ${CONNECTOR_LABELS[currentConnector] ?? currentConnector} artifacts by type`}
-            className="flex flex-wrap items-center gap-1.5 pt-1"
+            className="pt-1"
           >
-            {subfilterOptions.map((opt) => {
-              const isActive = activeSubfilter === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  aria-pressed={isActive}
-                  data-testid={`kb-subfilter-${opt.id.toLowerCase()}`}
-                  onClick={() => onSubfilterChange(opt.id)}
-                  className={`group relative inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-                    isActive
-                      ? "text-white"
-                      : "border border-app-border/70 bg-app-bg-soft/70 text-app-text-muted hover:border-app-border hover:bg-app-surface hover:text-app-text"
-                  }`}
-                >
-                  {isActive && (
-                    <motion.span
-                      aria-hidden="true"
-                      layoutId={`knowledge-base-subfilter-pill-${currentConnector}`}
-                      transition={
-                        prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken
-                      }
-                      className="absolute inset-0 rounded-xl bg-app-brand shadow-[0_4px_12px_-4px_var(--color-app-brand)]"
-                    />
-                  )}
-                  <span className="relative z-10 leading-none">{opt.label}</span>
-                  {typeof opt.count === "number" && (
-                    <span
-                      className={`relative z-10 inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold tabular-nums ${
-                        isActive ? "bg-white/20 text-white" : "bg-app-surface text-app-text-subtle"
-                      }`}
-                    >
-                      {opt.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            <SegmentedTabs
+              value={activeSubfilter}
+              options={subfilterTabOptions}
+              onChange={onSubfilterChange}
+              layoutId={`knowledge-base-subfilter-pill-${currentConnector}`}
+              ariaLabel={`Filter ${CONNECTOR_LABELS[currentConnector] ?? currentConnector} artifacts by type`}
+              size="sm"
+              wrap
+            />
           </motion.div>
         </AnimatePresence>
       )}

@@ -754,5 +754,41 @@ describe("ArtifactViewerDrawer", () => {
       expect(screen.queryByTestId("summarise-btn")).not.toBeInTheDocument();
       expect(warn).toHaveBeenCalled();
     });
+
+    it("encodes special characters in metadata.login for quick action links", async () => {
+      const orgWithSpecialLogin = JSON.stringify({
+        login: "special login/test",
+        name: "Special Org",
+        description: null,
+        company: null,
+        blog: null,
+        location: null,
+        email: null,
+        publicRepos: 1,
+        privateRepos: null,
+        teams: [],
+        members: [],
+      });
+
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "Special Org",
+          sourceSystem: "GITHUB",
+          metadata: orgWithSpecialLogin,
+        }),
+      );
+
+      const repoLink = await screen.findByRole("link", { name: /repositories/i });
+      expect(repoLink).toHaveAttribute(
+        "href",
+        "https://github.com/orgs/special%20login%2Ftest/repositories",
+      );
+      const peopleLink = screen.getByRole("link", { name: /people/i });
+      expect(peopleLink).toHaveAttribute(
+        "href",
+        "https://github.com/orgs/special%20login%2Ftest/people",
+      );
+    });
   });
 });

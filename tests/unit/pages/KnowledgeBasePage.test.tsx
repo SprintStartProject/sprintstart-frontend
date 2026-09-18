@@ -50,14 +50,14 @@ vi.mock("../../../src/features/knowledge-base/components", () => ({
   ArtifactFilters: ({
     searchQuery,
     onSearchChange,
-    activeTab,
-    onTabChange,
+    activeConnector,
+    onConnectorChange,
     onRefresh,
   }: {
     searchQuery: string;
     onSearchChange: (q: string) => void;
-    activeTab: string;
-    onTabChange: (t: string) => void;
+    activeConnector?: string;
+    onConnectorChange?: (c: any) => void;
     onRefresh?: () => void;
   }) => (
     <div data-testid="artifact-filters">
@@ -66,13 +66,13 @@ vi.mock("../../../src/features/knowledge-base/components", () => ({
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
       />
-      <button data-testid="kb-tab-uploads" onClick={() => onTabChange("UPLOADS")}>
+      <button data-testid="kb-tab-uploads" onClick={() => onConnectorChange?.("UPLOAD")}>
         Uploads
       </button>
       <button data-testid="kb-refresh" onClick={() => onRefresh?.()}>
         Refresh
       </button>
-      <span data-testid="active-tab">{activeTab}</span>
+      <span data-testid="active-tab">{activeConnector}</span>
     </div>
   ),
   ArtifactList: ({ artifacts }: { artifacts: Artifact[] }) => (

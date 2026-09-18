@@ -149,7 +149,7 @@ describe("useKnowledgeBase", () => {
     expect(result.current.currentPage).toBe(1);
   });
 
-  it("filters by tab (UPLOADS)", async () => {
+  it("filters by connector (UPLOAD)", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
       makeArtifact("a1", "github.md"),
@@ -163,14 +163,14 @@ describe("useKnowledgeBase", () => {
     });
 
     act(() => {
-      result.current.handleTabChange("UPLOADS");
+      result.current.handleConnectorChange("UPLOAD");
     });
 
     expect(result.current.filteredArtifacts).toHaveLength(1);
     expect(result.current.filteredArtifacts[0].sourceSystem).toBe("UPLOAD");
   });
 
-  it("filters by tab (ORGANIZATIONS)", async () => {
+  it("filters by subfilter (ORGANIZATIONS)", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
       makeArtifact("a1", "readme.md"),
@@ -184,14 +184,14 @@ describe("useKnowledgeBase", () => {
     });
 
     act(() => {
-      result.current.handleTabChange("ORGANIZATIONS");
+      result.current.handleSubfilterChange("ORGANIZATIONS");
     });
 
     expect(result.current.filteredArtifacts).toHaveLength(1);
     expect(result.current.filteredArtifacts[0].artifactType).toBe("ORG_METADATA");
   });
 
-  it("combines the ORGANIZATIONS tab with a search query", async () => {
+  it("combines the ORGANIZATIONS subfilter with a search query", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
       makeArtifact("a1", "readme.md"),
@@ -206,7 +206,7 @@ describe("useKnowledgeBase", () => {
     });
 
     act(() => {
-      result.current.handleTabChange("ORGANIZATIONS");
+      result.current.handleSubfilterChange("ORGANIZATIONS");
       result.current.handleSearchChange("sprintstart");
     });
 
@@ -214,7 +214,7 @@ describe("useKnowledgeBase", () => {
     expect(result.current.filteredArtifacts[0].title).toBe("SprintStart");
   });
 
-  it("resets to page 1 when switching to the ORGANIZATIONS tab", async () => {
+  it("resets to page 1 when switching to the ORGANIZATIONS subfilter", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     const artifacts: Artifact[] = Array.from({ length: 30 }, (_, i) =>
       makeArtifact(`o${i}`, `org-${i}`, "ORG_METADATA"),
@@ -233,7 +233,7 @@ describe("useKnowledgeBase", () => {
     expect(result.current.currentPage).toBe(2);
 
     act(() => {
-      result.current.handleTabChange("ORGANIZATIONS");
+      result.current.handleSubfilterChange("ORGANIZATIONS");
     });
 
     expect(result.current.currentPage).toBe(1);
@@ -315,9 +315,9 @@ describe("useKnowledgeBase", () => {
     expect(result.current.currentPage).toBe(2);
     expect(result.current.paginatedArtifacts).toHaveLength(5);
 
-    // Switch tab to UPLOADS where there are 0 items
+    // Switch connector to UPLOAD where there are 0 items
     act(() => {
-      result.current.handleTabChange("UPLOADS");
+      result.current.handleConnectorChange("UPLOAD");
     });
 
     expect(result.current.currentPage).toBe(1);

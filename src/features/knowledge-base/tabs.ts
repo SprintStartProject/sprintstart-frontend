@@ -82,7 +82,7 @@ export const CONNECTOR_SUBFILTERS: Record<ConnectorTab, SubfilterOption[]> = {
     {
       id: "PAGES",
       label: "Docs",
-      matches: (a) => a.artifactType === "PAGE" || a.sourceSystem === "UPLOAD",
+      matches: (a) => a.artifactType === "PAGE",
     },
     { id: "COMMITS", label: "Commits", matches: (a) => a.artifactType === "COMMIT" },
     {

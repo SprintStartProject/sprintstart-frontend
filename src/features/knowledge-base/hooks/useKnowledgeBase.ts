@@ -121,7 +121,9 @@ export function useKnowledgeBase(projectId: string | null) {
     });
   }, [artifacts, activeConnector, deferredSearchQuery, matchesSearch]);
 
-  // Paging and filter state resets when the project scope changes.
+  // Paging resets when the project scope changes. This deliberately does not live
+  // in `fetchArtifacts`: that function doubles as the Refresh handler, and hitting
+  // Refresh on page 3 should leave the reader on page 3 rather than snapping back.
   const [pagedProjectId, setPagedProjectId] = useState(projectId);
   if (pagedProjectId !== projectId) {
     setPagedProjectId(projectId);
@@ -153,6 +155,10 @@ export function useKnowledgeBase(projectId: string | null) {
 
   const totalPages = Math.max(1, Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE));
 
+  // Pull the page back into range when the result set shrinks -- deleting the last
+  // artifact on a page, or a filter narrowing while the reader is deep in the list.
+  // Without this the control keeps advertising a page the list no longer has, while
+  // the clamped slice below quietly shows a different one.
   if (currentPage > totalPages) {
     setCurrentPage(totalPages);
   }
@@ -169,8 +175,7 @@ export function useKnowledgeBase(projectId: string | null) {
   }, []);
 
   const handleConnectorChange = useCallback((connector: ConnectorTab) => {
-    const target = (connector as string) === "UPLOADS" ? "UPLOAD" : connector;
-    setActiveConnector(target);
+    setActiveConnector(connector);
     setActiveSubfilter("ALL");
     setCurrentPage(1);
   }, []);
@@ -187,56 +192,8 @@ export function useKnowledgeBase(projectId: string | null) {
     setCurrentPage(1);
   }, []);
 
-  // Backward-compatibility handler for legacy flat tab changes
-  const handleTabChange = useCallback((tab: string) => {
-    setCurrentPage(1);
-    switch (tab) {
-      case "ALL":
-        setActiveConnector("ALL");
-        setActiveSubfilter("ALL");
-        break;
-      case "UPLOADS":
-      case "UPLOAD":
-        setActiveConnector("UPLOAD");
-        setActiveSubfilter("ALL");
-        break;
-      case "GITHUB":
-      case "JIRA":
-      case "CONFLUENCE":
-        setActiveConnector(tab);
-        setActiveSubfilter("ALL");
-        break;
-      case "PR":
-      case "ISSUES":
-      case "FILES":
-      case "COMMITS":
-      case "ORGANIZATIONS":
-      case "PAGE":
-      case "DOCS":
-      case "PDF":
-      case "MARKDOWN":
-        setActiveConnector("ALL");
-        setActiveSubfilter(tab);
-        break;
-      default:
-        setActiveConnector("ALL");
-        setActiveSubfilter("ALL");
-    }
-  }, []);
-
   const hasActiveFilters =
     searchQuery !== "" || activeConnector !== "ALL" || activeSubfilter !== "ALL";
-
-  // Backward-compatibility alias reflecting active tab
-  const activeTab = useMemo(() => {
-    if (activeSubfilter !== "ALL") {
-      return activeSubfilter;
-    }
-    if (activeConnector === "UPLOAD") {
-      return "UPLOADS";
-    }
-    return activeConnector;
-  }, [activeConnector, activeSubfilter]);
 
   return {
     artifacts,
@@ -249,7 +206,6 @@ export function useKnowledgeBase(projectId: string | null) {
     availableConnectors,
     connectorCounts,
     subfilterOptions,
-    activeTab,
     currentPage,
     totalPages,
     filteredArtifacts,
@@ -257,7 +213,6 @@ export function useKnowledgeBase(projectId: string | null) {
     handleSearchChange,
     handleConnectorChange,
     handleSubfilterChange,
-    handleTabChange,
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,

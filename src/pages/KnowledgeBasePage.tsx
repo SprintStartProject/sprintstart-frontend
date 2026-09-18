@@ -86,7 +86,6 @@ export function KnowledgeBasePage() {
     availableConnectors,
     connectorCounts,
     subfilterOptions,
-    activeTab,
     currentPage,
     totalPages,
     filteredArtifacts,
@@ -94,7 +93,6 @@ export function KnowledgeBasePage() {
     handleSearchChange,
     handleConnectorChange,
     handleSubfilterChange,
-    handleTabChange,
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,
@@ -203,8 +201,6 @@ export function KnowledgeBasePage() {
                   activeSubfilter={activeSubfilter}
                   onSubfilterChange={handleSubfilterChange}
                   subfilterOptions={subfilterOptions}
-                  activeTab={activeTab}
-                  onTabChange={handleTabChange}
                   onRefresh={() => void fetchArtifacts()}
                   isRefreshing={isLoading}
                 />
@@ -256,7 +252,7 @@ export function KnowledgeBasePage() {
                 // states above are not tabs and would otherwise
                 // animate on their way in too.
                 <SlidingTabPanel
-                  activeKey={`${activeConnector}-${activeSubfilter}`}
+                  activeKey={activeConnector}
                   index={availableConnectors.indexOf(activeConnector)}
                 >
                   <ArtifactList artifacts={paginatedArtifacts} onSelect={setSelectedArtifactId} />

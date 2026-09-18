@@ -682,7 +682,7 @@ function OrgMetadataView({
 
       <div className="flex flex-wrap gap-2" data-testid="org-quick-links">
         <a
-          href={`https://github.com/orgs/${metadata.login}/repositories`}
+          href={`https://github.com/orgs/${encodeURIComponent(metadata.login)}/repositories`}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
@@ -692,7 +692,7 @@ function OrgMetadataView({
           <ExternalLink className="h-3 w-3 opacity-60" />
         </a>
         <a
-          href={`https://github.com/orgs/${metadata.login}/people`}
+          href={`https://github.com/orgs/${encodeURIComponent(metadata.login)}/people`}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
