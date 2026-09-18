@@ -40,8 +40,16 @@ export type JourneyCameraHandle = {
   flyToFit: (durationMs?: number) => Promise<void>;
 };
 
-/** How an edge is drawn: satisfied, the one being worked through right now, or still waiting. */
-export type JourneyEdgeTone = "done" | "active" | "waiting";
+/**
+ * How an edge is drawn: satisfied, the one being worked through right now, still waiting, or —
+ * while somebody is pointing at a node — one of the things standing in that node's way.
+ *
+ * The first three are states a graph with progress on it has. `upstream` is not a state: it is an
+ * answer to "why is this shut", which only exists while a node is being pointed at, and it is
+ * drawn apart from the other three so that the two halves of a lit run can be told apart at a
+ * glance instead of by following arrowheads.
+ */
+export type JourneyEdgeTone = "done" | "active" | "waiting" | "upstream";
 
 /** How a node relates to the one under the pointer or selected. */
 export type JourneyNodeEmphasis = "focus" | "related" | "dimmed" | "none";
@@ -50,6 +58,16 @@ export type JourneyNodeRenderState = {
   selected: boolean;
   emphasis: JourneyNodeEmphasis;
   dragging: boolean;
+  /**
+   * The canvas's current zoom, for a card that wants to size a label against it.
+   *
+   * Everything on the canvas shrinks with the zoom, which is right for the picture and wrong for
+   * the words in it: at the zoom where a large graph fits at once, 13px type is under five pixels
+   * on screen. A card that divides by this keeps a label roughly constant on screen however far
+   * out the reader is -- the graph becomes a map with labels rather than a smear. Cards with
+   * nothing to scale ignore it.
+   */
+  zoom: number;
 };
 
 type Props<TNode extends LayoutNode> = {
@@ -746,7 +764,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
             aria-hidden="true"
           >
             <defs>
-              {(["done", "active", "waiting"] as const).map((tone) => (
+              {(["done", "active", "waiting", "upstream"] as const).map((tone) => (
                 <marker
                   key={tone}
                   id={`${markerId}-${tone}`}
@@ -846,7 +864,12 @@ export function JourneyCanvas<TNode extends LayoutNode>({
                 onFocus={() => setHoveredId(node.id)}
                 onBlur={() => setHoveredId((current) => (current === node.id ? null : current))}
               >
-                {renderNode(node, { selected, emphasis: emphasisOf(node.id), dragging })}
+                {renderNode(node, {
+                  selected,
+                  emphasis: emphasisOf(node.id),
+                  dragging,
+                  zoom: viewport.zoom,
+                })}
                 {canConnect ? (
                   <span
                     data-port-for={node.id}
@@ -1028,12 +1051,14 @@ const toneStroke: Record<JourneyEdgeTone, string> = {
   done: "stroke-app-success-solid/70",
   active: "stroke-app-brand",
   waiting: "stroke-app-text-subtle/50",
+  upstream: "stroke-app-orange-text",
 };
 
 const toneFill: Record<JourneyEdgeTone, string> = {
   done: "fill-app-success-solid/70",
   active: "fill-app-brand",
   waiting: "fill-app-text-subtle/50",
+  upstream: "fill-app-orange-text",
 };
 
 export function CanvasButton({
