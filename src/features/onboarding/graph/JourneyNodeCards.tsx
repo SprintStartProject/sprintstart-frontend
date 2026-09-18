@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ItemState, PhaseItem, PhaseState } from "../journey";
+import { unseenSkipAnswerOf } from "../skipAnswers";
 import {
   feedbackOf,
   formatMinutes,
@@ -167,10 +168,37 @@ function emphasisClass({ emphasis, selected, dragging }: JourneyNodeRenderState)
  * What a step carries beyond its state -- a skip request, the member's feedback -- as small pills on
  * the card's top edge, so they can be seen without opening anything.
  */
-export function ItemFlags({ item, inline = false }: { item: PhaseItem; inline?: boolean }) {
-  const skip = skipRequestOf(item);
+/**
+ * A small pulsing dot: something changed here since the member last looked.
+ *
+ * Only pulses where motion is welcome; the colour and the "New" label carry it otherwise.
+ */
+export function UpdateDot({ className = "bg-white" }: { className?: string }) {
+  return (
+    <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+      <span
+        className={`absolute inline-flex h-full w-full rounded-full opacity-75 motion-safe:animate-ping ${className}`}
+      />
+      <span className={`relative inline-flex h-2 w-2 rounded-full ${className}`} />
+    </span>
+  );
+}
+
+export function ItemFlags({
+  item,
+  inline = false,
+  showUpdates = false,
+}: {
+  item: PhaseItem;
+  inline?: boolean;
+  /** Mark answers to the member's skip requests they have not seen yet -- the member's own views. */
+  showUpdates?: boolean;
+}) {
+  const answer = showUpdates ? unseenSkipAnswerOf(item) : null;
+  // A new answer replaces the plain "declined" flag; an approved one has no plain flag at all.
+  const skip = answer ? null : skipRequestOf(item);
   const feedback = feedbackOf(item);
-  if (!skip && !feedback) return null;
+  if (!answer && !skip && !feedback) return null;
   return (
     <span
       className={
@@ -179,6 +207,17 @@ export function ItemFlags({ item, inline = false }: { item: PhaseItem; inline?: 
           : "absolute -top-2.5 right-3 z-10 inline-flex items-center gap-1"
       }
     >
+      {answer ? (
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-2 ring-app-surface ${
+            answer === "approved" ? "bg-app-success-solid" : "bg-app-warning-solid"
+          }`}
+        >
+          <UpdateDot />
+          {answer === "approved" ? "Skip approved" : "Skip declined"}
+          <span className="sr-only"> — new answer from your project manager</span>
+        </span>
+      ) : null}
       {skip ? (
         <span
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
@@ -241,11 +280,13 @@ export function ItemNodeCard({
   state,
   render,
   isNext = false,
+  showUpdates = false,
 }: {
   item: PhaseItem;
   state: ItemState;
   render: JourneyNodeRenderState;
   isNext?: boolean;
+  showUpdates?: boolean;
 }) {
   const minutes = item.kind === "step" ? item.step.estimatedMinutes : null;
   const isQuestion = item.kind === "question";
@@ -265,7 +306,7 @@ export function ItemNodeCard({
           Up next
         </span>
       ) : null}
-      <ItemFlags item={item} />
+      <ItemFlags item={item} showUpdates={showUpdates} />
       <div className="flex items-start gap-2.5">
         <ItemGlyph item={item} state={state} size="sm" />
         <p
@@ -450,6 +491,7 @@ export function PhaseNodeCard({
   state,
   render,
   isFocus = false,
+  hasUpdate = false,
 }: {
   index: number;
   phase: OnboardingPhaseEndpoint;
@@ -457,6 +499,8 @@ export function PhaseNodeCard({
   render: JourneyNodeRenderState;
   /** The phase the member was last busy in. */
   isFocus?: boolean;
+  /** Something in it changed since the member last looked, e.g. an answered skip request. */
+  hasUpdate?: boolean;
 }) {
   const progress = phaseProgress(phase);
   return (
@@ -466,6 +510,12 @@ export function PhaseNodeCard({
       {isFocus ? (
         <span className="absolute -top-2.5 left-3 rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase shadow">
           You are here
+        </span>
+      ) : null}
+      {hasUpdate ? (
+        <span className="absolute -top-2.5 right-3 inline-flex items-center gap-1.5 rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase shadow ring-2 ring-app-surface">
+          <UpdateDot />
+          New answer
         </span>
       ) : null}
       <div className="flex items-start gap-3">

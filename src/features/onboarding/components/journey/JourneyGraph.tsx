@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { phaseHasUnseenSkipAnswer } from "../../skipAnswers";
 import {
   ArrowLeft,
   ChevronRight,
@@ -92,6 +93,8 @@ type Props = {
   onOpenItemChange?: (itemId: string | null) => void;
   renderItemFocus?: (item: PhaseItem, phase: OnboardingPhaseEndpoint) => ReactNode;
   heightClassName?: string;
+  /** Mark what changed since the member last looked (answered skip requests) -- the hire's view. */
+  showMemberUpdates?: boolean;
 };
 
 const PHASE_KEY = (id: string) => `phase:${id}`;
@@ -124,6 +127,7 @@ export function JourneyGraph({
   onOpenItemChange,
   renderItemFocus,
   heightClassName = "h-[calc(100vh-15rem)] min-h-[32rem]",
+  showMemberUpdates = false,
 }: Props) {
   const toast = useToast();
   const mapCamera = useRef<JourneyCameraHandle>(null);
@@ -405,6 +409,7 @@ export function JourneyGraph({
             state={phaseState(node.phase)}
             render={render}
             isFocus={node.id === focusPhaseId}
+            hasUpdate={showMemberUpdates && phaseHasUnseenSkipAnswer(node.phase)}
           />
         )}
       />
@@ -538,6 +543,7 @@ export function JourneyGraph({
             state={itemState(item, openPhase.locked)}
             render={render}
             isNext={item.id === nextItemId}
+            showUpdates={showMemberUpdates}
           />
         )}
       />

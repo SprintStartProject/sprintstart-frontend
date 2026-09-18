@@ -1,86 +1,58 @@
 // ============================================================
 // features/onboarding/skipAnswers.ts
 // ============================================================
-// The project manager's answers to a member's skip requests, and
-// which of them the member has already seen.
+// The project manager's answers to a member's skip requests that
+// the member has not looked at yet. The backend keeps when an
+// answer was seen (`skip.answerSeenAt`), so this holds across devices.
 // ============================================================
 
-import type { OnboardingPhaseEndpoint } from "./types";
+import { phaseItems, type PhaseItem } from "./journey";
+import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "./types";
 
-/** A skip request the project manager has approved or declined. */
-export type SkipAnswer = {
-  skipId: string;
-  stepId: string;
-  stepTitle: string;
-  approved: boolean;
-  comment: string | null;
-  reviewedAt: string | null;
-};
-
-/** Every answered skip request on the path, newest answer first. */
-export function skipAnswersOf(phases: readonly OnboardingPhaseEndpoint[]): SkipAnswer[] {
-  return phases
-    .flatMap((phase) => phase.steps)
-    .flatMap((step) =>
-      step.skip && step.skip.accepted !== null
-        ? [
-            {
-              skipId: step.skip.id,
-              stepId: step.id,
-              stepTitle: step.title,
-              approved: step.skip.accepted,
-              comment: step.skip.reviewComment?.trim() || null,
-              reviewedAt: step.skip.reviewedAt,
-            },
-          ]
-        : [],
-    )
-    .sort((a, b) => (b.reviewedAt ?? "").localeCompare(a.reviewedAt ?? ""));
+/** The PM's answer to this step's skip request, while the member has not seen it yet. */
+export function unseenSkipAnswerOf(item: PhaseItem): "approved" | "declined" | null {
+  if (item.kind !== "step" || !item.step.skip) return null;
+  const { accepted, answerSeenAt } = item.step.skip;
+  if (accepted === null || answerSeenAt) return null;
+  return accepted ? "approved" : "declined";
 }
 
-/**
- * Keyed per user, because two people share a browser more often than a path.
- *
- * Local storage rather than the backend, like the knowledge-gap owner notice: there is no endpoint
- * for "has this person seen the answer", and a notice that shows once more on a second machine is a
- * far smaller problem than one that cannot be dismissed. Moving it server-side means replacing
- * these functions.
- */
-function seenKey(userId: string): string {
-  return `sprintstart:onboarding-skip-answers-seen:${userId}`;
+/** Whether a phase holds an answer the member has not seen -- marked on the phase so it can be found. */
+export function phaseHasUnseenSkipAnswer(phase: OnboardingPhaseEndpoint): boolean {
+  return phaseItems(phase).some((item) => unseenSkipAnswerOf(item) !== null);
+}
+
+/** How many answers on the path are still new to the member. */
+export function unseenSkipAnswerCount(phases: readonly OnboardingPhaseEndpoint[]): number {
+  return phases.flatMap(phaseItems).filter((item) => unseenSkipAnswerOf(item) !== null).length;
+}
+
+/** The path with one skip answer marked seen, for showing it before the server has confirmed. */
+export function withSkipAnswerSeen(
+  path: OnboardingPathEndpoint,
+  skipId: string,
+  seenAt: string,
+): OnboardingPathEndpoint {
+  return {
+    ...path,
+    phases: path.phases.map((phase) => ({
+      ...phase,
+      steps: phase.steps.map((step) =>
+        step.skip?.id === skipId ? { ...step, skip: { ...step.skip, answerSeenAt: seenAt } } : step,
+      ),
+    })),
+  };
 }
 
 const SEEN_CHANGED_EVENT = "sprintstart:onboarding-skip-answers-seen";
 
-/** The skip answers this user has already seen. Unreadable storage means none. */
-export function readSeenSkipAnswers(userId: string): Set<string> {
-  if (!userId) return new Set();
-  try {
-    const raw = window.localStorage.getItem(seenKey(userId));
-    if (!raw) return new Set();
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((entry): entry is string => typeof entry === "string"));
-  } catch {
-    return new Set();
-  }
-}
-
-/** Records answers as seen, and tells anything showing a marker for them (the sidebar). */
-export function markSkipAnswersSeen(userId: string, skipIds: readonly string[]): void {
-  if (!userId || skipIds.length === 0) return;
-  const seen = readSeenSkipAnswers(userId);
-  skipIds.forEach((id) => seen.add(id));
-  try {
-    window.localStorage.setItem(seenKey(userId), JSON.stringify([...seen]));
-  } catch {
-    // Storage full or blocked: the notice simply shows again next time.
-  }
+/** Tells anything counting unseen answers (the sidebar marker) that one was just seen. */
+export function notifySkipAnswerSeen(): void {
   window.dispatchEvent(new Event(SEEN_CHANGED_EVENT));
 }
 
-/** Calls `listener` whenever answers are marked seen; returns the unsubscribe. */
-export function onSkipAnswersSeenChanged(listener: () => void): () => void {
+/** Calls `listener` whenever an answer is marked seen; returns the unsubscribe. */
+export function onSkipAnswerSeen(listener: () => void): () => void {
   window.addEventListener(SEEN_CHANGED_EVENT, listener);
   return () => window.removeEventListener(SEEN_CHANGED_EVENT, listener);
 }

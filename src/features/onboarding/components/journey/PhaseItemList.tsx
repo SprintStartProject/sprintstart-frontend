@@ -126,7 +126,7 @@ export function PhaseItemList({
                     <span className={state === "retry" ? "font-medium text-app-warning-text" : ""}>
                       {itemStateLabel[state]}
                     </span>
-                    <ItemFlags item={item} inline />
+                    <ItemFlags item={item} inline showUpdates />
                     {blockers.length > 0 ? (
                       <span className="text-app-text-muted">
                         Waits on{" "}

@@ -43,6 +43,8 @@ export interface OnboardingStepSkip {
   accepted: boolean | null;
   reviewComment: string | null;
   reviewedAt: string | null;
+  /** When the member saw the PM's answer; null while it is new to them. */
+  answerSeenAt?: string | null;
 }
 
 export interface OnboardingStepEndpoint {

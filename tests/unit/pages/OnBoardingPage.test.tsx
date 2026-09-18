@@ -32,10 +32,6 @@ vi.mock("../../../src/features/moments", () => ({
   }),
 }));
 
-vi.mock("../../../src/context/useAuth", () => ({
-  useAuth: () => ({ profile: { id: "user1" } }),
-}));
-
 vi.mock("../../../src/services/userService", () => ({
   userService: {
     getProfile: vi.fn().mockResolvedValue({
@@ -589,7 +585,7 @@ describe("OnBoardingPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
   });
 
-  it("tells the hire their skip request was answered, until they have looked", async () => {
+  it("marks an answered skip request on the step until the hire opens it", async () => {
     const phase = phaseFixture("phase1", 1, "Phase 1");
     phase.steps[0] = {
       ...phase.steps[0],
@@ -601,9 +597,18 @@ describe("OnBoardingPage", () => {
         accepted: true,
         reviewComment: "Makes sense",
         reviewedAt: "2026-09-18T10:00:00Z",
+        answerSeenAt: null,
       },
     } as never;
+    const seen = vi.fn();
     server.use(
+      http.get("/api/v1/onboarding/me/steps/:stepId", () => HttpResponse.json(phase.steps[0])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/tasks", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/resources", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/skips/:skipId/seen", ({ params }) => {
+        seen(params.skipId);
+        return new HttpResponse(null, { status: 204 });
+      }),
       http.get("/api/v1/onboarding/me/path", () =>
         HttpResponse.json({
           id: "path1",
@@ -615,23 +620,19 @@ describe("OnBoardingPage", () => {
     );
     const user = userEvent.setup();
 
-    const { unmount } = renderPage();
-
-    const notice = await screen.findByRole("region", { name: "Answers to your skip requests" });
-    expect(within(notice).getByText("Skip approved")).toBeInTheDocument();
-    expect(within(notice).getByText("“Makes sense”")).toBeInTheDocument();
-
-    await user.click(within(notice).getByRole("button", { name: "Got it" }));
-    expect(
-      screen.queryByRole("region", { name: "Answers to your skip requests" }),
-    ).not.toBeInTheDocument();
-
-    unmount();
     renderPage();
-    await screen.findByRole("heading", { level: 1, name: "Onboarding" });
+
+    const list = await screen.findByRole("list", { name: "Phase 1: steps and questions" });
+    expect(within(list).getByText(/new answer from your project manager/)).toBeInTheDocument();
+
+    await user.click(within(list).getByRole("button", { name: /Phase 1 step/, expanded: false }));
+
+    await waitFor(() => expect(seen).toHaveBeenCalledWith("skip1"));
     expect(
-      screen.queryByRole("region", { name: "Answers to your skip requests" }),
+      within(list).queryByText(/new answer from your project manager/),
     ).not.toBeInTheDocument();
+    // The answer itself stays readable in the step.
+    expect(within(list).getByText("Skip approved")).toBeInTheDocument();
   });
 
   it("lands on a step unfolded when opened by its address", async () => {
