@@ -8,7 +8,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
@@ -53,7 +53,19 @@ type Props = {
    * Without it a published blueprint drew a details panel with no footer at all, which reads as
    * "this has no actions" rather than "not on this version".
    */
-  onRequestDraft?: () => void;
+  /**
+   * Asks the page to open a draft, carrying the node it was asked from — so the author lands back
+   * in front of it rather than on a graph with nothing open.
+   */
+  onRequestDraft?: (node: BlueprintGraphNode) => void;
+  /**
+   * A node to open as soon as it is there, found by title.
+   *
+   * By title rather than by id: the one caller is a landing on a freshly opened draft, and a draft
+   * is a copy, so every id in it is new while the titles are the ones the author just read.
+   */
+  openNodeTitle?: string | null;
+  onOpenedNode?: () => void;
   onBack: () => void;
   onPositionChange: (node: BlueprintGraphNode, x: number, y: number) => Promise<void>;
   onAddBlocker: (node: BlueprintGraphNode, blockerId: string) => Promise<void>;
@@ -83,6 +95,8 @@ export function BlueprintSubGraphEditor({
   nodes,
   editable,
   onRequestDraft,
+  openNodeTitle = null,
+  onOpenedNode,
   onBack,
   onPositionChange,
   onAddBlocker,
@@ -164,6 +178,22 @@ export function BlueprintSubGraphEditor({
 
     setIsDetailsOpen(true);
   }
+
+  // Asked for from somewhere else — a draft opened from inside this very node. Cleared through the
+  // callback, so it opens once rather than every time the phase is reloaded.
+  useEffect(() => {
+    if (!openNodeTitle) return;
+    const match = nodes.find((node) => node.title === openNodeTitle);
+    if (!match) return;
+    // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
+    // and this is the pattern the repo already passes with.
+    queueMicrotask(() => {
+      openNodeDetails(match);
+      onOpenedNode?.();
+    });
+    // `openNodeDetails` reads this render's phase, which is what its metadata has to come from.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, onOpenedNode, openNodeTitle]);
 
   function closeNodeDetails() {
     setIsDetailsOpen(false);
@@ -374,7 +404,7 @@ export function BlueprintSubGraphEditor({
                 <Button
                   variant="primary"
                   icon={<FilePlus2 className="h-4 w-4" />}
-                  onClick={onRequestDraft}
+                  onClick={() => onRequestDraft(node)}
                 >
                   Edit as draft
                 </Button>

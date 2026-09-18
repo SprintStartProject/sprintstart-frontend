@@ -14,6 +14,7 @@ import {
   Loader2,
   Milestone,
   Minus,
+  Network,
   Pencil,
   Plus,
   Rocket,
@@ -21,7 +22,7 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AlertDialog } from "../components/ui/AlertDialog.tsx";
 import { Badge } from "../components/ui/Badge.tsx";
 import { Button } from "../components/ui/Button.tsx";
@@ -33,6 +34,7 @@ import { SegmentedTabs } from "../components/ui/SegmentedTabs.tsx";
 import { Select } from "../components/ui/Select.tsx";
 import { Textarea } from "../components/ui/Textarea.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
+import { PhasePrerequisites } from "../features/blueprints/components/PhasePrerequisites.tsx";
 import { useToast } from "../context/useToast.ts";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation.ts";
 import type {
@@ -119,6 +121,15 @@ const kindLabels: Record<CreateKind, string> = {
  * Phases keep whatever the nested DTO said about everything else; only the three fields that
  * response cannot carry come from the graph.
  */
+/**
+ * What to put back in front of the author after landing somewhere new.
+ *
+ * Carried by title, not by id, because the one journey that needs it ends on a *copy*: opening a
+ * draft duplicates every phase, step and question, so the ids the author was looking at a moment
+ * ago exist nowhere on the page they arrive at. The titles are the ones they just read.
+ */
+type BlueprintReopen = { phaseTitle: string; nodeTitle?: string };
+
 function withGraphNodes(path: BlueprintPath, nodes: BlueprintGraphNode[]): BlueprintPath {
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
 
@@ -206,6 +217,7 @@ type EditorMode = (typeof EDITOR_MODE_ORDER)[number];
 export function BlueprintPathDetailPage() {
   const { pathId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { profile } = useAuth();
   const { selectedProjectId, isLoading: isProjectLoading } = useProjectContext();
@@ -218,6 +230,9 @@ export function BlueprintPathDetailPage() {
   const projectIdAtMount = useRef<string | null>(null);
   const [path, setPath] = useState<BlueprintPath | null>(null);
   const [subGraphPhaseId, setSubGraphPhaseId] = useState<string | null>(null);
+  /** A phase or node the graph should open by itself, once it has it. See {@link BlueprintReopen}. */
+  const [pendingOpenPhaseTitle, setPendingOpenPhaseTitle] = useState<string | null>(null);
+  const [pendingOpenNodeTitle, setPendingOpenNodeTitle] = useState<string | null>(null);
   const [subGraphNodes, setSubGraphNodes] = useState<BlueprintGraphNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -428,8 +443,16 @@ export function BlueprintPathDetailPage() {
     setIsDraftPromptOpen(true);
   }
 
-  /** Opens (or reuses) the draft for this blueprint and continues there. */
-  async function openDraftFromPrompt() {
+  /**
+   * Opens (or reuses) the draft for this blueprint and continues there.
+   *
+   * `reopen` is what the author was looking at when they asked. Given one, the draft is opened
+   * without stopping to explain first: the question was asked from inside that very phase, with a
+   * line above the button already saying the version is read-only, and the toast on arrival says
+   * what stays published. The dialog is for the buttons scattered across the outline, where
+   * "why can I not type here" has not been answered yet.
+   */
+  async function openDraftAndContinue(reopen: BlueprintReopen | null) {
     if (!path) return;
     setIsOpeningDraft(true);
     setDraftPromptError(null);
@@ -439,14 +462,24 @@ export function BlueprintPathDetailPage() {
       toast.info(`Editing draft v${draft.version}`, {
         description: `Version ${path.version} stays published until you publish this one.`,
       });
-      void navigate(`/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`);
+      void navigate(`/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`, {
+        state: reopen ? { reopen } : null,
+      });
     } catch (reason) {
-      setDraftPromptError(
-        reason instanceof Error ? reason.message : "The draft could not be opened.",
-      );
+      const message = reason instanceof Error ? reason.message : "The draft could not be opened.";
+      // With no dialog on screen there is nowhere for the dialog's error line to be read.
+      if (reopen) toast.error("The draft could not be opened", { description: message });
+      else setDraftPromptError(message);
     } finally {
       setIsOpeningDraft(false);
     }
+  }
+
+  /** A graph edit asked for from the outline: made on a draft, and offered as one on anything else. */
+  function runGraphEdit(edit: () => Promise<void>): Promise<void> {
+    if (isDraft) return edit();
+    whenEditable(() => undefined);
+    return Promise.resolve();
   }
 
   /** Opens the overlay on an existing item, seeded with whatever that kind of item actually has. */
@@ -1072,6 +1105,38 @@ export function BlueprintPathDetailPage() {
     }
   }
 
+  /**
+   * Puts the author back in front of what they were looking at before they were sent here.
+   *
+   * The state is cleared first and unconditionally: a reload or a step back through history must
+   * not open the same thing again, and a title that no longer matches anything is not a reason to
+   * keep asking.
+   */
+  const reopenRequest = (location.state as { reopen?: BlueprintReopen } | null)?.reopen ?? null;
+  useEffect(() => {
+    if (!reopenRequest || !path) return;
+    const phase = path.blueprintPhases.find(
+      (candidate) => candidate.title === reopenRequest.phaseTitle,
+    );
+    void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    if (!phase) return;
+    // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
+    // and this is the pattern the repo already passes with.
+    queueMicrotask(() => {
+      if (reopenRequest.nodeTitle && phase.type === "FIXED") {
+        setPendingOpenNodeTitle(reopenRequest.nodeTitle);
+        setEditorMode("graph");
+        void openSubGraph(phase);
+        return;
+      }
+      setPendingOpenPhaseTitle(phase.title);
+      void openGraphEditor();
+    });
+    // `openSubGraph` and `openGraphEditor` are declared per render and would restart this on every
+    // one; what this effect actually depends on is the request and the path it has to find it in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search, navigate, path, reopenRequest]);
+
   /** Reloads top-level graph positions, which are not refreshed by subgraph mutations. */
   async function returnToTopLevelGraph() {
     if (!path) return;
@@ -1648,7 +1713,7 @@ export function BlueprintPathDetailPage() {
             setIsDraftPromptOpen(false);
             return;
           }
-          void openDraftFromPrompt();
+          void openDraftAndContinue(null);
         }}
       />
       <AlertDialog
@@ -1797,7 +1862,14 @@ export function BlueprintPathDetailPage() {
             phase={subGraphPhase}
             nodes={subGraphNodes}
             editable={path.status === "DRAFT"}
-            onRequestDraft={() => whenEditable(() => undefined)}
+            onRequestDraft={(node) =>
+              void openDraftAndContinue({
+                phaseTitle: subGraphPhase.title,
+                nodeTitle: node.title,
+              })
+            }
+            openNodeTitle={pendingOpenNodeTitle}
+            onOpenedNode={() => setPendingOpenNodeTitle(null)}
             onBack={() => void returnToTopLevelGraph()}
             onPositionChange={saveSubGraphPosition}
             onAddBlocker={addSubGraphBlocker}
@@ -1834,7 +1906,9 @@ export function BlueprintPathDetailPage() {
             phases={path.blueprintPhases}
             pathTitle={path.title}
             editable={path.status === "DRAFT"}
-            onRequestDraft={() => whenEditable(() => undefined)}
+            onRequestDraft={(phase) => void openDraftAndContinue({ phaseTitle: phase.title })}
+            openPhaseTitle={pendingOpenPhaseTitle}
+            onOpenedPhase={() => setPendingOpenPhaseTitle(null)}
             onPositionChange={saveGraphPosition}
             onAddBlocker={addGraphBlocker}
             onRemoveBlocker={removeGraphBlocker}
@@ -1941,6 +2015,25 @@ export function BlueprintPathDetailPage() {
                     </div>
                     {!collapsedPhaseIds.has(phase.id) ? (
                       <div className="flex shrink-0 items-center gap-1">
+                        {/*
+                          The same phase, in the other view. Somebody reading down the outline who
+                          wants to see where a phase actually sits had to switch views and then
+                          find it again — two steps to ask one question about the thing already
+                          under their cursor.
+                        */}
+                        <Button
+                          aria-label={`Open phase ${phase.title} in the graph`}
+                          title="Open in the graph"
+                          iconOnly
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setPendingOpenPhaseTitle(phase.title);
+                            changeEditorMode("graph");
+                          }}
+                        >
+                          <Network className="h-4 w-4" />
+                        </Button>
                         <Button
                           aria-label={`Edit phase ${phase.title}`}
                           iconOnly
@@ -1967,6 +2060,27 @@ export function BlueprintPathDetailPage() {
                   </div>
                   {!collapsedPhaseIds.has(phase.id) ? (
                     <>
+                      {/*
+                        The order the graph draws as arrows, written out. Without it the outline was
+                        a list of phases in `position` order and nothing else — and `position` is a
+                        suggestion, not a rule, so an author working from the list was reading an
+                        order the product does not actually enforce while the one it does enforce
+                        was only visible in the other view. Editable here too: the arrow is the same
+                        edge whichever end it is drawn from.
+                      */}
+                      <div className="mt-5 rounded-xl border border-app-border bg-app-surface-muted p-4">
+                        <PhasePrerequisites
+                          phase={phase}
+                          phases={path.blueprintPhases}
+                          editable
+                          onAdd={(blocked, blockerId) =>
+                            runGraphEdit(() => addGraphBlocker(blocked, blockerId))
+                          }
+                          onRemove={(blocked, blockerId) =>
+                            runGraphEdit(() => removeGraphBlocker(blocked, blockerId))
+                          }
+                        />
+                      </div>
                       <div className="mt-5 rounded-xl border border-app-border bg-app-surface-muted p-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
