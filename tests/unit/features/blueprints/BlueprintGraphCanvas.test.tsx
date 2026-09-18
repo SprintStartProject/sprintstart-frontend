@@ -324,6 +324,14 @@ describe("BlueprintGraphCanvas", () => {
     await waitFor(() => expect(screen.getByText("Fields for Node a")).toBeInTheDocument());
     expect(screen.getByRole("region", { name: "Node a" })).toBeInTheDocument();
 
+    // Pressing beside the page closes it — the gesture nobody has to be taught, and the reason
+    // there is no shrink-back glyph in the corner any more.
+    const backdrop = screen.getByRole("region", { name: "Node a" }).parentElement as HTMLElement;
+    fireEvent.pointerDown(backdrop);
+    await waitFor(() => expect(screen.queryByText("Fields for Node a")).not.toBeInTheDocument());
+
+    clickNode("a");
+    await waitFor(() => expect(screen.getByText("Fields for Node a")).toBeInTheDocument());
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() => expect(screen.queryByText("Fields for Node a")).not.toBeInTheDocument());
   });

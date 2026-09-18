@@ -14,7 +14,6 @@ import {
   Info,
   KeyRound,
   LayoutGrid,
-  Minimize2,
   Plus,
   Search,
   Waypoints,
@@ -690,7 +689,14 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
             // asking what the blueprint *is*, and being dropped into a corner of it answers a
             // question they did not ask. The card's own far form is what keeps that readable.
             focusId={null}
-            selectedId={selectedId}
+            // Selection is kept here rather than handed to the canvas, which would otherwise treat
+            // a click on the node it already has selected as a request to deselect it. That is
+            // right where a click *is* the selection, and wrong here where a click opens the node:
+            // closing a node left it selected, so opening it again took two clicks, the first of
+            // which appeared to do nothing. What the canvas would have drawn from it — the lit run
+            // and the dimming around it — is drawn below from the same `focus` that already decides
+            // the arrow colours, so nothing is lost by holding it in one place.
+            selectedId={null}
             onSelect={(id) => {
               if (id === null) {
                 setSelectedId(null);
@@ -751,7 +757,8 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
               // Two reasons a node goes quiet, and they stack: it is outside the run being looked
               // at, or it does not match what was typed.
               const dimmed =
-                state.emphasis === "dimmed" || (matchIds !== null && !matchIds.has(node.id));
+                (chainIds !== null && !chainIds.has(node.id)) ||
+                (matchIds !== null && !matchIds.has(node.id));
               const half = halfOfNode(node.id);
               return (
                 <div
@@ -769,7 +776,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   } ${
                     half
                       ? HALF_RING[half]
-                      : state.selected
+                      : node.id === selectedId
                         ? "ring-2 ring-app-focus ring-offset-2 ring-offset-app-bg-soft"
                         : ""
                   }`}
@@ -979,7 +986,20 @@ function NodeCover({
   children: ReactNode;
 }) {
   return (
-    <div className="absolute inset-0 flex items-stretch justify-center bg-app-bg-soft/70 p-3 backdrop-blur-sm sm:p-6">
+    /*
+      Pressing beside the page closes it. Dismissing a layer that way is the one gesture nobody has
+      to be taught, and what is behind this one is the graph the page was opened from. Escape does
+      the same thing from the keyboard and the header carries the way back in words, so this is a
+      shortcut rather than the only way out.
+    */
+    <div
+      className="absolute inset-0 flex items-stretch justify-center bg-app-bg-soft/70 p-3 backdrop-blur-sm sm:p-6"
+      onPointerDown={(event) => {
+        // Only the backdrop itself. A pointer that went down inside the page and came up out here
+        // is the end of a text selection, not somebody aiming at the graph.
+        if (event.target === event.currentTarget) onBack();
+      }}
+    >
       <motion.section
         aria-label={title}
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
@@ -995,26 +1015,21 @@ function NodeCover({
             <button
               type="button"
               onClick={onBack}
+              title="Back to the graph (Esc, or click beside this)"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 hover:bg-app-surface-hover hover:text-app-text"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
               {context ? `Back to ${context}` : "Back to the graph"}
             </button>
           </nav>
-          <div className="mt-1.5 flex items-start gap-3">
-            <h3 className="min-w-0 flex-1 text-lg leading-snug font-bold text-app-text sm:text-xl">
-              {title}
-            </h3>
-            <button
-              type="button"
-              onClick={onBack}
-              aria-label="Back to the graph"
-              title="Back to the graph (Esc)"
-              className="rounded-xl p-2 text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-            >
-              <Minimize2 className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
+          {/*
+            No shrink-back button in the corner. There were three ways out of this page and one of
+            them was a glyph somebody had to find and aim at, next to a link that already said
+            where it went in words.
+          */}
+          <h3 className="mt-1.5 text-lg leading-snug font-bold text-app-text sm:text-xl">
+            {title}
+          </h3>
         </header>
 
         <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
