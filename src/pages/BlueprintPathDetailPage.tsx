@@ -1640,6 +1640,7 @@ export function BlueprintPathDetailPage() {
   // option showed a title box and nothing else.
   const formKind = editTarget?.kind ?? target?.kind ?? null;
 
+  const orderedPhases = [...path.blueprintPhases].sort((a, b) => a.position - b.position);
   const subGraphPhase = subGraphPhaseId
     ? (path.blueprintPhases.find((phase) => phase.id === subGraphPhaseId) ?? null)
     : null;
@@ -1903,7 +1904,9 @@ export function BlueprintPathDetailPage() {
           />
         ) : (
           <BlueprintGraphEditor
-            phases={path.blueprintPhases}
+            // In the author's own order, which is what the graph falls back to when it steps from
+            // an opened phase to the one either side of it and there is no arrow to follow.
+            phases={orderedPhases}
             pathTitle={path.title}
             editable={path.status === "DRAFT"}
             onRequestDraft={(phase) => void openDraftAndContinue({ phaseTitle: phase.title })}

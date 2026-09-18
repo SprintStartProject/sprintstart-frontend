@@ -27,6 +27,37 @@ function node(id: string, blockerIds: string[] = [], placed = true): BlueprintGr
 const noop = () => Promise.resolve();
 
 /**
+ * The canvas as the Blueprint editors drive it: a node opens into the canvas, and the caller holds
+ * which one is open so that it can refuse to let go of one with unsaved fields.
+ */
+function OpenableCanvas({ canNavigate = false }: { canNavigate?: boolean }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  return (
+    <BlueprintGraphCanvas<BlueprintGraphCanvasNode>
+      nodes={[node("a"), node("b", ["a"]), node("c", ["b"])]}
+      title="Path graph"
+      description="Arrange the phases."
+      editable
+      onNodeClick={(clicked) => setOpenId(clicked.id)}
+      onPositionChange={noop}
+      onAddBlocker={noop}
+      onRemoveBlocker={noop}
+      renderNode={(item, cardProps) => (
+        <BlueprintNodeCard
+          {...cardProps}
+          title={item.title}
+          kind={{ label: "Phase", icon: Layers }}
+        />
+      )}
+      openNodeId={openId}
+      onCloseNodeDetail={() => setOpenId(null)}
+      onNavigateNodeDetail={canNavigate ? (id) => setOpenId(id) : undefined}
+      renderNodeDetail={(item) => ({ title: item.title, body: <p>Fields for {item.title}</p> })}
+    />
+  );
+}
+
+/**
  * A click on a node, as the canvas hears one.
  *
  * The canvas runs on pointer events rather than on `click`, because the same gesture that selects a
@@ -290,33 +321,7 @@ describe("BlueprintGraphCanvas", () => {
   });
 
   it("opens a node into the canvas rather than beside it", async () => {
-    function Harness() {
-      const [openId, setOpenId] = useState<string | null>(null);
-      return (
-        <BlueprintGraphCanvas<BlueprintGraphCanvasNode>
-          nodes={[node("a"), node("b", ["a"])]}
-          title="Path graph"
-          description="Arrange the phases."
-          editable
-          onNodeClick={(clicked) => setOpenId(clicked.id)}
-          onPositionChange={noop}
-          onAddBlocker={noop}
-          onRemoveBlocker={noop}
-          renderNode={(item, cardProps) => (
-            <BlueprintNodeCard
-              {...cardProps}
-              title={item.title}
-              kind={{ label: "Phase", icon: Layers }}
-            />
-          )}
-          openNodeId={openId}
-          onCloseNodeDetail={() => setOpenId(null)}
-          renderNodeDetail={(item) => ({ title: item.title, body: <p>Fields for {item.title}</p> })}
-        />
-      );
-    }
-
-    render(<Harness />);
+    render(<OpenableCanvas />);
     clickNode("a");
 
     // The camera flies in first, so the page appears once it has landed rather than over a graph
@@ -334,6 +339,44 @@ describe("BlueprintGraphCanvas", () => {
     await waitFor(() => expect(screen.getByText("Fields for Node a")).toBeInTheDocument());
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() => expect(screen.queryByText("Fields for Node a")).not.toBeInTheDocument());
+  });
+
+  it("offers a step either side of an opened node, and says where each one goes", async () => {
+    // Two bare chevrons say "there is more this way", which is the one thing somebody already
+    // knew. The relation in front of the title says whether this is the blueprint's own order or
+    // merely the author's list order.
+    render(<OpenableCanvas canNavigate />);
+    clickNode("b");
+    await waitFor(() => expect(screen.getByText("Fields for Node b")).toBeInTheDocument());
+
+    const steps = screen.getByRole("navigation", { name: "Steps either side of this one" });
+    expect(within(steps).getByRole("button", { name: "Waits for: Node a" })).toBeInTheDocument();
+
+    fireEvent.click(within(steps).getByRole("button", { name: "Opens: Node c" }));
+    await waitFor(() => expect(screen.getByText("Fields for Node c")).toBeInTheDocument());
+  });
+
+  it("takes a sideways swipe across the page as the same step", async () => {
+    // The graph under it marks the whole pane as somewhere the page's own swipe must not go,
+    // because a swipe there pans the canvas. A page drawn on top of it is not the canvas.
+    render(<OpenableCanvas canNavigate />);
+    clickNode("b");
+    await waitFor(() => expect(screen.getByText("Fields for Node b")).toBeInTheDocument());
+
+    const surface = screen.getByRole("region", { name: "Node b" }).parentElement as HTMLElement;
+    fireEvent.wheel(surface, { deltaX: 60, deltaY: 0 });
+
+    await waitFor(() => expect(screen.getByText("Fields for Node c")).toBeInTheDocument());
+  });
+
+  it("leaves the steps out where nothing can move between nodes", async () => {
+    render(<OpenableCanvas />);
+    clickNode("b");
+    await waitFor(() => expect(screen.getByText("Fields for Node b")).toBeInTheDocument());
+
+    expect(
+      screen.queryByRole("navigation", { name: "Steps either side of this one" }),
+    ).not.toBeInTheDocument();
   });
 
   it("says an empty canvas is empty, not broken, and says what to do about it", () => {

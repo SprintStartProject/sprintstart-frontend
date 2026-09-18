@@ -88,6 +88,8 @@ export function BlueprintGraphEditor({
   const [detailsSaveError, setDetailsSaveError] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
+  /** Where the author was on their way to when the unsaved-changes question stopped them. */
+  const [phaseAfterDiscard, setPhaseAfterDiscard] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const toast = useToast();
@@ -99,6 +101,25 @@ export function BlueprintGraphEditor({
   });
   const phaseById = useMemo(() => new Map(phases.map((phase) => [phase.id, phase])), [phases]);
   const detailsPhase = detailsPhaseId ? (phaseById.get(detailsPhaseId) ?? null) : null;
+
+  /**
+   * Steps from the open phase to one of its neighbours.
+   *
+   * Through the same question closing asks, because it is the same risk: leaving a phase with
+   * unsaved fields loses them, and it makes no difference whether the author left through the way
+   * out or through the way onward. Answering "discard" then continues to where they were going,
+   * rather than dropping them back on the graph with the step they asked for unmade.
+   */
+  function goToPhase(id: string) {
+    const phase = phaseById.get(id);
+    if (!phase) return;
+    if (isDirty) {
+      setPhaseAfterDiscard(id);
+      setIsDiscardConfirmOpen(true);
+      return;
+    }
+    openPhaseDetails(phase);
+  }
 
   function openPhaseDetails(phase: BlueprintPhase) {
     setDetailsPhaseId(phase.id);
@@ -199,6 +220,7 @@ export function BlueprintGraphEditor({
         onCreateNode={(_kindId, graphX, graphY) => onCreateNode(graphX, graphY)}
         renderNode={(phase, graphNodeProps) => <GraphNodeCard phase={phase} {...graphNodeProps} />}
         openNodeId={isDetailsOpen ? detailsPhaseId : null}
+        onNavigateNodeDetail={goToPhase}
         onCloseNodeDetail={() => {
           // Without the mode there is no Cancel, so stepping back out is the only way to walk away
           // from an edit — and it has to say so rather than dropping the work on the floor.
@@ -306,14 +328,28 @@ export function BlueprintGraphEditor({
       <AlertDialog
         isOpen={isDiscardConfirmOpen}
         title="Discard your changes?"
-        description={<p>This phase has edits that have not been saved.</p>}
+        description={
+          <p>
+            This phase has edits that have not been saved.
+            {phaseAfterDiscard ? " Discarding them moves on to the next one." : ""}
+          </p>
+        }
         confirmLabel="Discard changes"
         cancelLabel="Keep editing"
         variant="danger"
-        onClose={() => setIsDiscardConfirmOpen(false)}
+        onClose={() => {
+          setIsDiscardConfirmOpen(false);
+          setPhaseAfterDiscard(null);
+        }}
         onConfirm={() => {
           if (detailsPhase) setMetadata(metadataOf(detailsPhase));
           setIsDiscardConfirmOpen(false);
+          const next = phaseAfterDiscard ? phaseById.get(phaseAfterDiscard) : null;
+          setPhaseAfterDiscard(null);
+          if (next) {
+            openPhaseDetails(next);
+            return;
+          }
           setIsDetailsOpen(false);
         }}
       />

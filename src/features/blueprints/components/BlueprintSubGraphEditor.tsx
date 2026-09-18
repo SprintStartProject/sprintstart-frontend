@@ -131,6 +131,8 @@ export function BlueprintSubGraphEditor({
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
+  /** Where the author was on their way to when the unsaved-changes question stopped them. */
+  const [nodeAfterDiscard, setNodeAfterDiscard] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const toast = useToast();
@@ -194,6 +196,24 @@ export function BlueprintSubGraphEditor({
     // `openNodeDetails` reads this render's phase, which is what its metadata has to come from.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, onOpenedNode, openNodeTitle]);
+
+  /**
+   * Steps from the open node to one of its neighbours.
+   *
+   * Through the same question closing asks, because it is the same risk: leaving a node with
+   * unsaved fields loses them, and it makes no difference whether it was left through the way out
+   * or through the way onward.
+   */
+  function goToNode(id: string) {
+    const node = nodeById.get(id);
+    if (!node) return;
+    if ((detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty)) {
+      setNodeAfterDiscard(id);
+      setIsDiscardConfirmOpen(true);
+      return;
+    }
+    openNodeDetails(node);
+  }
 
   function closeNodeDetails() {
     setIsDetailsOpen(false);
@@ -312,6 +332,7 @@ export function BlueprintSubGraphEditor({
         }
         renderNode={(node, graphNodeProps) => <SubGraphNodeCard node={node} {...graphNodeProps} />}
         openNodeId={isDetailsOpen ? detailsNodeId : null}
+        onNavigateNodeDetail={goToNode}
         onCloseNodeDetail={() => {
           // Without the mode there is no Cancel, so stepping back out is the only way to walk away
           // from an edit — and it has to say so rather than dropping the work on the floor.
@@ -444,16 +465,28 @@ export function BlueprintSubGraphEditor({
         isOpen={isDiscardConfirmOpen}
         title="Discard your changes?"
         description={
-          <p>This {detailsStep ? "step" : "knowledge check"} has edits that have not been saved.</p>
+          <p>
+            This {detailsStep ? "step" : "knowledge check"} has edits that have not been saved.
+            {nodeAfterDiscard ? " Discarding them moves on to the next one." : ""}
+          </p>
         }
         confirmLabel="Discard changes"
         cancelLabel="Keep editing"
         variant="danger"
-        onClose={() => setIsDiscardConfirmOpen(false)}
+        onClose={() => {
+          setIsDiscardConfirmOpen(false);
+          setNodeAfterDiscard(null);
+        }}
         onConfirm={() => {
           if (detailsStep) setStepMetadata(stepMetadataOf(detailsStep));
           if (detailsQuestion) setQuestionMetadata(questionMetadataOf(detailsQuestion));
           setIsDiscardConfirmOpen(false);
+          const next = nodeAfterDiscard ? nodeById.get(nodeAfterDiscard) : null;
+          setNodeAfterDiscard(null);
+          if (next) {
+            openNodeDetails(next);
+            return;
+          }
           setIsDetailsOpen(false);
         }}
       />

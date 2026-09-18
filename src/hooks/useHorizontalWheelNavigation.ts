@@ -35,6 +35,19 @@ type UseHorizontalWheelNavigationOptions = {
   onPrevious: () => void;
   /** Set false to leave the gesture alone, e.g. while a dialog is open. */
   enabled?: boolean;
+  /**
+   * How far out the gesture counts, and how far up the ignore markers are read.
+   *
+   * `"page"` is the default and what a page's tab bar wants: a swipe anywhere counts, including
+   * the empty room below short content, and anything marked {@link SWIPE_IGNORE_ATTRIBUTE}
+   * anywhere above the pointer opts out.
+   *
+   * `"self"` is for a layer that sits *inside* something that already opted out — a page opened
+   * over a graph canvas, say. The gesture then has to start inside the element, and the walk for
+   * ignore markers stops there, so the canvas's own opt-out no longer covers what is drawn on top
+   * of it. Markers inside the element still count.
+   */
+  boundary?: "page" | "self";
 };
 
 /**
@@ -87,6 +100,7 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
   onNext,
   onPrevious,
   enabled = true,
+  boundary: scope = "page",
 }: UseHorizontalWheelNavigationOptions): RefCallback<T> {
   const [element, setElement] = useState<T | null>(null);
 
@@ -115,7 +129,7 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
      * body, so a swipe that starts inside a horizontal scroller or anything marked
      * `data-swipe-ignore` is left to whatever owns it.
      */
-    const boundary = element.ownerDocument.body;
+    const boundary = scope === "self" ? element : element.ownerDocument.body;
 
     let travelled = 0;
     /** -1 previous, 1 next, 0 nothing yet -- for this gesture. */
@@ -126,6 +140,10 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
 
     function handleWheel(event: WheelEvent) {
       if (!element) return;
+      // A layer that owns the gesture only within itself never sees one that began outside it.
+      if (scope === "self" && !(event.target instanceof Node && element.contains(event.target))) {
+        return;
+      }
 
       // The axis is decided once, on the first event of the gesture, and
       // then held: a real swipe drifts vertically halfway through, and
@@ -188,7 +206,7 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
       window.removeEventListener("wheel", handleWheel);
       window.clearTimeout(endTimer);
     };
-  }, [element, enabled]);
+  }, [element, enabled, scope]);
 
   return useCallback((node: T | null) => setElement(node), []);
 }

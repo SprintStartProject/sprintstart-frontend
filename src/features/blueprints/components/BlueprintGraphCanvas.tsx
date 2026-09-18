@@ -6,10 +6,13 @@ import {
   useState,
   type KeyboardEvent,
   type ReactNode,
+  type RefCallback,
 } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Flag,
   Info,
   KeyRound,
@@ -22,7 +25,10 @@ import {
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
-import { SWIPE_IGNORE_ATTRIBUTE } from "../../../hooks/useHorizontalWheelNavigation.ts";
+import {
+  SWIPE_IGNORE_ATTRIBUTE,
+  useHorizontalWheelNavigation,
+} from "../../../hooks/useHorizontalWheelNavigation.ts";
 import { LOCK_SENTENCE } from "../../graph-diagram/lockWords.ts";
 import {
   CanvasButton,
@@ -163,6 +169,17 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   openNodeId?: string | null;
   onCloseNodeDetail?: () => void;
   /**
+   * Moves the opened node to one of its neighbours, without going back out to the graph first.
+   *
+   * Given this, the opened page grows a way forward and a way back — and a two-finger swipe does
+   * the same thing. Reading a blueprint is walking a chain, and having to close a phase, find the
+   * next one on the canvas and open it is three gestures for the one step that was meant.
+   *
+   * The caller does the moving rather than this canvas, because a node with unsaved fields may
+   * not be left silently — which is the same reason {@link Props.openNodeId} is theirs to hold.
+   */
+  onNavigateNodeDetail?: (id: string) => void;
+  /**
    * How firm or how far along this arrow is, where that is a question the graph can answer.
    *
    * Left out by every Blueprint surface: a blueprint is a template, so no arrow on one has been
@@ -256,6 +273,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
   renderNodeDetail,
   openNodeId = null,
   onCloseNodeDetail,
+  onNavigateNodeDetail,
   edgeTone,
 }: Props<TNode>) {
   const camera = useRef<JourneyCameraHandle>(null);
@@ -570,6 +588,61 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
   const detail = openNode && renderNodeDetail ? renderNodeDetail(openNode) : null;
 
   /**
+   * Where forward and back go from the opened node.
+   *
+   * The arrows follow the arrows: back is something this node waits for, forward is something it
+   * opens up. That is the order a blueprint actually has, and the one somebody reading it is
+   * walking.
+   *
+   * Where a node has neither — most of them, on a blueprint nobody has connected yet — the step
+   * falls back to the author's own order, which is the order the nodes were handed to this canvas.
+   * A control that does nothing on most of a graph teaches people it is broken; one that says
+   * which of the two it just did is honest about the difference. That is what the labels are for.
+   */
+  const neighbours = useMemo(() => {
+    if (!openNode) return { previous: null, next: null };
+    const index = nodes.findIndex((node) => node.id === openNode.id);
+    const waitsFor = nodes.filter((node) => openNode.blockerIds.includes(node.id));
+    const opens = nodes.filter((node) => node.blockerIds.includes(openNode.id));
+    return {
+      // The last prerequisite the author wrote and the first thing it opens: the nearest neighbour
+      // on each side, by the only order there is to be near in.
+      previous: waitsFor.length
+        ? { node: waitsFor[waitsFor.length - 1], relation: "Waits for" }
+        : index > 0
+          ? { node: nodes[index - 1], relation: "Previous" }
+          : null,
+      next: opens.length
+        ? { node: opens[0], relation: "Opens" }
+        : index >= 0 && index < nodes.length - 1
+          ? { node: nodes[index + 1], relation: "Next" }
+          : null,
+    };
+  }, [nodes, openNode]);
+
+  const goToNeighbour = useCallback(
+    (side: "previous" | "next") => {
+      const target = neighbours[side];
+      if (target) onNavigateNodeDetail?.(target.node.id);
+    },
+    [neighbours, onNavigateNodeDetail],
+  );
+
+  /**
+   * A two-finger swipe across the opened page steps to the neighbour the arrows point at.
+   *
+   * Scoped to the page itself: the graph under it marks the whole pane as somewhere the page's own
+   * swipe must keep its hands off, because a swipe there pans the canvas. A page drawn on top of
+   * it is not the canvas, and this is the one gesture it wants.
+   */
+  const swipeRef = useHorizontalWheelNavigation<HTMLDivElement>({
+    onNext: () => goToNeighbour("next"),
+    onPrevious: () => goToNeighbour("previous"),
+    enabled: !!detail && !!onNavigateNodeDetail,
+    boundary: "self",
+  });
+
+  /**
    * Flies back out when the opened node is shut.
    *
    * Only on the way out. Flying in is done before the caller is told the node was clicked, so that
@@ -580,6 +653,11 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
     const previous = wasOpenRef.current;
     wasOpenRef.current = openNodeId;
     if (previous && !openNodeId) void camera.current?.flyToFit();
+    // Stepping from one node to the next takes the graph underneath with it, so closing lands on
+    // the node that was actually being read rather than on the one it was entered from.
+    if (previous && openNodeId && previous !== openNodeId) {
+      void camera.current?.zoomIntoNode(openNodeId, 260);
+    }
   }, [openNodeId]);
 
   /** Escape is how everything in this app that took the screen gives it back. */
@@ -709,11 +787,14 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
             cover={
               detail && openNode ? (
                 <NodeCover
-                  key={openNode.id}
                   title={detail.title ?? openNode.title}
                   context={title}
                   footer={detail.footer}
                   onBack={() => onCloseNodeDetail?.()}
+                  surfaceRef={swipeRef}
+                  previous={onNavigateNodeDetail ? neighbours.previous : null}
+                  next={onNavigateNodeDetail ? neighbours.next : null}
+                  onGo={goToNeighbour}
                 >
                   {detail.body}
                 </NodeCover>
@@ -959,6 +1040,54 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
 
 const zero: GraphPoint = { x: 0, y: 0 };
 
+/** Where one step forward or back from an opened node goes, and what that step is. */
+type NodeStep = { node: { id: string; title: string }; relation: string };
+
+/**
+ * One step either side of the opened node.
+ *
+ * Carries the title, not only a chevron: two chevrons say "there is more this way", which is the
+ * one thing somebody already knew. The relation in front of it says whether this is the blueprint's
+ * own order or merely the author's list order, so a step never quietly claims to be a prerequisite.
+ *
+ * A side with nowhere to go is drawn disabled rather than removed, because the pair is also how
+ * somebody learns the swipe exists, and a control that comes and goes is one nobody trusts.
+ */
+function StepButton({
+  step,
+  side,
+  onGo,
+}: {
+  step: NodeStep | null;
+  side: "previous" | "next";
+  onGo: (side: "previous" | "next") => void;
+}) {
+  const Chevron = side === "previous" ? ChevronLeft : ChevronRight;
+  const label = step
+    ? `${step.relation}: ${step.node.title}`
+    : side === "previous"
+      ? "Nothing before this one"
+      : "Nothing after this one";
+
+  return (
+    <button
+      type="button"
+      disabled={!step}
+      onClick={() => onGo(side)}
+      aria-label={label}
+      title={`${label} (or swipe sideways)`}
+      className={`flex max-w-40 items-center gap-1 rounded-xl border border-app-border/70 px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+        step
+          ? "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+          : "text-app-text-subtle"
+      } ${side === "next" ? "flex-row-reverse" : ""}`}
+    >
+      <Chevron className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span className="hidden min-w-0 truncate sm:inline">{step?.node.title ?? "—"}</span>
+    </button>
+  );
+}
+
 /**
  * A node zoomed into until it is a page, with the way back out along the top.
  *
@@ -976,6 +1105,10 @@ function NodeCover({
   context,
   footer,
   onBack,
+  surfaceRef,
+  previous,
+  next,
+  onGo,
   children,
 }: {
   title: string;
@@ -983,6 +1116,11 @@ function NodeCover({
   context?: string;
   footer?: ReactNode;
   onBack: () => void;
+  /** Takes the swipe gesture, so the whole page is what a two-finger flick lands on. */
+  surfaceRef?: RefCallback<HTMLDivElement>;
+  previous: NodeStep | null;
+  next: NodeStep | null;
+  onGo: (side: "previous" | "next") => void;
   children: ReactNode;
 }) {
   return (
@@ -993,6 +1131,7 @@ function NodeCover({
       shortcut rather than the only way out.
     */
     <div
+      ref={surfaceRef}
       className="absolute inset-0 flex items-stretch justify-center bg-app-bg-soft/70 p-3 backdrop-blur-sm sm:p-6"
       onPointerDown={(event) => {
         // Only the backdrop itself. A pointer that went down inside the page and came up out here
@@ -1027,9 +1166,25 @@ function NodeCover({
             them was a glyph somebody had to find and aim at, next to a link that already said
             where it went in words.
           */}
-          <h3 className="mt-1.5 text-lg leading-snug font-bold text-app-text sm:text-xl">
-            {title}
-          </h3>
+          <div className="mt-1.5 flex items-start justify-between gap-3">
+            <h3 className="min-w-0 flex-1 text-lg leading-snug font-bold text-app-text sm:text-xl">
+              {title}
+            </h3>
+            {/*
+              In the header rather than as arrows floating beside the page. The page is as wide as
+              the canvas allows, so on most screens there is no room beside it to float anything —
+              and an arrow out there could say only "that way", where these say where they go.
+            */}
+            {previous || next ? (
+              <nav
+                aria-label="Steps either side of this one"
+                className="flex shrink-0 items-center gap-1"
+              >
+                <StepButton step={previous} side="previous" onGo={onGo} />
+                <StepButton step={next} side="next" onGo={onGo} />
+              </nav>
+            ) : null}
+          </div>
         </header>
 
         <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
