@@ -438,7 +438,27 @@ describe("BlueprintGraphCanvas", () => {
     const edge = onlyEdge();
     // Out of one side and back in on the same one, level with both cards' middles.
     expect(edge.start).toEqual({ x: 112, y: 0 });
-    expect(edge.end).toEqual({ x: 118, y: 120 });
+    expect(edge.end).toEqual({ x: 112, y: 120 });
+  });
+
+  it("never doubles back through the card it is aiming at", () => {
+    // A row is routed around only where the edge passes *between* the two cards. The old rule --
+    // any row below one centre and above the other -- caught the target's own row whenever a
+    // neighbour sat a few pixels higher than the target. The waypoint then landed below the point
+    // the edge is drawn to, and the line dived past the card and came back up to its own head.
+    renderCanvas([
+      at("top", 0, -750),
+      at("target", -890, -301, ["top"]),
+      at("neighbour", -418, -310),
+      at("further", 49, -310),
+    ]);
+
+    // One curve, not a detour through the row it lands in.
+    const drawn = [...document.querySelectorAll("path[data-edge]")].map(
+      (path) => path.getAttribute("d") ?? "",
+    );
+    expect(drawn).toHaveLength(1);
+    expect(drawn[0].match(/ C /g)).toHaveLength(1);
   });
 
   it("draws the arrowhead in the line's own ink, at its end", () => {

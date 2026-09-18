@@ -781,13 +781,16 @@ export function JourneyCanvas<TNode extends LayoutNode>({
           axis === "down"
             ? { x: blockerPosition.x, y: blockerPosition.y + nodeSize.height / 2 }
             : { x: blockerPosition.x + (sideways * nodeSize.width) / 2, y: blockerPosition.y };
+        // On the card's edge, not hovering a few pixels off it. An arrow that stops short leaves a
+        // gap between its head and the thing it points at, and the head then reads as an object of
+        // its own rather than as the end of the line.
         const to =
           axis === "down"
-            ? { x: nodePosition.x, y: nodePosition.y - nodeSize.height / 2 - 6 }
+            ? { x: nodePosition.x, y: nodePosition.y - nodeSize.height / 2 }
             : axis === "across"
-              ? { x: nodePosition.x - sideways * (nodeSize.width / 2 + 6), y: nodePosition.y }
-              : // Back in on the side it went out on, clear of the card rather than into its edge.
-                { x: nodePosition.x + sideways * (nodeSize.width / 2 + 6), y: nodePosition.y };
+              ? { x: nodePosition.x - (sideways * nodeSize.width) / 2, y: nodePosition.y }
+              : // Back in on the side it went out on.
+                { x: nodePosition.x + (sideways * nodeSize.width) / 2, y: nodePosition.y };
         const tone = edgeTone?.(nodeById.get(blockerId)!, node) ?? "waiting";
         const inChain =
           !!emphasisSourceId &&

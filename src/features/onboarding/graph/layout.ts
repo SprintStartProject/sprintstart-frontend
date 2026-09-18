@@ -306,7 +306,14 @@ export function routeEdges(
       if (!from || to.y - from.y <= footprint.height) return;
       const waypoints: GraphPoint[] = [];
       rowYs
-        .filter((y) => y > from.y + 1 && y < to.y - 1)
+        // A row the edge actually passes *between* the two cards, which is a row clear of both of
+        // them: cards whose centres are less than a card apart overlap, so such a row is not
+        // between anything. The old test — any row strictly below the one centre and above the
+        // other — caught the target's own row whenever a neighbour sat a few pixels higher than
+        // the target itself. The waypoint then landed *below* the point the edge is drawn to, and
+        // the curve dived past the card it was aiming at and came back up to meet its own
+        // arrowhead. Rows here are centres; the edge is drawn between the cards' edges.
+        .filter((y) => y > from.y + footprint.height && y < to.y - footprint.height)
         .forEach((y) => {
           const xs = rows.get(y)!;
           const t = (y - from.y) / (to.y - from.y);
