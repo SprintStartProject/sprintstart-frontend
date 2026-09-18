@@ -78,14 +78,24 @@ type ViewMode = "list" | "graph";
 
 const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
 
-type NavigationState = { focusQuestionId?: string; choosePhase?: boolean } | null;
+type NavigationState = {
+  focusQuestionId?: string;
+  choosePhase?: boolean;
+  /** A phase to land on, set by anything that sends the member here pointing at one. */
+  openPhaseId?: string;
+} | null;
 
 /** The phase a visit opens on: what the member was sent for, else where they are, else a choice. */
 function initialPhaseId(
   path: OnboardingPathEndpoint,
   phases: OnboardingPhaseEndpoint[],
   focusItemId: string | undefined,
+  openPhaseId: string | undefined,
 ): string {
+  // A phase asked for by name wins over everything: whoever sent the member here was pointing at
+  // it, and landing them somewhere else answers a question they did not ask.
+  const named = openPhaseId ? phases.find((phase) => phase.id === openPhaseId) : undefined;
+  if (named) return named.id;
   const requested = focusItemId
     ? phases.find((phase) => phaseItems(phase).some((item) => item.id === focusItemId))
     : undefined;
@@ -133,6 +143,8 @@ export function OnBoardingPage() {
   // Set by the step page when a knowledge-check question is what stands between the user and the
   // rest of their path, so this page can land on the question's phase.
   const focusItemId = routeStepId ?? navigationState?.focusQuestionId;
+  // Set by the board's "where you are" strip when a phase on it is pressed.
+  const openPhaseId = navigationState?.openPhaseId;
 
   const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
@@ -147,7 +159,9 @@ export function OnBoardingPage() {
     routeStepId ? "list" : readJourneyView(HIRE_JOURNEY_VIEW_KEY).mode,
   );
   const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
-    () => readJourneyView(HIRE_JOURNEY_VIEW_KEY).graphPhaseId,
+    // A phase arrived at by name opens *inside* itself on the graph, the same way it opens selected
+    // in the list — the two views' idea of "here" has to be the one place the member was sent.
+    () => openPhaseId ?? readJourneyView(HIRE_JOURNEY_VIEW_KEY).graphPhaseId,
   );
   // The item unfolded in the list, and the one zoomed into on the graph.
   const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
@@ -166,11 +180,11 @@ export function OnBoardingPage() {
       setSelectedPhaseId((current) => {
         const ordered = sortedPhases(next);
         if (keepSelection && ordered.some((phase) => phase.id === current)) return current;
-        return initialPhaseId(next, ordered, focusItemId);
+        return initialPhaseId(next, ordered, focusItemId, openPhaseId);
       });
       setLoadingState("success");
     },
-    [focusItemId],
+    [focusItemId, openPhaseId],
   );
 
   // ── Loading ─────────────────────────────────────────────────

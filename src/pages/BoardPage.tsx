@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   ListTree,
   Maximize2,
+  Milestone,
   Minimize2,
   RefreshCw,
   Sparkles,
@@ -39,6 +40,7 @@ import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
+import { readPathWindowShown, writePathWindowShown } from "../features/board/layout/pathWindowFold";
 import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
 import {
   ALL_SECTIONS,
@@ -278,6 +280,37 @@ export function BoardPage() {
     },
     [boardId],
   );
+
+  const [isPathShown, setIsPathShown] = useState(true);
+  const [pathReadFor, setPathReadFor] = useState<string | null>(null);
+
+  if (storedFor !== pathReadFor) {
+    setPathReadFor(storedFor);
+    setIsPathShown(readPathWindowShown(boardId));
+  }
+
+  const showPathWindow = useCallback(
+    (shown: boolean) => {
+      setIsPathShown(shown);
+      writePathWindowShown(boardId, shown);
+    },
+    [boardId],
+  );
+
+  /**
+   * Takes the path strip off the board, with the same undo the board gives a dismissed card.
+   *
+   * No server call behind it and nothing to wait for, so the undo is the toast alone rather than a
+   * held-back write — and the switch in the rail is the way back afterwards, which is why this is
+   * allowed to be a one-press removal at all.
+   */
+  const removePathWindow = useCallback(() => {
+    showPathWindow(false);
+    toast.info("Taken off your board", {
+      description: "You can put it back from the switches on the right.",
+      action: { label: "Undo", onClick: () => showPathWindow(true) },
+    });
+  }, [showPathWindow, toast]);
 
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [pinsReadFor, setPinsReadFor] = useState<string | null>(null);
@@ -974,7 +1007,7 @@ export function BoardPage() {
           On the board rather than in the header. The header was a place for furniture about the
           page; this is about the work, and it belongs where the work is.
         */}
-        <BoardPathWindow />
+        {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
         {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
             space: the board is a column of cards and the margin is where a hand rests. So the
             offers live there — always in reach, never in the way, and out of the row above the
@@ -1059,6 +1092,22 @@ export function BoardPage() {
                 aria-label="New area"
               >
                 <FolderPlus className="h-4 w-4" aria-hidden="true" />
+              </Button>
+
+              {/* The strip saying where the hire stands, on or off this board. The switch lives
+                  here rather than on the strip, because the strip is the thing being switched: a
+                  control that takes its own surface away leaves nothing to press to get it back. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() => showPathWindow(!isPathShown)}
+                disabled={!board}
+                aria-pressed={isPathShown}
+                title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
+                aria-label={isPathShown ? "Hide where you are in your path" : "Show where you are"}
+              >
+                <Milestone className="h-4 w-4" aria-hidden="true" />
               </Button>
 
               {/* Which cards, by where they came from. It sits below the switches that change the
