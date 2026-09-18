@@ -163,6 +163,10 @@ export function ChatPage() {
     [newRequest, setNewRequest, handleSubmit],
   );
 
+  const handleToggleFilters = useCallback(() => {
+    setShowFilters((v) => !v);
+  }, [setShowFilters]);
+
   // Barrel roll side-effect
   useEffect(() => {
     if (isBarrelRolling) {
@@ -544,7 +548,7 @@ export function ChatPage() {
           sourcesLoading={sourcesLoading}
           textareaRef={textareaRef}
           showFilters={showFilters}
-          onToggleFilters={() => setShowFilters((v) => !v)}
+          onToggleFilters={handleToggleFilters}
           from={from}
           setFrom={setFrom}
           to={to}

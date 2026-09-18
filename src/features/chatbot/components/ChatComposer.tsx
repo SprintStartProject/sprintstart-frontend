@@ -13,6 +13,13 @@ function formatDateFilterLabel(from: string, to: string): string {
   return "";
 }
 
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 type ChatComposerProps = {
   /** Current draft text. */
   value: string;
@@ -158,10 +165,12 @@ export function ChatComposer({
 
   const setPastDays = (days: number) => {
     const now = new Date();
-    const past = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    setFrom(past.toISOString().split("T")[0]);
-    setTo(now.toISOString().split("T")[0]);
+    const past = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+    setFrom(formatLocalDate(past));
+    setTo(formatLocalDate(now));
   };
+
+  const today = formatLocalDate(new Date());
 
   const diffDays =
     from && to
@@ -172,8 +181,15 @@ export function ChatComposer({
       : null;
 
   const isAllTime = !from && !to;
-  const isPast7Days = diffDays === 7;
-  const isPast30Days = diffDays === 30;
+  const isPast7Days = to === today && diffDays === 7;
+  const isPast30Days = to === today && diffDays === 30;
+
+  const presetClass = (active: boolean) =>
+    `rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+      active
+        ? "bg-app-brand font-semibold text-white shadow-xs"
+        : "border border-app-border bg-app-surface text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+    }`;
 
   return (
     <footer className="app-page-frame shrink-0 border-t border-app-border bg-app-bg py-4">
@@ -193,6 +209,7 @@ export function ChatComposer({
             </span>
 
             {sourceSystems.map((source) => {
+              // Fallback serves as runtime defense against unmapped or unexpected source values
               const meta = SOURCE_META[source] ?? {
                 type: source,
                 description: source,
@@ -204,6 +221,7 @@ export function ChatComposer({
                   key={source}
                   type="button"
                   onClick={() => toggleSourceSystem(source)}
+                  aria-label={`Remove ${meta.type} filter`}
                   title={`Remove ${meta.type} filter`}
                   className="group inline-flex items-center gap-1.5 rounded-full border border-app-brand-border bg-app-brand/10 px-2.5 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:border-app-danger-border hover:bg-app-danger-bg hover:text-app-danger-text"
                 >
@@ -221,6 +239,7 @@ export function ChatComposer({
                   setFrom("");
                   setTo("");
                 }}
+                aria-label="Clear date filter"
                 title="Clear date filter"
                 className="group inline-flex items-center gap-1.5 rounded-full border border-app-brand-border bg-app-brand/10 px-2.5 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:border-app-danger-border hover:bg-app-danger-bg hover:text-app-danger-text"
               >
@@ -287,8 +306,12 @@ export function ChatComposer({
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={centralSpringToken}
                 onKeyDown={(e) => {
-                  // Prevent Enter key in filter popover from submitting the chat message form
-                  if (e.key === "Enter") e.stopPropagation();
+                  // Prevent Enter key in inputs from triggering implicit form submission,
+                  // while preserving keyboard activation for buttons inside the popover.
+                  if (e.key === "Enter" && (e.target as HTMLElement)?.tagName === "INPUT") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
                 }}
                 className="absolute bottom-full left-0 z-30 mb-3 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-app-border/80 bg-app-surface/95 p-4 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:w-[380px]"
               >
@@ -348,6 +371,7 @@ export function ChatComposer({
                     <div className="grid grid-cols-2 gap-2">
                       {availableSources.map((source) => {
                         const selected = sourceSystems.includes(source);
+                        // Fallback serves as runtime defense against unmapped or unexpected source values
                         const meta = SOURCE_META[source] ?? {
                           type: source,
                           description: source,
@@ -421,37 +445,28 @@ export function ChatComposer({
                   <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
+                      aria-pressed={isAllTime}
                       onClick={() => {
                         setFrom("");
                         setTo("");
                       }}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                        isAllTime
-                          ? "bg-app-brand font-semibold text-white shadow-xs"
-                          : "border border-app-border bg-app-surface text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                      }`}
+                      className={presetClass(isAllTime)}
                     >
                       All time
                     </button>
                     <button
                       type="button"
+                      aria-pressed={isPast7Days}
                       onClick={() => setPastDays(7)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                        isPast7Days
-                          ? "bg-app-brand font-semibold text-white shadow-xs"
-                          : "border border-app-border bg-app-surface text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                      }`}
+                      className={presetClass(isPast7Days)}
                     >
                       Past 7 days
                     </button>
                     <button
                       type="button"
+                      aria-pressed={isPast30Days}
                       onClick={() => setPastDays(30)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                        isPast30Days
-                          ? "bg-app-brand font-semibold text-white shadow-xs"
-                          : "border border-app-border bg-app-surface text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                      }`}
+                      className={presetClass(isPast30Days)}
                     >
                       Past 30 days
                     </button>
@@ -459,7 +474,13 @@ export function ChatComposer({
 
                   {/* Custom Inputs */}
                   <div className="flex items-center gap-2 pt-1">
-                    <div className="flex flex-1 items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-2 py-1.5 transition-colors focus-within:border-app-brand-border-strong focus-within:ring-1 focus-within:ring-app-focus">
+                    <div
+                      className={`flex flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors focus-within:ring-1 focus-within:ring-app-focus ${
+                        rangeInvalid
+                          ? "border-app-danger-border focus-within:border-app-danger-border"
+                          : "border-app-border bg-app-surface focus-within:border-app-brand-border-strong"
+                      }`}
+                    >
                       <span className="text-[10px] font-semibold tracking-wide text-app-text-disabled uppercase">
                         From
                       </span>
@@ -470,13 +491,25 @@ export function ChatComposer({
                         max={to || undefined}
                         value={from}
                         onChange={(e) => setFrom(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
                         className="w-full min-w-0 bg-transparent text-xs text-app-text outline-none"
                       />
                     </div>
 
                     <span className="text-xs text-app-text-disabled">→</span>
 
-                    <div className="flex flex-1 items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-2 py-1.5 transition-colors focus-within:border-app-brand-border-strong focus-within:ring-1 focus-within:ring-app-focus">
+                    <div
+                      className={`flex flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors focus-within:ring-1 focus-within:ring-app-focus ${
+                        rangeInvalid
+                          ? "border-app-danger-border focus-within:border-app-danger-border"
+                          : "border-app-border bg-app-surface focus-within:border-app-brand-border-strong"
+                      }`}
+                    >
                       <span className="text-[10px] font-semibold tracking-wide text-app-text-disabled uppercase">
                         To
                       </span>
@@ -487,6 +520,12 @@ export function ChatComposer({
                         min={from || undefined}
                         value={to}
                         onChange={(e) => setTo(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
                         className="w-full min-w-0 bg-transparent text-xs text-app-text outline-none"
                       />
                     </div>
