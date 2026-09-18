@@ -15,6 +15,7 @@ import { useOpenEscalationCount } from "../../features/knowledge-request/useOpen
 import {
   AdminIcon,
   ArrivalStepsIcon,
+  BlueprintsIcon,
   BoardIcon,
   ChatIcon,
   DashboardIcon,
@@ -105,11 +106,6 @@ const navItems: SidebarNavItem[] = [
 
 const projectManagerNavItems: SidebarNavItem[] = [
   {
-    label: "Blueprints",
-    path: "/blueprints",
-    icon: OnboardingIcon,
-  },
-  {
     label: "PM Dashboard",
     path: "/pm-dashboard",
     icon: PmDashboardIcon,
@@ -118,6 +114,14 @@ const projectManagerNavItems: SidebarNavItem[] = [
     label: "Data Ingestion",
     path: "/data-ingestion",
     icon: DataIngestionIcon,
+  },
+  // After the material it is written from. A blueprint is authored against what
+  // the project has already told the system about itself, so a PM setting one up
+  // for the first time meets the two in the order they are done in.
+  {
+    label: "Blueprints",
+    path: "/blueprints",
+    icon: BlueprintsIcon,
   },
   // The steps a new hire is walked through on arrival — set up here by the PM,
   // which is why it sits with the other things a PM prepares rather than in the
