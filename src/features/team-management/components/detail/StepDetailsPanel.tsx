@@ -1,4 +1,5 @@
 import {
+  Check,
   CheckCircle2,
   Circle,
   MessageSquareText,
@@ -67,6 +68,10 @@ type StepDetailsPanelProps = {
   onReorderTasks?: (activeTaskId: string, overTaskId: string) => void;
   /** Answers the step's open skip request; the review controls only show when this is given. */
   onReviewSkip?: (skipId: string, action: SkipReviewAction, comment: string) => Promise<void>;
+  /** Marks a piece of feedback as read; the button only shows when this is given. */
+  onMarkFeedbackRead?: (feedbackId: string) => void;
+  /** The feedback currently being marked, to hold its button while the request runs. */
+  markingFeedbackId?: string | null;
 };
 
 export function StepDetailsPanel({
@@ -98,6 +103,8 @@ export function StepDetailsPanel({
   getStepStatusStyles,
   onReorderTasks,
   onReviewSkip,
+  onMarkFeedbackRead,
+  markingFeedbackId = null,
 }: StepDetailsPanelProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
@@ -312,11 +319,16 @@ export function StepDetailsPanel({
         {feedbackItems.length > 0
           ? feedbackItems.map((feedback) => {
               const rating = getFeedbackRating(feedback.helpful);
+              // Feedback built from the step alone carries no read state -- neither badge nor button.
+              const isUnread = feedback.read === false && !feedback.readAt;
+              const isRead = feedback.read === true || !!feedback.readAt;
 
               return (
                 <div
                   key={feedback.id}
-                  className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3"
+                  className={`rounded-2xl border px-4 py-3 transition-opacity ${rating.cardClassName} ${
+                    isRead ? "opacity-75" : ""
+                  }`}
                 >
                   <div className="flex items-start gap-3">
                     <span
@@ -333,11 +345,15 @@ export function StepDetailsPanel({
                         >
                           {rating.label}
                         </span>
-                        {feedback.read === false && (
+                        {isUnread ? (
                           <Badge variant="warning" size="sm">
                             Unread
                           </Badge>
-                        )}
+                        ) : isRead ? (
+                          <Badge variant="neutral" size="sm">
+                            Read
+                          </Badge>
+                        ) : null}
                       </div>
 
                       <p className="mt-2 text-sm text-app-text">{feedback.message}</p>
@@ -352,6 +368,19 @@ export function StepDetailsPanel({
                         </p>
                       )}
                     </div>
+
+                    {isUnread && onMarkFeedbackRead ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={<Check className="h-3.5 w-3.5" />}
+                        loading={markingFeedbackId === feedback.id}
+                        onClick={() => onMarkFeedbackRead(feedback.id)}
+                        className="shrink-0"
+                      >
+                        Mark read
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -601,8 +630,9 @@ function getFeedbackRating(helpful?: boolean | null) {
     return {
       label: "Helpful",
       icon: <ThumbsUp className="h-4 w-4" />,
-      iconClassName: "bg-app-success-bg text-app-success-solid",
-      badgeClassName: "bg-app-success-bg text-app-success-solid",
+      iconClassName: "bg-app-surface text-app-success-solid",
+      badgeClassName: "bg-app-surface text-app-success-solid",
+      cardClassName: "border-app-success-border bg-app-success-bg",
     };
   }
 
@@ -610,16 +640,18 @@ function getFeedbackRating(helpful?: boolean | null) {
     return {
       label: "Not helpful",
       icon: <ThumbsDown className="h-4 w-4" />,
-      iconClassName: "bg-app-danger-bg text-app-danger-text",
-      badgeClassName: "bg-app-danger-bg text-app-danger-text",
+      iconClassName: "bg-app-surface text-app-danger-text",
+      badgeClassName: "bg-app-surface text-app-danger-text",
+      cardClassName: "border-app-danger-border bg-app-danger-bg",
     };
   }
 
   return {
     label: "Feedback",
     icon: <MessageSquareText className="h-4 w-4" />,
-    iconClassName: "bg-app-surface text-app-text-muted",
-    badgeClassName: "bg-app-border-muted text-app-text-muted",
+    iconClassName: "bg-app-surface text-app-brand-text",
+    badgeClassName: "bg-app-surface text-app-brand-text",
+    cardClassName: "border-app-brand-border bg-app-brand-soft",
   };
 }
 

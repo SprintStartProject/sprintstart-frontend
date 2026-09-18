@@ -1030,6 +1030,8 @@ export function TeamMemberDetailPage() {
             formatMinutes={formatMinutes}
             getStepStatusStyles={getStepStatusStyles}
             onReviewSkip={reviewSkip}
+            onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+            markingFeedbackId={markingFeedbackId}
             onReorderTasks={(activeTaskId, overTaskId) =>
               void handleReorderTasks(step.id, activeTaskId, overTaskId)
             }
