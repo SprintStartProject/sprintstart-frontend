@@ -207,21 +207,6 @@ describe("BlueprintGraphCanvas", () => {
     expect(screen.queryByText(/Click a node to edit it/)).not.toBeInTheDocument();
   });
 
-  it("offers a way into a node only where there is something to open", () => {
-    // Queried by label attribute rather than accessible name: a React Flow node is left
-    // `visibility: hidden` until it has been measured, and the name computation returns "" for
-    // anything hidden — so `getByRole(..., { name })` finds nothing inside one under jsdom.
-    const openControl = (nodeId: string) =>
-      screen.getByTestId(`graph-node-${nodeId}`).querySelector('[aria-label^="Open "]');
-
-    const { unmount } = renderCanvas([node("a")], { onOpenNode: vi.fn() });
-    expect(openControl("a")).toHaveAttribute("aria-label", "Open Node a");
-    unmount();
-
-    renderCanvas([node("a")]);
-    expect(openControl("a")).toBeNull();
-  });
-
   it("offers the tools that change the graph only while it can be changed", () => {
     const { unmount } = renderCanvas([node("a")], { onCreateNode: noop });
     expect(screen.getByRole("button", { name: "Tidy up" })).toBeInTheDocument();

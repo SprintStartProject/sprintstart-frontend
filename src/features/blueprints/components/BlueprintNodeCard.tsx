@@ -1,6 +1,5 @@
-import { KeyRound, Maximize2, type LucideIcon } from "lucide-react";
+import { KeyRound, type LucideIcon } from "lucide-react";
 import { Badge, type BadgeVariant } from "../../../components/ui/Badge.tsx";
-import { Button } from "../../../components/ui/Button.tsx";
 import { compactTitlePx, detailForZoom } from "../../graph-diagram/graphLayout.ts";
 import type { BlueprintGraphCanvasNodeProps } from "./BlueprintGraphCanvas.tsx";
 
@@ -156,7 +155,6 @@ export function BlueprintNodeCard({
   requirements,
   highlighted = false,
   zoom,
-  onOpen,
 }: BlueprintNodeCardProps) {
   const KindIcon = kind.icon;
   const StatusIcon = status?.icon;
@@ -188,30 +186,6 @@ export function BlueprintNodeCard({
         quiet enough to ignore.
       */}
       <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${palette.bar}`} />
-
-      {/*
-        Shown on approach rather than always. `nodrag` is not needed — the canvas starts a node drag
-        from a pointer-down anywhere on the node — so the control stops the click from also reaching
-        the canvas, which would otherwise open the details panel behind the graph it just left.
-      */}
-      {onOpen ? (
-        <span className="absolute top-1.5 right-1.5 z-10 opacity-0 transition-opacity group-focus-within/card:opacity-100 group-hover/node:opacity-100">
-          <Button
-            variant="secondary"
-            size="sm"
-            iconOnly
-            aria-label={`Open ${title}`}
-            title={`Open ${title}`}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpen();
-            }}
-          >
-            <Maximize2 className="h-3.5 w-3.5" />
-          </Button>
-        </span>
-      ) : null}
 
       <span className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 py-2.5 pr-2.5 pl-3.5">
         <span className="flex items-start gap-2">

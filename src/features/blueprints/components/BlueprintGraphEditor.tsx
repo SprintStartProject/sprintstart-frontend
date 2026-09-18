@@ -1,4 +1,13 @@
-import { Check, CircleHelp, FilePlus2, Layers, ListChecks, Sparkles, Trash2 } from "lucide-react";
+import {
+  Check,
+  CircleHelp,
+  FilePlus2,
+  Layers,
+  ListChecks,
+  Sparkles,
+  Trash2,
+  Waypoints,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
@@ -211,9 +220,6 @@ export function BlueprintGraphEditor({
         createKinds={[{ id: "phase", label: "New phase" }]}
         editable={editable}
         onNodeClick={openPhaseDetails}
-        onOpenNode={(phase) => {
-          if (phase.type === "FIXED") onOpenSubGraph(phase);
-        }}
         onPositionChange={onPositionChange}
         onAddBlocker={onAddBlocker}
         onRemoveBlocker={onRemoveBlocker}
@@ -243,6 +249,10 @@ export function BlueprintGraphEditor({
               onSubmit={savePhaseMetadata}
               onAddBlocker={onAddBlocker}
               onRemoveBlocker={onRemoveBlocker}
+              // Only a fixed phase has a graph of its own to open. An AI-enhanced one has no
+              // authored content until a path is generated from it, so the way in would land on an
+              // empty canvas.
+              onOpenSubGraph={phase.type === "FIXED" ? () => onOpenSubGraph(phase) : undefined}
             />
           ),
           footer: editable ? (
@@ -393,9 +403,6 @@ function GraphNodeCard({
         label: requirement.displayName,
         type: requirement.type,
       }))}
-      // Only a fixed phase has a sub-graph to open; an AI-enhanced one has no authored content
-      // until a path is generated from it, so offering the drill-in would open an empty canvas.
-      onOpen={isAiEnhanced ? undefined : cardProps.onOpen}
     />
   );
 }
@@ -418,6 +425,7 @@ function PhaseDetails({
   onSubmit,
   onAddBlocker,
   onRemoveBlocker,
+  onOpenSubGraph,
 }: {
   phase: BlueprintPhase;
   isEditing: boolean;
@@ -428,6 +436,8 @@ function PhaseDetails({
   phases: BlueprintPhase[];
   onAddBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
   onRemoveBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
+  /** The way into this phase's own graph, where it has one. */
+  onOpenSubGraph?: () => void;
 }) {
   return (
     <div className="space-y-6 text-sm">
@@ -503,11 +513,29 @@ function PhaseDetails({
         </div>
       )}
 
-      <dl className="grid grid-cols-3 gap-3">
-        <Detail label="Type" value={phase.type === "AI_ENHANCED" ? "AI-enhanced" : "Fixed"} />
-        <Detail label="Steps" value={String(phase.blueprintSteps.length)} />
-        <Detail label="Checks" value={String(phase.blueprintCheckQuestions.length)} />
-      </dl>
+      <div className="space-y-3">
+        <dl className="grid grid-cols-3 gap-3">
+          <Detail label="Type" value={phase.type === "AI_ENHANCED" ? "AI-enhanced" : "Fixed"} />
+          <Detail label="Steps" value={String(phase.blueprintSteps.length)} />
+          <Detail label="Checks" value={String(phase.blueprintCheckQuestions.length)} />
+        </dl>
+        {/*
+          The way into what those two numbers count, next to the numbers. It used to be a glyph that
+          appeared on the card when the pointer was over it — a second thing to aim at on a card
+          that is one big target already, and one whose destination differed from the card's own
+          without anything saying so.
+        */}
+        {onOpenSubGraph ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Waypoints className="h-4 w-4" />}
+            onClick={onOpenSubGraph}
+          >
+            Open this phase&rsquo;s graph
+          </Button>
+        ) : null}
+      </div>
 
       <div>
         <h3 className="font-semibold text-app-text">Who this phase is for</h3>

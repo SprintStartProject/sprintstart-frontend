@@ -73,23 +73,6 @@ export type BlueprintGraphCanvasNodeProps = {
   /** True while a graph mutation is in flight; the card should not invite another click. */
   disabled: boolean;
   /**
-   * Drills into this node's own graph, on the surfaces that have somewhere to drill to.
-   *
-   * Handed to the card rather than drawn by the canvas, because whether a *particular* node has
-   * anything inside it is a domain question: an AI-enhanced phase has no authored content until a
-   * path is generated from it, so its drill-in would open an empty canvas. The canvas used to draw
-   * this control itself from `onOpenNode`, which meant the card's own answer was ignored and every
-   * AI-enhanced phase carried a button that did nothing.
-   */
-  onOpen?: () => void;
-  /**
-   * True when this is the node the reader is pointing at, whose run is lit.
-   *
-   * The card that started a highlight has to be findable again: on a graph where half the nodes are
-   * lit, "which one did I point at" is a question the lighting cannot answer by itself.
-   */
-  highlighted?: boolean;
-  /**
    * The canvas's current zoom, so a card can size a label against it.
    *
    * Everything on the canvas shrinks with the zoom, which is right for the picture and wrong for
@@ -97,6 +80,13 @@ export type BlueprintGraphCanvasNodeProps = {
    * four pixels on screen. A card that divides by this stays a label rather than becoming a smear.
    */
   zoom: number;
+  /**
+   * True when this is the node the reader is pointing at, whose run is lit.
+   *
+   * The card that started a highlight has to be findable again: on a graph where half the nodes are
+   * lit, "which one did I point at" is a question the lighting cannot answer by itself.
+   */
+  highlighted?: boolean;
   /**
    * Where this node sits in the chain it belongs to, or `undefined` when it belongs to none.
    *
@@ -126,7 +116,6 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   /** Headline for the overlay drawn when nothing is placed. */
   emptyTitle?: string;
   onNodeClick: (node: TNode) => void;
-  onOpenNode?: (node: TNode) => void;
   onPositionChange: (node: TNode, x: number, y: number) => Promise<void>;
   onAddBlocker: (node: TNode, blockerId: string) => Promise<void>;
   onRemoveBlocker: (node: TNode, blockerId: string) => Promise<void>;
@@ -267,7 +256,6 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
   ariaLabel = "Blueprint graph canvas",
   emptyTitle = "Nothing on the canvas yet",
   onNodeClick,
-  onOpenNode,
   onPositionChange,
   onAddBlocker,
   onRemoveBlocker,
@@ -876,7 +864,6 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   {renderNode(node, {
                     disabled: isSaving,
                     zoom: state.zoom,
-                    onOpen: onOpenNode ? () => onOpenNode(node) : undefined,
                     highlighted: node.id === focusId,
                     chainPosition: chainPositionById.get(node.id),
                   })}
