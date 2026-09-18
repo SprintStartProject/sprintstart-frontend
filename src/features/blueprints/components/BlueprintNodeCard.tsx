@@ -1,6 +1,7 @@
-import { KeyRound, type LucideIcon } from "lucide-react";
+import { KeyRound, Maximize2, type LucideIcon } from "lucide-react";
 import { Badge, type BadgeVariant } from "../../../components/ui/Badge.tsx";
-import { GRAPH_NODE_HEIGHT, compactTitlePx } from "../../graph-diagram/graphLayout.ts";
+import { Button } from "../../../components/ui/Button.tsx";
+import { compactTitlePx, detailForZoom } from "../../graph-diagram/graphLayout.ts";
 import type { BlueprintGraphCanvasNodeProps } from "./BlueprintGraphCanvas.tsx";
 
 /**
@@ -65,9 +66,9 @@ const ACCENTS: Record<
  * The shape a node's glyph is drawn in.
  *
  * A second carrier beside the colour, and the one that survives both a colour-blind reader and the
- * zoom where the accent is three pixels wide. Borrowed from the journey graph on
- * `feature/onboarding-path-rework`, where a locked question and a locked step were indistinguishable
- * until the two kinds were given different outlines.
+ * zoom where the accent is three pixels wide. Borrowed from the journey graph, where a locked
+ * question and a locked step were indistinguishable until the two kinds were given different
+ * outlines.
  */
 export type NodeGlyphShape = "round" | "diamond";
 
@@ -119,15 +120,23 @@ export type BlueprintNodeCardProps = BlueprintGraphCanvasNodeProps & {
  * three ideas of what a badge says. They are the same object seen from three places, so they are
  * one component with a `kind`, an `accent` and an optional `status`.
  *
- * **Two states, not one shrunk.** A card that is simply scaled down is unreadable at the zoom where
- * a whole blueprint fits, which is the only zoom most people look at one from. So what the card
- * *says* changes with the distance it is read at:
+ * **A picture, not a control.** The canvas around it is one widget: it owns the click that selects,
+ * the keys that move between nodes and the drag that places one, and a node is a `role="button"`
+ * inside it. So this is a plain element. It used to be a `<button>`, which put a button inside a
+ * button the moment the card grew a control of its own — and left the card and the canvas each
+ * with their own idea of what a click meant.
+ *
+ * **Two states, not one shrunk.** A card that is simply scaled down is unreadable at the zoom
+ * where a whole blueprint fits, which is the zoom most people look at one from — the seeded
+ * blueprint's sixteen phases are stored across 1663 x 1412px and fit at about a third. So what the
+ * card *says* changes with the distance it is read at:
  *
  * - **near** — the title, what kind of thing it is, and the two or three numbers worth comparing
  *   two nodes by. Prose that was here went to the panel: a sentence on a card is a sentence
  *   nobody reads at a glance and everybody scrolls past.
  * - **far** — a map label: the icon, and the title sized against the zoom so it stays legible on
- *   screen however far out the reader is.
+ *   screen however far out the reader is. The card gives the context line's room to the title at
+ *   the point that line stops being readable, which is well before the title does.
  *
  * Every part is always in the DOM and fades between tiers rather than appearing and vanishing:
  * things popping in and out while somebody zooms is what makes a canvas feel like it is fighting
@@ -142,54 +151,35 @@ export function BlueprintNodeCard({
   progress,
   status,
   metrics,
-  detail,
-  zoom,
   disabled,
   chainPosition,
   requirements,
-  inLibrary,
   highlighted = false,
-  onClick,
+  zoom,
+  onOpen,
 }: BlueprintNodeCardProps) {
   const KindIcon = kind.icon;
   const StatusIcon = status?.icon;
   const gates = requirements ?? [];
-  const isFar: boolean = inLibrary ? false : detail === "far";
-  const titlePx = compactTitlePx(zoom);
   const palette = ACCENTS[accent];
+  const isFar = detailForZoom(zoom) === "far";
+  const titlePx = compactTitlePx(zoom);
 
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
+    <div
       className={[
-        "group/card relative flex w-full flex-col overflow-hidden rounded-xl bg-app-surface text-left",
+        "group/card relative flex h-full w-full flex-col overflow-hidden rounded-xl border-2 bg-app-surface text-left shadow-md",
         "transition-[box-shadow,transform,border-color,background-color] duration-200 ease-out",
-        "focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
-        // In the library the card sits on a plain panel beside other list rows, where a loud
-        // outline would shout. On the canvas it has to hold its own against a field of dots under
-        // a vignette, so it takes two pixels of the strong border and a shadow that still reads at
-        // the zoom where the whole graph fits.
-        inLibrary ? "border shadow-sm" : "border-2 shadow-md",
         highlighted
           ? "border-app-brand bg-app-brand-soft"
-          : inLibrary
-            ? "border-app-border"
-            : `border-app-border-strong ${palette.ring}`,
+          : `border-app-border-strong ${palette.ring}`,
         disabled
-          ? "cursor-default opacity-70"
+          ? "opacity-70"
           : // Depth is what tells a card from the surface it sits on: it lifts, its border comes up
             // to its own accent, and the house's brand lift — a bloom cast *under* the card rather
             // than a halo around it — says which one the pointer is on.
-            "hover:-translate-y-0.5 hover:shadow-app-brand-lift motion-reduce:hover:translate-y-0",
-        inLibrary ? "min-h-16" : "",
+            "group-hover/node:-translate-y-0.5 group-hover/node:shadow-app-brand-lift motion-reduce:group-hover/node:translate-y-0",
       ].join(" ")}
-      style={{
-        // Exactly the box the layout reserved for it. A card free to outgrow its own footprint is
-        // a card the tidy layout leaves too little room for, which is how they end up overlapping.
-        ...(inLibrary ? {} : { height: GRAPH_NODE_HEIGHT }),
-      }}
     >
       {/*
         The accent bar rather than a tinted card. A whole surface in a colour competes with every
@@ -197,16 +187,33 @@ export function BlueprintNodeCard({
         six of those fight is one nobody can read. A three-pixel edge is enough to group by and
         quiet enough to ignore.
       */}
-      {!inLibrary ? (
-        <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${palette.bar}`} />
+      <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-[3px] ${palette.bar}`} />
+
+      {/*
+        Shown on approach rather than always. `nodrag` is not needed — the canvas starts a node drag
+        from a pointer-down anywhere on the node — so the control stops the click from also reaching
+        the canvas, which would otherwise open the details panel behind the graph it just left.
+      */}
+      {onOpen ? (
+        <span className="absolute top-1.5 right-1.5 z-10 opacity-0 transition-opacity group-focus-within/card:opacity-100 group-hover/node:opacity-100">
+          <Button
+            variant="secondary"
+            size="sm"
+            iconOnly
+            aria-label={`Open ${title}`}
+            title={`Open ${title}`}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen();
+            }}
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </Button>
+        </span>
       ) : null}
 
-      <span
-        className={[
-          "flex min-h-0 flex-1 flex-col justify-center gap-1.5",
-          inLibrary ? "p-2.5" : "py-2.5 pr-2.5 pl-3.5",
-        ].join(" ")}
-      >
+      <span className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 py-2.5 pr-2.5 pl-3.5">
         <span className="flex items-start gap-2">
           {/*
             Kind and state in one glyph: the outline says what this is, the badge in its corner says
@@ -261,7 +268,8 @@ export function BlueprintNodeCard({
           thing this is, where it stands, what it holds, how far along the chain it sits. Separate
           rows for each of those is what left a card two thirds empty on a node that had only two
           of them — and made a graph of sixteen nodes twice as tall as it needed to be.
-
+        */}
+        {/*
           Faded rather than unmounted at a distance, so the card's height never changes as somebody
           zooms: a card that resizes under the pointer moves the thing being aimed at.
         */}
@@ -310,7 +318,7 @@ export function BlueprintNodeCard({
           {status ? <span className="ml-auto font-medium">{status.label}</span> : null}
         </span>
       </span>
-    </button>
+    </div>
   );
 }
 

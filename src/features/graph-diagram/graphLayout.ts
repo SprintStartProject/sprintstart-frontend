@@ -53,8 +53,15 @@ const COLUMNS_PER_ROW = 4;
  */
 export type GraphDetail = "far" | "near";
 
-/** Below this, a card is a map label: an icon and its title, sized to stay legible. */
-export const FAR_DETAIL_ZOOM = 0.45;
+/**
+ * Below this, a card is a map label: an icon and its title, sized to stay legible.
+ *
+ * Set by the smallest thing on the full card rather than by the title. The context line under the
+ * title is 11px, so at two thirds of full zoom it is already seven pixels on screen -- present,
+ * unreadable, and taking the room the title needs. The card gives that room back at the point the
+ * line stops being readable, not at the point the title does.
+ */
+export const FAR_DETAIL_ZOOM = 0.65;
 
 export function detailForZoom(zoom: number): GraphDetail {
   return zoom < FAR_DETAIL_ZOOM ? "far" : "near";
@@ -399,11 +406,16 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
  *
  * Divides by the zoom, so the result is roughly constant *on screen*: at the zoom where sixteen
  * phases fit at once, this is a label somebody can read instead of a five-pixel smear. Capped at
- * both ends — below 13 there is nothing to correct, and past the upper cap a title stops fitting
- * across a card 248 wide and starts being cut off mid-word, which is worse than being small.
+ * both ends — below 13 there is nothing to correct, and past the upper cap a title stops being
+ * shortened and starts being a word and a half, which says less than a small line that fits.
+ *
+ * The upper cap is what the seeded blueprint is read at. Its sixteen phases are stored across
+ * 1663 × 1412px, which fits a canvas at about a third — and at a third, 26 canvas pixels are eight
+ * on screen, which was still a smear. Forty gets it to thirteen, the size the rest of the app
+ * calls small text.
  */
 export function compactTitlePx(zoom: number): number {
-  return Math.min(26, Math.max(13, 13 / zoom));
+  return Math.min(40, Math.max(13, 13 / zoom));
 }
 
 /** Where a node sits inside the one chain it belongs to. */

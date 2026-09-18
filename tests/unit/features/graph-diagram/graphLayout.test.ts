@@ -293,9 +293,15 @@ describe("compactTitlePx", () => {
   });
 
   it("stops before the title outgrows its own card", () => {
-    // Past this a long phase name stops fitting across a 248-wide card and gets cut mid-word,
-    // which is a worse answer than being a little small.
-    expect(compactTitlePx(0.05)).toBe(26);
+    // Past this a long phase name stops being shortened and starts being a word and a half, which
+    // says less than a small line that fits.
+    expect(compactTitlePx(0.05)).toBe(40);
+  });
+
+  it("is still readable at the zoom the seeded blueprint is read at", () => {
+    // Sixteen phases spread over 1663 x 1412px fit a canvas at about a third. 13 canvas pixels
+    // there are 4.3 on screen; this has to land near the size the app calls small text.
+    expect(compactTitlePx(1 / 3) * (1 / 3)).toBeGreaterThan(11);
   });
 
   it("never shrinks below the normal size", () => {
