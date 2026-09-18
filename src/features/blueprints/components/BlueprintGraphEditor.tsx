@@ -1,14 +1,5 @@
-import {
-  Check,
-  CircleHelp,
-  FilePlus2,
-  Layers,
-  ListChecks,
-  Sparkles,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+import { Check, CircleHelp, FilePlus2, Layers, ListChecks, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
@@ -17,13 +8,12 @@ import { Input } from "../../../components/ui/Input.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
 import { useToast } from "../../../context/useToast.ts";
-import { canConnect } from "../../graph-diagram/graphLayout.ts";
-import { LOCK_SENTENCE } from "../../graph-diagram/lockWords.ts";
 import { BlueprintNodeCard } from "./BlueprintNodeCard.tsx";
 import {
   BlueprintGraphCanvas,
   type BlueprintGraphCanvasNodeProps,
 } from "./BlueprintGraphCanvas.tsx";
+import { PhasePrerequisites } from "./PhasePrerequisites.tsx";
 import type { BlueprintPhase, BlueprintPhaseType } from "../types.ts";
 
 export type BlueprintPhaseMetadata = {
@@ -42,8 +32,21 @@ type Props = {
    *
    * Without it a published blueprint drew a details panel with no footer at all, which reads
    * as "this has no actions" rather than "not on this version".
+   *
+   * Carries the phase it was asked from, so the page can put the author back in front of it once
+   * the draft is open. Pressing "Edit as draft" inside a phase and landing on a graph with nothing
+   * open is being answered with a different screen than the one the question was asked on.
    */
-  onRequestDraft?: () => void;
+  onRequestDraft?: (phase: BlueprintPhase) => void;
+  /**
+   * A phase to open as soon as it is there, found by title.
+   *
+   * By title rather than by id because the two most common reasons to ask are a jump from the
+   * outline and a landing on a freshly opened draft — and a draft is a *copy*, so every id in it
+   * is new while the titles are the ones the author just read.
+   */
+  openPhaseTitle?: string | null;
+  onOpenedPhase?: () => void;
   onPositionChange: (phase: BlueprintPhase, x: number, y: number) => Promise<void>;
   onAddBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
   onRemoveBlocker: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
@@ -52,6 +55,16 @@ type Props = {
   onOpenSubGraph: (phase: BlueprintPhase) => void;
   onUpdatePhase: (phase: BlueprintPhase, metadata: BlueprintPhaseMetadata) => Promise<void>;
 };
+
+/** The phase as it is stored, which is what "changed" is measured against. */
+function metadataOf(phase: BlueprintPhase): BlueprintPhaseMetadata {
+  return {
+    title: phase.title,
+    description: phase.description,
+    type: phase.type,
+    aiPrompt: phase.aiPrompt,
+  };
+}
 
 /** A phase-specific adapter around the reusable Blueprint graph canvas. */
 export function BlueprintGraphEditor({
@@ -66,6 +79,8 @@ export function BlueprintGraphEditor({
   onDeletePhase,
   onOpenSubGraph,
   onUpdatePhase,
+  openPhaseTitle = null,
+  onOpenedPhase,
 }: Props) {
   const [detailsPhaseId, setDetailsPhaseId] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -85,22 +100,30 @@ export function BlueprintGraphEditor({
   const phaseById = useMemo(() => new Map(phases.map((phase) => [phase.id, phase])), [phases]);
   const detailsPhase = detailsPhaseId ? (phaseById.get(detailsPhaseId) ?? null) : null;
 
-  /** The phase as it is stored, which is what "changed" is measured against. */
-  function metadataOf(phase: BlueprintPhase): BlueprintPhaseMetadata {
-    return {
-      title: phase.title,
-      description: phase.description,
-      type: phase.type,
-      aiPrompt: phase.aiPrompt,
-    };
-  }
-
   function openPhaseDetails(phase: BlueprintPhase) {
     setDetailsPhaseId(phase.id);
     setMetadata(metadataOf(phase));
     setDetailsSaveError(null);
     setIsDetailsOpen(true);
   }
+
+  // Asked for from somewhere else — the outline's "Open in graph", or a draft that was opened from
+  // inside this very phase. Cleared through the callback, so it opens once rather than every time
+  // the phases are reloaded.
+  useEffect(() => {
+    if (!openPhaseTitle) return;
+    const match = phases.find((phase) => phase.title === openPhaseTitle);
+    if (!match) return;
+    // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
+    // and this is the pattern the repo already passes with.
+    queueMicrotask(() => {
+      setDetailsPhaseId(match.id);
+      setMetadata(metadataOf(match));
+      setDetailsSaveError(null);
+      setIsDetailsOpen(true);
+      onOpenedPhase?.();
+    });
+  }, [onOpenedPhase, openPhaseTitle, phases]);
 
   /**
    * Deletes the phase the details panel is showing, once somebody has said so twice.
@@ -251,7 +274,7 @@ export function BlueprintGraphEditor({
               <Button
                 variant="primary"
                 icon={<FilePlus2 className="h-4 w-4" />}
-                onClick={onRequestDraft}
+                onClick={() => onRequestDraft(phase)}
               >
                 Edit as draft
               </Button>
@@ -499,88 +522,3 @@ function Detail({ label, value }: { label: string; value: string }) {
  * wait twice for the same thing, and cannot join a ring. Refused options are not offered rather
  * than offered and rejected — a menu that lists what it will not accept is a menu that lies.
  */
-function PhasePrerequisites({
-  phase,
-  phases,
-  editable,
-  onAdd,
-  onRemove,
-}: {
-  phase: BlueprintPhase;
-  phases: BlueprintPhase[];
-  editable: boolean;
-  onAdd: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
-  onRemove: (phase: BlueprintPhase, blockerId: string) => Promise<void>;
-}) {
-  const [isSaving, setIsSaving] = useState(false);
-  const byId = useMemo(() => new Map(phases.map((item) => [item.id, item])), [phases]);
-  const blockers = phase.blockerIds
-    .map((id) => byId.get(id))
-    .filter((item): item is BlueprintPhase => item !== undefined);
-
-  const addable = useMemo(
-    () => phases.filter((other) => canConnect(phases, phase.id, other.id)),
-    [phase.id, phases],
-  );
-
-  async function run(work: () => Promise<void>) {
-    setIsSaving(true);
-    try {
-      await work();
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  return (
-    <section className="space-y-2">
-      <h3 className="font-semibold text-app-text">Waits for</h3>
-      <p className="text-xs text-app-text-muted">{LOCK_SENTENCE}</p>
-
-      {blockers.length === 0 ? (
-        <p className="text-app-text-muted">Nothing — this phase is a place a hire can start.</p>
-      ) : (
-        <ul className="flex flex-wrap gap-1.5">
-          {blockers.map((blocker) => (
-            <li key={blocker.id}>
-              <Badge variant="brand" size="sm" className="gap-1">
-                {blocker.title}
-                {editable ? (
-                  <button
-                    type="button"
-                    aria-label={`Stop waiting for ${blocker.title}`}
-                    disabled={isSaving}
-                    onClick={() => void run(() => onRemove(phase, blocker.id))}
-                    className="rounded-full transition-colors hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                  >
-                    <X className="h-3 w-3" aria-hidden="true" />
-                  </button>
-                ) : null}
-              </Badge>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {editable && addable.length > 0 ? (
-        <Select
-          size="sm"
-          value=""
-          aria-label={`Add something ${phase.title} waits for`}
-          disabled={isSaving}
-          onChange={(event) => {
-            const blockerId = event.target.value;
-            if (blockerId) void run(() => onAdd(phase, blockerId));
-          }}
-        >
-          <option value="">Add one…</option>
-          {addable.map((other) => (
-            <option key={other.id} value={other.id}>
-              {other.title}
-            </option>
-          ))}
-        </Select>
-      ) : null}
-    </section>
-  );
-}
