@@ -143,6 +143,7 @@ function MessageRowImpl({
               // E5: mark the actively-streaming message as busy so
               // screen readers don't announce partial content mid-stream.
               aria-busy={showStreamingCaret || undefined}
+              data-chat-message-role={message.role}
               className={`chat-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
                 isRequest
                   ? "chat-md-user rounded-tr-sm bg-app-brand text-white"

@@ -538,7 +538,11 @@ export const projectService = {
   async setProjectIndustry(
     projectId: string,
     industry: string,
-  ): Promise<{ industry: string; industryConfidence: IndustryConfidence | null; industryCustom: boolean }> {
+  ): Promise<{
+    industry: string;
+    industryConfidence: IndustryConfidence | null;
+    industryCustom: boolean;
+  }> {
     const result = await apiClient.fetch<{
       industry: string | null;
       industryConfidence: string | null;

@@ -54,6 +54,18 @@ export type ChatContextValue = {
   newRequest: string;
   setNewRequest: (value: string) => void;
 
+  /**
+   * Registers a callback to focus the composer textarea and place the caret at the end.
+   * Called by useChat when mounted, cleaned up on unmount.
+   */
+  registerFocusComposer: (fn: () => void) => () => void;
+
+  /**
+   * Quotes the selected AI message text into the chat composer as a Markdown blockquote,
+   * focuses the textarea, and places the caret at the end.
+   */
+  quoteSelection: (text: string) => void;
+
   showFilters: boolean;
   setShowFilters: (value: boolean | ((prev: boolean) => boolean)) => void;
 

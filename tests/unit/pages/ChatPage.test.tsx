@@ -90,13 +90,15 @@ describe("ChatPage", () => {
   });
 
   it("renders the message list with user and assistant messages", () => {
-    render(
+    const { container } = render(
       <MemoryRouter>
         <ChatPage />
       </MemoryRouter>,
     );
     expect(screen.getByText("Hello bot")).toBeInTheDocument();
     expect(screen.getByText("Hi there")).toBeInTheDocument();
+    expect(container.querySelector('[data-chat-message-role="ASSISTANT"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-chat-message-role="USER"]')).toBeInTheDocument();
   });
 
   /*
