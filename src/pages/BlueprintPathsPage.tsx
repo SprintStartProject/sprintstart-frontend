@@ -8,7 +8,6 @@ import {
   Layers3,
   ListChecks,
   Loader2,
-  PencilLine,
   Search,
   Sparkles,
 } from "lucide-react";
@@ -414,14 +413,18 @@ function BlueprintRowCard({
           {/*
             The title is the control, and its own `::after` is stretched over the whole row — so
             clicking anywhere opens the blueprint, while what a keyboard reaches and what a screen
-            reader announces is still one button with the blueprint's name on it. A card that looks
-            openable and only opens from a button in its corner has taught somebody to aim.
+            reader announces is still one button with the blueprint's name on it.
+
+            It is the *only* control. There used to be a second one in the corner saying "Open",
+            "Continue draft" or "Read it", which went exactly where the row already went and said
+            what the rail underneath already says — "v5 being written", "Retired at v4". A card that
+            is one big target does not need a smaller target on top of it repeating itself.
           */}
           <h3 className="min-w-0 text-lg font-semibold text-app-text">
             <button
               type="button"
               onClick={onOpen}
-              className="text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-app-focus"
+              className="cursor-pointer text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-app-focus"
             >
               {latest.title}
             </button>
@@ -477,16 +480,6 @@ function BlueprintRowCard({
           </p>
         ) : null}
       </div>
-
-      {/* Above the stretched title, so it stays its own target rather than part of the row. */}
-      <Button
-        className="relative shrink-0 self-start"
-        variant={hasDraft ? "primary" : "secondary"}
-        icon={<PencilLine className="h-4 w-4" />}
-        onClick={onOpen}
-      >
-        {hasDraft ? "Continue draft" : lifecycle.retired ? "Read it" : "Open"}
-      </Button>
     </article>
   );
 }
