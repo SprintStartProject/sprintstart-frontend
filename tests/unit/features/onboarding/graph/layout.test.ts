@@ -114,7 +114,7 @@ describe("routeEdges", () => {
     expect(routes.has(edgeKey("top", "middle"))).toBe(false);
   });
 
-  it("goes straight through a row when nothing is in the way", () => {
+  it("adds no waypoint where nothing is in the way, so the curve stays one sweep", () => {
     const nodes = [
       { id: "a", blockerIds: [] },
       { id: "far", blockerIds: [] },
@@ -126,8 +126,23 @@ describe("routeEdges", () => {
       ["b", { x: 0, y: 300 }],
     ]);
 
-    expect(routeEdges(nodes, positions, footprint).get(edgeKey("a", "b"))).toEqual([
-      { x: 0, y: 150 },
+    expect(routeEdges(nodes, positions, footprint).has(edgeKey("a", "b"))).toBe(false);
+  });
+
+  it("treats cards a few pixels apart in height as one row", () => {
+    const nodes = [
+      { id: "top", blockerIds: [] },
+      { id: "left", blockerIds: [] },
+      { id: "right", blockerIds: [] },
+      { id: "bottom", blockerIds: ["top"] },
+    ];
+    const positions = new Map([
+      ["top", { x: 0, y: 0 }],
+      ["left", { x: -10, y: 148 }],
+      ["right", { x: 400, y: 153 }],
+      ["bottom", { x: 0, y: 300 }],
     ]);
+
+    expect(routeEdges(nodes, positions, footprint).get(edgeKey("top", "bottom"))).toHaveLength(1);
   });
 });

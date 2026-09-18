@@ -131,6 +131,8 @@ export function StepWorkspace({
   const allTasksDone = doneTasks === tasks.length;
   const isBehind = step.status === "FINISHED" || step.status === "SKIPPED";
   const skipPending = !!step.skip && step.skip.accepted === null;
+  const skipDeclined = !!step.skip && step.skip.accepted === false && step.status !== "SKIPPED";
+  const skipApproved = !!step.skip && step.skip.accepted === true;
   const isFocus = layout === "focus";
 
   const start = async () => {
@@ -255,6 +257,72 @@ export function StepWorkspace({
         ) : null}
       </div>
 
+      {/* ── Where a skip request or feedback stands -- said up front, in colour ── */}
+      {skipPending ? (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-app-warning-border bg-app-warning-bg px-3 py-2.5 text-sm text-app-warning-text">
+          <SkipForward className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">Skip requested</span> — your project manager decides.
+            You can keep working on it meanwhile.
+            {step.skip?.reason ? (
+              <span className="mt-0.5 block text-xs opacity-80">“{step.skip.reason}”</span>
+            ) : null}
+          </span>
+        </div>
+      ) : skipApproved ? (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-app-success-border bg-app-success-bg px-3 py-2.5 text-sm text-app-success-text">
+          <SkipForward className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">Skip approved</span> — your project manager agreed you
+            can leave this one out.
+            {step.skip?.reviewComment ? (
+              <span className="mt-0.5 block text-xs text-app-text-muted">
+                “{step.skip.reviewComment}”
+              </span>
+            ) : null}
+          </span>
+        </div>
+      ) : skipDeclined ? (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-app-warning-border bg-app-surface px-3 py-2.5 text-sm text-app-text">
+          <SkipForward
+            className="mt-0.5 h-4 w-4 shrink-0 text-app-warning-text"
+            aria-hidden="true"
+          />
+          <span>
+            <span className="font-semibold">Skip declined</span> — your project manager would like
+            you to do this one.
+            {step.skip?.reviewComment ? (
+              <span className="mt-0.5 block text-xs text-app-text-muted">
+                “{step.skip.reviewComment}”
+              </span>
+            ) : null}
+          </span>
+        </div>
+      ) : null}
+      {feedbackSent && drawer !== "feedback" ? (
+        <div
+          className={`flex items-start gap-2.5 rounded-2xl border px-3 py-2.5 text-sm ${
+            helpful === false
+              ? "border-app-danger-border bg-app-danger-bg text-app-danger-text"
+              : "border-app-success-border bg-app-success-bg text-app-success-text"
+          }`}
+        >
+          {helpful === false ? (
+            <ThumbsDown className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          ) : (
+            <ThumbsUp className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
+          <span className="min-w-0">
+            <span className="font-semibold">
+              {helpful === false
+                ? "You found this step not helpful"
+                : "You found this step helpful"}
+            </span>
+            {comment ? <span className="mt-0.5 block text-xs opacity-80">“{comment}”</span> : null}
+          </span>
+        </div>
+      ) : null}
+
       <div
         className={`grid gap-4 ${resources.length > 0 || outcomes.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}`}
       >
@@ -355,7 +423,7 @@ export function StepWorkspace({
 
       {/* ── Drawers ── */}
       {drawer === "skip" ? (
-        <div className="space-y-2 rounded-2xl border border-app-border bg-app-surface-muted p-3">
+        <div className="space-y-2 rounded-2xl border border-app-warning-border bg-app-warning-bg/50 p-3">
           <p className="text-xs text-app-text-muted">
             Already know this, or it doesn’t apply to you? Your project manager decides.
           </p>
@@ -384,7 +452,7 @@ export function StepWorkspace({
         </div>
       ) : null}
       {drawer === "feedback" ? (
-        <div className="space-y-2 rounded-2xl border border-app-border bg-app-surface-muted p-3">
+        <div className="space-y-2 rounded-2xl border border-app-brand-border bg-app-brand-soft/40 p-3">
           <div className="flex gap-2">
             {[true, false].map((value) => (
               <button
@@ -438,24 +506,26 @@ export function StepWorkspace({
       <div className="flex flex-col gap-3 border-t border-app-border pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-1">
           {!isBehind ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<SkipForward className="h-3.5 w-3.5" />}
+            <button
+              type="button"
               disabled={skipPending}
+              aria-expanded={drawer === "skip"}
               onClick={() => setDrawer(drawer === "skip" ? null : "skip")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-app-warning-border bg-app-warning-bg px-3 py-1.5 text-xs font-semibold text-app-warning-text transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-70"
             >
+              <SkipForward className="h-3.5 w-3.5" aria-hidden="true" />
               {skipPending ? "Skip requested" : "Skip"}
-            </Button>
+            </button>
           ) : null}
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<MessageSquareCheck className="h-3.5 w-3.5" />}
+          <button
+            type="button"
+            aria-expanded={drawer === "feedback"}
             onClick={() => setDrawer(drawer === "feedback" ? null : "feedback")}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-app-brand-border bg-app-brand-soft px-3 py-1.5 text-xs font-semibold text-app-brand-text transition-opacity hover:opacity-90"
           >
+            <MessageSquareCheck className="h-3.5 w-3.5" aria-hidden="true" />
             {feedbackSent ? "Edit feedback" : "Feedback"}
-          </Button>
+          </button>
         </div>
 
         {step.status === "WAITING" ? (

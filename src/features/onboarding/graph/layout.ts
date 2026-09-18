@@ -282,15 +282,19 @@ export function routeEdges(
   positions: ReadonlyMap<string, GraphPoint>,
   footprint: NodeFootprint,
 ): Map<string, GraphPoint[]> {
-  const rows = new Map<number, number[]>();
-  nodes.forEach((node) => {
-    const point = positions.get(node.id);
-    if (!point) return;
-    const y = Math.round(point.y);
-    rows.set(y, [...(rows.get(y) ?? []), point.x]);
-  });
-  const rowYs = [...rows.keys()].sort((a, b) => a - b);
-  rows.forEach((xs) => xs.sort((a, b) => a - b));
+  // Rows are cards at roughly the same height -- hand-placed cards are rarely pixel-aligned, and a
+  // row per stray pixel put a waypoint on every one of them.
+  const rows: { y: number; xs: number[] }[] = [];
+  [...positions.entries()]
+    .filter(([id]) => nodes.some((node) => node.id === id))
+    .map(([, point]) => point)
+    .sort((a, b) => a.y - b.y)
+    .forEach((point) => {
+      const row = rows.find((candidate) => Math.abs(candidate.y - point.y) < footprint.height / 2);
+      if (row) row.xs.push(point.x);
+      else rows.push({ y: point.y, xs: [point.x] });
+    });
+  rows.forEach((row) => row.xs.sort((a, b) => a - b));
 
   const margin = 14;
   const halfWidth = footprint.width / 2;
@@ -305,39 +309,35 @@ export function routeEdges(
       const from = positions.get(blockerId);
       if (!from || to.y - from.y <= footprint.height) return;
       const waypoints: GraphPoint[] = [];
-      rowYs
+      rows
         // A row the edge actually passes *between* the two cards, which is a row clear of both of
         // them: cards whose centres are less than a card apart overlap, so such a row is not
-        // between anything. The old test — any row strictly below the one centre and above the
-        // other — caught the target's own row whenever a neighbour sat a few pixels higher than
-        // the target itself. The waypoint then landed *below* the point the edge is drawn to, and
-        // the curve dived past the card it was aiming at and came back up to meet its own
-        // arrowhead. Rows here are centres; the edge is drawn between the cards' edges.
-        .filter((y) => y > from.y + footprint.height && y < to.y - footprint.height)
-        .forEach((y) => {
-          const xs = rows.get(y)!;
+        // between anything. A looser test caught the target's own row whenever a neighbour sat a
+        // few pixels higher than the target itself; the waypoint then landed *below* the point the
+        // edge is drawn to, and the curve dived past the card it was aiming at and came back up to
+        // meet its own arrowhead. Rows here are centres; the edge is drawn between the cards' edges.
+        .filter((row) => row.y > from.y + footprint.height && row.y < to.y - footprint.height)
+        .forEach(({ y, xs }) => {
           const t = (y - from.y) / (to.y - from.y);
           const ideal = from.x + (to.x - from.x) * t;
-          const blocked = xs.some((x) => Math.abs(x - ideal) < halfWidth + margin);
-          let x = ideal;
-          if (blocked) {
-            const channels = [
-              xs[0] - halfWidth - margin * 2,
-              xs[xs.length - 1] + halfWidth + margin * 2,
-            ];
-            for (let index = 1; index < xs.length; index += 1) {
-              if (xs[index] - xs[index - 1] >= footprint.width + margin) {
-                channels.push((xs[index] + xs[index - 1]) / 2);
-              }
+          // Nothing in the way: no waypoint, and the curve stays one clean sweep.
+          if (!xs.some((x) => Math.abs(x - ideal) < halfWidth + margin)) return;
+          const channels = [
+            xs[0] - halfWidth - margin * 2,
+            xs[xs.length - 1] + halfWidth + margin * 2,
+          ];
+          for (let index = 1; index < xs.length; index += 1) {
+            if (xs[index] - xs[index - 1] >= footprint.width + margin) {
+              channels.push((xs[index] + xs[index - 1]) / 2);
             }
-            x = channels.reduce((best, channel) =>
-              Math.abs(channel - ideal) < Math.abs(best - ideal) ? channel : best,
-            );
-            const slot = `${y}:${Math.round(x)}`;
-            const used = channelUse.get(slot) ?? 0;
-            channelUse.set(slot, used + 1);
-            x += (used % 2 === 0 ? 1 : -1) * Math.ceil(used / 2) * 6;
           }
+          let x = channels.reduce((best, channel) =>
+            Math.abs(channel - ideal) < Math.abs(best - ideal) ? channel : best,
+          );
+          const slot = `${Math.round(y)}:${Math.round(x)}`;
+          const used = channelUse.get(slot) ?? 0;
+          channelUse.set(slot, used + 1);
+          x += (used % 2 === 0 ? 1 : -1) * Math.ceil(used / 2) * 6;
           waypoints.push({ x, y });
         });
       if (waypoints.length) routes.set(edgeKey(blockerId, nodeId), waypoints);

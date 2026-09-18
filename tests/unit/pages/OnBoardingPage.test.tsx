@@ -585,6 +585,56 @@ describe("OnBoardingPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
   });
 
+  it("marks an answered skip request on the step until the hire opens it", async () => {
+    const phase = phaseFixture("phase1", 1, "Phase 1");
+    phase.steps[0] = {
+      ...phase.steps[0],
+      status: "SKIPPED",
+      skip: {
+        id: "skip1",
+        stepId: phase.steps[0].id,
+        reason: "Did this last week",
+        accepted: true,
+        reviewComment: "Makes sense",
+        reviewedAt: "2026-09-18T10:00:00Z",
+        answerSeenAt: null,
+      },
+    } as never;
+    const seen = vi.fn();
+    server.use(
+      http.get("/api/v1/onboarding/me/steps/:stepId", () => HttpResponse.json(phase.steps[0])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/tasks", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/resources", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/skips/:skipId/seen", ({ params }) => {
+        seen(params.skipId);
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phase],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+
+    renderPage();
+
+    const list = await screen.findByRole("list", { name: "Phase 1: steps and questions" });
+    expect(within(list).getByText(/new answer from your project manager/)).toBeInTheDocument();
+
+    await user.click(within(list).getByRole("button", { name: /Phase 1 step/, expanded: false }));
+
+    await waitFor(() => expect(seen).toHaveBeenCalledWith("skip1"));
+    expect(
+      within(list).queryByText(/new answer from your project manager/),
+    ).not.toBeInTheDocument();
+    // The answer itself stays readable in the step.
+    expect(within(list).getByText("Skip approved")).toBeInTheDocument();
+  });
+
   it("lands on a step unfolded when opened by its address", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/steps/:stepId", () =>

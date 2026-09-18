@@ -43,6 +43,8 @@ export interface OnboardingStepSkip {
   accepted: boolean | null;
   reviewComment: string | null;
   reviewedAt: string | null;
+  /** When the member saw the PM's answer; null while it is new to them. */
+  answerSeenAt?: string | null;
 }
 
 export interface OnboardingStepEndpoint {
@@ -275,5 +277,6 @@ export interface OnboardingPersonalizeHandlers {
   onStage?: (name: string, detail?: string) => void;
   onPath: (path: OnboardingPathEndpoint) => void;
   onDone: () => void;
-  onError?: (message: string) => void;
+  /** `reason` is a code for failures the client can explain, e.g. `not-enough-knowledge`. */
+  onError?: (message: string, reason?: string) => void;
 }

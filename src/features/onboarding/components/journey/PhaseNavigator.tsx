@@ -1,4 +1,6 @@
 import { CheckCircle2, ChevronDown, Lock } from "lucide-react";
+import { UpdateDot } from "../../graph/JourneyNodeCards";
+import { phaseHasUnseenSkipAnswer } from "../../skipAnswers";
 import { useState } from "react";
 import { blockingPhases, phaseProgress, phaseState, type PhaseState } from "../../journey";
 import { ProgressRing } from "../../graph/JourneyNodeCards";
@@ -13,6 +15,8 @@ type Props = {
   onSelect: (phaseId: string) => void;
   /** Tailwind classes for the sticky offset and height, which depend on the page. */
   className?: string;
+  /** Mark phases with news the member has not seen yet -- the hire's view. */
+  showUpdates?: boolean;
 };
 
 const GROUPS: { state: PhaseState; title: string }[] = [
@@ -28,6 +32,7 @@ function PhaseRow({
   phases,
   selected,
   isFocus,
+  hasUpdate,
   onSelect,
 }: {
   phase: OnboardingPhaseEndpoint;
@@ -35,6 +40,7 @@ function PhaseRow({
   phases: OnboardingPhaseEndpoint[];
   selected: boolean;
   isFocus: boolean;
+  hasUpdate: boolean;
   onSelect: () => void;
 }) {
   const state = phaseState(phase);
@@ -76,6 +82,9 @@ function PhaseRow({
           {phase.title}
         </span>
         <span className="mt-0.5 block truncate text-[11px] text-app-text-subtle">
+          {hasUpdate ? (
+            <span className="font-semibold text-app-brand-text">New answer · </span>
+          ) : null}
           {isFocus ? (
             <span className="font-semibold text-app-brand-text">You are here · </span>
           ) : null}
@@ -84,6 +93,7 @@ function PhaseRow({
             : `${progress.completed}/${progress.total} done`}
         </span>
       </span>
+      {hasUpdate ? <UpdateDot className="bg-app-brand" /> : null}
       <span className="sr-only">{phaseStateLabel[state]}</span>
     </button>
   );
@@ -103,6 +113,7 @@ export function PhaseNavigator({
   focusPhaseId,
   onSelect,
   className = "",
+  showUpdates = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [showDone, setShowDone] = useState(false);
@@ -115,8 +126,13 @@ export function PhaseNavigator({
       {GROUPS.map((group) => {
         const members = phases.filter((phase) => phaseState(phase) === group.state);
         if (members.length === 0) return null;
+        const hasUpdate = (phase: OnboardingPhaseEndpoint) =>
+          showUpdates && phaseHasUnseenSkipAnswer(phase);
+        // Done phases fold away -- unless one is selected or holds news the member has not seen.
         const folded =
-          group.state === "done" && !showDone && members.every((p) => p.id !== selectedPhaseId);
+          group.state === "done" &&
+          !showDone &&
+          members.every((p) => p.id !== selectedPhaseId && !hasUpdate(p));
         return (
           <section key={group.state} aria-label={group.title}>
             <div className="flex items-center justify-between px-3 pb-1">
@@ -144,6 +160,7 @@ export function PhaseNavigator({
                     phases={phases}
                     selected={phase.id === selectedPhaseId}
                     isFocus={phase.id === focusPhaseId}
+                    hasUpdate={hasUpdate(phase)}
                     onSelect={() => {
                       onSelect(phase.id);
                       setOpen(false);

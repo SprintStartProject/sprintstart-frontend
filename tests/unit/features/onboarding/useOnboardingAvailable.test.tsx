@@ -64,7 +64,7 @@ describe("useOnboardingAvailable", () => {
     expect(result.current).toBe(false);
   });
 
-  it("is left out when there is no path and nothing to build one from", () => {
+  it("stays in the navigation even when nothing can be built yet -- the page explains why", () => {
     const journey = (availability: OnboardingJourneyValue["availability"]) =>
       function Wrapper({ children }: { children: ReactNode }) {
         return (
@@ -86,7 +86,7 @@ describe("useOnboardingAvailable", () => {
     expect(
       renderHook(() => useOnboardingAvailable(), { wrapper: journey("unavailable") }).result
         .current,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       renderHook(() => useOnboardingAvailable(), { wrapper: journey("buildable") }).result.current,
     ).toBe(true);

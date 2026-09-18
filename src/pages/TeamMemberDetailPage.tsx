@@ -1,4 +1,14 @@
-import { ArrowLeft, Check, MessageSquareText, Pencil, Plus, SkipForward, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  MessageSquareText,
+  Pencil,
+  Plus,
+  SkipForward,
+  ThumbsDown,
+  ThumbsUp,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
@@ -299,6 +309,24 @@ export function TeamMemberDetailPage() {
       toast.error(error instanceof Error ? error.message : "Couldn't remove the role.");
     } finally {
       setSavingRoleId(null);
+    }
+  }
+
+  /**
+   * Answers a skip request -- the current step's from the card below, or any step's from where the
+   * step is shown. Phases run side by side, so the one waiting is not always the current step.
+   */
+  async function reviewSkip(skipId: string, action: "accept" | "deny", comment = "") {
+    try {
+      if (action === "accept") {
+        await acceptOnboardingSkipRequest(skipId, comment);
+      } else {
+        await denyOnboardingSkipRequest(skipId, comment);
+      }
+      await Promise.all([refreshMember(), refreshOnboardingPath()]);
+      toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
     }
   }
 
@@ -662,6 +690,10 @@ export function TeamMemberDetailPage() {
           onOpenStep={setDetailStepId}
           onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
           onDeleteStep={setGraphStepToDelete}
+          onReviewSkip={reviewSkip}
+          feedbackItems={feedbackItems}
+          onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+          markingFeedbackId={markingFeedbackId}
           onPathChanged={refreshOnboardingPath}
         />
 
@@ -743,39 +775,57 @@ export function TeamMemberDetailPage() {
               ) : unreadFeedback.length > 0 ? (
                 unreadFeedback.map((feedback) => {
                   const isUnread = feedback.read !== true && !feedback.readAt;
+                  // Coloured by what it says, not by whether it has been read: a thumbs-down and a
+                  // thumbs-up are different news. Unread is a badge of its own.
+                  const tone =
+                    feedback.helpful === true
+                      ? {
+                          card: "border-app-success-border bg-app-success-bg",
+                          icon: "text-app-success-text",
+                          label: "Found it helpful",
+                        }
+                      : feedback.helpful === false
+                        ? {
+                            card: "border-app-danger-border bg-app-danger-bg",
+                            icon: "text-app-danger-text",
+                            label: "Found it not helpful",
+                          }
+                        : {
+                            card: "border-app-brand-border bg-app-brand-soft",
+                            icon: "text-app-brand-text",
+                            label: "Feedback",
+                          };
 
                   return (
                     <div
                       key={feedback.id}
-                      className={`rounded-2xl border p-4 ${
-                        isUnread
-                          ? "border-app-warning-border bg-app-warning-bg"
-                          : "border-app-border bg-app-surface-muted"
-                      }`}
+                      className={`rounded-2xl border p-4 ${tone.card} ${isUnread ? "" : "opacity-75"}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 gap-3">
                           <span
-                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                              isUnread
-                                ? "bg-app-surface text-app-warning-text"
-                                : "bg-app-surface text-app-text-muted"
-                            }`}
+                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface ${tone.icon}`}
                           >
-                            <MessageSquareText className="h-4 w-4" />
+                            {feedback.helpful === true ? (
+                              <ThumbsUp className="h-4 w-4" />
+                            ) : feedback.helpful === false ? (
+                              <ThumbsDown className="h-4 w-4" />
+                            ) : (
+                              <MessageSquareText className="h-4 w-4" />
+                            )}
                           </span>
 
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold text-app-text">Feedback</p>
+                              <p className="text-sm font-semibold text-app-text">{tone.label}</p>
                               <span
                                 className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                                   isUnread
-                                    ? "bg-app-surface text-app-warning-text"
-                                    : "bg-app-border-muted text-app-text-muted"
+                                    ? "bg-app-brand text-white"
+                                    : "bg-app-surface text-app-text-muted"
                                 }`}
                               >
-                                {isUnread ? "Unread" : "Read"}
+                                {isUnread ? "New" : "Read"}
                               </span>
                             </div>
 
@@ -982,6 +1032,9 @@ export function TeamMemberDetailPage() {
             onCreateTask={() => void handleCreateTask()}
             formatMinutes={formatMinutes}
             getStepStatusStyles={getStepStatusStyles}
+            onReviewSkip={reviewSkip}
+            onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+            markingFeedbackId={markingFeedbackId}
             onReorderTasks={(activeTaskId, overTaskId) =>
               void handleReorderTasks(step.id, activeTaskId, overTaskId)
             }

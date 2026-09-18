@@ -94,7 +94,7 @@ export const onboardingService = {
           handlers.onDone();
           return;
         case "error":
-          handlers.onError?.(event.message ?? "Unknown error");
+          handlers.onError?.(event.message ?? "Unknown error", event.name ?? undefined);
           return;
       }
     }
@@ -170,6 +170,11 @@ export const onboardingService = {
         }),
       },
     );
+  },
+
+  /** Records that the member has seen the PM's answer to a skip request. */
+  async markSkipAnswerSeen(skipId: string): Promise<void> {
+    await apiClient.fetch(`/api/v1/onboarding/me/skips/${skipId}/seen`, { method: "POST" });
   },
 
   // ── KNOWLEDGE-CHECK QUESTIONS ───────────────────────────

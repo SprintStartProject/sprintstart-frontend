@@ -186,7 +186,14 @@ function arrowHead(tip: GraphPoint, direction: GraphPoint, size = 9): string {
 
 const round = (value: number) => Math.round(value * 100) / 100;
 
-/** The curve from a blocker to what waits on it. */
+/**
+ * The curve from a blocker to what waits on it.
+ *
+ * Its ends leave and arrive straight along the axis, which is what the arrowhead is drawn from. The
+ * waypoints in between are passed through along the line joining their neighbours (Catmull-Rom)
+ * rather than stood upright at each one: forcing every waypoint vertical made an edge with several
+ * of them wobble through a string of S-bends, most visibly while a card was being dragged.
+ */
 function edgePath(
   from: GraphPoint,
   to: GraphPoint,
@@ -204,21 +211,27 @@ function edgePath(
   }
 
   const points = [from, ...waypoints, to];
+  /** The tangent through a waypoint: along the line joining the points either side of it. */
+  const throughWaypoint = (index: number) => ({
+    x: (points[index + 1].x - points[index - 1].x) / 4,
+    y: (points[index + 1].y - points[index - 1].y) / 4,
+  });
   let d = `M ${from.x} ${from.y}`;
   for (let index = 1; index < points.length; index += 1) {
     const start = points[index - 1];
     const end = points[index];
-    // Straight tangents at every point: the curve leaves and enters each row straight, which keeps it
-    // inside the gap a waypoint was put in.
-    const minimum = index === 1 || index === points.length - 1 ? 56 : 24;
+    const first = index === 1;
+    const last = index === points.length - 1;
     if (axis === "across") {
-      const bend = bendFor(end.x - start.x, minimum);
+      const bend = bendFor(end.x - start.x, 56);
       const direction = end.x >= start.x ? 1 : -1;
       d += ` C ${start.x + bend * direction} ${start.y}, ${end.x - bend * direction} ${end.y}, ${end.x} ${end.y}`;
       continue;
     }
-    const bend = bendFor(end.y - start.y, minimum);
-    d += ` C ${start.x} ${start.y + bend}, ${end.x} ${end.y - bend}, ${end.x} ${end.y}`;
+    const bend = bendFor(end.y - start.y, first || last ? 56 : 24);
+    const out = first ? { x: 0, y: bend } : throughWaypoint(index - 1);
+    const into = last ? { x: 0, y: bend } : throughWaypoint(index);
+    d += ` C ${start.x + out.x} ${start.y + out.y}, ${end.x - into.x} ${end.y - into.y}, ${end.x} ${end.y}`;
   }
   return d;
 }

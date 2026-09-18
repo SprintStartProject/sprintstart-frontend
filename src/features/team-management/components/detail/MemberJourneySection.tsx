@@ -1,10 +1,10 @@
 import {
-  AlertTriangle,
   ClipboardCheck,
   Clock,
   GitBranch,
   ListChecks,
   Lock,
+  ListPlus,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -28,7 +28,7 @@ import {
 } from "../../../onboarding/components/journey/JourneyGraph";
 import { PhaseNavigator } from "../../../onboarding/components/journey/PhaseNavigator";
 import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
-import { ItemGlyph, ItemKindIcon } from "../../../onboarding/graph/JourneyNodeCards";
+import { ItemFlags, ItemGlyph, ItemKindIcon } from "../../../onboarding/graph/JourneyNodeCards";
 import { itemKindLabel, itemStateLabel } from "../../../onboarding/graph/nodeLabels";
 import {
   blockingPhases,
@@ -36,6 +36,7 @@ import {
   itemState,
   orderedPhaseItems,
   pathProgress,
+  skipRequestOf,
   phaseItems,
   phaseProgress,
   phaseState,
@@ -46,6 +47,9 @@ import {
 } from "../../../onboarding/journey";
 import { resolveNextAction } from "../../../onboarding/nextAction";
 import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "../../../onboarding/types";
+import type { OnboardingFeedback } from "../../../../services/teamManagementService";
+import { FeedbackNote } from "./FeedbackNote";
+import { SkipReview, type SkipReviewAction } from "./SkipReview";
 import { StepQuickEdit } from "./StepQuickEdit";
 
 type ViewMode = "list" | "graph";
@@ -61,6 +65,12 @@ type Props = {
   onOpenStep: (stepId: string) => void;
   onOpenQuestions: (phaseId: string, tab: "results" | "questions") => void;
   onDeleteStep: (stepId: string) => void;
+  /** Answers a step's pending skip request. */
+  onReviewSkip?: (skipId: string, action: SkipReviewAction, comment: string) => Promise<void>;
+  /** The member's feedback, shown with the step it is about. */
+  feedbackItems?: OnboardingFeedback[];
+  onMarkFeedbackRead?: (feedbackId: string) => void;
+  markingFeedbackId?: string | null;
   /** Re-reads the path after a change. */
   onPathChanged: () => Promise<void>;
 };
@@ -95,6 +105,10 @@ export function MemberJourneySection({
   onOpenStep,
   onOpenQuestions,
   onDeleteStep,
+  onReviewSkip,
+  feedbackItems = [],
+  onMarkFeedbackRead,
+  markingFeedbackId = null,
   onPathChanged,
 }: Props) {
   const toast = useToast();
@@ -265,8 +279,9 @@ export function MemberJourneySection({
   const overall = path ? pathProgress(path) : null;
   const allSteps = phases.flatMap((candidate) => candidate.steps);
   const skipped = allSteps.filter((step) => step.status === "SKIPPED").length;
+  // `accepted` is null while the PM has not answered yet.
   const pendingSkips = allSteps.filter(
-    (step) => (step.skip as { status?: string } | null)?.status === "PENDING",
+    (step) => !!step.skip && step.skip.accepted === null && step.status !== "SKIPPED",
   ).length;
 
   const questionTools = (target: OnboardingPhaseEndpoint) => (
@@ -352,7 +367,19 @@ export function MemberJourneySection({
                     phases={phases}
                     isFocus={phase.id === focusPhaseId}
                     firstName={firstName}
-                    tools={questionTools(phase)}
+                    tools={
+                      <>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          icon={<ListPlus className="h-4 w-4" />}
+                          onClick={() => void addStepInList(phase, null)}
+                        >
+                          Add step
+                        </Button>
+                        {questionTools(phase)}
+                      </>
+                    }
                   />
                   <MemberItemList
                     phase={phase}
@@ -403,7 +430,6 @@ export function MemberJourneySection({
                     ? onOpenStep(item.id)
                     : onOpenQuestions(item.question.phaseId, "results")
                 }
-                renderPhaseActions={questionTools}
                 renderItemAside={(item, asidePhase) => (
                   <ItemAside
                     key={item.id}
@@ -442,6 +468,25 @@ export function MemberJourneySection({
                     {item.kind === "step" ? (
                       <>
                         <StepFacts item={item} taskCount={stepTaskCounts[item.id]} />
+                        {onReviewSkip && skipRequestOf(item) === "pending" && item.step.skip?.id ? (
+                          <SkipReview
+                            key={item.step.skip.id}
+                            reason={item.step.skip.reason}
+                            onReview={(action, comment) =>
+                              onReviewSkip(item.step.skip!.id, action, comment)
+                            }
+                          />
+                        ) : null}
+                        {feedbackItems
+                          .filter((feedback) => feedback.stepId === item.id)
+                          .map((feedback) => (
+                            <FeedbackNote
+                              key={feedback.id}
+                              feedback={feedback}
+                              marking={markingFeedbackId === feedback.id}
+                              onMarkRead={onMarkFeedbackRead}
+                            />
+                          ))}
                         <StepQuickEdit
                           key={`${item.step.id}:${item.step.title}:${item.step.description}`}
                           step={item.step}
@@ -551,7 +596,6 @@ function StepFacts({ item, taskCount }: { item: PhaseItem; taskCount?: StepTaskC
   if (item.kind !== "step") return null;
   const actual = actualMinutesOf(item);
   const delta = actual && item.step.estimatedMinutes ? actual - item.step.estimatedMinutes : null;
-  const skip = item.step.skip as { status?: string; reason?: string } | null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">
       <StepOriginBadge step={item.step} />
@@ -572,12 +616,7 @@ function StepFacts({ item, taskCount }: { item: PhaseItem; taskCount?: StepTaskC
           {delta ? ` (${delta > 0 ? "+" : "-"}${formatMinutes(Math.abs(delta))})` : ""}
         </span>
       ) : null}
-      {skip?.reason ? (
-        <span className="inline-flex items-center gap-1 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 font-medium text-app-warning-text">
-          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-          {item.step.status === "SKIPPED" ? "Skipped" : "Skip requested"}
-        </span>
-      ) : null}
+      <ItemFlags item={item} inline />
     </div>
   );
 }
@@ -792,15 +831,24 @@ function MemberItemRow({
       </div>
       {/* In between this row and the next: where a new step goes. Visible on hover and focus, so the
           list stays calm while it is only being read. */}
-      <div className="flex h-3 items-center justify-center">
+      {/* Always there, quiet until pointed at: a small "+" on a dashed line, which names itself on
+          hover. Hidden entirely it was too easy to miss that steps can be put in between. */}
+      <div className="group/insert relative flex h-5 items-center justify-center">
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-10 top-1/2 border-t border-dashed border-app-border opacity-0 transition-opacity group-hover/insert:opacity-100"
+        />
         <button
           type="button"
           onClick={onAddAfter}
           aria-label={`Add a step after ${item.title}`}
-          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-2.5 py-0.5 text-[11px] font-semibold text-app-brand-text opacity-0 shadow-sm transition-opacity group-hover/item:opacity-100 hover:bg-app-brand-soft focus-visible:opacity-100"
+          title={`Add a step after ${item.title}`}
+          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-1.5 py-0.5 text-[11px] font-semibold text-app-brand-text shadow-sm transition-all hover:bg-app-brand-soft hover:px-2.5 focus-visible:px-2.5"
         >
           <Plus className="h-3 w-3" aria-hidden="true" />
-          Add step after
+          <span className="hidden group-focus-within/insert:inline group-hover/insert:inline">
+            Add step here
+          </span>
         </button>
       </div>
     </li>
