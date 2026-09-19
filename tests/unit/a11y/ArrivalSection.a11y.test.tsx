@@ -63,8 +63,8 @@ const derivable: DerivableArrivalStep = {
  */
 describe("ArrivalSection Accessibility", () => {
   beforeEach(() => {
-    vi.mocked(arrivalService.listSteps).mockImplementation(async (projectId) =>
-      projectId ? [] : [step],
+    vi.mocked(arrivalService.listSteps).mockImplementation((projectId) =>
+      Promise.resolve(projectId ? [] : [step]),
     );
     vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable]);
   });
