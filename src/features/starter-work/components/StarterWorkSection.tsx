@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { SidePanel } from "../../../components/ui/SidePanel";
-import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { useAuth } from "../../../context/useAuth";
 import { useToast } from "../../../context/useToast";
@@ -23,25 +22,7 @@ import type { PoolFlightItem, PoolFlightRect } from "./poolFlight";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useStarterWorkReview } from "../hooks/useStarterWorkReview";
 import { useStarterWorkPool } from "../hooks/useStarterWorkPool";
-import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
 import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../types";
-
-/**
- * The sections this page holds, and the order they sit in the section filter.
- *
- * `overview` is the dashboard: it shows every section at once. `pool` narrows to the same pool on
- * its own tab, mirroring the Data Ingestion page. There is no separate review section any more —
- * going through the unreviewed queue is the "Go through them" triage modal — and no Issues tab: the
- * corpus browser opens from the header's "Add tasks" menu, in its own sheet.
- */
-type StarterWorkSection = "overview" | "pool";
-
-const SECTION_LABELS: Record<StarterWorkSection, string> = {
-  overview: "Overview",
-  pool: "Pool",
-};
-
-const SECTION_ORDER: StarterWorkSection[] = ["overview", "pool"];
 
 /**
  * A one-shot instruction for what to do right after landing on this tab, set by the Overview
@@ -57,6 +38,12 @@ type StarterWorkSectionProps = {
    * simply re-rendering — would replay the same jump every time.
    */
   onFocusHandled?: () => void;
+  /**
+   * DOM node to portal "Find with AI" and "Add tasks" into — the First Week page's shared header,
+   * top right, instead of this section's own body. Falls back to rendering them inline (used
+   * directly in tests, without that header) when omitted or not yet mounted.
+   */
+  actionsPortalTarget?: HTMLElement | null;
 };
 
 function compactToastDetail(value: string, maxLength: number): string {
@@ -76,7 +63,11 @@ function compactToastDetail(value: string, maxLength: number): string {
  *
  * HR reads, `ADMIN`/`PM` act, matching the backend's role split.
  */
-export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWorkSectionProps = {}) {
+export function StarterWorkSection({
+  focus = null,
+  onFocusHandled,
+  actionsPortalTarget = null,
+}: StarterWorkSectionProps = {}) {
   const { profile } = useAuth();
   const toast = useToast();
   const canAct = profile?.permissionGroup !== PermissionGroup.HR;
@@ -115,11 +106,6 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
   const [isCreating, setIsCreating] = useState(false);
   const [isTriageOpen, setIsTriageOpen] = useState(false);
   const [isIssuesSheetOpen, setIsIssuesSheetOpen] = useState(false);
-  // The Overview tab's "Choose Task 0" card wants the reader looking at the dedicated pool tab
-  // with the filter already applied, not the overview's own copy of the cloud.
-  const [activeSection, setActiveSection] = useState<StarterWorkSection>(
-    focus === "task0" ? "pool" : "overview",
-  );
   // The task whose detail drawer is open, or null. Held as the object so the
   // drawer can animate itself out after the task has left the queue.
   const [selectedTask, setSelectedTask] = useState<StarterWorkTask | null>(null);
@@ -135,12 +121,11 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
     showErrorToast("Action failed", { description: error });
   }, [error, showErrorToast]);
 
-  // Consumes the Overview tab's one-shot jump exactly once, so revisiting this tab later (a plain
-  // click on the tab bar, or this section re-rendering) never replays it. `"task0"` was already
-  // acted on above, in the `activeSection`/pool-filter initial state, so it only needs clearing
-  // here. `"triage"` has to wait for the unreviewed queue's own fetch first — the triage modal
-  // snapshots `tasks` the moment it mounts, and opening it against an empty in-flight list would
-  // start it "All caught up".
+  // Consumes the Overview tab's one-shot jump exactly once, so revisiting this tab later never
+  // replays it. `"task0"` was already acted on above, in the pool's `initialStatusFilter`, so it
+  // only needs clearing here. `"triage"` has to wait for the unreviewed queue's own fetch first —
+  // the triage modal snapshots `tasks` the moment it mounts, and opening it against an empty
+  // in-flight list would start it "All caught up".
   const focusHandled = useRef(false);
   useEffect(() => {
     if (!focus || focusHandled.current) return;
@@ -187,7 +172,6 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
     (task: { title: string; summary?: string | null }, origin?: PoolFlightRect) => {
       if (!origin) return;
       flightSequence.current += 1;
-      setActiveSection("overview");
       setPoolFlight({
         id: flightSequence.current,
         title: task.title,
@@ -304,25 +288,6 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
     }
   }, [queryClient, toast]);
 
-  // Two-finger swipe between the sections, matching the Data Ingestion page. Every section is
-  // readable by every role now, so the order is fixed rather than built from the role.
-  const swipeRef = useSwipeableTabs<StarterWorkSection, HTMLElement>({
-    order: SECTION_ORDER,
-    value: activeSection,
-    onChange: setActiveSection,
-  });
-
-  const tabOptions: SegmentedTabOption<StarterWorkSection>[] = SECTION_ORDER.map((key) => ({
-    value: key,
-    label: SECTION_LABELS[key],
-    // The pool carries a page-level count; the other sections own their own data, so their tabs
-    // stay countless rather than showing a wrong number.
-    count: key === "pool" ? pool.length : undefined,
-  }));
-
-  const showOverview = activeSection === "overview";
-  const showPoolTab = activeSection === "pool";
-
   // Mining needs a selected project; disabled (with a hint) without one.
   const hasProjectForAi = Boolean(selectedProjectId);
   const findWithAiHintId = useId();
@@ -350,104 +315,76 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
     [launchPoolFlight, notePromoted, reloadPool],
   );
 
-  return (
-    <div ref={swipeRef} className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SegmentedTabs
-          value={activeSection}
-          options={tabOptions}
-          onChange={setActiveSection}
-          layoutId="starter-work-section-pill"
-          ariaLabel="Filter sections"
-        />
-        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-          {canAct && (
-            <>
-              <Button
-                variant="secondary"
-                data-testid="generate-starter-work"
-                icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
-                loading={isGenerating}
-                disabled={!hasProjectForAi}
-                title={hasProjectForAi ? undefined : "Pick a project first"}
-                aria-describedby={hasProjectForAi ? undefined : findWithAiHintId}
-                onClick={() => void generate(selectedProjectId)}
-              >
-                {isGenerating ? "Finding tasks…" : "Find with AI"}
-              </Button>
-              {!hasProjectForAi && (
-                <span id={findWithAiHintId} className="sr-only">
-                  Pick a project first
-                </span>
-              )}
-            </>
+  const actionButtons = (
+    <>
+      {canAct && (
+        <>
+          <Button
+            variant="secondary"
+            data-testid="generate-starter-work"
+            icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+            loading={isGenerating}
+            disabled={!hasProjectForAi}
+            title={hasProjectForAi ? undefined : "Pick a project first"}
+            aria-describedby={hasProjectForAi ? undefined : findWithAiHintId}
+            onClick={() => void generate(selectedProjectId)}
+          >
+            {isGenerating ? "Finding tasks…" : "Find with AI"}
+          </Button>
+          {!hasProjectForAi && (
+            <span id={findWithAiHintId} className="sr-only">
+              Pick a project first
+            </span>
           )}
-          <StarterWorkAddMenu
-            canAct={canAct}
-            onPickFromIssues={() => setIsIssuesSheetOpen(true)}
-            onWriteOne={() => setIsCreateOpen(true)}
-          />
+        </>
+      )}
+      <StarterWorkAddMenu
+        canAct={canAct}
+        onPickFromIssues={() => setIsIssuesSheetOpen(true)}
+        onWriteOne={() => setIsCreateOpen(true)}
+      />
+    </>
+  );
+
+  return (
+    <div className="space-y-5">
+      {actionsPortalTarget ? (
+        createPortal(actionButtons, actionsPortalTarget)
+      ) : (
+        <div className="flex justify-end gap-2">{actionButtons}</div>
+      )}
+
+      {tasks.length > 0 && (
+        <div
+          data-testid="unreviewed-hint"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-app-brand-border bg-app-brand-soft px-5 py-4 text-sm text-app-text"
+        >
+          <span>
+            {tasks.length} {tasks.length === 1 ? "task" : "tasks"} nobody has looked at yet
+          </span>
+          <Button
+            variant="primary"
+            size="sm"
+            data-testid="open-triage"
+            onClick={() => setIsTriageOpen(true)}
+          >
+            Go through them
+          </Button>
         </div>
-      </div>
+      )}
 
-      <SlidingTabPanel
-        activeKey={activeSection}
-        index={SECTION_ORDER.indexOf(activeSection)}
-        className="space-y-8"
-      >
-        {showOverview && (
-          <>
-            {tasks.length > 0 && (
-              <div
-                data-testid="unreviewed-hint"
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-app-brand-border bg-app-brand-soft px-5 py-4 text-sm text-app-text"
-              >
-                <span>
-                  {tasks.length} {tasks.length === 1 ? "task" : "tasks"} nobody has looked at yet
-                </span>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  data-testid="open-triage"
-                  onClick={() => setIsTriageOpen(true)}
-                >
-                  Go through them
-                </Button>
-              </div>
-            )}
-
-            <StarterWorkPoolCloud
-              tasks={pool}
-              isLoading={isPoolLoading}
-              error={poolError}
-              canAct={canAct}
-              fullWidth
-              onSync={() => void handleSync()}
-              isSyncing={isSyncing}
-              onOpenTask={toggleSelectedTask}
-            />
-          </>
-        )}
-
-        {/* The pool on its own, the same surface the overview shows above. Its cards open the
-              same detail drawer the overview's do. */}
-        {showPoolTab && (
-          <>
-            <StarterWorkPoolCloud
-              tasks={pool}
-              isLoading={isPoolLoading}
-              error={poolError}
-              canAct={canAct}
-              fullWidth
-              onSync={() => void handleSync()}
-              isSyncing={isSyncing}
-              onOpenTask={toggleSelectedTask}
-              initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
-            />
-            <ClosedInTrackerList onOpenTask={toggleSelectedTask} />
-          </>
-        )}
-      </SlidingTabPanel>
+      <StarterWorkPoolCloud
+        tasks={pool}
+        isLoading={isPoolLoading}
+        error={poolError}
+        canAct={canAct}
+        fullWidth
+        onSync={() => void handleSync()}
+        isSyncing={isSyncing}
+        onOpenTask={toggleSelectedTask}
+        initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
+      />
+      <ClosedInTrackerList onOpenTask={toggleSelectedTask} />
 
       <PanelPresence value={selectedTask}>
         {(task) => (
@@ -481,8 +418,7 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
       )}
 
       {/* Mounted only while open (and while its slide-out plays), so the corpus is never fetched
-          before a PM actually opens the sheet. Page-level, like the task drawer above, so it needs
-          no extra AnimatePresence reset for SlidingTabPanel's `initial={false}` context. */}
+          before a PM actually opens the sheet. Page-level, like the task drawer above. */}
       <PanelPresence value={isIssuesSheetOpen ? true : null}>
         {() => (
           <SidePanel

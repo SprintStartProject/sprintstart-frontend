@@ -33,8 +33,9 @@ function parseTab(value: string | null): FirstWeekTab {
  * which now redirect here.
  *
  * The active tab lives in the URL (`?tab=overview|arrival|starter`) so a deep link lands on the
- * right one. Each tab still renders its former page's content unchanged, including that page's own
- * header and actions.
+ * right one. Each tab still renders its former page's content largely unchanged; the one exception
+ * is Starter work's "Find with AI"/"Add tasks" buttons, which portal into this shared header's
+ * top-right corner instead of sitting in that tab's own body.
  *
  * The Overview tab's cards jump straight into a specific state of the Starter work tab — "go
  * through the unreviewed queue", "show only Task 0 candidates" — rather than just switching tabs
@@ -47,6 +48,9 @@ export function FirstWeekPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseTab(searchParams.get("tab"));
   const [starterFocus, setStarterFocus] = useState<StarterWorkFocus | null>(null);
+  // Measured via a callback ref rather than a plain `useRef`, so setting it triggers the re-render
+  // that hands the freshly mounted node to `StarterWorkSection`'s portal.
+  const [starterActionsHost, setStarterActionsHost] = useState<HTMLDivElement | null>(null);
 
   const handleTabChange = useCallback(
     (tab: FirstWeekTab) => {
@@ -85,6 +89,14 @@ export function FirstWeekPage() {
             icon={Sunrise}
             title="First Week"
             subtitle="What a new hire needs before they start, and the first work waiting for them once they do."
+            actions={
+              // Starter work's "Find with AI"/"Add tasks" buttons portal into this node instead of
+              // sitting in the tab's own body — empty (and rendered) on the other tabs, which don't
+              // use it.
+              activeTab === "starter" ? (
+                <div ref={setStarterActionsHost} className="flex flex-wrap items-center gap-2" />
+              ) : undefined
+            }
           />
         </div>
       </header>
@@ -108,7 +120,11 @@ export function FirstWeekPage() {
           ) : activeTab === "arrival" ? (
             <ArrivalSection />
           ) : (
-            <StarterWorkSection focus={starterFocus} onFocusHandled={() => setStarterFocus(null)} />
+            <StarterWorkSection
+              focus={starterFocus}
+              onFocusHandled={() => setStarterFocus(null)}
+              actionsPortalTarget={starterActionsHost}
+            />
           )}
         </SlidingTabPanel>
       </main>

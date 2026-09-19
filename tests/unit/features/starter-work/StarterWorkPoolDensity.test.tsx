@@ -157,7 +157,7 @@ describe("StarterWorkPoolCloud density", () => {
     await user.click(screen.getByRole("button", { name: "Next page" }));
     expect(await screen.findByText("Starter task 7")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Task 0" }));
+    await user.click(screen.getByRole("button", { name: /^Task 0/ }));
 
     // Page 2 no longer exists once the filter leaves a single match — the view lands back on
     // page 1 and shows it, rather than a blank page 2.

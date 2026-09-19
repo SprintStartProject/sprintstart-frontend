@@ -15,6 +15,7 @@ import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { useToast } from "../../../context/useToast";
@@ -30,12 +31,14 @@ import type { StarterWorkTask } from "../types";
 
 export type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero";
 
-const STATUS_FILTER_OPTIONS: { value: PoolStatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "unseen", label: "Not looked at" },
-  { value: "seen", label: "Looked at" },
-  { value: "taskZero", label: "Task 0" },
-];
+const STATUS_FILTER_ORDER: PoolStatusFilter[] = ["all", "unseen", "seen", "taskZero"];
+
+const STATUS_FILTER_LABELS: Record<PoolStatusFilter, string> = {
+  all: "All",
+  unseen: "New",
+  seen: "Looked at",
+  taskZero: "Task 0",
+};
 
 /** Cloud cards need more breathing room than the compact issue-style list rows. */
 const CLOUD_PAGE_SIZE = 5;
@@ -415,19 +418,43 @@ export function StarterWorkPoolCloud({
     [tasks],
   );
 
+  // Scoped by "Only {project}" alone, so the status filter's own counts (below) reflect what
+  // picking each one would show without also baking in the status filter that is currently active.
+  const projectScopedTasks = useMemo(() => {
+    if (!onlyProject) return sortedTasks;
+    return sortedTasks.filter((task) => {
+      const groupKey = parseCandidateSource(task.sourceId).groupKey;
+      return groupKey !== null && projectGroupKeys.has(groupKey);
+    });
+  }, [sortedTasks, onlyProject, projectGroupKeys]);
+
+  const statusCounts = useMemo(
+    () => ({
+      all: projectScopedTasks.length,
+      unseen: projectScopedTasks.filter((task) => !task.reviewed).length,
+      seen: projectScopedTasks.filter((task) => task.reviewed).length,
+      taskZero: projectScopedTasks.filter((task) => task.taskZeroEligible).length,
+    }),
+    [projectScopedTasks],
+  );
+
+  const statusFilterOptions: SegmentedTabOption<PoolStatusFilter>[] = STATUS_FILTER_ORDER.map(
+    (value) => ({
+      value,
+      label: STATUS_FILTER_LABELS[value],
+      count: statusCounts[value],
+    }),
+  );
+
   const filteredTasks = useMemo(
     () =>
-      sortedTasks.filter((task) => {
-        if (statusFilter === "unseen" && task.reviewed) return false;
-        if (statusFilter === "seen" && !task.reviewed) return false;
-        if (statusFilter === "taskZero" && !task.taskZeroEligible) return false;
-        if (onlyProject) {
-          const groupKey = parseCandidateSource(task.sourceId).groupKey;
-          if (!groupKey || !projectGroupKeys.has(groupKey)) return false;
-        }
+      projectScopedTasks.filter((task) => {
+        if (statusFilter === "unseen") return !task.reviewed;
+        if (statusFilter === "seen") return task.reviewed;
+        if (statusFilter === "taskZero") return task.taskZeroEligible;
         return true;
       }),
-    [sortedTasks, statusFilter, onlyProject, projectGroupKeys],
+    [projectScopedTasks, statusFilter],
   );
 
   const listPageSize = fullWidth ? LIST_PAGE_SIZE_WIDE : LIST_PAGE_SIZE;
@@ -480,15 +507,15 @@ export function StarterWorkPoolCloud({
           text="Every pooled task stays claimable. Review lifts its rank; edit orientation to write the guide."
         />
 
-        {/* Nothing to say before the first sync ever runs — a pool that has never been checked
-            is a normal starting state, not a problem worth a line about. */}
-        {lastCheckedAt && (
-          <span className="text-xs text-app-text-subtle">
-            Last checked against trackers {formatRelativeDate(lastCheckedAt)}
-          </span>
-        )}
-
         <div className="ml-auto flex items-center gap-2">
+          {/* Nothing to say before the first sync ever runs — a pool that has never been checked
+              is a normal starting state, not a problem worth a line about. */}
+          {lastCheckedAt && (
+            <span className="text-xs text-app-text-subtle">
+              Checked {formatRelativeDate(lastCheckedAt)}
+            </span>
+          )}
+
           {canAct && onSync && (
             <Button
               variant="ghost"
@@ -532,22 +559,14 @@ export function StarterWorkPoolCloud({
         </div>
       </div>
 
-      <div
-        className="mb-4 flex flex-wrap items-center gap-1.5"
-        role="group"
-        aria-label="Filter pool tasks"
-      >
-        {STATUS_FILTER_OPTIONS.map((option) => (
-          <Button
-            key={option.value}
-            variant={statusFilter === option.value ? "secondary" : "ghost"}
-            size="sm"
-            aria-pressed={statusFilter === option.value}
-            onClick={() => changeStatusFilter(option.value)}
-          >
-            {option.label}
-          </Button>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <SegmentedTabs
+          value={statusFilter}
+          options={statusFilterOptions}
+          onChange={changeStatusFilter}
+          layoutId="starter-work-pool-status-pill"
+          ariaLabel="Filter pool tasks"
+        />
         {selectedProject && projectGroupKeys.size > 0 && (
           <Button
             variant={onlyProject ? "secondary" : "ghost"}

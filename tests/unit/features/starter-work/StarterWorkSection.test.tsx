@@ -77,7 +77,7 @@ describe("StarterWorkSection", () => {
     vi.spyOn(orientationService, "fetchTaskOrientation").mockResolvedValue(emptyOrientation);
   });
 
-  it("shows every live pool task in the overview, and how many are still unreviewed", async () => {
+  it("shows every live pool task, and how many are still unreviewed", async () => {
     vi.spyOn(starterWorkService, "fetchPool").mockResolvedValue([
       task,
       { ...task, id: "task-2", title: "Document the auth flow" },
@@ -160,20 +160,11 @@ describe("StarterWorkSection", () => {
     expect(await screen.findByTestId("orientation-editor")).toBeInTheDocument();
   });
 
-  it("offers only the overview and pool sections — no review, issues or orientation tab", async () => {
-    const user = userEvent.setup();
+  it("shows the pool directly, with no sub-tabs and no issues browser until asked for", async () => {
     render(<StarterWorkSection />);
 
-    const tabs = await screen.findByRole("group", { name: "Filter sections" });
-    expect(within(tabs).getByText("Overview")).toBeInTheDocument();
-    expect(within(tabs).getByText("Pool")).toBeInTheDocument();
-    expect(within(tabs).queryByText("Issues")).not.toBeInTheDocument();
-    expect(within(tabs).queryByText("Review")).not.toBeInTheDocument();
-    expect(within(tabs).queryByText("Orientation")).not.toBeInTheDocument();
-
-    // The pool section stands on its own under the Pool tab.
-    await user.click(within(tabs).getByText("Pool"));
     expect(await screen.findByTestId("starter-work-pool")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Filter sections" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("corpus-issue-browser")).not.toBeInTheDocument();
   });
 
@@ -218,8 +209,6 @@ describe("StarterWorkSection", () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
 
-    const tabs = await screen.findByRole("group", { name: "Filter sections" });
-    await user.click(within(tabs).getByText("Pool"));
     await user.click(await screen.findByRole("button", { name: /closed in the tracker/i }));
     await user.click(await screen.findByRole("button", { name: /open details for/i }));
 

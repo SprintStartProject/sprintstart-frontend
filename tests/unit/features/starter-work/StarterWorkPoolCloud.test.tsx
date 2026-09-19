@@ -226,7 +226,7 @@ describe("StarterWorkPoolCloud", () => {
     // "2026-09-01" is the newer of the two, so it decides the wording — a month ago from a
     // fixed "now" the test doesn't control, which is why this asserts the label's shape rather
     // than pinning an exact relative phrase.
-    expect(screen.getByText(/Last checked against trackers/)).toBeInTheDocument();
+    expect(screen.getByText(/Checked/)).toBeInTheDocument();
   });
 
   it("says nothing about being checked when reconciliation has never run", () => {
@@ -240,7 +240,7 @@ describe("StarterWorkPoolCloud", () => {
       />,
     );
 
-    expect(screen.queryByText(/Last checked against trackers/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Checked/)).not.toBeInTheDocument();
   });
 
   it("filters to tasks nobody has looked at yet", async () => {
@@ -255,7 +255,7 @@ describe("StarterWorkPoolCloud", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Not looked at" }));
+    await user.click(screen.getByRole("button", { name: /^New/ }));
 
     expect(screen.getByText("Starter task 2")).toBeInTheDocument();
     expect(screen.queryByText("Starter task 1")).not.toBeInTheDocument();
@@ -273,7 +273,7 @@ describe("StarterWorkPoolCloud", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Looked at" }));
+    await user.click(screen.getByRole("button", { name: /^Looked at/ }));
 
     expect(screen.getByText("Starter task 1")).toBeInTheDocument();
     expect(screen.queryByText("Starter task 2")).not.toBeInTheDocument();
@@ -291,7 +291,7 @@ describe("StarterWorkPoolCloud", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Task 0" }));
+    await user.click(screen.getByRole("button", { name: /^Task 0/ }));
 
     expect(screen.getByText("Starter task 2")).toBeInTheDocument();
     expect(screen.queryByText("Starter task 1")).not.toBeInTheDocument();
@@ -309,7 +309,7 @@ describe("StarterWorkPoolCloud", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Task 0" }));
+    await user.click(screen.getByRole("button", { name: /^Task 0/ }));
 
     expect(screen.getByText("No tasks match this filter.")).toBeInTheDocument();
   });
