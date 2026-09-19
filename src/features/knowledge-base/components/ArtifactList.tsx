@@ -7,9 +7,11 @@ import {
   CircleDot,
   FileCode,
   FileText,
+  GitBranch,
   GitPullRequest,
 } from "lucide-react";
 import type { Artifact, ArtifactType } from "../types";
+import { getArtifactRepository } from "../githubMetadata";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
 
@@ -70,6 +72,8 @@ interface ArtifactCardProps {
  * leave this card's props untouched don't re-render it.
  */
 const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: ArtifactCardProps) {
+  const repository = getArtifactRepository(artifact);
+
   return (
     <SpotlightCard
       className="p-4"
@@ -99,6 +103,19 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
             <span className="rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
               {artifact.sourceSystem}
             </span>
+            {/* Repo names are case-sensitive `owner/repo` identifiers, so unlike the
+                sibling chips this one is not uppercased; it truncates with a tooltip
+                because a long name would otherwise push the row off-width. */}
+            {repository && (
+              <span
+                data-testid="artifact-repo-badge"
+                title={repository}
+                className="flex min-w-0 items-center gap-1 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted"
+              >
+                <GitBranch className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <span className="truncate">{repository}</span>
+              </span>
+            )}
           </div>
           <div className="mt-2 flex items-center gap-4 text-xs font-medium text-app-text-muted">
             <span>Ingested: {formatDate(artifact.ingestedAt)}</span>
