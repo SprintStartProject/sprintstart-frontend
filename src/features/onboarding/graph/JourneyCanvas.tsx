@@ -410,13 +410,20 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   useLayoutEffect(() => {
     viewportRef.current = viewport;
   }, [viewport]);
-  const flightRef = useRef<{ frame: number; timeout: number } | null>(null);
+  const flightRef = useRef<{ frame: number; timeout: number; land: () => void } | null>(null);
 
+  /**
+   * Stops the flight in progress where it is. Its promise still settles: callers await a flight
+   * behind a "diving" guard, and a flight cut short by a wheel, a second click or an unmount must
+   * not leave that guard up for good.
+   */
   const cancelFlight = useCallback(() => {
-    if (!flightRef.current) return;
-    cancelAnimationFrame(flightRef.current.frame);
-    window.clearTimeout(flightRef.current.timeout);
+    const flight = flightRef.current;
+    if (!flight) return;
     flightRef.current = null;
+    cancelAnimationFrame(flight.frame);
+    window.clearTimeout(flight.timeout);
+    flight.land();
   }, []);
 
   const flyTo = useCallback(
@@ -434,7 +441,12 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         const origin = viewportRef.current;
         const startedAt = performance.now();
         const finish = () => {
-          cancelFlight();
+          const flight = flightRef.current;
+          flightRef.current = null;
+          if (flight) {
+            cancelAnimationFrame(flight.frame);
+            window.clearTimeout(flight.timeout);
+          }
           setViewport(target);
           resolve();
         };
@@ -459,6 +471,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         flightRef.current = {
           frame: requestAnimationFrame(step),
           timeout: window.setTimeout(finish, durationMs + 120),
+          land: resolve,
         };
       }),
     [cancelFlight],
@@ -709,12 +722,15 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     const nodeId = target.dataset?.journeyNode;
     if (nodeId && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
+      // Enter opens where there is an "open"; otherwise it does what a click does, like Space.
       if (event.key === "Enter" && onOpen) onOpen(nodeId);
       else onSelect?.(nodeId === selectedId ? null : nodeId);
       return;
     }
     if (event.key === "Escape") {
-      if (expanded) setExpanded(false);
+      // One step back per press: the selected edge first, then the expanded view, then the node.
+      if (selectedEdge) setSelectedEdge(null);
+      else if (expanded) setExpanded(false);
       else onSelect?.(null);
       return;
     }
@@ -723,8 +739,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     else if (event.key === "-") zoomAround(1 / 1.2, size.width / 2, size.height / 2);
     else if (event.key === "0") fit(false);
     else if (event.key === "Delete" || event.key === "Backspace") {
-      if (selectedEdge && onDisconnect) {
-        onDisconnect(selectedEdge.blockerId, selectedEdge.nodeId);
+      // Only an edge that is still drawn: a refetch may have taken it away since it was picked.
+      if (selectedEdgeData && onDisconnect) {
+        onDisconnect(selectedEdgeData.blockerId, selectedEdgeData.nodeId);
         setSelectedEdge(null);
       }
     }
@@ -734,6 +751,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   useEffect(() => {
     if (!expanded) return;
     const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      // Escape in a field or a dialog belongs to it, not to the canvas behind.
+      if (target?.closest?.('input, textarea, select, [role="dialog"]')) return;
       if (event.key === "Escape") setExpanded(false);
     };
     window.addEventListener("keydown", onKey);

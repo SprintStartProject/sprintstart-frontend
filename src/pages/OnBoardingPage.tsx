@@ -166,8 +166,12 @@ export function OnBoardingPage() {
   const [chosenPhaseId, setChosenPhaseId] = useState<string | null>(null);
   // Where the member left the page last time: list or graph, and the phase the graph was zoomed into.
   // A link to a step always opens the list, since that is where the step unfolds.
+  // Arriving for a particular step, question or phase choice opens the list: that is where each of
+  // them unfolds, whichever view was used last.
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    routeStepId ? "list" : readJourneyView(HIRE_JOURNEY_VIEW_KEY).mode,
+    routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase
+      ? "list"
+      : readJourneyView(HIRE_JOURNEY_VIEW_KEY).mode,
   );
   const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
     // A phase arrived at by name opens *inside* itself on the graph, the same way it opens selected
@@ -209,7 +213,20 @@ export function OnBoardingPage() {
     hasLoadedRef.current = true;
     void (async () => {
       try {
-        applyPath(await onboardingService.fetchPath(), { keepSelection: false });
+        let loaded = await onboardingService.fetchPath();
+        // A step opened by its address starts like one opened by a click.
+        const linked = routeStepId
+          ? loaded.phases.flatMap((phase) => phase.steps).find((step) => step.id === routeStepId)
+          : undefined;
+        if (linked && linked.status === "WAITING" && !linked.locked) {
+          try {
+            await onboardingService.startStep(linked.id);
+            loaded = await onboardingService.fetchPath();
+          } catch (error) {
+            console.error("Failed to start the linked onboarding step:", error);
+          }
+        }
+        applyPath(loaded, { keepSelection: false });
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) {
           // Absence is a normal state; a path is only built when the user asks for one.
@@ -220,6 +237,8 @@ export function OnBoardingPage() {
         setErrorMessage(error instanceof Error ? error.message : "Unknown error");
       }
     })();
+    // Once, on arrival: the route's step is read from the first render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyPath]);
 
   const refreshPath = useCallback(async () => {
@@ -227,8 +246,12 @@ export function OnBoardingPage() {
       applyPath(await onboardingService.fetchPath(), { keepSelection: true });
     } catch (error) {
       console.error("Failed to refresh onboarding path:", error);
+      // Said out loud: after finishing a step, a silent failure leaves progress looking unchanged.
+      toast.error("Your path could not be refreshed", {
+        description: "What you did is saved. Reload the page to see it.",
+      });
     }
-  }, [applyPath]);
+  }, [applyPath, toast]);
 
   // A generation that finished -- here or while the user was elsewhere -- means there is a new path.
   // Read fresh rather than taken from the generation: the hire may have started working on it before
@@ -335,6 +358,9 @@ export function OnBoardingPage() {
       await refreshPath();
     } catch (error) {
       console.error("Failed to start onboarding step:", error);
+      toast.error("The step could not be started", {
+        description: error instanceof Error ? error.message : undefined,
+      });
     }
   };
 
@@ -412,12 +438,14 @@ export function OnBoardingPage() {
           setExpandedItemId(null);
           setGraphItemId(null);
           setGraphPhaseId(null);
+          // The chooser lives in the list; from inside the graph there is nothing to scroll to.
+          setViewMode("list");
           window.setTimeout(
             () =>
               document
                 .querySelector("#phase-chooser")
                 ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
-            50,
+            150,
           );
         },
       };

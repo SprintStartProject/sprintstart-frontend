@@ -8,7 +8,6 @@ import {
   orderByGraph,
   resolveLayout,
   routeEdges,
-  wouldCreateCycle,
 } from "../../../../../src/features/onboarding/graph/layout";
 
 const node = (id: string, blockerIds: string[] = [], graphX?: number, graphY?: number) => ({
@@ -78,14 +77,6 @@ describe("onboarding graph layout", () => {
 
     expect([...collectUpstream(nodes, "c")].sort()).toEqual(["a", "b"]);
     expect([...collectDownstream(nodes, "a")].sort()).toEqual(["b", "c"]);
-  });
-
-  it("recognises an edge that would close a loop", () => {
-    const nodes = [node("a"), node("b", ["a"]), node("c", ["b"])];
-
-    expect(wouldCreateCycle(nodes, "a", "c")).toBe(true);
-    expect(wouldCreateCycle(nodes, "c", "a")).toBe(false);
-    expect(wouldCreateCycle(nodes, "a", "a")).toBe(true);
   });
 });
 

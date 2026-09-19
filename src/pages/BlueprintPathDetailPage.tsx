@@ -89,10 +89,6 @@ type RequirementCatalog = {
   skills: { id: string; name: string }[];
   projectRoles: { id: string; name: string }[];
 };
-type GraphDetail =
-  | { kind: "phase"; item: BlueprintPhase }
-  | { kind: "step"; item: BlueprintStep }
-  | { kind: "question"; item: BlueprintQuestion };
 
 /** What else goes when one of these is deleted — the part somebody has to weigh before saying yes. */
 const DELETE_CONSEQUENCE: Record<CreateKind, string> = {
@@ -113,14 +109,6 @@ const kindLabels: Record<CreateKind, string> = {
   option: "option",
 };
 
-/** Compact definition-list cell used by the graph node detail dialog. */
-
-/**
- * A loaded path with its phases' graph coordinates and prerequisite edges filled in.
- *
- * Phases keep whatever the nested DTO said about everything else; only the three fields that
- * response cannot carry come from the graph.
- */
 /**
  * What to put back in front of the author after landing somewhere new.
  *
@@ -130,6 +118,12 @@ const kindLabels: Record<CreateKind, string> = {
  */
 type BlueprintReopen = { phaseTitle: string; nodeTitle?: string };
 
+/**
+ * A loaded path with its phases' graph coordinates and prerequisite edges filled in.
+ *
+ * Phases keep whatever the nested DTO said about everything else; only the three fields that
+ * response cannot carry come from the graph.
+ */
 function withGraphNodes(path: BlueprintPath, nodes: BlueprintGraphNode[]): BlueprintPath {
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
 
@@ -192,15 +186,6 @@ function LifecycleNotice({
       this project is given. To change it, open a draft — this version stays in service until the
       draft is published.
     </p>
-  );
-}
-
-function DetailStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-app-surface-muted p-3">
-      <dt className="text-xs font-medium tracking-wide text-app-text-muted uppercase">{label}</dt>
-      <dd className="mt-1 font-semibold text-app-text">{value}</dd>
-    </div>
   );
 }
 
@@ -285,7 +270,6 @@ export function BlueprintPathDetailPage() {
     value: editorMode,
     onChange: (mode) => changeEditorMode(mode),
   });
-  const [graphDetail, setGraphDetail] = useState<GraphDetail | null>(null);
 
   /**
    * Loads the path together with its graph, and merges the two.
@@ -408,6 +392,12 @@ export function BlueprintPathDetailPage() {
     position: number,
     graphPosition?: { graphX: number; graphY: number },
   ) {
+    // Every "Add …" lands here. On a published version, offer the draft rather than a form whose
+    // save can only come back refused.
+    if (!isDraft) {
+      whenEditable(() => undefined);
+      return;
+    }
     setTitle("");
     setDescription("");
     setPhaseType("FIXED");
@@ -516,7 +506,6 @@ export function BlueprintPathDetailPage() {
       setMinutes(String(nextTarget.item.estimatedMinutes));
       setOutcome(nextTarget.item.expectedOutcome);
     }
-    if (nextTarget.kind === "task") setQuestionTitle(nextTarget.item.title);
 
     setEditTarget(nextTarget);
   }
@@ -693,7 +682,8 @@ export function BlueprintPathDetailPage() {
         await blueprintService.updateTask(blueprintScope, editTarget.item.id, {
           revision: editTarget.item.revision,
           position: editTarget.item.position,
-          title: questionTitle,
+          // The task form edits `title`; `questionTitle` belongs to the question form.
+          title,
           description,
         });
       if (editTarget?.kind === "option")
@@ -869,7 +859,23 @@ export function BlueprintPathDetailPage() {
       blueprintService.getPath(blueprintScope, pathId),
       blueprintService.getSubGraph(blueprintScope, phaseId),
     ]);
-    setPath(nextPath);
+    // The nested DTO has no phase coordinates or prerequisites; keep the ones already loaded
+    // rather than dropping them while the sub-graph editor is open.
+    setPath((current) =>
+      current
+        ? withGraphNodes(
+            nextPath,
+            current.blueprintPhases.map((phase): BlueprintGraphNode => ({
+              id: phase.id,
+              revision: phase.revision,
+              title: phase.title,
+              graphX: phase.graphX ?? null,
+              graphY: phase.graphY ?? null,
+              blockerIds: phase.blockerIds ?? [],
+            })),
+          )
+        : nextPath,
+    );
     setSubGraphNodes(graph.nodes);
   }
 
@@ -1564,9 +1570,29 @@ export function BlueprintPathDetailPage() {
         };
       });
     } catch (reason) {
-      setPath(path);
+      // Back to what the server has, not to the snapshot this call started from: anything saved
+      // meanwhile would be thrown away with the failed move.
+      void loadPath(false);
       setError(reason instanceof Error ? reason.message : "The item could not be reordered.");
     }
+  }
+
+  /** The ids of the list an item sits in -- a drag only reorders within one. */
+  function siblingIds(kind: SortKind, id: string): string[] {
+    const phases = path?.blueprintPhases ?? [];
+    const steps = phases.flatMap((phase) => phase.blueprintSteps);
+    const questions = phases.flatMap((phase) => phase.blueprintCheckQuestions);
+    const lists: { id: string }[][] =
+      kind === "phase"
+        ? [phases]
+        : kind === "step"
+          ? phases.map((phase) => phase.blueprintSteps)
+          : kind === "task"
+            ? steps.map((step) => step.blueprintTasks)
+            : kind === "question"
+              ? phases.map((phase) => phase.blueprintCheckQuestions)
+              : questions.map((question) => question.blueprintCheckOptions);
+    return (lists.find((list) => list.some((item) => item.id === id)) ?? []).map((item) => item.id);
   }
 
   function dragProps(kind: SortKind, id: string, position: number) {
@@ -1584,8 +1610,12 @@ export function BlueprintPathDetailPage() {
       onDrop: (event: DragEvent<HTMLElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        if (dragged?.kind === kind && dragged.id !== id) void reorder(kind, dragged.id, position);
+        const source = dragged;
         setDragged(null);
+        // Dropped on an item of another list, the target's position means nothing in the source's.
+        if (source?.kind !== kind || source.id === id) return;
+        if (!siblingIds(kind, id).includes(source.id)) return;
+        whenEditable(() => void reorder(kind, source.id, position));
       },
       onDragEnd: () => setDragged(null),
     };
@@ -1972,7 +2002,7 @@ export function BlueprintPathDetailPage() {
               Build the path in phases, then add steps and a knowledge check to each phase.
             </EmptyState>
           ) : (
-            path.blueprintPhases
+            [...path.blueprintPhases]
               .sort((a, b) => a.position - b.position)
               .map((phase, phaseIndex) => (
                 <section
@@ -2161,7 +2191,7 @@ export function BlueprintPathDetailPage() {
                             {phase.blueprintSteps.length === 0 ? (
                               <EmptyState size="sm">No steps in this phase.</EmptyState>
                             ) : (
-                              phase.blueprintSteps
+                              [...phase.blueprintSteps]
                                 .sort((a, b) => a.position - b.position)
                                 .map((step, stepIndex) => (
                                   <article
@@ -2379,7 +2409,7 @@ export function BlueprintPathDetailPage() {
                             {phase.blueprintCheckQuestions.length === 0 ? (
                               <EmptyState size="sm">No questions in this phase.</EmptyState>
                             ) : (
-                              phase.blueprintCheckQuestions
+                              [...phase.blueprintCheckQuestions]
                                 .sort((a, b) => a.position - b.position)
                                 .map((question, questionIndex) => (
                                   <article
@@ -2528,97 +2558,6 @@ export function BlueprintPathDetailPage() {
           ) : null}
         </section>
       )}
-      <Modal
-        isOpen={graphDetail !== null}
-        title={graphDetail?.item.title ?? "Blueprint details"}
-        onClose={() => setGraphDetail(null)}
-        size="lg"
-      >
-        {graphDetail?.kind === "phase" ? (
-          <div className="space-y-6 text-sm">
-            <div>
-              <h3 className="font-semibold text-app-text">Description</h3>
-              <p className="mt-1 text-app-text-muted">
-                {graphDetail.item.description || "No description yet."}
-              </p>
-            </div>
-            <dl className="grid gap-4 sm:grid-cols-3">
-              <DetailStat label="Phase type" value={graphDetail.item.type} />
-              <DetailStat label="Steps" value={String(graphDetail.item.blueprintSteps.length)} />
-              <DetailStat
-                label="Knowledge-check questions"
-                value={String(graphDetail.item.blueprintCheckQuestions.length)}
-              />
-            </dl>
-            {graphDetail.item.aiPrompt ? (
-              <div>
-                <h3 className="font-semibold text-app-text">AI prompt</h3>
-                <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
-                  {graphDetail.item.aiPrompt}
-                </p>
-              </div>
-            ) : null}
-            <div>
-              <h3 className="font-semibold text-app-text">Requirements</h3>
-              {graphDetail.item.requirements?.length ? (
-                <ul className="mt-2 flex flex-wrap gap-2">
-                  {graphDetail.item.requirements.map((requirement) => (
-                    <li key={requirement.id}>
-                      <Badge variant="neutral">
-                        {requirement.type === "SKILL" ? "Skill" : "Project role"}:{" "}
-                        {requirement.displayName}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-1 text-app-text-muted">No requirements configured.</p>
-              )}
-            </div>
-          </div>
-        ) : graphDetail?.kind === "step" ? (
-          <div className="space-y-5 text-sm">
-            <p className="text-app-text-muted">{graphDetail.item.description}</p>
-            <dl className="grid gap-4 sm:grid-cols-3">
-              <DetailStat label="Step type" value={graphDetail.item.type} />
-              <DetailStat
-                label="Estimated time"
-                value={`${graphDetail.item.estimatedMinutes} min`}
-              />
-              <DetailStat label="AI assisted" value={graphDetail.item.aiAssisted ? "Yes" : "No"} />
-            </dl>
-            <div>
-              <h3 className="font-semibold text-app-text">Expected outcome</h3>
-              <p className="mt-1 text-app-text-muted">{graphDetail.item.expectedOutcome}</p>
-            </div>
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <DetailStat label="Tasks" value={String(graphDetail.item.blueprintTasks.length)} />
-              <DetailStat
-                label="Resources"
-                value={String(graphDetail.item.blueprintResources.length)}
-              />
-            </dl>
-          </div>
-        ) : graphDetail?.kind === "question" ? (
-          <div className="space-y-5 text-sm">
-            <DetailStat label="Question type" value={graphDetail.item.type} />
-            <div>
-              <h3 className="font-semibold text-app-text">Question</h3>
-              <p className="mt-1 text-app-text-muted">{graphDetail.item.question}</p>
-            </div>
-            {graphDetail.item.explanation ? (
-              <div>
-                <h3 className="font-semibold text-app-text">Explanation</h3>
-                <p className="mt-1 text-app-text-muted">{graphDetail.item.explanation}</p>
-              </div>
-            ) : null}
-            <DetailStat
-              label="Answer options"
-              value={String(graphDetail.item.blueprintCheckOptions.length)}
-            />
-          </div>
-        ) : null}
-      </Modal>
       <Modal
         isOpen={addRequirementTarget !== null}
         title="Add phase requirements"

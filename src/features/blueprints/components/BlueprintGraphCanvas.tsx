@@ -460,10 +460,19 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
       }
 
       setOverrides((current) => ({ ...current, [id]: centre }));
-      void runMutation(
-        () => onPositionChange(node, centre.x, centre.y),
-        "The node position could not be saved.",
-      );
+      void runMutation(async () => {
+        try {
+          await onPositionChange(node, centre.x, centre.y);
+        } catch (reason) {
+          // Back to where the server still has it, rather than showing a move that did not happen.
+          setOverrides((current) => {
+            const next = { ...current };
+            delete next[id];
+            return next;
+          });
+          throw reason;
+        }
+      }, "The node position could not be saved.");
     },
     [nodeById, onPositionChange, preview, runMutation],
   );
@@ -527,13 +536,27 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
     const accepted = preview;
 
     void runMutation(async () => {
+      // Every card is tried, so one refusal does not leave the rest of the layout unsaved; the
+      // preview stays open when anything failed, to accept again.
+      let failed = 0;
+      let attempted = 0;
       for (const node of nodes) {
         const target = accepted[node.id];
         if (!target) continue;
         const x = Math.round(target.x);
         const y = Math.round(target.y);
         if (node.graphX === x && node.graphY === y) continue;
-        await onPositionChange(node, x, y);
+        attempted += 1;
+        try {
+          await onPositionChange(node, x, y);
+        } catch {
+          failed += 1;
+        }
+      }
+      if (failed > 0) {
+        throw new Error(
+          `${failed} of ${attempted} cards could not be moved. Accept again to retry them.`,
+        );
       }
       setPreview(null);
     }, "The layout could not be saved.");
@@ -807,7 +830,9 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
               if (half) return HALF_EDGE[half];
               return edgeTone?.(node, blocker.id) ?? "rule";
             }}
-            canMove={editable}
+            // Not while a save is in flight: a second drag of the same card would send the revision
+            // the first one is about to replace, and come back as a conflict.
+            canMove={editable && !isSaving}
             onMove={handleMove}
             canConnect={editable}
             onConnect={handleConnect}

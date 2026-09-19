@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { EDGE_REFUSAL_MESSAGE, edgeRefusal } from "../../../graph-diagram/graphLayout";
 import { phaseHasUnseenSkipAnswer } from "../../skipAnswers";
 import {
   ArrowLeft,
@@ -36,12 +37,7 @@ import {
   itemGraphLayout,
 } from "../../graph/graphLayouts";
 import { itemKindLabel, itemStateLabel, phaseStateLabel } from "../../graph/nodeLabels";
-import {
-  layeredLayout,
-  resolveLayout,
-  wouldCreateCycle,
-  type GraphPoint,
-} from "../../graph/layout";
+import { layeredLayout, resolveLayout, type GraphPoint } from "../../graph/layout";
 import type { OnboardingPhaseEndpoint } from "../../types";
 import type { GraphNodePosition } from "../../../../services/onboardingGraphService";
 
@@ -278,10 +274,20 @@ export function JourneyGraph({
   const connect = (blockerId: string, nodeId: string) => {
     if (!editing) return;
     const nodes = openPhase ? items : phaseNodes;
-    if (wouldCreateCycle(nodes, nodeId, blockerId)) {
-      toast.warning("That connection would make a loop", {
-        description: "Something it unlocks already waits on it.",
-      });
+    // The same rules, and the same sentences, as the blueprint canvas: a loop, a duplicate and a
+    // node pointed at itself are each said, not silently dropped.
+    const refusal = edgeRefusal(
+      nodes.map((node) => ({
+        id: node.id,
+        blockerIds: node.blockerIds ?? [],
+        graphX: null,
+        graphY: null,
+      })),
+      nodeId,
+      blockerId,
+    );
+    if (refusal) {
+      toast.warning("Those can't be connected", { description: EDGE_REFUSAL_MESSAGE[refusal] });
       return;
     }
     void run(
@@ -439,7 +445,11 @@ export function JourneyGraph({
         positions={positions}
         nodeSize={ITEM_NODE_SIZE}
         ariaLabel={`Graph of the steps and questions in ${openPhase.title}`}
-        nodeLabel={(item) => `${item.kind === "step" ? "Step" : "Question"}: ${item.title}`}
+        // The state is part of the name: the card's own text sits under this label, so a locked step
+        // and one in progress would otherwise sound the same.
+        nodeLabel={(item) =>
+          `${item.kind === "step" ? "Step" : "Question"}: ${item.title}, ${itemStateLabel[itemState(item, openPhase.locked)]}`
+        }
         fitKey={PHASE_KEY(openPhase.id)}
         focusId={nextItemId ?? selectedItemId}
         selectedId={entersItems ? null : selectedItemId}
@@ -451,10 +461,15 @@ export function JourneyGraph({
           onSelectItem(id);
         }}
         spotlightId={divingIntoItem ?? focusedItem?.id ?? null}
-        onOpen={(id) => {
-          const item = items.find((candidate) => candidate.id === id);
-          if (item) onOpenItem?.(item);
-        }}
+        // Only where there is something to open: without it Enter falls back to what a click does.
+        onOpen={
+          onOpenItem
+            ? (id) => {
+                const item = items.find((candidate) => candidate.id === id);
+                if (item) onOpenItem(item);
+              }
+            : undefined
+        }
         edgeTone={(blocker, node): JourneyEdgeTone => {
           const blockerState = itemState(blocker, openPhase.locked);
           const nodeState = itemState(node, openPhase.locked);

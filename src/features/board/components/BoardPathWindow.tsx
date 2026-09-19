@@ -110,7 +110,8 @@ export function BoardPathWindow({
             size="sm"
             iconOnly
             aria-expanded={isOpen}
-            aria-controls={panelId}
+            // Only while the panel is mounted: folded, there is nothing for it to point at.
+            aria-controls={isOpen ? panelId : undefined}
             aria-label={
               isOpen ? "Hide where you are in your path" : "Show where you are in your path"
             }

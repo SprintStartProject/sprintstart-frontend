@@ -254,15 +254,6 @@ export function collectDownstream(nodes: readonly LayoutNode[], id: string): Set
   return seen;
 }
 
-/** Whether adding the edge `blocker → node` would close a loop. */
-export function wouldCreateCycle(
-  nodes: readonly LayoutNode[],
-  nodeId: string,
-  blockerId: string,
-): boolean {
-  return nodeId === blockerId || collectUpstream(nodes, blockerId).has(nodeId);
-}
-
 /** Key of an edge in a route map. */
 export const edgeKey = (blockerId: string, nodeId: string) => `${blockerId}->${nodeId}`;
 

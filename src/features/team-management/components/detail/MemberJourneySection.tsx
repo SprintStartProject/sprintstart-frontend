@@ -8,7 +8,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../../../components/ui/Button";
 import { SegmentedTabs } from "../../../../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../../../../components/ui/SlidingTabPanel";
@@ -212,38 +212,75 @@ export function MemberJourneySection({
     }
   };
 
+  // Blocker lists sent but not yet back in `phases`. The endpoints replace the whole list, so a
+  // second edit to the same node computed from the stale snapshot would drop the first one.
+  const pendingBlockers = useRef(new Map<string, string[]>());
+
+  const rewire = useCallback(
+    async (
+      id: string,
+      current: string[] | undefined,
+      change: (blockers: string[]) => string[],
+      save: (id: string, blockers: string[]) => Promise<unknown>,
+    ) => {
+      const before = pendingBlockers.current.get(id) ?? current ?? [];
+      const next = change(before);
+      if (next.length === before.length && next.every((blocker, i) => blocker === before[i])) {
+        return;
+      }
+      pendingBlockers.current.set(id, next);
+      try {
+        await save(id, next);
+        await onPathChanged();
+      } finally {
+        // Only this edit's own entry: a later edit to the same node has put its list there by now.
+        if (pendingBlockers.current.get(id) === next) pendingBlockers.current.delete(id);
+      }
+    },
+    [onPathChanged],
+  );
+
   const editing = useMemo<GraphEditing>(
     () => ({
       connectItems: async (_phaseId, blockerId, nodeId) => {
         const node = phases.flatMap(phaseItems).find((item) => item.id === nodeId);
-        if (!node || node.blockerIds.includes(blockerId)) return;
-        await onboardingGraphService.replaceNodeBlockers(nodeId, [...node.blockerIds, blockerId]);
-        await onPathChanged();
+        if (!node) return;
+        await rewire(
+          nodeId,
+          node.blockerIds,
+          (blockers) => (blockers.includes(blockerId) ? blockers : [...blockers, blockerId]),
+          (id, blockers) => onboardingGraphService.replaceNodeBlockers(id, blockers),
+        );
       },
       disconnectItems: async (_phaseId, blockerId, nodeId) => {
         const node = phases.flatMap(phaseItems).find((item) => item.id === nodeId);
         if (!node) return;
-        await onboardingGraphService.replaceNodeBlockers(
+        await rewire(
           nodeId,
-          node.blockerIds.filter((id) => id !== blockerId),
+          node.blockerIds,
+          (blockers) => blockers.filter((id) => id !== blockerId),
+          (id, blockers) => onboardingGraphService.replaceNodeBlockers(id, blockers),
         );
-        await onPathChanged();
       },
       connectPhases: async (blockerId, phaseId) => {
         const target = phases.find((candidate) => candidate.id === phaseId);
-        const blockers = target?.blockerIds ?? [];
-        if (!target || blockers.includes(blockerId)) return;
-        await onboardingGraphService.replacePhaseBlockers(phaseId, [...blockers, blockerId]);
-        await onPathChanged();
+        if (!target) return;
+        await rewire(
+          phaseId,
+          target.blockerIds,
+          (blockers) => (blockers.includes(blockerId) ? blockers : [...blockers, blockerId]),
+          (id, blockers) => onboardingGraphService.replacePhaseBlockers(id, blockers),
+        );
       },
       disconnectPhases: async (blockerId, phaseId) => {
         const target = phases.find((candidate) => candidate.id === phaseId);
         if (!target) return;
-        await onboardingGraphService.replacePhaseBlockers(
+        await rewire(
           phaseId,
-          (target.blockerIds ?? []).filter((id) => id !== blockerId),
+          target.blockerIds,
+          (blockers) => blockers.filter((id) => id !== blockerId),
+          (id, blockers) => onboardingGraphService.replacePhaseBlockers(id, blockers),
         );
-        await onPathChanged();
       },
       addStep: async (phaseId, point) => {
         const target = phases.find((candidate) => candidate.id === phaseId);
@@ -259,7 +296,7 @@ export function MemberJourneySection({
         setSelectedItemId(created.id);
       },
     }),
-    [createBlankStep, onPathChanged, phases],
+    [createBlankStep, phases, rewire],
   );
 
   const saveLayout = useMemo(

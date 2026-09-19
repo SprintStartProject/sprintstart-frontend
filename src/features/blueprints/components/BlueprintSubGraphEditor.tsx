@@ -48,14 +48,11 @@ type Props = {
   nodes: BlueprintGraphNode[];
   editable: boolean;
   /**
-   * Asks the page to open a draft, on a version that cannot be edited.
+   * Asks the page to open a draft, on a version that cannot be edited, carrying the node it was
+   * asked from — so the author lands back in front of it rather than on a graph with nothing open.
    *
    * Without it a published blueprint drew a details panel with no footer at all, which reads as
    * "this has no actions" rather than "not on this version".
-   */
-  /**
-   * Asks the page to open a draft, carrying the node it was asked from — so the author lands back
-   * in front of it rather than on a graph with nothing open.
    */
   onRequestDraft?: (node: BlueprintGraphNode) => void;
   /**

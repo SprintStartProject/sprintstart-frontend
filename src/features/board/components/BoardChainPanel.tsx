@@ -82,7 +82,8 @@ export function BoardChainPanel({
 
   return (
     <SidePanel
-      isOpen={cardId !== null}
+      // Closed, not an empty shell, once the card it was opened for is gone from the board.
+      isOpen={cardId !== null && subject !== null}
       onClose={onClose}
       title={subject ? `What ${subject.title} is waiting on` : "The chain"}
       description={
@@ -107,7 +108,9 @@ export function BoardChainPanel({
             onAddBlocker={() => Promise.resolve()}
             onRemoveBlocker={() => Promise.resolve()}
             edgeTone={(node, blockerId) =>
-              EDGE_TONE_STYLE[SOURCE_WORDS[node.sourceByBlockerId[blockerId] ?? "HIRE"].tone]
+              // An arrow with no recorded source is drawn as the team's, not as one the hire made:
+              // claiming they arranged it would invite them to take off a rule.
+              EDGE_TONE_STYLE[SOURCE_WORDS[node.sourceByBlockerId[blockerId] ?? "TEAM"].tone]
             }
             renderNode={(node, cardProps) => {
               const badge = STATUS_BADGE[node.status];

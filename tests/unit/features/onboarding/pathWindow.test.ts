@@ -118,6 +118,35 @@ describe("pathWindow", () => {
     expect(window.currentId).toBe("b");
   });
 
+  it("finds where somebody stands by position, whatever order the phases arrive in", () => {
+    // Listed out of order: the first open phase by position is "b", although "c" comes first.
+    const window = pathWindow(
+      path([
+        phase("c", 2, { steps: ["WAITING"] }),
+        phase("a", 0, { steps: ["FINISHED"] }),
+        phase("b", 1, { steps: ["IN_PROGRESS"] }),
+      ]),
+    );
+
+    expect(window.currentId).toBe("b");
+  });
+
+  it("keeps the current phase when many phases lead into it", () => {
+    const before = ["p1", "p2", "p3", "p4", "p5", "p6"];
+    const window = pathWindow(
+      path([
+        ...before.map((id, index) => phase(id, index, { steps: ["FINISHED"] })),
+        phase("now", 6, { steps: ["IN_PROGRESS"], blockerIds: before }),
+        phase("next", 7, { steps: ["WAITING"], blockerIds: ["now"] }),
+      ]),
+    );
+
+    const ids = window.nodes.map((node) => node.id);
+    expect(ids).toContain("now");
+    expect(ids).toContain("next");
+    expect(ids.length).toBeLessThanOrEqual(5);
+  });
+
   it("gives no phase a position, because a board has nowhere to keep one", () => {
     const window = pathWindow(path([phase("a", 0, { steps: ["WAITING"] })]));
 

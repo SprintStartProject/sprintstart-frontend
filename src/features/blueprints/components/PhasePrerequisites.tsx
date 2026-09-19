@@ -46,6 +46,7 @@ export function PhasePrerequisites({
   onRemove: (blocked: BlueprintPhase, blockerId: string) => Promise<void>;
 }) {
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const byId = useMemo(() => new Map(phases.map((item) => [item.id, item])), [phases]);
 
   const blockers = phase.blockerIds
@@ -67,8 +68,15 @@ export function PhasePrerequisites({
 
   async function run(work: () => Promise<void>) {
     setIsSaving(true);
+    setSaveError(null);
     try {
       await work();
+    } catch (reason) {
+      // Every call site fires and forgets, so a refusal (a cycle, a stale revision, a published
+      // version) has to be said here or it is not said at all.
+      setSaveError(
+        reason instanceof Error ? reason.message : "The prerequisite could not be saved.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -76,6 +84,11 @@ export function PhasePrerequisites({
 
   return (
     <div className="space-y-4">
+      {saveError ? (
+        <p role="alert" className="text-sm text-app-danger-text">
+          {saveError}
+        </p>
+      ) : null}
       <section className="space-y-2">
         <h3 className="font-semibold text-app-text">Waits for</h3>
         <p className="text-xs text-app-text-muted">{LOCK_SENTENCE}</p>

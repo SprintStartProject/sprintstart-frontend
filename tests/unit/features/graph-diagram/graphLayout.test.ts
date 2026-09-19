@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   GRAPH_NODE_HEIGHT,
   GRAPH_NODE_WIDTH,
-  MIN_NODE_GAP,
-  arrangementFor,
   autoLayoutPositions,
   blockersBehind,
   blueprintEdgePath,
@@ -16,8 +14,6 @@ import {
   edgeRefusal,
   entryPointIds,
   keyboardNeighbour,
-  separateOverlaps,
-  withFallbackPositions,
   type GraphRuleNode,
 } from "../../../../src/features/graph-diagram/graphLayout.ts";
 
@@ -103,54 +99,6 @@ describe("chainFor", () => {
     const nodes = [node("a", ["b"]), node("b", ["a"])];
 
     expect(chainFor(nodes, "a")).toEqual(new Set(["a", "b"]));
-  });
-});
-
-describe("withFallbackPositions", () => {
-  it("keeps a stored position untouched", () => {
-    const positions = withFallbackPositions([node("a", [], 120, -40)]);
-
-    expect(positions.a).toEqual({ x: 120, y: -40 });
-  });
-
-  it("places a node that was never dragged", () => {
-    const positions = withFallbackPositions([
-      { id: "a", blockerIds: [], graphX: null, graphY: null },
-    ]);
-
-    expect(positions.a).toEqual({ x: 0, y: 0 });
-  });
-
-  it("does not stack unplaced nodes on one another", () => {
-    const unplaced = Array.from({ length: 6 }, (_, index) => ({
-      id: `n${index}`,
-      blockerIds: [],
-      graphX: null,
-      graphY: null,
-    }));
-
-    const positions = withFallbackPositions(unplaced);
-    const distinct = new Set(Object.values(positions).map((point) => `${point.x}:${point.y}`));
-
-    expect(distinct.size).toBe(6);
-  });
-
-  it("does not drop an unplaced node onto an occupied cell", () => {
-    const positions = withFallbackPositions([
-      node("placed", [], 0, 0),
-      { id: "loose", blockerIds: [], graphX: null, graphY: null },
-    ]);
-
-    expect(positions.loose).not.toEqual(positions.placed);
-  });
-
-  it("gives the same answer twice", () => {
-    const nodes = [
-      { id: "a", blockerIds: [], graphX: null, graphY: null },
-      { id: "b", blockerIds: [], graphX: null, graphY: null },
-    ];
-
-    expect(withFallbackPositions(nodes)).toEqual(withFallbackPositions(nodes));
   });
 });
 
@@ -306,97 +254,6 @@ describe("compactTitlePx", () => {
 
   it("never shrinks below the normal size", () => {
     expect(compactTitlePx(2)).toBe(13);
-  });
-});
-
-describe("separateOverlaps", () => {
-  /** How far apart two cards have to be on an axis before they stop covering each other. */
-  const clearX = GRAPH_NODE_WIDTH;
-  const clearY = GRAPH_NODE_HEIGHT;
-
-  function overlaps(positions: ReturnType<typeof separateOverlaps>, a: string, b: string) {
-    return (
-      Math.abs(positions[a].x - positions[b].x) < clearX &&
-      Math.abs(positions[a].y - positions[b].y) < clearY
-    );
-  }
-
-  it("leaves positions that already clear each other exactly where they are", () => {
-    const nodes = [node("a", [], 0, 0), node("b", [], 400, 0)];
-    const before = withFallbackPositions(nodes);
-
-    expect(separateOverlaps(nodes, before)).toEqual(before);
-  });
-
-  it("pushes apart the geometry the seeded blueprint actually stores", () => {
-    // Two of the seeded phases sit 226 apart on x with 2 between them on y, against a card 248
-    // wide: the seed was laid out for a narrower card, so it draws them on top of each other.
-    const nodes = [node("meetings", [], 0, 0), node("industry", [], 226, 2)];
-
-    const positions = separateOverlaps(nodes, withFallbackPositions(nodes));
-
-    expect(overlaps(positions, "meetings", "industry")).toBe(false);
-    expect(Math.abs(positions.industry.x - positions.meetings.x)).toBeGreaterThanOrEqual(
-      GRAPH_NODE_WIDTH,
-    );
-  });
-
-  it("separates a whole pile, not just the first pair it meets", () => {
-    const nodes = [
-      node("a", [], 0, 0),
-      node("b", [], 20, 10),
-      node("c", [], 40, 20),
-      node("d", [], 60, 30),
-    ];
-
-    const positions = separateOverlaps(nodes, withFallbackPositions(nodes));
-
-    for (const [left, right] of [
-      ["a", "b"],
-      ["a", "c"],
-      ["a", "d"],
-      ["b", "c"],
-      ["b", "d"],
-      ["c", "d"],
-    ]) {
-      expect(overlaps(positions, left, right)).toBe(false);
-    }
-  });
-
-  it("parts two cards stacked at the same point rather than leaving them stacked", () => {
-    const nodes = [node("a", [], 120, 120), node("b", [], 120, 120)];
-
-    const positions = separateOverlaps(nodes, withFallbackPositions(nodes));
-
-    expect(overlaps(positions, "a", "b")).toBe(false);
-  });
-
-  it("draws the same graph the same way every time", () => {
-    const nodes = [node("a", [], 0, 0), node("b", [], 226, 2), node("c", [], 100, 40)];
-    const first = separateOverlaps(nodes, withFallbackPositions(nodes));
-    const second = separateOverlaps(nodes, withFallbackPositions(nodes));
-
-    expect(second).toEqual(first);
-  });
-
-  it("is a nudge, not a re-layout: cards stay near where the author put them", () => {
-    const nodes = [node("a", [], 0, 0), node("b", [], 226, 2)];
-
-    const positions = separateOverlaps(nodes, withFallbackPositions(nodes));
-
-    // Neither card moves further than the distance the pair was short of a clear gap.
-    const shortfall = GRAPH_NODE_WIDTH + MIN_NODE_GAP - 226;
-    expect(Math.abs(positions.a.x)).toBeLessThanOrEqual(shortfall);
-    expect(Math.abs(positions.b.x - 226)).toBeLessThanOrEqual(shortfall);
-  });
-
-  it("ignores a node with nowhere to be", () => {
-    const nodes = [node("a", [], 0, 0), { id: "gone", blockerIds: [], graphX: null, graphY: null }];
-
-    const positions = separateOverlaps(nodes, { a: { x: 0, y: 0 } });
-
-    expect(positions.gone).toBeUndefined();
-    expect(positions.a).toEqual({ x: 0, y: 0 });
   });
 });
 
@@ -575,33 +432,6 @@ describe("autoLayoutPositions ordering", () => {
 
     expect(looseRight).toBeLessThanOrEqual(chainRight + GRAPH_NODE_WIDTH);
     expect(positions.one.y).toBeGreaterThan(Math.max(positions.a.y, positions.b.y));
-  });
-});
-
-describe("arrangementFor", () => {
-  it("keeps a stored arrangement, and drops what has no coordinates into a free cell beside it", () => {
-    const nodes = [node("placed", [], 500, 500), { ...node("new"), graphX: null, graphY: null }];
-
-    const positions = arrangementFor(nodes);
-
-    expect(positions.placed).toEqual({ x: 500, y: 500 });
-    expect(positions.new).toBeDefined();
-    expect(positions.new).not.toEqual(positions.placed);
-  });
-
-  it("lays a graph out properly when nothing has been arranged at all", () => {
-    // The hire's read-only view of a path copied from a blueprint nobody opened the graph of: a
-    // grid that knows no prerequisites is strictly worse than a layout that does.
-    const nodes = ["a", "b", "c"].map((id, index) => ({
-      ...node(id, index === 0 ? [] : [["a", "b"][index - 1]]),
-      graphX: null,
-      graphY: null,
-    }));
-
-    const positions = arrangementFor(nodes);
-
-    expect(positions.a.x).toBeLessThan(positions.b.x);
-    expect(positions.b.x).toBeLessThan(positions.c.x);
   });
 });
 

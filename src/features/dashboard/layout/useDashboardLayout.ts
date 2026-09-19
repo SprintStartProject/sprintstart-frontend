@@ -93,7 +93,10 @@ export function useDashboardLayout(): DashboardLayoutController {
   const availableWidgets = getAvailableWidgets({
     profile,
     canManageSelectedProject: canManageSelected,
-    hasLiveOnboarding: onboarding.state === "loading" || onboarding.state === "ready",
+    // A journey with nothing left renders no card, so it must not hold the slot either.
+    hasLiveOnboarding:
+      onboarding.state === "loading" ||
+      (onboarding.state === "ready" && onboarding.nextAction.kind !== "done"),
   });
 
   const availableIds = availableWidgets.map((widget) => widget.id);

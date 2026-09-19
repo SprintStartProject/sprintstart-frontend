@@ -17,7 +17,6 @@ import type {
   UpsertQuestion,
   QuestionAttemptsReviewEndpoint,
 } from "../features/onboarding/types";
-import onboardingStepMock from "../mocks/onboardingStepMock.json";
 
 /**
  * Onboarding path, step, question and task CRUD.
@@ -114,13 +113,12 @@ export const onboardingService = {
 
   // ── STEP ─────────────────────────────────────────────────
 
+  /**
+   * One step with its details. Failures propagate: the step view shows its own error state, and a
+   * stand-in step would offer to complete or skip something that does not exist.
+   */
   async fetchStep(stepId: string): Promise<OnboardingStepDetail> {
-    try {
-      return await apiClient.fetch<OnboardingStepDetail>(`/api/v1/onboarding/me/steps/${stepId}`);
-    } catch (error) {
-      console.error(`Error fetching onboarding step with ID ${stepId}:`, error);
-      return onboardingStepMock as OnboardingStepDetail;
-    }
+    return await apiClient.fetch<OnboardingStepDetail>(`/api/v1/onboarding/me/steps/${stepId}`);
   },
 
   /**

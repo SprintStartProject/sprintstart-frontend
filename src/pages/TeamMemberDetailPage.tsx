@@ -154,31 +154,64 @@ export function TeamMemberDetailPage() {
   // `feedbackError` stays for the feedback *load* failure (shown inline where the
   // list would be); every action outcome on this page is a toast instead.
   const [feedbackError, setFeedbackError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const toast = useToast();
 
   useEffect(() => {
+    // A response for the member (or project) this page has since moved away from is dropped: it
+    // would otherwise render member A's journey, with A's step and skip ids, under B's URL.
+    let cancelled = false;
+
     async function loadMember() {
       if (!userId) {
         setLoading(false);
         return;
       }
 
+      setLoading(true);
+      setLoadError("");
       setLoadingFeedback(true);
 
-      const [memberData, rolesData, skills, path, knowledgeGapOverview] = await Promise.all([
-        getTeamMember(userId),
-        getProjectRoles(),
-        getUserSkillLevels(userId),
-        getUserOnboardingPath(userId),
-        knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-      ]);
-      let feedback: OnboardingFeedback[] = [];
       try {
-        feedback = await getUserOnboardingFeedback(userId);
+        const [memberData, rolesData, skills, path, knowledgeGapOverview] = await Promise.all([
+          getTeamMember(userId),
+          getProjectRoles(),
+          getUserSkillLevels(userId),
+          getUserOnboardingPath(userId),
+          knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
+        ]);
+        let feedback: OnboardingFeedback[] = [];
+        try {
+          feedback = await getUserOnboardingFeedback(userId);
+        } catch (error) {
+          if (!cancelled) {
+            setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
+          }
+        }
+        if (cancelled) return;
+        applyMember(memberData, rolesData, skills, path, knowledgeGapOverview, feedback);
       } catch (error) {
-        setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
+        if (cancelled) return;
+        setUser(undefined);
+        setLoadError(
+          error instanceof Error ? error.message : "The team member could not be loaded.",
+        );
+      } finally {
+        if (!cancelled) {
+          setLoadingFeedback(false);
+          setLoading(false);
+        }
       }
+    }
 
+    function applyMember(
+      memberData: Awaited<ReturnType<typeof getTeamMember>>,
+      rolesData: Awaited<ReturnType<typeof getProjectRoles>>,
+      skills: Awaited<ReturnType<typeof getUserSkillLevels>>,
+      path: Awaited<ReturnType<typeof getUserOnboardingPath>>,
+      knowledgeGapOverview: Awaited<ReturnType<typeof knowledgeGapService.fetchKnowledgeGaps>>,
+      feedback: OnboardingFeedback[],
+    ) {
       setUser(memberData);
       setAvailableRoles(rolesData);
       setSkillLevels(skills);
@@ -189,16 +222,20 @@ export function TeamMemberDetailPage() {
       setKnowledgeGaps(knowledgeGapOverview.gaps.filter((gap) => gap.severity !== "covered"));
       setFeedbackItems(feedback);
       setOnboardingPath(path);
-      setLoadingFeedback(false);
-      setLoading(false);
     }
 
     void loadMember();
+    return () => {
+      cancelled = true;
+    };
     // Knowledge gaps are project-scoped, so switching projects has to reload them —
     // otherwise this page keeps showing the previous project's gaps for the member.
   }, [userId, selectedProjectId]);
 
   useEffect(() => {
+    // Re-run on every path change (each PM edit); an older run finishing last must not win.
+    let cancelled = false;
+
     async function loadPathTaskCounts() {
       const steps = onboardingPath?.phases.flatMap((phase) => phase.steps ?? []) ?? [];
 
@@ -225,11 +262,17 @@ export function TeamMemberDetailPage() {
         ]),
       );
 
+      if (cancelled) return;
       setStepTasksById(tasksByStepId);
       setStepTaskCounts(counts);
     }
 
-    void loadPathTaskCounts();
+    void loadPathTaskCounts().catch((error: unknown) => {
+      console.error("Failed to load the member's task counts:", error);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [onboardingPath]);
 
   async function refreshMember() {
@@ -324,10 +367,16 @@ export function TeamMemberDetailPage() {
       } else {
         await denyOnboardingSkipRequest(skipId, comment);
       }
-      await Promise.all([refreshMember(), refreshOnboardingPath()]);
-      toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
+      return;
+    }
+    toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
+    // Told apart from a failed decision: the answer is in, and retrying it would be refused.
+    try {
+      await Promise.all([refreshMember(), refreshOnboardingPath()]);
+    } catch {
+      toast.error("The answer was saved, but the page could not refresh. Reload to see it.");
     }
   }
 
@@ -362,7 +411,8 @@ export function TeamMemberDetailPage() {
       if (detailStepId === step.id) {
         setDetailStepId("");
       }
-      await refreshOnboardingPath();
+      // The member too: the deleted step may have been their current one.
+      await Promise.all([refreshOnboardingPath(), refreshMember()]);
       toast.success("Step deleted");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't delete the step.");
@@ -535,7 +585,11 @@ export function TeamMemberDetailPage() {
         back={{ label: "Back", onClick: goBack }}
       >
         <div className="rounded-3xl border border-app-border bg-app-surface p-8">
-          <p className="text-sm text-app-text">Team member not found.</p>
+          <p className="text-sm text-app-text">
+            {loadError
+              ? `The team member could not be loaded: ${loadError}`
+              : "Team member not found."}
+          </p>
         </div>
       </PageShell>
     );
@@ -551,6 +605,14 @@ export function TeamMemberDetailPage() {
       .sort((a, b) => a.position - b.position)
       .map((step) => step as DetailOnboardingStep),
   );
+  // Every step's, like the journey section counts them: phases run side by side, so the step
+  // waiting on a skip answer is not always the current one.
+  const pendingSkipCount = allSteps.filter(
+    (step) =>
+      !!step.skip?.id &&
+      (step.skip.accepted === null || step.skip.accepted === undefined) &&
+      step.status !== "SKIPPED",
+  ).length;
   const checkModalPhase = checkModal
     ? (phases.find((phase) => phase.id === checkModal.phaseId) ?? null)
     : null;
@@ -706,9 +768,9 @@ export function TeamMemberDetailPage() {
                   <p className="text-sm font-semibold text-app-text">Open items</p>
                 </div>
 
-                {(unreadFeedback.length > 0 || pendingSkip) && (
+                {unreadFeedback.length + pendingSkipCount > 0 && (
                   <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
-                    {unreadFeedback.length + (pendingSkip ? 1 : 0)} open
+                    {unreadFeedback.length + pendingSkipCount} open
                   </span>
                 )}
               </div>
@@ -996,7 +1058,9 @@ export function TeamMemberDetailPage() {
         onClose={() => setGraphStepToDelete(null)}
         onConfirm={() => {
           const step = allSteps.find((candidate) => candidate.id === graphStepToDelete);
-          if (step) void handleDeleteStep(step).finally(() => setGraphStepToDelete(null));
+          // Gone since the dialog opened (a refetch): nothing left to delete, so just close.
+          if (!step) setGraphStepToDelete(null);
+          else void handleDeleteStep(step).finally(() => setGraphStepToDelete(null));
         }}
       />
       <PanelPresence value={detailStep}>

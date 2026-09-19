@@ -49,7 +49,7 @@ export function StepQuickEdit({
         title: title.trim(),
         description: description.trim(),
         type: step.type,
-        estimatedMinutes: Math.max(1, Number(minutes) || 30),
+        estimatedMinutes: Math.max(1, Math.round(Number(minutes)) || 30),
         expectedOutcome: outcome.trim(),
       });
       await onSaved();

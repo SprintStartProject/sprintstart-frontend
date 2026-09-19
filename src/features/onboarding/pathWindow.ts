@@ -45,7 +45,8 @@ export function pathWindow(path: OnboardingPathEndpoint): {
   const phases = [...path.phases].sort((left, right) => left.position - right.position);
   if (phases.length === 0) return { nodes: [], currentId: null };
 
-  const activeIndex = findActivePhaseIndex(path);
+  // Over the sorted copy: the index is applied to it, and the backend's order is not promised.
+  const activeIndex = findActivePhaseIndex({ ...path, phases });
   const current = phases[Math.min(activeIndex, phases.length - 1)];
   const byId = new Map(phases.map((phase) => [phase.id, phase]));
 
@@ -55,14 +56,17 @@ export function pathWindow(path: OnboardingPathEndpoint): {
   const ahead = phases.filter((phase) => (phase.blockerIds ?? []).includes(current.id));
 
   const index = phases.indexOf(current);
-  const chosen =
+  // Trimmed around the current phase, never through it: the neighbours closest to where somebody
+  // stands are the ones the question is about, and the current phase is the point of the strip.
+  const room = WINDOW_LIMIT - 1;
+  const before = behind.slice(
+    behind.length - Math.min(behind.length, Math.max(Math.ceil(room / 2), room - ahead.length)),
+  );
+  const after = ahead.slice(0, room - before.length);
+  const window =
     behind.length > 0 || ahead.length > 0
-      ? [...behind, current, ...ahead]
+      ? [...before, current, ...after]
       : phases.slice(Math.max(0, index - 1), index + 2);
-
-  // Trimmed from the far end rather than the near one: the neighbours closest to where somebody
-  // stands are the ones the question is about.
-  const window = chosen.slice(0, WINDOW_LIMIT);
   const drawn = new Set(window.map((phase) => phase.id));
 
   return {

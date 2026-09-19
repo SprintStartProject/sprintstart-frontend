@@ -17,7 +17,7 @@ import dagre from "dagre";
 /**
  * The card box on the canvas, fixed — and the card is drawn at exactly this size.
  *
- * Fixed rather than measured because dagre needs a size before React Flow has laid anything out,
+ * Fixed rather than measured because dagre needs a size before anything has been drawn,
  * and because two cards of different heights in one rank make a tidy layout look untidy.
  *
  * The height used to be an estimate the card was free to exceed: a title over two lines, a line of
@@ -34,10 +34,9 @@ import dagre from "dagre";
 export const GRAPH_NODE_WIDTH = 224;
 export const GRAPH_NODE_HEIGHT = 108;
 
-/** The grid an unplaced node falls into, and the spacing "tidy up" lays chains out on. */
+/** The spacing "tidy up" lays chains and loose nodes out on. */
 const COLUMN_STEP = GRAPH_NODE_WIDTH + 80;
 const ROW_STEP = GRAPH_NODE_HEIGHT + 56;
-const COLUMNS_PER_ROW = 4;
 
 /**
  * How much a card says, by how far away it is being read from.
@@ -146,7 +145,7 @@ export const EDGE_REFUSAL_MESSAGE: Record<EdgeRefusal, string> = {
   cycle: "That would make them wait for each other, so neither could ever start.",
 };
 
-/** Convenience wrapper for React Flow's `isValidConnection`, which only wants a yes or no. */
+/** Whether an edge may be drawn at all, for callers that only want a yes or no (the pickers). */
 export function canConnect(
   nodes: readonly GraphRuleNode[],
   blockedId: string,
@@ -229,68 +228,6 @@ export function chainFor(nodes: readonly GraphRuleNode[], rootId: string): Set<s
   return new Set([rootId, ...blockersBehind(nodes, rootId), ...dependentsAhead(nodes, rootId)]);
 }
 
-/** The grid cell a position sits in, so a fallback placement can avoid an occupied one. */
-function cellKey(position: GraphPoint): string {
-  return `${Math.round(position.x / COLUMN_STEP)}:${Math.round(position.y / ROW_STEP)}`;
-}
-
-function cellPosition(index: number): GraphPoint {
-  return {
-    x: (index % COLUMNS_PER_ROW) * COLUMN_STEP,
-    y: Math.floor(index / COLUMNS_PER_ROW) * ROW_STEP,
-  };
-}
-
-/**
- * Every node given a position: the stored one where there is one, the first free grid cell where
- * there is not.
- *
- * A personalized path copied from a blueprint whose author never opened the graph has no
- * coordinates at all, and a canvas that dropped those on the origin would stack sixteen phases on
- * one spot. Free cells are taken in the order the nodes arrive, so opening the graph twice puts the
- * same node in the same place.
- */
-export function withFallbackPositions(nodes: readonly GraphRuleNode[]): GraphPositions {
-  const resolved: GraphPositions = {};
-  const taken = new Set(
-    nodes
-      .filter((node) => node.graphX !== null && node.graphY !== null)
-      .map((node) => cellKey({ x: node.graphX as number, y: node.graphY as number })),
-  );
-
-  let next = 0;
-  for (const node of nodes) {
-    if (node.graphX !== null && node.graphY !== null) {
-      resolved[node.id] = { x: node.graphX, y: node.graphY };
-      continue;
-    }
-
-    while (taken.has(cellKey(cellPosition(next)))) next += 1;
-    const free = cellPosition(next);
-    taken.add(cellKey(free));
-    resolved[node.id] = free;
-  }
-
-  return resolved;
-}
-
-/**
- * Where the canvas draws a set of nodes before anybody has dragged anything.
- *
- * Two cases, and the difference between them is whether there is an arrangement to respect. Once
- * one node has coordinates somebody put them there, so the stored arrangement is kept and anything
- * without coordinates falls into a free grid cell beside it. When *nothing* has coordinates there
- * is nothing to preserve, and a grid that knows no dependencies is strictly worse than a layout
- * that does — so the graph is laid out properly instead. That is the common case in the hire's
- * read-only view of a path copied from a blueprint whose author never opened the graph.
- *
- * Drawing only, either way. Nothing here is written back.
- */
-export function arrangementFor(nodes: readonly GraphRuleNode[]): GraphPositions {
-  const anyStored = nodes.some((node) => node.graphX !== null && node.graphY !== null);
-  return anyStored ? withFallbackPositions(nodes) : autoLayoutPositions(nodes);
-}
-
 /**
  * Everything laid out from scratch, chains running left to right.
  *
@@ -354,7 +291,7 @@ export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPosit
 
     dagre.layout(graph);
 
-    // Dagre centres its nodes; React Flow places them by the top-left corner.
+    // Dagre centres its nodes; positions here are top-left corners, which is what callers draw from.
     const laidOut = connected.map((node) => {
       const placed = graph.node(node.id) as { x?: number; y?: number } | undefined;
       return {
@@ -494,78 +431,6 @@ export function chainPositions(nodes: readonly GraphRuleNode[]): Map<string, Cha
   return positions;
 }
 
-/**
- * Breathing space kept between two drawn cards, on top of the card box itself.
- *
- * Modest on purpose: this pass moves nodes away from where their author put them, so it should do
- * the least that works. But "works" is more than not touching — an edge between two cards a dozen
- * pixels apart is a stub with nowhere to curve, so the gap is wide enough for the arrow between
- * them to be drawn as one.
- */
-export const MIN_NODE_GAP = 48;
-
-/**
- * The same positions, with any cards that would sit on top of each other pushed apart.
- *
- * Needed because overlapping coordinates are a thing the data can simply contain. The seeded
- * blueprint is the proof: six of its sixteen phases are stored between 226 and 242 apart on x with
- * almost no difference on y, against a card 248 wide — it was laid out for a narrower card than the
- * one that draws it, and no amount of care in the card fixes a number in the database.
- *
- * **Drawing only.** Nothing here is saved. An author who drags a card onto another gets it nudged
- * clear rather than stacked, and an author who never touches the graph still sees every card.
- *
- * Deterministic: pairs are visited in the order the nodes arrive, each overlap is resolved along
- * whichever axis needs the smaller push, and the sweep repeats a bounded number of times — so the
- * same graph always draws the same way, and a knot that cannot be resolved stops rather than spins.
- */
-export function separateOverlaps(
-  nodes: readonly GraphRuleNode[],
-  positions: GraphPositions,
-): GraphPositions {
-  const ids = nodes.map((node) => node.id).filter((id) => positions[id] !== undefined);
-  const out: GraphPositions = {};
-  for (const id of ids) out[id] = { ...positions[id] };
-
-  const minX = GRAPH_NODE_WIDTH + MIN_NODE_GAP;
-  const minY = GRAPH_NODE_HEIGHT + MIN_NODE_GAP;
-  const MAX_SWEEPS = 24;
-
-  for (let sweep = 0; sweep < MAX_SWEEPS; sweep += 1) {
-    let moved = false;
-
-    for (let i = 0; i < ids.length; i += 1) {
-      for (let j = i + 1; j < ids.length; j += 1) {
-        const a = out[ids[i]];
-        const b = out[ids[j]];
-        const overlapX = minX - Math.abs(b.x - a.x);
-        const overlapY = minY - Math.abs(b.y - a.y);
-        if (overlapX <= 0 || overlapY <= 0) continue;
-
-        moved = true;
-        if (overlapX <= overlapY) {
-          // Two cards dead on top of each other have no axis to be pushed along, so one is picked
-          // — by arrival order, so it is the same one every time.
-          const direction = b.x === a.x ? 1 : Math.sign(b.x - a.x);
-          a.x -= (direction * overlapX) / 2;
-          b.x += (direction * overlapX) / 2;
-        } else {
-          const direction = b.y === a.y ? 1 : Math.sign(b.y - a.y);
-          a.y -= (direction * overlapY) / 2;
-          b.y += (direction * overlapY) / 2;
-        }
-      }
-    }
-
-    if (!moved) break;
-  }
-
-  for (const id of ids) {
-    out[id] = { x: Math.round(out[id].x), y: Math.round(out[id].y) };
-  }
-  return out;
-}
-
 /** How far a control point reaches out of a handle, at the very least. */
 const EDGE_MIN_REACH = 72;
 /** And at the very most, so a long edge sweeps rather than loops off the canvas. */
@@ -617,7 +482,7 @@ export function edgeSides(source: GraphPoint, target: GraphPoint): GraphEdgeSide
 /**
  * The shape of an edge: one cubic curve from the source handle to the target handle.
  *
- * React Flow's own edge types are a staircase (`smoothstep`) or a bezier whose control points reach
+ * The usual library edge types are a staircase (`smoothstep`) or a bezier whose control points reach
  * out by a quarter of the gap — enough to round a corner, not enough to read as a curve. Two cards
  * on the same row got a dead straight dash, and several of those running parallel are hard to tell
  * apart at a glance. So the geometry is ours:
@@ -684,17 +549,9 @@ export function blueprintEdgePath(
  * rather than only in a tooltip, because "may I move this" is the first question asked of an arrow
  * and a hover is a poor place to answer it.
  *
- * Here rather than in the canvas so that the legend explaining the styles reads the same table the
- * canvas draws from: a legend that restates a style from memory is a legend that goes quietly
- * wrong.
+ * How each is drawn lives in `edgeStyles.ts` (`EDGE_TONE_STYLE`), the one table the canvas reads.
  */
 export type GraphEdgeTone = "rule" | "suggestion" | "own";
-
-export const EDGE_TONES: Record<GraphEdgeTone, { dash?: string; width: number; said: string }> = {
-  rule: { width: 2.5, said: "set by the team" },
-  suggestion: { width: 2, dash: "7 5", said: "suggested by the buddy" },
-  own: { width: 1.5, dash: "2 4", said: "arranged by you" },
-};
 
 /** The four ways a reader moves through a graph from the keyboard. */
 export type GraphDirection = "left" | "right" | "up" | "down";
