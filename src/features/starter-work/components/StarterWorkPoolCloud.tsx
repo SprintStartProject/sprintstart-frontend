@@ -266,9 +266,9 @@ function PoolTaskSourceBadge({ task }: { task: StarterWorkTask }) {
   return (
     <Badge
       variant={variant}
-      size="sm"
+      size="md"
       title={fullSource}
-      className="w-fit min-w-0 shrink self-center"
+      className="w-fit min-w-0 shrink gap-1 self-center"
     >
       {Icon && <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />}
       <span className="truncate">{identifier}</span>
@@ -284,7 +284,7 @@ function PoolTaskSourceBadge({ task }: { task: StarterWorkTask }) {
 function PoolTaskBadges({ task }: { task: StarterWorkTask }) {
   if (task.taskZeroEligible) {
     return (
-      <Badge variant="purple" size="sm" className="w-fit shrink-0 self-center">
+      <Badge variant="purple" size="md" className="w-fit shrink-0 self-center">
         Task 0
       </Badge>
     );
@@ -293,7 +293,7 @@ function PoolTaskBadges({ task }: { task: StarterWorkTask }) {
   // Only a definite `true` means somebody has this — `null` is "we don't know", not "nobody".
   if (task.sourceHasAssignee === true) {
     return (
-      <Badge variant="neutral" size="sm" className="w-fit shrink-0 self-center">
+      <Badge variant="neutral" size="md" className="w-fit shrink-0 gap-1 self-center">
         <UserRound className="h-3 w-3" aria-hidden="true" />
         Someone is on this
       </Badge>
@@ -670,7 +670,7 @@ export function StarterWorkPoolCloud({
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-semibold tracking-tight text-app-text">In the pool</h2>
         {tasks.length > 0 && (
-          <Badge variant="neutral" size="sm" className="tabular-nums">
+          <Badge variant="neutral" size="md" className="tabular-nums">
             {tasks.length}
           </Badge>
         )}

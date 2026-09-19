@@ -146,11 +146,11 @@ export function StarterWorkTriage({ tasks, onApprove, onReject, onClose }: Start
                     Source
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <Badge variant="brand" size="sm">
+                    <Badge variant="brand" size="md">
                       {hasKnownTracker ? trackerLabel(trackerCode) : "Custom"}
                     </Badge>
                     {hasKnownTracker && numberLabel && (
-                      <Badge variant="neutral" size="sm">
+                      <Badge variant="neutral" size="md">
                         {numberLabel}
                       </Badge>
                     )}
@@ -168,7 +168,7 @@ export function StarterWorkTriage({ tasks, onApprove, onReject, onClose }: Start
                     <ul className="mt-1.5 flex flex-wrap gap-1.5">
                       {current.competencyKeys.map((key) => (
                         <li key={key}>
-                          <Badge variant="purple" size="sm">
+                          <Badge variant="purple" size="md">
                             {key}
                           </Badge>
                         </li>

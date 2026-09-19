@@ -226,7 +226,7 @@ function StageCard({
 
       <div className="flex flex-wrap gap-1.5">
         {chips.map((chip) => (
-          <Badge key={chip.label} variant={chip.variant} size="sm">
+          <Badge key={chip.label} variant={chip.variant} size="md" className="gap-1">
             {chip.icon && <chip.icon className="h-3 w-3" aria-hidden="true" />}
             {chip.label}
           </Badge>

@@ -135,7 +135,7 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
             Issues in this project
           </h2>
           {projectId && totalCount > 0 && (
-            <Badge variant="neutral" size="sm" className="tabular-nums">
+            <Badge variant="neutral" size="md" className="tabular-nums">
               {totalCount}
             </Badge>
           )}

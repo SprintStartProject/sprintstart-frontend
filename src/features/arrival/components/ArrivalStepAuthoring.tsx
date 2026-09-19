@@ -354,7 +354,8 @@ function EditStepDrawer({
           {isOverride && (
             <Badge
               variant="brand"
-              size="sm"
+              size="md"
+              className="gap-1"
               title="Replaces the company-wide wording for this project."
             >
               <CornerDownRight className="h-3 w-3" aria-hidden="true" />
@@ -363,7 +364,8 @@ function EditStepDrawer({
           )}
           <Badge
             variant={step.settledBy === "OBSERVED" ? "success" : "neutral"}
-            size="sm"
+            size="md"
+            className="gap-1"
             title={howItsDone.label}
           >
             <HowItsDoneIcon className="h-3 w-3" aria-hidden="true" />

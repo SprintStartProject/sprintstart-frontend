@@ -216,11 +216,11 @@ export function StarterWorkTaskDetails({
                 </p>
               </div>
               {unseen ? (
-                <Badge variant="brand" size="sm">
+                <Badge variant="brand" size="md">
                   Not looked at
                 </Badge>
               ) : (
-                <Badge variant="success" size="sm">
+                <Badge variant="success" size="md" className="gap-1">
                   <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                   Looked at
                 </Badge>
@@ -237,7 +237,7 @@ export function StarterWorkTaskDetails({
                     The tracker shows somebody assigned when reconciliation last checked.
                   </p>
                 </div>
-                <Badge variant="neutral" size="sm">
+                <Badge variant="neutral" size="md" className="gap-1">
                   <UserRound className="h-3 w-3" aria-hidden="true" />
                   Assigned
                 </Badge>
@@ -259,7 +259,7 @@ export function StarterWorkTaskDetails({
                   onChange={(eligible) => void handleToggleTaskZero(eligible)}
                 />
               ) : (
-                <Badge variant={task.taskZeroEligible ? "purple" : "neutral"} size="sm">
+                <Badge variant={task.taskZeroEligible ? "purple" : "neutral"} size="md">
                   {task.taskZeroEligible ? "Task 0" : "Not Task 0"}
                 </Badge>
               )}
