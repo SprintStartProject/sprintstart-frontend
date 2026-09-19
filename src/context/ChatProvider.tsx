@@ -12,13 +12,8 @@ import { useToastApi } from "./useToast";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
 import type { ChatContextValue, SelectedCitation } from "./ChatContext";
-import type {
-  Chat,
-  ChatMessage,
-  ChatQueueItem,
-  Citation,
-  SourceSystem,
-} from "../features/chatbot/types";
+import type { Chat, ChatMessage, Citation, SourceSystem } from "../features/chatbot/types";
+import { insertQuoteIntoDraft } from "../features/chatbot/utils/quoteFormat";
 
 type MessagesByChat = Record<string, ChatMessage[]>;
 
@@ -131,6 +126,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);
   const [newRequest, setNewRequest] = useState("");
+  const focusComposerFnRef = useRef<(() => void) | null>(null);
+
+  const registerFocusComposer = useCallback((fn: () => void) => {
+    focusComposerFnRef.current = fn;
+    return () => {
+      if (focusComposerFnRef.current === fn) {
+        focusComposerFnRef.current = null;
+      }
+    };
+  }, []);
+
+  const quoteSelection = useCallback((text: string) => {
+    setNewRequest((prev) => insertQuoteIntoDraft(prev, text));
+    requestAnimationFrame(() => {
+      focusComposerFnRef.current?.();
+    });
+  }, []);
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -977,6 +989,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setSelectedCitation,
     newRequest,
     setNewRequest,
+    registerFocusComposer,
+    quoteSelection,
     showFilters,
     setShowFilters,
     from,
