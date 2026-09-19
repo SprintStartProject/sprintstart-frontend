@@ -8,10 +8,17 @@ import {
   streamMessage,
 } from "../services/chatService";
 import { useAuth } from "./useAuth";
+import { useToastApi } from "./useToast";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
 import type { ChatContextValue, SelectedCitation } from "./ChatContext";
-import type { Chat, ChatMessage, Citation, SourceSystem } from "../features/chatbot/types";
+import type {
+  Chat,
+  ChatMessage,
+  ChatQueueItem,
+  Citation,
+  SourceSystem,
+} from "../features/chatbot/types";
 
 type MessagesByChat = Record<string, ChatMessage[]>;
 
@@ -53,6 +60,10 @@ function deriveTitle(text: string): string {
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
   const userId = profile?.id ?? "";
+  // The API-only half of the toast context: raising a chat error must not
+  // re-render the whole chat tree every time some other toast appears or
+  // auto-dismisses. See `useToastApi`.
+  const toast = useToastApi();
 
   // Chats live inside a project: the list is scoped to it and a new chat is created
   // in it. Switching projects therefore has to reset chat state the same way a user
@@ -83,6 +94,40 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // composer's busy state and the stop button follow the user into whatever
   // chat they switch to. Consumers gate on this in `useChat`.
   const [streamingChatId, setStreamingChatId] = useState<string | null>(null);
+
+  // Synchronous mirror of `streamingChatId`, written through `commitStreamingChat`
+  // rather than by an effect: the queue's submit path has to see it in the same
+  // tick a turn starts, or a second message typed before React flushes would
+  // read `null` and interrupt the turn it should have queued behind.
+  const streamingChatIdRef = useRef<string | null>(null);
+  const commitStreamingChat = useCallback((chatId: string | null) => {
+    streamingChatIdRef.current = chatId;
+    setStreamingChatId(chatId);
+  }, []);
+
+  /**
+   * Messages waiting behind a running answer, oldest first.
+   *
+   * Held in a ref as well as in state, both written through `commitQueue`: the
+   * drain runs from a stream's terminal paths (a callback, not a render) and
+   * has to read the queue as it is *now*, while the state half is what the
+   * queue strip renders.
+   */
+  const [queue, setQueue] = useState<ChatQueueItem[]>([]);
+  const queueRef = useRef<ChatQueueItem[]>([]);
+  const commitQueue = useCallback((next: ChatQueueItem[]) => {
+    queueRef.current = next;
+    setQueue(next);
+  }, []);
+
+  // Same split for the paused flag — `stopStreaming` sets it and the drain
+  // reads it, neither inside a render.
+  const [queuePaused, setQueuePaused] = useState(false);
+  const queuePausedRef = useRef(false);
+  const setPaused = useCallback((paused: boolean) => {
+    queuePausedRef.current = paused;
+    setQueuePaused(paused);
+  }, []);
 
   const [selectedCitation, setSelectedCitation] = useState<SelectedCitation | null>(null);
   const [newRequest, setNewRequest] = useState("");
@@ -165,6 +210,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // The router's `navigate`, captured at the last submit: a queued message is
+  // sent from a callback (a stream's terminal path) that has no router access
+  // of its own.
+  const lastNavigateRef = useRef<NavigateFunction | null>(null);
+
+  // The queue's two exits, held in refs because the callbacks they point at are
+  // defined *after* `sendMessage` while `sendMessage`'s terminal paths need to
+  // call them — depending on each other directly would be a dependency cycle
+  // between two `useCallback`s.
+  //
+  //   drainRef  — start the next queued turn for the chat that just finished.
+  //   submitRef — what the error toast's "Retry" runs, so a retry queues like
+  //               any other send instead of cutting off a newer answer.
+  const drainRef = useRef<(chatId: string) => void>(() => {});
+  const submitRef = useRef<
+    ((chatId: string | undefined, text: string, navigate: NavigateFunction) => void) | null
+  >(null);
+
   /**
    * Flushes the buffered streaming draft into React state in one update.
    * Called by `requestAnimationFrame`; also called synchronously on
@@ -246,7 +309,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setIsStreaming(false);
       setStreamingMessageId(null);
       setThinkingState(null);
-      setStreamingChatId(null);
+      commitStreamingChat(null);
+      // Queued messages belong to the chats of the scope being left — a message
+      // queued in another project's chat has no chat to be sent to any more.
+      commitQueue([]);
+      setPaused(false);
       setMessagesByChat({});
       setChatsProjectId(null);
 
@@ -272,7 +339,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setChatsProjectId(selectedProjectId);
       }
     })();
-  }, [userId, hasSelectedProject, selectedProjectId, clearStreamTimeout]);
+  }, [
+    userId,
+    hasSelectedProject,
+    selectedProjectId,
+    clearStreamTimeout,
+    commitStreamingChat,
+    commitQueue,
+    setPaused,
+  ]);
 
   const sortedChats = useMemo(
     () =>
@@ -317,39 +392,61 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Ends a turn that is still in flight without the user asking for it: the
+   * request is aborted, its handlers are silenced, and a bubble that never
+   * received a token is marked as interrupted.
+   *
+   * Reached only when a message is submitted into a *different* chat than the
+   * one streaming — a follow-up in the same chat is queued instead, which is
+   * the whole point of the queue. A second stream can never be started without
+   * settling the first: the abandoned request would keep streaming in the
+   * background while its chat kept an empty assistant bubble forever (no
+   * content, no notice, and no refetch — `loadMessages` skips cached chats).
+   *
+   * Deliberately leaves the thinking/streaming flags alone: the caller sets
+   * them for the turn it is starting, and clearing them here would flash an
+   * empty bubble while a new chat is being created.
+   */
+  const settleCurrentStream = useCallback(() => {
+    // Silence the handlers of the stream being abandoned before touching the
+    // state it is still writing to.
+    streamIdRef.current += 1;
+    clearStreamTimeout();
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+
+    const orphan = draftRef.current;
+    if (!orphan) return;
+
+    cancelDraft();
+    flushDraft();
+    draftRef.current = null;
+    // Partial content stays visible, exactly like a manual stop. Only a bubble
+    // that never received a content token needs an explanation — and it says
+    // the user's own message did this, not a failure.
+    if (!orphan.content) {
+      setMessagesByChat((prev) => ({
+        ...prev,
+        [orphan.chatId]: (prev[orphan.chatId] ?? []).map((m) =>
+          m.id === orphan.assistantId ? { ...m, notice: "interrupted", isStreaming: false } : m,
+        ),
+      }));
+    }
+  }, [cancelDraft, clearStreamTimeout, flushDraft]);
+
   const sendMessage = useCallback(
     async (chatId: string | undefined, text: string, navigate: NavigateFunction) => {
       if (!text.trim()) return;
 
-      // Invalidate any previous stream so its handlers can't clobber state.
-      const thisStreamId = ++streamIdRef.current;
+      // Settle a stream that is still in flight before starting a new one: this
+      // bumps the id, silencing the handlers of the turn it abandons.
+      settleCurrentStream();
 
-      // Settle a stream that is still in flight before starting a new one.
-      // The id bump above already silenced its handlers, so without this the
-      // request would keep streaming in the background while its chat kept an
-      // empty assistant bubble forever — no content, no error, and no refetch
-      // (`loadMessages` skips chats that are already cached).
-      const orphan = draftRef.current;
-      clearStreamTimeout();
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = null;
-      if (orphan) {
-        cancelDraft();
-        flushDraft();
-        draftRef.current = null;
-        // Partial content stays visible, exactly like a manual stop. Only a
-        // bubble that never received a content token needs an explanation.
-        if (!orphan.content) {
-          setMessagesByChat((prev) => ({
-            ...prev,
-            [orphan.chatId]: (prev[orphan.chatId] ?? []).map((m) =>
-              m.id === orphan.assistantId
-                ? { ...m, error: "Interrupted by a new message.", isStreaming: false }
-                : m,
-            ),
-          }));
-        }
-      }
+      // Take this stream's id *after* settling. Taking it first made it stale
+      // the moment `settleCurrentStream` bumped again, and every handler of the
+      // turn being started was dropped as "not current".
+      const thisStreamId = ++streamIdRef.current;
 
       let currentChatId = chatId;
       let shouldNavigate = false;
@@ -416,7 +513,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setIsStreaming(false);
       setStreamingMessageId(null);
       setThinkingState(null);
-      setStreamingChatId(currentChatId);
+      commitStreamingChat(currentChatId);
       streamingStartedRef.current = false;
       sawToolUseRef.current = false;
 
@@ -448,16 +545,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           console.error("Chat stream timed out (no events for " + STREAM_TIMEOUT_MS + "ms)");
           // Abort so chatService's reader throws → onDone path runs.
           abortController.abort();
-          // Surface a visible error on the assistant message.
+          // Surface the failure as a toast; the abort above makes
+          // `chatService` finish the turn through its `onDone` path, which is
+          // where the queue is released.
           resetStreamingState();
-          setMessagesByChat((prev) => ({
-            ...prev,
-            [currentChatId]: (prev[currentChatId] ?? []).map((m) =>
-              m.id === assistantId
-                ? { ...m, error: "The response timed out. Please try again.", isStreaming: false }
-                : m,
-            ),
-          }));
+          reportFailure(
+            "The answer timed out",
+            "The assistant stopped responding for five minutes.",
+          );
         }, STREAM_TIMEOUT_MS);
       };
       armStreamTimeout();
@@ -487,7 +582,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         // again at the start of the next one, before the first real
         // `tool_use` event arrives.
         setThinkingState(null);
-        setStreamingChatId(null);
+        commitStreamingChat(null);
+      };
+
+      /**
+       * Reports a failed turn: a toast, not a banner under the bubble.
+       *
+       * A failure at the bottom of a long thread is exactly what the user does
+       * not see — the answer they were reading has pushed it below the fold, and
+       * the thread gives no sign anything went wrong. The toast carries the
+       * reason and a Retry, and the partial answer (if any) stays in the thread
+       * untouched.
+       *
+       * Retry goes through `submitRef`, i.e. the same path the composer uses: if
+       * the user has since asked something else, it queues behind that answer
+       * instead of cutting it off.
+       */
+      const reportFailure = (message: string, description: string) => {
+        toast.error(message, {
+          description,
+          action: {
+            label: "Retry",
+            onClick: () => submitRef.current?.(currentChatId, text, navigate),
+          },
+        });
       };
 
       try {
@@ -582,6 +700,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               }));
 
               void refreshChats();
+
+              // The answer is complete, so the next queued message may go.
+              drainRef.current(currentChatId);
             },
 
             onError: (err) => {
@@ -594,23 +715,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               resetStreamingState();
 
               if (!isCurrentStream()) return;
-              // #3: surface the error on the assistant message so the
-              // user sees what went wrong, not just a silent stop.
-              setMessagesByChat((prev) => ({
-                ...prev,
-                [currentChatId]: (prev[currentChatId] ?? []).map((m) =>
-                  m.id === assistantId ? { ...m, error: err, isStreaming: false } : m,
-                ),
-              }));
+              reportFailure("The answer failed", err);
+              // A failed turn still frees the queue: the next message may well
+              // be the retry, and holding it hostage to a failure the user has
+              // already been told about helps nobody.
+              drainRef.current(currentChatId);
             },
           },
           abortController.signal,
         );
       } catch (e) {
         // Safety net: chatService should never throw (all errors go to
-        // onError), but if something truly unexpected slips through we
-        // still route it to the visible error banner instead of leaving
-        // a stuck empty bubble.
+        // onError), but if something truly unexpected slips through the user
+        // still has to be told — and the queue still has to move on.
         clearStreamTimeout();
         console.error(e);
         cancelDraft();
@@ -619,14 +736,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         resetStreamingState();
 
         if (!isCurrentStream()) return;
-        setMessagesByChat((prev) => ({
-          ...prev,
-          [currentChatId]: (prev[currentChatId] ?? []).map((m) =>
-            m.id === assistantId
-              ? { ...m, error: "Unexpected error during streaming.", isStreaming: false }
-              : m,
-          ),
-        }));
+        reportFailure("The answer failed", "Unexpected error during streaming.");
+        drainRef.current(currentChatId);
       }
     },
     [
@@ -637,6 +748,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       flushDraft,
       scheduleDraftFlush,
       clearStreamTimeout,
+      commitStreamingChat,
+      settleCurrentStream,
+      toast,
     ],
   );
 
@@ -664,7 +778,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsThinking(false);
     setStreamingMessageId(null);
     setThinkingState(null);
-    setStreamingChatId(null);
+    commitStreamingChat(null);
+    // Stop means "stop doing things", so it holds the queue too. The messages
+    // stay visible in the strip with a "Send queued" button — silently dropping
+    // them would throw away text the user deliberately wrote, and letting them
+    // keep firing would make Stop a lie.
+    setPaused(true);
 
     // Stopping before the first token would otherwise leave a bare empty
     // bubble (or reasoning without an answer/explanation) — the placeholder
@@ -673,9 +792,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setMessagesByChat((prev) => ({
         ...prev,
         [stopped.chatId]: (prev[stopped.chatId] ?? []).map((m) =>
-          m.id === stopped.assistantId
-            ? { ...m, error: "Stopped before the assistant replied.", isStreaming: false }
-            : m,
+          m.id === stopped.assistantId ? { ...m, notice: "stopped", isStreaming: false } : m,
         ),
       }));
     }
@@ -684,7 +801,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // its `refreshChats` is skipped — a chat stopped right after creation
     // would keep the client-side fallback title forever.
     void refreshChats().catch((e) => console.error("Failed to refresh chats", e));
-  }, [cancelDraft, flushDraft, clearStreamTimeout, refreshChats]);
+  }, [cancelDraft, flushDraft, clearStreamTimeout, refreshChats, commitStreamingChat, setPaused]);
 
   /**
    * Deletes a chat conversation and all of its messages for the authenticated user,
@@ -718,6 +835,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         // Evict persisted draft from localStorage
         localStorage.removeItem(`chatDraft.${chatId}`);
+        // …and anything queued for it: the chat it was waiting for no longer
+        // exists, so the message has nowhere to go.
+        commitQueue(queueRef.current.filter((item) => item.chatId !== chatId));
       } catch (err) {
         deletedChatIdsRef.current.delete(chatId);
         void refreshChats().catch((e) =>
@@ -726,8 +846,121 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [streamingChatId, stopStreaming, refreshChats],
+    [streamingChatId, stopStreaming, refreshChats, commitQueue],
   );
+
+  /**
+   * Removes one queued message and starts its turn.
+   *
+   * The single exit from the queue: it takes the item out first, so a send that
+   * throws cannot leave the same message to be sent twice, and then goes through
+   * `sendMessage` — never `submitMessage` — because the caller has already
+   * decided this message's turn is due.
+   */
+  const startQueuedTurn = useCallback(
+    (item: ChatQueueItem) => {
+      const navigate = lastNavigateRef.current;
+      if (!navigate) return;
+      commitQueue(queueRef.current.filter((queued) => queued.id !== item.id));
+      void sendMessage(item.chatId, item.text, navigate);
+    },
+    [commitQueue, sendMessage],
+  );
+
+  /**
+   * Sends the oldest message queued for `chatId`, if there is one and the queue
+   * is not paused.
+   *
+   * Called from a turn's terminal paths, i.e. only ever when nothing is
+   * streaming, so it cannot race the answer it follows. Filtered by chat on
+   * purpose: a message queued in a chat the user has since left waits for that
+   * chat's next turn rather than being fired into a conversation nobody is
+   * looking at.
+   */
+  const drainNextQueued = useCallback(
+    (chatId: string) => {
+      if (queuePausedRef.current) return;
+      const next = queueRef.current.find((item) => item.chatId === chatId);
+      if (next) startQueuedTurn(next);
+    },
+    [startQueuedTurn],
+  );
+
+  /**
+   * The composer's entry point — and the only path the chat UI uses to send.
+   *
+   * Same chat, still answering → queue it. That is the whole point of the
+   * change: a follow-up typed while the assistant is mid-sentence used to abort
+   * the answer being read, which lost the very thing the user was looking at.
+   *
+   * Different chat → the running turn is settled instead, because the queue
+   * drains per chat and a message for another conversation would otherwise wait
+   * forever. A toast says so; silently dropping the answer would be worse.
+   */
+  const submitMessage = useCallback(
+    (chatId: string | undefined, text: string, navigate: NavigateFunction) => {
+      if (!text.trim()) return;
+
+      // Queued messages are sent later, from a callback with no router of its
+      // own — the navigate has to be remembered here or the queue can only ever
+      // be drained while this exact page is mounted.
+      lastNavigateRef.current = navigate;
+
+      const runningChatId = streamingChatIdRef.current;
+
+      if (runningChatId !== null && runningChatId === chatId && chatId !== undefined) {
+        commitQueue([...queueRef.current, { id: crypto.randomUUID(), chatId, text }]);
+        // Sending something new is the user taking over again, so a queue held
+        // back by Stop starts moving without them having to press anything else.
+        setPaused(false);
+        return;
+      }
+
+      if (runningChatId !== null && runningChatId !== chatId) {
+        settleCurrentStream();
+        toast.info("Stopped the answer in the other chat", {
+          description: "Your message was sent here instead of queued behind it.",
+        });
+      }
+
+      void sendMessage(chatId, text, navigate);
+    },
+    [commitQueue, setPaused, settleCurrentStream, sendMessage, toast],
+  );
+
+  const removeQueuedMessage = useCallback(
+    (id: string) => {
+      commitQueue(queueRef.current.filter((item) => item.id !== id));
+    },
+    [commitQueue],
+  );
+
+  const pullQueuedMessage = useCallback(
+    (id: string): string | null => {
+      const item = queueRef.current.find((queued) => queued.id === id);
+      if (!item) return null;
+      commitQueue(queueRef.current.filter((queued) => queued.id !== id));
+      return item.text;
+    },
+    [commitQueue],
+  );
+
+  const resumeQueue = useCallback(
+    (navigate: NavigateFunction) => {
+      lastNavigateRef.current = navigate;
+      setPaused(false);
+      const next = queueRef.current[0];
+      if (next) startQueuedTurn(next);
+    },
+    [setPaused, startQueuedTurn],
+  );
+
+  // The refs `sendMessage`'s terminal paths and its error toast read. Assigned
+  // in an effect because a ref must not be written during render.
+  useEffect(() => {
+    drainRef.current = drainNextQueued;
+    submitRef.current = submitMessage;
+  }, [drainNextQueued, submitMessage]);
 
   const value: ChatContextValue = {
     chats,
@@ -756,6 +989,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     clearFilters,
     loadMessages,
     sendMessage,
+    submitMessage,
+    queue,
+    queuePaused,
+    removeQueuedMessage,
+    pullQueuedMessage,
+    resumeQueue,
     stopStreaming,
     refreshChats,
     deleteChat,

@@ -139,7 +139,12 @@ export function useChat() {
     toggleSourceSystem,
     activeFilterCount,
     clearFilters,
-    sendMessage,
+    submitMessage,
+    queue,
+    queuePaused,
+    removeQueuedMessage,
+    pullQueuedMessage,
+    resumeQueue,
     stopStreaming,
     deleteChat: ctxDeleteChat,
   } = ctx;
@@ -353,11 +358,19 @@ export function useChat() {
     return () => clearTimeout(id);
   }, [newRequest, chatId]);
 
+  /**
+   * The composer's send — routed through the provider's `submitMessage`, so a
+   * message typed while this chat is still answering is queued instead of
+   * aborting the answer being read.
+   *
+   * Returns void rather than the stream's promise: a queued message has no
+   * stream to await yet, and callers only ever fire this and forget.
+   */
   const addMessage = useCallback(
     (text: string) => {
-      return sendMessage(chatId, text, navigate);
+      submitMessage(chatId, text, navigate);
     },
-    [sendMessage, chatId, navigate],
+    [submitMessage, chatId, navigate],
   );
 
   const handleSubmit = useCallback(
@@ -378,6 +391,33 @@ export function useChat() {
     },
     [newRequest, addMessage, setNewRequest, chatId],
   );
+
+  /**
+   * The queue as this chat sees it.
+   *
+   * The provider holds one list for the whole app, but a message queued in
+   * another conversation is not this page's business — it drains into its own
+   * chat, whenever that chat is next answered.
+   */
+  const queuedMessages = useMemo(
+    () => (chatId ? queue.filter((item) => item.chatId === chatId) : []),
+    [queue, chatId],
+  );
+
+  /**
+   * Hands a queued message back to the composer for editing, dropping it from the
+   * queue — leaving it in place would send both the edit and the original.
+   */
+  const editQueuedMessage = useCallback(
+    (id: string) => {
+      const text = pullQueuedMessage(id);
+      if (text !== null) setNewRequest(text);
+    },
+    [pullQueuedMessage, setNewRequest],
+  );
+
+  /** Releases a queue that Stop held back, starting with the oldest message. */
+  const sendQueuedNow = useCallback(() => resumeQueue(navigate), [resumeQueue, navigate]);
 
   const deleteChat = useCallback(
     async (targetChatId: string) => {
@@ -413,6 +453,12 @@ export function useChat() {
     addMessage,
     stopStreaming: stopActiveStream,
     deleteChat,
+
+    queuedMessages,
+    queuePaused,
+    removeQueuedMessage,
+    editQueuedMessage,
+    sendQueuedNow,
 
     newRequest,
     setNewRequest,

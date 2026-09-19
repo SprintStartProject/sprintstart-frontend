@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { AlertCircle, BookmarkPlus } from "lucide-react";
+import { BookmarkPlus, MessageSquareOff, Square } from "lucide-react";
 import type { ChatMessage } from "../types";
 import type { SelectedCitation } from "../../../context/ChatContext";
 import { UserAvatar } from "../../../components/common/UserAvatar";
@@ -40,7 +40,11 @@ type MessageRowProps = {
 
 /**
  * A single chat message row: avatar + bubble (markdown + citations + copy) +
- * optional reasoning block and error banner.
+ * optional reasoning block and the notice chip for a turn the user ended.
+ *
+ * Failures are not rendered here at all — `ChatProvider` raises them as toasts,
+ * because a banner under the bubble sits at the bottom of the thread exactly
+ * when the answer above it has pushed it out of sight.
  *
  * Wrapped in `React.memo` so that when one message receives a streamed token,
  * only that row re-renders — all sibling rows whose props are referentially
@@ -63,14 +67,14 @@ function MessageRowImpl({
 
   // Suppress the empty assistant placeholder while the assistant is still
   // thinking (no tokens yet) — the ThinkingIndicator renders instead. A
-  // bubble that carries an error is never suppressed: an interrupted or
-  // stopped turn leaves exactly that (empty content + error) and would
+  // bubble that carries a notice is never suppressed: a stopped or
+  // interrupted turn leaves exactly that (empty content + notice) and would
   // otherwise stay invisible for the rest of the session.
   if (
     message.role === "ASSISTANT" &&
     message.content === "" &&
     !message.reasoning &&
-    !message.error &&
+    !message.notice &&
     isThinking
   ) {
     return null;
@@ -79,9 +83,9 @@ function MessageRowImpl({
   const citations = message.citations ?? [];
   const showStreamingCaret = !isRequest && isStreaming && message.id === streamingMessageId;
 
-  // An assistant turn that carries an error and no text: the error banner is the whole
-  // message, so it replaces the bubble instead of hanging underneath an empty one.
-  const isEmptyErrorTurn = !isRequest && !!message.error && message.content === "";
+  // An assistant turn the user ended before it produced text: the notice is the
+  // whole message, so it replaces the bubble instead of hanging under an empty one.
+  const isEmptyNoticeTurn = !isRequest && !!message.notice && message.content === "";
   const hasBubbleContent = isRequest || message.content !== "" || citations.length > 0;
 
   return (
@@ -136,9 +140,9 @@ function MessageRowImpl({
 
           {/* A turn that produced no text at all — stopped, interrupted, or failed
                         before the first token — has nothing to put in a bubble. Rendering one
-                        anyway left a stray empty pill above the error, which is what made a
+                        anyway left a stray empty pill above the notice, which is what made a
                         cancelled chat look broken rather than cancelled. */}
-          {!isEmptyErrorTurn && hasBubbleContent && (
+          {!isEmptyNoticeTurn && hasBubbleContent && (
             <div
               // E5: mark the actively-streaming message as busy so
               // screen readers don't announce partial content mid-stream.
@@ -166,14 +170,26 @@ function MessageRowImpl({
             </div>
           )}
 
-          {!isRequest && message.error && (
+          {/* Quiet, not alarming: the user ended this turn themselves, so there is
+              nothing to warn them about — the thread just has to say why the answer
+              they asked for never arrived. Genuine failures are toasts instead. */}
+          {!isRequest && message.notice && (
             <div
-              className={`flex w-full items-start gap-2.5 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm leading-relaxed text-app-danger-text ${
-                isEmptyErrorTurn ? "" : "mt-2"
+              data-testid="chat-message-notice"
+              className={`flex w-full items-start gap-2.5 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-3 text-sm leading-relaxed text-app-text-muted ${
+                isEmptyNoticeTurn ? "" : "mt-2"
               }`}
             >
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
-              <span>{message.error}</span>
+              {message.notice === "stopped" ? (
+                <Square size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+              ) : (
+                <MessageSquareOff size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+              )}
+              <span>
+                {message.notice === "stopped"
+                  ? "Stopped before the assistant replied."
+                  : "Interrupted by a new message."}
+              </span>
             </div>
           )}
 
