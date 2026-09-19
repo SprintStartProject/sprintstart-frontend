@@ -39,6 +39,24 @@ function task(index: number): StarterWorkTask {
   };
 }
 
+function staleTask(over: Partial<StarterWorkTask> = {}): StarterWorkTask {
+  return {
+    id: "stale-1",
+    sourceId: "github:acme/repo:ISSUE:1",
+    title: "Fix the login redirect",
+    summary: null,
+    rationale: null,
+    sourceUrl: "https://github.com/acme/repo/issues/1",
+    competencyKeys: [],
+    status: "STALE",
+    reviewed: true,
+    taskZeroEligible: false,
+    sourceHasAssignee: null,
+    sourceCheckedAt: "2026-08-01T00:00:00.000Z",
+    ...over,
+  };
+}
+
 describe("StarterWorkPoolCloud", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -391,5 +409,65 @@ describe("StarterWorkPoolCloud", () => {
     );
 
     expect(screen.queryByRole("button", { name: /sync/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a Closed tab with a count once the pool has tasks closed at their source", async () => {
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={vi.fn()}
+        closedTasks={[staleTask(), staleTask({ id: "stale-2" })]}
+      />,
+    );
+
+    const closedTab = await screen.findByRole("button", { name: /^Closed/ });
+    expect(within(closedTab).getByText("2")).toBeInTheDocument();
+  });
+
+  it("hides the Closed tab when nothing has closed at the source", () => {
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^Closed/ })).not.toBeInTheDocument();
+  });
+
+  it("lists closed tasks under the Closed filter, dimmed and without their live summary", async () => {
+    const user = userEvent.setup();
+    const onOpenTask = vi.fn();
+    const closed = staleTask({ summary: "This would only make sense while still live." });
+    renderWithProviders(
+      <StarterWorkPoolCloud
+        tasks={[task(1)]}
+        isLoading={false}
+        error={null}
+        canAct
+        onOpenTask={onOpenTask}
+        closedTasks={[closed]}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /^Closed/ }));
+
+    expect(screen.queryByText("Starter task 1")).not.toBeInTheDocument();
+    const card = screen.getByTestId(`pool-task-${closed.id}`);
+    expect(within(card).getByText("Fix the login redirect")).toBeInTheDocument();
+    expect(
+      within(card).queryByText("This would only make sense while still live."),
+    ).not.toBeInTheDocument();
+    expect(within(card).getByText(/^Closed/)).toBeInTheDocument();
+    expect(card.querySelector(".opacity-70")).toBeInTheDocument();
+
+    await user.click(within(card).getByRole("button", { name: /open details for/i }));
+    expect(onOpenTask).toHaveBeenCalledWith(closed);
   });
 });

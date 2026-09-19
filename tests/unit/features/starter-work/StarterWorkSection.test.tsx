@@ -201,7 +201,7 @@ describe("StarterWorkSection", () => {
     expect(within(dialog).getByText("Someone is on this")).toBeInTheDocument();
   });
 
-  it("offers no decision on a task closed at its source, opened from the closed list", async () => {
+  it("offers no decision on a task closed at its source, opened from the Closed filter", async () => {
     const staleTask: StarterWorkTask = { ...task, id: "task-2", status: "STALE" };
     vi.spyOn(starterWorkService, "fetchPool").mockImplementation((status = "LIVE") =>
       Promise.resolve(status === "STALE" ? [staleTask] : [task]),
@@ -209,7 +209,7 @@ describe("StarterWorkSection", () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
 
-    await user.click(await screen.findByRole("button", { name: /closed in the tracker/i }));
+    await user.click(await screen.findByRole("button", { name: /^Closed/ }));
     await user.click(await screen.findByRole("button", { name: /open details for/i }));
 
     const dialog = await screen.findByRole("dialog");

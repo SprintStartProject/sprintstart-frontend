@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
+  Archive,
   CheckCircle2,
   ChevronRight,
   Cloud,
@@ -33,15 +34,16 @@ import { formatRelativeDate } from "../format";
 import { parseCandidateSource, stripRedundantIssuePrefix, trackerLabel } from "../sourceId";
 import type { StarterWorkTask } from "../types";
 
-export type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero";
+export type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero" | "closed";
 
-const STATUS_FILTER_ORDER: PoolStatusFilter[] = ["all", "unseen", "seen", "taskZero"];
+const STATUS_FILTER_ORDER: PoolStatusFilter[] = ["all", "unseen", "seen", "taskZero", "closed"];
 
 const STATUS_FILTER_LABELS: Record<PoolStatusFilter, string> = {
   all: "All",
   unseen: "New",
   seen: "Looked at",
   taskZero: "Task 0",
+  closed: "Closed",
 };
 
 /** One page fills the cloud with twelve cards, or the list's matching stack of ten — a compact row
@@ -189,11 +191,24 @@ type StarterWorkPoolCloudProps = {
    * every other filter here behaves.
    */
   initialStatusFilter?: PoolStatusFilter;
+  /**
+   * Tasks reconciliation found closed at their source — shown under the "Closed" filter tab
+   * instead of a separate box under the pool. Not sticky: a task leaves this list on its own once
+   * its source issue reopens. Defaults to empty, which simply keeps the tab hidden.
+   */
+  closedTasks?: StarterWorkTask[];
+  isClosedLoading?: boolean;
 };
 
 type PoolTaskProps = {
   task: StarterWorkTask;
   onOpen: (task: StarterWorkTask) => void;
+  /**
+   * True inside the "Closed" filter: dims the row/card and swaps the unseen/seen marker and the
+   * summary line for an archive icon and a "Closed …" timestamp, since neither of those mean
+   * anything for a task that already left the live pool.
+   */
+  closed?: boolean;
 };
 
 /** Placeholder for one pool row, matching `PoolListRow`'s marker/title/description/badge shape. */
@@ -316,10 +331,16 @@ function PoolStatusMarker({ unseen }: { unseen: boolean }) {
   );
 }
 
+/** "Closed 2 days ago" for a task shown under the Closed filter, or null with no timestamp to phrase one from. */
+function closedLineFor(task: StarterWorkTask): string | null {
+  return task.sourceCheckedAt ? `Closed ${formatRelativeDate(task.sourceCheckedAt)}` : null;
+}
+
 /** A cloud card whose stretched button makes the entire surface open the task's detail drawer. */
-function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
-  const unseen = !task.reviewed;
+function PoolCloudCard({ task, onOpen, closed = false }: PoolTaskProps) {
+  const unseen = !closed && !task.reviewed;
   const description = task.summary?.trim();
+  const closedLine = closed ? closedLineFor(task) : null;
   const displayTitle = stripRedundantIssuePrefix(
     task.title,
     parseCandidateSource(task.sourceId).numberLabel,
@@ -330,7 +351,7 @@ function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
       roundedClassName="rounded-2xl"
       className={`transition-shadow focus-within:ring-2 focus-within:ring-app-focus hover:shadow-xl ${
         unseen ? "border-dashed border-app-border-muted" : ""
-      }`}
+      } ${closed ? "opacity-70" : ""}`}
     >
       {/* A soft always-on glow, not the mouse-tracked spotlight — the cue that this one is new has
           to read before the reader's cursor ever reaches it. */}
@@ -351,7 +372,15 @@ function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
       <article className="pointer-events-none relative z-10 flex h-full flex-col gap-1 p-3">
         <div className="flex items-center justify-between gap-2">
           <PoolTaskSourceBadge task={task} />
-          <PoolStatusMarker unseen={unseen} />
+          {closed ? (
+            <Archive
+              role="img"
+              aria-label="Closed in the tracker"
+              className="h-4 w-4 shrink-0 text-app-text-subtle"
+            />
+          ) : (
+            <PoolStatusMarker unseen={unseen} />
+          )}
         </div>
 
         <h3
@@ -361,13 +390,17 @@ function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
           {displayTitle}
         </h3>
 
-        {description && (
-          <p
-            className="line-clamp-1 text-xs leading-relaxed text-app-text-muted"
-            title={description}
-          >
-            {description}
-          </p>
+        {closedLine ? (
+          <p className="line-clamp-1 text-xs leading-relaxed text-app-text-subtle">{closedLine}</p>
+        ) : (
+          description && (
+            <p
+              className="line-clamp-1 text-xs leading-relaxed text-app-text-muted"
+              title={description}
+            >
+              {description}
+            </p>
+          )
         )}
 
         <div className="mt-auto pt-0.5">
@@ -383,16 +416,20 @@ function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
  * out its own content — marker, title/summary, then the trailing badges and a chevron. Below `sm`
  * the trailing group wraps under the title instead of staying pinned to the row's right edge.
  */
-function PoolListRow({ task, onOpen }: PoolTaskProps) {
-  const unseen = !task.reviewed;
+function PoolListRow({ task, onOpen, closed = false }: PoolTaskProps) {
+  const unseen = !closed && !task.reviewed;
   const description = task.summary?.trim();
+  const closedLine = closed ? closedLineFor(task) : null;
   const displayTitle = stripRedundantIssuePrefix(
     task.title,
     parseCandidateSource(task.sourceId).numberLabel,
   );
 
   return (
-    <li className="group relative" data-testid={`pool-list-task-${task.id}`}>
+    <li
+      className={`group relative ${closed ? "opacity-70" : ""}`}
+      data-testid={`pool-list-task-${task.id}`}
+    >
       <button
         type="button"
         onClick={() => onOpen(task)}
@@ -402,7 +439,15 @@ function PoolListRow({ task, onOpen }: PoolTaskProps) {
 
       <div className="pointer-events-none relative z-10 flex flex-col gap-2 p-4 transition-colors group-hover:bg-app-surface-hover sm:flex-row sm:items-center sm:gap-3">
         <div className="flex w-5 shrink-0 items-center justify-center">
-          <PoolStatusMarker unseen={unseen} />
+          {closed ? (
+            <Archive
+              role="img"
+              aria-label="Closed in the tracker"
+              className="h-4 w-4 shrink-0 text-app-text-subtle"
+            />
+          ) : (
+            <PoolStatusMarker unseen={unseen} />
+          )}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -412,10 +457,14 @@ function PoolListRow({ task, onOpen }: PoolTaskProps) {
           >
             {displayTitle}
           </h3>
-          {description && (
-            <p className="truncate text-xs text-app-text-muted" title={description}>
-              {description}
-            </p>
+          {closedLine ? (
+            <p className="truncate text-xs text-app-text-subtle">{closedLine}</p>
+          ) : (
+            description && (
+              <p className="truncate text-xs text-app-text-muted" title={description}>
+                {description}
+              </p>
+            )
           )}
         </div>
 
@@ -449,11 +498,14 @@ export function StarterWorkPoolCloud({
   isSyncing = false,
   onOpenTask,
   initialStatusFilter,
+  closedTasks = [],
+  isClosedLoading = false,
 }: StarterWorkPoolCloudProps) {
   const { selectedProjectId, selectedProject } = useProjectContext();
   const prefersReducedMotion = useReducedMotion();
   const { error: showErrorToast } = useToast();
   const showLoadingSkeleton = useDelayedFlag(isLoading);
+  const showClosedLoadingSkeleton = useDelayedFlag(isClosedLoading);
 
   const [view, setView] = useState<PoolView>("cloud");
   const [page, setPage] = useState(1);
@@ -523,34 +575,60 @@ export function StarterWorkPoolCloud({
     });
   }, [sortedTasks, onlyProject, projectGroupKeys]);
 
+  // Most recently closed first — "Only {project}" scopes this the same way it scopes the live
+  // pool, so the tab's own count always matches what picking it would actually show.
+  const projectScopedClosedTasks = useMemo(() => {
+    const mostRecentlyClosedFirst = [...closedTasks].sort((a, b) => {
+      if (!a.sourceCheckedAt) return 1;
+      if (!b.sourceCheckedAt) return -1;
+      return b.sourceCheckedAt.localeCompare(a.sourceCheckedAt);
+    });
+    if (!onlyProject) return mostRecentlyClosedFirst;
+    return mostRecentlyClosedFirst.filter((task) => {
+      const groupKey = parseCandidateSource(task.sourceId).groupKey;
+      return groupKey !== null && projectGroupKeys.has(groupKey);
+    });
+  }, [closedTasks, onlyProject, projectGroupKeys]);
+
   const statusCounts = useMemo(
     () => ({
       all: projectScopedTasks.length,
       unseen: projectScopedTasks.filter((task) => !task.reviewed).length,
       seen: projectScopedTasks.filter((task) => task.reviewed).length,
       taskZero: projectScopedTasks.filter((task) => task.taskZeroEligible).length,
+      closed: projectScopedClosedTasks.length,
     }),
-    [projectScopedTasks],
+    [projectScopedTasks, projectScopedClosedTasks],
   );
 
-  const statusFilterOptions: SegmentedTabOption<PoolStatusFilter>[] = STATUS_FILTER_ORDER.map(
-    (value) => ({
-      value,
-      label: STATUS_FILTER_LABELS[value],
-      count: statusCounts[value],
-    }),
-  );
+  // Kept out of the bar entirely below its first closed task — a tab that is always empty is just
+  // clutter — except while it is the active filter, so picking it and later syncing it away never
+  // yanks the bar out from under the reader mid-look.
+  const statusFilterOptions: SegmentedTabOption<PoolStatusFilter>[] = STATUS_FILTER_ORDER.filter(
+    (value) => value !== "closed" || statusCounts.closed > 0 || statusFilter === "closed",
+  ).map((value) => ({
+    value,
+    label: STATUS_FILTER_LABELS[value],
+    icon: value === "closed" ? <Archive className="h-3.5 w-3.5" aria-hidden="true" /> : undefined,
+    count: statusCounts[value],
+  }));
 
-  const filteredTasks = useMemo(
-    () =>
-      projectScopedTasks.filter((task) => {
-        if (statusFilter === "unseen") return !task.reviewed;
-        if (statusFilter === "seen") return task.reviewed;
-        if (statusFilter === "taskZero") return task.taskZeroEligible;
-        return true;
-      }),
-    [projectScopedTasks, statusFilter],
-  );
+  const isViewingClosed = statusFilter === "closed";
+
+  const filteredTasks = useMemo(() => {
+    if (isViewingClosed) return projectScopedClosedTasks;
+    return projectScopedTasks.filter((task) => {
+      if (statusFilter === "unseen") return !task.reviewed;
+      if (statusFilter === "seen") return task.reviewed;
+      if (statusFilter === "taskZero") return task.taskZeroEligible;
+      return true;
+    });
+  }, [projectScopedTasks, projectScopedClosedTasks, isViewingClosed, statusFilter]);
+
+  const activeIsLoading = isViewingClosed ? isClosedLoading : isLoading;
+  const activeShowLoadingSkeleton = isViewingClosed
+    ? showClosedLoadingSkeleton
+    : showLoadingSkeleton;
 
   const pageSize = effectiveView === "cloud" ? CLOUD_PAGE_SIZE : LIST_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(filteredTasks.length / pageSize));
@@ -673,7 +751,14 @@ export function StarterWorkPoolCloud({
         )}
       </div>
 
-      {showLoadingSkeleton ? (
+      {isViewingClosed && (
+        <p className="mb-4 text-sm text-app-text-subtle">
+          These came back closed from their tracker. They return to the pool on their own if the
+          issue reopens.
+        </p>
+      )}
+
+      {activeShowLoadingSkeleton ? (
         <SkeletonGroup
           label="Loading the pool"
           className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-app-surface"
@@ -682,7 +767,7 @@ export function StarterWorkPoolCloud({
             <PoolRowSkeleton key={index} />
           ))}
         </SkeletonGroup>
-      ) : isLoading ? null : tasks.length === 0 ? (
+      ) : activeIsLoading ? null : !isViewingClosed && tasks.length === 0 ? (
         <EmptyState icon={<PackageOpen className="h-8 w-8" aria-hidden="true" />}>
           Nothing here yet. Mine or add a task and it lands here, claimable right away.
         </EmptyState>
@@ -748,7 +833,7 @@ export function StarterWorkPoolCloud({
                         className="w-[70%]"
                         style={{ marginLeft: `${slotStyle.offsetPercent}%` }}
                       >
-                        <PoolCloudCard task={task} onOpen={onOpenTask} />
+                        <PoolCloudCard task={task} onOpen={onOpenTask} closed={isViewingClosed} />
                       </motion.div>
                     );
                   })}
@@ -762,7 +847,12 @@ export function StarterWorkPoolCloud({
               data-pool-flight-target
             >
               {pageItems.map((task) => (
-                <PoolListRow key={task.id} task={task} onOpen={onOpenTask} />
+                <PoolListRow
+                  key={task.id}
+                  task={task}
+                  onOpen={onOpenTask}
+                  closed={isViewingClosed}
+                />
               ))}
             </ul>
           )}

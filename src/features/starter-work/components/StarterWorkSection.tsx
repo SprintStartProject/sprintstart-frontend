@@ -10,7 +10,6 @@ import { useToast } from "../../../context/useToast";
 import { queryKeys } from "../../../services/queryKeys";
 import { starterWorkService } from "../../../services/starterWorkService";
 import { PermissionGroup } from "../../../services/types";
-import { ClosedInTrackerList } from "./ClosedInTrackerList";
 import { StarterWorkAddMenu } from "./StarterWorkAddMenu";
 import { StarterWorkTaskDetails } from "./StarterWorkTaskDetails";
 import { StarterWorkTriage } from "./StarterWorkTriage";
@@ -98,6 +97,11 @@ export function StarterWorkSection({
     error: poolError,
     reload: reloadPool,
   } = useStarterWorkPool();
+
+  // The pool's own "Closed" filter tab, not a separate box under it — reconciliation found these
+  // tasks' source issues closed. Fetched unconditionally rather than only while that tab is open,
+  // so the tab's count is there to show (or to stay hidden by) as soon as the pool itself has one.
+  const { pool: closedPool, isLoading: isClosedPoolLoading } = useStarterWorkPool("STALE");
 
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -383,8 +387,9 @@ export function StarterWorkSection({
         isSyncing={isSyncing}
         onOpenTask={toggleSelectedTask}
         initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
+        closedTasks={closedPool}
+        isClosedLoading={isClosedPoolLoading}
       />
-      <ClosedInTrackerList onOpenTask={toggleSelectedTask} />
 
       <PanelPresence value={selectedTask}>
         {(task) => (
