@@ -35,6 +35,9 @@ function prefetchRouteModule(path: string): void {
     case "/onboarding":
       void import("../pages/OnBoardingPage");
       return;
+    case "/blueprints":
+      void import("../pages/BlueprintPathsPage");
+      return;
     case "/pm-dashboard":
       void import("../pages/PmDashboardPage");
       return;

@@ -172,6 +172,12 @@ type SidebarNavLinkProps = {
    * own tells a screen reader nothing about what three of them there are.
    */
   countLabel?: (count: number) => string;
+  /**
+   * Something is being prepared behind this entry right now -- the onboarding path while it is
+   * built in the background. A small spinner in the trailing slot, announced with `busyLabel`.
+   */
+  busy?: boolean;
+  busyLabel?: string;
   onNavigate?: () => void;
 };
 
@@ -206,6 +212,8 @@ export function SidebarNavLink({
   attentionLabel,
   count = 0,
   countLabel,
+  busy = false,
+  busyLabel,
   onNavigate,
 }: SidebarNavLinkProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -524,7 +532,17 @@ export function SidebarNavLink({
                                     two separate signals about the same row, and the row
                                     you are already on has less to tell you than the one
                                     with work waiting behind it. */}
-                {count > 0 ? (
+                {busy ? (
+                  <span className="ml-auto flex items-center" role="status">
+                    <span
+                      aria-hidden="true"
+                      className={`h-[14px] w-[14px] rounded-full border-2 border-t-transparent motion-safe:animate-spin ${
+                        isHighlighted ? "border-white" : "border-app-brand"
+                      }`}
+                    />
+                    <span className="sr-only">{busyLabel ?? "In progress"}</span>
+                  </span>
+                ) : count > 0 ? (
                   <span className="ml-auto flex items-center">
                     {/* The same amber as the icon beside it, and the same
                                             amber on the active row as off it. This is the

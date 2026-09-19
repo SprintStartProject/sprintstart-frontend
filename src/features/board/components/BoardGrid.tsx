@@ -36,6 +36,8 @@ import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
 import { moveTo } from "../layout/boardOrder";
 import { cardIcon } from "../layout/cardIcons";
+import { buddyLockSaid, lockedAfter, teamLockSaid } from "../../graph-diagram/lockWords";
+import { unblockedByFinishing } from "../layout/nextUp";
 import { cardName } from "../layout/cardNames";
 import type { CardStack } from "../layout/cardStacks";
 import {
@@ -375,6 +377,8 @@ type BoardGridProps = {
   onToggleDone?: (cardId: string, done: boolean) => void;
   /** Makes a card wait on one other card, or on nothing. */
   onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
+  /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
+  onShowChain?: (cardId: string) => void;
   /**
    * The stacks on this board, keyed by every member's id.
    *
@@ -524,6 +528,7 @@ export function BoardGrid({
   onAssignGroupStage,
   onToggleDone,
   onSetPredecessor,
+  onShowChain,
   stacks,
   expandedStackIds,
   onToggleStack,
@@ -564,6 +569,25 @@ export function BoardGrid({
 
   /** The cards on screen, in the order they are drawn. */
   const shownIds = useMemo(() => board.cards.map((card) => card.id), [board.cards]);
+
+  /**
+   * What finishing each card would free, counted once for the whole board.
+   *
+   * A question about *other* cards, like "blocked" is — so it is answered in one pass here rather
+   * than by every card asking the same question about the same forty.
+   */
+  const unblocksById = useMemo(
+    () =>
+      states
+        ? new Map(
+            board.cards.map((card) => [
+              card.id,
+              unblockedByFinishing(board.cards, states, card.id),
+            ]),
+          )
+        : null,
+    [board.cards, states],
+  );
 
   /**
    * The whole board's order, filtered cards included.
@@ -990,6 +1014,10 @@ export function BoardGrid({
         onAssignStage={isArranging ? onAssignStage : undefined}
         onToggleDone={onToggleDone}
         onSetPredecessor={isArranging ? onSetPredecessor : undefined}
+        // Unlike the pickers, this is not an arranging tool: the question it answers — why is this
+        // card closed — is asked hardest by somebody who is trying to work, not to rearrange.
+        onShowChain={onShowChain}
+        unblocks={unblocksById?.get(card.id)}
         onDrop={handleCardDrop}
         onMove={move}
         onDismiss={onDismiss}
@@ -1331,6 +1359,10 @@ type BoardCardCellProps = {
   onAssignStage?: (cardId: string, stage: BoardStage) => void;
   onToggleDone?: (cardId: string, done: boolean) => void;
   onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
+  /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
+  onShowChain?: (cardId: string) => void;
+  /** How many cards this one alone is holding up, already counted by the grid. */
+  unblocks?: number;
   /**
    * Set only on the top card of a *closed* pile — the one standing in for the others.
    *
@@ -1391,6 +1423,8 @@ function BoardCardCell({
   onAssignStage,
   onToggleDone,
   onSetPredecessor,
+  onShowChain,
+  unblocks,
   stack,
   origin,
   onToggleStack,
@@ -1550,11 +1584,11 @@ function BoardCardCell({
         // why this card is behind that one when the hire never put it there.
         <span
           className="flex max-w-40 items-center gap-1 text-xs text-app-text-muted"
-          title={`Your team put this after ${predecessorName ? cardName(predecessorName) : "another card"}.`}
+          title={teamLockSaid(predecessorName ? cardName(predecessorName) : null)}
         >
           <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
           <span className="min-w-0 truncate">
-            After: {predecessorName ? cardName(predecessorName) : "another card"}
+            {lockedAfter(predecessorName ? cardName(predecessorName) : "another card")}
           </span>
         </span>
       ) : (
@@ -1567,7 +1601,7 @@ function BoardCardCell({
           // not look like something they set themselves and forgot.
           title={
             state?.predecessorSource === "BUDDY" && predecessorName
-              ? `Your buddy put this after ${cardName(predecessorName)}. You can change it.`
+              ? buddyLockSaid(cardName(predecessorName))
               : undefined
           }
           onChange={(event) => onSetPredecessor(card.id, event.target.value || null)}
@@ -1577,11 +1611,13 @@ function BoardCardCell({
             .filter((other) => other.id !== card.id)
             .map((other) => (
               <option key={other.id} value={other.id}>
-                After: {cardName(other)}
+                {lockedAfter(cardName(other))}
               </option>
             ))}
         </Select>
       ),
+      onShowChain: onShowChain ? () => onShowChain(card.id) : undefined,
+      unblocks,
       stack:
         stack && onToggleStack
           ? {
@@ -1663,6 +1699,8 @@ function BoardCardCell({
       onAssignStage,
       onMove,
       onSetPredecessor,
+      onShowChain,
+      unblocks,
       onToggleStack,
       predecessorName,
       isArranging,
