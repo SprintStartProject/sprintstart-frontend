@@ -126,12 +126,14 @@ export function useKnowledgeBase(projectId: string | null) {
   /**
    * Top-level tabs for SegmentedTabs.
    *
-   * Options are scoped to artifact types present in the project (plus "ALL" and
-   * whatever tab is active, so an active tab never disappears). Each tab's count
-   * reflects the current search, source selection, and format facet.
+   * Options are scoped to artifact types available from the selected sources
+   * (plus "ALL" and whatever tab is active, so an active tab never disappears).
+   * Each tab's count reflects the current search, source selection, and format facet.
    */
   const tabOptions = useMemo<TabOption[]>(() => {
-    const presentTypes = new Set(artifacts.map((artifact) => artifact.artifactType));
+    const presentTypes = new Set(
+      artifacts.filter(passesSources).map((artifact) => artifact.artifactType),
+    );
     const reachableTabs = KNOWLEDGE_TABS.filter(
       (tab) =>
         tab.id === "ALL" ||

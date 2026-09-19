@@ -561,7 +561,7 @@ describe("useKnowledgeBase", () => {
     expect(result.current.filteredArtifacts[0].title).toBe("archive.tar.gz");
   });
 
-  it("offers tab options for types present in the project plus ALL", async () => {
+  it("offers tab options for types available from the selected sources plus ALL", async () => {
     const result = await renderWith(makeFacetFixture());
 
     expect(result.current.tabOptions.map((option) => option.value)).toEqual([
@@ -576,11 +576,9 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("JIRA");
     });
 
-    // Jira carries issues and nothing else, so other types have count 0
-    const issueTab = result.current.tabOptions.find((t) => t.value === "ISSUE");
-    const prTab = result.current.tabOptions.find((t) => t.value === "PULL_REQUEST");
-    expect(issueTab?.count).toBe(1);
-    expect(prTab?.count).toBe(0);
+    // Jira carries issues and nothing else, so unrelated artifact-type tabs disappear.
+    expect(result.current.tabOptions.map((option) => option.value)).toEqual(["ALL", "ISSUE"]);
+    expect(result.current.tabOptions.find((option) => option.value === "ISSUE")?.count).toBe(1);
   });
 
   it("keeps an active tab visible even if chosen sources cannot produce it", async () => {

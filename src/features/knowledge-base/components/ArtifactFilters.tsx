@@ -119,8 +119,9 @@ function isUploadFormat(value: string): value is UploadFormat {
  *
  * 3-tier filtering hierarchy for the knowledge base:
  * 1. Tier 1: Prominent full-width search input with refresh trigger.
- * 2. Tier 2: SegmentedTabs switcher for artifact types (All, PRs, Issues, Files, Docs, Commits, Org).
- * 3. Tier 3: Action & facet row with result count, "Clear filters", and Source multi-select dropdown.
+ * 2. Tier 2: Content-width SegmentedTabs switcher for artifact types.
+ * 3. Tier 3: Action & facet row with result count, "Clear filters", and a compact,
+ *    right-aligned Source multi-select dropdown.
  */
 export function ArtifactFilters({
   searchQuery,
@@ -220,18 +221,19 @@ export function ArtifactFilters({
         onChange={onTabChange}
         layoutId="kb-artifact-type-tab"
         ariaLabel="Filter artifacts by type"
-        wrap
+        className="self-start"
       />
 
-      {/* Tier 3: Action bar with result count, Clear filters, and full-length Sources dropdown */}
+      {/* Tier 3: Action bar with result count, Clear filters, and compact Sources dropdown */}
       <div className="flex flex-wrap items-center gap-3 pt-1">
-        <div className="flex shrink-0 items-center gap-3">
-          <p
-            className="text-sm font-medium whitespace-nowrap text-app-text-muted"
-            data-testid="kb-result-count"
-          >
-            {resultCount} {resultCount === 1 ? "result" : "results"}
-          </p>
+        <p
+          className="flex h-9 shrink-0 items-center text-sm leading-none font-medium whitespace-nowrap text-app-text-muted"
+          data-testid="kb-result-count"
+        >
+          {resultCount} {resultCount === 1 ? "result" : "results"}
+        </p>
+
+        <div className="ml-auto flex w-full items-center justify-end gap-3 sm:w-auto">
           {hasActiveFilters && (
             <Button
               variant="ghost"
@@ -243,21 +245,21 @@ export function ArtifactFilters({
               Clear filters
             </Button>
           )}
-        </div>
 
-        <div className="min-w-[200px] flex-1">
-          <MultiSelectFilter
-            label="Filter sources"
-            summary={summariseSources(selectedSources, selectedFormat)}
-            activeCount={activeCount}
-            sections={sections}
-            selected={selectedValues}
-            onToggle={handleToggle}
-            size="sm"
-            testId="kb-filter"
-            className="w-full"
-            collapsible={false}
-          />
+          <div className="min-w-0 flex-1 sm:w-80 sm:flex-none">
+            <MultiSelectFilter
+              label="Filter sources"
+              summary={summariseSources(selectedSources, selectedFormat)}
+              activeCount={activeCount}
+              sections={sections}
+              selected={selectedValues}
+              onToggle={handleToggle}
+              size="sm"
+              testId="kb-filter"
+              className="w-full"
+              collapsible={false}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
+import { Checkbox } from "./Checkbox";
 import { Collapsible } from "./Collapsible";
 import { buttonHoverMotion, buttonHoverMotionDisabled } from "../../styles/tokens";
 import { MENU_Z_INDEX, menuTransition, usePopoverMenu } from "./usePopoverMenu";
@@ -259,12 +260,10 @@ export function MultiSelectFilter<TValue extends string>({
                     key={option.value}
                     className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selected.has(option.value)}
                       onChange={() => onToggle(option.value)}
                       data-testid={`${testId}-option-${option.value.toLowerCase()}`}
-                      className="h-4 w-4 shrink-0 cursor-pointer accent-app-brand focus-visible:ring-2 focus-visible:ring-app-focus"
                     />
 
                     {option.icon}
