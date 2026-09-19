@@ -1,11 +1,15 @@
 import { Eye, PlaneLanding, Target } from "lucide-react";
 import { Spinner } from "../../../components/ui/Spinner";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useArrivalAuthoring } from "../../arrival/hooks/useArrivalAuthoring";
 import { mergedStepCount } from "../../arrival/mergedSteps";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useStarterWorkPool } from "../../starter-work/hooks/useStarterWorkPool";
 import { useStarterWorkReview } from "../../starter-work/hooks/useStarterWorkReview";
 import { buildReadiness, type OverviewTarget } from "../readiness";
+import { FirstWeekHires } from "./FirstWeekHires";
 import { NeedsYouList } from "./NeedsYouList";
 import { StageCard } from "./StageCard";
 
@@ -34,6 +38,15 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
   const { pool, isLoading: isPoolLoading } = useStarterWorkPool();
   const { pool: staleTasks, isLoading: isStaleLoading } = useStarterWorkPool("STALE");
   const { tasks: unseenTasks, isLoading: isReviewLoading } = useStarterWorkReview();
+  // Shares its cache and query key with `FirstWeekHires` below (and with the standalone
+  // Onboarding insights page) rather than being awaited here: a slow or failed load must not hold
+  // up the readiness cards, so it is read as "no hires yet" until it resolves rather than gating
+  // the spinner above.
+  const { data: onboardingMetrics } = useQueryFetch(
+    queryKeys.onboardingMetrics.project(projectId ?? ""),
+    () =>
+      projectId ? onboardingMetricsService.fetchProjectMetrics(projectId) : Promise.resolve(null),
+  );
 
   if (isArrivalLoading || isPoolLoading || isStaleLoading || isReviewLoading) {
     return (
@@ -55,6 +68,7 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
     stale: staleTasks,
     unseenCount,
     projectName,
+    hires: onboardingMetrics?.hires,
     now: new Date(),
   });
 
@@ -115,6 +129,8 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
       </section>
 
       <NeedsYouList checks={readiness.openChecks} onNavigate={onNavigate} />
+
+      <FirstWeekHires projectId={projectId} />
     </div>
   );
 }

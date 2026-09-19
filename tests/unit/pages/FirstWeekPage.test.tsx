@@ -3,10 +3,33 @@ import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FirstWeekPage } from "../../../src/pages/FirstWeekPage";
 import { arrivalService } from "../../../src/services/arrivalService";
+import { onboardingMetricsService } from "../../../src/services/onboardingMetricsService";
 import { starterWorkService } from "../../../src/services/starterWorkService";
 import { userService } from "../../../src/services/userService";
 import type { ArrivalStep, DerivableArrivalStep } from "../../../src/features/arrival/types";
+import type {
+  HireTimeline,
+  ProjectOnboardingMetrics,
+} from "../../../src/features/onboarding-metrics/types";
 import type { StarterWorkTask } from "../../../src/features/starter-work/types";
+
+/** The Overview tab reads onboarding metrics too (for the hire readiness checks and the "People
+ * in their first weeks" list), so every test that can land on it mocks this — otherwise MSW logs
+ * an unhandled-request error for a project id ("p1") no handler knows about. */
+function emptyOnboardingMetrics(): ProjectOnboardingMetrics {
+  return {
+    projectId: "p1",
+    memberCount: 0,
+    unattributableMemberCount: 0,
+    hiresWithAcceptedContribution: 0,
+    medianHoursToFirstAcceptedContribution: null,
+    medianHoursToFirstResponse: null,
+    p90HoursToFirstResponse: null,
+    stalledCount: 0,
+    waitingOnResponseCount: 0,
+    hires: [],
+  };
+}
 
 vi.mock("../../../src/services/arrivalService", () => ({
   arrivalService: {
@@ -54,6 +77,9 @@ describe("FirstWeekPage tab switching", () => {
     vi.spyOn(starterWorkService, "fetchPool").mockResolvedValue([]);
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
     vi.spyOn(userService, "getMyProjects").mockResolvedValue([]);
+    vi.spyOn(onboardingMetricsService, "fetchProjectMetrics").mockResolvedValue(
+      emptyOnboardingMetrics(),
+    );
   });
 
   it("defaults to the Overview tab when no ?tab= is given", async () => {
@@ -137,6 +163,27 @@ function starterTask(over: Partial<StarterWorkTask> = {}): StarterWorkTask {
   };
 }
 
+function hireFixture(over: Partial<HireTimeline> = {}): HireTimeline {
+  return {
+    userId: "h1",
+    displayName: "New Hire",
+    githubLogin: "new-hire",
+    joinedAt: new Date().toISOString(),
+    firstTaskClaimedAt: null,
+    firstContributionOpenedAt: null,
+    firstResponseAt: null,
+    firstContributionAcceptedAt: null,
+    hoursToFirstAcceptedContribution: null,
+    hoursToFirstResponse: null,
+    acceptedContributionCount: 0,
+    openContributionCount: 0,
+    longestOpenWaitHours: null,
+    stalled: false,
+    stalledReason: null,
+    ...over,
+  };
+}
+
 /**
  * The Overview tab reads live data through the same hooks Arrival and Starter work use — no
  * summary endpoint of its own — so its tests set up the same service mocks those tabs' own tests
@@ -179,6 +226,9 @@ describe("FirstWeekPage Overview tab", () => {
     ]);
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
     vi.spyOn(userService, "getMyProjects").mockResolvedValue([]);
+    vi.spyOn(onboardingMetricsService, "fetchProjectMetrics").mockResolvedValue(
+      emptyOnboardingMetrics(),
+    );
   });
 
   it("shows each stage's readiness status and its open checks", async () => {
@@ -353,6 +403,43 @@ describe("FirstWeekPage Overview tab", () => {
 
     expect(await screen.findByRole("button", { name: "Add step" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows hires still in their first weeks, with a mini-journey and a stalled badge", async () => {
+    vi.spyOn(onboardingMetricsService, "fetchProjectMetrics").mockResolvedValue({
+      ...emptyOnboardingMetrics(),
+      hires: [
+        hireFixture({
+          userId: "h1",
+          displayName: "Jamie Stalled",
+          stalled: true,
+          stalledReason: "No response in 6 days",
+          githubLogin: null,
+        }),
+      ],
+    });
+
+    renderTab("overview");
+
+    const row = await screen.findByTestId("overview-hire-h1");
+    expect(within(row).getByText("Jamie Stalled")).toBeInTheDocument();
+    expect(within(row).getByText("Stalled")).toBeInTheDocument();
+  });
+
+  it("points a stalled hire's readiness check at their own timeline, not the Onboarding insights page", async () => {
+    vi.spyOn(onboardingMetricsService, "fetchProjectMetrics").mockResolvedValue({
+      ...emptyOnboardingMetrics(),
+      hires: [hireFixture({ userId: "h1", displayName: "Jamie Stalled", stalled: true })],
+    });
+
+    renderTab("overview");
+
+    // The Overview tab wires the drawer this opens; here it only has to still be reachable.
+    expect(
+      within(await screen.findByTestId("overview-needs-hire-stalled-h1")).getByRole("button", {
+        name: "See Jamie Stalled's timeline",
+      }),
+    ).toBeInTheDocument();
   });
 });
 

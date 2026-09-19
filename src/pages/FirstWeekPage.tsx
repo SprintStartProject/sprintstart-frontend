@@ -66,6 +66,9 @@ export function FirstWeekPage() {
 
   const navigateFromOverview = useCallback(
     (target: OverviewTarget) => {
+      // A `{ hire }` target opens that hire's timeline within the Overview tab itself — `OverviewSection`
+      // intercepts it before it reaches this callback, so there is nothing left for a tab switch to do.
+      if ("hire" in target) return;
       if (target.tab === "starter" && target.focus) setStarterFocus(target.focus);
       if (target.tab === "arrival" && target.focus) setArrivalFocus(target.focus);
       handleTabChange(target.tab);
