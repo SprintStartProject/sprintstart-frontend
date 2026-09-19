@@ -200,7 +200,9 @@ export function SelectionActions() {
               size="sm"
               variant="ghost"
               onClick={() => {
-                quoteSelection(selection.text);
+                // quoteText rather than text: it keeps the answer's paragraph breaks, which
+                // `text` has collapsed away for the card paths.
+                quoteSelection(selection.quoteText);
                 clear();
               }}
               icon={<Reply className="h-4 w-4" />}
