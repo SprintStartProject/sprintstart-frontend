@@ -157,7 +157,44 @@ export function ChatPage() {
   // `isThinking` flips off — see `useSpaceOpensDino`. `closeGame` is only
   // for an exit from inside the game.
 
-  // Dino easter egg phrase matching happens in `handleChatSubmit` below.
+  const handleToggleFilters = useCallback(() => {
+    setShowFilters((v) => !v);
+  }, [setShowFilters]);
+
+  // Barrel roll side-effect
+  useEffect(() => {
+    if (isBarrelRolling) {
+      document.body.classList.add("barrel-roll-active");
+      const timeout = setTimeout(() => {
+        document.body.classList.remove("barrel-roll-active");
+        setIsBarrelRolling(false);
+      }, 2000);
+      return () => {
+        clearTimeout(timeout);
+        document.body.classList.remove("barrel-roll-active");
+      };
+    }
+  }, [isBarrelRolling]);
+
+  // Dino easter egg: while the assistant is thinking, pressing Space drops the
+  // AI avatar into a tiny endless runner. Doing nothing leaves the chat untouched.
+  const [gameActive, setGameActive] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(
+    () => localStorage.getItem("dinoUnlocked") === "true",
+  );
+
+  // Close the game as soon as the answer arrives. Uses React's documented
+  // "adjust state when a value changes" pattern (guarded setState during
+  // render) instead of an effect — avoids cascading renders and the
+  // set-state-in-effect lint rule. See:
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [prevIsThinking, setPrevIsThinking] = useState(isThinking);
+  if (prevIsThinking !== isThinking) {
+    setPrevIsThinking(isThinking);
+    if (!isThinking && gameActive) {
+      setGameActive(false);
+    }
+  }
 
   // E5: replacement for the live region that used to wrap the message list.
   // `ThinkingIndicator` already carries `role="status"` for the working
@@ -504,7 +541,7 @@ export function ChatPage() {
           sourcesLoading={sourcesLoading}
           textareaRef={textareaRef}
           showFilters={showFilters}
-          onToggleFilters={() => setShowFilters((v) => !v)}
+          onToggleFilters={handleToggleFilters}
           from={from}
           setFrom={setFrom}
           to={to}

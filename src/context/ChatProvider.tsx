@@ -273,7 +273,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [flushDraft]);
 
   const activeFilterCount = useMemo(() => {
-    return sourceSystems.length + (from ? 1 : 0) + (to ? 1 : 0);
+    return sourceSystems.length + (from || to ? 1 : 0);
   }, [sourceSystems, from, to]);
 
   const clearFilters = useCallback(() => {

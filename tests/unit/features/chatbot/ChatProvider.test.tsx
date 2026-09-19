@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useContext } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ChatProvider } from "../../../../src/context/ChatProvider";
@@ -66,5 +66,57 @@ describe("ChatProvider project gating", () => {
 
     await waitFor(() => expect(screen.getByTestId("chats")).toBeInTheDocument());
     expect(vi.mocked(getMyChats)).not.toHaveBeenCalled();
+  });
+});
+
+function FilterProbe() {
+  const context = useContext(ChatContext);
+  if (!context) return null;
+
+  return (
+    <div>
+      <span data-testid="filter-count">{context.activeFilterCount}</span>
+      <button onClick={() => context.toggleSourceSystem("GITHUB")}>Add GitHub</button>
+      <button
+        onClick={() => {
+          context.setFrom("2026-09-01");
+          context.setTo("2026-09-10");
+        }}
+      >
+        Set Range
+      </button>
+      <button onClick={context.clearFilters}>Clear</button>
+    </div>
+  );
+}
+
+describe("ChatProvider activeFilterCount", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    project.selected = true;
+    vi.mocked(getMyChats).mockResolvedValue({ chats: [] });
+  });
+
+  it("counts a date range (both from and to set) as 1 filter", async () => {
+    render(
+      <ChatProvider>
+        <FilterProbe />
+      </ChatProvider>,
+    );
+
+    await waitFor(() => expect(vi.mocked(getMyChats)).toHaveBeenCalledWith("p1"));
+    expect(screen.getByTestId("filter-count")).toHaveTextContent("0");
+
+    // Setting a date range increments count by 1 (not 2)
+    fireEvent.click(screen.getByText("Set Range"));
+    expect(screen.getByTestId("filter-count")).toHaveTextContent("1");
+
+    // Adding a source brings count to 2
+    fireEvent.click(screen.getByText("Add GitHub"));
+    expect(screen.getByTestId("filter-count")).toHaveTextContent("2");
+
+    // Clearing resets count to 0
+    fireEvent.click(screen.getByText("Clear"));
+    expect(screen.getByTestId("filter-count")).toHaveTextContent("0");
   });
 });
