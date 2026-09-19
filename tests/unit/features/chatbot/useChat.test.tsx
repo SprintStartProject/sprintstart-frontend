@@ -1079,4 +1079,151 @@ describe("useChat", () => {
       "Let me look.\n\nFound the retro.\n\nAuth work blocked us.",
     );
   });
+
+  it("appends post-tool tokens to a mid-word preamble without a break (#231)", async () => {
+    // Reproduces the wire shape from issue #231: the tool round's preamble
+    // was cut off mid-word upstream, so the post-tool answer continues the
+    // truncated word ("…Bas" + "ierend…"). The break must not split it.
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Gerne, ich schaue kurz nach. Bas"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"ierend auf den Dokumenten."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("Basierend auf den Dokumenten.");
+    });
+
+    expect(result.current.messages[1].content).toBe(
+      "Gerne, ich schaue kurz nach. Basierend auf den Dokumenten.",
+    );
+  });
+
+  it("drops a dangling space before gluing a mid-word post-tool token (#231)", async () => {
+    // Same truncation shape, but the cut also carried the word's trailing
+    // space ("Bas" + " "). Gluing must not leave "Bas ierend" behind.
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Ich pruefe kurz. Bas "}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"ierend darauf folgt:"}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("Basierend darauf folgt:");
+    });
+  });
+
+  it("keeps the paragraph break when the post-tool token starts uppercase", async () => {
+    // The glue rule only covers lowercase continuations. A post-tool answer
+    // starting with a capital letter is a real boundary and keeps its break —
+    // this also covers a model restarting after a mid-word cut ("…Ba" +
+    // "New thought."), where gluing would produce "…BaNew thought.".
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Let me look. Ba"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"New findings came up."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("New findings came up.");
+    });
+
+    expect(result.current.messages[1].content).toBe("Let me look. Ba\n\nNew findings came up.");
+  });
 });
