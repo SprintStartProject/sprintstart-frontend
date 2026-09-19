@@ -58,16 +58,18 @@ export interface Toast extends ToastOptions {
 }
 
 /**
- * The toast API, obtained through the {@link useToast} hook.
+ * The toast API on its own — every creator plus the two dismissers, without
+ * the list of visible toasts.
  *
- * The four named helpers are the everyday surface — `toast.success("Saved")`.
- * `show` exists for the rare case where the variant is computed at runtime.
- * Every creator returns the new toast's id so a caller can later `dismiss` it
- * itself (e.g. clearing a "still loading…" toast once the request resolves).
+ * Split out from {@link ToastContextType} so a component that only ever *raises*
+ * toasts can subscribe to something that never changes identity: the visible
+ * list changes on every appearance and auto-dismiss, and anything consuming it
+ * re-renders each time. `ChatProvider` is the reason this exists — it raises
+ * chat errors from inside the streaming hot path, and re-rendering every
+ * message row because an unrelated "Copied" toast came and went is waste.
+ * Read it through {@link useToastApi}.
  */
-export interface ToastContextType {
-  /** The currently visible toasts, oldest first. Consumed by the viewport. */
-  toasts: Toast[];
+export interface ToastApi {
   /** Low-level creator with an explicit variant. Returns the new toast's id. */
   show: (variant: ToastVariant, message: string, options?: ToastOptions) => string;
   info: (message: string, options?: ToastOptions) => string;
@@ -79,6 +81,26 @@ export interface ToastContextType {
   /** Clears every toast at once, e.g. on route changes or logout. */
   dismissAll: () => void;
 }
+
+/**
+ * The toast API, obtained through the {@link useToast} hook.
+ *
+ * The four named helpers are the everyday surface — `toast.success("Saved")`.
+ * `show` exists for the rare case where the variant is computed at runtime.
+ * Every creator returns the new toast's id so a caller can later `dismiss` it
+ * itself (e.g. clearing a "still loading…" toast once the request resolves).
+ */
+export interface ToastContextType extends ToastApi {
+  /** The currently visible toasts, oldest first. Consumed by the viewport. */
+  toasts: Toast[];
+}
+
+/**
+ * The stable half of the toast context — see {@link ToastApi}. Provided by
+ * {@link ToastProvider} alongside the full one; use {@link useToastApi} rather
+ * than reading it directly.
+ */
+export const ToastApiContext = createContext<ToastApi | undefined>(undefined);
 
 /**
  * Context for the app-wide toast stack. Access it through the {@link useToast}
