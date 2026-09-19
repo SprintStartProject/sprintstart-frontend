@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { ChatComposer } from "../../../../../src/features/chatbot/components/ChatComposer";
-import type { SourceSystem } from "../../../../../src/features/chatbot/types";
+import type { ChatQueueItem, SourceSystem } from "../../../../../src/features/chatbot/types";
 
 describe("ChatComposer filter interactions", () => {
   const defaultProps = {
@@ -29,6 +29,11 @@ describe("ChatComposer filter interactions", () => {
     toggleSourceSystem: vi.fn(),
     activeFilterCount: 0,
     clearFilters: vi.fn(),
+    queuedMessages: [] as ChatQueueItem[],
+    queuePaused: false,
+    onRemoveQueued: vi.fn(),
+    onEditQueued: vi.fn(),
+    onSendQueued: vi.fn(),
   };
 
   it("renders the filter toggle button with badge when filters are active", () => {
