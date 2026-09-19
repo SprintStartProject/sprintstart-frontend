@@ -14,6 +14,7 @@ import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
+import { BuddyModeSwitcher } from "../features/buddy/components/BuddyModeSwitcher";
 import { useGreetingReveal } from "../features/buddy/hooks/useGreetingReveal";
 import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { announceBuddyPageReady } from "../features/buddy/aiBuddyBus";
@@ -101,6 +102,7 @@ function BuddyPageShell({
   rail,
   railToggle,
   freshVisitControl,
+  modeControl,
   isRailOpen = false,
   children,
 }: {
@@ -114,6 +116,12 @@ function BuddyPageShell({
    * with Chat, and only this half has visits to start.
    */
   freshVisitControl?: ReactNode;
+  /**
+   * The conversation switcher, in a slim row above the transcript. In flow, not floating: it
+   * is a standing answer to "which conversation am I in", not a transient control. Omitted for
+   * a hire-only user, so nobody gets a row of nothing.
+   */
+  modeControl?: ReactNode;
   /** Whether that column is currently taking width, which decides this column's left gutter. */
   isRailOpen?: boolean;
   children: ReactNode;
@@ -140,6 +148,7 @@ function BuddyPageShell({
       >
         {railToggle}
         {freshVisitControl}
+        {modeControl && <div className="app-page-frame shrink-0 pt-4">{modeControl}</div>}
 
         {children}
       </div>
@@ -171,6 +180,8 @@ function BuddyMentorHome() {
     startFreshVisit,
     presentedGreetingId,
     markGreetingPresented,
+    teamProjectId,
+    switchTeamProject,
   } = useBuddySession();
 
   // A greeting written while the hire was somewhere else still gets the buddy thinking and
@@ -188,7 +199,10 @@ function BuddyMentorHome() {
     void ensureOpened();
   }, [ensureOpened]);
 
-  const suggestions = useBuddySuggestions();
+  // Hire-only: the suggestions describe the *hire's* next useful question, and the backend has
+  // no team-scoped list, so a team-mode conversation asks for none and shows no chips.
+  const isHireMode = teamProjectId === null;
+  const suggestions = useBuddySuggestions(isHireMode);
   const replies = usePmReplies();
 
   // Below `md` the rail is a drawer over the conversation, so it must never open by itself
@@ -265,6 +279,13 @@ function BuddyMentorHome() {
   const isBusy = isThinking || isStreaming;
   const canStartFresh = hasUserMessage && !isBusy;
 
+  // The switcher is offered on the page exactly like in the dock — to whoever manages at least
+  // one project, and to nobody else, so a hire never meets a row of nothing. Read here rather
+  // than inside the page-wide gate above: the gate is about *having* a project, the switcher
+  // about *managing* one.
+  const { projects } = useProjectContext();
+  const canSwitchModes = projects.some((project) => project.isManaged);
+
   // Memoised so the listener is bound once rather than torn down and rebuilt on every token
   // that arrives while the buddy is answering.
   const startFresh = useCallback(() => void startFreshVisit(), [startFreshVisit]);
@@ -292,7 +313,9 @@ function BuddyMentorHome() {
         // Mounted whenever the hire has ever escalated something, open or not: the count on the
         // control that reopens it is read from the same list the rail is showing, and a rail
         // that unmounted would lose its scroll position every time it was put away.
-        replies.hasAny ? (
+        // Hire-flow only: what came back from the PM is an answer to the hire's own questions,
+        // which a team-mode conversation is not about.
+        isHireMode && replies.hasAny ? (
           <ConversationRail
             id="buddy-pm-replies"
             isOpen={rail.open}
@@ -310,10 +333,20 @@ function BuddyMentorHome() {
           <BuddyFreshVisitButton onClick={startFresh} shortcut={NEW_CONVERSATION_CHORD} />
         ) : undefined
       }
+      modeControl={
+        canSwitchModes ? (
+          <BuddyModeSwitcher
+            teamProjectId={teamProjectId}
+            onSwitch={(projectId) => void switchTeamProject(projectId)}
+            disabled={isBusy || isOpening}
+            className="max-w-xs"
+          />
+        ) : undefined
+      }
       railToggle={
         // Only offered when there is something behind it: a control that opens an empty panel
-        // is worse than no control.
-        replies.hasAny && !rail.open ? (
+        // is worse than no control. Hire-flow only, for the same reason the rail itself is.
+        isHireMode && replies.hasAny && !rail.open ? (
           <RailToggle
             label={PM_REPLIES_LABEL}
             controls="buddy-pm-replies"
@@ -363,14 +396,16 @@ function BuddyMentorHome() {
         // button shunted the whole transcript down and back on every single turn. Visible while
         // the transcript is shorter than the viewport, which is exactly the first few turns this
         // control exists for.
-        hasFloatingControl={(replies.hasAny && !rail.open) || hasUserMessage}
+        hasFloatingControl={(isHireMode && replies.hasAny && !rail.open) || hasUserMessage}
         aboveComposer={
           // The chips *fill* the composer instead of sending, which is why they sit on top of
           // it. The hire presses send: the words stay theirs, and they can edit the question
           // first — which is how somebody learns they are allowed to. The list is the
           // backend's, built from the tools it actually mounts for this hire, so the chips and
           // the mentor cannot disagree about whether this role has pull requests.
-          !hasUserMessage ? (
+          // Hire-only, matching the fetch gate above: a team-mode conversation would otherwise
+          // show the heading over an empty list, since there is nothing team-scoped to load.
+          isHireMode && !hasUserMessage ? (
             <BuddySuggestionChips
               suggestions={suggestions}
               onPick={setDraft}

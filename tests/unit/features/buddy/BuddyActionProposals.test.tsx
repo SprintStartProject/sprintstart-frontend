@@ -139,4 +139,111 @@ describe("BuddyActionProposals", () => {
 
     expect(screen.queryByTestId("buddy-orientation-card")).not.toBeInTheDocument();
   });
+
+  describe("stored team proposals", () => {
+    function storedAction(overrides: Partial<ProposedAction> = {}): ProposedAction {
+      return {
+        id: "s1",
+        proposalId: "prop-9",
+        label: "Shift Task 0",
+        preview: "Jonas takes Task 0 instead.",
+        risk: "DESTRUCTIVE",
+        status: "idle",
+        ...overrides,
+      };
+    }
+
+    it("shows what the manager is agreeing to, and how loud the warning is", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[storedAction()]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Jonas takes Task 0 instead.")).toBeInTheDocument();
+      // Colour-blind rule: the risk badge is words next to an icon, never colour alone.
+      const badge = screen.getByTestId("buddy-proposal-risk");
+      expect(badge).toHaveTextContent("Cannot be undone");
+      expect(badge.querySelector("svg")).toBeInTheDocument();
+    });
+
+    it("tones the badge down for a standard change", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[storedAction({ risk: "STANDARD" })]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("buddy-proposal-risk")).toHaveTextContent("Standard change");
+    });
+
+    it("scales to bulk changes", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[storedAction({ risk: "BULK" })]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("buddy-proposal-risk")).toHaveTextContent("Affects everyone");
+    });
+
+    it("confirms by id — the click passes the whole stored proposal through", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[storedAction()]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /Shift Task 0/ }));
+
+      expect(onConfirm).toHaveBeenCalledWith(
+        "m1",
+        expect.objectContaining({ proposalId: "prop-9" }),
+      );
+    });
+
+    it("dismisses without mutating", async () => {
+      const onDismiss = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[storedAction()]}
+          onConfirm={vi.fn()}
+          onDismiss={onDismiss}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /Not now/ }));
+
+      expect(onDismiss).toHaveBeenCalledWith("m1", "s1");
+      expect(onDismiss.mock.calls[0][1]).not.toBe("prop-9");
+    });
+
+    it("hides the buttons once the outcome is known, whatever it was", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[storedAction({ status: "resolved", ok: false, outcome: "Nothing changed." })]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Nothing changed.")).toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    });
+  });
 });

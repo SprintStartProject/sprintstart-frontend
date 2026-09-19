@@ -18,7 +18,7 @@ import { useBuddySuggestions } from "./useBuddySuggestions";
  */
 export function useBuddy() {
   const conversation = useBuddySession();
-  const { ensureOpened, setDraft } = conversation;
+  const { ensureOpened, setDraft, teamProjectId } = conversation;
 
   const [isOpen, setIsOpen] = useState(false);
 
@@ -26,7 +26,10 @@ export function useBuddy() {
   // makes no request. Chips are the answer to an empty composer, so they have to be ready by
   // the time one is on screen — hence the read is its own cheap endpoint, not something riding
   // on a greeting a model has to write first.
-  const suggestions = useBuddySuggestions(isOpen);
+  // Hire-only, too: the suggestions describe the *hire's* next useful question, and the backend
+  // has no team-scoped list, so a team-mode conversation simply asks for none.
+  const isTeamMode = teamProjectId !== null;
+  const suggestions = useBuddySuggestions(isOpen && !isTeamMode);
 
   const toggleOpen = useCallback(() => {
     setIsOpen((prev) => !prev);

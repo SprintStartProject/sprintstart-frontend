@@ -229,9 +229,11 @@ describe("useBuddy", () => {
     // The proposal landed on the reply with its payload intact.
     await waitFor(() => {
       const action = result.current.messages[1]?.actions?.[0];
-      expect(action?.action).toBe("request_attestation");
-      expect(action?.title).toBe("the auth fix");
-      expect(action?.attesterId).toBe("u-9");
+      // A hire proposal is one kind of `ProposedAction` now; the stored kind never carries a
+      // tool name, so this test's expectations only hold on the hire one.
+      expect(action && "action" in action ? action.action : undefined).toBe("request_attestation");
+      expect(action && "title" in action ? action.title : undefined).toBe("the auth fix");
+      expect(action && "attesterId" in action ? action.attesterId : undefined).toBe("u-9");
     });
 
     act(() => {

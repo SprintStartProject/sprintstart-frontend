@@ -3,10 +3,12 @@ import {
   getMessages,
   streamOpenBuddy,
   performAction,
+  confirmStoredProposal,
+  dismissStoredProposal,
   streamMessage,
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
-import type { BuddyMessageView, ProposedAction } from "../types";
+import type { ActionPatch, BuddyMessageView, ProposedAction } from "../types";
 
 /**
  * What the hire is told when a stream does not finish.
@@ -17,6 +19,35 @@ import type { BuddyMessageView, ProposedAction } from "../types";
 const REPLY_FAILED = "Your buddy could not finish that reply. Ask again in a moment.";
 const GREETING_FAILED = "Your buddy could not be reached just now.";
 const HISTORY_FAILED = "Your conversation could not be loaded.";
+
+/** Where "which conversation am I in" lives between reloads — the stored project id, or nothing. */
+const TEAM_PROJECT_KEY = "buddyTeamProjectId";
+
+/**
+ * The team-mode conversation a manager left open, if they did.
+ *
+ * Stored raw: whether that project still belongs to this manager is a question only the loaded
+ * project list can answer, and the switcher audits it once that list has arrived — this read
+ * deliberately trusts and later verifies, because failing to restore a conversation they were
+ * having would be worse than briefly showing one they no longer run.
+ */
+function readStoredTeamProjectId(): string | null {
+  try {
+    return localStorage.getItem(TEAM_PROJECT_KEY);
+  } catch {
+    // Private modes can refuse storage outright. Not a reason to refuse the conversation.
+    return null;
+  }
+}
+
+function writeStoredTeamProjectId(projectId: string | null): void {
+  try {
+    if (projectId === null) localStorage.removeItem(TEAM_PROJECT_KEY);
+    else localStorage.setItem(TEAM_PROJECT_KEY, projectId);
+  } catch {
+    // Nothing to do: the conversation still switches, it just will not be remembered.
+  }
+}
 
 /**
  * The conversation core behind every buddy surface: the message list, the optimistic
@@ -50,6 +81,17 @@ export function useBuddyConversation() {
    * dock already played is not played again on `/buddy`, and the other way round.
    */
   const [presentedGreetingId, setPresentedGreetingId] = useState<string | null>(null);
+
+  /**
+   * Team mode: the managed project this conversation is about, or `null` for the hire's own.
+   *
+   * Held as state (so surfaces re-render around it) *and* as a ref (so the streaming calls read
+   * the current conversation mid-turn without every token re-creating their callbacks). The two
+   * are written together, always in that order — ref first, so a switch that then opens reads
+   * the new conversation and not the one being left.
+   */
+  const [teamProjectId, setTeamProjectId] = useState<string | null>(readStoredTeamProjectId);
+  const teamProjectIdRef = useRef<string | null>(teamProjectId);
 
   const loadedRef = useRef(false);
   // Guards the greeting against overlapping calls — see `startFreshVisit`.
@@ -96,25 +138,30 @@ export function useBuddyConversation() {
     const stream = { wroteSomething: false, failure: null as string | null };
 
     try {
-      await streamOpenBuddy({
-        onToken: (token) => {
-          stream.wroteSomething = true;
-          setMessages((prev) =>
-            prev.map((message) =>
-              message.id === id ? { ...message, content: message.content + token } : message,
-            ),
-          );
-          // The surface stops waiting at the first word, not the last: everything after this
-          // is the hire reading along, and the composer is theirs from here.
-          setIsOpening(false);
+      await streamOpenBuddy(
+        {
+          onToken: (token) => {
+            stream.wroteSomething = true;
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === id ? { ...message, content: message.content + token } : message,
+              ),
+            );
+            // The surface stops waiting at the first word, not the last: everything after this
+            // is the hire reading along, and the composer is theirs from here.
+            setIsOpening(false);
+          },
+          onAction: setOpenerAction,
+          onDone: () => setIsOpening(false),
+          onError: (message) => {
+            console.error(message);
+            stream.failure = GREETING_FAILED;
+          },
         },
-        onAction: setOpenerAction,
-        onDone: () => setIsOpening(false),
-        onError: (message) => {
-          console.error(message);
-          stream.failure = GREETING_FAILED;
-        },
-      });
+        // Read at call time, not captured: the greeting is for whichever conversation is current
+        // when it runs, and a switch that lands between turns opens the right one.
+        teamProjectIdRef.current ?? undefined,
+      );
     } catch (e) {
       console.error(e);
       stream.failure = GREETING_FAILED;
@@ -181,7 +228,7 @@ export function useBuddyConversation() {
     setOpenError(null);
 
     try {
-      const history = await getMessages();
+      const history = await getMessages(teamProjectIdRef.current ?? undefined);
       // Merged in front of whatever is already there, never assigned over it. The fetch is in
       // flight while the composer is live, so a hire who types straight away has an optimistic
       // turn in the list by the time this resolves — assigning would delete their own message
@@ -326,74 +373,97 @@ export function useBuddyConversation() {
       setOpenerAction(null);
 
       try {
-        await streamMessage(text, {
-          onToolUse: (name) => {
-            setActiveTool(name);
-          },
+        await streamMessage(
+          text,
+          {
+            onToolUse: (name) => {
+              setActiveTool(name);
+            },
 
-          onToken: (token) => {
-            setIsStreaming(true);
-            setIsThinking(false);
-            setActiveTool(null);
+            onToken: (token) => {
+              setIsStreaming(true);
+              setIsThinking(false);
+              setActiveTool(null);
 
-            setMessages((prev) =>
-              prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)),
-            );
-          },
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)),
+              );
+            },
 
-          onCitation: (citation) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, citations: [...(m.citations ?? []), citation] } : m,
-              ),
-            );
-          },
-
-          onActionProposal: (proposal) => {
-            // The buddy is offering to do something. Nothing has changed yet and nothing will
-            // until the hire confirms — so this is only recorded here, and attached to the reply
-            // once the reply exists. The confirm payloads ride along so the action runs against
-            // what the buddy actually proposed.
-            setActiveTool(null);
-            proposed.push({
-              id: crypto.randomUUID(),
-              action: proposal.action,
-              label: proposal.label,
-              question: proposal.question,
-              taskId: proposal.taskId,
-              title: proposal.title,
-              attesterId: proposal.attesterId,
-              githubLogin: proposal.githubLogin,
-              competencyKey: proposal.competencyKey,
-              level: proposal.level,
-              status: "idle",
-            });
-          },
-
-          onDone: () => {
-            setIsStreaming(false);
-            // Also here, not only in `onToken`: a turn whose whole answer is a proposal never
-            // emits a token, and the typing dots would sit under it forever.
-            setIsThinking(false);
-            setActiveTool(null);
-
-            if (proposed.length > 0) {
+            onCitation: (citation) => {
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantId ? { ...m, actions: [...(m.actions ?? []), ...proposed] } : m,
+                  m.id === assistantId
+                    ? { ...m, citations: [...(m.citations ?? []), citation] }
+                    : m,
                 ),
               );
-            }
-          },
+            },
 
-          onError: (err) => {
-            console.error(err);
-            setIsStreaming(false);
-            setIsThinking(false);
-            setActiveTool(null);
-            failReply(assistantId);
+            onActionProposal: (proposal) => {
+              // The buddy is offering to do something. Nothing has changed yet and nothing will
+              // until the hire confirms — so this is only recorded here, and attached to the reply
+              // once the reply exists. The confirm payloads ride along so the action runs against
+              // what the buddy actually proposed.
+              setActiveTool(null);
+              proposed.push({
+                id: crypto.randomUUID(),
+                action: proposal.action,
+                label: proposal.label,
+                question: proposal.question,
+                taskId: proposal.taskId,
+                title: proposal.title,
+                attesterId: proposal.attesterId,
+                githubLogin: proposal.githubLogin,
+                competencyKey: proposal.competencyKey,
+                level: proposal.level,
+                status: "idle",
+              });
+            },
+
+            onStoredProposal: (proposal) => {
+              // A team-mode offer: stored server-side, confirmed by id. Recorded the same way —
+              // held back until the reply exists, so the card never lands above an empty bubble.
+              setActiveTool(null);
+              proposed.push({
+                id: crypto.randomUUID(),
+                proposalId: proposal.proposalId,
+                label: proposal.label,
+                preview: proposal.preview,
+                risk: proposal.risk,
+                status: "idle",
+              });
+            },
+
+            onDone: () => {
+              setIsStreaming(false);
+              // Also here, not only in `onToken`: a turn whose whole answer is a proposal never
+              // emits a token, and the typing dots would sit under it forever.
+              setIsThinking(false);
+              setActiveTool(null);
+
+              if (proposed.length > 0) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? { ...m, actions: [...(m.actions ?? []), ...proposed] }
+                      : m,
+                  ),
+                );
+              }
+            },
+
+            onError: (err) => {
+              console.error(err);
+              setIsStreaming(false);
+              setIsThinking(false);
+              setActiveTool(null);
+              failReply(assistantId);
+            },
           },
-        });
+          // Read at call time: a turn speaks to whichever conversation is current when it starts.
+          teamProjectIdRef.current ?? undefined,
+        );
       } catch (e) {
         console.error(e);
         setIsStreaming(false);
@@ -406,40 +476,61 @@ export function useBuddyConversation() {
   );
 
   /** Patches one proposed action in place, keyed by its message and action id. */
-  const patchAction = useCallback(
-    (messageId: string, actionId: string, patch: Partial<ProposedAction>) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, actions: m.actions?.map((a) => (a.id === actionId ? { ...a, ...patch } : a)) }
-            : m,
-        ),
-      );
-    },
-    [],
-  );
+  const patchAction = useCallback((messageId: string, actionId: string, patch: ActionPatch) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, actions: m.actions?.map((a) => (a.id === actionId ? { ...a, ...patch } : a)) }
+          : m,
+      ),
+    );
+  }, []);
+
+  // The one proposal currently on its way to the backend, per message and action id. A stored
+  // proposal survives a reload server-side and the card disables its buttons while a confirm is
+  // in flight — but two clicks inside one React frame both read the same pre-re-render state, so
+  // the honest guard is here, where the second click is refused rather than re-sent.
+  const inFlightRef = useRef<Set<string>>(new Set());
 
   /**
    * Confirms a proposed action: the one call that mutates. Reflects the outcome inline — a
    * legible line whether it changed something (`ok`) or legibly couldn't, or a retryable error
    * if the request itself failed.
+   *
+   * The two kinds confirm differently, and the split is what keeps each honest: a hire offer
+   * echoes its own payload back (`performAction`), while a stored team proposal confirms by id
+   * alone (`confirmStoredProposal`) — the client sends back exactly what it was given, nothing
+   * derived. A `404` from either stored call arrives as a *resolved* outcome: the proposal was
+   * already confirmed or dismissed (a reload between sessions, or a second tab), and the
+   * backend's message says so legibly — not an error to retry.
    */
   const confirmAction = useCallback(
     (messageId: string, action: ProposedAction) => {
+      // Retryable after a transport error; anything already on its way, answered or declined is
+      // not confirmable again.
+      if (action.status !== "idle" && action.status !== "error") return;
+
+      const flightKey = `${messageId}:${action.id}`;
+      if (inFlightRef.current.has(flightKey)) return;
+      inFlightRef.current.add(flightKey);
+
       patchAction(messageId, action.id, { status: "confirming" });
       // Fire-and-forget: the outcome lands back in message state, so the handler stays a plain
       // void callback (no Promise handed to a JSX prop).
       void (async () => {
         try {
-          const result = await performAction(action.action, {
-            question: action.question,
-            taskId: action.taskId,
-            title: action.title,
-            attesterId: action.attesterId,
-            githubLogin: action.githubLogin,
-            competencyKey: action.competencyKey,
-            level: action.level,
-          });
+          const result =
+            "proposalId" in action
+              ? await confirmStoredProposal(action.proposalId)
+              : await performAction(action.action, {
+                  question: action.question,
+                  taskId: action.taskId,
+                  title: action.title,
+                  attesterId: action.attesterId,
+                  githubLogin: action.githubLogin,
+                  competencyKey: action.competencyKey,
+                  level: action.level,
+                });
           patchAction(messageId, action.id, {
             status: "resolved",
             ok: result.ok,
@@ -447,19 +538,113 @@ export function useBuddyConversation() {
           });
         } catch (e) {
           console.error(e);
-          patchAction(messageId, action.id, { status: "error" });
+          // A settled proposal (confirmed or dismissed elsewhere — another tab, or a reload
+          // between sessions) comes back 404. That is a handled state, not a failure: the
+          // backend owns the outcome and says so legibly when it can, and the client sentence
+          // covers the bodyless case. Retrying cannot help, so the card must not offer one.
+          const isNotFound =
+            e instanceof Error && "status" in e && (e as { status: number }).status === 404;
+          patchAction(
+            messageId,
+            action.id,
+            isNotFound
+              ? {
+                  status: "resolved",
+                  ok: false,
+                  outcome: "This proposal was already settled.",
+                }
+              : { status: "error" },
+          );
+        } finally {
+          inFlightRef.current.delete(flightKey);
         }
       })();
     },
     [patchAction],
   );
 
-  /** Declines a proposed action — nothing changes; the conversation simply continues. */
+  /**
+   * Declines a proposed action — nothing changes; the conversation simply continues.
+   *
+   * A stored proposal is declined *at the backend* rather than only on screen, because it may
+   * also be sitting in another tab waiting to be confirmed: dismissal closes that door too, and
+   * only the backend can. A hire offer was never stored, so there is nothing to tell the
+   * backend — declining is purely local, as it has always been.
+   */
   const dismissAction = useCallback(
     (messageId: string, actionId: string) => {
-      patchAction(messageId, actionId, { status: "dismissed" });
+      const action = messages
+        .find((m) => m.id === messageId)
+        ?.actions?.find((a) => a.id === actionId);
+
+      // Unknown action: nothing to decline at the backend, but still worth putting away here.
+      if (!action || !("proposalId" in action)) {
+        patchAction(messageId, actionId, { status: "dismissed" });
+        return;
+      }
+
+      if (action.status !== "idle" && action.status !== "error") return;
+
+      const flightKey = `${messageId}:${actionId}:dismiss`;
+      if (inFlightRef.current.has(flightKey)) return;
+      inFlightRef.current.add(flightKey);
+
+      patchAction(messageId, actionId, { status: "confirming" });
+      void (async () => {
+        try {
+          await dismissStoredProposal(action.proposalId);
+          patchAction(messageId, actionId, { status: "dismissed" });
+        } catch (e) {
+          console.error(e);
+          // Back to idle rather than "error": the offer is still on the table, and the card's
+          // own error note would read as if the dismissal had half-happened.
+          patchAction(messageId, actionId, { status: "idle" });
+        } finally {
+          inFlightRef.current.delete(flightKey);
+        }
+      })();
     },
-    [patchAction],
+    [messages, patchAction],
+  );
+
+  /**
+   * Switches the conversation between the hire's own buddy and team mode about a managed
+   * project.
+   *
+   * **A switch is a different conversation, and it is treated as one**: the thread, the opener,
+   * the failure banner and the read latch all reset, and the new conversation opens exactly as
+   * an untouched visit would — read first, then greeted. The backend keeps the two as separate
+   * conversations, so reusing the latch would show one inside the other.
+   *
+   * Offered only between turns (the switcher disables while one is in flight — same rule, and
+   * the same reason, as the fresh-visit control: a stream cannot call back its callbacks into a
+   * thread that has just been cleared).
+   */
+  const switchTeamProject = useCallback(
+    async (projectId: string | null) => {
+      if (teamProjectIdRef.current === projectId) return;
+
+      // Ref first: everything below reads or resets this conversation, and the open that
+      // follows must address the new one.
+      teamProjectIdRef.current = projectId;
+      setTeamProjectId(projectId);
+      writeStoredTeamProjectId(projectId);
+
+      setMessages([]);
+      setOpenerAction(null);
+      setOpenError(null);
+      setDraft("");
+      setActiveTool(null);
+      setIsThinking(false);
+      setIsStreaming(false);
+      setPresentedGreetingId(null);
+      // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
+      // the one being switched to, exactly as it did the first time.
+      loadedRef.current = false;
+
+      await ensureOpened();
+    },
+    [ensureOpened],
   );
 
   const handleSubmit = useCallback(
@@ -483,6 +668,11 @@ export function useBuddyConversation() {
     openerAction,
     isOpening,
     openError,
+
+    // Team mode: which managed project this conversation is about (`null` = the hire's own),
+    // and how to switch between the two.
+    teamProjectId,
+    switchTeamProject,
 
     draft,
     setDraft,
