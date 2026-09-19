@@ -4,24 +4,21 @@ import { describe, it, expect, vi } from "vitest";
 import { StarterWorkAddMenu } from "../../../../src/features/starter-work/components/StarterWorkAddMenu";
 
 function setup(overrides: Partial<Parameters<typeof StarterWorkAddMenu>[0]> = {}) {
-  const onFindWithAi = vi.fn();
   const onPickFromIssues = vi.fn();
   const onWriteOne = vi.fn();
   render(
     <StarterWorkAddMenu
       canAct
-      canFindWithAi
-      onFindWithAi={onFindWithAi}
       onPickFromIssues={onPickFromIssues}
       onWriteOne={onWriteOne}
       {...overrides}
     />,
   );
-  return { onFindWithAi, onPickFromIssues, onWriteOne };
+  return { onPickFromIssues, onWriteOne };
 }
 
 describe("StarterWorkAddMenu", () => {
-  it("opens the three ways to add work and closes again on the trigger", async () => {
+  it("opens the two ways to add work and closes again on the trigger", async () => {
     const user = userEvent.setup();
     setup();
 
@@ -30,7 +27,6 @@ describe("StarterWorkAddMenu", () => {
     await user.click(screen.getByTestId("add-tasks-menu"));
 
     expect(screen.getByRole("menu", { name: "Add tasks" })).toBeInTheDocument();
-    expect(screen.getByTestId("generate-starter-work")).toBeInTheDocument();
     expect(screen.getByTestId("pick-from-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-starter-task")).toBeInTheDocument();
 
@@ -74,22 +70,12 @@ describe("StarterWorkAddMenu", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
-  it("disables Find with AI without a selected project", async () => {
-    const user = userEvent.setup();
-    setup({ canFindWithAi: false });
-
-    await user.click(screen.getByTestId("add-tasks-menu"));
-
-    expect(screen.getByTestId("generate-starter-work")).toBeDisabled();
-  });
-
-  it("hides mining and hand-authoring from HR, keeping only picking from issues", async () => {
+  it("hides hand-authoring from HR, keeping only picking from issues", async () => {
     const user = userEvent.setup();
     setup({ canAct: false });
 
     await user.click(screen.getByTestId("add-tasks-menu"));
 
-    expect(screen.queryByTestId("generate-starter-work")).not.toBeInTheDocument();
     expect(screen.queryByTestId("add-starter-task")).not.toBeInTheDocument();
     expect(screen.getByTestId("pick-from-issues")).toBeInTheDocument();
   });

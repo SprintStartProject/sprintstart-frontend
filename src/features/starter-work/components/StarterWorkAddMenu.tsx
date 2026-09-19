@@ -2,14 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
-import { ChevronDown, Inbox, PenLine, Plus, Sparkles } from "lucide-react";
+import { ChevronDown, Inbox, PenLine, Plus } from "lucide-react";
 
 type StarterWorkAddMenuProps = {
-  /** HR reads the pool and can browse issues, but does not mine or hand-author work. */
+  /** HR reads the pool and can browse issues, but does not hand-author work. */
   canAct: boolean;
-  /** Mining needs a selected project; disabled (with a hint) without one, matching the old button. */
-  canFindWithAi: boolean;
-  onFindWithAi: () => void;
   onPickFromIssues: () => void;
   onWriteOne: () => void;
 };
@@ -30,14 +27,12 @@ function getMenuPosition(trigger: HTMLElement): MenuPosition {
 }
 
 /**
- * The three ways a task lands in the pool, collapsed into one header menu instead of three buttons
- * competing for space. Mining and hand-authoring already existed; "Pick from issues" opens the
- * corpus browser in its own sheet rather than sharing a tab with the pool.
+ * The two ways to add a task by hand, collapsed into one header menu next to the standalone
+ * "Find with AI" button. "Pick from issues" opens the corpus browser in its own sheet rather than
+ * sharing a tab with the pool.
  */
 export function StarterWorkAddMenu({
   canAct,
-  canFindWithAi,
-  onFindWithAi,
   onPickFromIssues,
   onWriteOne,
 }: StarterWorkAddMenuProps) {
@@ -121,17 +116,6 @@ export function StarterWorkAddMenu({
               }}
               className="rounded-2xl border border-app-border bg-app-surface p-1.5 shadow-2xl"
             >
-              {canAct && (
-                <MenuItem
-                  icon={Sparkles}
-                  title="Find with AI"
-                  description="Mine the selected project's open issues for starter-sized work."
-                  disabled={!canFindWithAi}
-                  disabledHint={canFindWithAi ? undefined : "Pick a project first"}
-                  testId="generate-starter-work"
-                  onClick={() => pick(onFindWithAi)}
-                />
-              )}
               <MenuItem
                 icon={Inbox}
                 title="Pick from issues"

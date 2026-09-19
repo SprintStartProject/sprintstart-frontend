@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { SidePanel } from "../../../components/ui/SidePanel";
@@ -322,6 +323,10 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
   const showOverview = activeSection === "overview";
   const showPoolTab = activeSection === "pool";
 
+  // Mining needs a selected project; disabled (with a hint) without one.
+  const hasProjectForAi = Boolean(selectedProjectId);
+  const findWithAiHintId = useId();
+
   const handleCreate = async (
     input: CreateStarterWorkTaskInput,
     origin?: PoolFlightRect,
@@ -355,13 +360,34 @@ export function StarterWorkSection({ focus = null, onFocusHandled }: StarterWork
           layoutId="starter-work-section-pill"
           ariaLabel="Filter sections"
         />
-        <StarterWorkAddMenu
-          canAct={canAct}
-          canFindWithAi={Boolean(selectedProjectId) && !isGenerating}
-          onFindWithAi={() => void generate(selectedProjectId)}
-          onPickFromIssues={() => setIsIssuesSheetOpen(true)}
-          onWriteOne={() => setIsCreateOpen(true)}
-        />
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+          {canAct && (
+            <>
+              <Button
+                variant="secondary"
+                data-testid="generate-starter-work"
+                icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+                loading={isGenerating}
+                disabled={!hasProjectForAi}
+                title={hasProjectForAi ? undefined : "Pick a project first"}
+                aria-describedby={hasProjectForAi ? undefined : findWithAiHintId}
+                onClick={() => void generate(selectedProjectId)}
+              >
+                {isGenerating ? "Finding tasks…" : "Find with AI"}
+              </Button>
+              {!hasProjectForAi && (
+                <span id={findWithAiHintId} className="sr-only">
+                  Pick a project first
+                </span>
+              )}
+            </>
+          )}
+          <StarterWorkAddMenu
+            canAct={canAct}
+            onPickFromIssues={() => setIsIssuesSheetOpen(true)}
+            onWriteOne={() => setIsCreateOpen(true)}
+          />
+        </div>
       </div>
 
       <SlidingTabPanel

@@ -279,7 +279,6 @@ describe("StarterWorkSection", () => {
     const user = userEvent.setup();
     render(<StarterWorkSection />);
 
-    await openAddMenu(user);
     await user.click(await screen.findByTestId("generate-starter-work"));
 
     expect(await screen.findByText("2 tasks added")).toBeInTheDocument();
@@ -288,10 +287,8 @@ describe("StarterWorkSection", () => {
 
   it("disables mining without a selected project", async () => {
     selectedProjectId.current = "";
-    const user = userEvent.setup();
     render(<StarterWorkSection />);
 
-    await openAddMenu(user);
     expect(await screen.findByTestId("generate-starter-work")).toBeDisabled();
   });
 
@@ -400,8 +397,9 @@ describe("StarterWorkSection", () => {
     render(<StarterWorkSection />);
 
     await screen.findByTestId("starter-work-pool");
-    await openAddMenu(user);
     expect(screen.queryByTestId("generate-starter-work")).not.toBeInTheDocument();
+
+    await openAddMenu(user);
     expect(screen.queryByTestId("add-starter-task")).not.toBeInTheDocument();
     expect(screen.getByTestId("pick-from-issues")).toBeInTheDocument();
   });
