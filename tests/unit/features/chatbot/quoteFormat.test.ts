@@ -15,15 +15,21 @@ describe("quoteFormat", () => {
       expect(formatMarkdownQuote("Hello world")).toBe("> Hello world");
     });
 
-    it("prefixes every line in multi-line text with `> `", () => {
+    it("quotes each paragraph, separated by an empty quoted line", () => {
       const input = "First line\nSecond line\nThird line";
-      const expected = "> First line\n> Second line\n> Third line";
+      const expected = "> First line\n>\n> Second line\n>\n> Third line";
+      expect(formatMarkdownQuote(input)).toBe(expected);
+    });
+
+    it("drops blank lines between paragraphs", () => {
+      const input = "First\n\n\nSecond\n   \nThird";
+      const expected = "> First\n>\n> Second\n>\n> Third";
       expect(formatMarkdownQuote(input)).toBe(expected);
     });
 
     it("preserves lines that already have blockquote syntax", () => {
       const input = "> Already quoted\nNew line";
-      const expected = "> Already quoted\n> New line";
+      const expected = "> Already quoted\n>\n> New line";
       expect(formatMarkdownQuote(input)).toBe(expected);
     });
   });
@@ -40,11 +46,11 @@ describe("quoteFormat", () => {
       expect(result).toBe("What does this mean?\n\n> AI explanation here\n\n");
     });
 
-    it("handles multi-line quotes appended to existing draft", () => {
+    it("handles multi-paragraph quotes appended to existing draft", () => {
       const currentDraft = "My question.";
       const quote = "Line 1\nLine 2";
       const result = insertQuoteIntoDraft(currentDraft, quote);
-      expect(result).toBe("My question.\n\n> Line 1\n> Line 2\n\n");
+      expect(result).toBe("My question.\n\n> Line 1\n>\n> Line 2\n\n");
     });
 
     it("returns current draft untouched if quote text is empty", () => {

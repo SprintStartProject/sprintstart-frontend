@@ -14,6 +14,15 @@ import { composeNote, normalise } from "../generation/noteComposition";
 export type CapturedSelection = {
   /** The selected text, trimmed and with collapsed whitespace runs. */
   text: string;
+  /**
+   * The selected text with its line structure kept, for the reply-to-AI quote.
+   *
+   * [text] collapses every whitespace run because cards and highlights want one line of words; a
+   * blockquote of a two-paragraph answer, though, is worth two paragraphs. The Reply offer sends
+   * this instead, and the chatbot's `formatMarkdownQuote` turns each line into its own quoted
+   * paragraph.
+   */
+  quoteText: string;
   /** The link the selection sits in or is, when it is one. */
   url: string | null;
   /** Where in the app it came from, in words. Null when nothing better than the app name exists. */
@@ -63,7 +72,8 @@ const MIN_SELECTION_LENGTH = 2;
 export function captureSelection(selection: Selection | null): CapturedSelection | null {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
 
-  const text = normalise(selection.toString());
+  const rawText = selection.toString();
+  const text = normalise(rawText);
   if (text.length < MIN_SELECTION_LENGTH) return null;
 
   const anchor = selection.anchorNode;
@@ -72,14 +82,32 @@ export function captureSelection(selection: Selection | null): CapturedSelection
   const range = selection.getRangeAt(0);
   return {
     text,
+    quoteText: selectionQuoteText(rawText),
     url: linkFor(anchor, text),
     source: sourceFor(anchor),
     origin: originUrl(window.location, text),
     cardId: elementOf(anchor)?.closest("[data-card-id]")?.getAttribute("data-card-id") ?? null,
     inLink: Boolean(elementOf(anchor)?.closest("a")),
     rect: range.getBoundingClientRect(),
-    isAiMessage: isInsideAiMessage(anchor, range),
+    isAiMessage: isInsideAiMessage(range),
   };
+}
+
+/**
+ * The quote-ready form of a selection's raw text: line structure kept, everything else tidied.
+ *
+ * A browser's selection `toString` puts a newline at block boundaries — paragraphs, list items —
+ * and hands back the stray spacing a drag across inline markup picks up. The quote keeps the
+ * paragraph breaks, because that is the whole point of replying with a quote, while dropping
+ * empty lines and collapsing horizontal whitespace — so the chatbot's `formatMarkdownQuote`
+ * receives one line per paragraph and nothing else.
+ */
+export function selectionQuoteText(raw: string): string {
+  return raw
+    .split("\n")
+    .map((line) => line.replace(/[^\S\n]+/g, " ").trim())
+    .filter((line) => line.length > 0)
+    .join("\n");
 }
 
 /**
@@ -196,12 +224,15 @@ function elementOf(node: Node): Element | null {
 }
 
 /**
- * Whether the selection is located within an AI assistant message bubble.
+ * Whether the selection sits entirely inside one AI assistant message bubble.
+ *
+ * Both ends have to resolve to the same bubble, which keeps the answer independent of the drag
+ * direction: a selection that runs from an answer into the next message is not a reply to that
+ * answer — its text would carry the hire's own words — whichever end the drag started at.
  */
-function isInsideAiMessage(anchor: Node, range: Range): boolean {
-  const ancestorEl = elementOf(range.commonAncestorContainer);
-  if (ancestorEl?.closest("[data-chat-message-role='ASSISTANT']")) return true;
-
-  const anchorEl = elementOf(anchor);
-  return Boolean(anchorEl?.closest("[data-chat-message-role='ASSISTANT']"));
+function isInsideAiMessage(range: Range): boolean {
+  const bubbleOf = (node: Node): Element | null =>
+    elementOf(node)?.closest("[data-chat-message-role='ASSISTANT']") ?? null;
+  const bubble = bubbleOf(range.startContainer);
+  return bubble !== null && bubble === bubbleOf(range.endContainer);
 }
