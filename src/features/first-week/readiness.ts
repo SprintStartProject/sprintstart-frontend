@@ -1,3 +1,4 @@
+import type { ArrivalFocus } from "../arrival/components/ArrivalStepAuthoring";
 import { mergedStepCount } from "../arrival/mergedSteps";
 import type { DerivableArrivalStep, ArrivalStep } from "../arrival/types";
 import type { StarterWorkFocus } from "../starter-work/components/StarterWorkSection";
@@ -13,14 +14,6 @@ export type ReadinessStage = "arrive" | "task0" | "starter";
 
 /** How urgently a check is worth a PM's attention. */
 export type CheckSeverity = "critical" | "warning" | "info";
-
-/**
- * A one-shot jump into the Arrival tab's add-step flow, set by a readiness check.
- *
- * Mirrors `StarterWorkFocus` on the arrival side: `"add"` is the only jump today, ahead of the
- * Overview readiness list actually wiring it up.
- */
-export type ArrivalFocus = "add";
 
 /** Where a readiness check's action label sends the PM, and what it should do once it lands. */
 export type OverviewTarget =
@@ -223,17 +216,10 @@ function starterChecks(input: BuildReadinessInput): ReadinessCheck[] {
     });
   }
 
-  if (input.stale.length > 0) {
-    checks.push({
-      id: "pool-closed",
-      stage: "starter",
-      severity: "info",
-      title: `${input.stale.length} ${input.stale.length === 1 ? "task" : "tasks"} closed in their tracker`,
-      description: "They're still listed here until someone looks at them.",
-      actionLabel: "Look at closed",
-      target: { tab: "starter", focus: "closed" },
-    });
-  }
+  // Deliberately no "N tasks closed in their tracker" check here: a closed task isn't something a
+  // PM can act on. The Closed tab is read-only (no approve/reject, nothing to reassign), and the
+  // task returns to the pool on its own if the issue reopens — there is nothing to fix, so it does
+  // not belong in a list of things that need a PM.
 
   return checks;
 }

@@ -6,7 +6,9 @@ import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/Segment
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { ArrivalSection } from "../features/arrival/components/ArrivalSection";
+import type { ArrivalFocus } from "../features/arrival/components/ArrivalStepAuthoring";
 import { OverviewSection } from "../features/first-week/components/OverviewSection";
+import type { OverviewTarget } from "../features/first-week/readiness";
 import { StarterWorkSection } from "../features/starter-work/components/StarterWorkSection";
 import type { StarterWorkFocus } from "../features/starter-work/components/StarterWorkSection";
 
@@ -37,17 +39,18 @@ function parseTab(value: string | null): FirstWeekTab {
  * is Starter work's "Find with AI"/"Add tasks" buttons, which portal into this shared header's
  * top-right corner instead of sitting in that tab's own body.
  *
- * The Overview tab's cards jump straight into a specific state of the Starter work tab — "go
- * through the unreviewed queue", "show only Task 0 candidates" — rather than just switching tabs
- * and leaving the PM to find it themselves. That intent (`starterFocus`) is plain component state
- * rather than another URL param: it is a one-shot instruction for the tab about to mount, not
- * something worth a bookmarkable link, and `StarterWorkSection` clears it back to `null` once
- * acted on.
+ * The Overview tab's cards and readiness checks jump straight into a specific state of the
+ * Arrival or Starter work tab — "go through the unreviewed queue", "add the missing step" —
+ * rather than just switching tabs and leaving the PM to find it themselves. That intent
+ * (`starterFocus`/`arrivalFocus`) is plain component state rather than another URL param: it is a
+ * one-shot instruction for the tab about to mount, not something worth a bookmarkable link, and
+ * each tab clears its own focus back to `null` once acted on.
  */
 export function FirstWeekPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseTab(searchParams.get("tab"));
   const [starterFocus, setStarterFocus] = useState<StarterWorkFocus | null>(null);
+  const [arrivalFocus, setArrivalFocus] = useState<ArrivalFocus | null>(null);
   // Measured via a callback ref rather than a plain `useRef`, so setting it triggers the re-render
   // that hands the freshly mounted node to `StarterWorkSection`'s portal.
   const [starterActionsHost, setStarterActionsHost] = useState<HTMLDivElement | null>(null);
@@ -62,9 +65,10 @@ export function FirstWeekPage() {
   );
 
   const navigateFromOverview = useCallback(
-    (tab: "arrival" | "starter", focus?: StarterWorkFocus) => {
-      if (tab === "starter" && focus) setStarterFocus(focus);
-      handleTabChange(tab);
+    (target: OverviewTarget) => {
+      if (target.tab === "starter" && target.focus) setStarterFocus(target.focus);
+      if (target.tab === "arrival" && target.focus) setArrivalFocus(target.focus);
+      handleTabChange(target.tab);
     },
     [handleTabChange],
   );
@@ -118,7 +122,7 @@ export function FirstWeekPage() {
           {activeTab === "overview" ? (
             <OverviewSection onNavigate={navigateFromOverview} />
           ) : activeTab === "arrival" ? (
-            <ArrivalSection />
+            <ArrivalSection focus={arrivalFocus} onFocusHandled={() => setArrivalFocus(null)} />
           ) : (
             <StarterWorkSection
               focus={starterFocus}

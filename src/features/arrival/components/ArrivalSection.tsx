@@ -1,7 +1,13 @@
-import { ArrivalStepAuthoring } from "./ArrivalStepAuthoring";
+import { ArrivalStepAuthoring, type ArrivalFocus } from "./ArrivalStepAuthoring";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useAuth } from "../../../context/useAuth";
 import { PermissionGroup } from "../../../services/types";
+
+type ArrivalSectionProps = {
+  /** The Overview tab's one-shot jump into this tab — see `ArrivalStepAuthoring`'s own doc. */
+  focus?: ArrivalFocus | null;
+  onFocusHandled?: () => void;
+};
 
 /**
  * Authoring the arrival list: what a new joiner needs before they can work.
@@ -12,7 +18,7 @@ import { PermissionGroup } from "../../../services/types";
  *
  * HR reads but does not write, matching the backend.
  */
-export function ArrivalSection() {
+export function ArrivalSection({ focus = null, onFocusHandled }: ArrivalSectionProps = {}) {
   const { profile } = useAuth();
   const { selectedProjectId, selectedProject } = useProjectContext();
   const projectId = selectedProjectId || null;
@@ -24,7 +30,13 @@ export function ArrivalSection() {
 
   return (
     <div>
-      <ArrivalStepAuthoring readOnly={!canAuthor} projectId={projectId} projectName={projectName} />
+      <ArrivalStepAuthoring
+        readOnly={!canAuthor}
+        projectId={projectId}
+        projectName={projectName}
+        focus={focus}
+        onFocusHandled={onFocusHandled}
+      />
     </div>
   );
 }

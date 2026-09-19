@@ -264,11 +264,12 @@ describe("buildReadiness", () => {
       expect(readiness.openChecks.some((one) => one.id === "pool-sync")).toBe(false);
     });
 
-    it("flags closed pool tasks as info", () => {
+    // Deliberately no "closed pool tasks" check — see the comment in `starterChecks`: a closed
+    // task self-heals and the Closed tab has no action to take, so it never becomes a check.
+    it("never flags a stale (non-Task-0) pool task on its own", () => {
       const readiness = buildReadiness(readyInput({ stale: [task({ id: "s1" })] }));
 
-      const check = readiness.openChecks.find((one) => one.id === "pool-closed");
-      expect(check?.severity).toBe("info");
+      expect(readiness.openChecks.some((one) => one.stage === "starter")).toBe(false);
     });
   });
 

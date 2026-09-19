@@ -26,9 +26,6 @@ import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../types";
 /**
  * A one-shot instruction for what to do right after landing on this tab, set by the Overview
  * tab's readiness checks. Consumed once — see `onFocusHandled`.
- *
- * `"closed"` and `"sync"` are not yet acted on here — see the Overview readiness plan — but the
- * type carries them already so `readiness.ts` can target them ahead of that wiring.
  */
 export type StarterWorkFocus = "triage" | "task0" | "closed" | "sync";
 
@@ -109,6 +106,41 @@ export function StarterWorkSection({
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Brings the pool back in line with its trackers right now, rather than waiting for the next
+  // scheduled or event-driven pass. Every affected surface reads from the same three query keys,
+  // so invalidating them is what makes the pool, the review queue and the corpus browser agree
+  // with what the sync just found -- no separate reload calls to keep in sync with this one.
+  //
+  // Declared up here, ahead of the other handlers below, so the Overview tab's `"sync"` focus
+  // effect can call it without a "used before its declaration" error.
+  const handleSync = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const outcome = await starterWorkService.reconcile();
+      const changes = [
+        outcome.markedStale > 0 ? `${outcome.markedStale} closed` : null,
+        outcome.revived > 0 ? `${outcome.revived} reopened` : null,
+        outcome.assigneeChanged > 0 ? `${outcome.assigneeChanged} reassigned` : null,
+      ].filter((part): part is string => part !== null);
+      toast.success("Pool synced", {
+        description: changes.length > 0 ? changes.join(", ") : "Nothing changed.",
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.starterWork.pool() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.starterWork.review() }),
+        // Partial match: catches the corpus query for whichever project is selected, without this
+        // component needing to know its id.
+        queryClient.invalidateQueries({ queryKey: ["starter-work", "corpus"] }),
+      ]);
+    } catch (err) {
+      toast.error("Sync failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [queryClient, toast]);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isTriageOpen, setIsTriageOpen] = useState(false);
@@ -129,10 +161,12 @@ export function StarterWorkSection({
   }, [error, showErrorToast]);
 
   // Consumes the Overview tab's one-shot jump exactly once, so revisiting this tab later never
-  // replays it. `"task0"` was already acted on above, in the pool's `initialStatusFilter`, so it
-  // only needs clearing here. `"triage"` has to wait for the unreviewed queue's own fetch first —
-  // the triage modal snapshots `tasks` the moment it mounts, and opening it against an empty
-  // in-flight list would start it "All caught up".
+  // replays it. `"task0"` and `"closed"` are already acted on above, in the pool's
+  // `initialStatusFilter`, so they only need clearing here. `"triage"` has to wait for the
+  // unreviewed queue's own fetch first — the triage modal snapshots `tasks` the moment it mounts,
+  // and opening it against an empty in-flight list would start it "All caught up". `"sync"` runs
+  // the same reconciliation the pool's own "Sync" button does, once, and only for a reader who can
+  // act at all — HR would just see it fail.
   const focusHandled = useRef(false);
   useEffect(() => {
     if (!focus || focusHandled.current) return;
@@ -143,9 +177,10 @@ export function StarterWorkSection({
     // body, which `react-hooks/set-state-in-effect` rejects.
     void Promise.resolve().then(() => {
       if (focus === "triage" && tasks.length > 0) setIsTriageOpen(true);
+      if (focus === "sync" && canAct) void handleSync();
       onFocusHandled?.();
     });
-  }, [focus, isReviewLoading, tasks, onFocusHandled]);
+  }, [focus, isReviewLoading, tasks, canAct, handleSync, onFocusHandled]);
 
   useEffect(() => {
     if (!createdTask) return;
@@ -263,38 +298,6 @@ export function StarterWorkSection({
     [reloadPool, toast],
   );
 
-  // Brings the pool back in line with its trackers right now, rather than waiting for the next
-  // scheduled or event-driven pass. Every affected surface reads from the same three query keys,
-  // so invalidating them is what makes the pool, the review queue and the corpus browser agree
-  // with what the sync just found -- no separate reload calls to keep in sync with this one.
-  const handleSync = useCallback(async () => {
-    setIsSyncing(true);
-    try {
-      const outcome = await starterWorkService.reconcile();
-      const changes = [
-        outcome.markedStale > 0 ? `${outcome.markedStale} closed` : null,
-        outcome.revived > 0 ? `${outcome.revived} reopened` : null,
-        outcome.assigneeChanged > 0 ? `${outcome.assigneeChanged} reassigned` : null,
-      ].filter((part): part is string => part !== null);
-      toast.success("Pool synced", {
-        description: changes.length > 0 ? changes.join(", ") : "Nothing changed.",
-      });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.starterWork.pool() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.starterWork.review() }),
-        // Partial match: catches the corpus query for whichever project is selected, without this
-        // component needing to know its id.
-        queryClient.invalidateQueries({ queryKey: ["starter-work", "corpus"] }),
-      ]);
-    } catch (err) {
-      toast.error("Sync failed", {
-        description: err instanceof Error ? err.message : "Please try again.",
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [queryClient, toast]);
-
   // Mining needs a selected project; disabled (with a hint) without one.
   const hasProjectForAi = Boolean(selectedProjectId);
   const findWithAiHintId = useId();
@@ -389,7 +392,9 @@ export function StarterWorkSection({
         onSync={() => void handleSync()}
         isSyncing={isSyncing}
         onOpenTask={toggleSelectedTask}
-        initialStatusFilter={focus === "task0" ? "taskZero" : undefined}
+        initialStatusFilter={
+          focus === "task0" ? "taskZero" : focus === "closed" ? "closed" : undefined
+        }
         closedTasks={closedPool}
         isClosedLoading={isClosedPoolLoading}
       />

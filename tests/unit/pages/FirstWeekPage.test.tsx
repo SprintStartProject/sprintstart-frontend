@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FirstWeekPage } from "../../../src/pages/FirstWeekPage";
@@ -140,7 +140,7 @@ function starterTask(over: Partial<StarterWorkTask> = {}): StarterWorkTask {
 /**
  * The Overview tab reads live data through the same hooks Arrival and Starter work use — no
  * summary endpoint of its own — so its tests set up the same service mocks those tabs' own tests
- * do, just with fixtures chosen to exercise the counts and the "Up next" list together.
+ * do, just with fixtures chosen to exercise the stage statuses and the "Needs you" list together.
  */
 describe("FirstWeekPage Overview tab", () => {
   beforeEach(() => {
@@ -200,26 +200,39 @@ describe("FirstWeekPage Overview tab", () => {
     expect(within(taskZeroCard).getByText("No Task 0 yet")).toBeInTheDocument();
     expect(within(taskZeroCard).getByText("0 Task 0")).toBeInTheDocument();
 
-    // Unseen task and a pool under the minimum both warn, so the stage is "attention"; the pool's
-    // never-synced and closed-in-tracker checks are info-only and push the list past 3.
+    // Unseen task and a pool under the minimum both warn, so the stage is "attention". Its third
+    // check (never synced) is info-only and exactly fills the 3-item cap, so there's no "+more" —
+    // there's deliberately no "closed in tracker" check at all; see `starterChecks`.
     const starterCard = screen.getByTestId("overview-stage-starter");
     expect(starterCard).toHaveAttribute("data-status", "attention");
     expect(within(starterCard).getByText("1 task nobody has looked at yet")).toBeInTheDocument();
     expect(within(starterCard).getByText("2 in the pool")).toBeInTheDocument();
-    expect(within(starterCard).getByText("+1 more")).toBeInTheDocument();
+    expect(within(starterCard).queryByText(/more$/)).not.toBeInTheDocument();
   });
 
-  it("lists up to three things worth a PM's attention, built from the same data", async () => {
+  it("lists open readiness checks worst-first, capped at four with a 'Show all' toggle", async () => {
     renderTab("overview");
 
-    // Unseen tasks, no Task 0, and the missing derivable step — all three fire from this fixture.
-    expect(await screen.findByTestId("overview-upnext-unseen")).toHaveTextContent(
+    // Five checks fire from this fixture: 1 critical, 2 warnings, 2 info. Only the first four show.
+    expect(await screen.findByTestId("overview-needs-task0-none")).toHaveTextContent(
+      "No Task 0 yet",
+    );
+    expect(screen.getByTestId("overview-needs-pool-unseen")).toHaveTextContent(
       "1 task nobody has looked at yet",
     );
-    expect(screen.getByTestId("overview-upnext-no-task-zero")).toHaveTextContent("No Task 0 yet");
-    expect(screen.getByTestId("overview-upnext-derivable")).toHaveTextContent(
-      "Development environment works",
+    expect(screen.getByTestId("overview-needs-pool-small")).toBeInTheDocument();
+    expect(screen.getByTestId("overview-needs-arrival-derivable")).toHaveTextContent(
+      "1 automatic check isn't on the list",
     );
+    expect(screen.queryByTestId("overview-needs-pool-sync")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+
+    expect(screen.getByTestId("overview-needs-pool-sync")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+
+    expect(screen.queryByTestId("overview-needs-pool-sync")).not.toBeInTheDocument();
   });
 
   it("does not list an item once its underlying condition is gone", async () => {
@@ -233,17 +246,17 @@ describe("FirstWeekPage Overview tab", () => {
     renderTab("overview");
     await screen.findByTestId("overview-stage-arrival");
 
-    expect(screen.queryByTestId("overview-upnext-no-task-zero")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("overview-upnext-derivable")).not.toBeInTheDocument();
-    // Still unseen, so "Up next" itself is not empty.
-    expect(screen.getByTestId("overview-upnext-unseen")).toBeInTheDocument();
+    expect(screen.queryByTestId("overview-needs-task0-none")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("overview-needs-arrival-derivable")).not.toBeInTheDocument();
+    // Still unseen, so "Needs you" itself is not empty.
+    expect(screen.getByTestId("overview-needs-pool-unseen")).toBeInTheDocument();
   });
 
   it("jumps to the Starter work tab and opens the triage from 'Go through them'", async () => {
     renderTab("overview");
 
     fireEvent.click(
-      within(await screen.findByTestId("overview-upnext-unseen")).getByRole("button", {
+      within(await screen.findByTestId("overview-needs-pool-unseen")).getByRole("button", {
         name: "Go through them",
       }),
     );
@@ -252,6 +265,58 @@ describe("FirstWeekPage Overview tab", () => {
     expect(
       await screen.findByRole("heading", { name: "Go through tasks nobody has looked at" }),
     ).toBeInTheDocument();
+  });
+
+  it("jumps to Starter work's Closed filter from 'Review closed'", async () => {
+    // A distinct STALE list this time: the Task 0 task itself went stale, which is the one
+    // "closed" case that is actually actionable — it means no live task can serve as Task 0.
+    vi.spyOn(starterWorkService, "fetchPool").mockImplementation((status) =>
+      Promise.resolve(
+        status === "STALE"
+          ? [starterTask({ id: "stale-1", taskZeroEligible: true })]
+          : [
+              starterTask({ id: "pool-1", taskZeroEligible: false }),
+              starterTask({ id: "pool-2", taskZeroEligible: false }),
+            ],
+      ),
+    );
+
+    renderTab("overview");
+
+    fireEvent.click(
+      within(await screen.findByTestId("overview-needs-task0-closed")).getByRole("button", {
+        name: "Review closed",
+      }),
+    );
+
+    expect(await screen.findByTestId("add-tasks-menu")).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("group", { name: "Filter pool tasks" })
+        .querySelector('[aria-pressed="true"]'),
+    ).toHaveTextContent("Closed");
+  });
+
+  it("jumps to Starter work and syncs the pool from 'Sync now'", async () => {
+    const reconcileSpy = vi.spyOn(starterWorkService, "reconcile").mockResolvedValue({
+      examined: 0,
+      markedStale: 0,
+      revived: 0,
+      assigneeChanged: 0,
+      skipped: 0,
+    });
+
+    renderTab("overview");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show all" }));
+    fireEvent.click(
+      within(await screen.findByTestId("overview-needs-pool-sync")).getByRole("button", {
+        name: "Sync now",
+      }),
+    );
+
+    expect(await screen.findByTestId("add-tasks-menu")).toBeInTheDocument();
+    await waitFor(() => expect(reconcileSpy).toHaveBeenCalledTimes(1));
   });
 
   it("jumps to the Starter work tab's pool with Task 0 already filtered from 'Choose Task 0'", async () => {
@@ -268,24 +333,26 @@ describe("FirstWeekPage Overview tab", () => {
     ).toHaveTextContent("Task 0");
   });
 
-  it("jumps to the Arrival tab from the missing derivable step", async () => {
+  it("jumps to the Arrival tab and opens the add wizard from a readiness check", async () => {
     renderTab("overview");
 
     fireEvent.click(
-      within(await screen.findByTestId("overview-upnext-derivable")).getByRole("button", {
-        name: "Add it",
+      within(await screen.findByTestId("overview-needs-arrival-derivable")).getByRole("button", {
+        name: "Add them",
       }),
     );
 
-    expect(await screen.findByRole("button", { name: "Add step" })).toBeInTheDocument();
+    // The wizard opens on its own — no need to click "Add step" first, unlike a plain tab switch.
+    expect(await screen.findByRole("dialog", { name: "Add a step" })).toBeInTheDocument();
   });
 
-  it("jumps to the Arrival tab from the Arrive stage card itself", async () => {
+  it("jumps to the Arrival tab from the Arrive stage card itself without opening the wizard", async () => {
     renderTab("overview");
 
     fireEvent.click(await screen.findByTestId("overview-stage-arrival"));
 
     expect(await screen.findByRole("button", { name: "Add step" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
 
