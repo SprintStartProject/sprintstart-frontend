@@ -127,6 +127,11 @@ export function ChatPage() {
     scrollContainerRef,
     isAtBottom,
     scrollToBottom,
+    queuedMessages,
+    queuePaused,
+    removeQueuedMessage,
+    editQueuedMessage,
+    sendQueuedNow,
   } = useChat();
 
   const { sources: availableSources, loading: sourcesLoading } = useAvailableSources();
@@ -166,6 +171,21 @@ export function ChatPage() {
     const finished = prevTurn.chatId === chatId && prevTurn.busy && !busy;
     setPrevTurn({ chatId, busy });
     setAnnouncement(finished ? "Response complete." : "");
+  }
+
+  // The queue is otherwise a silent event: the composer empties on submit, so
+  // without this a screen reader would hear nothing at all between asking for a
+  // follow-up and it being sent. Same adjust-state-on-change pattern as above,
+  // and deliberately after it — when a turn ends and the next queued message
+  // starts in the same render, that is the more useful thing to say.
+  const [prevQueue, setPrevQueue] = useState({ count: 0, paused: false });
+  if (prevQueue.count !== queuedMessages.length || prevQueue.paused !== queuePaused) {
+    const grew = queuedMessages.length > prevQueue.count;
+    const pausedNow = queuePaused && !prevQueue.paused;
+    setPrevQueue({ count: queuedMessages.length, paused: queuePaused });
+    setAnnouncement(
+      grew ? "Message queued." : pausedNow ? "Queue paused." : "Queued message sent.",
+    );
   }
 
   // Submitting blurs the composer so Space can start the dino game while the assistant
@@ -473,6 +493,11 @@ export function ChatPage() {
           onSubmit={handleChatSubmit}
           onStop={stopStreaming}
           isBusy={isThinking || isStreaming}
+          queuedMessages={queuedMessages}
+          queuePaused={queuePaused}
+          onRemoveQueued={removeQueuedMessage}
+          onEditQueued={editQueuedMessage}
+          onSendQueued={sendQueuedNow}
           hasProject={hasProject}
           promptHistory={promptHistory}
           availableSources={availableSources}

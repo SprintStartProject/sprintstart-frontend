@@ -1,5 +1,43 @@
 import { useContext } from "react";
-import { ToastContext, type ToastContextType } from "./ToastContext";
+import {
+  ToastApiContext,
+  ToastContext,
+  type ToastApi,
+  type ToastContextType,
+} from "./ToastContext";
+
+/**
+ * The no-provider fallback, shared by both hooks. Module-level so it is one
+ * stable object: a fresh one per render would defeat the point of
+ * `useToastApi` (its value must not change identity) and would churn any
+ * effect that depends on it.
+ */
+const INERT_API: ToastApi = {
+  show: () => "",
+  info: () => "",
+  success: () => "",
+  warning: () => "",
+  error: () => "",
+  dismiss: () => {},
+  dismissAll: () => {},
+};
+
+const INERT_CONTEXT: ToastContextType = { toasts: [], ...INERT_API };
+
+/**
+ * The toast API without the visible list — the same functions `useToast`
+ * returns, from a context whose value never changes identity.
+ *
+ * Use this when a component only *raises* toasts: consuming `useToast` instead
+ * subscribes to the list as well, so every toast appearing anywhere in the app
+ * (and every auto-dismiss) re-renders that component. Outside a
+ * {@link ToastProvider} it returns the same inert no-ops as `useToast`.
+ */
+export function useToastApi(): ToastApi {
+  const context = useContext(ToastApiContext);
+  if (context === undefined) return INERT_API;
+  return context;
+}
 
 /**
  * Access to the app-wide toast stack.
@@ -18,17 +56,6 @@ import { ToastContext, type ToastContextType } from "./ToastContext";
  */
 export function useToast(): ToastContextType {
   const context = useContext(ToastContext);
-  if (context === undefined) {
-    return {
-      toasts: [],
-      show: () => "",
-      info: () => "",
-      success: () => "",
-      warning: () => "",
-      error: () => "",
-      dismiss: () => {},
-      dismissAll: () => {},
-    };
-  }
+  if (context === undefined) return INERT_CONTEXT;
   return context;
 }
