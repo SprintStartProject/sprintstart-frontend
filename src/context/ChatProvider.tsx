@@ -680,8 +680,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 // newline would otherwise leave a trailing space before the
                 // break, or stack three-plus newlines, purely depending on how
                 // the model happened to chunk it.
+                //
+                // Except when the break would land mid-word (#231): a tool
+                // round whose preamble was cut off upstream (provider token
+                // cap, dropped stream) leaves text like "…Bas" right before
+                // the `tool_use` event, and the post-tool answer then
+                // continues that word with "ierend…". Rendering the break
+                // there shows "Bas" and "ierend" as separate paragraphs. A
+                // paragraph never starts lowercase, so a letter followed by
+                // a lowercase letter is a continuation, not a boundary —
+                // append it to the word instead. Uppercase, digits and
+                // punctuation keep the break, so real preamble/answer
+                // boundaries are unaffected.
                 if (sawToolUseRef.current && draft.content.trim() !== "") {
-                  draft.content = `${draft.content.trimEnd()}\n\n`;
+                  const trimmed = draft.content.trimEnd();
+                  const continuesWord = /\p{L}$/u.test(trimmed) && /^\p{Ll}/u.test(token);
+                  draft.content = continuesWord ? trimmed : `${trimmed}\n\n`;
                   sawToolUseRef.current = false;
                 }
                 draft.content += token;
