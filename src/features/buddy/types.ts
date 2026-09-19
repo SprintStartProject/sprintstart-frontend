@@ -11,13 +11,30 @@ import type { Citation } from "../chatbot/types";
 export type ProposedActionStatus = "idle" | "confirming" | "resolved" | "error" | "dismissed";
 
 /**
+ * The fields of either proposal kind that describe its one confirm round-trip. This is the only
+ * patch shape `patchAction` accepts: confirming touches the round-trip, never the offer itself.
+ */
+export type ActionPatch = {
+  status: ProposedActionStatus;
+  /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
+  ok?: boolean;
+  /** The outcome line to show once resolved. */
+  outcome?: string;
+};
+
+/**
  * The backend's `open_orientation` action. Once confirmed, its payoff is not the outcome line
  * but the orientation packet itself, rendered in the thread (see `BuddyOrientationCard`) — the
  * conversation is the surface now, so confirming must not navigate anywhere.
  */
 export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
 
-export type ProposedAction = {
+/**
+ * An action proposed in hire mode: the buddy offers to do something *for this hire*, and the
+ * confirm echoes the offer's own payload back verbatim. What gets written is what was shown on
+ * the button — never something the client derived.
+ */
+export type HireActionProposal = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
   /** The action's tool name, sent back verbatim to confirm it (e.g. "claim_task_zero"). */
@@ -64,6 +81,43 @@ export type ProposedAction = {
   /** The outcome line to show once resolved. */
   outcome?: string;
 };
+
+/**
+ * How much a team-mode proposal would change, as the backend's `BuddyProposalRisk` enum spells
+ * it. Decides how loudly the card warns — see `BuddyActionProposals`.
+ */
+export type ProposalRisk = "STANDARD" | "DESTRUCTIVE" | "BULK";
+
+/**
+ * A proposal made in team mode: the buddy offers to change something about a project the
+ * *manager* runs, and the change is stored server-side (`buddy_action_proposals`) — so unlike a
+ * hire action, nothing is echoed back. Confirm goes by id, and the id is the only thing the
+ * client is trusted to send back: what the change actually is lives on the backend, where the
+ * manager already saw it described in `preview`.
+ */
+export type StoredActionProposal = {
+  /** Local id for keying and targeting the confirm — same role as a hire proposal's. */
+  id: string;
+  /** The stored proposal's backend id — the whole confirm payload. */
+  proposalId: string;
+  /** The button text, as the buddy phrased the offer. */
+  label: string;
+  /** What the manager is agreeing to, in words, as the buddy composed it. */
+  preview: string;
+  /** How loudly the card should warn about the change. */
+  risk: ProposalRisk;
+  status: ProposedActionStatus;
+  ok?: boolean;
+  outcome?: string;
+};
+
+/**
+ * An action the buddy proposed, whichever conversation proposed it: a hire offer echoes its
+ * payload back verbatim, a team offer confirms by stored id. Distinguish with
+ * `"proposalId" in action` — a hire offer never carries one, and a stored proposal carries no
+ * `action` name to echo.
+ */
+export type ProposedAction = HireActionProposal | StoredActionProposal;
 
 /**
  * A single turn in the user's persistent buddy conversation, as returned by the backend.
@@ -149,5 +203,16 @@ export type BuddyStreamHandlers = {
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+  }) => void;
+  /**
+   * The buddy has proposed a *team-mode* change, stored server-side. Confirm goes by
+   * `proposalId` alone — the client echoes nothing back but that id, because what the change
+   * actually is lives on the backend.
+   */
+  onStoredProposal?: (proposal: {
+    proposalId: string;
+    label: string;
+    preview: string;
+    risk: ProposalRisk;
   }) => void;
 };

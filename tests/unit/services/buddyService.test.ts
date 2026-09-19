@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getMessages, performAction, streamMessage } from "../../../src/services/buddyService";
+import {
+  getMessages,
+  performAction,
+  streamMessage,
+  streamOpenBuddy,
+  confirmStoredProposal,
+  dismissStoredProposal,
+} from "../../../src/services/buddyService";
 import { http, HttpResponse } from "msw";
 import { mockKeycloakInstance, server } from "../../unit/setup/vitest.setup";
 
@@ -503,6 +510,196 @@ describe("buddyService", () => {
         competencyKey: "kotlin",
         level: "intermediate",
       });
+    });
+  });
+
+  describe("team mode", () => {
+    it("reads the team conversation under the teamProjectId query param", async () => {
+      let capturedUrl = "";
+      server.use(
+        http.get("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
+          capturedUrl = new URL(request.url).search;
+          return HttpResponse.json([{ role: "ASSISTANT", content: "team hello" }]);
+        }),
+      );
+
+      const result = await getMessages("p-123");
+
+      expect(result[0].content).toBe("team hello");
+      expect(capturedUrl).toBe("?teamProjectId=p-123");
+    });
+
+    it("reads the hire conversation without any query param", async () => {
+      let capturedUrl = "";
+      server.use(
+        http.get("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
+          capturedUrl = new URL(request.url).search;
+          return HttpResponse.json([]);
+        }),
+      );
+
+      await getMessages();
+
+      expect(capturedUrl).toBe("");
+    });
+
+    it("sends teamProjectId on the message body, never as null", async () => {
+      let capturedBody: Record<string, unknown> = {};
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/messages", async ({ request }) => {
+          capturedBody = (await request.json()) as Record<string, unknown>;
+          return new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } });
+        }),
+      );
+
+      await streamMessage(
+        "who is behind?",
+        { onToken: vi.fn(), onCitation: vi.fn(), onDone: vi.fn() },
+        "p-123",
+      );
+
+      expect(capturedBody).toEqual({ content: "who is behind?", teamProjectId: "p-123" });
+    });
+
+    it("opens the team greeting under the teamProjectId query param", async () => {
+      let capturedUrl = "";
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/open/stream", ({ request }) => {
+          capturedUrl = new URL(request.url).search;
+          return new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } });
+        }),
+      );
+
+      await streamOpenBuddy({ onToken: vi.fn(), onDone: vi.fn() }, "p-123");
+
+      expect(capturedUrl).toBe("?teamProjectId=p-123");
+    });
+
+    it("surfaces a stored proposal from the stream with its risk", async () => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              'data: {"type":"action_proposal","proposal_id":"prop-1","label":"Shift Task 0","preview":"Jonas takes Task 0.","risk":"DESTRUCTIVE"}\n\n',
+            ),
+          );
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/messages",
+          () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+        ),
+      );
+
+      const onStoredProposal = vi.fn();
+      const onActionProposal = vi.fn();
+      await streamMessage("change the plan", {
+        onToken: vi.fn(),
+        onCitation: vi.fn(),
+        onDone: vi.fn(),
+        onActionProposal,
+        onStoredProposal,
+      });
+
+      expect(onStoredProposal).toHaveBeenCalledWith({
+        proposalId: "prop-1",
+        label: "Shift Task 0",
+        preview: "Jonas takes Task 0.",
+        risk: "DESTRUCTIVE",
+      });
+      // A stored offer is not a hire offer: the tool-name echo must stay silent.
+      expect(onActionProposal).not.toHaveBeenCalled();
+    });
+
+    it("falls back to STANDARD for an unknown risk instead of warning loudly", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              'data: {"type":"action_proposal","proposal_id":"prop-2","label":"x","preview":"y","risk":"COSMIC"}\n\n',
+            ),
+          );
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/messages",
+          () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+        ),
+      );
+
+      const onStoredProposal = vi.fn();
+      await streamMessage("m", {
+        onToken: vi.fn(),
+        onCitation: vi.fn(),
+        onDone: vi.fn(),
+        onStoredProposal,
+      });
+
+      expect(onStoredProposal).toHaveBeenCalledWith(expect.objectContaining({ risk: "STANDARD" }));
+      expect(warn).toHaveBeenCalledWith("Buddy sent an unknown proposal risk: COSMIC");
+      warn.mockRestore();
+    });
+
+    it("confirms a stored proposal by id alone", async () => {
+      let capturedUrl = "";
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/proposals/prop-9/confirm", ({ request }) => {
+          capturedUrl = new URL(request.url).pathname;
+          return HttpResponse.json({ ok: true, message: "Task 0 reassigned." });
+        }),
+      );
+
+      const result = await confirmStoredProposal("prop-9");
+
+      expect(result).toEqual({ ok: true, message: "Task 0 reassigned." });
+      expect(capturedUrl).toBe("/api/v1/onboarding/me/buddy/proposals/prop-9/confirm");
+    });
+
+    it("dismisses a stored proposal by id alone", async () => {
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/proposals/prop-9/dismiss", () =>
+          HttpResponse.json({ ok: true, message: "Nothing changed." }),
+        ),
+      );
+
+      const result = await dismissStoredProposal("prop-9");
+
+      expect(result).toEqual({ ok: true, message: "Nothing changed." });
+    });
+
+    it("lets the 404 of an already-settled proposal surface as a rejection", async () => {
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/proposals/prop-9/confirm",
+          () => new HttpResponse(null, { status: 404 }),
+        ),
+      );
+
+      // The hook maps this to the outcome line; the service's job is only to fail visibly.
+      await expect(confirmStoredProposal("prop-9")).rejects.toThrow();
     });
   });
 });
