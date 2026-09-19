@@ -145,7 +145,7 @@ export function StarterWorkSection({
     if (!createdTask) return;
     // Both land reviewed in the same spot, but "you wrote it" and "you picked it out of the corpus"
     // are different things to have just done, so the confirmation names the one that happened.
-    const title = createdVia === "picked" ? "Added to pool" : "Task created";
+    const title = createdVia === "picked" ? "Added, claimable now" : "Created, claimable now";
     showSuccessToast(title, { description: compactToastDetail(createdTask.title, 80) });
   }, [createdTask, createdVia, showSuccessToast]);
 

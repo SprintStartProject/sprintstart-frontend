@@ -676,7 +676,7 @@ export function StarterWorkPoolCloud({
         )}
         <InfoHint
           label="About the pool"
-          text="Every pooled task stays claimable. Review lifts its rank; edit orientation to write the guide."
+          text="Review lifts a task's rank; edit orientation to write its guide."
         />
 
         <div className="ml-auto flex items-center gap-2">
@@ -730,6 +730,10 @@ export function StarterWorkPoolCloud({
           </div>
         </div>
       </div>
+
+      <p className="mb-4 text-sm text-app-text-subtle">
+        Visible to every new hire on this project, claimable the moment it lands here.
+      </p>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <SegmentedTabs
