@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import {
   ArtifactFilters,
   ArtifactList,
   ArtifactViewerDrawer,
 } from "../features/knowledge-base/components";
-import { KNOWLEDGE_TAB_ORDER, TABS, type KnowledgeTab } from "../features/knowledge-base/tabs";
-import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
-import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { Pagination } from "../components/ui/Pagination";
 import { Button } from "../components/ui/Button";
+import { centralSpringToken } from "../styles/tokens";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
@@ -82,12 +80,19 @@ export function KnowledgeBasePage() {
     fetchArtifacts,
     searchQuery,
     activeTab,
+    tabOptions,
+    sourceOptions,
+    formatOptions,
+    selectedSources,
+    selectedFormat,
     currentPage,
     totalPages,
     filteredArtifacts,
     paginatedArtifacts,
     handleSearchChange,
     handleTabChange,
+    toggleSource,
+    toggleFormat,
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,
@@ -143,13 +148,18 @@ export function KnowledgeBasePage() {
     [artifacts, selectedArtifactId],
   );
 
-  // Two-finger swipe between the artifact-type tabs, for people who would
-  // rather not aim at the bar.
-  const swipeRef = useSwipeableTabs<KnowledgeTab, HTMLElement>({
-    order: KNOWLEDGE_TAB_ORDER,
-    value: activeTab,
-    onChange: handleTabChange,
-  });
+  const prefersReducedMotion = useReducedMotion();
+
+  /*
+    The list re-enters when the *facets* change, so switching GitHub -> Jira reads as a different
+    answer arriving rather than the same rows mutating in place. Search is deliberately not part of
+    the key: every keystroke would remount the list and replay the fade under the reader's cursor.
+
+    This replaced a `SlidingTabPanel` that slid the content sideways by the index of the active
+    connector. There is no index any more -- a multi-select selection has no direction, and a slide
+    chosen from a set's iteration order would move left on a change the reader reads as forward.
+  */
+  const facetKey = `${activeTab}|${[...selectedSources].sort().join(",")}|${selectedFormat ?? ""}`;
 
   return (
     <div className="flex min-h-screen flex-col text-app-text">
@@ -164,7 +174,6 @@ export function KnowledgeBasePage() {
       </header>
 
       <main
-        ref={swipeRef}
         // Unlike Access Management, nothing above this page caps its height (the wrapper
         // and App's own <main> are both `min-h-screen`), so `overflow-y-auto` never actually
         // engages -- the document scrolls. No `SCROLL_CONTAINER_ATTRIBUTE` here for that
@@ -191,26 +200,20 @@ export function KnowledgeBasePage() {
                   onSearchChange={handleSearchChange}
                   activeTab={activeTab}
                   onTabChange={handleTabChange}
+                  tabOptions={tabOptions}
+                  sourceOptions={sourceOptions}
+                  formatOptions={formatOptions}
+                  selectedSources={selectedSources}
+                  selectedFormat={selectedFormat}
+                  onToggleSource={toggleSource}
+                  onToggleFormat={toggleFormat}
+                  resultCount={filteredArtifacts.length}
+                  hasActiveFilters={hasActiveFilters}
+                  onClearFilters={handleClearFilters}
                   onRefresh={() => void fetchArtifacts()}
                   isRefreshing={isLoading}
                 />
               </motion.div>
-
-              <div className="mt-8 mb-4 flex items-center justify-between">
-                <p className="text-sm font-medium text-app-text-muted">
-                  {filteredArtifacts.length} {filteredArtifacts.length === 1 ? "result" : "results"}
-                </p>
-                {hasActiveFilters && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearFilters}
-                    data-testid="kb-clear-filters"
-                  >
-                    Clear filters
-                  </Button>
-                )}
-              </div>
 
               {fetchError && !isLoading && (
                 <div
@@ -238,12 +241,13 @@ export function KnowledgeBasePage() {
               {showLoadingSkeleton ? (
                 <ArtifactListSkeleton />
               ) : isLoading ? null : fetchError ? null : (
-                // Only the list slides; the loading and error
-                // states above are not tabs and would otherwise
-                // animate on their way in too.
-                <SlidingTabPanel
-                  activeKey={activeTab}
-                  index={TABS.findIndex((tab) => tab.id === activeTab)}
+                // Only the list fades; the loading and error states above are not facets and would
+                // otherwise animate on their way in too.
+                <motion.div
+                  key={facetKey}
+                  initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={prefersReducedMotion ? { duration: 0 } : centralSpringToken}
                 >
                   <ArtifactList artifacts={paginatedArtifacts} onSelect={setSelectedArtifactId} />
                   {totalPages > 1 && (
@@ -257,7 +261,7 @@ export function KnowledgeBasePage() {
                       className="mt-8 mb-12"
                     />
                   )}
-                </SlidingTabPanel>
+                </motion.div>
               )}
             </>
           )}
