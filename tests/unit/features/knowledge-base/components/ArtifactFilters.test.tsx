@@ -1,16 +1,20 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { ArtifactFilters } from "../../../../../src/features/knowledge-base/components/ArtifactFilters";
-import type { FacetOption } from "../../../../../src/features/knowledge-base/hooks/useKnowledgeBase";
-import type { UploadFormat } from "../../../../../src/features/knowledge-base/tabs";
-import type { ArtifactType, SourceSystem } from "../../../../../src/features/knowledge-base/types";
+import type {
+  FacetOption,
+  TabOption,
+} from "../../../../../src/features/knowledge-base/hooks/useKnowledgeBase";
+import type { KnowledgeTab, UploadFormat } from "../../../../../src/features/knowledge-base/tabs";
+import type { SourceSystem } from "../../../../../src/features/knowledge-base/types";
 
 const SOURCE_OPTIONS: FacetOption<SourceSystem>[] = [
   { value: "GITHUB", label: "GitHub", count: 6 },
   { value: "UPLOAD", label: "Uploads", count: 4 },
 ];
 
-const TYPE_OPTIONS: FacetOption<ArtifactType>[] = [
+const TAB_OPTIONS: TabOption[] = [
+  { value: "ALL", label: "All", count: 10 },
   { value: "PULL_REQUEST", label: "Pull requests", count: 2 },
   { value: "ISSUE", label: "Issues", count: 4 },
 ];
@@ -24,32 +28,46 @@ function buildProps(overrides: Partial<Parameters<typeof ArtifactFilters>[0]> = 
   return {
     searchQuery: "",
     onSearchChange: vi.fn(),
+    activeTab: "ALL" as KnowledgeTab,
+    onTabChange: vi.fn(),
+    tabOptions: TAB_OPTIONS,
     sourceOptions: SOURCE_OPTIONS,
-    typeOptions: TYPE_OPTIONS,
     formatOptions: [],
     selectedSources: new Set<SourceSystem>(),
-    selectedTypes: new Set<ArtifactType>(),
     selectedFormat: null,
     onToggleSource: vi.fn(),
-    onToggleType: vi.fn(),
     onToggleFormat: vi.fn(),
+    resultCount: 10,
+    hasActiveFilters: false,
+    onClearFilters: vi.fn(),
     ...overrides,
   };
 }
 
 describe("ArtifactFilters", () => {
-  it("renders the search field, the filter trigger and refresh", () => {
+  it("renders search field, tab switcher, result count, and source filter trigger", () => {
     const onRefresh = vi.fn();
     render(<ArtifactFilters {...buildProps({ onRefresh })} />);
 
     expect(screen.getByTestId("kb-search-input")).toBeInTheDocument();
-    expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("All sources · All types");
+    expect(screen.getByRole("button", { name: /all/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /pull requests/i })).toBeInTheDocument();
+    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("10 results");
+    expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("All sources");
 
     fireEvent.click(screen.getByTestId("kb-refresh"));
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it("reports a source toggle from inside the menu", () => {
+  it("calls onTabChange when a tab is clicked", () => {
+    const onTabChange = vi.fn();
+    render(<ArtifactFilters {...buildProps({ onTabChange })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /pull requests/i }));
+    expect(onTabChange).toHaveBeenCalledWith("PULL_REQUEST");
+  });
+
+  it("reports a source toggle from inside the source menu", () => {
     const onToggleSource = vi.fn();
     render(<ArtifactFilters {...buildProps({ onToggleSource })} />);
 
@@ -83,23 +101,48 @@ describe("ArtifactFilters", () => {
     expect(screen.getByTestId("kb-filter-option-markdown")).toBeInTheDocument();
   });
 
-  it("summarises the selection and counts the facets, not the options", () => {
-    render(
+  it("summarises the source selection and shows active filter count", () => {
+    const { rerender } = render(
       <ArtifactFilters
         {...buildProps({
           selectedSources: new Set<SourceSystem>(["GITHUB"]),
-          selectedTypes: new Set<ArtifactType>(["ISSUE"]),
         })}
       />,
     );
 
     const trigger = screen.getByTestId("kb-filter-trigger");
-    expect(trigger).toHaveTextContent("GitHub · Issues");
-    // Two facets, not the two option values behind them.
+    expect(trigger).toHaveTextContent("GitHub");
+    expect(trigger).toHaveTextContent("1");
+
+    rerender(
+      <ArtifactFilters
+        {...buildProps({
+          selectedSources: new Set<SourceSystem>(["GITHUB", "JIRA"]),
+        })}
+      />,
+    );
+
+    expect(trigger).toHaveTextContent("GitHub, Jira");
     expect(trigger).toHaveTextContent("2");
   });
 
-  it("marks the ticked options as checked", () => {
+  it("renders Clear filters button when hasActiveFilters is true and calls onClearFilters", () => {
+    const onClearFilters = vi.fn();
+    const { rerender } = render(
+      <ArtifactFilters {...buildProps({ hasActiveFilters: false, onClearFilters })} />,
+    );
+
+    expect(screen.queryByTestId("kb-clear-filters")).not.toBeInTheDocument();
+
+    rerender(<ArtifactFilters {...buildProps({ hasActiveFilters: true, onClearFilters })} />);
+    const clearBtn = screen.getByTestId("kb-clear-filters");
+    expect(clearBtn).toBeInTheDocument();
+
+    fireEvent.click(clearBtn);
+    expect(onClearFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks ticked options as checked", () => {
     render(
       <ArtifactFilters {...buildProps({ selectedSources: new Set<SourceSystem>(["UPLOAD"]) })} />,
     );
@@ -117,16 +160,5 @@ describe("ArtifactFilters", () => {
     fireEvent.change(screen.getByTestId("kb-search-input"), { target: { value: "readme" } });
 
     expect(onSearchChange).toHaveBeenCalledWith("readme");
-  });
-  it("leaves out a section that has no options left to show", () => {
-    render(<ArtifactFilters {...buildProps({ typeOptions: [] })} />);
-
-    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
-
-    expect(screen.getByTestId("kb-filter-section-sources")).toBeInTheDocument();
-    // `Types` empties out once the chosen sources cannot produce any of them; a
-    // heading over an empty group reads as a loading state.
-    expect(screen.queryByTestId("kb-filter-section-types")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("kb-filter-section-formats")).not.toBeInTheDocument();
   });
 });

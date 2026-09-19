@@ -48,6 +48,32 @@ export const DEFAULT_TYPE_ORDER: ArtifactType[] = [
 ];
 
 /**
+ * Top-level tabs for filtering artifacts by type in SegmentedTabs.
+ *
+ * "ALL" means all artifact types. Selecting a specific tab narrows the view
+ * to that single ArtifactType while allowing multi-source selection beneath it.
+ */
+export type KnowledgeTab = "ALL" | ArtifactType;
+
+export interface KnowledgeTabDef {
+  id: KnowledgeTab;
+  label: string;
+  type?: ArtifactType;
+}
+
+export const KNOWLEDGE_TABS: readonly KnowledgeTabDef[] = [
+  { id: "ALL", label: "All" },
+  { id: "PULL_REQUEST", label: "Pull requests", type: "PULL_REQUEST" },
+  { id: "ISSUE", label: "Issues", type: "ISSUE" },
+  { id: "FILE", label: "Files", type: "FILE" },
+  { id: "PAGE", label: "Docs", type: "PAGE" },
+  { id: "COMMIT", label: "Commits", type: "COMMIT" },
+  { id: "ORG_METADATA", label: "Organization", type: "ORG_METADATA" },
+] as const;
+
+export const KNOWLEDGE_TAB_ORDER: readonly KnowledgeTab[] = KNOWLEDGE_TABS.map((tab) => tab.id);
+
+/**
  * File formats a reader can narrow *uploaded* artifacts to.
  *
  * Not a source type and not an artifact type: an upload's format only exists

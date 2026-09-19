@@ -2,14 +2,14 @@ import { useState, useMemo, useCallback, useDeferredValue } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { Artifact, ArtifactType, SourceSystem } from "../types";
+import type { Artifact, SourceSystem } from "../types";
 import {
   DEFAULT_FORMAT_ORDER,
   DEFAULT_SOURCE_ORDER,
-  DEFAULT_TYPE_ORDER,
   FORMAT_LABELS,
+  KNOWLEDGE_TABS,
+  type KnowledgeTab,
   SOURCE_LABELS,
-  TYPE_LABELS,
   isUpload,
   matchesFormat,
   type UploadFormat,
@@ -18,7 +18,6 @@ import {
 const ITEMS_PER_PAGE = 20;
 const NO_ARTIFACTS: Artifact[] = [];
 const NO_SOURCES: ReadonlySet<SourceSystem> = new Set<SourceSystem>();
-const NO_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>();
 
 /** A single selectable option in a facet, with the count it would yield if added. */
 export interface FacetOption<TValue extends string> {
@@ -27,11 +26,11 @@ export interface FacetOption<TValue extends string> {
   count: number;
 }
 
-/** How many options of each facet are currently selected. */
-export interface FacetSelectionCounts {
-  sources: number;
-  types: number;
-  format: number;
+/** An option for the top-level artifact type tabs in SegmentedTabs. */
+export interface TabOption {
+  value: KnowledgeTab;
+  label: string;
+  count: number;
 }
 
 /** The knowledge-base query's loader, shared with route prefetch so the two never drift apart. */
@@ -86,8 +85,8 @@ export function useKnowledgeBase(projectId: string | null) {
   // React batches the filter to a lower-priority render.
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
+  const [activeTab, setActiveTab] = useState<KnowledgeTab>("ALL");
   const [selectedSources, setSelectedSources] = useState<ReadonlySet<SourceSystem>>(NO_SOURCES);
-  const [selectedTypes, setSelectedTypes] = useState<ReadonlySet<ArtifactType>>(NO_TYPES);
   const [selectedFormat, setSelectedFormat] = useState<UploadFormat | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -100,37 +99,58 @@ export function useKnowledgeBase(projectId: string | null) {
     return searchableText.includes(query.toLowerCase());
   }, []);
 
-  /**
-   * Whether an artifact passes the facets.
-   *
-   * `skip` leaves one facet out, which is what a facet's own option counts need:
-   * "3" next to GitHub means three artifacts match the search and everything else
-   * the reader has chosen, not three that also satisfy the source facet they are
-   * about to change.
-   */
-  const passesFacets = useCallback(
-    (artifact: Artifact, skip?: "sources" | "types" | "format"): boolean => {
-      if (
-        skip !== "sources" &&
-        selectedSources.size > 0 &&
-        !selectedSources.has(artifact.sourceSystem)
-      ) {
-        return false;
-      }
-      if (skip !== "types" && selectedTypes.size > 0 && !selectedTypes.has(artifact.artifactType)) {
-        return false;
-      }
-      if (
-        skip !== "format" &&
-        selectedFormat !== null &&
-        !matchesFormat(artifact, selectedFormat)
-      ) {
-        return false;
-      }
-      return true;
+  const passesTab = useCallback(
+    (artifact: Artifact): boolean => {
+      if (activeTab === "ALL") return true;
+      return artifact.artifactType === activeTab;
     },
-    [selectedSources, selectedTypes, selectedFormat],
+    [activeTab],
   );
+
+  const passesSources = useCallback(
+    (artifact: Artifact): boolean => {
+      if (selectedSources.size === 0) return true;
+      return selectedSources.has(artifact.sourceSystem);
+    },
+    [selectedSources],
+  );
+
+  const passesFormat = useCallback(
+    (artifact: Artifact): boolean => {
+      if (selectedFormat === null) return true;
+      return matchesFormat(artifact, selectedFormat);
+    },
+    [selectedFormat],
+  );
+
+  /**
+   * Top-level tabs for SegmentedTabs.
+   *
+   * Options are scoped to artifact types present in the project (plus "ALL" and
+   * whatever tab is active, so an active tab never disappears). Each tab's count
+   * reflects the current search, source selection, and format facet.
+   */
+  const tabOptions = useMemo<TabOption[]>(() => {
+    const presentTypes = new Set(artifacts.map((artifact) => artifact.artifactType));
+    const reachableTabs = KNOWLEDGE_TABS.filter(
+      (tab) =>
+        tab.id === "ALL" ||
+        tab.id === activeTab ||
+        (tab.type !== undefined && presentTypes.has(tab.type)),
+    );
+
+    return reachableTabs.map((tab) => ({
+      value: tab.id,
+      label: tab.label,
+      count: artifacts.filter(
+        (artifact) =>
+          (tab.id === "ALL" || artifact.artifactType === tab.id) &&
+          matchesSearch(artifact, deferredSearchQuery) &&
+          passesSources(artifact) &&
+          passesFormat(artifact),
+      ).length,
+    }));
+  }, [artifacts, activeTab, deferredSearchQuery, matchesSearch, passesSources, passesFormat]);
 
   /** Sources present in the project (plus any selected one, so a filter is never invisible). */
   const sourceOptions = useMemo<FacetOption<SourceSystem>[]>(() => {
@@ -144,40 +164,11 @@ export function useKnowledgeBase(projectId: string | null) {
         (artifact) =>
           artifact.sourceSystem === source &&
           matchesSearch(artifact, deferredSearchQuery) &&
-          passesFacets(artifact, "sources"),
+          passesTab(artifact) &&
+          passesFormat(artifact),
       ).length,
     }));
-  }, [artifacts, deferredSearchQuery, matchesSearch, passesFacets, selectedSources]);
-
-  /**
-   * The types the reader can actually reach right now — one entry per
-   * `ArtifactType`, whatever connector carries it.
-   *
-   * A type is offered only while the sources, file format and search already
-   * chosen can produce one: an option that is guaranteed to return nothing is
-   * not a filter, it is a trap. Check Jira alone and the list is Jira's own
-   * types, not every type in the project.
-   *
-   * A *selected* type is always kept, even after its count falls to zero, or the
-   * reader could not uncheck the thing that emptied the list.
-   *
-   * Sources deliberately do not follow this rule. A connector is an entry point
-   * ("is anything in Jira yet?") and stays listed with a count of 0; a type is a
-   * refinement *within* the sources already chosen.
-   */
-  const typeOptions = useMemo<FacetOption<ArtifactType>[]>(() => {
-    const reachable = artifacts.filter(
-      (artifact) => matchesSearch(artifact, deferredSearchQuery) && passesFacets(artifact, "types"),
-    );
-
-    return DEFAULT_TYPE_ORDER.filter(
-      (type) => selectedTypes.has(type) || reachable.some((a) => a.artifactType === type),
-    ).map((type) => ({
-      value: type,
-      label: TYPE_LABELS[type],
-      count: reachable.filter((artifact) => artifact.artifactType === type).length,
-    }));
-  }, [artifacts, deferredSearchQuery, matchesSearch, passesFacets, selectedTypes]);
+  }, [artifacts, deferredSearchQuery, matchesSearch, passesTab, passesFormat, selectedSources]);
 
   /**
    * File formats, offered only while Uploads is part of the source selection.
@@ -191,9 +182,7 @@ export function useKnowledgeBase(projectId: string | null) {
 
     const uploads = artifacts.filter(
       (artifact) =>
-        isUpload(artifact) &&
-        matchesSearch(artifact, deferredSearchQuery) &&
-        passesFacets(artifact, "format"),
+        isUpload(artifact) && matchesSearch(artifact, deferredSearchQuery) && passesTab(artifact),
     );
 
     // Same rule as the types: a format no upload in scope can produce is not
@@ -205,14 +194,7 @@ export function useKnowledgeBase(projectId: string | null) {
       label: FORMAT_LABELS[format],
       count: uploads.filter((artifact) => matchesFormat(artifact, format)).length,
     }));
-  }, [
-    artifacts,
-    deferredSearchQuery,
-    matchesSearch,
-    passesFacets,
-    selectedSources,
-    selectedFormat,
-  ]);
+  }, [artifacts, deferredSearchQuery, matchesSearch, passesTab, selectedSources, selectedFormat]);
 
   // Paging resets when the project scope changes. This deliberately does not live
   // in `fetchArtifacts`: that function doubles as the Refresh handler, and hitting
@@ -221,17 +203,21 @@ export function useKnowledgeBase(projectId: string | null) {
   if (pagedProjectId !== projectId) {
     setPagedProjectId(projectId);
     setCurrentPage(1);
+    setActiveTab("ALL");
     setSelectedSources(NO_SOURCES);
-    setSelectedTypes(NO_TYPES);
     setSelectedFormat(null);
   }
 
   const filteredArtifacts = useMemo(
     () =>
       artifacts.filter(
-        (artifact) => matchesSearch(artifact, deferredSearchQuery) && passesFacets(artifact),
+        (artifact) =>
+          matchesSearch(artifact, deferredSearchQuery) &&
+          passesTab(artifact) &&
+          passesSources(artifact) &&
+          passesFormat(artifact),
       ),
-    [artifacts, deferredSearchQuery, matchesSearch, passesFacets],
+    [artifacts, deferredSearchQuery, matchesSearch, passesTab, passesSources, passesFormat],
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE));
@@ -252,6 +238,11 @@ export function useKnowledgeBase(projectId: string | null) {
 
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
+    setCurrentPage(1);
+  }, []);
+
+  const handleTabChange = useCallback((tab: KnowledgeTab) => {
+    setActiveTab(tab);
     setCurrentPage(1);
   }, []);
 
@@ -281,19 +272,6 @@ export function useKnowledgeBase(projectId: string | null) {
     [selectedSources],
   );
 
-  const toggleType = useCallback((type: ArtifactType) => {
-    setSelectedTypes((current) => {
-      const next = new Set(current);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
-    setCurrentPage(1);
-  }, []);
-
   const toggleFormat = useCallback((format: UploadFormat) => {
     setSelectedFormat((current) => (current === format ? null : format));
     setCurrentPage(1);
@@ -301,26 +279,17 @@ export function useKnowledgeBase(projectId: string | null) {
 
   const handleClearFilters = useCallback(() => {
     setSearchQuery("");
+    setActiveTab("ALL");
     setSelectedSources(NO_SOURCES);
-    setSelectedTypes(NO_TYPES);
     setSelectedFormat(null);
     setCurrentPage(1);
   }, []);
 
-  const facetCounts = useMemo<FacetSelectionCounts>(
-    () => ({
-      sources: selectedSources.size,
-      types: selectedTypes.size,
-      format: selectedFormat === null ? 0 : 1,
-    }),
-    [selectedSources, selectedTypes, selectedFormat],
-  );
-
   const hasActiveFilters =
     searchQuery !== "" ||
-    facetCounts.sources > 0 ||
-    facetCounts.types > 0 ||
-    facetCounts.format > 0;
+    activeTab !== "ALL" ||
+    selectedSources.size > 0 ||
+    selectedFormat !== null;
 
   return {
     artifacts,
@@ -328,20 +297,19 @@ export function useKnowledgeBase(projectId: string | null) {
     fetchError,
     fetchArtifacts,
     searchQuery,
+    activeTab,
+    tabOptions,
     sourceOptions,
-    typeOptions,
     formatOptions,
     selectedSources,
-    selectedTypes,
     selectedFormat,
-    facetCounts,
     currentPage,
     totalPages,
     filteredArtifacts,
     paginatedArtifacts,
     handleSearchChange,
+    handleTabChange,
     toggleSource,
-    toggleType,
     toggleFormat,
     setCurrentPage,
     handleClearFilters,

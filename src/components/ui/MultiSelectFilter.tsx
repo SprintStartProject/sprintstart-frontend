@@ -59,6 +59,12 @@ type MultiSelectFilterProps<TValue extends string> = {
    */
   size?: MultiSelectFilterSize;
   disabled?: boolean;
+  /**
+   * Whether sections inside the menu have collapsible accordion headers.
+   * Defaults to `true`. When `false`, options are rendered directly without
+   * an inner dropdown/collapsible button.
+   */
+  collapsible?: boolean;
   className?: string;
   /** Prefix for the control's `data-testid`s. */
   testId?: string;
@@ -99,6 +105,7 @@ export function MultiSelectFilter<TValue extends string>({
   onToggle,
   size = "sm",
   disabled = false,
+  collapsible = true,
   className = "",
   testId = "multiselect-filter",
 }: MultiSelectFilterProps<TValue>) {
@@ -246,7 +253,50 @@ export function MultiSelectFilter<TValue extends string>({
                 <p className="px-2.5 py-3 text-sm text-app-text-muted">Nothing to filter yet</p>
               )}
 
-              {sections.map((section) => {
+              {sections.map((section, sectionIndex) => {
+                const renderOption = (option: MultiSelectFilterOption<TValue>) => (
+                  <label
+                    key={option.value}
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.has(option.value)}
+                      onChange={() => onToggle(option.value)}
+                      data-testid={`${testId}-option-${option.value.toLowerCase()}`}
+                      className="h-4 w-4 shrink-0 cursor-pointer accent-app-brand focus-visible:ring-2 focus-visible:ring-app-focus"
+                    />
+
+                    {option.icon}
+
+                    <span className="flex-1 truncate">{option.label}</span>
+
+                    {option.count !== undefined && (
+                      <span className="shrink-0 text-xs text-app-text-subtle tabular-nums">
+                        {option.count}
+                      </span>
+                    )}
+                  </label>
+                );
+
+                if (!collapsible) {
+                  return (
+                    <div key={section.id} className="py-0.5">
+                      {sections.length > 1 && (
+                        <div className="px-2 py-1 text-xs font-semibold text-app-text-muted">
+                          {section.label}
+                        </div>
+                      )}
+                      <div role="group" aria-label={section.label}>
+                        {section.options.map(renderOption)}
+                      </div>
+                      {sectionIndex < sections.length - 1 && (
+                        <div className="my-1 border-t border-app-border/40" />
+                      )}
+                    </div>
+                  );
+                }
+
                 const headerId = `${menuId}-${section.id}-header`;
                 const panelId = `${menuId}-${section.id}-panel`;
                 const isCollapsed = collapsedSections.has(section.id);
@@ -277,30 +327,7 @@ export function MultiSelectFilter<TValue extends string>({
 
                     <Collapsible open={!isCollapsed}>
                       <div id={panelId} role="group" aria-labelledby={headerId}>
-                        {section.options.map((option) => (
-                          <label
-                            key={option.value}
-                            className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selected.has(option.value)}
-                              onChange={() => onToggle(option.value)}
-                              data-testid={`${testId}-option-${option.value.toLowerCase()}`}
-                              className="h-4 w-4 shrink-0 cursor-pointer accent-app-brand focus-visible:ring-2 focus-visible:ring-app-focus"
-                            />
-
-                            {option.icon}
-
-                            <span className="flex-1 truncate">{option.label}</span>
-
-                            {option.count !== undefined && (
-                              <span className="shrink-0 text-xs text-app-text-subtle tabular-nums">
-                                {option.count}
-                              </span>
-                            )}
-                          </label>
-                        ))}
+                        {section.options.map(renderOption)}
                       </div>
                     </Collapsible>
                   </div>

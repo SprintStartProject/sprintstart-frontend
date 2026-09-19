@@ -79,19 +79,19 @@ export function KnowledgeBasePage() {
     fetchError,
     fetchArtifacts,
     searchQuery,
-    selectedSources,
-    selectedTypes,
-    selectedFormat,
+    activeTab,
+    tabOptions,
     sourceOptions,
-    typeOptions,
     formatOptions,
+    selectedSources,
+    selectedFormat,
     currentPage,
     totalPages,
     filteredArtifacts,
     paginatedArtifacts,
     handleSearchChange,
+    handleTabChange,
     toggleSource,
-    toggleType,
     toggleFormat,
     setCurrentPage,
     handleClearFilters,
@@ -159,9 +159,7 @@ export function KnowledgeBasePage() {
     connector. There is no index any more -- a multi-select selection has no direction, and a slide
     chosen from a set's iteration order would move left on a change the reader reads as forward.
   */
-  const facetKey = `${[...selectedSources].sort().join(",")}|${[...selectedTypes]
-    .sort()
-    .join(",")}|${selectedFormat ?? ""}`;
+  const facetKey = `${activeTab}|${[...selectedSources].sort().join(",")}|${selectedFormat ?? ""}`;
 
   return (
     <div className="flex min-h-screen flex-col text-app-text">
@@ -200,35 +198,22 @@ export function KnowledgeBasePage() {
                 <ArtifactFilters
                   searchQuery={searchQuery}
                   onSearchChange={handleSearchChange}
+                  activeTab={activeTab}
+                  onTabChange={handleTabChange}
+                  tabOptions={tabOptions}
                   sourceOptions={sourceOptions}
-                  typeOptions={typeOptions}
                   formatOptions={formatOptions}
                   selectedSources={selectedSources}
-                  selectedTypes={selectedTypes}
                   selectedFormat={selectedFormat}
                   onToggleSource={toggleSource}
-                  onToggleType={toggleType}
                   onToggleFormat={toggleFormat}
+                  resultCount={filteredArtifacts.length}
+                  hasActiveFilters={hasActiveFilters}
+                  onClearFilters={handleClearFilters}
                   onRefresh={() => void fetchArtifacts()}
                   isRefreshing={isLoading}
                 />
               </motion.div>
-
-              <div className="mt-8 mb-4 flex items-center justify-between">
-                <p className="text-sm font-medium text-app-text-muted">
-                  {filteredArtifacts.length} {filteredArtifacts.length === 1 ? "result" : "results"}
-                </p>
-                {hasActiveFilters && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearFilters}
-                    data-testid="kb-clear-filters"
-                  >
-                    Clear filters
-                  </Button>
-                )}
-              </div>
 
               {fetchError && !isLoading && (
                 <div

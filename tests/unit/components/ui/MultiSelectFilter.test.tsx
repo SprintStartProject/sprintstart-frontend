@@ -124,4 +124,18 @@ describe("MultiSelectFilter", () => {
 
     expect(screen.getByTestId("kb-filter-menu")).toHaveTextContent("Nothing to filter yet");
   });
+
+  it("renders options directly without collapsible accordion headers when collapsible is false", () => {
+    renderFilter({ collapsible: false });
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+
+    // No accordion buttons should be rendered
+    expect(screen.queryByTestId("kb-filter-section-sources")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("kb-filter-section-formats")).not.toBeInTheDocument();
+
+    // Checkboxes are immediately available
+    expect(screen.getByRole("checkbox", { name: /GitHub/ })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /PDFs/ })).toBeInTheDocument();
+  });
 });

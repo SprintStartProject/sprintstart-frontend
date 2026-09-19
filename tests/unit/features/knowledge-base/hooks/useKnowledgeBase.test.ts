@@ -192,12 +192,12 @@ describe("useKnowledgeBase", () => {
     ]);
   });
 
-  it("ANDs the type facet with the source facet", async () => {
+  it("ANDs the tab filter with the source facet", async () => {
     const result = await renderWith(makeFacetFixture());
 
     act(() => {
       result.current.toggleSource("GITHUB");
-      result.current.toggleType("PULL_REQUEST");
+      result.current.handleTabChange("PULL_REQUEST");
     });
 
     expect(result.current.filteredArtifacts).toHaveLength(1);
@@ -208,7 +208,7 @@ describe("useKnowledgeBase", () => {
     const result = await renderWith(makeFacetFixture());
 
     act(() => {
-      result.current.toggleType("ISSUE");
+      result.current.handleTabChange("ISSUE");
     });
 
     expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
@@ -216,11 +216,9 @@ describe("useKnowledgeBase", () => {
       "jira-issue",
     ]);
 
-    // The two-tier bar needed GITHUB:ISSUES and JIRA:ISSUES — the second labelled
-    // "Tickets" — to express this. One artifactType, one option.
-    const typeValues = result.current.typeOptions.map((option) => option.value);
-    expect(typeValues).toContain("ISSUE");
-    expect(typeValues).not.toContain("TICKET");
+    const tabValues = result.current.tabOptions.map((option) => option.value);
+    expect(tabValues).toContain("ISSUE");
+    expect(tabValues).toContain("ALL");
   });
 
   it("offers the file-format facet only while Uploads is selected", async () => {
@@ -283,7 +281,7 @@ describe("useKnowledgeBase", () => {
     expect(result.current.sourceOptions.find((option) => option.value === "GITHUB")?.count).toBe(2);
 
     act(() => {
-      result.current.toggleType("ISSUE");
+      result.current.handleTabChange("ISSUE");
     });
 
     // With Issues on, GitHub can only contribute one artifact — the count has to
@@ -292,12 +290,11 @@ describe("useKnowledgeBase", () => {
     expect(
       result.current.sourceOptions.find((option) => option.value === "CONFLUENCE")?.count,
     ).toBe(0);
-    // A facet's own counts ignore its own selection, or a second option in the
-    // same facet could never be added to the first.
-    expect(result.current.typeOptions.find((option) => option.value === "PAGE")?.count).toBe(1);
+    // Tab options reflect the available types and their counts
+    expect(result.current.tabOptions.find((option) => option.value === "PAGE")?.count).toBe(1);
   });
 
-  it("resets to page 1 when a facet is toggled", async () => {
+  it("resets to page 1 when a tab is changed", async () => {
     const artifacts: Artifact[] = Array.from({ length: 30 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
@@ -309,7 +306,7 @@ describe("useKnowledgeBase", () => {
     expect(result.current.currentPage).toBe(2);
 
     act(() => {
-      result.current.toggleType("FILE");
+      result.current.handleTabChange("FILE");
     });
 
     expect(result.current.currentPage).toBe(1);
@@ -321,7 +318,7 @@ describe("useKnowledgeBase", () => {
     act(() => {
       result.current.handleSearchChange("Add feature");
       result.current.toggleSource("GITHUB");
-      result.current.toggleType("PULL_REQUEST");
+      result.current.handleTabChange("PULL_REQUEST");
       result.current.toggleSource("UPLOAD");
       result.current.toggleFormat("PDF");
     });
@@ -333,7 +330,7 @@ describe("useKnowledgeBase", () => {
 
     expect(result.current.hasActiveFilters).toBe(false);
     expect(result.current.selectedSources.size).toBe(0);
-    expect(result.current.selectedTypes.size).toBe(0);
+    expect(result.current.activeTab).toBe("ALL");
     expect(result.current.selectedFormat).toBeNull();
     expect(result.current.searchQuery).toBe("");
     expect(result.current.filteredArtifacts).toHaveLength(5);
@@ -388,7 +385,7 @@ describe("useKnowledgeBase", () => {
 
     act(() => {
       result.current.toggleSource("GITHUB");
-      result.current.toggleType("FILE");
+      result.current.handleTabChange("FILE");
     });
     expect(result.current.hasActiveFilters).toBe(true);
 
@@ -398,7 +395,7 @@ describe("useKnowledgeBase", () => {
     // the empty list it produces looks like the project having no knowledge at all.
     await waitFor(() => {
       expect(result.current.selectedSources.size).toBe(0);
-      expect(result.current.selectedTypes.size).toBe(0);
+      expect(result.current.activeTab).toBe("ALL");
       expect(result.current.hasActiveFilters).toBe(false);
     });
   });
@@ -494,7 +491,7 @@ describe("useKnowledgeBase", () => {
     act(() => {
       result.current.toggleSource("GITHUB");
       result.current.toggleSource("JIRA");
-      result.current.toggleType("ISSUE");
+      result.current.handleTabChange("ISSUE");
     });
 
     expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
@@ -563,10 +560,12 @@ describe("useKnowledgeBase", () => {
     // "Other" no longer swallows images — that is what the Images option is for.
     expect(result.current.filteredArtifacts[0].title).toBe("archive.tar.gz");
   });
-  it("offers only the types the chosen sources can produce", async () => {
+
+  it("offers tab options for types present in the project plus ALL", async () => {
     const result = await renderWith(makeFacetFixture());
 
-    expect(result.current.typeOptions.map((option) => option.value)).toEqual([
+    expect(result.current.tabOptions.map((option) => option.value)).toEqual([
+      "ALL",
       "PULL_REQUEST",
       "ISSUE",
       "FILE",
@@ -577,32 +576,23 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("JIRA");
     });
 
-    // Jira carries issues and nothing else, so no dead Pull requests / Files / Docs.
-    expect(result.current.typeOptions.map((option) => option.value)).toEqual(["ISSUE"]);
-
-    act(() => {
-      result.current.toggleSource("GITHUB");
-    });
-
-    expect(result.current.typeOptions.map((option) => option.value)).toEqual([
-      "PULL_REQUEST",
-      "ISSUE",
-    ]);
+    // Jira carries issues and nothing else, so other types have count 0
+    const issueTab = result.current.tabOptions.find((t) => t.value === "ISSUE");
+    const prTab = result.current.tabOptions.find((t) => t.value === "PULL_REQUEST");
+    expect(issueTab?.count).toBe(1);
+    expect(prTab?.count).toBe(0);
   });
 
-  it("keeps a selected type visible once the chosen sources cannot produce it", async () => {
+  it("keeps an active tab visible even if chosen sources cannot produce it", async () => {
     const result = await renderWith(makeFacetFixture());
 
     act(() => {
-      result.current.toggleType("PAGE");
-    });
-    act(() => {
+      result.current.handleTabChange("PAGE");
       result.current.toggleSource("GITHUB");
     });
 
-    const page = result.current.typeOptions.find((option) => option.value === "PAGE");
+    const page = result.current.tabOptions.find((option) => option.value === "PAGE");
 
-    // Still listed, so it can be unchecked; the count tells the truth about it.
     expect(page).toBeDefined();
     expect(page?.count).toBe(0);
     expect(result.current.filteredArtifacts).toHaveLength(0);
