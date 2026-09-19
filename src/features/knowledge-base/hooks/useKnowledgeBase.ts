@@ -14,10 +14,12 @@ import {
   matchesFormat,
   type UploadFormat,
 } from "../tabs";
+import { getArtifactRepository, matchesRepository } from "../githubMetadata";
 
 const ITEMS_PER_PAGE = 20;
 const NO_ARTIFACTS: Artifact[] = [];
 const NO_SOURCES: ReadonlySet<SourceSystem> = new Set<SourceSystem>();
+const NO_REPOSITORIES: ReadonlySet<string> = new Set<string>();
 
 /** A single selectable option in a facet, with the count it would yield if added. */
 export interface FacetOption<TValue extends string> {
@@ -88,6 +90,8 @@ export function useKnowledgeBase(projectId: string | null) {
   const [activeTab, setActiveTab] = useState<KnowledgeTab>("ALL");
   const [selectedSources, setSelectedSources] = useState<ReadonlySet<SourceSystem>>(NO_SOURCES);
   const [selectedFormat, setSelectedFormat] = useState<UploadFormat | null>(null);
+  const [selectedRepositories, setSelectedRepositories] =
+    useState<ReadonlySet<string>>(NO_REPOSITORIES);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Helper to match text search across title, sourceId, and sourceUrl
@@ -123,6 +127,11 @@ export function useKnowledgeBase(projectId: string | null) {
     [selectedFormat],
   );
 
+  const passesRepository = useCallback(
+    (artifact: Artifact): boolean => matchesRepository(artifact, selectedRepositories),
+    [selectedRepositories],
+  );
+
   /**
    * Top-level tabs for SegmentedTabs.
    *
@@ -149,10 +158,19 @@ export function useKnowledgeBase(projectId: string | null) {
           (tab.id === "ALL" || artifact.artifactType === tab.id) &&
           matchesSearch(artifact, deferredSearchQuery) &&
           passesSources(artifact) &&
-          passesFormat(artifact),
+          passesFormat(artifact) &&
+          passesRepository(artifact),
       ).length,
     }));
-  }, [artifacts, activeTab, deferredSearchQuery, matchesSearch, passesSources, passesFormat]);
+  }, [
+    artifacts,
+    activeTab,
+    deferredSearchQuery,
+    matchesSearch,
+    passesSources,
+    passesFormat,
+    passesRepository,
+  ]);
 
   /** Sources present in the project (plus any selected one, so a filter is never invisible). */
   const sourceOptions = useMemo<FacetOption<SourceSystem>[]>(() => {
@@ -167,10 +185,19 @@ export function useKnowledgeBase(projectId: string | null) {
           artifact.sourceSystem === source &&
           matchesSearch(artifact, deferredSearchQuery) &&
           passesTab(artifact) &&
-          passesFormat(artifact),
+          passesFormat(artifact) &&
+          passesRepository(artifact),
       ).length,
     }));
-  }, [artifacts, deferredSearchQuery, matchesSearch, passesTab, passesFormat, selectedSources]);
+  }, [
+    artifacts,
+    deferredSearchQuery,
+    matchesSearch,
+    passesTab,
+    passesFormat,
+    passesRepository,
+    selectedSources,
+  ]);
 
   /**
    * File formats, offered only while Uploads is part of the source selection.
@@ -184,7 +211,10 @@ export function useKnowledgeBase(projectId: string | null) {
 
     const uploads = artifacts.filter(
       (artifact) =>
-        isUpload(artifact) && matchesSearch(artifact, deferredSearchQuery) && passesTab(artifact),
+        isUpload(artifact) &&
+        matchesSearch(artifact, deferredSearchQuery) &&
+        passesTab(artifact) &&
+        passesRepository(artifact),
     );
 
     // Same rule as the types: a format no upload in scope can produce is not
@@ -196,7 +226,60 @@ export function useKnowledgeBase(projectId: string | null) {
       label: FORMAT_LABELS[format],
       count: uploads.filter((artifact) => matchesFormat(artifact, format)).length,
     }));
-  }, [artifacts, deferredSearchQuery, matchesSearch, passesTab, selectedSources, selectedFormat]);
+  }, [
+    artifacts,
+    deferredSearchQuery,
+    matchesSearch,
+    passesTab,
+    passesRepository,
+    selectedSources,
+    selectedFormat,
+  ]);
+
+  /**
+   * Repositories behind the project's GitHub artifacts, offered only while
+   * GitHub is part of the source selection.
+   *
+   * Same contract as `formatOptions`: empty means "this facet does not apply
+   * right now", which is the condition the filter UI renders the section on.
+   * Alphabetical because repository names are unbounded, unlike the fixed enum
+   * facets. A choice that no longer appears in scope stays so it can be
+   * unchosen.
+   */
+  const repositoryOptions = useMemo<FacetOption<string>[]>(() => {
+    if (!selectedSources.has("GITHUB")) return [];
+
+    const counts = new Map<string, number>();
+    for (const artifact of artifacts) {
+      const repository = getArtifactRepository(artifact);
+      if (
+        repository === null ||
+        !matchesSearch(artifact, deferredSearchQuery) ||
+        !passesTab(artifact) ||
+        !passesFormat(artifact)
+      ) {
+        continue;
+      }
+      counts.set(repository, (counts.get(repository) ?? 0) + 1);
+    }
+
+    const offered = new Set([...counts.keys(), ...selectedRepositories]);
+    return [...offered]
+      .sort((a, b) => a.localeCompare(b))
+      .map((repository) => ({
+        value: repository,
+        label: repository,
+        count: counts.get(repository) ?? 0,
+      }));
+  }, [
+    artifacts,
+    deferredSearchQuery,
+    matchesSearch,
+    passesTab,
+    passesFormat,
+    selectedSources,
+    selectedRepositories,
+  ]);
 
   // Paging resets when the project scope changes. This deliberately does not live
   // in `fetchArtifacts`: that function doubles as the Refresh handler, and hitting
@@ -208,6 +291,7 @@ export function useKnowledgeBase(projectId: string | null) {
     setActiveTab("ALL");
     setSelectedSources(NO_SOURCES);
     setSelectedFormat(null);
+    setSelectedRepositories(NO_REPOSITORIES);
   }
 
   const filteredArtifacts = useMemo(
@@ -217,9 +301,18 @@ export function useKnowledgeBase(projectId: string | null) {
           matchesSearch(artifact, deferredSearchQuery) &&
           passesTab(artifact) &&
           passesSources(artifact) &&
-          passesFormat(artifact),
+          passesFormat(artifact) &&
+          passesRepository(artifact),
       ),
-    [artifacts, deferredSearchQuery, matchesSearch, passesTab, passesSources, passesFormat],
+    [
+      artifacts,
+      deferredSearchQuery,
+      matchesSearch,
+      passesTab,
+      passesSources,
+      passesFormat,
+      passesRepository,
+    ],
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE));
@@ -269,6 +362,11 @@ export function useKnowledgeBase(projectId: string | null) {
         setSelectedFormat(null);
       }
 
+      // Same rule for the repository facet, which only describes GitHub.
+      if (isRemoving && source === "GITHUB") {
+        setSelectedRepositories(NO_REPOSITORIES);
+      }
+
       setCurrentPage(1);
     },
     [selectedSources],
@@ -279,11 +377,25 @@ export function useKnowledgeBase(projectId: string | null) {
     setCurrentPage(1);
   }, []);
 
+  const toggleRepository = useCallback((repository: string) => {
+    setSelectedRepositories((current) => {
+      const next = new Set(current);
+      if (next.has(repository)) {
+        next.delete(repository);
+      } else {
+        next.add(repository);
+      }
+      return next;
+    });
+    setCurrentPage(1);
+  }, []);
+
   const handleClearFilters = useCallback(() => {
     setSearchQuery("");
     setActiveTab("ALL");
     setSelectedSources(NO_SOURCES);
     setSelectedFormat(null);
+    setSelectedRepositories(NO_REPOSITORIES);
     setCurrentPage(1);
   }, []);
 
@@ -291,7 +403,8 @@ export function useKnowledgeBase(projectId: string | null) {
     searchQuery !== "" ||
     activeTab !== "ALL" ||
     selectedSources.size > 0 ||
-    selectedFormat !== null;
+    selectedFormat !== null ||
+    selectedRepositories.size > 0;
 
   return {
     artifacts,
@@ -303,8 +416,10 @@ export function useKnowledgeBase(projectId: string | null) {
     tabOptions,
     sourceOptions,
     formatOptions,
+    repositoryOptions,
     selectedSources,
     selectedFormat,
+    selectedRepositories,
     currentPage,
     totalPages,
     filteredArtifacts,
@@ -313,6 +428,7 @@ export function useKnowledgeBase(projectId: string | null) {
     handleTabChange,
     toggleSource,
     toggleFormat,
+    toggleRepository,
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,

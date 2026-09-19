@@ -11,6 +11,7 @@
  */
 
 import type { Artifact } from "./types";
+import { parseOrgMetadata } from "./orgMetadata";
 
 export interface GithubArtifactMetadata {
   /**
@@ -86,4 +87,43 @@ export function getArtifactRepository(
     return null;
   }
   return parseGithubMetadata(artifact.metadata)?.repositoryFullName ?? null;
+}
+
+/**
+ * Whether an artifact survives the repository facet's current selection.
+ *
+ * Mirrors `matchesFormat`'s scoping rule where it can: artifacts from other
+ * sources are outside the facet's reach and always match, so "GitHub + Uploads
+ * + repo X" does not hide the uploads. Within GitHub a selection narrows
+ * strictly, with one exception: the org profile names no repository, but it
+ * describes the org that owns the chosen ones — so it stays visible exactly
+ * when its login is the owner half of a checked `owner/repo`. An unrelated
+ * org's profile hides like any other unchosen artifact; letting every org
+ * through made a checked repository look like it had content on tabs it has
+ * nothing to do with, while hiding them all cut the reader off from the org
+ * that owns the repo they picked.
+ *
+ * @param artifact The artifact under test.
+ * @param selected The currently chosen repositories; empty means "no narrowing".
+ * @returns Whether the artifact belongs in the filtered list.
+ */
+export function matchesRepository(
+  artifact: Pick<Artifact, "sourceSystem" | "artifactType" | "metadata">,
+  selected: ReadonlySet<string>,
+): boolean {
+  if (selected.size === 0) return true;
+  if (artifact.sourceSystem !== "GITHUB") return true;
+
+  const repository = getArtifactRepository(artifact);
+  if (repository !== null) return selected.has(repository);
+
+  // A GitHub artifact that names no repository: only the org profile can still
+  // belong to the selection — namely when its org owns one of the chosen repos.
+  if (artifact.artifactType !== "ORG_METADATA") return false;
+  const login = parseOrgMetadata(artifact.metadata)?.login;
+  if (!login) return false;
+  return [...selected].some((repo) => {
+    const ownerSeparator = repo.indexOf("/");
+    return (ownerSeparator > 0 ? repo.slice(0, ownerSeparator) : repo) === login;
+  });
 }

@@ -83,8 +83,10 @@ export function KnowledgeBasePage() {
     tabOptions,
     sourceOptions,
     formatOptions,
+    repositoryOptions,
     selectedSources,
     selectedFormat,
+    selectedRepositories,
     currentPage,
     totalPages,
     filteredArtifacts,
@@ -93,6 +95,7 @@ export function KnowledgeBasePage() {
     handleTabChange,
     toggleSource,
     toggleFormat,
+    toggleRepository,
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,
@@ -159,7 +162,7 @@ export function KnowledgeBasePage() {
     connector. There is no index any more -- a multi-select selection has no direction, and a slide
     chosen from a set's iteration order would move left on a change the reader reads as forward.
   */
-  const facetKey = `${activeTab}|${[...selectedSources].sort().join(",")}|${selectedFormat ?? ""}`;
+  const facetKey = `${activeTab}|${[...selectedSources].sort().join(",")}|${selectedFormat ?? ""}|${[...selectedRepositories].sort().join(",")}`;
 
   return (
     <div className="flex min-h-screen flex-col text-app-text">
@@ -207,6 +210,9 @@ export function KnowledgeBasePage() {
                   selectedFormat={selectedFormat}
                   onToggleSource={toggleSource}
                   onToggleFormat={toggleFormat}
+                  repositoryOptions={repositoryOptions}
+                  selectedRepositories={selectedRepositories}
+                  onToggleRepository={toggleRepository}
                   resultCount={filteredArtifacts.length}
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={handleClearFilters}

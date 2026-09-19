@@ -24,6 +24,19 @@ const FORMAT_OPTIONS: FacetOption<UploadFormat>[] = [
   { value: "MARKDOWN", label: "Markdown", count: 1 },
 ];
 
+const REPOSITORY_OPTIONS: FacetOption<string>[] = [
+  {
+    value: "sprintstart/sprintstart-backend",
+    label: "sprintstart/sprintstart-backend",
+    count: 3,
+  },
+  {
+    value: "sprintstart/sprintstart-frontend",
+    label: "sprintstart/sprintstart-frontend",
+    count: 2,
+  },
+];
+
 function buildProps(overrides: Partial<Parameters<typeof ArtifactFilters>[0]> = {}) {
   return {
     searchQuery: "",
@@ -33,10 +46,13 @@ function buildProps(overrides: Partial<Parameters<typeof ArtifactFilters>[0]> = 
     tabOptions: TAB_OPTIONS,
     sourceOptions: SOURCE_OPTIONS,
     formatOptions: [],
+    repositoryOptions: [],
     selectedSources: new Set<SourceSystem>(),
     selectedFormat: null,
+    selectedRepositories: new Set<string>(),
     onToggleSource: vi.fn(),
     onToggleFormat: vi.fn(),
+    onToggleRepository: vi.fn(),
     resultCount: 10,
     hasActiveFilters: false,
     onClearFilters: vi.fn(),
@@ -160,5 +176,68 @@ describe("ArtifactFilters", () => {
     fireEvent.change(screen.getByTestId("kb-search-input"), { target: { value: "readme" } });
 
     expect(onSearchChange).toHaveBeenCalledWith("readme");
+  });
+
+  it("offers the repositories section only while GitHub is selected", () => {
+    const { unmount } = render(<ArtifactFilters {...buildProps()} />);
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(
+      screen.queryByTestId("kb-filter-option-sprintstart/sprintstart-backend"),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          repositoryOptions: REPOSITORY_OPTIONS,
+          selectedSources: new Set<SourceSystem>(["GITHUB"]),
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(
+      screen.getByTestId("kb-filter-option-sprintstart/sprintstart-backend"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("kb-filter-option-sprintstart/sprintstart-frontend"),
+    ).toBeInTheDocument();
+  });
+
+  it("reports a repository toggle from inside the source menu", () => {
+    const onToggleRepository = vi.fn();
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          repositoryOptions: REPOSITORY_OPTIONS,
+          selectedSources: new Set<SourceSystem>(["GITHUB"]),
+          selectedRepositories: new Set<string>(["sprintstart/sprintstart-backend"]),
+          onToggleRepository,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+
+    expect(screen.getByTestId("kb-filter-option-sprintstart/sprintstart-backend")).toBeChecked();
+    fireEvent.click(screen.getByTestId("kb-filter-option-sprintstart/sprintstart-frontend"));
+    expect(onToggleRepository).toHaveBeenCalledWith("sprintstart/sprintstart-frontend");
+  });
+
+  it("summarises selected repositories in the trigger", () => {
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          selectedSources: new Set<SourceSystem>(["GITHUB"]),
+          selectedRepositories: new Set<string>([
+            "sprintstart/sprintstart-backend",
+            "sprintstart/sprintstart-frontend",
+          ]),
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("2 repositories");
   });
 });
