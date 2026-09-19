@@ -52,6 +52,24 @@ function jiraProjectKey(issueKey: string): string | null {
   return /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(issueKey)?.[1] ?? null;
 }
 
+const ISSUE_PREFIX_SEPARATOR = /^\s*[:\-–—]\s*/;
+
+/**
+ * Strips a redundant "Issue #103" (or "Issue ONB-2") lead-in from a title when it already restates
+ * the source badge's own number — the badge already says it, so repeating it in the title is just
+ * noise. Display only: callers keep showing the full, untouched title in a tooltip or the drawer.
+ */
+export function stripRedundantIssuePrefix(title: string, numberLabel: string | null): string {
+  if (!numberLabel) return title;
+
+  const trimmed = title.trim();
+  const prefix = `issue ${numberLabel}`.toLowerCase();
+  if (!trimmed.toLowerCase().startsWith(prefix)) return title;
+
+  const rest = trimmed.slice(prefix.length).replace(ISSUE_PREFIX_SEPARATOR, "").trim();
+  return rest || title;
+}
+
 export function parseCandidateSource(sourceId: string): ParsedSource {
   const parts = sourceId.split(":");
   const trackerCode = parts[0] ?? "";

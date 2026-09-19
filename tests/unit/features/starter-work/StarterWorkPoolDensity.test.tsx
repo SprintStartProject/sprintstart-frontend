@@ -45,11 +45,11 @@ describe("StarterWorkPoolCloud density", () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
   });
 
-  it("lays the list out as a 2×3 grid of up to six rows per page", async () => {
+  it("lays the list out as a single grouped list of up to ten rows per page", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
-        tasks={Array.from({ length: 7 }, (_, index) => task(index + 1))}
+        tasks={Array.from({ length: 11 }, (_, index) => task(index + 1))}
         isLoading={false}
         error={null}
         canAct
@@ -60,17 +60,14 @@ describe("StarterWorkPoolCloud density", () => {
     await user.click(screen.getByRole("button", { name: "List view" }));
 
     const list = screen.getByTestId("pool-task-list");
-    expect(list).toHaveClass("grid", "@min-[38rem]:grid-cols-2");
+    expect(list).toHaveClass("divide-y");
     const rows = screen.getAllByTestId(/^pool-list-task-/);
-    expect(rows).toHaveLength(6);
-    // Each row and its card stretch to the grid cell so side-by-side cards match the taller one.
-    expect(rows[0]).toHaveClass("h-full");
-    expect(rows[0].querySelector("div")).toHaveClass("h-full");
-    expect(screen.queryByText("Starter task 7")).not.toBeInTheDocument();
+    expect(rows).toHaveLength(10);
+    expect(screen.queryByText("Starter task 11")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
 
-    expect(await screen.findByText("Starter task 7")).toBeInTheDocument();
+    expect(await screen.findByText("Starter task 11")).toBeInTheDocument();
     expect(screen.getAllByTestId(/^pool-list-task-/)).toHaveLength(1);
   });
 
@@ -115,9 +112,9 @@ describe("StarterWorkPoolCloud density", () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
-        // Only the first task is flagged for Task 0; the other six fill up the list's first
-        // page (6 per page), pushing it onto page 2.
-        tasks={Array.from({ length: 7 }, (_, index) =>
+        // Only the first task is flagged for Task 0; the other ten fill up the list's first
+        // page (10 per page), pushing it onto page 2.
+        tasks={Array.from({ length: 11 }, (_, index) =>
           index === 0 ? { ...task(1), taskZeroEligible: true } : task(index + 1),
         )}
         isLoading={false}
@@ -129,13 +126,13 @@ describe("StarterWorkPoolCloud density", () => {
 
     await user.click(screen.getByRole("button", { name: "List view" }));
     await user.click(screen.getByRole("button", { name: "Next page" }));
-    expect(await screen.findByText("Starter task 7")).toBeInTheDocument();
+    expect(await screen.findByText("Starter task 11")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^Task 0/ }));
 
     // Page 2 no longer exists once the filter leaves a single match — the view lands back on
     // page 1 and shows it, rather than a blank page 2.
     expect(await screen.findByText("Starter task 1")).toBeInTheDocument();
-    expect(screen.queryByText("Starter task 7")).not.toBeInTheDocument();
+    expect(screen.queryByText("Starter task 11")).not.toBeInTheDocument();
   });
 });

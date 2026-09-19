@@ -94,7 +94,7 @@ describe("StarterWorkPoolCloud views", () => {
     expect(onOpenTask).toHaveBeenCalledWith(task(1));
   });
 
-  it("marks an unseen task with a dashed row and a dot in list view too", async () => {
+  it("marks an unseen task with a heavier title and a dot in list view too", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
@@ -109,7 +109,7 @@ describe("StarterWorkPoolCloud views", () => {
     await user.click(screen.getByRole("button", { name: "List view" }));
 
     const row = screen.getByTestId("pool-list-task-task-1");
-    expect(row.querySelector(".border-dashed")).toBeInTheDocument();
+    expect(within(row).getByText("Starter task 1")).toHaveClass("font-semibold");
     expect(within(row).getByLabelText("Not looked at yet")).toBeInTheDocument();
   });
 });

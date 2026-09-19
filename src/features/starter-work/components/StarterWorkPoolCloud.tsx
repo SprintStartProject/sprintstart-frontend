@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   CheckCircle2,
+  ChevronRight,
   Cloud,
   GitBranch,
   List as ListIcon,
@@ -19,7 +20,7 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
-import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { useToast } from "../../../context/useToast";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
@@ -29,7 +30,7 @@ import { starterWorkService } from "../../../services/starterWorkService";
 import { centralSpringToken } from "../../../styles/tokens";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { formatRelativeDate } from "../format";
-import { parseCandidateSource, trackerLabel } from "../sourceId";
+import { parseCandidateSource, stripRedundantIssuePrefix, trackerLabel } from "../sourceId";
 import type { StarterWorkTask } from "../types";
 
 export type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero";
@@ -43,9 +44,10 @@ const STATUS_FILTER_LABELS: Record<PoolStatusFilter, string> = {
   taskZero: "Task 0",
 };
 
-/** One page fills the cloud with twelve cards, or the list's matching stack of six. */
+/** One page fills the cloud with twelve cards, or the list's matching stack of ten — a compact row
+ *  holds more than a card does. */
 const CLOUD_PAGE_SIZE = 12;
-const LIST_PAGE_SIZE = 6;
+const LIST_PAGE_SIZE = 10;
 
 /** The cloud is always four columns of three — used to know which slots sit in the same column. */
 const CLOUD_GRID_COLUMNS = 4;
@@ -194,15 +196,16 @@ type PoolTaskProps = {
   onOpen: (task: StarterWorkTask) => void;
 };
 
-/** Placeholder for one pool row, matching `PoolListRow`'s title/description/meta shape. */
+/** Placeholder for one pool row, matching `PoolListRow`'s marker/title/description/badge shape. */
 function PoolRowSkeleton() {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4">
+    <div className="flex items-center gap-3 p-4">
+      <SkeletonBlock className="h-2 w-2 shrink-0 rounded-full" />
       <div className="min-w-0 flex-1">
         <SkeletonLine className="w-2/3" />
         <SkeletonLine className="mt-1.5 w-1/2" />
-        <SkeletonLine className="mt-2 h-5 w-20" />
       </div>
+      <SkeletonBlock className="h-5 w-16 shrink-0 rounded-full" />
     </div>
   );
 }
@@ -231,7 +234,7 @@ function PoolTaskSourceBadge({ task }: { task: StarterWorkTask }) {
 
   if (!parsed.hasKnownTracker) {
     return (
-      <span className="flex min-w-0 items-center gap-1.5 text-xs text-app-text-subtle">
+      <span className="flex w-fit min-w-0 shrink-0 items-center gap-1.5 self-center text-xs text-app-text-subtle">
         <PenLine className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span className="truncate">Written by hand</span>
       </span>
@@ -246,7 +249,12 @@ function PoolTaskSourceBadge({ task }: { task: StarterWorkTask }) {
     trackerLabel(parsed.trackerCode);
 
   return (
-    <Badge variant={variant} size="sm" title={fullSource} className="min-w-0 shrink">
+    <Badge
+      variant={variant}
+      size="sm"
+      title={fullSource}
+      className="w-fit min-w-0 shrink self-center"
+    >
       {Icon && <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />}
       <span className="truncate">{identifier}</span>
     </Badge>
@@ -261,7 +269,7 @@ function PoolTaskSourceBadge({ task }: { task: StarterWorkTask }) {
 function PoolTaskBadges({ task }: { task: StarterWorkTask }) {
   if (task.taskZeroEligible) {
     return (
-      <Badge variant="purple" size="sm">
+      <Badge variant="purple" size="sm" className="w-fit shrink-0 self-center">
         Task 0
       </Badge>
     );
@@ -270,7 +278,7 @@ function PoolTaskBadges({ task }: { task: StarterWorkTask }) {
   // Only a definite `true` means somebody has this — `null` is "we don't know", not "nobody".
   if (task.sourceHasAssignee === true) {
     return (
-      <Badge variant="neutral" size="sm">
+      <Badge variant="neutral" size="sm" className="w-fit shrink-0 self-center">
         <UserRound className="h-3 w-3" aria-hidden="true" />
         Someone is on this
       </Badge>
@@ -312,6 +320,10 @@ function PoolStatusMarker({ unseen }: { unseen: boolean }) {
 function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
   const unseen = !task.reviewed;
   const description = task.summary?.trim();
+  const displayTitle = stripRedundantIssuePrefix(
+    task.title,
+    parseCandidateSource(task.sourceId).numberLabel,
+  );
 
   return (
     <SpotlightCard
@@ -346,7 +358,7 @@ function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
           className="line-clamp-2 text-sm leading-snug font-semibold text-app-text"
           title={task.title}
         >
-          {task.title}
+          {displayTitle}
         </h3>
 
         {description && (
@@ -366,43 +378,55 @@ function PoolCloudCard({ task, onOpen }: PoolTaskProps) {
   );
 }
 
-/** Pool task row, same content structure as {@link PoolCloudCard} in the issue-browser's row language. */
+/**
+ * Pool task row: a single grouped list stacks these with `divide-y`, so each row only has to lay
+ * out its own content — marker, title/summary, then the trailing badges and a chevron. Below `sm`
+ * the trailing group wraps under the title instead of staying pinned to the row's right edge.
+ */
 function PoolListRow({ task, onOpen }: PoolTaskProps) {
   const unseen = !task.reviewed;
   const description = task.summary?.trim();
+  const displayTitle = stripRedundantIssuePrefix(
+    task.title,
+    parseCandidateSource(task.sourceId).numberLabel,
+  );
 
   return (
-    <li className="group relative h-full" data-testid={`pool-list-task-${task.id}`}>
+    <li className="group relative" data-testid={`pool-list-task-${task.id}`}>
       <button
         type="button"
         onClick={() => onOpen(task)}
         aria-label={`Open details for ${task.title}`}
-        className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="absolute inset-0 z-0 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset"
       />
 
-      {/* h-full so that side by side in the two-column grid, the row's two cards match the taller
-          one's height; in the single stacked column it is a no-op. */}
-      <div
-        className={`pointer-events-none relative z-10 flex h-full flex-col gap-1 rounded-2xl border bg-app-surface p-3 transition-colors group-hover:border-app-border-strong ${
-          unseen ? "border-dashed border-app-border-muted" : "border-app-border"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <PoolTaskSourceBadge task={task} />
+      <div className="pointer-events-none relative z-10 flex flex-col gap-2 p-4 transition-colors group-hover:bg-app-surface-hover sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex w-5 shrink-0 items-center justify-center">
           <PoolStatusMarker unseen={unseen} />
         </div>
 
-        <h3 className="line-clamp-2 text-sm font-semibold text-app-text" title={task.title}>
-          {task.title}
-        </h3>
+        <div className="min-w-0 flex-1">
+          <h3
+            className={`truncate text-sm text-app-text ${unseen ? "font-semibold" : "font-medium"}`}
+            title={task.title}
+          >
+            {displayTitle}
+          </h3>
+          {description && (
+            <p className="truncate text-xs text-app-text-muted" title={description}>
+              {description}
+            </p>
+          )}
+        </div>
 
-        {description && (
-          <p className="line-clamp-1 text-xs text-app-text-muted" title={description}>
-            {description}
-          </p>
-        )}
-
-        <PoolTaskBadges task={task} />
+        <div className="flex flex-wrap items-center gap-2 pl-8 sm:flex-nowrap sm:pl-0">
+          <PoolTaskBadges task={task} />
+          <PoolTaskSourceBadge task={task} />
+          <ChevronRight
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-app-text-subtle transition-transform group-hover:translate-x-0.5"
+          />
+        </div>
       </div>
     </li>
   );
@@ -652,7 +676,7 @@ export function StarterWorkPoolCloud({
       {showLoadingSkeleton ? (
         <SkeletonGroup
           label="Loading the pool"
-          className="grid grid-cols-1 gap-2.5 @min-[38rem]:grid-cols-2"
+          className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-app-surface"
         >
           {Array.from({ length: 6 }).map((_, index) => (
             <PoolRowSkeleton key={index} />
@@ -733,7 +757,7 @@ export function StarterWorkPoolCloud({
             </div>
           ) : (
             <ul
-              className="grid grid-cols-1 gap-2.5 @min-[38rem]:grid-cols-2"
+              className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-app-surface"
               data-testid="pool-task-list"
               data-pool-flight-target
             >

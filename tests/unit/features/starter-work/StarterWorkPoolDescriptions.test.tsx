@@ -63,7 +63,7 @@ describe("StarterWorkPoolCloud descriptions", () => {
     await user.click(screen.getByRole("button", { name: "List view" }));
 
     const listDescription = screen.getByText(description);
-    expect(listDescription).toHaveClass("line-clamp-1");
+    expect(listDescription).toHaveClass("truncate");
     expect(listDescription).toHaveAttribute("title", description);
     expect(screen.getByTestId("pool-list-task-2").querySelector("p")).toBeNull();
   });
