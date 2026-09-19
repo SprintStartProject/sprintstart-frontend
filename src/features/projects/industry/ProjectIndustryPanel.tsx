@@ -170,7 +170,10 @@ export function ProjectIndustryPanel({
                 {industry || "Not determined yet"}
               </p>
               {industry && (
-                <IndustryConfidenceBadge confidence={industryConfidence} isCustom={industryCustom} />
+                <IndustryConfidenceBadge
+                  confidence={industryConfidence}
+                  isCustom={industryCustom}
+                />
               )}
             </>
           )}
