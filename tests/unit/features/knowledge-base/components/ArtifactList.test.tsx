@@ -64,6 +64,12 @@ describe("ArtifactList", () => {
     expect(screen.getByTestId("artifact-repo-badge")).toHaveTextContent(
       "sprintstart/sprintstart-backend",
     );
+    // The chip ellipsizes rather than widening the row, so the full name has to
+    // stay reachable through the tooltip.
+    expect(screen.getByTestId("artifact-repo-badge")).toHaveAttribute(
+      "title",
+      "sprintstart/sprintstart-backend",
+    );
   });
 
   it("shows no repository badge when GitHub metadata is missing or malformed", () => {

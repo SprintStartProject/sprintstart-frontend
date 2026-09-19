@@ -1263,10 +1263,13 @@ export function ArtifactViewerDrawer({
   const repositoryBadge = repository ? (
     <span
       data-testid="artifact-drawer-repo-badge"
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted"
+      title={repository}
+      className="flex min-w-0 items-center gap-1.5 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted"
     >
-      <GitBranch className="h-3 w-3" aria-hidden="true" />
-      {repository}
+      <GitBranch className="h-3 w-3 shrink-0" aria-hidden="true" />
+      {/* A long `owner/repository` must ellipsize rather than widen the header:
+          the badge shares its row with the title, and the panel clips overflow. */}
+      <span className="truncate">{repository}</span>
     </span>
   ) : undefined;
 

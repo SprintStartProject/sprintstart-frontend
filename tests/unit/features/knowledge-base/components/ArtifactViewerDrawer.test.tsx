@@ -148,6 +148,12 @@ describe("ArtifactViewerDrawer", () => {
       expect(screen.getByTestId("artifact-drawer-repo-badge")).toHaveTextContent(
         "sprintstart/sprintstart-backend",
       );
+      // The badge ellipsizes inside the header, so the full name has to stay
+      // reachable through the tooltip.
+      expect(screen.getByTestId("artifact-drawer-repo-badge")).toHaveAttribute(
+        "title",
+        "sprintstart/sprintstart-backend",
+      );
     });
 
     it("shows no repository badge for an artifact without repo metadata", () => {
