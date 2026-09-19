@@ -161,7 +161,9 @@ export function BuddyConversation({
           )}
 
           <BuddyThread
-            renderReplyAction={(reply) => <BuddyReplyActions reply={reply} />}
+            renderReplyAction={(reply, message) => (
+              <BuddyReplyActions reply={reply} message={message} />
+            )}
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}

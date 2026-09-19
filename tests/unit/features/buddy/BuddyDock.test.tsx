@@ -73,6 +73,64 @@ const user = (content: string): BuddyMessageView => ({
   createdAt: "2026-08-03T00:00:00Z",
 });
 
+/** A reply holding a markdown list, which is what makes `SaveReplyToBoard` draw anything. */
+const LIST_REPLY = "Here is how to start:\n\n- Find the component\n- Run it locally";
+
+/**
+ * Two ways to keep the same list, and they do not agree: the mentor's proposal is the steps it
+ * chose, the reply button is every bullet in the reply scraped flat. A structured answer would
+ * offer one list of five beside one of twenty.
+ */
+describe("a reply the mentor already offered to keep", () => {
+  it("offers the list button when the mentor proposed nothing", () => {
+    renderDock([assistant(LIST_REPLY)]);
+
+    expect(screen.getByRole("button", { name: /keep as checklist/i })).toBeInTheDocument();
+  });
+
+  it("stands the list button down beside a place_checklist proposal", () => {
+    renderDock([
+      {
+        ...assistant(LIST_REPLY),
+        actions: [
+          {
+            id: "act-1",
+            action: "place_checklist",
+            label: "Keep this as a checklist",
+            checklistTitle: "Getting started",
+            checklistItems: ["Find the component", "Run it locally"],
+            status: "idle",
+          },
+        ],
+      },
+    ]);
+
+    expect(screen.getByRole("button", { name: /keep this as a checklist/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /keep as checklist/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  /** Declining the mentor's list is not declining every way to keep one. */
+  it("brings it back once the proposal is dismissed", () => {
+    renderDock([
+      {
+        ...assistant(LIST_REPLY),
+        actions: [
+          {
+            id: "act-1",
+            action: "place_checklist",
+            label: "Keep this as a checklist",
+            status: "dismissed",
+          },
+        ],
+      },
+    ]);
+
+    expect(screen.getByRole("button", { name: /keep as checklist/i })).toBeInTheDocument();
+  });
+});
+
 /**
  * These assert classes, not layout, and that is deliberate. jsdom computes no layout, so a
  * genuine "does it overflow at 400 px" test is not available here — but the regression they guard
