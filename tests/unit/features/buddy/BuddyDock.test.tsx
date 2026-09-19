@@ -85,7 +85,7 @@ describe("a reply the mentor already offered to keep", () => {
   it("offers the list button when the mentor proposed nothing", () => {
     renderDock([assistant(LIST_REPLY)]);
 
-    expect(screen.getByRole("button", { name: /keep this on my board/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /keep as checklist/i })).toBeInTheDocument();
   });
 
   it("stands the list button down beside a place_checklist proposal", () => {
@@ -107,7 +107,7 @@ describe("a reply the mentor already offered to keep", () => {
 
     expect(screen.getByRole("button", { name: /keep this as a checklist/i })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /keep this on my board/i }),
+      screen.queryByRole("button", { name: /keep as checklist/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -127,7 +127,7 @@ describe("a reply the mentor already offered to keep", () => {
       },
     ]);
 
-    expect(screen.getByRole("button", { name: /keep this on my board/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /keep as checklist/i })).toBeInTheDocument();
   });
 });
 
