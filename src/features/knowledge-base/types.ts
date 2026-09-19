@@ -39,7 +39,10 @@ export interface Artifact {
    * the field — and every fixture that omits it — must stay assignable.
    * For `ORG_METADATA` artifacts it carries the GitHub org profile, teams and
    * members — see
-   * [`parseOrgMetadata`](./orgMetadata). The artifact *content* endpoint
+   * [`parseOrgMetadata`](./orgMetadata); for GitHub repo artifacts (`COMMIT`,
+   * `FILE`, `ISSUE`, `PULL_REQUEST`) it carries `repositoryId` and
+   * `repositoryFullName` — see [`parseGithubMetadata`](./githubMetadata). The
+   * artifact *content* endpoint
    * (`GET /artifacts/{id}/content`) is a 302 redirect to the org's GitHub page for
    * this type and holds no stored bytes, so org artifacts must be rendered purely
    * from this field (see `ArtifactViewerDrawer`).
