@@ -67,7 +67,7 @@ describe("StarterWorkPoolCloud", () => {
     expect(screen.getByText("pool unavailable")).toBeInTheDocument();
   });
 
-  it("labels manually created tasks as Custom instead of exposing their source id", () => {
+  it("labels manually created tasks as written by hand instead of exposing their source id", () => {
     const sourceId = "c90aad2a-f7c5-4cd5-9b02-8c3ab5fb83ed";
     renderWithProviders(
       <StarterWorkPoolCloud
@@ -79,14 +79,14 @@ describe("StarterWorkPoolCloud", () => {
       />,
     );
 
-    expect(screen.getByText("Custom")).toBeInTheDocument();
+    expect(screen.getByText("Written by hand")).toBeInTheDocument();
     expect(screen.queryByText(sourceId)).not.toBeInTheDocument();
   });
 
-  it("places one page of tasks in five deterministic, unique cloud slots", () => {
+  it("places one page of up to twelve cards on a fixed four-column grid", () => {
     renderWithProviders(
       <StarterWorkPoolCloud
-        tasks={Array.from({ length: 6 }, (_, index) => task(index + 1))}
+        tasks={Array.from({ length: 13 }, (_, index) => task(index + 1))}
         isLoading={false}
         error={null}
         canAct
@@ -95,17 +95,16 @@ describe("StarterWorkPoolCloud", () => {
     );
 
     const cards = screen.getAllByTestId(/^pool-task-task-/);
-    expect(cards).toHaveLength(5);
-    expect(cards.map((card) => card.dataset.cloudSlot)).toEqual(["0", "1", "2", "3", "4"]);
-    expect(new Set(cards.map((card) => card.style.getPropertyValue("--cloud-left"))).size).toBe(5);
-    expect(screen.queryByText("Starter task 6")).not.toBeInTheDocument();
+    expect(cards).toHaveLength(12);
+    expect(screen.getByTestId("pool-task-cloud")).toHaveClass("grid", "grid-cols-4");
+    expect(screen.queryByText("Starter task 13")).not.toBeInTheDocument();
   });
 
   it("keeps the existing pagination for pools larger than the cloud", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
-        tasks={Array.from({ length: 6 }, (_, index) => task(index + 1))}
+        tasks={Array.from({ length: 13 }, (_, index) => task(index + 1))}
         isLoading={false}
         error={null}
         canAct
@@ -115,7 +114,7 @@ describe("StarterWorkPoolCloud", () => {
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
 
-    expect(await screen.findByText("Starter task 6")).toBeInTheDocument();
+    expect(await screen.findByText("Starter task 13")).toBeInTheDocument();
     expect(screen.queryByText("Starter task 1")).not.toBeInTheDocument();
   });
 
@@ -155,7 +154,7 @@ describe("StarterWorkPoolCloud", () => {
     expect(onOpenTask).toHaveBeenCalledWith(task(1));
   });
 
-  it("sorts unseen tasks first and marks them, leaving seen ones with a checkmark", () => {
+  it("sorts unseen tasks first and marks them, leaving seen ones unmarked", () => {
     renderWithProviders(
       <StarterWorkPoolCloud
         tasks={[task(1), { ...task(2), reviewed: false }, task(3)]}
@@ -169,7 +168,7 @@ describe("StarterWorkPoolCloud", () => {
     const cards = screen.getAllByTestId(/^pool-task-task-/);
     expect(cards[0]).toHaveAttribute("data-testid", "pool-task-task-2");
     expect(within(cards[0]).getByLabelText("Not looked at yet")).toBeInTheDocument();
-    expect(within(cards[1]).getByLabelText("Looked at")).toBeInTheDocument();
+    expect(within(cards[1]).queryByLabelText("Not looked at yet")).not.toBeInTheDocument();
   });
 
   it("badges a task flagged for Task 0", () => {

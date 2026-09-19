@@ -41,7 +41,7 @@ describe("StarterWorkPoolCloud descriptions", () => {
     mockViewport();
   });
 
-  it("renders a real description as one truncated line and omits blank descriptions", async () => {
+  it("renders a real description clamped to one line and omits blank descriptions", async () => {
     const user = userEvent.setup();
     const description = "A meaningful description that previews what the task is about.";
 
@@ -56,14 +56,14 @@ describe("StarterWorkPoolCloud descriptions", () => {
     );
 
     const cloudDescription = screen.getByText(description);
-    expect(cloudDescription).toHaveClass("truncate");
+    expect(cloudDescription).toHaveClass("line-clamp-1");
     expect(cloudDescription).toHaveAttribute("title", description);
     expect(screen.getByTestId("pool-task-2").querySelector("p")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "List view" }));
 
     const listDescription = screen.getByText(description);
-    expect(listDescription).toHaveClass("truncate");
+    expect(listDescription).toHaveClass("line-clamp-1");
     expect(listDescription).toHaveAttribute("title", description);
     expect(screen.getByTestId("pool-list-task-2").querySelector("p")).toBeNull();
   });

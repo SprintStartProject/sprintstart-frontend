@@ -40,35 +40,12 @@ describe("StarterWorkPoolCloud density", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
-    // The cloud view (and its wide ten-card page) only exists from `sm` up, so pin a desktop viewport.
+    // The cloud view only exists from `sm` up, so pin a desktop viewport.
     mockViewport();
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
   });
 
-  it("shows at most three issue-style rows on each list page", async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <StarterWorkPoolCloud
-        tasks={Array.from({ length: 4 }, (_, index) => task(index + 1))}
-        isLoading={false}
-        error={null}
-        canAct
-        onOpenTask={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: "List view" }));
-
-    expect(screen.getAllByTestId(/^pool-list-task-/)).toHaveLength(3);
-    expect(screen.queryByText("Starter task 4")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Next page" }));
-
-    expect(await screen.findByText("Starter task 4")).toBeInTheDocument();
-    expect(screen.getAllByTestId(/^pool-list-task-/)).toHaveLength(1);
-  });
-
-  it("lays the full-width list out as a 2×3 grid of up to six rows per page", async () => {
+  it("lays the list out as a 2×3 grid of up to six rows per page", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
@@ -76,7 +53,6 @@ describe("StarterWorkPoolCloud density", () => {
         isLoading={false}
         error={null}
         canAct
-        fullWidth
         onOpenTask={vi.fn()}
       />,
     );
@@ -98,21 +74,20 @@ describe("StarterWorkPoolCloud density", () => {
     expect(screen.getAllByTestId(/^pool-list-task-/)).toHaveLength(1);
   });
 
-  it("shows the small cloud twice, up to ten cards per page, when full width", () => {
+  it("shows a 4×3 grid of up to twelve cards per cloud page", () => {
     renderWithProviders(
       <StarterWorkPoolCloud
-        tasks={Array.from({ length: 11 }, (_, index) => task(index + 1))}
+        tasks={Array.from({ length: 13 }, (_, index) => task(index + 1))}
         isLoading={false}
         error={null}
         canAct
-        fullWidth
         onOpenTask={vi.fn()}
       />,
     );
 
-    // Cloud view is the default; full width doubles the five-card page to ten.
-    expect(screen.getAllByTestId(/^pool-task-task-/)).toHaveLength(10);
-    expect(screen.queryByText("Starter task 11")).not.toBeInTheDocument();
+    // Cloud view is the default.
+    expect(screen.getAllByTestId(/^pool-task-task-/)).toHaveLength(12);
+    expect(screen.queryByText("Starter task 13")).not.toBeInTheDocument();
   });
 
   it("does not render competency badges in either pool view", async () => {
@@ -141,14 +116,13 @@ describe("StarterWorkPoolCloud density", () => {
     renderWithProviders(
       <StarterWorkPoolCloud
         // Only the first task is flagged for Task 0; the other six fill up the list's first
-        // full-width page (6 per page), pushing it onto page 2.
+        // page (6 per page), pushing it onto page 2.
         tasks={Array.from({ length: 7 }, (_, index) =>
           index === 0 ? { ...task(1), taskZeroEligible: true } : task(index + 1),
         )}
         isLoading={false}
         error={null}
         canAct
-        fullWidth
         onOpenTask={vi.fn()}
       />,
     );

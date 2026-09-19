@@ -45,27 +45,7 @@ describe("StarterWorkPoolCloud views", () => {
     vi.spyOn(starterWorkService, "fetchCandidates").mockResolvedValue([]);
   });
 
-  it("chooses a different one of the five cloud layouts whenever the page changes", async () => {
-    const user = userEvent.setup();
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    renderWithProviders(
-      <StarterWorkPoolCloud
-        tasks={Array.from({ length: 7 }, (_, index) => task(index + 1))}
-        isLoading={false}
-        error={null}
-        canAct
-        onOpenTask={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByTestId("pool-task-cloud")).toHaveAttribute("data-cloud-layout", "0");
-
-    await user.click(screen.getByRole("button", { name: "Next page" }));
-
-    expect(screen.getByTestId("pool-task-cloud")).toHaveAttribute("data-cloud-layout", "1");
-  });
-
-  it("switches to issue-style list rows and shows only the repository name", async () => {
+  it("shows the repo and issue number as a coloured source badge", async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <StarterWorkPoolCloud
@@ -77,8 +57,8 @@ describe("StarterWorkPoolCloud views", () => {
       />,
     );
 
-    expect(screen.getByText("repo")).toBeInTheDocument();
-    expect(screen.queryByText("acme/repo")).not.toBeInTheDocument();
+    const sourceBadge = screen.getByText("#1");
+    expect(sourceBadge.closest("[title]")).toHaveAttribute("title", "acme/repo #1");
 
     await user.click(screen.getByRole("button", { name: "List view" }));
 
