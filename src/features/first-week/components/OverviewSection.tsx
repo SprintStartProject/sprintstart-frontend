@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, PlaneLanding, Target } from "lucide-react";
-import { Badge, type BadgeVariant } from "../../../components/ui/Badge";
+import { Eye, PlaneLanding, Target } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useArrivalAuthoring } from "../../arrival/hooks/useArrivalAuthoring";
@@ -9,6 +8,8 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { useStarterWorkPool } from "../../starter-work/hooks/useStarterWorkPool";
 import { useStarterWorkReview } from "../../starter-work/hooks/useStarterWorkReview";
 import type { StarterWorkFocus } from "../../starter-work/components/StarterWorkSection";
+import { buildReadiness } from "../readiness";
+import { StageCard } from "./StageCard";
 
 type OverviewTarget = "arrival" | "starter";
 
@@ -18,13 +19,14 @@ type OverviewSectionProps = {
 };
 
 /**
- * The default First Week tab: where a new hire stands across the three stages in order — arrival
- * steps, their first task, and the wider starter-work pool — plus up to three things worth a PM's
- * attention right now.
+ * The default First Week tab: whether the three preparation stages — arrival steps, their first
+ * task, and the wider starter-work pool — are actually ready for the next hire, plus up to three
+ * things worth a PM's attention right now.
  *
  * Reads the same data the Arrival and Starter work tabs own (`useArrivalAuthoring`,
  * `useStarterWorkPool`, `useStarterWorkReview`) rather than a summary endpoint of its own — there
- * is no aggregate to keep in sync, and every figure here is something either tab can already show.
+ * is no aggregate to keep in sync, and every readiness check here is something either tab can
+ * already show. `buildReadiness` (see `../readiness`) turns that raw data into a status per stage.
  */
 export function OverviewSection({ onNavigate }: OverviewSectionProps) {
   const { selectedProjectId, selectedProject } = useProjectContext();
@@ -44,14 +46,21 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
     );
   }
 
-  const companySteps = company ?? [];
-  const projectSteps = project ?? [];
   const stepCount = mergedStepCount(company, project);
-  const autoCheckedCount = companySteps.filter((step) => step.settledBy === "OBSERVED").length;
-
   const taskZeroCount = pool.filter((task) => task.taskZeroEligible).length;
   const unseenCount = unseenTasks.length;
   const missingDerivable = derivable.find((candidate) => !candidate.added) ?? null;
+
+  const readiness = buildReadiness({
+    company,
+    project,
+    derivable,
+    pool,
+    stale: staleTasks,
+    unseenCount,
+    projectName,
+    now: new Date(),
+  });
 
   const upNext: UpNextItem[] = [
     unseenCount > 0
@@ -99,27 +108,28 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
         <h2 className="mb-3 text-lg font-semibold tracking-tight text-app-text">
           A new hire&apos;s first week
         </h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="relative grid gap-4 sm:grid-cols-3">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-[34px] hidden sm:block"
+          >
+            <div
+              className="absolute h-px bg-app-border"
+              style={{ left: "calc(33.333% - 8px)", width: "16px" }}
+            />
+            <div
+              className="absolute h-px bg-app-border"
+              style={{ left: "calc(66.666% - 8px)", width: "16px" }}
+            />
+          </div>
           <StageCard
             testId="overview-stage-arrival"
             icon={PlaneLanding}
             step={1}
             label="Arrive"
-            figure={stepCount}
-            figureSuffix={
-              projectName ? `steps for someone on ${projectName}` : "steps for every new hire"
-            }
-            chips={[
-              { variant: "neutral", label: `${autoCheckedCount} checked automatically` },
-              ...(projectName
-                ? [
-                    {
-                      variant: "brand" as const,
-                      label: `${projectSteps.length} added by ${projectName}`,
-                    },
-                  ]
-                : []),
-            ]}
+            status={readiness.stages.arrive.status}
+            checks={readiness.stages.arrive.checks}
+            figureLabel={`${stepCount} ${stepCount === 1 ? "step" : "steps"}`}
             actionLabel="Edit arrival"
             onClick={() => onNavigate("arrival")}
           />
@@ -128,13 +138,9 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
             icon={Target}
             step={2}
             label="First task"
-            figure={taskZeroCount}
-            figureSuffix="tasks marked as Task 0"
-            chips={[
-              taskZeroCount > 0
-                ? { variant: "success", label: "Hires get one automatically", icon: CheckCircle2 }
-                : { variant: "warning", label: "No Task 0 yet", icon: AlertTriangle },
-            ]}
+            status={readiness.stages.task0.status}
+            checks={readiness.stages.task0.checks}
+            figureLabel={`${taskZeroCount} Task 0`}
             actionLabel="Choose Task 0"
             onClick={() => onNavigate("starter", "task0")}
           />
@@ -143,21 +149,9 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
             icon={Eye}
             step={3}
             label="Starter work"
-            figure={pool.length}
-            figureSuffix="tasks hires can pick"
-            chips={[
-              unseenCount > 0
-                ? { variant: "brand", label: `${unseenCount} not looked at yet` }
-                : { variant: "success", label: "All looked at", icon: CheckCircle2 },
-              ...(staleTasks.length > 0
-                ? [
-                    {
-                      variant: "neutral" as const,
-                      label: `${staleTasks.length} closed in their tracker`,
-                    },
-                  ]
-                : []),
-            ]}
+            status={readiness.stages.starter.status}
+            checks={readiness.stages.starter.checks}
+            figureLabel={`${pool.length} in the pool`}
             actionLabel="Open the pool"
             onClick={() => onNavigate("starter")}
           />
@@ -175,66 +169,6 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
         </section>
       )}
     </div>
-  );
-}
-
-type StageChip = { variant: BadgeVariant; label: string; icon?: LucideIcon };
-
-function StageCard({
-  testId,
-  icon: Icon,
-  step,
-  label,
-  figure,
-  figureSuffix,
-  chips,
-  actionLabel,
-  onClick,
-}: {
-  testId: string;
-  icon: LucideIcon;
-  step: number;
-  label: string;
-  figure: number;
-  figureSuffix: string;
-  chips: StageChip[];
-  actionLabel: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      onClick={onClick}
-      className="flex flex-col gap-3 rounded-2xl border border-app-border bg-app-surface p-5 text-left transition-colors hover:border-app-border-strong"
-    >
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-app-brand-border bg-app-brand-soft text-xs font-bold text-app-brand-text">
-          {step}
-        </span>
-        <span className="text-sm font-medium text-app-text-muted">{label}</span>
-        <Icon className="ml-auto h-5 w-5 text-app-brand-text" aria-hidden="true" />
-      </div>
-
-      <p className="text-3xl font-bold tracking-tight text-app-text">
-        {figure}
-        <span className="ml-1.5 text-sm font-medium text-app-text-muted">{figureSuffix}</span>
-      </p>
-
-      <div className="flex flex-wrap gap-1.5">
-        {chips.map((chip) => (
-          <Badge key={chip.label} variant={chip.variant} size="md" className="gap-1">
-            {chip.icon && <chip.icon className="h-3 w-3" aria-hidden="true" />}
-            {chip.label}
-          </Badge>
-        ))}
-      </div>
-
-      <span className="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-app-brand-text">
-        {actionLabel}
-        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-      </span>
-    </button>
   );
 }
 

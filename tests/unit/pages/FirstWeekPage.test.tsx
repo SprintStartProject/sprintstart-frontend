@@ -181,22 +181,32 @@ describe("FirstWeekPage Overview tab", () => {
     vi.spyOn(userService, "getMyProjects").mockResolvedValue([]);
   });
 
-  it("counts the merged arrival list, Task 0 and the pool", async () => {
+  it("shows each stage's readiness status and its open checks", async () => {
     renderTab("overview");
 
-    const arrivalCard = await screen.findByTestId("overview-stage-arrival");
     // 2 company steps + 1 project addition, none overridden — 3, not the company list's own 2.
-    expect(within(arrivalCard).getByText("3")).toBeInTheDocument();
-    expect(within(arrivalCard).getByText("1 checked automatically")).toBeInTheDocument();
-    expect(within(arrivalCard).getByText("1 added by Project One")).toBeInTheDocument();
+    // Only the missing "environment-ready" derivable is open, and it's info-only, so the stage
+    // itself is still "ready".
+    const arrivalCard = await screen.findByTestId("overview-stage-arrival");
+    expect(arrivalCard).toHaveAttribute("data-status", "ready");
+    expect(within(arrivalCard).getByText("3 steps")).toBeInTheDocument();
+    expect(
+      within(arrivalCard).getByText("1 automatic check isn't on the list"),
+    ).toBeInTheDocument();
 
+    // No pool task is Task 0 eligible — critical, so the stage is "missing".
     const taskZeroCard = screen.getByTestId("overview-stage-task0");
-    expect(within(taskZeroCard).getByText("0")).toBeInTheDocument();
+    expect(taskZeroCard).toHaveAttribute("data-status", "missing");
     expect(within(taskZeroCard).getByText("No Task 0 yet")).toBeInTheDocument();
+    expect(within(taskZeroCard).getByText("0 Task 0")).toBeInTheDocument();
 
+    // Unseen task and a pool under the minimum both warn, so the stage is "attention"; the pool's
+    // never-synced and closed-in-tracker checks are info-only and push the list past 3.
     const starterCard = screen.getByTestId("overview-stage-starter");
-    expect(within(starterCard).getByText("2")).toBeInTheDocument();
-    expect(within(starterCard).getByText("1 not looked at yet")).toBeInTheDocument();
+    expect(starterCard).toHaveAttribute("data-status", "attention");
+    expect(within(starterCard).getByText("1 task nobody has looked at yet")).toBeInTheDocument();
+    expect(within(starterCard).getByText("2 in the pool")).toBeInTheDocument();
+    expect(within(starterCard).getByText("+1 more")).toBeInTheDocument();
   });
 
   it("lists up to three things worth a PM's attention, built from the same data", async () => {
