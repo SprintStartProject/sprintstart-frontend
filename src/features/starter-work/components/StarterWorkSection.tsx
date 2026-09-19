@@ -23,20 +23,7 @@ import { useStarterWorkReview } from "../hooks/useStarterWorkReview";
 import { useStarterWorkPool } from "../hooks/useStarterWorkPool";
 import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../types";
 
-/**
- * A one-shot instruction for what to do right after landing on this tab, set by the Overview
- * tab's readiness checks. Consumed once — see `onFocusHandled`.
- */
-export type StarterWorkFocus = "triage" | "task0" | "closed" | "sync";
-
 type StarterWorkSectionProps = {
-  focus?: StarterWorkFocus | null;
-  /**
-   * Called once `focus` has been acted on (or found to have nothing to act on), so the caller can
-   * clear it. Without this, navigating away and back to the Starter work tab — or the section
-   * simply re-rendering — would replay the same jump every time.
-   */
-  onFocusHandled?: () => void;
   /**
    * DOM node to portal "Find with AI" and "Add tasks" into — the First Week page's shared header,
    * top right, instead of this section's own body. Falls back to rendering them inline (used
@@ -63,8 +50,6 @@ function compactToastDetail(value: string, maxLength: number): string {
  * HR reads, `ADMIN`/`PM` act, matching the backend's role split.
  */
 export function StarterWorkSection({
-  focus = null,
-  onFocusHandled,
   actionsPortalTarget = null,
 }: StarterWorkSectionProps = {}) {
   const { profile } = useAuth();
@@ -75,7 +60,6 @@ export function StarterWorkSection({
   const { selectedProjectId } = useProjectContext();
   const {
     tasks,
-    isLoading: isReviewLoading,
     isGenerating,
     error,
     generateResult,
@@ -110,9 +94,6 @@ export function StarterWorkSection({
   // scheduled or event-driven pass. Every affected surface reads from the same three query keys,
   // so invalidating them is what makes the pool, the review queue and the corpus browser agree
   // with what the sync just found -- no separate reload calls to keep in sync with this one.
-  //
-  // Declared up here, ahead of the other handlers below, so the Overview tab's `"sync"` focus
-  // effect can call it without a "used before its declaration" error.
   const handleSync = useCallback(async () => {
     setIsSyncing(true);
     try {
@@ -159,28 +140,6 @@ export function StarterWorkSection({
     if (!error) return;
     showErrorToast("Action failed", { description: error });
   }, [error, showErrorToast]);
-
-  // Consumes the Overview tab's one-shot jump exactly once, so revisiting this tab later never
-  // replays it. `"task0"` and `"closed"` are already acted on above, in the pool's
-  // `initialStatusFilter`, so they only need clearing here. `"triage"` has to wait for the
-  // unreviewed queue's own fetch first — the triage modal snapshots `tasks` the moment it mounts,
-  // and opening it against an empty in-flight list would start it "All caught up". `"sync"` runs
-  // the same reconciliation the pool's own "Sync" button does, once, and only for a reader who can
-  // act at all — HR would just see it fail.
-  const focusHandled = useRef(false);
-  useEffect(() => {
-    if (!focus || focusHandled.current) return;
-    if (focus === "triage" && isReviewLoading) return;
-
-    focusHandled.current = true;
-    // Deferred to a microtask so the fetch-gated setState is not synchronous inside the effect
-    // body, which `react-hooks/set-state-in-effect` rejects.
-    void Promise.resolve().then(() => {
-      if (focus === "triage" && tasks.length > 0) setIsTriageOpen(true);
-      if (focus === "sync" && canAct) void handleSync();
-      onFocusHandled?.();
-    });
-  }, [focus, isReviewLoading, tasks, canAct, handleSync, onFocusHandled]);
 
   useEffect(() => {
     if (!createdTask) return;
@@ -392,9 +351,6 @@ export function StarterWorkSection({
         onSync={() => void handleSync()}
         isSyncing={isSyncing}
         onOpenTask={toggleSelectedTask}
-        initialStatusFilter={
-          focus === "task0" ? "taskZero" : focus === "closed" ? "closed" : undefined
-        }
         closedTasks={closedPool}
         isClosedLoading={isClosedPoolLoading}
       />

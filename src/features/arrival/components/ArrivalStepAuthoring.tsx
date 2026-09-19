@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, CornerDownRight, ListChecks, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Badge } from "../../../components/ui/Badge";
@@ -18,12 +18,6 @@ import { radioCardClassName } from "../radioCard";
 import { AddArrivalStepModal } from "./AddArrivalStepModal";
 import { ArrivalStepThread } from "./ArrivalStepThread";
 import type { ArrivalScope, ArrivalStep, UpdateArrivalStepRequest } from "../types";
-
-/**
- * A one-shot instruction for what to do right after landing on this tab, set by the Overview
- * tab's readiness checks. Consumed once — see `onFocusHandled`. Mirrors `StarterWorkFocus`.
- */
-export type ArrivalFocus = "add";
 
 /** Spells out every short badge word the thread and the edit drawer use, for the "What the badges
  * mean" hint next to the step count — the badges themselves stay terse on purpose. */
@@ -56,19 +50,10 @@ export function ArrivalStepAuthoring({
   readOnly = false,
   projectId = null,
   projectName = null,
-  focus = null,
-  onFocusHandled,
 }: {
   readOnly?: boolean;
   projectId?: string | null;
   projectName?: string | null;
-  focus?: ArrivalFocus | null;
-  /**
-   * Called once `focus` has been acted on (or found to have nothing to act on), so the caller can
-   * clear it. Without this, navigating away and back to the Arrival tab — or the section simply
-   * re-rendering — would replay the same jump every time. Matches `StarterWorkSection`'s own.
-   */
-  onFocusHandled?: () => void;
 }) {
   const {
     company,
@@ -105,22 +90,6 @@ export function ArrivalStepAuthoring({
     if (!writeError) return;
     showErrorToast("That didn't save", { description: writeError });
   }, [writeError, showErrorToast]);
-
-  // Consumes the Overview tab's one-shot jump exactly once, so revisiting this tab later never
-  // replays it. Waits for the lists' own fetch first — opening the wizard while `loading` is still
-  // true would hand it an empty derivable catalog. Never opens for a reader who cannot write.
-  const focusHandled = useRef(false);
-  useEffect(() => {
-    if (!focus || focusHandled.current || loading || readOnly) return;
-
-    focusHandled.current = true;
-    // Deferred to a microtask, matching `StarterWorkSection`'s own focus effect — see
-    // `react-hooks/set-state-in-effect`.
-    void Promise.resolve().then(() => {
-      if (focus === "add") setIsAddModalOpen(true);
-      onFocusHandled?.();
-    });
-  }, [focus, loading, readOnly, onFocusHandled]);
 
   if (loading) {
     return (
