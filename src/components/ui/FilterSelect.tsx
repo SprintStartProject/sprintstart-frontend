@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, ChevronDown } from "lucide-react";
@@ -8,6 +8,7 @@ import {
   dockMagnifySpringToken,
   slidingIndicatorSpringToken,
 } from "../../styles/tokens";
+import { MENU_Z_INDEX, menuTransition, usePopoverMenu } from "./usePopoverMenu";
 
 /**
  * Magnification of the highlighted option. Much gentler than the sidebar's
@@ -15,47 +16,6 @@ import {
  * list's padding.
  */
 const OPTION_HOVER_SCALE = 1.03;
-
-/** Distance between the trigger and the menu, whichever side it opens on. */
-const MENU_OFFSET = 6;
-
-/** How tall the menu may get before it scrolls. */
-const MENU_MAX_HEIGHT = 256;
-
-/** Breathing room kept between the menu and the edge of the viewport. */
-const VIEWPORT_MARGIN = 8;
-
-/**
- * Below this, "there is room underneath" stops being true in any useful sense
- * and the menu flips above the trigger instead.
- */
-const MIN_USABLE_HEIGHT = 160;
-
-/**
- * Above modals (`z-50` on `<body>`), below toasts (`z-[200]`).
- *
- * A dropdown opened from inside a dialog has to clear it, and a toast arriving
- * while one is open has to clear the dropdown.
- */
-const MENU_Z_INDEX = 100;
-
-/**
- * Where the menu is painted, in viewport coordinates.
- *
- * Anchored by `top` when it opens downwards and by `bottom` when it flips, so
- * the edge that touches the trigger is the one that stays put — pinning `top`
- * for an upward menu would make it grow away from the control as options are
- * filtered.
- */
-type MenuPosition = {
-  left: number;
-  width: number;
-  top?: number;
-  bottom?: number;
-  maxHeight: number;
-  maxWidth: number;
-  isAbove: boolean;
-};
 
 export type FilterSelectOption<TValue extends string> = {
   value: TValue;
@@ -110,12 +70,12 @@ export function FilterSelect<TValue extends string>({
   disabled = false,
   className = "",
 }: FilterSelectProps<TValue>) {
-  const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [position, setPosition] = useState<MenuPosition | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  // Open/close state, measured placement and outside-dismissal all come from the
+  // shared popover hook, so this control and `MultiSelectFilter` cannot drift
+  // apart on where the menu lands or what counts as an outside press.
+  const { isOpen, position, containerRef, triggerRef, menuRef, open, close } =
+    usePopoverMenu<HTMLUListElement>();
   const typeaheadRef = useRef<{ query: string; timeoutId: number | null }>({
     query: "",
     timeoutId: null,
@@ -130,81 +90,16 @@ export function FilterSelect<TValue extends string>({
   );
   const selectedLabel = options[selectedIndex]?.label ?? "";
 
-  /**
-   * Measures the trigger and decides which side the menu opens on.
-   *
-   * Downwards unless the space under the trigger has stopped being usable and
-   * there is more of it above — a control near the bottom of the window would
-   * otherwise open into a two-option sliver.
-   *
-   * Horizontally the menu is left-aligned with the trigger but never allowed
-   * past either edge of the window. It may be wider than the control it hangs
-   * from — options do not wrap, so a long label grows the list sideways — which
-   * for a trigger near the right edge, like the size picker in a dashboard
-   * widget's toolbar, would otherwise put the menu half off-screen. Its own
-   * width is only knowable once it is mounted, so this reads it back when there
-   * is one to read and falls back to the trigger's width on the first pass.
-   */
-  const updatePosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-
-    const rect = trigger.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom - MENU_OFFSET - VIEWPORT_MARGIN;
-    const spaceAbove = rect.top - MENU_OFFSET - VIEWPORT_MARGIN;
-    const isAbove = spaceBelow < MIN_USABLE_HEIGHT && spaceAbove > spaceBelow;
-    const available = isAbove ? spaceAbove : spaceBelow;
-
-    const maxWidth = Math.max(window.innerWidth - VIEWPORT_MARGIN * 2, 0);
-    const menuWidth = Math.min(Math.max(listRef.current?.offsetWidth ?? 0, rect.width), maxWidth);
-    const furthestLeft = window.innerWidth - VIEWPORT_MARGIN - menuWidth;
-
-    setPosition({
-      left: Math.max(VIEWPORT_MARGIN, Math.min(rect.left, furthestLeft)),
-      width: rect.width,
-      top: isAbove ? undefined : rect.bottom + MENU_OFFSET,
-      bottom: isAbove ? window.innerHeight - rect.top + MENU_OFFSET : undefined,
-      maxHeight: Math.min(MENU_MAX_HEIGHT, Math.max(available, 0)),
-      maxWidth,
-      isAbove,
-    });
-  }, []);
-
-  const open = () => {
+  const openMenu = () => {
     if (disabled) return;
     setActiveIndex(selectedIndex);
-    // Measured before the menu is mounted, so it is never painted at 0,0 first.
-    updatePosition();
-    setIsOpen(true);
-  };
-
-  const close = () => {
-    setIsOpen(false);
+    open();
   };
 
   // Re-measured rather than closed on scroll: a filter bar inside a scrolling
   // page is the normal case, and a menu that vanishes the moment the page moves
   // under the pointer is worse than one that follows. Capture phase, because a
   // scroll inside a nested container does not bubble to `window`.
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-
-    const handle = () => updatePosition();
-
-    // Once more now that the menu exists: the measurement taken on open could
-    // only guess its width from the trigger, and a menu wider than its control
-    // may need to sit further left. Before paint, so it never appears to jump.
-    handle();
-
-    window.addEventListener("scroll", handle, { capture: true, passive: true });
-    window.addEventListener("resize", handle, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handle, { capture: true });
-      window.removeEventListener("resize", handle);
-    };
-  }, [isOpen, updatePosition]);
-
   const commit = (index: number) => {
     const option = options[index];
     if (option) {
@@ -213,32 +108,6 @@ export function FilterSelect<TValue extends string>({
     close();
     triggerRef.current?.focus();
   };
-
-  // Pointer interactions outside the control dismiss it. `pointerdown` rather
-  // than `click`, so the menu is gone before the click lands on whatever is
-  // underneath — and rather than `mousedown`, which on a touch device only
-  // arrives as an emulated event after the tap, or not at all.
-  //
-  // The menu has to be tested separately from the container: it is portaled
-  // into `<body>`, so `containerRef` no longer contains it, and checking the
-  // container alone would treat a press on an option as an outside click —
-  // unmounting the option before the click that selects it could land.
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-
-      if (!containerRef.current?.contains(target) && !listRef.current?.contains(target)) {
-        close();
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [isOpen]);
 
   // Focus never leaves the trigger in the select-only combobox pattern, so the
   // browser does not scroll the list for us the way it would if the options
@@ -291,7 +160,7 @@ export function FilterSelect<TValue extends string>({
       case "ArrowDown":
         event.preventDefault();
         if (!isOpen) {
-          open();
+          openMenu();
         } else {
           setActiveIndex((current) => Math.min(current + 1, options.length - 1));
         }
@@ -299,7 +168,7 @@ export function FilterSelect<TValue extends string>({
       case "ArrowUp":
         event.preventDefault();
         if (!isOpen) {
-          open();
+          openMenu();
         } else {
           setActiveIndex((current) => Math.max(current - 1, 0));
         }
@@ -320,7 +189,7 @@ export function FilterSelect<TValue extends string>({
         if (isOpen) {
           commit(activeIndex);
         } else {
-          open();
+          openMenu();
         }
         return;
       case "Escape":
@@ -357,7 +226,7 @@ export function FilterSelect<TValue extends string>({
         aria-haspopup="listbox"
         aria-activedescendant={isOpen ? `${optionIdPrefix}-${activeIndex}` : undefined}
         disabled={disabled}
-        onClick={() => (isOpen ? close() : open())}
+        onClick={() => (isOpen ? close() : openMenu())}
         onKeyDown={handleKeyDown}
         {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}
         className="inline-flex h-9 w-full cursor-pointer items-center justify-between gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 text-sm text-app-text backdrop-blur-md transition-colors outline-none hover:border-app-brand-border-strong hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70"
@@ -376,7 +245,7 @@ export function FilterSelect<TValue extends string>({
         <AnimatePresence>
           {isOpen && position && (
             <motion.ul
-              ref={listRef}
+              ref={menuRef}
               id={listboxId}
               role="listbox"
               aria-label={label}
@@ -389,7 +258,7 @@ export function FilterSelect<TValue extends string>({
               exit={
                 prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: position.isAbove ? 6 : -6 }
               }
-              transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+              transition={menuTransition}
               style={{
                 left: position.left,
                 top: position.top,
