@@ -375,9 +375,7 @@ describe("ProjectIndustryWidget", () => {
     await user.click(screen.getByTestId("save-industry-button"));
 
     await waitFor(() =>
-      expect(
-        within(toastStack()).getByText("You may not edit this project."),
-      ).toBeInTheDocument(),
+      expect(within(toastStack()).getByText("You may not edit this project.")).toBeInTheDocument(),
     );
     expect(screen.getByTestId("industry-edit-input")).toHaveValue("Healthcare");
   });

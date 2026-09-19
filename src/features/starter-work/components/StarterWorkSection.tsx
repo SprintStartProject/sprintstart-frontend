@@ -49,9 +49,7 @@ function compactToastDetail(value: string, maxLength: number): string {
  *
  * HR reads, `ADMIN`/`PM` act, matching the backend's role split.
  */
-export function StarterWorkSection({
-  actionsPortalTarget = null,
-}: StarterWorkSectionProps = {}) {
+export function StarterWorkSection({ actionsPortalTarget = null }: StarterWorkSectionProps = {}) {
   const { profile } = useAuth();
   const toast = useToast();
   const canAct = profile?.permissionGroup !== PermissionGroup.HR;

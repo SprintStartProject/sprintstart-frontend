@@ -309,7 +309,7 @@ describe("StarterWorkSection", () => {
         expect.objectContaining({ title: "Add a dark-mode toggle" }),
       ),
     );
-    expect(await screen.findByText("Created — claimable now")).toBeInTheDocument();
+    expect(await screen.findByText("Created, claimable now")).toBeInTheDocument();
     expect(screen.getAllByText("Add a dark-mode toggle").length).toBeGreaterThan(0);
   });
 
@@ -350,7 +350,7 @@ describe("StarterWorkSection", () => {
     );
     await user.click(await screen.findByTestId("promote-issue-github:acme/repo:ISSUE:7"));
 
-    expect(await screen.findByText("Added — claimable now")).toBeInTheDocument();
+    expect(await screen.findByText("Added, claimable now")).toBeInTheDocument();
     expect(screen.getAllByText("Tidy the onboarding README").length).toBeGreaterThan(0);
   });
 
