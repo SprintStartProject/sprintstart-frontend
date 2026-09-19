@@ -7,15 +7,22 @@
 // place.
 // ============================================================
 
+import { isPhaseStarted, itemState, lastActivityAt, orderedPhaseItems } from "./journey";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
+  OnboardingQuestionEndpoint,
   OnboardingStepEndpoint,
 } from "./types";
 
-/** A step still waiting to be done — neither finished nor skipped. */
+/** A step still waiting to be done — neither finished nor skipped nor locked. */
 export function isStepOpen(step: OnboardingStepEndpoint): boolean {
   return step.status !== "FINISHED" && step.status !== "SKIPPED";
+}
+
+/** A question still waiting to be answered — not passed yet. */
+export function isQuestionOpen(question: OnboardingQuestionEndpoint): boolean {
+  return question.status !== "PASSED";
 }
 
 export type PathProgress = {
@@ -41,16 +48,18 @@ export function countPathProgress(path: OnboardingPathEndpoint): PathProgress {
 }
 
 /**
- * The single next thing waiting for the member.
+ * The next thing waiting for the member.
  *
- * Deliberately one value rather than a list: every caller — the dashboard card, the
- * "next" button on a step — has exactly one destination to offer, and each of them
- * deciding for itself is how they end up disagreeing.
+ * One value rather than a list: every caller -- the dashboard card, the "next" button on a step --
+ * has exactly one destination to offer, and each of them deciding for itself is how they end up
+ * disagreeing. The one exception is a real fork in the path: when finishing a phase opens several
+ * new ones at once, there is no single next thing, and pretending there is one takes the choice
+ * away from the member. That is `choose`, and it carries the phases to choose from.
  */
 export type OnboardingNextAction =
   | { kind: "step"; phase: OnboardingPhaseEndpoint; step: OnboardingStepEndpoint }
-  | { kind: "check"; phase: OnboardingPhaseEndpoint; isFinalPhase: boolean }
-  | { kind: "review"; openCount: number }
+  | { kind: "question"; phase: OnboardingPhaseEndpoint; question: OnboardingQuestionEndpoint }
+  | { kind: "choose"; phases: OnboardingPhaseEndpoint[] }
   | { kind: "done" };
 
 function byPosition<T extends { position: number }>(items: readonly T[]): T[] {
@@ -58,44 +67,77 @@ function byPosition<T extends { position: number }>(items: readonly T[]): T[] {
 }
 
 /**
- * Resolves the next action from a path and the size of the review pool.
+ * The item to do next inside one phase, or null when the phase has nothing reachable.
  *
- * Walks the phases in order and stops at the first one with anything open, which is what
- * keeps the answer inside the phase the member is actually allowed to be in:
+ * A step already in progress comes first -- it is where the member left off. After that the first
+ * open item in the order the phase graph reads, steps and questions mixed, because questions are
+ * nodes of the same graph and often stand between two steps.
+ */
+export function nextItemInPhase(
+  phase: OnboardingPhaseEndpoint,
+):
+  | { kind: "step"; step: OnboardingStepEndpoint }
+  | { kind: "question"; question: OnboardingQuestionEndpoint }
+  | null {
+  if (phase.locked) return null;
+  const inProgress = phase.steps.find((step) => step.status === "IN_PROGRESS");
+  if (inProgress) return { kind: "step", step: inProgress };
+
+  for (const item of orderedPhaseItems(phase)) {
+    const state = itemState(item, false);
+    // A step waiting on the PM's answer to a skip request is not what to do next.
+    const skipPending =
+      item.kind === "step" && !!item.step.skip && item.step.skip.accepted === null;
+    if (item.kind === "step" && state === "open" && !skipPending) {
+      return { kind: "step", step: item.step };
+    }
+    if (item.kind === "question" && (state === "open" || state === "retry")) {
+      return { kind: "question", question: item.question };
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolves the next action from a path.
  *
- * - **Locked phases are skipped entirely.** Their steps exist but cannot be started, so
- *   offering one leads to a step the backend refuses. This is the difference to reading
- *   `currentStep` off the team overview, which reports the first unfinished step in the
- *   path regardless of locks — for someone standing in front of an unpassed check that is
- *   a step in the *next* phase, which is exactly where they may not go.
- * - **A phase's knowledge check comes before anything in a later phase.** Once its steps
- *   are done the check is that phase's last item, and while it is unpassed nothing behind
- *   it is reachable.
- * - **The review pool outlives the phases.** Questions missed earlier have to be answered
- *   correctly once, and the backend does not count the journey as finished while any are
- *   still open — so a path whose phases are all cleared can still have work left.
+ * Phases can run side by side -- a blueprint often opens several at once -- so "the next phase" is
+ * not the next one by position. In order of preference:
+ *
+ * 1. **The phase the member is in right now** (`preferPhaseId`), while it has anything left. Finish a
+ *    step in phase 3 and "continue" stays in phase 3, even if phase 2 is open too.
+ * 2. **A phase the member already started**, most recently touched first.
+ * 3. **The only open phase**, when there is just one.
+ * 4. Otherwise the member **chooses** between the phases that are open.
+ *
+ * Locked phases are never candidates: their items exist but the backend refuses to start them.
  *
  * @param path The member's own path, as returned by `GET /onboarding/me/path`.
- * @param openReviewCount Questions waiting in the review pool. Only consulted when the
- *   phases have nothing left, so callers may leave it out while they do not know it yet.
  */
 export function resolveNextAction(
   path: OnboardingPathEndpoint,
-  openReviewCount = 0,
+  { preferPhaseId = null }: { preferPhaseId?: string | null } = {},
 ): OnboardingNextAction {
-  const phases = byPosition(path.phases);
-  const finalPhaseId = phases.at(-1)?.id;
+  const candidates = byPosition(path.phases)
+    .map((phase) => ({ phase, item: nextItemInPhase(phase) }))
+    .filter(
+      (
+        candidate,
+      ): candidate is {
+        phase: OnboardingPhaseEndpoint;
+        item: NonNullable<typeof candidate.item>;
+      } => candidate.item !== null,
+    );
+  if (candidates.length === 0) return { kind: "done" };
 
-  for (const phase of phases) {
-    if (phase.locked) continue;
+  const preferred = candidates.find((candidate) => candidate.phase.id === preferPhaseId);
+  const started = candidates
+    .filter((candidate) => isPhaseStarted(candidate.phase))
+    .sort((left, right) => lastActivityAt(right.phase) - lastActivityAt(left.phase));
+  const pick = preferred ?? started[0] ?? (candidates.length === 1 ? candidates[0] : null);
 
-    const openStep = byPosition(phase.steps).find(isStepOpen);
-    if (openStep) return { kind: "step", phase, step: openStep };
-
-    if (phase.checkSummary?.required && !phase.checkSummary.passed) {
-      return { kind: "check", phase, isFinalPhase: phase.id === finalPhaseId };
-    }
-  }
-
-  return openReviewCount > 0 ? { kind: "review", openCount: openReviewCount } : { kind: "done" };
+  if (!pick) return { kind: "choose", phases: candidates.map((candidate) => candidate.phase) };
+  return pick.item.kind === "step"
+    ? { kind: "step", phase: pick.phase, step: pick.item.step }
+    : { kind: "question", phase: pick.phase, question: pick.item.question };
 }

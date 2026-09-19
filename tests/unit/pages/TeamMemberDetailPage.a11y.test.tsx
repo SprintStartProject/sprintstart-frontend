@@ -68,10 +68,6 @@ vi.mock("../../../src/components/common/UserAvatar", () => ({
   UserAvatar: () => <svg role="img" aria-label="User Avatar" width="56" height="56" />,
 }));
 
-vi.mock("../../../src/features/team-management/components/detail/MemberOnboardingSection", () => ({
-  MemberOnboardingSection: () => <section aria-label="Onboarding">Onboarding</section>,
-}));
-
 vi.mock("../../../src/features/team-management/components/detail/MemberGapsPanel", () => ({
   MemberGapsPanel: () => <section aria-label="Gaps">Gaps</section>,
 }));

@@ -1,0 +1,645 @@
+import dagre from "dagre";
+
+/**
+ * The geometry and the graph rules of the Blueprint canvas, kept apart from the canvas itself.
+ *
+ * Everything here is a pure function of the nodes it is handed, which is the point: the rules that
+ * decide whether an edge may exist, where an unplaced node lands and what "tidy up" does are the
+ * parts worth testing, and none of them need a DOM to be true.
+ *
+ * **What an edge means.** A node's `blockerIds` are the nodes that must be finished before it opens
+ * — a hard lock, not a suggestion. That is the only relationship the Blueprint model has; the order
+ * a node sits in (`position`) is a suggestion and is not drawn here. Everything in this module that
+ * talks about "reaching" walks that lock relation in the direction a reader would: from a node to
+ * the things it waits on.
+ */
+
+/**
+ * The card box on the canvas, fixed — and the card is drawn at exactly this size.
+ *
+ * Fixed rather than measured because dagre needs a size before anything has been drawn,
+ * and because two cards of different heights in one rank make a tidy layout look untidy.
+ *
+ * The height used to be an estimate the card was free to exceed: a title over two lines, a line of
+ * context, a requirements line and a row of chips came to about 180px against an assumed 116, so
+ * every gap the layout left was too small and cards sat on top of each other. Both the geometry and
+ * the card now read this, so they cannot drift apart again.
+ *
+ * It has come down twice since, both times because the card was made to say less rather than
+ * because the box was squeezed. What is on it now is a title, what kind of thing it is, and two
+ * numbers — everything else was either prose a glance cannot read or a badge that appeared on every
+ * card and so distinguished nothing. A canvas of half-empty boxes fits fewer of them on screen for
+ * nothing, and on a graph the number that fit *is* the feature.
+ */
+export const GRAPH_NODE_WIDTH = 224;
+export const GRAPH_NODE_HEIGHT = 108;
+
+/** The spacing "tidy up" lays chains and loose nodes out on. */
+const COLUMN_STEP = GRAPH_NODE_WIDTH + 80;
+const ROW_STEP = GRAPH_NODE_HEIGHT + 56;
+
+/**
+ * How much a card says, by how far away it is being read from.
+ *
+ * Two tiers, and the second one was tried and dropped. A middle step that kept the counts and left
+ * the prose behind looked almost exactly like the full card — on most nodes it *was* the full card,
+ * because most of them carry no prose — so it bought a threshold, a state and a transition to show
+ * the same thing twice. A distinction nobody can see is not a distinction.
+ *
+ * What is left is the one that earns itself: a card near enough to read says everything, and a card
+ * too far to read anything becomes a label on a map instead of a grey smear. The full card appears
+ * as soon as there is room for it, rather than waiting for a second threshold nobody asked for.
+ */
+export type GraphDetail = "far" | "near";
+
+/**
+ * Below this, a card is a map label: an icon and its title, sized to stay legible.
+ *
+ * Set by the smallest thing on the full card rather than by the title. The context line under the
+ * title is 11px, so at two thirds of full zoom it is already seven pixels on screen -- present,
+ * unreadable, and taking the room the title needs. The card gives that room back at the point the
+ * line stops being readable, not at the point the title does.
+ */
+export const FAR_DETAIL_ZOOM = 0.65;
+
+export function detailForZoom(zoom: number): GraphDetail {
+  return zoom < FAR_DETAIL_ZOOM ? "far" : "near";
+}
+
+/** What the canvas rules need to know about a node. Both graph levels satisfy this. */
+export type GraphRuleNode = {
+  id: string;
+  graphX: number | null;
+  graphY: number | null;
+  /** Nodes that must be finished before this one opens. */
+  blockerIds: string[];
+  /**
+   * The order this node is listed in, which is a suggestion and not a rule.
+   *
+   * Never drawn and never used to sequence anything — the arrows are the only order this model
+   * has. It is read in one place only: as the order nodes are handed to the layout, so that two
+   * phases nothing sequences come out in the order their author listed them rather than in
+   * whatever order the algorithm happened to settle on.
+   */
+  position?: number;
+};
+
+export type GraphPoint = { x: number; y: number };
+export type GraphPositions = Record<string, GraphPoint>;
+
+/**
+ * Whether `nodeId` can reach `targetId` by walking what it waits on.
+ *
+ * Counts its own steps rather than trusting the data: a ring that somehow got stored would
+ * otherwise hang the render that called this.
+ */
+function reaches(nodes: readonly GraphRuleNode[], nodeId: string, targetId: string): boolean {
+  const blockersById = new Map(nodes.map((node) => [node.id, node.blockerIds]));
+  const seen = new Set<string>();
+  const queue = [nodeId];
+
+  while (queue.length > 0) {
+    const current = queue.pop() as string;
+    if (current === targetId) return true;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    queue.push(...(blockersById.get(current) ?? []));
+  }
+
+  return false;
+}
+
+/**
+ * Why an edge from `blockerId` to `blockedId` cannot be drawn, or `null` when it can.
+ *
+ * Answered before the drag finishes rather than after the request fails. The backend refuses both
+ * of these too (400 for a cycle, 403 for a duplicate), but a handle that takes a connection and
+ * then shows an error box has already told the author the edge was fine.
+ *
+ * A cycle is refused because nothing in a ring can ever be first: every node it touches would be
+ * locked forever on every hire's path, and the person who drew it would have no way to see why.
+ */
+export type EdgeRefusal = "self" | "duplicate" | "cycle";
+
+export function edgeRefusal(
+  nodes: readonly GraphRuleNode[],
+  blockedId: string,
+  blockerId: string,
+): EdgeRefusal | null {
+  if (blockedId === blockerId) return "self";
+
+  const blocked = nodes.find((node) => node.id === blockedId);
+  if (blocked?.blockerIds.includes(blockerId)) return "duplicate";
+
+  // Walking from the proposed blocker: if it already waits on the node we are about to block,
+  // this edge closes the ring.
+  if (reaches(nodes, blockerId, blockedId)) return "cycle";
+
+  return null;
+}
+
+/** The sentence shown when a connection is refused. */
+export const EDGE_REFUSAL_MESSAGE: Record<EdgeRefusal, string> = {
+  self: "A node cannot wait for itself.",
+  duplicate: "These two are already connected.",
+  cycle: "That would make them wait for each other, so neither could ever start.",
+};
+
+/** Whether an edge may be drawn at all, for callers that only want a yes or no (the pickers). */
+export function canConnect(
+  nodes: readonly GraphRuleNode[],
+  blockedId: string,
+  blockerId: string,
+): boolean {
+  return edgeRefusal(nodes, blockedId, blockerId) === null;
+}
+
+/**
+ * The nodes nothing else has to happen before: where a reader starts.
+ *
+ * Only counts blockers that are actually on the canvas. A node waiting on something that was
+ * returned to the library is waiting on nothing anybody can see, and calling it a starting point
+ * is the honest reading — the edge is gone from the picture either way.
+ */
+export function entryPointIds(nodes: readonly GraphRuleNode[]): Set<string> {
+  const drawn = new Set(nodes.map((node) => node.id));
+
+  return new Set(
+    nodes
+      .filter((node) => node.blockerIds.every((blockerId) => !drawn.has(blockerId)))
+      .map((node) => node.id),
+  );
+}
+
+/** Walks one relation from `rootId` and returns everything it reaches, `rootId` excluded. */
+function walk(edges: Map<string, string[]>, rootId: string): Set<string> {
+  const reached = new Set<string>();
+  const queue = [...(edges.get(rootId) ?? [])];
+
+  while (queue.length > 0) {
+    const current = queue.pop() as string;
+    if (current === rootId || reached.has(current)) continue;
+    reached.add(current);
+    queue.push(...(edges.get(current) ?? []));
+  }
+
+  return reached;
+}
+
+function blockerEdges(nodes: readonly GraphRuleNode[]): Map<string, string[]> {
+  return new Map(nodes.map((node) => [node.id, node.blockerIds]));
+}
+
+function dependentEdges(nodes: readonly GraphRuleNode[]): Map<string, string[]> {
+  const edges = new Map<string, string[]>();
+  for (const node of nodes) {
+    for (const blockerId of node.blockerIds) {
+      edges.set(blockerId, [...(edges.get(blockerId) ?? []), node.id]);
+    }
+  }
+  return edges;
+}
+
+/**
+ * Everything `rootId` waits on, however far back — `rootId` itself excluded.
+ *
+ * Kept apart from what waits on it, because the two are different questions and the answers get
+ * different treatment when a reader points at a node. What comes *before* is the constraint: these
+ * are the reasons the node is shut. What comes *after* is the consequence: this is what opening it
+ * would let through. Lit in one colour, a chain says "these are related"; lit in two, it says which
+ * half is holding you up and which half you are holding up.
+ */
+export function blockersBehind(nodes: readonly GraphRuleNode[], rootId: string): Set<string> {
+  return walk(blockerEdges(nodes), rootId);
+}
+
+/** Everything waiting on `rootId`, however far forward — `rootId` itself excluded. */
+export function dependentsAhead(nodes: readonly GraphRuleNode[], rootId: string): Set<string> {
+  return walk(dependentEdges(nodes), rootId);
+}
+
+/**
+ * Everything `rootId` waits on, everything that waits on it, and itself.
+ *
+ * The one question a prerequisite graph is asked is "what does this depend on and what depends on
+ * this", and answering it by pointing is the reason to draw the graph rather than list it.
+ */
+export function chainFor(nodes: readonly GraphRuleNode[], rootId: string): Set<string> {
+  return new Set([rootId, ...blockersBehind(nodes, rootId), ...dependentsAhead(nodes, rootId)]);
+}
+
+/**
+ * Everything laid out from scratch, chains running left to right.
+ *
+ * The button behind this is an escape hatch, not a mode. Nothing calls it on its own: an
+ * arrangement somebody has been dragging into shape for a month is worth more than any layout an
+ * algorithm produces. But a graph that has drifted into a knot needs one click to become readable
+ * again, and untangling sixteen phases by hand is not that.
+ *
+ * Nodes with no edges are laid out too — dagre gives every disconnected node its own rank, which
+ * would spread eight unsequenced phases across the width of the screen, so they are packed into a
+ * grid below the chains instead.
+ */
+export function autoLayoutPositions(nodes: readonly GraphRuleNode[]): GraphPositions {
+  if (nodes.length === 0) return {};
+
+  const ids = new Set(nodes.map((node) => node.id));
+  // The order nodes are handed to dagre seeds its own ordering pass, so it decides which of two
+  // phases in the same rank sits on top. Left alone that is an implementation detail nobody can
+  // predict; seeded with the author's own listing order it is at least the answer they expect.
+  const inListOrder = [...nodes].sort(
+    (left, right) =>
+      (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER),
+  );
+  const hasDrawnEdge = (node: GraphRuleNode) =>
+    node.blockerIds.some((blockerId) => ids.has(blockerId)) ||
+    nodes.some((other) => other.blockerIds.includes(node.id));
+  const connected = inListOrder.filter(hasDrawnEdge);
+  const loose = inListOrder.filter((node) => !hasDrawnEdge(node));
+
+  const positions: GraphPositions = {};
+  let looseTop = 0;
+
+  if (connected.length > 0) {
+    const graph = new dagre.graphlib.Graph();
+    graph.setGraph({
+      rankdir: "LR",
+      // Ranks line up at the top rather than being centred on each other. Centred ranks put a
+      // one-node rank halfway down beside a four-node one, which reads as a position that means
+      // something; aligned, a rank is a column and the eye can follow it.
+      align: "UL",
+      // Generous on both axes, because the edges are curves now and a curve needs room to be one:
+      // packed ranks turn every connection into a short straight dash between two borders.
+      ranksep: 150,
+      nodesep: 64,
+      marginx: 0,
+      marginy: 0,
+    });
+    graph.setDefaultEdgeLabel(() => ({}));
+
+    for (const node of connected) {
+      graph.setNode(node.id, {
+        width: GRAPH_NODE_WIDTH,
+        height: GRAPH_NODE_HEIGHT,
+      });
+    }
+    for (const node of connected) {
+      for (const blockerId of node.blockerIds) {
+        if (ids.has(blockerId)) graph.setEdge(blockerId, node.id);
+      }
+    }
+
+    dagre.layout(graph);
+
+    // Dagre centres its nodes; positions here are top-left corners, which is what callers draw from.
+    const laidOut = connected.map((node) => {
+      const placed = graph.node(node.id) as { x?: number; y?: number } | undefined;
+      return {
+        id: node.id,
+        x: (placed?.x ?? GRAPH_NODE_WIDTH / 2) - GRAPH_NODE_WIDTH / 2,
+        y: (placed?.y ?? GRAPH_NODE_HEIGHT / 2) - GRAPH_NODE_HEIGHT / 2,
+      };
+    });
+
+    const offsetX = -Math.min(...laidOut.map((node) => node.x));
+    const offsetY = -Math.min(...laidOut.map((node) => node.y));
+    for (const node of laidOut) {
+      positions[node.id] = {
+        x: Math.round(node.x + offsetX),
+        y: Math.round(node.y + offsetY),
+      };
+    }
+
+    looseTop =
+      Math.max(...Object.values(positions).map((position) => position.y)) + ROW_STEP + ROW_STEP / 2;
+  }
+
+  // Unsequenced nodes go in a block under the chains, as wide as the chains are: a fixed four
+  // columns either left a narrow graph with a block sticking out past it, or stacked eight loose
+  // phases into a tall tower beside a wide layout.
+  //
+  // With no chains at all there is nothing to be as wide as, and "as wide as nothing" comes out as
+  // one column — which is how a blueprint whose author never drew a single arrow got tidied into
+  // one tall stack. A square-ish block is the honest shape for a set of things in no order.
+  const chainWidth =
+    connected.length > 0 ? Math.max(...Object.values(positions).map((point) => point.x)) : 0;
+  const looseColumns =
+    connected.length === 0
+      ? Math.max(1, Math.ceil(Math.sqrt(loose.length)))
+      : Math.max(1, Math.min(loose.length, Math.round(chainWidth / COLUMN_STEP) + 1));
+
+  loose.forEach((node, index) => {
+    positions[node.id] = {
+      x: (index % looseColumns) * COLUMN_STEP,
+      y: looseTop + Math.floor(index / looseColumns) * ROW_STEP,
+    };
+  });
+
+  return positions;
+}
+
+/**
+ * Title size for a card that has been zoomed away from, in canvas pixels.
+ *
+ * Divides by the zoom, so the result is roughly constant *on screen*: at the zoom where sixteen
+ * phases fit at once, this is a label somebody can read instead of a five-pixel smear. Capped at
+ * both ends — below 13 there is nothing to correct, and past the upper cap a title stops being
+ * shortened and starts being a word and a half, which says less than a small line that fits.
+ *
+ * The upper cap is what the seeded blueprint is read at. Its sixteen phases are stored across
+ * 1663 × 1412px, which fits a canvas at about a third — and at a third, 26 canvas pixels are eight
+ * on screen, which was still a smear. Forty gets it to thirteen, the size the rest of the app
+ * calls small text.
+ */
+export function compactTitlePx(zoom: number): number {
+  return Math.min(40, Math.max(13, 13 / zoom));
+}
+
+/** Where a node sits inside the one chain it belongs to. */
+export type ChainPosition = { index: number; total: number };
+
+/**
+ * A position for every node that is actually part of a chain, and nothing for every node that is not.
+ *
+ * This is the honest half of "what order do I do these in". A prerequisite graph does not have one
+ * order — that is why it is a graph — so numbering all sixteen phases 1..16 would invent a sequence
+ * the model never claimed, and a reader who followed it would believe things were required that are
+ * not. But *within* a run of nodes that really do wait on each other there is an order, and it is
+ * the first thing anybody wants to know.
+ *
+ * So: nodes are grouped into connected runs by their edges, ignoring direction — two nodes that
+ * share a chain belong to the same run whichever way the arrow points. A run of one is not a chain
+ * and gets nothing. Inside a run, the order is topological with ties broken by the order the nodes
+ * arrive in, which is the author's own `position`, so the same graph always numbers the same way.
+ *
+ * A run that contains a ring is skipped entirely: nothing in it can be first, and a number would
+ * paper over exactly the mistake worth seeing.
+ */
+export function chainPositions(nodes: readonly GraphRuleNode[]): Map<string, ChainPosition> {
+  const drawn = new Set(nodes.map((node) => node.id));
+  const neighbours = new Map<string, Set<string>>(nodes.map((node) => [node.id, new Set()]));
+  for (const node of nodes) {
+    for (const blockerId of node.blockerIds) {
+      if (!drawn.has(blockerId)) continue;
+      neighbours.get(node.id)?.add(blockerId);
+      neighbours.get(blockerId)?.add(node.id);
+    }
+  }
+
+  const positions = new Map<string, ChainPosition>();
+  const assigned = new Set<string>();
+
+  for (const start of nodes) {
+    if (assigned.has(start.id)) continue;
+
+    // The whole run this node belongs to, walked without caring about arrow direction.
+    const run = new Set<string>();
+    const queue = [start.id];
+    while (queue.length > 0) {
+      const current = queue.pop() as string;
+      if (run.has(current)) continue;
+      run.add(current);
+      queue.push(...(neighbours.get(current) ?? []));
+    }
+    for (const id of run) assigned.add(id);
+    if (run.size < 2) continue;
+
+    // Topological order inside the run, one node at a time so a chain the author wrote in order
+    // stays in that order rather than being interleaved with its own branches.
+    const inRun = nodes.filter((node) => run.has(node.id));
+    const settled = new Set<string>();
+    const ordered: string[] = [];
+    while (settled.size < inRun.length) {
+      const next = inRun.find(
+        (node) =>
+          !settled.has(node.id) &&
+          node.blockerIds
+            .filter((blockerId) => run.has(blockerId))
+            .every((blockerId) => settled.has(blockerId)),
+      );
+      if (!next) break;
+      settled.add(next.id);
+      ordered.push(next.id);
+    }
+
+    // Nothing was ready at some point: the run holds a ring, so none of it gets a number.
+    if (ordered.length !== inRun.length) continue;
+
+    ordered.forEach((id, index) => positions.set(id, { index: index + 1, total: ordered.length }));
+  }
+
+  return positions;
+}
+
+/** How far a control point reaches out of a handle, at the very least. */
+const EDGE_MIN_REACH = 72;
+/** And at the very most, so a long edge sweeps rather than loops off the canvas. */
+const EDGE_MAX_REACH = 260;
+/** Below this sideways difference an edge counts as flat and is bowed rather than left straight. */
+const EDGE_FLAT_THRESHOLD = 28;
+
+/** Which side of a card an edge leaves from or lands on. */
+export type GraphSide = "left" | "right" | "top" | "bottom";
+
+/** The direction a side faces, which is the direction an edge leaves it in. */
+const SIDE_NORMAL: Record<GraphSide, GraphPoint> = {
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+  top: { x: 0, y: -1 },
+  bottom: { x: 0, y: 1 },
+};
+
+/** The two sides an edge between these two card centres should use. */
+export type GraphEdgeSides = { source: GraphSide; target: GraphSide };
+
+/**
+ * Which sides of two cards the edge between them should connect.
+ *
+ * Every edge used to leave on the right and land on the left, whatever the two cards' actual
+ * arrangement. A card sitting directly below the one it waits on got an edge that left rightwards,
+ * turned around and came back — a detour describing nothing, since the relation is the same one an
+ * arrow straight down would draw. So the side is picked from where the cards are: the edge leaves
+ * towards its target and lands facing where it came from.
+ *
+ * **Derived, never stored.** The backend has no field for a side and does not need one — move a
+ * card and its edges rearrange themselves, which is the behaviour an author expects and the one
+ * that cannot go stale.
+ *
+ * The axis is chosen against the card's own proportions rather than in raw pixels: the card is
+ * wider than it is tall, so "150 to the right" is a smaller displacement than "150 below", and
+ * comparing the two as bare numbers would send far too many edges out of the top and bottom.
+ */
+export function edgeSides(source: GraphPoint, target: GraphPoint): GraphEdgeSides {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+
+  if (Math.abs(dx) / GRAPH_NODE_WIDTH >= Math.abs(dy) / GRAPH_NODE_HEIGHT) {
+    return dx >= 0 ? { source: "right", target: "left" } : { source: "left", target: "right" };
+  }
+  return dy >= 0 ? { source: "bottom", target: "top" } : { source: "top", target: "bottom" };
+}
+
+/**
+ * The shape of an edge: one cubic curve from the source handle to the target handle.
+ *
+ * The usual library edge types are a staircase (`smoothstep`) or a bezier whose control points reach
+ * out by a quarter of the gap — enough to round a corner, not enough to read as a curve. Two cards
+ * on the same row got a dead straight dash, and several of those running parallel are hard to tell
+ * apart at a glance. So the geometry is ours:
+ *
+ * - **Each end leaves along the direction its side faces**, so the curve grows out of the card
+ *   rather than cutting across its corner.
+ * - **Reach** grows with the distance the edge has to cover, bounded at both ends, and never past
+ *   halfway on an edge already pointing the right way — past halfway the two control points sit
+ *   behind each other's handles and the curve doubles back on itself, which on a short hop between
+ *   two neighbours reads as a kink rather than a connection.
+ * - **A flat edge is bowed.** Two handles facing each other across an empty run have no direction
+ *   for a curve to take, so both control points are pushed sideways by an amount that scales with
+ *   the run. That is the swing, and it is what separates two parallel edges that would otherwise
+ *   be drawn as one line.
+ * - **An edge that has to double back** — a card that waits on one placed after it — keeps the full
+ *   reach and loops, which is what makes an edge running against the flow visible as one.
+ *
+ * Pure geometry, so what the canvas draws can be checked without mounting a canvas.
+ */
+export function blueprintEdgePath(
+  source: GraphPoint,
+  target: GraphPoint,
+  sides: GraphEdgeSides,
+): string {
+  const sourceNormal = SIDE_NORMAL[sides.source];
+  const targetNormal = SIDE_NORMAL[sides.target];
+  const isHorizontal = sourceNormal.x !== 0;
+
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  // Along the axis the handles face; across it for everything else.
+  const along = isHorizontal ? dx : dy;
+  const across = Math.abs(isHorizontal ? dy : dx);
+  const span = Math.abs(along);
+  const facesTarget = along * (isHorizontal ? sourceNormal.x : sourceNormal.y) > 0;
+
+  const wanted = Math.max(EDGE_MIN_REACH, span * 0.55 + across * 0.25);
+  const reach = Math.min(EDGE_MAX_REACH, facesTarget ? Math.min(wanted, span * 0.5) : wanted);
+
+  // Both control points are offset the same way, which bows the curve rather than tilting it.
+  // Proportional, with no floor: a long flat run gets a real swing, and a short hop between two
+  // neighbouring cards stays nearly flat rather than kinking over the few pixels it has.
+  const bowSize = across < EDGE_FLAT_THRESHOLD ? Math.min(44, span * 0.16) : 0;
+  const bow = isHorizontal ? { x: 0, y: bowSize } : { x: bowSize, y: 0 };
+
+  const round = (value: number) => Math.round(value * 100) / 100;
+  const control = (point: GraphPoint, normal: GraphPoint) =>
+    `${round(point.x + normal.x * reach + bow.x)},${round(point.y + normal.y * reach + bow.y)}`;
+
+  return [
+    `M ${round(source.x)},${round(source.y)}`,
+    `C ${control(source, sourceNormal)}`,
+    control(target, targetNormal),
+    `${round(target.x)},${round(target.y)}`,
+  ].join(" ");
+}
+
+/**
+ * How firm one arrow is, on a graph whose arrows do not all come from the same place.
+ *
+ * A Blueprint has one kind: every arrow is a rule its author wrote. A hire's board has three — a
+ * lock the team set, a sequence their buddy proposed, and one the hire arranged themselves — and
+ * which it is decides whether they may take it off. Drawn as the line's own weight and dashes
+ * rather than only in a tooltip, because "may I move this" is the first question asked of an arrow
+ * and a hover is a poor place to answer it.
+ *
+ * How each is drawn lives in `edgeStyles.ts` (`EDGE_TONE_STYLE`), the one table the canvas reads.
+ */
+export type GraphEdgeTone = "rule" | "suggestion" | "own";
+
+/** The four ways a reader moves through a graph from the keyboard. */
+export type GraphDirection = "left" | "right" | "up" | "down";
+
+/**
+ * The node an arrow key should move to, or null when there is nowhere to go.
+ *
+ * The canvas was reachable by pointer and by nothing else: a chain could only be seen by hovering
+ * one, and a prerequisite could only be set by dragging. Tab alone does not fix that — it walks the
+ * nodes in whatever order they happen to be in the DOM, which on a graph is no order at all.
+ *
+ * **Edges first, geometry second.** Left and right follow the one relation the model has: left goes
+ * to what this waits on, right to what waits on it. That is what "onward" means here, and following
+ * it is how somebody reads a chain without seeing it. When there is no arrow that way — a node at
+ * the end of its run, or a graph nobody has connected yet — the key falls back to the nearest node
+ * in that direction on screen, because a key that does nothing teaches somebody the canvas is
+ * broken. Up and down are always geometric: the model has nothing vertical to follow.
+ *
+ * Ties are broken by how far off the straight line a candidate sits, then by id, so the same key
+ * from the same node always lands in the same place.
+ */
+export function keyboardNeighbour(
+  nodes: readonly GraphRuleNode[],
+  positions: GraphPositions,
+  fromId: string,
+  direction: GraphDirection,
+): string | null {
+  const from = positions[fromId];
+  if (!from) return null;
+
+  const placed = nodes.filter((node) => node.id !== fromId && positions[node.id] !== undefined);
+
+  if (direction === "left" || direction === "right") {
+    const linked =
+      direction === "left"
+        ? placed.filter((node) =>
+            nodes.find((item) => item.id === fromId)?.blockerIds.includes(node.id),
+          )
+        : placed.filter((node) => node.blockerIds.includes(fromId));
+
+    const nearest = closest(linked, positions, from, null);
+    if (nearest) return nearest;
+  }
+
+  const wanted =
+    direction === "left"
+      ? (point: GraphPoint) => point.x < from.x
+      : direction === "right"
+        ? (point: GraphPoint) => point.x > from.x
+        : direction === "up"
+          ? (point: GraphPoint) => point.y < from.y
+          : (point: GraphPoint) => point.y > from.y;
+
+  const axis = direction === "left" || direction === "right" ? "y" : "x";
+  return closest(
+    placed.filter((node) => wanted(positions[node.id])),
+    positions,
+    from,
+    axis,
+  );
+}
+
+/**
+ * The candidate nearest to `from`, counting distance off the straight line twice.
+ *
+ * Doubling the sideways component is what makes the key feel like a direction rather than a jump:
+ * a node dead ahead and far away is a better answer to "right" than one just beside it.
+ */
+function closest(
+  candidates: readonly GraphRuleNode[],
+  positions: GraphPositions,
+  from: GraphPoint,
+  offAxis: "x" | "y" | null,
+): string | null {
+  let best: { id: string; score: number } | null = null;
+
+  for (const node of candidates) {
+    const point = positions[node.id];
+    const dx = Math.abs(point.x - from.x);
+    const dy = Math.abs(point.y - from.y);
+    const score =
+      offAxis === "y" ? dx + dy * 2 : offAxis === "x" ? dy + dx * 2 : Math.hypot(dx, dy);
+
+    // Ties go to the lower id, so the same key from the same node always lands in the same place.
+    if (!best || score < best.score || (score === best.score && node.id < best.id)) {
+      best = { id: node.id, score };
+    }
+  }
+
+  return best?.id ?? null;
+}
