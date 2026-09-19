@@ -129,6 +129,8 @@ export function useChat() {
     setSelectedCitation,
     newRequest,
     setNewRequest,
+    registerFocusComposer,
+    quoteSelection,
     showFilters,
     setShowFilters,
     from,
@@ -148,6 +150,17 @@ export function useChat() {
     stopStreaming,
     deleteChat: ctxDeleteChat,
   } = ctx;
+
+  useEffect(() => {
+    return registerFocusComposer(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    });
+  }, [registerFocusComposer]);
 
   /**
    * When the user navigates to `/chat` (no chatId) from the main sidebar
@@ -485,6 +498,8 @@ export function useChat() {
     textareaRef,
     bottomRef,
     scrollContainerRef,
+
+    quoteSelection,
 
     isAtBottom,
     scrollToBottom,
