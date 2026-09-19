@@ -4,23 +4,8 @@ import type { FormEvent, RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SOURCE_META } from "../../data-ingestion/data";
 import type { ChatQueueItem, SourceSystem } from "../types";
-import { centralSpringToken } from "../../../styles/tokens";
 import { QueuedMessages } from "./QueuedMessages";
 import { centralSpringToken } from "../../../styles/tokens";
-
-function formatDateFilterLabel(from: string, to: string): string {
-  if (from && to) return `${from} → ${to}`;
-  if (from) return `From ${from}`;
-  if (to) return `Until ${to}`;
-  return "";
-}
-
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 function formatDateFilterLabel(from: string, to: string): string {
   if (from && to) return `${from} → ${to}`;
@@ -236,20 +221,6 @@ export function ChatComposer({
         onEdit={onEditQueued}
         onSendQueued={onSendQueued}
       />
-      {/* Active filter chips strip — visible whenever filters are active */}
-      <AnimatePresence>
-        {activeFilterCount > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, y: 4 }}
-            animate={{ opacity: 1, height: "auto", y: 0 }}
-            exit={{ opacity: 0, height: 0, y: 4 }}
-            transition={centralSpringToken}
-            className="mb-2.5 flex flex-wrap items-center gap-1.5 overflow-hidden px-1"
-          >
-            <span className="mr-0.5 flex items-center gap-1 text-[11px] font-semibold tracking-wider text-app-text-muted uppercase">
-              <Filter size={11} className="text-app-brand" />
-              <span>Filtering:</span>
-            </span>
 
       {/* Active filter chips strip — visible whenever filters are active */}
       <AnimatePresence>
