@@ -17,11 +17,11 @@ import {
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
+  HireSetupIcon,
   InboxIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
-  StarterWorkIcon,
   type SidebarIcon,
 } from "./SidebarNavIcons";
 import { SidebarLogo } from "./SidebarLogo";
@@ -116,9 +116,9 @@ const projectManagerNavItems: SidebarNavItem[] = [
   // which is why it sits with the other things a PM prepares rather than in the hire's own list.
   // `canAccessRoute` keeps it off a hire's sidebar.
   {
-    label: "First Week",
-    path: "/first-week",
-    icon: StarterWorkIcon,
+    label: "Hire Setup",
+    path: "/hire-setup",
+    icon: HireSetupIcon,
   },
   // The escalation inbox, surfaced as its own entry while it is being evaluated
   // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`

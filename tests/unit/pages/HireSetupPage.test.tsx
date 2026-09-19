@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { FirstWeekPage } from "../../../src/pages/FirstWeekPage";
+import { HireSetupPage } from "../../../src/pages/HireSetupPage";
 import { arrivalService } from "../../../src/services/arrivalService";
 import { starterWorkService } from "../../../src/services/starterWorkService";
 import { userService } from "../../../src/services/userService";
@@ -37,13 +37,13 @@ vi.mock("../../../src/context/useAuth", () => ({
 
 function renderTab(tab: "arrival" | "starter") {
   return render(
-    <MemoryRouter initialEntries={[`/first-week?tab=${tab}`]}>
-      <FirstWeekPage />
+    <MemoryRouter initialEntries={[`/hire-setup?tab=${tab}`]}>
+      <HireSetupPage />
     </MemoryRouter>,
   );
 }
 
-describe("FirstWeekPage tab switching", () => {
+describe("HireSetupPage tab switching", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.mocked(arrivalService.listSteps).mockResolvedValue([]);
@@ -56,8 +56,8 @@ describe("FirstWeekPage tab switching", () => {
 
   it("defaults to the Arrival tab when no ?tab= is given", async () => {
     render(
-      <MemoryRouter initialEntries={["/first-week"]}>
-        <FirstWeekPage />
+      <MemoryRouter initialEntries={["/hire-setup"]}>
+        <HireSetupPage />
       </MemoryRouter>,
     );
 
@@ -86,7 +86,7 @@ describe("FirstWeekPage tab switching", () => {
   });
 });
 
-describe("old First Week routes", () => {
+describe("old Hire Setup routes", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.mocked(arrivalService.listSteps).mockResolvedValue([]);
@@ -103,10 +103,10 @@ describe("old First Week routes", () => {
         <Routes>
           <Route
             path="/arrival-steps"
-            element={<Navigate to="/first-week?tab=arrival" replace />}
+            element={<Navigate to="/hire-setup?tab=arrival" replace />}
           />
-          <Route path="/starter-work" element={<Navigate to="/first-week?tab=starter" replace />} />
-          <Route path="/first-week" element={<FirstWeekPage />} />
+          <Route path="/starter-work" element={<Navigate to="/hire-setup?tab=starter" replace />} />
+          <Route path="/hire-setup" element={<HireSetupPage />} />
         </Routes>
       </MemoryRouter>,
     );

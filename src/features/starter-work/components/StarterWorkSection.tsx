@@ -25,7 +25,7 @@ import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../types";
 
 type StarterWorkSectionProps = {
   /**
-   * DOM node to portal "Find with AI" and "Add tasks" into — the First Week page's shared header,
+   * DOM node to portal "Find with AI" and "Add tasks" into — the Hire Setup page's shared header,
    * top right, instead of this section's own body. Falls back to rendering them inline (used
    * directly in tests, without that header) when omitted or not yet mounted.
    */

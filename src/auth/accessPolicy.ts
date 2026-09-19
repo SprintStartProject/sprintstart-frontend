@@ -13,7 +13,7 @@ export type AppRoute =
   | "/buddy"
   | "/board"
   | "/data-ingestion"
-  | "/first-week"
+  | "/hire-setup"
   | "/arrival-steps"
   | "/starter-work"
   | "/admin"
@@ -46,8 +46,8 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
   // Arrival authoring and Starter Work review, as tabs of one page. HR reads both; PM/ADMIN act
   // on them (enforced server-side too -- this only decides who sees the page). Worth revisiting:
   // paperwork and accounts are arguably HR's to own.
-  "/first-week": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
-  // Retired in favour of `/first-week`; kept only as a redirect target, so the permissions here
+  "/hire-setup": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
+  // Retired in favour of `/hire-setup`; kept only as a redirect target, so the permissions here
   // are unused but left matching it in case anything still resolves the route directly.
   "/arrival-steps": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/starter-work": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],

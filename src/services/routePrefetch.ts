@@ -41,8 +41,8 @@ function prefetchRouteModule(path: string): void {
     case "/data-ingestion":
       void import("../pages/DataIngestionPage");
       return;
-    case "/first-week":
-      void import("../pages/FirstWeekPage");
+    case "/hire-setup":
+      void import("../pages/HireSetupPage");
       return;
     case "/insights/knowledge-requests":
       void import("../features/knowledge-request/components/KnowledgeRequestInboxPage");
@@ -78,7 +78,7 @@ export function prefetchRoute(
       });
       return;
 
-    case "/first-week":
+    case "/hire-setup":
       void queryClient.prefetchQuery({
         queryKey: queryKeys.starterWork.review(),
         queryFn: loadStarterWorkReviewQueue,

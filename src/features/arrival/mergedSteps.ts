@@ -5,7 +5,7 @@ import type { ArrivalStep } from "./types";
  * company-wide counterpart in place.
  *
  * A step a project overrides is still one entry on the hire's list, not two — it is a
- * replacement, not an addition. Shared by the arrival authoring screen and the First Week
+ * replacement, not an addition. Shared by the arrival authoring screen and the Hire Setup
  * overview so the two never drift apart on what "one step" means.
  */
 export function mergedStepCount(

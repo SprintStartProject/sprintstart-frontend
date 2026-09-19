@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Sunrise } from "lucide-react";
+import { DoorOpen } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
@@ -8,16 +8,16 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { ArrivalSection } from "../features/arrival/components/ArrivalSection";
 import { StarterWorkSection } from "../features/starter-work/components/StarterWorkSection";
 
-type FirstWeekTab = "arrival" | "starter";
+type HireSetupTab = "arrival" | "starter";
 
-const TAB_ORDER: FirstWeekTab[] = ["arrival", "starter"];
+const TAB_ORDER: HireSetupTab[] = ["arrival", "starter"];
 
-const TAB_LABELS: Record<FirstWeekTab, string> = {
+const TAB_LABELS: Record<HireSetupTab, string> = {
   arrival: "Arrival",
   starter: "Starter work",
 };
 
-function parseTab(value: string | null): FirstWeekTab {
+function parseTab(value: string | null): HireSetupTab {
   if (value === "starter") return "starter";
   return "arrival";
 }
@@ -33,7 +33,7 @@ function parseTab(value: string | null): FirstWeekTab {
  * Starter work's "Find with AI"/"Add tasks" buttons, which portal into this shared header's
  * top-right corner instead of sitting in that tab's own body.
  */
-export function FirstWeekPage() {
+export function HireSetupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseTab(searchParams.get("tab"));
   // Measured via a callback ref rather than a plain `useRef`, so setting it triggers the re-render
@@ -41,7 +41,7 @@ export function FirstWeekPage() {
   const [starterActionsHost, setStarterActionsHost] = useState<HTMLDivElement | null>(null);
 
   const handleTabChange = useCallback(
-    (tab: FirstWeekTab) => {
+    (tab: HireSetupTab) => {
       const nextSearchParams = new URLSearchParams(searchParams);
       nextSearchParams.set("tab", tab);
       setSearchParams(nextSearchParams, { replace: true });
@@ -49,13 +49,13 @@ export function FirstWeekPage() {
     [searchParams, setSearchParams],
   );
 
-  const tabOptions: SegmentedTabOption<FirstWeekTab>[] = useMemo(
+  const tabOptions: SegmentedTabOption<HireSetupTab>[] = useMemo(
     () => TAB_ORDER.map((tab) => ({ value: tab, label: TAB_LABELS[tab] })),
     [],
   );
 
   // Two-finger swipe between the tabs, matching Starter Work and Data Ingestion.
-  const swipeRef = useSwipeableTabs<FirstWeekTab, HTMLElement>({
+  const swipeRef = useSwipeableTabs<HireSetupTab, HTMLElement>({
     order: TAB_ORDER,
     value: activeTab,
     onChange: handleTabChange,
@@ -66,8 +66,8 @@ export function FirstWeekPage() {
       <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
         <div className="app-page-frame py-6">
           <PageHeader
-            icon={Sunrise}
-            title="First Week"
+            icon={DoorOpen}
+            title="Hire Setup"
             subtitle="What a new hire needs before they start, and the first work waiting for them once they do."
             actions={
               // Starter work's "Find with AI"/"Add tasks" buttons portal into this node instead of
@@ -86,8 +86,8 @@ export function FirstWeekPage() {
           value={activeTab}
           options={tabOptions}
           onChange={handleTabChange}
-          layoutId="first-week-tab-pill"
-          ariaLabel="First Week sections"
+          layoutId="hire-setup-tab-pill"
+          ariaLabel="Hire Setup sections"
         />
 
         <SlidingTabPanel

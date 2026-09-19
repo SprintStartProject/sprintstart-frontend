@@ -98,8 +98,8 @@ const BuddyPage = lazy(() =>
 const BoardPage = lazy(() =>
   import("../pages/BoardPage.tsx").then((module) => ({ default: module.BoardPage })),
 );
-const FirstWeekPage = lazy(() =>
-  import("../pages/FirstWeekPage").then((module) => ({ default: module.FirstWeekPage })),
+const HireSetupPage = lazy(() =>
+  import("../pages/HireSetupPage").then((module) => ({ default: module.HireSetupPage })),
 );
 const NotFoundPage = lazy(() =>
   import("../pages/NotFoundPage.tsx").then((module) => ({ default: module.NotFoundPage })),
@@ -196,22 +196,22 @@ export function AppRouter() {
               role, but a hire who typed the path still got the page and a column of failed
               requests, and the policy claimed otherwise. */}
             <Route
-              path="/first-week"
+              path="/hire-setup"
               element={
-                <ManagerAreaGuard route="/first-week">
-                  <FirstWeekPage />
+                <ManagerAreaGuard route="/hire-setup">
+                  <HireSetupPage />
                 </ManagerAreaGuard>
               }
             />
-            {/* The former standalone pages, now tabs of `/first-week`. Kept as redirects so old
+            {/* The former standalone pages, now tabs of `/hire-setup`. Kept as redirects so old
               links and bookmarks still land somewhere useful. */}
             <Route
               path="/arrival-steps"
-              element={<Navigate to="/first-week?tab=arrival" replace />}
+              element={<Navigate to="/hire-setup?tab=arrival" replace />}
             />
             <Route
               path="/starter-work"
-              element={<Navigate to="/first-week?tab=starter" replace />}
+              element={<Navigate to="/hire-setup?tab=starter" replace />}
             />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<Navigate to="/settings" replace />} />
