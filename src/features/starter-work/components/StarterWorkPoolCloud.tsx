@@ -103,7 +103,7 @@ function buildColumnOffsets(random: () => number): number[] {
 /** One set of twelve left-offsets, built column by column so every column gets its own guaranteed
  *  spread rather than being assembled from independently-drawn rows. */
 function buildCandidateOffsets(random: () => number, slotCount: number): number[] {
-  const offsets: number[] = new Array(slotCount);
+  const offsets: number[] = new Array<number>(slotCount);
   for (let columnIndex = 0; columnIndex < CLOUD_GRID_COLUMNS; columnIndex++) {
     buildColumnOffsets(random).forEach((offset, rowIndex) => {
       offsets[rowIndex * CLOUD_GRID_COLUMNS + columnIndex] = offset;
