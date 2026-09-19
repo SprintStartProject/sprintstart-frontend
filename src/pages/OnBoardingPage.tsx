@@ -1093,9 +1093,11 @@ function EmptyJourney({
           {noBlueprint ? <GitBranch className="h-7 w-7" /> : <BookOpen className="h-7 w-7" />}
         </StateIcon>
         <h2 className="mt-5 text-xl font-semibold text-app-text">
-          {noBlueprint
-            ? "Onboarding isn't set up for this project yet"
-            : "There's nothing to learn from yet"}
+          {several
+            ? "This project has more than one onboarding blueprint"
+            : noBlueprint
+              ? "Onboarding isn't set up for this project yet"
+              : "There's nothing to learn from yet"}
         </h2>
         <p className="mt-2 max-w-md text-sm text-app-text-muted">
           {several
