@@ -32,6 +32,35 @@ function makeArtifact(
   };
 }
 
+/** One artifact per source, for the union/AND assertions. */
+function makeFacetFixture(): Artifact[] {
+  return [
+    { ...makeArtifact("gh-pr", "Add feature", "PULL_REQUEST"), sourceSystem: "GITHUB" },
+    { ...makeArtifact("gh-issue", "Bug report", "ISSUE"), sourceSystem: "GITHUB" },
+    { ...makeArtifact("jira-issue", "Task ticket", "ISSUE"), sourceSystem: "JIRA" },
+    { ...makeArtifact("conf-page", "Onboarding Runbook", "PAGE"), sourceSystem: "CONFLUENCE" },
+    {
+      ...makeArtifact("up-pdf", "manual.pdf", "FILE"),
+      sourceSystem: "UPLOAD",
+      mime: "application/pdf",
+    },
+  ];
+}
+
+/** Renders the hook against a fixed artifact list and waits for the fetch to land. */
+async function renderWith(artifacts: Artifact[]) {
+  const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+  vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+
+  const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+
+  await waitFor(() => {
+    expect(result.current.artifacts).toHaveLength(artifacts.length);
+  });
+
+  return result;
+}
+
 describe("useKnowledgeBase", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -102,17 +131,10 @@ describe("useKnowledgeBase", () => {
   });
 
   it("filters by search query", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+    const result = await renderWith([
       makeArtifact("a1", "readme.md"),
       makeArtifact("a2", "contributing.md"),
     ]);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(2);
-    });
 
     act(() => {
       result.current.handleSearchChange("readme");
@@ -124,17 +146,10 @@ describe("useKnowledgeBase", () => {
   });
 
   it("resets to page 1 when search changes", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(25);
-    });
+    const result = await renderWith(artifacts);
 
     expect(result.current.totalPages).toBe(2);
 
@@ -149,83 +164,141 @@ describe("useKnowledgeBase", () => {
     expect(result.current.currentPage).toBe(1);
   });
 
-  it("filters by tab (UPLOADS)", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
-      makeArtifact("a1", "github.md"),
-      { ...makeArtifact("a2", "upload.pdf"), sourceSystem: "UPLOAD" as const },
-    ]);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(2);
-    });
+  it("narrows to a single source", async () => {
+    const result = await renderWith(makeFacetFixture());
 
     act(() => {
-      result.current.handleTabChange("UPLOADS");
+      result.current.toggleSource("UPLOAD");
     });
 
     expect(result.current.filteredArtifacts).toHaveLength(1);
     expect(result.current.filteredArtifacts[0].sourceSystem).toBe("UPLOAD");
+    expect(result.current.hasActiveFilters).toBe(true);
   });
 
-  it("filters by tab (ORGANIZATIONS)", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
-      makeArtifact("a1", "readme.md"),
-      makeArtifact("a2", "SprintStart", "ORG_METADATA", JSON.stringify({ login: "SprintStart" })),
-    ]);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(2);
-    });
+  it("unions several sources instead of replacing the last one", async () => {
+    const result = await renderWith(makeFacetFixture());
 
     act(() => {
-      result.current.handleTabChange("ORGANIZATIONS");
+      result.current.toggleSource("GITHUB");
+      result.current.toggleSource("JIRA");
+    });
+
+    expect(result.current.selectedSources.size).toBe(2);
+    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      "gh-issue",
+      "gh-pr",
+      "jira-issue",
+    ]);
+  });
+
+  it("ANDs the tab filter with the source facet", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+      result.current.handleTabChange("PULL_REQUEST");
     });
 
     expect(result.current.filteredArtifacts).toHaveLength(1);
-    expect(result.current.filteredArtifacts[0].artifactType).toBe("ORG_METADATA");
+    expect(result.current.filteredArtifacts[0].id).toBe("gh-pr");
   });
 
-  it("combines the ORGANIZATIONS tab with a search query", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
-      makeArtifact("a1", "readme.md"),
-      makeArtifact("a2", "SprintStart", "ORG_METADATA"),
-      makeArtifact("a3", "Acme Corp", "ORG_METADATA"),
-    ]);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(3);
-    });
+  it("matches one type across every source, so Issues covers GitHub and Jira alike", async () => {
+    const result = await renderWith(makeFacetFixture());
 
     act(() => {
-      result.current.handleTabChange("ORGANIZATIONS");
-      result.current.handleSearchChange("sprintstart");
+      result.current.handleTabChange("ISSUE");
     });
 
-    expect(result.current.filteredArtifacts).toHaveLength(1);
-    expect(result.current.filteredArtifacts[0].title).toBe("SprintStart");
+    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      "gh-issue",
+      "jira-issue",
+    ]);
+
+    const tabValues = result.current.tabOptions.map((option) => option.value);
+    expect(tabValues).toContain("ISSUE");
+    expect(tabValues).toContain("ALL");
   });
 
-  it("resets to page 1 when switching to the ORGANIZATIONS tab", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+  it("offers the file-format facet only while Uploads is selected", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    expect(result.current.formatOptions).toHaveLength(0);
+
+    act(() => {
+      result.current.toggleSource("UPLOAD");
+    });
+
+    // The fixture holds one PDF upload, so that is the only format worth offering.
+    expect(result.current.formatOptions.map((option) => option.value)).toEqual(["PDF"]);
+  });
+
+  it("narrows only the uploads when a format is chosen", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+      result.current.toggleSource("UPLOAD");
+    });
+    act(() => {
+      result.current.toggleFormat("PDF");
+    });
+
+    // The format facet describes uploads; it must not hide the GitHub artifacts.
+    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      "gh-issue",
+      "gh-pr",
+      "up-pdf",
+    ]);
+  });
+
+  it("clears the format selection when Uploads is deselected", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    act(() => {
+      result.current.toggleSource("UPLOAD");
+    });
+    act(() => {
+      result.current.toggleFormat("PDF");
+    });
+    expect(result.current.selectedFormat).toBe("PDF");
+
+    act(() => {
+      result.current.toggleSource("UPLOAD");
+    });
+
+    // Otherwise a hidden facet keeps filtering and the trigger badge counts
+    // something the reader can no longer see or clear.
+    expect(result.current.selectedFormat).toBeNull();
+    expect(result.current.formatOptions).toHaveLength(0);
+    expect(result.current.filteredArtifacts).toHaveLength(5);
+  });
+
+  it("counts each option against the other facets, not just the search", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    expect(result.current.sourceOptions.find((option) => option.value === "GITHUB")?.count).toBe(2);
+
+    act(() => {
+      result.current.handleTabChange("ISSUE");
+    });
+
+    // With Issues on, GitHub can only contribute one artifact — the count has to
+    // say so, or the number promises rows that clicking will not deliver.
+    expect(result.current.sourceOptions.find((option) => option.value === "GITHUB")?.count).toBe(1);
+    expect(
+      result.current.sourceOptions.find((option) => option.value === "CONFLUENCE")?.count,
+    ).toBe(0);
+    // Tab options reflect the available types and their counts
+    expect(result.current.tabOptions.find((option) => option.value === "PAGE")?.count).toBe(1);
+  });
+
+  it("resets to page 1 when a tab is changed", async () => {
     const artifacts: Artifact[] = Array.from({ length: 30 }, (_, i) =>
-      makeArtifact(`o${i}`, `org-${i}`, "ORG_METADATA"),
+      makeArtifact(`a${i}`, `file-${i}.md`),
     );
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(30);
-    });
+    const result = await renderWith(artifacts);
 
     act(() => {
       result.current.setCurrentPage(2);
@@ -233,36 +306,34 @@ describe("useKnowledgeBase", () => {
     expect(result.current.currentPage).toBe(2);
 
     act(() => {
-      result.current.handleTabChange("ORGANIZATIONS");
+      result.current.handleTabChange("FILE");
     });
 
     expect(result.current.currentPage).toBe(1);
-    expect(result.current.filteredArtifacts).toHaveLength(30);
   });
 
-  it("clears filters", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
-      makeArtifact("a1", "readme.md"),
-      makeArtifact("a2", "contributing.md"),
-    ]);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(2);
-    });
+  it("clears the search and every facet at once", async () => {
+    const result = await renderWith(makeFacetFixture());
 
     act(() => {
-      result.current.handleSearchChange("readme");
+      result.current.handleSearchChange("Add feature");
+      result.current.toggleSource("GITHUB");
+      result.current.handleTabChange("PULL_REQUEST");
+      result.current.toggleSource("UPLOAD");
+      result.current.toggleFormat("PDF");
     });
     expect(result.current.hasActiveFilters).toBe(true);
 
     act(() => {
       result.current.handleClearFilters();
     });
-    expect(result.current.filteredArtifacts).toHaveLength(2);
+
     expect(result.current.hasActiveFilters).toBe(false);
+    expect(result.current.selectedSources.size).toBe(0);
+    expect(result.current.activeTab).toBe("ALL");
+    expect(result.current.selectedFormat).toBeNull();
+    expect(result.current.searchQuery).toBe("");
+    expect(result.current.filteredArtifacts).toHaveLength(5);
   });
 
   it("does not fetch when projectId is null", () => {
@@ -296,18 +367,44 @@ describe("useKnowledgeBase", () => {
     });
   });
 
-  it("safely indexes paginatedArtifacts when totalPages decreases", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+  it("clears the facets when the project changes", async () => {
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
 
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+    const initialProps: { pid: string | null } = { pid: "proj-1" };
+    const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      initialProps,
+    });
 
     await waitFor(() => {
       expect(result.current.artifacts).toHaveLength(25);
     });
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+      result.current.handleTabChange("FILE");
+    });
+    expect(result.current.hasActiveFilters).toBe(true);
+
+    rerender({ pid: "proj-2" });
+
+    // A facet chosen for one project's corpus matches nothing in the next one, and
+    // the empty list it produces looks like the project having no knowledge at all.
+    await waitFor(() => {
+      expect(result.current.selectedSources.size).toBe(0);
+      expect(result.current.activeTab).toBe("ALL");
+      expect(result.current.hasActiveFilters).toBe(false);
+    });
+  });
+
+  it("safely indexes paginatedArtifacts when totalPages decreases", async () => {
+    const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
+      makeArtifact(`a${i}`, `file-${i}.md`),
+    );
+    const result = await renderWith(artifacts);
 
     act(() => {
       result.current.setCurrentPage(2);
@@ -315,9 +412,9 @@ describe("useKnowledgeBase", () => {
     expect(result.current.currentPage).toBe(2);
     expect(result.current.paginatedArtifacts).toHaveLength(5);
 
-    // Switch tab to UPLOADS where there are 0 items
+    // Narrow to a source with 0 items.
     act(() => {
-      result.current.handleTabChange("UPLOADS");
+      result.current.toggleSource("UPLOAD");
     });
 
     expect(result.current.currentPage).toBe(1);
@@ -325,10 +422,10 @@ describe("useKnowledgeBase", () => {
   });
 
   it("resets currentPage to 1 when switching projectId", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
 
     const initialProps: { pid: string | null } = { pid: "proj-1" };
@@ -353,17 +450,10 @@ describe("useKnowledgeBase", () => {
   });
 
   it("keeps the current page when refreshing the same result set", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(25);
-    });
+    const result = await renderWith(artifacts);
 
     act(() => {
       result.current.setCurrentPage(2);
@@ -379,18 +469,11 @@ describe("useKnowledgeBase", () => {
   });
 
   it("pulls the current page back into range when it exceeds the available pages", async () => {
-    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     // 25 artifacts at 20 per page is exactly two pages.
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
-
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
-
-    await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(25);
-    });
+    const result = await renderWith(artifacts);
 
     act(() => {
       result.current.setCurrentPage(5);
@@ -400,5 +483,132 @@ describe("useKnowledgeBase", () => {
     // the end of the list and renders nothing.
     expect(result.current.currentPage).toBe(2);
     expect(result.current.paginatedArtifacts).toHaveLength(5);
+  });
+
+  it("combines the source, type and format facets with a search query", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+      result.current.toggleSource("JIRA");
+      result.current.handleTabChange("ISSUE");
+    });
+
+    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      "gh-issue",
+      "jira-issue",
+    ]);
+
+    act(() => {
+      result.current.handleSearchChange("ticket");
+    });
+
+    expect(result.current.filteredArtifacts).toHaveLength(1);
+    expect(result.current.filteredArtifacts[0].id).toBe("jira-issue");
+  });
+
+  it("identifies uploaded PDFs, Markdown and images with a UUID sourceId and no mime", async () => {
+    const result = await renderWith([
+      {
+        ...makeArtifact("art-1", "specification.pdf", "FILE"),
+        sourceSystem: "UPLOAD",
+        sourceId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        mime: null,
+      },
+      {
+        ...makeArtifact("art-2", "notes.md", "FILE"),
+        sourceSystem: "UPLOAD",
+        sourceId: "9c8b7a6d-4e3f-2a1b-0c9d-8e7f6a5b4c3d",
+        mime: null,
+      },
+      {
+        ...makeArtifact("art-3", "wireframe.png", "FILE"),
+        sourceSystem: "UPLOAD",
+        sourceId: "0f8e7d6c-5b4a-3928-1706-5f4e3d2c1b0a",
+        mime: null,
+      },
+      {
+        ...makeArtifact("art-4", "archive.tar.gz", "FILE"),
+        sourceSystem: "UPLOAD",
+        sourceId: "12345678-1234-1234-1234-123456789abc",
+        mime: null,
+      },
+    ]);
+
+    act(() => {
+      result.current.toggleSource("UPLOAD");
+    });
+
+    const countOf = (value: string) =>
+      result.current.formatOptions.find((option) => option.value === value)?.count;
+
+    // The filename is the only dependable signal: `mime` is null and `sourceId`
+    // is a UUID, so an extension check on `sourceId` would have counted zero here.
+    expect(countOf("PDF")).toBe(1);
+    expect(countOf("MARKDOWN")).toBe(1);
+    expect(countOf("IMAGE")).toBe(1);
+    expect(countOf("OTHER")).toBe(1);
+
+    act(() => {
+      result.current.toggleFormat("IMAGE");
+    });
+    expect(result.current.filteredArtifacts[0].title).toBe("wireframe.png");
+
+    act(() => {
+      result.current.toggleFormat("OTHER");
+    });
+    // "Other" no longer swallows images — that is what the Images option is for.
+    expect(result.current.filteredArtifacts[0].title).toBe("archive.tar.gz");
+  });
+
+  it("offers tab options for types available from the selected sources plus ALL", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    expect(result.current.tabOptions.map((option) => option.value)).toEqual([
+      "ALL",
+      "PULL_REQUEST",
+      "ISSUE",
+      "FILE",
+      "PAGE",
+    ]);
+
+    act(() => {
+      result.current.toggleSource("JIRA");
+    });
+
+    // Jira carries issues and nothing else, so unrelated artifact-type tabs disappear.
+    expect(result.current.tabOptions.map((option) => option.value)).toEqual(["ALL", "ISSUE"]);
+    expect(result.current.tabOptions.find((option) => option.value === "ISSUE")?.count).toBe(1);
+  });
+
+  it("keeps an active tab visible even if chosen sources cannot produce it", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    act(() => {
+      result.current.handleTabChange("PAGE");
+      result.current.toggleSource("GITHUB");
+    });
+
+    const page = result.current.tabOptions.find((option) => option.value === "PAGE");
+
+    expect(page).toBeDefined();
+    expect(page?.count).toBe(0);
+    expect(result.current.filteredArtifacts).toHaveLength(0);
+  });
+  it("keeps a chosen format visible after the uploads that matched it are gone", async () => {
+    const result = await renderWith(makeFacetFixture());
+
+    act(() => {
+      result.current.toggleSource("UPLOAD");
+    });
+    act(() => {
+      result.current.toggleFormat("IMAGE");
+    });
+
+    const image = result.current.formatOptions.find((option) => option.value === "IMAGE");
+
+    expect(image).toBeDefined();
+    expect(image?.count).toBe(0);
+    expect(result.current.filteredArtifacts).toHaveLength(0);
   });
 });

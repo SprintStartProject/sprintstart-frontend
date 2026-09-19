@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { GraduationCap } from "lucide-react";
+import { useAuth } from "../../../context/useAuth";
 import { Badge } from "../../../components/ui/Badge";
 import { getMySkillLevels, getMyTeamOverview } from "../../../services/teamManagementService";
 import type { UserSkillLevel } from "../../../services/teamManagementService";
-import type { ProjectRole } from "../../team-management/types";
+import type { ProjectRoleSummary } from "../../../services/types";
 import type { DashboardWidgetSize } from "../layout/types";
 
 /** Filled dots per level — mirrors the team member detail panel. */
@@ -61,9 +62,22 @@ function SkillPill({ skill, large }: { skill: UserSkillLevel; large: boolean }) 
  * a fixed-height cell.
  */
 export function SkillsStrip({ size }: { size: DashboardWidgetSize }) {
-  const [roles, setRoles] = useState<ProjectRole[]>([]);
+  const { profile } = useAuth();
+  const [roles, setRoles] = useState<ProjectRoleSummary[]>([]);
   const [skills, setSkills] = useState<UserSkillLevel[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /*
+    The role names that label each skill come from the user's own profile roles rather
+    than from `/api/v1/projectRoles`: that endpoint is ADMIN/PM/HR-only, so asking for it
+    here produced a 403 on every regular user's dashboard and fell back to fixture data.
+    `/users/me` already carries the same role IDs the skills point at.
+
+    Those roles are also the fallback for the role badges below. `/me/team-overview` is
+    gated on the USER role as well, so a PM, HR or admin account gets the same 403 one
+    endpoint over and would otherwise badge nothing at all.
+  */
+  const profileRoles = profile?.projectRoles;
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -71,12 +85,14 @@ export function SkillsStrip({ size }: { size: DashboardWidgetSize }) {
     async function loadProfile() {
       const [overview, skillLevels] = await Promise.all([
         getMyTeamOverview().catch(() => null),
-        getMySkillLevels(),
+        getMySkillLevels(profileRoles ?? []),
       ]);
 
       if (!isCurrentRequest) return;
 
-      setRoles(overview?.roles ?? []);
+      // The overview stays the preferred source — it is the team module's own view of the
+      // same user — but an account that may not read it still badges from its profile.
+      setRoles(overview?.roles ?? profileRoles ?? []);
       setSkills(skillLevels);
       setLoading(false);
     }
@@ -86,7 +102,7 @@ export function SkillsStrip({ size }: { size: DashboardWidgetSize }) {
     return () => {
       isCurrentRequest = false;
     };
-  }, []);
+  }, [profileRoles]);
 
   if (loading) return null;
 
