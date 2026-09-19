@@ -12,7 +12,13 @@ import { useToastApi } from "./useToast";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
 import type { ChatContextValue, SelectedCitation } from "./ChatContext";
-import type { Chat, ChatMessage, Citation, SourceSystem } from "../features/chatbot/types";
+import type {
+  Chat,
+  ChatMessage,
+  ChatQueueItem,
+  Citation,
+  SourceSystem,
+} from "../features/chatbot/types";
 import { insertQuoteIntoDraft } from "../features/chatbot/utils/quoteFormat";
 
 type MessagesByChat = Record<string, ChatMessage[]>;

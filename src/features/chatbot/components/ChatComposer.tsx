@@ -1,10 +1,11 @@
-import { Calendar, Check, Filter, RotateCcw, Send, Square, X } from "lucide-react";
+import { Calendar, Check, Filter, ListPlus, RotateCcw, Send, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SOURCE_META } from "../../data-ingestion/data";
-import type { SourceSystem } from "../types";
+import type { ChatQueueItem, SourceSystem } from "../types";
 import { centralSpringToken } from "../../../styles/tokens";
+import { QueuedMessages } from "./QueuedMessages";
 
 function formatDateFilterLabel(from: string, to: string): string {
   if (from && to) return `${from} → ${to}`;
@@ -213,6 +214,13 @@ export function ChatComposer({
 
   return (
     <footer className="app-page-frame shrink-0 border-t border-app-border bg-app-bg py-4">
+      <QueuedMessages
+        items={queuedMessages}
+        paused={queuePaused}
+        onRemove={onRemoveQueued}
+        onEdit={onEditQueued}
+        onSendQueued={onSendQueued}
+      />
       {/* Active filter chips strip — visible whenever filters are active */}
       <AnimatePresence>
         {activeFilterCount > 0 && (
