@@ -4,6 +4,7 @@ import { Badge, type BadgeVariant } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useArrivalAuthoring } from "../../arrival/hooks/useArrivalAuthoring";
+import { mergedStepCount } from "../../arrival/mergedSteps";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useStarterWorkPool } from "../../starter-work/hooks/useStarterWorkPool";
 import { useStarterWorkReview } from "../../starter-work/hooks/useStarterWorkReview";
@@ -45,11 +46,7 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
 
   const companySteps = company ?? [];
   const projectSteps = project ?? [];
-  const overriddenKeys = new Set(projectSteps.map((step) => step.key));
-  // A step a project overrides is still one entry on the hire's list, not two — it is a
-  // replacement, not an addition.
-  const mergedStepCount =
-    companySteps.filter((step) => !overriddenKeys.has(step.key)).length + projectSteps.length;
+  const stepCount = mergedStepCount(company, project);
   const autoCheckedCount = companySteps.filter((step) => step.settledBy === "OBSERVED").length;
 
   const taskZeroCount = pool.filter((task) => task.taskZeroEligible).length;
@@ -108,7 +105,7 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
             icon={PlaneLanding}
             step={1}
             label="Arrive"
-            figure={mergedStepCount}
+            figure={stepCount}
             figureSuffix={
               projectName ? `steps for someone on ${projectName}` : "steps for every new hire"
             }

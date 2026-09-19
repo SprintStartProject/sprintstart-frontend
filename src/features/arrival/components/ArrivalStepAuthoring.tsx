@@ -13,6 +13,7 @@ import { Textarea } from "../../../components/ui/Textarea";
 import { useToast } from "../../../context/useToast";
 import { useArrivalAuthoring } from "../hooks/useArrivalAuthoring";
 import { howStepGetsDone } from "../howItsDone";
+import { mergedStepCount } from "../mergedSteps";
 import { radioCardClassName } from "../radioCard";
 import { AddArrivalStepModal } from "./AddArrivalStepModal";
 import { ArrivalStepThread } from "./ArrivalStepThread";
@@ -113,15 +114,12 @@ export function ArrivalStepAuthoring({
   const projectSteps = project ?? [];
   const companyKeys = new Set(companySteps.map((step) => step.key));
   const overriddenKeys = new Set(projectSteps.map((step) => step.key));
-  // A step a project overrides is still one entry on the hire's list, not two — it is a
-  // replacement, not an addition. Same calculation as the Overview tab's Arrive card.
-  const mergedStepCount =
-    companySteps.filter((step) => !overriddenKeys.has(step.key)).length + projectSteps.length;
+  const stepCount = mergedStepCount(company, project);
   const countLabel = hasProject
-    ? `${mergedStepCount} ${mergedStepCount === 1 ? "step" : "steps"} for a new hire on ${
+    ? `${stepCount} ${stepCount === 1 ? "step" : "steps"} for a new hire on ${
         projectName ?? "this project"
       }`
-    : `${mergedStepCount} ${mergedStepCount === 1 ? "step" : "steps"} for every new hire`;
+    : `${stepCount} ${stepCount === 1 ? "step" : "steps"} for every new hire`;
 
   return (
     <section className="space-y-5">

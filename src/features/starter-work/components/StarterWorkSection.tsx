@@ -25,9 +25,12 @@ import type { CreateStarterWorkTaskInput, StarterWorkTask } from "../types";
 
 /**
  * A one-shot instruction for what to do right after landing on this tab, set by the Overview
- * tab's "Go through them" and "Choose Task 0" cards. Consumed once — see `onFocusHandled`.
+ * tab's readiness checks. Consumed once — see `onFocusHandled`.
+ *
+ * `"closed"` and `"sync"` are not yet acted on here — see the Overview readiness plan — but the
+ * type carries them already so `readiness.ts` can target them ahead of that wiring.
  */
-export type StarterWorkFocus = "triage" | "task0";
+export type StarterWorkFocus = "triage" | "task0" | "closed" | "sync";
 
 type StarterWorkSectionProps = {
   focus?: StarterWorkFocus | null;
