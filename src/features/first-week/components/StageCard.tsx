@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { AlertTriangle, ArrowRight, CheckCircle2, Info } from "lucide-react";
 import type { ReadinessCheck, StageReadiness } from "../readiness";
 
-export type StatusTone = "success" | "warning" | "danger";
+export type StatusTone = "success" | "warning" | "danger" | "info";
 
 /** Maps a stage's `ready | attention | missing` onto the app's ordinary status colours. */
 const STAGE_STATUS_TONE: Record<StageReadiness["status"], StatusTone> = {
@@ -15,6 +15,7 @@ const STATUS_DOT_CLASSES: Record<StatusTone, string> = {
   success: "bg-app-success-solid",
   warning: "bg-app-warning-solid",
   danger: "bg-app-danger-solid",
+  info: "bg-app-neutral-text",
 };
 
 /** A small coloured dot for a status ladder — never the only signal, always paired with text. */

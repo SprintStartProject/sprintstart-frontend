@@ -260,10 +260,10 @@ describe("FirstWeekPage Overview tab", () => {
     expect(within(starterCard).queryByText(/more$/)).not.toBeInTheDocument();
   });
 
-  it("lists open readiness checks worst-first, capped at four with a 'Show all' toggle", async () => {
+  it("lists open readiness checks worst-first, capped at three with a 'Show all' toggle", async () => {
     renderTab("overview");
 
-    // Five checks fire from this fixture: 1 critical, 2 warnings, 2 info. Only the first four show.
+    // Five checks fire from this fixture: 1 critical, 2 warnings, 2 info. Only the first three show.
     expect(await screen.findByTestId("overview-needs-task0-none")).toHaveTextContent(
       "No Task 0 yet",
     );
@@ -271,17 +271,19 @@ describe("FirstWeekPage Overview tab", () => {
       "1 task nobody has looked at yet",
     );
     expect(screen.getByTestId("overview-needs-pool-small")).toBeInTheDocument();
+    expect(screen.queryByTestId("overview-needs-arrival-derivable")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("overview-needs-pool-sync")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show all 5" }));
+
     expect(screen.getByTestId("overview-needs-arrival-derivable")).toHaveTextContent(
       "1 automatic check isn't on the list",
     );
-    expect(screen.queryByTestId("overview-needs-pool-sync")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
-
     expect(screen.getByTestId("overview-needs-pool-sync")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show less" }));
 
+    expect(screen.queryByTestId("overview-needs-arrival-derivable")).not.toBeInTheDocument();
     expect(screen.queryByTestId("overview-needs-pool-sync")).not.toBeInTheDocument();
   });
 
@@ -358,7 +360,7 @@ describe("FirstWeekPage Overview tab", () => {
 
     renderTab("overview");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Show all" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Show all 5" }));
     fireEvent.click(
       within(await screen.findByTestId("overview-needs-pool-sync")).getByRole("button", {
         name: "Sync now",
@@ -386,6 +388,8 @@ describe("FirstWeekPage Overview tab", () => {
   it("jumps to the Arrival tab and opens the add wizard from a readiness check", async () => {
     renderTab("overview");
 
+    // Not in the top three by severity, so it only shows once "Show all" is expanded.
+    fireEvent.click(await screen.findByRole("button", { name: "Show all 5" }));
     fireEvent.click(
       within(await screen.findByTestId("overview-needs-arrival-derivable")).getByRole("button", {
         name: "Add them",

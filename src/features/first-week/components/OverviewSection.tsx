@@ -74,6 +74,8 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
 
   return (
     <div className="space-y-8">
+      <NeedsYouList checks={readiness.openChecks} onNavigate={onNavigate} />
+
       <section aria-label="The first week, in order">
         <h2 className="mb-3 text-lg font-semibold tracking-tight text-app-text">
           A new hire&apos;s first week
@@ -127,8 +129,6 @@ export function OverviewSection({ onNavigate }: OverviewSectionProps) {
           />
         </div>
       </section>
-
-      <NeedsYouList checks={readiness.openChecks} onNavigate={onNavigate} />
 
       <FirstWeekHires projectId={projectId} />
     </div>
