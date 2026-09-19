@@ -195,7 +195,10 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
         }
         if (!status.hasActiveBlueprint) {
           setAvailability("unavailable");
-          setUnavailableReason("no-blueprint");
+          // More than one published blueprint is a different fix from none at all.
+          setUnavailableReason(
+            (status.activeBlueprintCount ?? 0) > 1 ? "several-blueprints" : "no-blueprint",
+          );
           return;
         }
       } catch {

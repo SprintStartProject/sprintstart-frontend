@@ -49,7 +49,7 @@ export function asFailureReason(value: string | undefined): GenerationFailureRea
  */
 export type OnboardingAvailability = "loading" | "path" | "buildable" | "unavailable";
 
-export type UnavailableReason = "no-project" | "no-blueprint" | "no-content";
+export type UnavailableReason = "no-project" | "no-blueprint" | "several-blueprints" | "no-content";
 
 export type OnboardingJourneyValue = {
   generation: OnboardingGeneration;

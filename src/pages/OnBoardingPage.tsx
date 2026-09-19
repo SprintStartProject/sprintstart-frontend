@@ -43,6 +43,7 @@ import { StepWorkspace } from "../features/onboarding/components/journey/StepWor
 import {
   useOnboardingJourney,
   type GenerationFailureReason,
+  type UnavailableReason,
 } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
@@ -1055,7 +1056,7 @@ function EmptyJourney({
   hasProject: boolean;
   isSwitcherEnabled: boolean;
   canManage: boolean;
-  unavailableReason: "no-project" | "no-blueprint" | "no-content" | null;
+  unavailableReason: UnavailableReason | null;
   lastError: string | null;
   /** Why the last generation came back without a path, when the backend could say. */
   failureReason: GenerationFailureReason | null;
@@ -1079,8 +1080,13 @@ function EmptyJourney({
     );
   }
 
-  if (unavailableReason === "no-blueprint" || unavailableReason === "no-content") {
-    const noBlueprint = unavailableReason === "no-blueprint";
+  if (
+    unavailableReason === "no-blueprint" ||
+    unavailableReason === "several-blueprints" ||
+    unavailableReason === "no-content"
+  ) {
+    const several = unavailableReason === "several-blueprints";
+    const noBlueprint = unavailableReason === "no-blueprint" || several;
     return (
       <CenteredState>
         <StateIcon tone="brand">
@@ -1092,9 +1098,11 @@ function EmptyJourney({
             : "There's nothing to learn from yet"}
         </h2>
         <p className="mt-2 max-w-md text-sm text-app-text-muted">
-          {noBlueprint
-            ? "An onboarding path is built from the project's published blueprint, and this project doesn't have one."
-            : "An onboarding path is built from the project's knowledge base, and nothing has been added to it yet."}{" "}
+          {several
+            ? "An onboarding path is built from one published blueprint, and this project has several — so it can't tell which to use."
+            : noBlueprint
+              ? "An onboarding path is built from the project's published blueprint, and this project doesn't have one."
+              : "An onboarding path is built from the project's knowledge base, and nothing has been added to it yet."}{" "}
           {canManage
             ? ""
             : "Your project manager can set this up — your path will be ready to build afterwards."}

@@ -70,6 +70,19 @@ describe("OnboardingJourneyProvider", () => {
     await waitFor(() => expect(result.current.unavailableReason).toBe("no-blueprint"));
   });
 
+  it("tells several published blueprints apart from none", async () => {
+    vi.spyOn(onboardingService, "fetchPath").mockRejectedValue(new ApiError(404, "none"));
+    vi.spyOn(onboardingService, "fetchGenerationStatus").mockResolvedValue({
+      running: false,
+      hasActiveBlueprint: false,
+      activeBlueprintCount: 2,
+    });
+
+    const { result } = renderHook(() => useOnboardingJourney(), { wrapper });
+
+    await waitFor(() => expect(result.current.unavailableReason).toBe("several-blueprints"));
+  });
+
   it("keeps the entry when the checks themselves fail", async () => {
     vi.spyOn(onboardingService, "fetchPath").mockRejectedValue(new ApiError(404, "none"));
     vi.spyOn(onboardingService, "fetchGenerationStatus").mockRejectedValue(new Error("down"));

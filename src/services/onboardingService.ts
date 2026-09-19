@@ -93,7 +93,7 @@ export const onboardingService = {
           handlers.onDone();
           return;
         case "error":
-          handlers.onError?.(event.message ?? "Unknown error", event.name ?? undefined);
+          handlers.onError?.(event.message ?? "Unknown error", event.reason ?? undefined);
           return;
       }
     }

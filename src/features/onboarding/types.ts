@@ -263,6 +263,8 @@ export interface OnboardingPersonalizeEvent {
   detail?: string;
   path?: OnboardingPathEndpoint;
   message?: string;
+  /** On `error`: a code the client can explain, e.g. `not-enough-knowledge`. */
+  reason?: string;
 }
 
 /** GET /projects/{projectId}/onboarding/me/path/generation */
@@ -271,6 +273,8 @@ export interface OnboardingGenerationStatus {
   runningProjectId?: string | null;
   startedAt?: string | null;
   hasActiveBlueprint: boolean;
+  /** Tells "none yet" from "several, which is ambiguous" when `hasActiveBlueprint` is false. */
+  activeBlueprintCount?: number;
 }
 
 export interface OnboardingPersonalizeHandlers {
