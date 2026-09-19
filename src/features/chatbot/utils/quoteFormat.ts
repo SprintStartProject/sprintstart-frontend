@@ -13,7 +13,9 @@ export function formatMarkdownQuote(text: string): string {
     .filter((line) => line.length > 0);
   if (paragraphs.length === 0) return "";
 
-  return paragraphs.map((line) => (line.startsWith(">") ? line : `> ${line}`)).join("\n>\n");
+  return paragraphs
+    .map((line) => (line.startsWith(">") ? line : `> ${line}`))
+    .join("\n>\n");
 }
 
 /**
