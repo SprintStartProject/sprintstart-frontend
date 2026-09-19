@@ -46,9 +46,13 @@ function markRevealed(pathId: string) {
  * everybody and nothing ever reports it.
  */
 function isPathUntouched(path: OnboardingPathEndpoint): boolean {
+  // A path without a phase has nothing to reveal -- and `every` on nothing would say yes.
+  if (path.phases.length === 0) return false;
   return path.phases.every(
     (phase) =>
-      !phase.checkSummary?.passed &&
+      phase.questions.every(
+        (question) => question.status === "LOCKED" || question.status === "OPEN",
+      ) &&
       phase.steps.every(
         (step) =>
           step.startedAt === null &&

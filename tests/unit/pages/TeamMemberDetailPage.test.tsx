@@ -72,8 +72,8 @@ vi.mock("../../../src/components/common/UserAvatar", () => ({
   UserAvatar: () => <svg role="img" aria-label="User Avatar" width="56" height="56" />,
 }));
 
-vi.mock("../../../src/features/team-management/components/detail/MemberOnboardingSection", () => ({
-  MemberOnboardingSection: () => <div data-testid="member-onboarding-section">Onboarding</div>,
+vi.mock("../../../src/features/team-management/components/detail/MemberJourneySection", () => ({
+  MemberJourneySection: () => <div data-testid="member-journey-section">Onboarding</div>,
 }));
 
 vi.mock("../../../src/features/team-management/components/detail/MemberGapsPanel", () => ({

@@ -1,38 +1,43 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRepeatClicks } from "../../easter-eggs/hooks/useRepeatClicks";
 
 const TOAST_DURATION_MS = 3000;
 const TOGGLE_DEBOUNCE_MS = 2000;
 const UNLOCK_THRESHOLD = 3;
 
 type DinoEasterEgg = {
-  isUnlocked: boolean;
-  gameActive: boolean;
+  /** Current unlock toast text, or null when none is showing. */
   toast: string | null;
+  /** Registers one cogwheel click; every third click toggles the unlock. */
   handleIconClick: () => void;
-  setGameActive: (active: boolean) => void;
 };
 
 /**
- * Dino game easter-egg: triple-clicking the settings cogwheel toggles a
- * hidden Space-to-play dinosaur game. The unlock state is persisted in
- * `localStorage` under `dinoUnlocked` and broadcast via a custom
- * `dinoUnlockChanged` window event so multiple components stay in sync.
+ * Dino game easter-egg trigger: triple-clicking the settings cogwheel
+ * toggles the hidden Space-to-play dinosaur game, persisted in
+ * `localStorage` under `dinoUnlocked`.
  *
- * Extracted from `SettingsPage` so the page itself only orchestrates
- * settings sections. The click-counter state lives in a ref (not in a state
- * updater) so the side effects (localStorage write, event dispatch, toast)
- * run exactly once even when React double-invokes updaters in StrictMode dev.
+ * This hook only owns the *trigger* (click counting, persistence, toast).
+ * Whoever plays the game subscribes through {@link useDinoUnlocked} /
+ * {@link useSpaceOpensDino}, which react to the `dinoUnlockChanged`
+ * window event dispatched here — so unlocking in Settings instantly arms
+ * the chat, onboarding and buddy waiting-games without any direct wiring.
+ *
+ * The toggle is debounced (2s) so an accidental fourth+third click can't
+ * silently re-lock the game, and the unlock write is wrapped in try/catch
+ * because private-browsing modes can reject localStorage writes.
  */
 export function useDinoEasterEgg(): DinoEasterEgg {
-  const [isUnlocked, setIsUnlocked] = useState(
-    () => localStorage.getItem("dinoUnlocked") === "true",
-  );
-  const [gameActive, setGameActive] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-
-  const clickCountRef = useRef(0);
-  const lastToggleRef = useRef(0);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastToggleRef = useRef(0);
+
+  // Clear any pending toast timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -42,14 +47,7 @@ export function useDinoEasterEgg(): DinoEasterEgg {
     }, TOAST_DURATION_MS);
   }, []);
 
-  const handleIconClick = useCallback(() => {
-    const next = clickCountRef.current + 1;
-    if (next < UNLOCK_THRESHOLD) {
-      clickCountRef.current = next;
-      return;
-    }
-
-    clickCountRef.current = 0;
+  const toggleUnlock = useCallback(() => {
     if (Date.now() - lastToggleRef.current < TOGGLE_DEBOUNCE_MS) return;
     lastToggleRef.current = Date.now();
 
@@ -61,67 +59,20 @@ export function useDinoEasterEgg(): DinoEasterEgg {
       console.warn("Failed to persist dino unlock state", error);
     }
 
-    // Update our own state directly (batched with the click handler) rather
-    // than round-tripping through a synchronous `dispatchEvent`, which can
-    // land the listener's setState during a sibling's render cycle (React
-    // 19: "Cannot update a component while rendering a different
-    // component"). Notify external listeners (SideBar, DinoGame) on a
-    // microtask so their setState is deferred past the current render.
-    const nextUnlocked = nextValue === "true";
-    setIsUnlocked(nextUnlocked);
-    if (!nextUnlocked) setGameActive(false);
+    // Notify listeners (chat, onboarding, buddy) on a microtask so their
+    // setState is deferred past the current render — a synchronous
+    // dispatchEvent can land a listener's setState during a sibling's
+    // render cycle (React 19: "Cannot update a component while rendering
+    // a different component").
     queueMicrotask(() => window.dispatchEvent(new Event("dinoUnlockChanged")));
 
     showToast(currentlyUnlocked ? "you saw nothing... 🫣" : "shh... 🤫 (press Space)");
   }, [showToast]);
 
-  // Keep isUnlocked in sync with localStorage (other tabs, or our own event).
-  useEffect(() => {
-    const sync = () => {
-      const unlocked = localStorage.getItem("dinoUnlocked") === "true";
-      setIsUnlocked(unlocked);
-      if (!unlocked) setGameActive(false);
-    };
-    window.addEventListener("dinoUnlockChanged", sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener("dinoUnlockChanged", sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
-
-  // Space-to-play, but only when unlocked, no game running, and not typing.
-  useEffect(() => {
-    if (!isUnlocked || gameActive) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
-      const active = document.activeElement;
-      const typing =
-        active instanceof HTMLElement &&
-        (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable);
-      if (typing) return;
-
-      e.preventDefault();
-      setGameActive(true);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isUnlocked, gameActive]);
-
-  // Clear any pending toast timer on unmount.
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, []);
+  const handleIconClick = useRepeatClicks(UNLOCK_THRESHOLD, toggleUnlock);
 
   return {
-    isUnlocked,
-    gameActive,
     toast,
     handleIconClick,
-    setGameActive,
   };
 }

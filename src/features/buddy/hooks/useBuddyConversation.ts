@@ -1,4 +1,7 @@
 import { useCallback, useRef, useState } from "react";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
+import { matchEggPhrase } from "../../easter-eggs/lib/eggPhrases";
+import { playEggEffect } from "../../easter-eggs/eggEffectBus";
 import {
   getMessages,
   streamOpenBuddy,
@@ -35,6 +38,14 @@ export function useBuddyConversation() {
   // The tool the buddy is running right now, if any -- drives "Checking your progress…"
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
+
+  // Dino waiting-game: unlocked users may press Space while the buddy thinks
+  // to play the runner until the answer arrives — the same deal the AI chat
+  // offers. Closing is handled inside the hook: on exit, when the turn ends,
+  // or when the cogwheel unlock flag flips off.
+  const dinoUnlocked = useDinoUnlocked();
+  const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(isThinking, dinoUnlocked);
+
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);
   // True while a surface is opening the conversation, so it can show a loading state rather
@@ -366,6 +377,14 @@ export function useBuddyConversation() {
               githubLogin: proposal.githubLogin,
               competencyKey: proposal.competencyKey,
               level: proposal.level,
+              checklistTitle: proposal.checklistTitle,
+              checklistItems: proposal.checklistItems,
+              cardId: proposal.cardId,
+              linkUrl: proposal.linkUrl,
+              linkLabel: proposal.linkLabel,
+              noteText: proposal.noteText,
+              lineBefore: proposal.lineBefore,
+              lineAfter: proposal.lineAfter,
               status: "idle",
             });
           },
@@ -439,6 +458,14 @@ export function useBuddyConversation() {
             githubLogin: action.githubLogin,
             competencyKey: action.competencyKey,
             level: action.level,
+            checklistTitle: action.checklistTitle,
+            checklistItems: action.checklistItems,
+            cardId: action.cardId,
+            linkUrl: action.linkUrl,
+            linkLabel: action.linkLabel,
+            noteText: action.noteText,
+            lineBefore: action.lineBefore,
+            lineAfter: action.lineAfter,
           });
           patchAction(messageId, action.id, {
             status: "resolved",
@@ -462,17 +489,33 @@ export function useBuddyConversation() {
     [patchAction],
   );
 
+  /**
+   * Handles a composer submission: an egg phrase plays its effect and is swallowed, anything
+   * else is sent. Returns whether a turn was started — `false` means the submission went
+   * nowhere, which the composer uses to decide whether the caret should be handed off.
+   */
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
 
+      // Easter-egg phrases are intercepted before anything is sent: the
+      // effect plays app-wide (EggEffectsLayer) and the message is swallowed
+      // silently — no reply, no request. Same contract as the AI chat.
+      const eggEffect = matchEggPhrase(draft);
+      if (eggEffect) {
+        setDraft("");
+        playEggEffect(eggEffect);
+        return false;
+      }
+
       const text = draft;
-      if (!text.trim()) return;
+      if (!text.trim()) return false;
 
       setDraft("");
       void sendMessage(text);
+      return true;
     },
-    [draft, sendMessage],
+    [draft, sendMessage, setDraft],
   );
 
   return {
@@ -490,6 +533,10 @@ export function useBuddyConversation() {
     handleSubmit,
     confirmAction,
     dismissAction,
+
+    dinoGameActive,
+    closeDinoGame,
+    dinoUnlocked,
 
     ensureOpened,
     retryOpen,

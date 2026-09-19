@@ -1,5 +1,11 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { ToastContext, type Toast, type ToastOptions, type ToastVariant } from "./ToastContext";
+import {
+  ToastApiContext,
+  ToastContext,
+  type Toast,
+  type ToastOptions,
+  type ToastVariant,
+} from "./ToastContext";
 import { ToastViewport } from "../components/ui/Toast";
 
 /**
@@ -88,15 +94,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const dismissAll = useCallback(() => setToasts([]), []);
 
-  const value = useMemo(
-    () => ({ toasts, show, info, success, warning, error, dismiss, dismissAll }),
-    [toasts, show, info, success, warning, error, dismiss, dismissAll],
+  // The stable half: identity depends only on the callbacks, all of which are
+  // `useCallback`-ed with empty deps — so a component that only raises toasts
+  // (see `ToastApiContext`) is never re-rendered by a toast appearing or
+  // dismissing.
+  const api = useMemo(
+    () => ({ show, info, success, warning, error, dismiss, dismissAll }),
+    [show, info, success, warning, error, dismiss, dismissAll],
   );
 
+  const value = useMemo(() => ({ ...api, toasts }), [api, toasts]);
+
   return (
-    <ToastContext.Provider value={value}>
-      {children}
-      <ToastViewport toasts={toasts} onDismiss={dismiss} />
-    </ToastContext.Provider>
+    <ToastApiContext.Provider value={api}>
+      <ToastContext.Provider value={value}>
+        {children}
+        <ToastViewport toasts={toasts} onDismiss={dismiss} />
+      </ToastContext.Provider>
+    </ToastApiContext.Provider>
   );
 }

@@ -16,8 +16,7 @@ function toMessage(error: unknown, fallback: string): string {
 export type TaskOrigin = "authored" | "picked";
 
 type ReviewAction =
-  | { kind: "generate"; projectId: string }
-  | { kind: "create"; input: CreateStarterWorkTaskInput };
+  { kind: "generate"; projectId: string } | { kind: "create"; input: CreateStarterWorkTaskInput };
 
 const NO_TASKS: StarterWorkTask[] = [];
 

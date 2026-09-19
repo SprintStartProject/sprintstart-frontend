@@ -488,4 +488,26 @@ describe("DashboardPage", () => {
       expect(within(picker).queryByRole("button", { name: "Projects" })).not.toBeInTheDocument();
     });
   });
+
+  describe("easter egg", () => {
+    it("renders the header icon with eggHint enabled", () => {
+      renderPage();
+
+      const iconButton = screen.getByRole("button", { name: "Dashboard icon" });
+      expect(iconButton).toHaveAttribute("data-egg-hint", "true");
+    });
+
+    it("opens the 2048 game modal after three clicks on the header icon", async () => {
+      renderPage();
+
+      const iconButton = screen.getByRole("button", { name: "Dashboard icon" });
+      expect(screen.queryByRole("dialog", { name: "2048" })).not.toBeInTheDocument();
+
+      await userEvent.click(iconButton);
+      await userEvent.click(iconButton);
+      await userEvent.click(iconButton);
+
+      expect(screen.getByRole("dialog", { name: "2048" })).toBeInTheDocument();
+    });
+  });
 });

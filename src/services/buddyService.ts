@@ -120,6 +120,24 @@ interface BuddyStreamChunk {
   github_login?: string;
   competency_key?: string;
   level?: string;
+  /**
+   * `place_checklist` confirm payload: the list the buddy offered to keep.
+   *
+   * Content rather than a target id, and echoed back for a sharper version of the same reason:
+   * re-deriving these lines at confirm time would keep a card the hire never read.
+   */
+  checklist_title?: string;
+  checklist_items?: string[];
+  /** `amend_checklist`: which card of theirs the lines would be added to. */
+  card_id?: string;
+  /** `place_link` confirm payload. */
+  link_url?: string;
+  link_label?: string;
+  /** `place_note` confirm payload. */
+  note_text?: string;
+  /** `reword_checklist_item`: the line as it reads now, and as it would read. */
+  line_before?: string;
+  line_after?: string;
 }
 
 /** The outcome of confirming a buddy-proposed action — a single line to relay in the thread. */
@@ -145,6 +163,14 @@ export async function performAction(
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    checklistTitle?: string;
+    checklistItems?: string[];
+    cardId?: string;
+    linkUrl?: string;
+    linkLabel?: string;
+    noteText?: string;
+    lineBefore?: string;
+    lineAfter?: string;
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -158,6 +184,14 @@ export async function performAction(
       githubLogin: extras.githubLogin,
       competencyKey: extras.competencyKey,
       level: extras.level,
+      checklistTitle: extras.checklistTitle,
+      checklistItems: extras.checklistItems,
+      cardId: extras.cardId,
+      linkUrl: extras.linkUrl,
+      linkLabel: extras.linkLabel,
+      noteText: extras.noteText,
+      lineBefore: extras.lineBefore,
+      lineAfter: extras.lineAfter,
     }),
   });
 }
@@ -327,6 +361,14 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
               githubLogin: event.github_login,
               competencyKey: event.competency_key,
               level: event.level,
+              checklistTitle: event.checklist_title,
+              checklistItems: event.checklist_items,
+              cardId: event.card_id,
+              linkUrl: event.link_url,
+              linkLabel: event.link_label,
+              noteText: event.note_text,
+              lineBefore: event.line_before,
+              lineAfter: event.line_after,
             });
           }
           break;

@@ -267,9 +267,10 @@ function spawnPlayerExplosion(w: World, x: number, y: number): void {
 /**
  * SpaceInvaders
  *
- * A canvas Space Invaders clone, hidden as an easter egg on the 404 page
- * and reachable from the dashboard via the Ctrl+Shift+3 chord (see
- * {@link SpaceInvadersModal}).
+ * A canvas Space Invaders clone, hidden as an easter egg behind the 404
+ * page's rocket teaser and opened through the shared egg shell
+ * (see {@link EggModalShell}, registry id `space-invaders`). The game owns
+ * its own keyboard — Escape and the exit button call `onExit`.
  *
  * Architecture mirrors {@link DinoGame}: all mutable game state lives in a
  * single `useRef<World>` so the `requestAnimationFrame` loop never restarts

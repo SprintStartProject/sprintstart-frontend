@@ -48,16 +48,19 @@ vi.mock("../../../../../src/components/ui/SidePanel", () => ({
     isOpen,
     title,
     actions,
+    badge,
     children,
   }: {
     isOpen: boolean;
     title: React.ReactNode;
     actions: React.ReactNode;
+    badge?: React.ReactNode;
     children: React.ReactNode;
   }) =>
     isOpen ? (
       <div data-testid="side-panel">
         <div data-testid="panel-header">{title}</div>
+        {badge && <div data-testid="panel-badge">{badge}</div>}
         <div data-testid="panel-actions">{actions}</div>
         {children}
       </div>
@@ -127,6 +130,42 @@ describe("ArtifactViewerDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+  });
+
+  describe("source repository badge", () => {
+    it("shows the repository in the drawer header for a GitHub artifact with repo metadata", () => {
+      renderDrawer(
+        createArtifact({
+          metadata: JSON.stringify({
+            repositoryId: "r1",
+            repositoryFullName: "sprintstart/sprintstart-backend",
+          }),
+        }),
+      );
+
+      // The badge is derived from the artifact synchronously, so it must be
+      // present as soon as the panel renders.
+      expect(screen.getByTestId("artifact-drawer-repo-badge")).toHaveTextContent(
+        "sprintstart/sprintstart-backend",
+      );
+    });
+
+    it("shows no repository badge for an artifact without repo metadata", () => {
+      renderDrawer(createArtifact({ metadata: undefined }));
+
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+    });
+
+    it("shows no repository badge for a non-GitHub artifact", () => {
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "UPLOAD",
+          metadata: JSON.stringify({ repositoryFullName: "owner/repo" }),
+        }),
+      );
+
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+    });
   });
 
   it("shows a spinner while fetching the summary", async () => {

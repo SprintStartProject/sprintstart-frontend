@@ -33,9 +33,14 @@ const DataIngestionPage = lazy(() =>
 const OnBoardingPage = lazy(() =>
   import("../pages/OnBoardingPage").then((module) => ({ default: module.OnBoardingPage })),
 );
-const OnBoardingItemPage = lazy(() =>
-  import("../features/onboarding/components/OnBoardingItemPage").then((module) => ({
-    default: module.OnBoardingItemPage,
+const BlueprintPathsPage = lazy(() =>
+  import("../pages/BlueprintPathsPage.tsx").then((module) => ({
+    default: module.BlueprintPathsPage,
+  })),
+);
+const BlueprintPathDetailPage = lazy(() =>
+  import("../pages/BlueprintPathDetailPage.tsx").then((module) => ({
+    default: module.BlueprintPathDetailPage,
   })),
 );
 const SkillWizardPage = lazy(() =>
@@ -149,8 +154,11 @@ export function AppRouter() {
               <Route path="/buddy" element={<BuddyPage />} />
             </Route>
             <Route path="/onboarding" element={<OnBoardingPage />} />
+            <Route path="/blueprints" element={<BlueprintPathsPage />} />
+            <Route path="/blueprints/:pathId" element={<BlueprintPathDetailPage />} />
             <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-            <Route path="/onboarding/:stepId" element={<OnBoardingItemPage />} />
+            {/* The old address of a step page: opens the path with that step unfolded. */}
+            <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
             <Route
               path="/data-ingestion"
               element={

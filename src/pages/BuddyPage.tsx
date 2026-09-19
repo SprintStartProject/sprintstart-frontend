@@ -166,6 +166,8 @@ function BuddyMentorHome() {
     confirmAction,
     dismissAction,
     openError,
+    dinoGameActive,
+    closeDinoGame,
     ensureOpened,
     retryOpen,
     startFreshVisit,
@@ -327,12 +329,15 @@ function BuddyMentorHome() {
       <BuddyConversation
         messages={greeting.messages}
         isThinking={isThinking || isOpening || greeting.isThinking}
+        isStreaming={isStreaming}
         activeTool={activeTool}
         draft={draft}
         setDraft={setDraft}
         handleSubmit={handleSubmit}
         confirmAction={confirmAction}
         dismissAction={dismissAction}
+        dinoGameActive={dinoGameActive}
+        onDinoGameExit={closeDinoGame}
         // Escalating hangs off the hire's own question now, not off the buddy's answer — see
         // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered
         // where a messenger offers a quick reply: right under the message that suggested it. It

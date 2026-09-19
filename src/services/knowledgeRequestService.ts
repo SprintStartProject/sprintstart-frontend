@@ -1,4 +1,4 @@
-import { apiClient } from "./apiClient";
+import { ApiError, apiClient } from "./apiClient";
 import type { CanonicalAnswer, KnowledgeRequest } from "../features/knowledge-request/types";
 
 const BASE = "/api/v1/onboarding";
@@ -33,6 +33,16 @@ function notifyOpenEscalationsChanged(): void {
   });
 }
 
+/**
+ * Set once this deployment has answered 404 for the open-escalation count.
+ *
+ * Deliberately module-wide and never reset: the shape of the backend does not change while the tab
+ * is open. It exists because a frontend branch can sit ahead of the backend branch it is run
+ * against — which is the normal state during a feature that spans both repos — and a badge is not
+ * worth a 404 in the console on every single navigation.
+ */
+let countEndpointMissing = false;
+
 export const knowledgeRequestService = {
   /** Hire: flag a question the buddy could not answer to the project's PM. */
   async escalate(projectId: string, question: string): Promise<KnowledgeRequest> {
@@ -62,10 +72,24 @@ export const knowledgeRequestService = {
    * asks for it on every navigation.
    */
   async countOpen(projectId: string): Promise<number> {
-    const { open } = await apiClient.fetch<{ open: number }>(
-      `${BASE}/knowledge-requests/count?projectId=${encodeURIComponent(projectId)}`,
-    );
-    return open;
+    // A backend that does not have this endpoint will not grow one mid-session, and the sidebar
+    // asks on every navigation — so a 404 is remembered and the badge quietly reports nothing
+    // instead of writing a failed request to the console for every view. Any other failure is
+    // thrown as usual: a 500 or a dropped connection may well be gone by the next check.
+    if (countEndpointMissing) return 0;
+
+    try {
+      const { open } = await apiClient.fetch<{ open: number }>(
+        `${BASE}/knowledge-requests/count?projectId=${encodeURIComponent(projectId)}`,
+      );
+      return open;
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 404) {
+        countEndpointMissing = true;
+        return 0;
+      }
+      throw reason;
+    }
   },
 
   /** PM: answer an open request, minting the durable answer and closing the request. */

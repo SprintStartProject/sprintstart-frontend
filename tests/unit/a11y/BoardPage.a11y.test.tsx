@@ -79,7 +79,10 @@ describe("BoardPage Accessibility", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByLabelText("Your path here")).toBeInTheDocument());
+    // Waits for a card rather than for the header strip of moments, which the board no longer
+    // carries: that strip answered "how far through onboarding am I", which is a question the
+    // board was already answering four other ways.
+    await waitFor(() => expect(screen.getByRole("main")).toBeInTheDocument());
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 

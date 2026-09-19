@@ -43,7 +43,7 @@ type BuddyThreadProps = {
    * keeping or how — it hands over the text and lets the caller decide, which is what stops this
    * component from growing a dependency on the board.
    */
-  renderReplyAction?: (reply: string) => ReactNode;
+  renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
   /**
    * Why the conversation could not be brought on screen at all, if it could not.
    *
@@ -54,6 +54,14 @@ type BuddyThreadProps = {
   openError?: string | null;
   /** Tries the read again. The banner is only worth showing when there is something to press. */
   onRetryOpen?: () => void;
+  /**
+   * Whether the dino waiting-game is open while the buddy thinks (unlocked
+   * users only; Space opens it — see useSpaceOpensDino). Both surfaces pass
+   * it so dock and page offer the same deal.
+   */
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
   /**
    * Clears the conversation above the visit divider and opens a clean one.
    *
@@ -101,6 +109,8 @@ export function BuddyThread({
   renderReplyAction,
   openError,
   onRetryOpen,
+  dinoGameActive = false,
+  onDinoGameExit,
   onStartFreshVisit,
   freshVisitShortcut,
 }: BuddyThreadProps) {
@@ -192,7 +202,7 @@ export function BuddyThread({
               footer={
                 <>
                   {isUser && renderQuestionAction?.(message.content)}
-                  {!isUser && hasText && renderReplyAction?.(message.content)}
+                  {!isUser && hasText && renderReplyAction?.(message.content, message)}
                   {!isUser && hasActions && (
                     <BuddyActionProposals
                       messageId={message.id}
@@ -221,6 +231,8 @@ export function BuddyThread({
         <BuddyTypingMessage
           label={activeTool ? toolLabel(activeTool) : undefined}
           showName={showNames}
+          gameActive={dinoGameActive}
+          onGameExit={onDinoGameExit}
         />
       )}
     </div>

@@ -47,6 +47,22 @@ export type BoardCardControls = {
   /** The "waits on…" picker for this card, shown while the board is being arranged. */
   dependencyPicker?: ReactNode;
   /**
+   * Opens the picture of the run this card belongs to.
+   *
+   * Absent where there is nothing to draw — a card with no arrow either way is not a chain, and a
+   * control that opens a box teaches people not to press it. Absent on a read-only board too,
+   * where the structure it would draw is not there to be read.
+   */
+  onShowChain?: () => void;
+  /**
+   * How many cards this one alone is holding up.
+   *
+   * Said on the card rather than only on the board's "start here" line, because the line names one
+   * card and this is the reason to pick any of the others: a card that frees three is worth doing
+   * before a card that frees none, and nothing else on the board says which is which.
+   */
+  unblocks?: number;
+  /**
    * This card's place in a stack of cards that have to be worked in order.
    *
    * Set on exactly one card: the one standing in for the rest while the pile is *closed*. An open
