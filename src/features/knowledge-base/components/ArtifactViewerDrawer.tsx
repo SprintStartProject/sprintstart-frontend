@@ -14,6 +14,8 @@ import {
   Users,
   Hash,
   Link2,
+  ExternalLink,
+  MessageSquare,
 } from "lucide-react";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -23,6 +25,11 @@ import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Artifact, ArtifactContent, ArtifactSummaryCitation } from "../types";
+import { questionForArtifact, quoteForChat } from "../../../hooks/askAiQuote";
+import { useArtifactSelection } from "../hooks/useArtifactSelection";
+import { useAskAi } from "../../../hooks/useAskAi";
+import { isEmptyContent, summariseBlockReason } from "../summarizability";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { preprocessMarkdown } from "../markdown";
 import {
   parseOrgMetadata,
@@ -679,6 +686,29 @@ function OrgMetadataView({
         </div>
       </header>
 
+      <div className="flex flex-wrap gap-2" data-testid="org-quick-links">
+        <a
+          href={`https://github.com/orgs/${encodeURIComponent(metadata.login)}/repositories`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
+        >
+          <Hash className="h-3.5 w-3.5" />
+          <span>Repositories</span>
+          <ExternalLink className="h-3 w-3 opacity-60" />
+        </a>
+        <a
+          href={`https://github.com/orgs/${encodeURIComponent(metadata.login)}/people`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
+        >
+          <Users className="h-3.5 w-3.5" />
+          <span>People</span>
+          <ExternalLink className="h-3 w-3 opacity-60" />
+        </a>
+      </div>
+
       <dl className="grid gap-3 sm:grid-cols-2">
         {metadata.location && (
           <OrgProfileRow icon={<MapPin className="h-4 w-4" />} label="Location">
@@ -715,18 +745,20 @@ function OrgMetadataView({
             <>
               {metadata.publicRepos} public · {metadata.privateRepos} private
             </>
+          ) : metadata.publicRepos !== null ? (
+            <>{metadata.publicRepos} public</>
           ) : (
             "N/A"
           )}
         </OrgProfileRow>
       </dl>
 
-      {metadata.teams && metadata.teams.length > 0 && (
-        <section aria-label="Teams">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
-            <Users className="h-4 w-4 text-app-text-subtle" />
-            Teams
-          </h3>
+      <section aria-label="Teams">
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
+          <Users className="h-4 w-4 text-app-text-subtle" />
+          Teams
+        </h3>
+        {metadata.teams && metadata.teams.length > 0 ? (
           <div className="space-y-3">
             {metadata.teams.map((team: OrgMetadataTeam) => (
               <div
@@ -749,18 +781,30 @@ function OrgMetadataView({
               </div>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <p className="text-xs text-app-text-muted">
+            No teams configured or visible in this organization.
+          </p>
+        )}
+      </section>
 
-      {metadata.members.length > 0 && (
-        <section aria-label="Members">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
+      <section aria-label="Members">
+        <div className="mb-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-app-text">
             <Users className="h-4 w-4 text-app-text-subtle" />
             Members
-            <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-bold text-app-text-subtle">
-              {metadata.members.length}
-            </span>
+            {metadata.members.length > 0 && (
+              <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-bold text-app-text-subtle">
+                {metadata.members.length}
+              </span>
+            )}
           </h3>
+          <p className="mt-1 text-xs text-app-text-muted">
+            Only members with public organization visibility on GitHub are listed.
+          </p>
+        </div>
+
+        {metadata.members.length > 0 ? (
           <ul className="flex flex-wrap gap-1.5">
             {metadata.members.map((member) => (
               <li key={member.login}>
@@ -776,8 +820,13 @@ function OrgMetadataView({
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        ) : (
+          <p className="text-xs text-app-text-muted">
+            No public members visible. Members can set their organization membership to public on
+            GitHub.
+          </p>
+        )}
+      </section>
     </div>
   );
 }
@@ -1096,6 +1145,36 @@ export function ArtifactViewerDrawer({
     content?.mimeType === "application/pdf" || (content?.mimeType.startsWith("image/") ?? false);
   const canHighlight = highlightLines && highlightLines.length > 0 && !isPdfOrImage;
 
+  // A known-empty or near-empty artifact is refused before the round trip: the AI
+  // service would index it first and only then answer that there is nothing to
+  // summarise. Null while the content is still loading, or for formats that are
+  // not text at all -- see summariseBlockReason.
+  const askAi = useAskAi();
+
+  /**
+   * Whatever the reader has highlighted in the document, while they have it.
+   *
+   * The action below quotes it; with nothing selected it asks about the whole
+   * artifact instead. The offer lives here rather than floating over the text,
+   * because a button positioned over a selection covers the lines around it —
+   * and the lines around a selection are usually the next thing being read.
+   */
+  const selection = useArtifactSelection(contentContainerRef);
+
+  const ask = () => {
+    const prompt = selection.text
+      ? quoteForChat({
+          text: selection.text,
+          source: artifact?.title ?? null,
+          url: artifact?.sourceUrl ?? null,
+        })
+      : questionForArtifact({ title: artifact?.title, url: artifact?.sourceUrl });
+
+    if (askAi(prompt)) selection.clear();
+  };
+
+  const summariseBlockedReason = summariseBlockReason(content);
+
   const orgMetadata = useMemo(
     () => (artifact?.artifactType === "ORG_METADATA" ? parseOrgMetadata(artifact.metadata) : null),
     [artifact],
@@ -1132,14 +1211,35 @@ export function ArtifactViewerDrawer({
         </div>
       )}
       <Button
-        variant="primary"
+        variant="secondary"
         size="sm"
-        onClick={() => void handleSummarize()}
-        data-testid="summarise-btn"
-        icon={<Sparkles className="h-4 w-4" />}
+        onClick={ask}
+        data-testid="ask-ai-btn"
+        icon={<MessageSquare className="h-4 w-4" />}
       >
-        Summarise
+        {selection.text ? "Ask AI about this" : "Ask AI"}
       </Button>
+      {/* The wrapper carries the reason, not the button: a disabled control
+          receives no pointer events, so its own title would never be shown. */}
+      <span title={summariseBlockedReason ?? undefined}>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => void handleSummarize()}
+          disabled={summariseBlockedReason !== null}
+          // Keeps the reason reachable without sight; the accessible name still
+          // begins with the visible label.
+          aria-label={
+            summariseBlockedReason
+              ? `Summarise (unavailable: ${summariseBlockedReason})`
+              : undefined
+          }
+          data-testid="summarise-btn"
+          icon={<Sparkles className="h-4 w-4" />}
+        >
+          Summarise
+        </Button>
+      </span>
       {canDeleteThisArtifact && (
         <button
           onClick={openDeleteConfirm}
@@ -1207,9 +1307,17 @@ export function ArtifactViewerDrawer({
                   </button>
                 </div>
               )}
-              {content &&
-              shouldRenderAsMarkdown(content, artifact) &&
-              markdownViewMode === "rendered" ? (
+              {content && isEmptyContent(content) ? (
+                <div data-testid="empty-body-notice">
+                  <EmptyState size="sm" title="Nothing to read here">
+                    This artifact came in with a title and an empty body — a pull request or issue
+                    whose description was never written, or a file with no content. There is nothing
+                    to read, and nothing to summarise.
+                  </EmptyState>
+                </div>
+              ) : content &&
+                shouldRenderAsMarkdown(content, artifact) &&
+                markdownViewMode === "rendered" ? (
                 <div className="prose prose-sm max-w-none text-app-text dark:prose-invert">
                   <ReactMarkdown
                     remarkPlugins={REMARK_PLUGINS}

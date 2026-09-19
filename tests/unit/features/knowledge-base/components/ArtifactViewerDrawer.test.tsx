@@ -1,4 +1,4 @@
-import { render as rtlRender, screen } from "@testing-library/react";
+import { act, render as rtlRender, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
@@ -14,12 +14,29 @@ import type {
 vi.mock("../../../../../src/services/knowledgeService", () => ({
   knowledgeService: {
     getArtifactContent: vi.fn().mockResolvedValue({
-      content: "# Test content",
+      // Long enough to be worth summarising: the drawer refuses the action for
+      // empty or near-empty content, and every test below assumes it is offered.
+      content: [
+        "# Test content",
+        "",
+        "A paragraph long enough that summarising it is a sensible thing to ask for.",
+        "",
+        "## Section",
+        "",
+        "- a bullet",
+        "- another bullet",
+      ].join("\n"),
       mimeType: "text/markdown",
     }),
     streamArtifactSummary: vi.fn(),
     deleteUpload: vi.fn().mockResolvedValue(undefined),
   },
+}));
+
+const { mockAskAi } = vi.hoisted(() => ({ mockAskAi: vi.fn((_prompt: string) => true) }));
+
+vi.mock("../../../../../src/hooks/useAskAi", () => ({
+  useAskAi: () => mockAskAi,
 }));
 
 vi.mock("../../../../../src/context/useAuth", () => ({
@@ -685,6 +702,15 @@ describe("ArtifactViewerDrawer", () => {
       // Teams + members come from the metadata, not from a fetched body.
       expect(screen.getByText("Platform")).toBeInTheDocument();
       expect(screen.getAllByText("alice").length).toBe(2);
+      expect(
+        screen.getByText(/only members with public organization visibility on github are listed/i),
+      ).toBeInTheDocument();
+
+      // Quick action links
+      const repoLink = screen.getByRole("link", { name: /repositories/i });
+      expect(repoLink).toHaveAttribute("href", "https://github.com/orgs/sprintstart/repositories");
+      const peopleLink = screen.getByRole("link", { name: /people/i });
+      expect(peopleLink).toHaveAttribute("href", "https://github.com/orgs/sprintstart/people");
 
       // The content endpoint 302-redirects for this type; the drawer must not
       // follow it into GitHub's HTML.
@@ -692,6 +718,42 @@ describe("ArtifactViewerDrawer", () => {
       // No summarise (nothing summarisable) and no delete (not an UPLOAD artifact).
       expect(screen.queryByTestId("summarise-btn")).not.toBeInTheDocument();
       expect(screen.queryByTestId("delete-artifact-btn")).not.toBeInTheDocument();
+    });
+
+    it("renders public-only repos and empty states when private repos and teams are omitted", async () => {
+      const partialOrgMetadata = JSON.stringify({
+        login: "sprintstart",
+        name: "SprintStart",
+        description: null,
+        company: null,
+        blog: null,
+        location: null,
+        email: null,
+        publicRepos: 7,
+        privateRepos: null,
+        teams: [],
+        members: [],
+      });
+
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "SprintStart",
+          sourceSystem: "GITHUB",
+          metadata: partialOrgMetadata,
+        }),
+      );
+
+      expect(await screen.findByTestId("org-metadata-view")).toBeInTheDocument();
+      expect(screen.getByText("7 public")).toBeInTheDocument();
+      expect(
+        screen.getByText("No teams configured or visible in this organization."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "No public members visible. Members can set their organization membership to public on GitHub.",
+        ),
+      ).toBeInTheDocument();
     });
 
     it("shows a quiet empty state when the metadata JSON is unusable", async () => {
@@ -709,5 +771,187 @@ describe("ArtifactViewerDrawer", () => {
       expect(screen.queryByTestId("summarise-btn")).not.toBeInTheDocument();
       expect(warn).toHaveBeenCalled();
     });
+
+    it("encodes special characters in metadata.login for quick action links", async () => {
+      const orgWithSpecialLogin = JSON.stringify({
+        login: "special login/test",
+        name: "Special Org",
+        description: null,
+        company: null,
+        blog: null,
+        location: null,
+        email: null,
+        publicRepos: 1,
+        privateRepos: null,
+        teams: [],
+        members: [],
+      });
+
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "Special Org",
+          sourceSystem: "GITHUB",
+          metadata: orgWithSpecialLogin,
+        }),
+      );
+
+      const repoLink = await screen.findByRole("link", { name: /repositories/i });
+      expect(repoLink).toHaveAttribute(
+        "href",
+        "https://github.com/orgs/special%20login%2Ftest/repositories",
+      );
+      const peopleLink = screen.getByRole("link", { name: /people/i });
+      expect(peopleLink).toHaveAttribute(
+        "href",
+        "https://github.com/orgs/special%20login%2Ftest/people",
+      );
+    });
+  });
+  it("refuses an empty artifact instead of asking the AI", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "   \n\n  \n",
+      mimeType: "text/plain",
+      isObjectUrl: false,
+    });
+
+    renderDrawer();
+
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    expect(summariseBtn).toBeDisabled();
+    expect(summariseBtn).toHaveAccessibleName(/nothing to summarise/i);
+    expect(summariseBtn.parentElement).toHaveAttribute("title", expect.stringMatching(/empty/i));
+
+    await userEvent.click(summariseBtn);
+    expect(knowledgeService.streamArtifactSummary).not.toHaveBeenCalled();
+  });
+
+  it("refuses a file too short to summarise", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "line one\n\nline two\n",
+      mimeType: "text/plain",
+      isObjectUrl: false,
+    });
+
+    renderDrawer();
+
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    expect(summariseBtn).toBeDisabled();
+    expect(summariseBtn).toHaveAccessibleName(/2 lines of content/i);
+
+    await userEvent.click(summariseBtn);
+    expect(knowledgeService.streamArtifactSummary).not.toHaveBeenCalled();
+  });
+
+  it("offers the summary once there is something to summarise", async () => {
+    renderDrawer();
+
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    expect(summariseBtn).toBeEnabled();
+    expect(summariseBtn.parentElement).not.toHaveAttribute("title");
+  });
+
+  it("still offers the summary for a PDF, whose content is not text to count", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "blob:http://localhost/object-url",
+      mimeType: "application/pdf",
+      isObjectUrl: true,
+    });
+
+    renderDrawer(createArtifact({ title: "spec.pdf", mime: "application/pdf" }));
+
+    const summariseBtn = await screen.findByTestId("summarise-btn");
+    expect(summariseBtn).toBeEnabled();
+  });
+  it("says the body is empty instead of showing a blank pane", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "   ",
+      mimeType: "text/markdown",
+      isObjectUrl: false,
+    });
+
+    renderDrawer();
+
+    const notice = await screen.findByTestId("empty-body-notice");
+    expect(notice).toHaveTextContent(/nothing to read here/i);
+    expect(notice).toHaveTextContent(/empty body/i);
+  });
+
+  it("explains an empty pull-request body in the reader's terms", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "",
+      mimeType: "text/markdown",
+      isObjectUrl: false,
+    });
+
+    renderDrawer(createArtifact({ title: "PR #12 Fix the thing", artifactType: "PULL_REQUEST" }));
+
+    const notice = await screen.findByTestId("empty-body-notice");
+    expect(notice).toHaveTextContent(/pull request or issue/i);
+  });
+
+  it("shows the empty-body notice in the source view too", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+      content: "",
+      mimeType: "text/markdown",
+      isObjectUrl: false,
+    });
+
+    const { container } = renderDrawer();
+    await screen.findByTestId("empty-body-notice");
+
+    await userEvent.click(screen.getByTestId("view-source-btn"));
+
+    expect(screen.getByTestId("empty-body-notice")).toBeInTheDocument();
+    expect(container.querySelector("pre")).toBeNull();
+  });
+  it("hands the whole artifact to the chat when Ask AI is pressed", async () => {
+    renderDrawer();
+
+    const askAi = await screen.findByTestId("ask-ai-btn");
+    await userEvent.click(askAi);
+
+    expect(mockAskAi).toHaveBeenCalledTimes(1);
+    const prompt = mockAskAi.mock.calls[0][0];
+    expect(prompt).toContain("README.md");
+    expect(prompt).toContain("in the Knowledge Base");
+  });
+  it("quotes the highlighted text when the reader has selected some", async () => {
+    renderDrawer();
+
+    const body = await screen.findByTestId("raw-content");
+    const selected = {
+      isCollapsed: false,
+      rangeCount: 1,
+      toString: () => "  rolls back on its own  ",
+      getRangeAt: () => ({ commonAncestorContainer: body }),
+      removeAllRanges: vi.fn(),
+    };
+    vi.spyOn(window, "getSelection").mockReturnValue(selected as unknown as Selection);
+
+    act(() => {
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    const askAi = screen.getByTestId("ask-ai-btn");
+    expect(askAi).toHaveTextContent("Ask AI about this");
+
+    await userEvent.click(askAi);
+
+    expect(mockAskAi).toHaveBeenCalledTimes(1);
+    expect(mockAskAi.mock.calls[0][0]).toContain("> rolls back on its own");
+    expect(mockAskAi.mock.calls[0][0]).toContain("From README.md");
+    expect(selected.removeAllRanges).toHaveBeenCalledTimes(1);
+
+    vi.restoreAllMocks();
   });
 });
