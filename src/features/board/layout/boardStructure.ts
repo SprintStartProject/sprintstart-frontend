@@ -252,6 +252,7 @@ export function isSelfReporting(card: BoardCard): boolean {
     case "CHECKLIST":
     case "ARRIVAL_STEPS":
     case "PATH_TO_FIRST_CONTRIBUTION":
+    case "PATH_STEP":
       return true;
     default:
       return false;
@@ -279,6 +280,10 @@ export function cardProgress(card: BoardCard): { done: number; total: number } |
     case "PATH_TO_FIRST_CONTRIBUTION": {
       const total = content.moments.length;
       return { done: content.moments.filter((moment) => moment.reachedAt !== null).length, total };
+    }
+    case "PATH_STEP": {
+      const total = content.tasks.length;
+      return { done: content.tasks.filter((task) => task.finished).length, total };
     }
     default:
       return null;

@@ -34,6 +34,8 @@ export function cardName(card: BoardCard): string {
       return "What you have shown";
     case "MEMORY_RECAP":
       return "What your buddy remembers";
+    case "PATH_STEP":
+      return content.title ?? "A step of your path";
     default:
       return "Card";
   }
