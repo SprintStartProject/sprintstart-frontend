@@ -6,7 +6,7 @@ import { BoardPage } from "../../../src/pages/BoardPage";
 import type { Board } from "../../../src/features/board/types";
 
 vi.mock("../../../src/services/boardService", () => ({
-  boardService: { fetchBoard: vi.fn() },
+  boardService: { fetchBoard: vi.fn(), tickPathStepTask: vi.fn() },
 }));
 
 vi.mock("../../../src/context/useAuth", () => ({
@@ -64,6 +64,43 @@ const board: Board = {
           },
         ],
         attributionMissing: false,
+      },
+    },
+    {
+      id: "c3",
+      kind: "PATH_STEP",
+      owner: "AI",
+      position: 2,
+      placedAt: "2026-07-27T09:00:00Z",
+      content: {
+        kind: "PATH_STEP",
+        stepId: "step-1",
+        phaseTitle: "Getting oriented",
+        title: "Set up your local environment",
+        description: "Install the tools you need and get the project running.",
+        status: "IN_PROGRESS",
+        isAiAssisted: true,
+        expectedOutcomes: ["You can run the project locally"],
+        tasks: [
+          {
+            id: "task-1",
+            stepId: "step-1",
+            position: 1,
+            title: "Clone the repo",
+            description: "git clone the project and open it in your editor",
+            finished: false,
+          },
+        ],
+        resources: [
+          {
+            id: "resource-1",
+            stepId: "step-1",
+            title: "Setup guide",
+            description: "The onboarding doc",
+            url: "https://example.test/setup",
+          },
+        ],
+        reason: null,
       },
     },
   ],
