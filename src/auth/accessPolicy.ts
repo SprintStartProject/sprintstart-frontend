@@ -13,6 +13,7 @@ export type AppRoute =
   | "/buddy"
   | "/board"
   | "/data-ingestion"
+  | "/hire-setup"
   | "/arrival-steps"
   | "/starter-work"
   | "/admin"
@@ -42,11 +43,13 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
   // surface, and everybody onboards onto a project at some point.
   "/board": ALL_GROUPS,
   "/data-ingestion": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
-  // HR reads the arrival list; PM/ADMIN author it (enforced server-side too -- this only decides
-  // who sees the page). Worth revisiting: paperwork and accounts are arguably HR's to own.
+  // Arrival authoring and Starter Work review, as tabs of one page. HR reads both; PM/ADMIN act
+  // on them (enforced server-side too -- this only decides who sees the page). Worth revisiting:
+  // paperwork and accounts are arguably HR's to own.
+  "/hire-setup": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
+  // Retired in favour of `/hire-setup`; kept only as a redirect target, so the permissions here
+  // are unused but left matching it in case anything still resolves the route directly.
   "/arrival-steps": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
-  // HR reads the queue; approving is what mints a goal node, so only PM/ADMIN act (enforced
-  // server-side too -- this only decides who sees the page).
   "/starter-work": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],
   "/admin": [PermissionGroup.HR, PermissionGroup.ADMIN],
   "/pm-dashboard": [PermissionGroup.PM, PermissionGroup.HR, PermissionGroup.ADMIN],

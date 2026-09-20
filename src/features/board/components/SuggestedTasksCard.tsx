@@ -39,7 +39,7 @@ export function SuggestedTasksCard({
       icon={Sparkles}
       title="Good next tasks"
       card={card}
-      subtitle={content.tasks.length > 0 ? "Best fit first" : undefined}
+      subtitle={content.tasks.length > 0 ? "From your starter work, best fit first" : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
     >

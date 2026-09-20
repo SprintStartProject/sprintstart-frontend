@@ -10,6 +10,13 @@
  */
 
 /**
+ * Which list a step (or a write against one) belongs to. Spelled out rather than passed as
+ * `projectId: string | null` at every call site — a typo'd id silently writes into a project
+ * scope, `"company"` cannot.
+ */
+export type ArrivalScope = "company" | "project";
+
+/**
  * How a step was established, or how it is meant to be.
  *
  * Shared with the contribution stream deliberately, and the rule travels with it: rigor is never
