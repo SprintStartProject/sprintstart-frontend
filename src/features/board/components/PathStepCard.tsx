@@ -1,6 +1,11 @@
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Footprints, Lightbulb, MoveRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { boardService } from "../../../services/boardService";
+import { queryKeys } from "../../../services/queryKeys";
+import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
@@ -20,19 +25,68 @@ type PathStepCardProps = {
  *
  * Everything on it but the tasks is a read straight from the path: the title, the outcomes, the
  * resources, the footer link. Ticking a task is the one write, and it goes to the path itself, not
- * to the board — the same split `ArrivalStepsCard` draws for confirming an arrival step. Reading
- * this card and reading `/onboarding/:stepId` for the same step must never say different things.
+ * to the board — the same split `ArrivalStepsCard` draws for confirming an arrival step, and the
+ * card owns that write itself rather than going through the board's `editCard`, whose contract is
+ * for the hire's own, authored cards. Reading this card and reading `/onboarding/:stepId` for the
+ * same step must never say different things.
  *
  * Almost every field is nullable because the path underneath a placed card can be regenerated —
  * `reason` is the honest answer for a step that is gone, and the card shows it rather than
  * disappearing: a live card that vanished would read as the board losing something.
+ *
+ * **The tick is a two-way race, not a one-way confirmation.** `ArrivalStepsCard`'s optimistic state
+ * only ever moves one direction, because a step, once settled, stays settled. A task here can be
+ * ticked and unticked from two places — this card and `/onboarding/:stepId` — so an `intent` that
+ * stayed forever over the props would start lying the moment the step page changes the same task
+ * and the board reloads behind it. The effect below clears an `intent` entry as soon as the props
+ * agree with it: the click wins immediately, the server wins eventually, and neither can block the
+ * other from ever being true again.
  */
 export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepCardProps) {
   // The path writes this text, so its highlights are matched by their words rather than written
   // into it — the same reason `ArrivalStepList` reads marks off the card rather than the step.
   const marks = useCardMarks().marksFor(card.id);
-  const total = content.tasks.length;
-  const done = content.tasks.filter((task) => task.finished).length;
+  const queryClient = useQueryClient();
+
+  // What the hire just clicked, laid over the server's `finished` until the props catch up.
+  const [intent, setIntent] = useState<Record<string, boolean>>({});
+  // Tasks with a tick in flight — a second click on one of these is ignored rather than queued.
+  // `SelectionCheckbox` has no `disabled` prop and is shared with the admin surface, so the guard
+  // lives here rather than adding one there for a single caller.
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const [failedTaskId, setFailedTaskId] = useState<string | null>(null);
+
+  // Drops an `intent` entry the moment the props agree with it, so a tick made from the step page
+  // is not shadowed by a stale optimistic value here — see the doc comment above. Deferred to a
+  // microtask: React 19's lint rejects a synchronous first setState in an effect body.
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setIntent((current) => {
+        if (Object.keys(current).length === 0) return current;
+
+        const next = { ...current };
+        let changed = false;
+        for (const task of content.tasks) {
+          if (task.id in next && next[task.id] === task.finished) {
+            delete next[task.id];
+            changed = true;
+          }
+        }
+        return changed ? next : current;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [content.tasks]);
+
+  const tasks = [...content.tasks]
+    .map((task) => ({ ...task, finished: intent[task.id] ?? task.finished }))
+    .sort((a, b) => a.position - b.position);
+  const total = tasks.length;
+  const done = tasks.filter((task) => task.finished).length;
   const subtitle = [content.phaseTitle, total > 0 ? `${done}/${total} done` : null]
     .filter((part): part is string => part !== null && part.length > 0)
     .join(" · ");
@@ -40,6 +94,35 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
   // A regenerated path can leave this card pointing at a step that is no longer there. The card
   // stays on the board and says why, rather than showing tasks and a link that no longer resolve.
   const degraded = content.reason !== null || content.stepId === null;
+
+  async function tick(taskId: string, next: boolean) {
+    if (pending.has(taskId)) return;
+
+    setIntent((current) => ({ ...current, [taskId]: next }));
+    setPending((current) => new Set(current).add(taskId));
+    setFailedTaskId((current) => (current === taskId ? null : current));
+
+    try {
+      // The response is a projection read before the write inside the same call, so it is not
+      // trusted to already carry this tick — rendering it could snap a just-ticked box back.
+      // `myStatuses` is invalidated instead, which is what keeps the step page and the onboarding
+      // progress indicator in step with what just happened here.
+      await boardService.tickPathStepTask(card.id, taskId, next);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
+    } catch {
+      setIntent((current) => {
+        const { [taskId]: _removed, ...rest } = current;
+        return rest;
+      });
+      setFailedTaskId(taskId);
+    } finally {
+      setPending((current) => {
+        const rest = new Set(current);
+        rest.delete(taskId);
+        return rest;
+      });
+    }
+  }
 
   return (
     <BoardCardFrame
@@ -65,37 +148,32 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
 
           {total > 0 && (
             <ul className="space-y-1.5">
-              {[...content.tasks]
-                .sort((a, b) => a.position - b.position)
-                .map((task) => (
-                  <li key={task.id} className="flex items-start gap-2.5">
-                    {/* A picture of the state, not a control — ticking a task lives on
-                        `/onboarding/:stepId` for now and lands here too. */}
-                    <span
-                      aria-hidden="true"
-                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border ${
-                        task.finished
-                          ? "border-app-brand bg-app-brand text-white"
-                          : "border-app-border bg-app-surface"
-                      }`}
-                    >
-                      {task.finished && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
-                    </span>
-                    <span
-                      className={`flex-1 text-sm ${
-                        task.finished ? "text-app-text-muted line-through" : "text-app-text"
-                      }`}
-                    >
-                      <Marked text={task.title} marks={marks} cardId={card.id} />
-                      <span className="sr-only">{task.finished ? " — done" : " — not done"}</span>
-                      {task.description && (
-                        <span className="mt-0.5 block text-xs text-app-text-muted">
-                          <Marked text={task.description} marks={marks} cardId={card.id} />
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                ))}
+              {tasks.map((task) => (
+                <li key={task.id} className="flex items-start gap-2.5">
+                  <SelectionCheckbox
+                    checked={task.finished}
+                    onChange={() => void tick(task.id, !task.finished)}
+                    ariaLabel={task.title}
+                  />
+                  <span
+                    className={`flex-1 pt-0.5 text-sm ${
+                      task.finished ? "text-app-text-muted line-through" : "text-app-text"
+                    }`}
+                  >
+                    <Marked text={task.title} marks={marks} cardId={card.id} />
+                    {task.description && (
+                      <span className="mt-0.5 block text-xs text-app-text-muted">
+                        <Marked text={task.description} marks={marks} cardId={card.id} />
+                      </span>
+                    )}
+                    {failedTaskId === task.id && (
+                      <span className="mt-0.5 block text-xs text-app-danger-text">
+                        That didn&apos;t save. Try again in a moment.
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
             </ul>
           )}
 
