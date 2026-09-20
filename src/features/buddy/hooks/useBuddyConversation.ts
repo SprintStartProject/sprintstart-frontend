@@ -33,7 +33,12 @@ const TEAM_PROJECT_KEY = "buddyTeamProjectId";
  */
 function readStoredTeamProjectId(): string | null {
   try {
-    return localStorage.getItem(TEAM_PROJECT_KEY);
+    // A blank is no conversation: stored empty (however that happened) must not read as team
+    // mode with an empty target, which would send reads out without the query param while the
+    // UI claimed team mode — until the switcher's audit healed it.
+    const stored = localStorage.getItem(TEAM_PROJECT_KEY);
+
+    return stored ? stored : null;
   } catch {
     // Private modes can refuse storage outright. Not a reason to refuse the conversation.
     return null;
@@ -71,6 +76,13 @@ export function useBuddyConversation() {
   // True while a surface is opening the conversation, so it can show a loading state rather
   // than an empty thread. Starts false: nothing is opening until somebody asks.
   const [isOpening, setIsOpening] = useState(false);
+  /**
+   * True for as long as a greeting is actually streaming — longer than `isOpening`, which the
+   * first token deliberately releases so the composer unlocks while the words are still
+   * arriving. The switcher reads this one: a switch mid-greeting would clear the thread under a
+   * live stream, and `isOpening` alone cannot see that window.
+   */
+  const [isGreeting, setIsGreeting] = useState(false);
   // Set when the conversation could not be brought on screen at all -- distinct from a turn that
   // failed, which carries its own reason. Nothing is on screen to hang that on, so it is state.
   const [openError, setOpenError] = useState<string | null>(null);
@@ -137,6 +149,9 @@ export function useBuddyConversation() {
     // the call, which is exactly the behaviour wanted here.
     const stream = { wroteSomething: false, failure: null as string | null };
 
+    // The switch gate holds for the whole greeting, not just the empty-screen part — see
+    // `isGreeting`.
+    setIsGreeting(true);
     try {
       await streamOpenBuddy(
         {
@@ -192,6 +207,7 @@ export function useBuddyConversation() {
       });
 
       setIsOpening(false);
+      setIsGreeting(false);
     }
   }, []);
 
@@ -596,9 +612,25 @@ export function useBuddyConversation() {
           patchAction(messageId, actionId, { status: "dismissed" });
         } catch (e) {
           console.error(e);
-          // Back to idle rather than "error": the offer is still on the table, and the card's
-          // own error note would read as if the dismissal had half-happened.
-          patchAction(messageId, actionId, { status: "idle" });
+          // The same 404 rule as the confirm: a proposal already settled (from another tab, or a
+          // reload between sessions) is a handled outcome, not a transport failure. Back to idle
+          // would re-offer a change that cannot happen any more, and every retry would meet the
+          // same 404 — so it resolves, legibly, instead. Any other failure keeps the offer on
+          // the table: the card's own error note would read as if the dismissal had
+          // half-happened, so it goes back to idle and stays retryable.
+          const isNotFound =
+            e instanceof Error && "status" in e && (e as { status: number }).status === 404;
+          patchAction(
+            messageId,
+            actionId,
+            isNotFound
+              ? {
+                  status: "resolved",
+                  ok: false,
+                  outcome: "This proposal was already settled.",
+                }
+              : { status: "idle" },
+          );
         } finally {
           inFlightRef.current.delete(flightKey);
         }
@@ -622,6 +654,12 @@ export function useBuddyConversation() {
    */
   const switchTeamProject = useCallback(
     async (projectId: string | null) => {
+      // A switch clears the thread under whatever is streaming into it, so it waits for the
+      // turn — the switcher's `disabled` is the affordance, this is the invariant. Without it,
+      // any future caller (a shortcut, a bus event, a test) could clear a live stream by
+      // reaching past the component.
+      if (isThinking || isStreaming || isOpening || isGreeting) return;
+
       if (teamProjectIdRef.current === projectId) return;
 
       // Ref first: everything below reads or resets this conversation, and the open that
@@ -644,7 +682,7 @@ export function useBuddyConversation() {
 
       await ensureOpened();
     },
-    [ensureOpened],
+    [ensureOpened, isGreeting, isOpening, isStreaming, isThinking],
   );
 
   const handleSubmit = useCallback(
@@ -667,6 +705,9 @@ export function useBuddyConversation() {
     activeTool,
     openerAction,
     isOpening,
+    // Longer than `isOpening` — the greeting keeps streaming after the composer unlocks. The
+    // switch gate reads it; a surface's own "opening" indicator does not need to.
+    isGreeting,
     openError,
 
     // Team mode: which managed project this conversation is about (`null` = the hire's own),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { Select } from "../../../components/ui/Select";
 
@@ -46,14 +46,24 @@ export function BuddyModeSwitcher({
     [managedProjects, teamProjectId],
   );
 
+  // The audit drops a stored conversation this user no longer runs — but only when a switch
+  // would actually be accepted. Read through a ref so the effect does not re-arm on every
+  // parent render (the callback is usually an inline arrow), and wait out `disabled` (a turn
+  // in flight refuses switches): when the turn ends, the changed `disabled` re-runs the audit
+  // and the fallback still happens — just at a moment it can succeed.
+  const onSwitchRef = useRef(onSwitch);
   useEffect(() => {
-    if (isLoading || teamProjectId === null || managesStoredProject) return;
+    onSwitchRef.current = onSwitch;
+  });
+
+  useEffect(() => {
+    if (isLoading || disabled || teamProjectId === null || managesStoredProject) return;
 
     console.warn(
       `Buddy team mode dropped a stored project (${teamProjectId}) that this user no longer manages.`,
     );
-    onSwitch(null);
-  }, [isLoading, teamProjectId, managesStoredProject, onSwitch]);
+    onSwitchRef.current(null);
+  }, [isLoading, disabled, teamProjectId, managesStoredProject]);
 
   if (managedProjects.length === 0) return null;
 

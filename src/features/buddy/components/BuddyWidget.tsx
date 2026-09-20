@@ -78,11 +78,14 @@ export function BuddyWidget() {
     startFreshVisit,
     teamProjectId,
     switchTeamProject,
+    isGreeting,
   } = useBuddy();
 
   // The switcher (and the composer, and everything else) waits: a turn in flight cannot be
   // called back into a thread that a switch would clear. Same rule as the fresh-visit control.
-  const isTurnInFlight = isThinking || isStreaming || isOpening;
+  // `isGreeting` closes the hole where the first token had already released `isOpening` while
+  // the greeting was still streaming.
+  const isTurnInFlight = isThinking || isStreaming || isOpening || isGreeting;
 
   // The greeting is usually written before the dock is ever opened; this is what still lets the
   // hire watch the buddy think and write it — see the hook.

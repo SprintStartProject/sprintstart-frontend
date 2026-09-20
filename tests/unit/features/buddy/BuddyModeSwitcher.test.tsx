@@ -113,6 +113,36 @@ describe("BuddyModeSwitcher", () => {
     warn.mockRestore();
   });
 
+  it("waits out a turn in flight before dropping the stored conversation", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const onSwitch = vi.fn();
+    // p3 is stored but no longer managed — and a turn is in flight, so switches are refused.
+    const { rerender } = render(
+      <ProjectContext.Provider value={contextValue([project("p1", true)])}>
+        <BuddyModeSwitcher teamProjectId="p3" onSwitch={onSwitch} disabled />
+      </ProjectContext.Provider>,
+    );
+
+    // No switch can be accepted while the turn is running, so the audit holds its fire rather
+    // than calling one that would be swallowed.
+    await vi.waitFor(() => {});
+    expect(onSwitch).not.toHaveBeenCalled();
+
+    // The turn ends: the same stored conversation is now droppable, and the audit fires.
+    rerender(
+      <ProjectContext.Provider value={contextValue([project("p1", true)])}>
+        <BuddyModeSwitcher teamProjectId="p3" onSwitch={onSwitch} />
+      </ProjectContext.Provider>,
+    );
+
+    await vi.waitFor(() => {
+      expect(onSwitch).toHaveBeenCalledWith(null);
+    });
+    expect(warn).toHaveBeenCalled();
+
+    warn.mockRestore();
+  });
+
   it("leaves a stored conversation alone while the project list is still loading", () => {
     const onSwitch = vi.fn();
     render(

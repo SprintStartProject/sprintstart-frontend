@@ -182,6 +182,7 @@ function BuddyMentorHome() {
     markGreetingPresented,
     teamProjectId,
     switchTeamProject,
+    isGreeting,
   } = useBuddySession();
 
   // A greeting written while the hire was somewhere else still gets the buddy thinking and
@@ -203,7 +204,7 @@ function BuddyMentorHome() {
   // no team-scoped list, so a team-mode conversation asks for none and shows no chips.
   const isHireMode = teamProjectId === null;
   const suggestions = useBuddySuggestions(isHireMode);
-  const replies = usePmReplies();
+  const replies = usePmReplies(isHireMode);
 
   // Below `md` the rail is a drawer over the conversation, so it must never open by itself
   // there — the auto-open below is a desktop courtesy, not a takeover.
@@ -338,7 +339,7 @@ function BuddyMentorHome() {
           <BuddyModeSwitcher
             teamProjectId={teamProjectId}
             onSwitch={(projectId) => void switchTeamProject(projectId)}
-            disabled={isBusy || isOpening}
+            disabled={isBusy || isOpening || isGreeting}
             className="max-w-xs"
           />
         ) : undefined

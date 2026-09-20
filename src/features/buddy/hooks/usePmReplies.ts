@@ -30,10 +30,17 @@ export type PmReplies = {
  * Scoped to the hire, not to the selected project: these are their own questions, and hiding the
  * ones asked on another project would mean an answer silently never arriving.
  */
-export function usePmReplies(): PmReplies {
+export function usePmReplies(enabled = true): PmReplies {
   const { data, isLoading, isError } = useQuery({
     queryKey: queryKeys.knowledgeRequest.mine(),
     queryFn: () => knowledgeRequestService.listMine(),
+    /**
+     * Hire-flow only. What the hire sent to a person has no meaning inside a team-mode
+     * conversation about a project they manage, so a team thread asks for none — the same rule
+     * the suggestion chips follow. `false` skips the fetch entirely; nothing cached is shown
+     * either, because the rail the data would feed is not mounted in team mode.
+     */
+    enabled,
   });
 
   return useMemo(() => {
