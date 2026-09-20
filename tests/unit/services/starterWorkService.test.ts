@@ -14,10 +14,9 @@ describe("starterWorkService", () => {
 
     await starterWorkService.generate("p1");
 
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/v1/onboarding/starter-work/generate?projectId=p1",
-      { method: "POST" },
-    );
+    expect(fetchSpy).toHaveBeenCalledWith("/api/v1/onboarding/starter-work/generate?projectId=p1", {
+      method: "POST",
+    });
   });
 
   it("reads candidate issues scoped to the project", async () => {
