@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { PathStepCard } from "../../../../src/features/board/components/PathStepCard";
 import { boardService } from "../../../../src/services/boardService";
@@ -59,8 +59,11 @@ const content = (over: Partial<PathStepContent> = {}): PathStepContent => ({
 
 function renderCard(over: Partial<PathStepContent> = {}) {
   return render(
-    <MemoryRouter>
-      <PathStepCard content={content(over)} card={card} />
+    <MemoryRouter initialEntries={["/board"]}>
+      <Routes>
+        <Route path="/board" element={<PathStepCard content={content(over)} card={card} />} />
+        <Route path="/onboarding/:stepId" element={<p>The full step page</p>} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -93,13 +96,12 @@ describe("PathStepCard", () => {
     expect(screen.getByRole("checkbox", { name: "Run the seed script" })).toBeInTheDocument();
   });
 
-  it("links to the full step", () => {
+  it("opens the full step from its header button", () => {
     renderCard();
 
-    expect(screen.getByRole("link", { name: /Open the full step/ })).toHaveAttribute(
-      "href",
-      "/onboarding/step-1",
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Open the full step" }));
+
+    expect(screen.getByText("The full step page")).toBeInTheDocument();
   });
 
   it("ticks a task immediately and writes it back through the board's own endpoint", async () => {
@@ -146,11 +148,11 @@ describe("PathStepCard", () => {
     release(content());
   });
 
-  it("shows the reason and offers no checkboxes or link once the step is gone", () => {
+  it("shows the reason and offers no checkboxes or full-step button once the step is gone", () => {
     renderCard({ reason: "This step is no longer on the hire's path." });
 
     expect(screen.getByText("This step is no longer on the hire's path.")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Open the full step/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open the full step" })).not.toBeInTheDocument();
   });
 });

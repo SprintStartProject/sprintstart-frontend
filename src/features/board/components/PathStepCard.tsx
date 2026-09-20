@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, Footprints, Lightbulb, MoveRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  ExternalLink,
+  Footprints,
+  Lightbulb,
+  Link2,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { boardService } from "../../../services/boardService";
 import { queryKeys } from "../../../services/queryKeys";
@@ -24,7 +32,7 @@ type PathStepCardProps = {
  * `AI`-owned and still partly the hire's to change.
  *
  * Everything on it but the tasks is a read straight from the path: the title, the outcomes, the
- * resources, the footer link. Ticking a task is the one write, and it goes to the path itself, not
+ * resources, the link to the full step. Ticking a task is the one write, and it goes to the path itself, not
  * to the board — the same split `ArrivalStepsCard` draws for confirming an arrival step, and the
  * card owns that write itself rather than going through the board's `editCard`, whose contract is
  * for the hire's own, authored cards. Reading this card and reading `/onboarding/:stepId` for the
@@ -47,6 +55,7 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
   // into it — the same reason `ArrivalStepList` reads marks off the card rather than the step.
   const marks = useCardMarks().marksFor(card.id);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // What the hire just clicked, laid over the server's `finished` until the props catch up.
   const [intent, setIntent] = useState<Record<string, boolean>>({});
@@ -133,6 +142,20 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
       subtitle={subtitle.length > 0 ? subtitle : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
+      action={
+        !degraded && content.stepId ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={() => void navigate(`/onboarding/${content.stepId}`)}
+            title="Open the full step"
+            aria-label="Open the full step"
+          >
+            <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        ) : undefined
+      }
     >
       {degraded ? (
         <EmptyState size="sm">
@@ -199,42 +222,38 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
 
           {content.resources.length > 0 && (
             <div className="mt-3">
-              <p className="mb-1.5 text-xs font-semibold text-app-text-muted">Resources</p>
-              <div className="space-y-1.5">
-                {content.resources.map((resource) => (
-                  <a
-                    key={resource.id}
-                    href={resource.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex items-center justify-between gap-2 rounded-xl border border-app-border p-2.5 transition-colors hover:border-app-brand-border-strong"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-app-text">{resource.title}</p>
-                      {resource.description && (
-                        <p className="mt-0.5 truncate text-xs text-app-text-subtle">
-                          {resource.description}
-                        </p>
-                      )}
-                    </div>
-                    <ExternalLink
-                      className="h-4 w-4 shrink-0 text-app-text-subtle transition-colors group-hover:text-app-brand"
-                      aria-hidden="true"
-                    />
-                  </a>
-                ))}
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-app-text-muted">
+                <Link2 className="h-3.5 w-3.5 text-app-brand" aria-hidden="true" />
+                Resource{content.resources.length > 1 ? "s" : ""}
               </div>
+              <ul className="space-y-1.5">
+                {content.resources.map((resource) => (
+                  <li key={resource.id}>
+                    <a
+                      href={resource.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-start gap-2 text-sm"
+                    >
+                      <ExternalLink
+                        className="mt-0.5 h-4 w-4 shrink-0 text-app-text-muted transition-colors group-hover:text-app-brand"
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0">
+                        <span className="font-medium text-app-text group-hover:text-app-brand-text group-hover:underline">
+                          {resource.title}
+                        </span>
+                        {resource.description && (
+                          <span className="mt-0.5 block text-xs text-app-text-muted">
+                            {resource.description}
+                          </span>
+                        )}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
-
-          {content.stepId && (
-            <Link
-              to={`/onboarding/${content.stepId}`}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-app-brand-text hover:underline"
-            >
-              Open the full step
-              <MoveRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
           )}
         </>
       )}
