@@ -1,4 +1,4 @@
-import { ExternalLink, Target } from "lucide-react";
+import { AlertTriangle, ExternalLink, Target } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
@@ -23,9 +23,15 @@ type CurrentTaskCardProps = {
  * With no task the card stays and says so, rather than disappearing: it vanishing when a goal is
  * cleared would read as the board losing things, and "you have nothing on" is usually the thing
  * worth fixing.
+ *
+ * A task whose issue was closed where it lives also stays, rather than disappearing or quietly
+ * looking current: the task block is kept but muted, a warning stripe above it says what happened
+ * and where to go next, and the buddy question is repointed at picking a new one. Silently
+ * dropping the card would leave the hire still thinking this is their goal.
  */
 export function CurrentTaskCard({ content, card, onDismiss, dismissing }: CurrentTaskCardProps) {
   const hasTask = content.taskId !== null;
+  const closed = hasTask && content.closedAtSource;
   // A live card, so its highlights are matched by their words rather than written into the text —
   // see `marks/cardMarks.ts`. The title and the summary are re-read from the tracker on every
   // board load, and a sentence that survives that stays marked.
@@ -38,9 +44,11 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
       card={card}
       subtitle={
         hasTask
-          ? content.chosen
-            ? "You picked this one"
-            : "Handed to you as a first task"
+          ? closed
+            ? "Closed where it lives"
+            : content.chosen
+              ? "You picked this one"
+              : "Handed to you as a first task"
           : undefined
       }
       onDismiss={onDismiss}
@@ -48,7 +56,18 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
     >
       {hasTask ? (
         <div>
-          <p className="text-sm font-medium text-app-text">
+          {closed && (
+            <p className="flex items-start gap-2 rounded-xl bg-app-warning-bg/40 p-3 text-xs text-app-warning-text">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                This issue was closed where it lives. Pick a new task from the &quot;Good next
+                tasks&quot; card.
+              </span>
+            </p>
+          )}
+          <p
+            className={`text-sm font-medium ${closed ? "mt-3 text-app-text-muted line-through" : "text-app-text"}`}
+          >
             <Marked text={content.title ?? ""} marks={marks} cardId={card.id} />
           </p>
           {content.summary && (
@@ -79,10 +98,13 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
                 packet, so the card needs no orientation action of its own. */}
       <AskTheBuddy
         question={
-          hasTask
-            ? `How do I get started on "${content.title ?? "my task"}"?`
-            : "What would be a good task for me to pick up?"
+          closed
+            ? `My task "${content.title ?? "my task"}" was closed. Which one should I take instead?`
+            : hasTask
+              ? `How do I get started on "${content.title ?? "my task"}"?`
+              : "What would be a good task for me to pick up?"
         }
+        label={closed ? "Help me pick another one" : undefined}
       />
     </BoardCardFrame>
   );
