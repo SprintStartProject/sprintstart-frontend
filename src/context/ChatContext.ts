@@ -1,5 +1,11 @@
 import { createContext } from "react";
-import type { Chat, ChatMessage, Citation, SourceSystem } from "../features/chatbot/types";
+import type {
+  Chat,
+  ChatMessage,
+  ChatQueueItem,
+  Citation,
+  SourceSystem,
+} from "../features/chatbot/types";
 import type { NavigateFunction } from "react-router-dom";
 
 type MessagesByChat = Record<string, ChatMessage[]>;
@@ -79,12 +85,58 @@ export type ChatContextValue = {
    * Sends a user message and streams the AI response. Takes the routing
    * `chatId` and `navigate` as parameters so the provider itself has no
    * router dependency and stays mounted across route changes.
+   *
+   * Starts a turn unconditionally — a caller that wants the queueing behaviour
+   * the chat UI has should use {@link submitMessage} instead.
    */
   sendMessage: (
     chatId: string | undefined,
     text: string,
     navigate: NavigateFunction,
   ) => Promise<void>;
+
+  /**
+   * The composer's entry point: sends `text`, or queues it when this chat is
+   * already being answered.
+   *
+   * This is the "send a follow-up mid-answer" path, and it never cuts the
+   * running answer off. The one exception is a message submitted into a
+   * *different* chat while one is streaming: the queue only drains per chat, so
+   * that would otherwise sit forever — the running turn is settled instead and
+   * a toast says so.
+   */
+  submitMessage: (chatId: string | undefined, text: string, navigate: NavigateFunction) => void;
+
+  /**
+   * Messages waiting behind a running answer, oldest first — for every chat, so
+   * a consumer must filter by the chat it is showing. The provider drains each
+   * one into its own chat as that chat's turn finishes.
+   */
+  queue: ChatQueueItem[];
+
+  /**
+   * True when the user pressed Stop with messages still queued: the queue holds
+   * until {@link resumeQueue} (or the next thing they send), so a Stop means
+   * "stop doing things", not "and now send the rest".
+   */
+  queuePaused: boolean;
+
+  /**
+   * Drops one queued message. Used by the "remove" control in the queue strip.
+   */
+  removeQueuedMessage: (id: string) => void;
+
+  /**
+   * Removes a queued message and returns its text, so the composer can take it
+   * back for editing. Returns `null` if the id is unknown (already sent).
+   */
+  pullQueuedMessage: (id: string) => string | null;
+
+  /**
+   * Un-pauses the queue and sends the oldest queued message — the "Send queued"
+   * button that appears once Stop has held the queue back.
+   */
+  resumeQueue: (navigate: NavigateFunction) => void;
 
   /**
    * Aborts the in-flight chat stream (if any). The partial content already

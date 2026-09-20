@@ -1,8 +1,9 @@
-import { Check, Filter, Send, Square, X } from "lucide-react";
+import { Check, Filter, ListPlus, Send, Square, X } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { SOURCE_META } from "../../data-ingestion/data";
-import type { SourceSystem } from "../types";
+import type { ChatQueueItem, SourceSystem } from "../types";
+import { QueuedMessages } from "./QueuedMessages";
 
 type ChatComposerProps = {
   /** Current draft text. */
@@ -15,6 +16,21 @@ type ChatComposerProps = {
   onStop: () => void;
   /** True while the assistant is thinking or streaming. */
   isBusy: boolean;
+
+  /**
+   * Messages submitted while this chat was still answering, oldest first. They
+   * are shown above the composer so a follow-up that has not been sent yet is
+   * still visible somewhere — the draft it came from was cleared on submit.
+   */
+  queuedMessages: ChatQueueItem[];
+  /** True when Stop held the queue back and it is waiting to be released. */
+  queuePaused: boolean;
+  /** Drops a queued message. */
+  onRemoveQueued: (id: string) => void;
+  /** Takes a queued message back into the composer to edit it. */
+  onEditQueued: (id: string) => void;
+  /** Releases a queue paused by Stop. */
+  onSendQueued: () => void;
   /**
    * Whether a project is selected. Without one there is nothing to scope retrieval to, so
    * sending is blocked here rather than failing silently after the fact.
@@ -61,6 +77,11 @@ export function ChatComposer({
   onSubmit,
   onStop,
   isBusy,
+  queuedMessages,
+  queuePaused,
+  onRemoveQueued,
+  onEditQueued,
+  onSendQueued,
   hasProject,
   promptHistory,
   availableSources,
@@ -113,6 +134,14 @@ export function ChatComposer({
 
   return (
     <footer className="app-page-frame shrink-0 border-t border-app-border bg-app-bg py-4">
+      <QueuedMessages
+        items={queuedMessages}
+        paused={queuePaused}
+        onRemove={onRemoveQueued}
+        onEdit={onEditQueued}
+        onSendQueued={onSendQueued}
+      />
+
       {showFilters && (
         <div className="mb-3 overflow-hidden rounded-2xl border border-app-border bg-app-surface">
           <div className="flex items-center justify-between gap-3 border-b border-app-border-muted px-4 py-2.5">
@@ -345,7 +374,10 @@ export function ChatComposer({
           }}
         />
 
-        {isBusy ? (
+        {/* Stop and Send coexist while an answer is being written: Stop is "no more of
+            this answer", Send is "yes, and then this one". Replacing Send with Stop
+            meant the only way to queue a follow-up was to hit Enter and hope. */}
+        {isBusy && (
           <button
             type="button"
             aria-label="Stop generation"
@@ -355,17 +387,18 @@ export function ChatComposer({
           >
             <Square size={16} className="fill-current" />
           </button>
-        ) : (
-          <button
-            type="submit"
-            aria-label="Send message"
-            data-testid="chat-send-button"
-            disabled={!value.trim() || blocked}
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Send size={18} />
-          </button>
         )}
+
+        <button
+          type="submit"
+          aria-label={isBusy ? "Queue message" : "Send message"}
+          title={isBusy ? "Queued: it is sent once this answer finishes" : undefined}
+          data-testid={isBusy ? "chat-queue-button" : "chat-send-button"}
+          disabled={!value.trim() || blocked}
+          className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-app-brand text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {isBusy ? <ListPlus size={18} /> : <Send size={18} />}
+        </button>
       </form>
 
       {!hasProject && (
@@ -375,7 +408,9 @@ export function ChatComposer({
       )}
 
       <p className="mt-2 text-center text-[11px] text-app-text-disabled">
-        Enter to send · Shift + Enter for a new line
+        {isBusy
+          ? "Enter to queue a follow-up · Shift + Enter for a new line"
+          : "Enter to send · Shift + Enter for a new line"}
       </p>
     </footer>
   );

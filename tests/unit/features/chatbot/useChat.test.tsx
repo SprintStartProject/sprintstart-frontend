@@ -4,6 +4,7 @@ import { useContext, type ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useChat } from "../../../../src/features/chatbot/hooks/useChat";
 import { ChatProvider } from "../../../../src/context/ChatProvider";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { ChatContext } from "../../../../src/context/ChatContext";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
@@ -64,6 +65,19 @@ vi.mock("../../../../src/features/projects/useProjectContext", async () => {
 });
 
 const wrapper = ({ children }: { children: ReactNode }) => <ChatProvider>{children}</ChatProvider>;
+
+/**
+ * The same tree plus the toast stack, for the tests that assert on a toast.
+ *
+ * Only the failure paths need it: `useToastApi` returns inert no-ops outside a
+ * provider (by design, so a component can be tested without one), which would
+ * make "did it toast?" unanswerable rather than false.
+ */
+const toastWrapper = ({ children }: { children: ReactNode }) => (
+  <ToastProvider>
+    <ChatProvider>{children}</ChatProvider>
+  </ToastProvider>
+);
 
 const HANDOFF_QUESTION = "What should I work on next?";
 
@@ -317,12 +331,15 @@ describe("useChat", () => {
       expect(result.current.chats).toEqual([]);
     });
 
-    await act(async () => {
-      await result.current.addMessage("My new prompt");
+    act(() => {
+      result.current.addMessage("My new prompt");
     });
 
     await waitFor(() => {
       expect(result.current.messages.length).toBe(2);
+      // `addMessage` returns void — a queued message has no stream to await — so
+      // the answer has to be waited for rather than the send.
+      expect(result.current.messages[1]?.content).toBe("Hello world");
     });
 
     const userMsg = result.current.messages[0];
@@ -340,7 +357,7 @@ describe("useChat", () => {
     expect(result.current.isStreaming).toBe(false);
   });
 
-  it("surfaces stream errors on the assistant message", async () => {
+  it("keeps the partial answer and reports a stream failure as a toast", async () => {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
@@ -382,26 +399,33 @@ describe("useChat", () => {
       ),
     );
 
-    const { result } = renderHook(() => useChat(), { wrapper });
+    const { result } = renderHook(() => useChat(), { wrapper: toastWrapper });
 
     await waitFor(() => {
       expect(result.current.chats).toEqual([]);
     });
 
-    await act(async () => {
-      await result.current.addMessage("My prompt");
+    act(() => {
+      result.current.addMessage("My prompt");
     });
 
     await waitFor(() => {
       expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toBe("partial");
     });
 
     const aiMsg = result.current.messages[1];
     expect(aiMsg.role).toBe("ASSISTANT");
+    // What did arrive stays where it is; only the failure moves.
     expect(aiMsg.content).toBe("partial");
-    expect(aiMsg.error).toBe("LLM overload");
+    expect(aiMsg.notice).toBeUndefined();
     expect(result.current.isStreaming).toBe(false);
     expect(result.current.streamingMessageId).toBeNull();
+
+    // …and it is reported where it cannot be scrolled past.
+    expect(await screen.findByText("The answer failed")).toBeInTheDocument();
+    expect(screen.getByText("LLM overload")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
   it("exposes stopStreaming function that can abort a stream", async () => {
@@ -456,19 +480,23 @@ describe("useChat", () => {
 
     expect(typeof result.current.stopStreaming).toBe("function");
 
-    await act(async () => {
-      await result.current.addMessage("My prompt");
+    act(() => {
+      result.current.addMessage("My prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages[1]?.content).toBe("partial");
     });
 
     await waitFor(() => {
       expect(result.current.isStreaming).toBe(false);
     });
 
-    // Partial content stays visible
+    // Partial content stays visible, and a turn with content carries no notice.
     const aiMsg = result.current.messages[1];
     expect(aiMsg).toBeTruthy();
     expect(aiMsg.content).toBe("partial");
-    expect(aiMsg.error).toBeUndefined();
+    expect(aiMsg.notice).toBeUndefined();
   });
 
   it("clears isThinking when stopStreaming is called before the first token (B9)", async () => {
@@ -733,7 +761,7 @@ describe("useChat", () => {
     expect(result.current.chats).toEqual([{ id: "chat2", userId: "user1" }]);
   });
 
-  it("attaches stopped error message when stopped during reasoning before first content token", async () => {
+  it("marks a stopped turn as stopped rather than failed", async () => {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
@@ -795,7 +823,9 @@ describe("useChat", () => {
     await waitFor(() => {
       const assistantMsg = result.current.messages.find((m) => m.role === "ASSISTANT");
       expect(assistantMsg?.reasoning).toBe("Thinking deep...");
-      expect(assistantMsg?.error).toBe("Stopped before the assistant replied.");
+      // A notice, not an error: the user did this, so it is not reported as a
+      // failure (and does not raise a toast).
+      expect(assistantMsg?.notice).toBe("stopped");
     });
   });
 
@@ -983,12 +1013,13 @@ describe("useChat", () => {
       expect(result.current.chats).toEqual([]);
     });
 
-    await act(async () => {
-      await result.current.addMessage("My new prompt");
+    act(() => {
+      result.current.addMessage("My new prompt");
     });
 
     await waitFor(() => {
       expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("Blockers were the auth work.");
     });
 
     const aiMsg = result.current.messages[1];
@@ -1034,12 +1065,13 @@ describe("useChat", () => {
       expect(result.current.chats).toEqual([]);
     });
 
-    await act(async () => {
-      await result.current.addMessage("My new prompt");
+    act(() => {
+      result.current.addMessage("My new prompt");
     });
 
     await waitFor(() => {
       expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("Auth work blocked us.");
     });
 
     // The flag re-arms on every `tool_use`, so both rounds get their own break.
