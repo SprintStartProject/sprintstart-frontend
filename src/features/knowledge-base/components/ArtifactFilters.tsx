@@ -4,6 +4,7 @@ import {
   File,
   FileCode,
   FileText,
+  FolderGit2,
   GitBranch,
   Image as ImageIcon,
   RefreshCw,
@@ -199,7 +200,7 @@ export function ArtifactFilters({
         value: option.value,
         label: option.label,
         count: option.count,
-        icon: <GitBranch className={ICON_CLASS} aria-hidden="true" />,
+        icon: <FolderGit2 className={ICON_CLASS} aria-hidden="true" />,
       })),
     });
   }
@@ -211,10 +212,19 @@ export function ArtifactFilters({
   const activeCount =
     selectedSources.size + (selectedFormat !== null ? 1 : 0) + selectedRepositories.size;
 
+  const repositoryValues = new Set(repositoryOptions.map((option) => option.value));
+
   const handleToggle = (value: string) => {
-    if (isSource(value)) onToggleSource(value);
-    else if (isUploadFormat(value)) onToggleFormat(value);
-    else onToggleRepository(value);
+    if (isSource(value)) {
+      onToggleSource(value);
+    } else if (isUploadFormat(value)) {
+      onToggleFormat(value);
+    } else if (repositoryValues.has(value)) {
+      onToggleRepository(value);
+    }
+    // A value matching no known facet does nothing on purpose: a facet added
+    // later must be wired explicitly instead of silently falling through to
+    // the repository toggle.
   };
 
   return (

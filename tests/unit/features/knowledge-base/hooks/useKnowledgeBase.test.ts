@@ -353,7 +353,29 @@ describe("useKnowledgeBase", () => {
       result.current.repositoryOptions.find(
         (option) => option.value === "sprintstart/sprintstart-frontend",
       )?.count,
-    ).toBe(2);
+    ).toBe(3);
+  });
+
+  it("promises with its count exactly what choosing the repository delivers", async () => {
+    const result = await renderWith(makeRepoFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+    });
+
+    // The owning org's profile counts toward the repo it owns — the number is
+    // a promise about what clicking does, so the list the reader gets must
+    // have exactly that many rows.
+    const frontend = result.current.repositoryOptions.find(
+      (option) => option.value === "sprintstart/sprintstart-frontend",
+    );
+    expect(frontend?.count).toBe(3);
+
+    act(() => {
+      result.current.toggleRepository("sprintstart/sprintstart-frontend");
+    });
+
+    expect(result.current.filteredArtifacts).toHaveLength(frontend?.count ?? -1);
   });
 
   it("narrows only the github artifacts when a repository is chosen", async () => {

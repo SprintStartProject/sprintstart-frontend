@@ -16,7 +16,6 @@ import {
   Link2,
   ExternalLink,
   MessageSquare,
-  GitBranch,
 } from "lucide-react";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -39,6 +38,7 @@ import {
 } from "../orgMetadata";
 import { getArtifactRepository } from "../githubMetadata";
 import { knowledgeService } from "../../../services/knowledgeService";
+import { RepositoryBadge } from "./RepositoryBadge";
 import { useToast } from "../../../context/useToast";
 import { Button } from "../../../components/ui/Button";
 import { ApiError } from "../../../services/apiClient";
@@ -1261,16 +1261,7 @@ export function ArtifactViewerDrawer({
   const repository = artifact ? getArtifactRepository(artifact) : null;
 
   const repositoryBadge = repository ? (
-    <span
-      data-testid="artifact-drawer-repo-badge"
-      title={repository}
-      className="flex min-w-0 items-center gap-1.5 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted"
-    >
-      <GitBranch className="h-3 w-3 shrink-0" aria-hidden="true" />
-      {/* A long `owner/repository` must ellipsize rather than widen the header:
-          the badge shares its row with the title, and the panel clips overflow. */}
-      <span className="truncate">{repository}</span>
-    </span>
+    <RepositoryBadge repository={repository} testId="artifact-drawer-repo-badge" />
   ) : undefined;
 
   return (

@@ -178,7 +178,7 @@ describe("ArtifactFilters", () => {
     expect(onSearchChange).toHaveBeenCalledWith("readme");
   });
 
-  it("offers the repositories section only while GitHub is selected", () => {
+  it("renders the repositories section only when repository options are provided", () => {
     const { unmount } = render(<ArtifactFilters {...buildProps()} />);
 
     fireEvent.click(screen.getByTestId("kb-filter-trigger"));

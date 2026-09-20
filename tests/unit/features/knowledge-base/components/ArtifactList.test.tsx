@@ -70,6 +70,11 @@ describe("ArtifactList", () => {
       "title",
       "sprintstart/sprintstart-backend",
     );
+    // SpotlightCard's aria-label replaces the row's contents as the accessible
+    // name, so the repository has to be folded into it to reach screen readers.
+    expect(
+      screen.getByRole("button", { name: "View readme.md from sprintstart/sprintstart-backend" }),
+    ).toBeInTheDocument();
   });
 
   it("shows no repository badge when GitHub metadata is missing or malformed", () => {

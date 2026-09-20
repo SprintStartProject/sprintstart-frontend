@@ -57,9 +57,20 @@ describe("parseGithubMetadata", () => {
   it("returns null when repositoryFullName is missing or not a usable string", () => {
     expect(parseGithubMetadata("{}")).toBeNull();
     expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: 42 }))).toBeNull();
-    expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: null }))).toBeNull();
     expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: "" }))).toBeNull();
     expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: "   " }))).toBeNull();
+    expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: null }))).toBeNull();
+  });
+
+  it("trims the repository name and drops a non-string repositoryId", () => {
+    const parsed = parseGithubMetadata(
+      JSON.stringify({ repositoryId: 42, repositoryFullName: "  owner/repo  " }),
+    );
+
+    expect(parsed?.repositoryFullName).toBe("owner/repo");
+    // The parsed shape may only promise what it validated: repositoryId is
+    // unconsumed, so a non-string payload value must not be typed as a string.
+    expect(parsed?.repositoryId).toBeUndefined();
   });
 });
 
@@ -173,5 +184,18 @@ describe("matchesRepository", () => {
         new Set(["owner/repo"]),
       ),
     ).toBe(false);
+  });
+
+  it("matches owner halves case-insensitively", () => {
+    // GitHub logins are case-insensitive, and the two strings come from
+    // independent payloads — the owning-org rule must survive a capital letter.
+    const orgProfile = JSON.stringify({ login: "sprintstart", members: [] });
+
+    expect(
+      matchesRepository(
+        { sourceSystem: "GITHUB", artifactType: "ORG_METADATA", metadata: orgProfile },
+        new Set(["SprintStart/sprintstart-backend"]),
+      ),
+    ).toBe(true);
   });
 });

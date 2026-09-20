@@ -209,12 +209,12 @@ export function useKnowledgeBase(projectId: string | null) {
   const formatOptions = useMemo<FacetOption<UploadFormat>[]>(() => {
     if (!selectedSources.has("UPLOAD")) return [];
 
+    // No passesRepository here: the candidates are uploads, and
+    // matchesRepository passes every non-GitHub artifact — the condition could
+    // never exclude anything, it only pulled a dependency in for nothing.
     const uploads = artifacts.filter(
       (artifact) =>
-        isUpload(artifact) &&
-        matchesSearch(artifact, deferredSearchQuery) &&
-        passesTab(artifact) &&
-        passesRepository(artifact),
+        isUpload(artifact) && matchesSearch(artifact, deferredSearchQuery) && passesTab(artifact),
     );
 
     // Same rule as the types: a format no upload in scope can produce is not
@@ -226,15 +226,7 @@ export function useKnowledgeBase(projectId: string | null) {
       label: FORMAT_LABELS[format],
       count: uploads.filter((artifact) => matchesFormat(artifact, format)).length,
     }));
-  }, [
-    artifacts,
-    deferredSearchQuery,
-    matchesSearch,
-    passesTab,
-    passesRepository,
-    selectedSources,
-    selectedFormat,
-  ]);
+  }, [artifacts, deferredSearchQuery, matchesSearch, passesTab, selectedSources, selectedFormat]);
 
   /**
    * Repositories behind the project's GitHub artifacts, offered only while
@@ -249,34 +241,41 @@ export function useKnowledgeBase(projectId: string | null) {
   const repositoryOptions = useMemo<FacetOption<string>[]>(() => {
     if (!selectedSources.has("GITHUB")) return [];
 
-    const counts = new Map<string, number>();
-    for (const artifact of artifacts) {
+    // Candidates are the GitHub artifacts the current tab and search admit;
+    // the format facet cannot exclude them (matchesFormat passes every
+    // non-upload), so it is deliberately not applied here.
+    const githubCandidates = artifacts.filter(
+      (artifact) =>
+        artifact.sourceSystem === "GITHUB" &&
+        matchesSearch(artifact, deferredSearchQuery) &&
+        passesTab(artifact),
+    );
+
+    const repos = new Set<string>();
+    for (const artifact of githubCandidates) {
       const repository = getArtifactRepository(artifact);
-      if (
-        repository === null ||
-        !matchesSearch(artifact, deferredSearchQuery) ||
-        !passesTab(artifact) ||
-        !passesFormat(artifact)
-      ) {
-        continue;
-      }
-      counts.set(repository, (counts.get(repository) ?? 0) + 1);
+      if (repository !== null) repos.add(repository);
     }
 
-    const offered = new Set([...counts.keys(), ...selectedRepositories]);
+    // Count through the predicate the list itself uses, one candidate selection
+    // at a time: bucketing on getArtifactRepository alone never counted the
+    // owning org's profile, so checking a repo delivered one more row (per
+    // owning org) than the number beside it promised.
+    const offered = new Set([...repos, ...selectedRepositories]);
     return [...offered]
       .sort((a, b) => a.localeCompare(b))
       .map((repository) => ({
         value: repository,
         label: repository,
-        count: counts.get(repository) ?? 0,
+        count: githubCandidates.filter((artifact) =>
+          matchesRepository(artifact, new Set([repository])),
+        ).length,
       }));
   }, [
     artifacts,
     deferredSearchQuery,
     matchesSearch,
     passesTab,
-    passesFormat,
     selectedSources,
     selectedRepositories,
   ]);

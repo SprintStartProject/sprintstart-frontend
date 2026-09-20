@@ -57,12 +57,21 @@ export function parseGithubMetadata(
     return null;
   }
 
-  const repositoryFullName = (parsed as Record<string, unknown>)["repositoryFullName"];
+  const payload = parsed as Record<string, unknown>;
+  const repositoryFullName = payload["repositoryFullName"];
   if (typeof repositoryFullName !== "string" || repositoryFullName.trim() === "") {
     return null;
   }
 
-  return parsed as GithubArtifactMetadata;
+  // Normalize here rather than at every consumer: a stray `"  owner/repo  "`
+  // must not become a facet value or a chip with leading whitespace. And the
+  // parsed shape may only promise what it validated — `repositoryId` is
+  // declared-but-unconsumed, so a non-string payload value is dropped instead
+  // of being typed as a string it was never checked to be.
+  return {
+    repositoryId: typeof payload["repositoryId"] === "string" ? payload["repositoryId"] : undefined,
+    repositoryFullName: repositoryFullName.trim(),
+  };
 }
 
 /**
@@ -90,6 +99,42 @@ export function getArtifactRepository(
 }
 
 /**
+ * Per-artifact parse results, cached because the filter path evaluates every
+ * artifact once per facet memo per interaction — without the cache a single
+ * tab change re-ran `JSON.parse` on every artifact's metadata ~5x (and the org
+ * profile parse walks teams + members, the most expensive payload in the
+ * feature). Keyed weakly by the artifact object: a refetch produces new
+ * objects and a fresh parse, so stale cache can never outlive its batch.
+ */
+interface RepositoryInfo {
+  repository: string | null;
+  orgLogin: string | null;
+}
+
+const repositoryInfoCache = new WeakMap<object, RepositoryInfo>();
+
+function repositoryInfoOf(
+  artifact: Pick<Artifact, "sourceSystem" | "artifactType" | "metadata">,
+): RepositoryInfo {
+  const cached = repositoryInfoCache.get(artifact);
+  if (cached !== undefined) return cached;
+
+  const repository = getArtifactRepository(artifact);
+  const info: RepositoryInfo =
+    repository !== null
+      ? { repository, orgLogin: null }
+      : {
+          repository: null,
+          orgLogin:
+            artifact.artifactType === "ORG_METADATA"
+              ? (parseOrgMetadata(artifact.metadata)?.login ?? null)
+              : null,
+        };
+  repositoryInfoCache.set(artifact, info);
+  return info;
+}
+
+/**
  * Whether an artifact survives the repository facet's current selection.
  *
  * Mirrors `matchesFormat`'s scoping rule where it can: artifacts from other
@@ -103,6 +148,12 @@ export function getArtifactRepository(
  * nothing to do with, while hiding them all cut the reader off from the org
  * that owns the repo they picked.
  *
+ * The owner comparison folds case on both sides: GitHub logins are
+ * case-insensitive and the two strings come from independent payloads
+ * (`repositoryFullName` from the repository entity, `login` from the org
+ * profile), so "SprintStart/frontend" must match a profile with login
+ * "sprintstart".
+ *
  * @param artifact The artifact under test.
  * @param selected The currently chosen repositories; empty means "no narrowing".
  * @returns Whether the artifact belongs in the filtered list.
@@ -114,16 +165,16 @@ export function matchesRepository(
   if (selected.size === 0) return true;
   if (artifact.sourceSystem !== "GITHUB") return true;
 
-  const repository = getArtifactRepository(artifact);
+  const { repository, orgLogin } = repositoryInfoOf(artifact);
   if (repository !== null) return selected.has(repository);
 
   // A GitHub artifact that names no repository: only the org profile can still
   // belong to the selection — namely when its org owns one of the chosen repos.
-  if (artifact.artifactType !== "ORG_METADATA") return false;
-  const login = parseOrgMetadata(artifact.metadata)?.login;
-  if (!login) return false;
+  if (orgLogin === null) return false;
+  const login = orgLogin.toLowerCase();
   return [...selected].some((repo) => {
     const ownerSeparator = repo.indexOf("/");
-    return (ownerSeparator > 0 ? repo.slice(0, ownerSeparator) : repo) === login;
+    const owner = ownerSeparator > 0 ? repo.slice(0, ownerSeparator) : repo;
+    return owner.toLowerCase() === login;
   });
 }
