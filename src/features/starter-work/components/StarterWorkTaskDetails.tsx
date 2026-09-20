@@ -2,44 +2,77 @@ import { useState } from "react";
 import {
   AlignLeft,
   Check,
+  CheckCircle2,
   ExternalLink,
   Loader2,
+  PencilLine,
   ShieldCheck,
   Sparkles,
   Target,
+  UserRound,
   X,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { DrawerCard } from "../../admin/components/DrawerCard";
+import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle";
 import { Badge } from "../../../components/ui/Badge";
+import { Button } from "../../../components/ui/Button";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { orientationService } from "../../../services/orientationService";
+import { queryKeys } from "../../../services/queryKeys";
+import { OrientationEditor } from "../../orientation/components/OrientationEditor";
+import { formatRelativeDate } from "../format";
 import type { StarterWorkTask } from "../types";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
 type StarterWorkTaskDetailsProps = {
   task: StarterWorkTask;
-  /** HR reads the detail but does not decide, so the footer is theirs to hide. */
+  /** Needed to read and write the task's orientation; the section is hidden without one selected. */
+  projectId: string | null;
+  /** HR reads the drawer but does not decide, write orientation, or flag Task 0. */
   canAct: boolean;
   onApprove: (id: string, origin?: PoolFlightRect) => Promise<void>;
   onReject: (id: string, reason?: string) => Promise<void>;
+  onToggleTaskZero: (task: StarterWorkTask, eligible: boolean) => Promise<void>;
   onClose: () => void;
 };
 
 /**
- * The full view of one mined starter task, opened from the review list.
+ * The one detail drawer for every pool task, opened from the review queue, the pool cloud and the
+ * pool list alike.
  *
- * The body is split into the same kind of labelled sections the admin user drawer uses — summary,
- * the AI's scope-safety rationale (the claim a PM is being asked to check) and the skills the task
- * exercises. The two decisions fill the footer; a successful one closes the drawer, since the task
- * then leaves the queue behind it.
+ * The body is split into labelled sections matching the admin user drawer — what the task is, the
+ * AI's scope-safety rationale, where it stands (looked-at status, the Task 0 flag) and its
+ * orientation. The footer's decision mirrors what still needs deciding: an unreviewed task offers
+ * both "Looks good" and "Remove"; one already looked at only offers "Remove", since vouching for it
+ * again says nothing new.
  */
 export function StarterWorkTaskDetails({
   task,
+  projectId,
   canAct,
   onApprove,
   onReject,
+  onToggleTaskZero,
   onClose,
 }: StarterWorkTaskDetailsProps) {
+  const queryClient = useQueryClient();
   const [isDeciding, setIsDeciding] = useState(false);
+  const [isTogglingZero, setIsTogglingZero] = useState(false);
+  const [isEditingOrientation, setIsEditingOrientation] = useState(false);
+  const unseen = !task.reviewed;
+  // The two decisions this drawer offers only make sense against a claimable task — a `STALE` row
+  // (closed at its source) refuses both `reject` and `markReviewed` server-side, so offering the
+  // buttons here would be an affordance whose only outcome is an error.
+  const canDecide = task.status === "LIVE";
+
+  const orientationQueryKey = queryKeys.starterWork.taskOrientation(task.id, projectId ?? "");
+  const orientation = useQueryFetch(
+    orientationQueryKey,
+    () => orientationService.fetchTaskOrientation(task.id, projectId as string),
+    { enabled: canAct && Boolean(projectId) },
+  );
 
   const decide = async (action: () => Promise<void>) => {
     setIsDeciding(true);
@@ -51,6 +84,21 @@ export function StarterWorkTaskDetails({
       // open so the reader can try again.
       setIsDeciding(false);
     }
+  };
+
+  const handleToggleTaskZero = async (eligible: boolean) => {
+    setIsTogglingZero(true);
+    try {
+      await onToggleTaskZero(task, eligible);
+    } catch {
+      // The page's handler already raised a toast for the failure.
+    } finally {
+      setIsTogglingZero(false);
+    }
+  };
+
+  const refetchOrientation = () => {
+    void queryClient.invalidateQueries({ queryKey: orientationQueryKey });
   };
 
   return (
@@ -78,41 +126,73 @@ export function StarterWorkTaskDetails({
         ) : undefined
       }
       footer={
-        canAct ? (
-          <div className="grid w-full grid-cols-2 gap-3">
+        canAct && canDecide ? (
+          unseen ? (
+            <div className="grid w-full grid-cols-2 gap-3">
+              <button
+                type="button"
+                data-testid={`approve-task-${task.id}`}
+                disabled={isDeciding}
+                onClick={(event) => {
+                  const origin = capturePoolFlightRect(event.currentTarget);
+                  void decide(() => onApprove(task.id, origin));
+                }}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-app-success-border bg-app-success-bg px-4 py-2.5 text-sm font-semibold text-app-success-text transition-colors hover:border-app-success-solid hover:bg-app-success-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeciding ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                )}
+                Looks good
+              </button>
+              <button
+                type="button"
+                data-testid={`reject-task-${task.id}`}
+                disabled={isDeciding}
+                onClick={() => void decide(() => onReject(task.id))}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm font-semibold text-app-danger-text transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+                Remove
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
+              data-testid={`reject-task-${task.id}`}
               disabled={isDeciding}
-              onClick={(event) => {
-                const origin = capturePoolFlightRect(event.currentTarget);
-                void decide(() => onApprove(task.id, origin));
-              }}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-app-success-border bg-app-success-bg px-4 py-2.5 text-sm font-semibold text-app-success-text transition-colors hover:border-app-success-solid hover:bg-app-success-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => void decide(() => onReject(task.id))}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm font-semibold text-app-danger-text transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isDeciding ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (
-                <Check className="h-4 w-4" aria-hidden="true" />
+                <X className="h-4 w-4" aria-hidden="true" />
               )}
-              Looks good
+              Remove from pool
             </button>
-            <button
-              type="button"
-              disabled={isDeciding}
-              onClick={() => void decide(() => onReject(task.id))}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm font-semibold text-app-danger-text transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-              Take it out of the pool
-            </button>
-          </div>
+          )
         ) : undefined
       }
     >
       <div className="space-y-4 sm:space-y-5">
-        {task.summary && (
-          <DrawerCard label="Summary" icon={AlignLeft} index={0}>
-            <p className="text-sm leading-relaxed text-app-text-muted">{task.summary}</p>
+        {(task.summary || task.competencyKeys.length > 0) && (
+          <DrawerCard label="What it is" icon={AlignLeft} index={0}>
+            {task.summary && (
+              <p className="text-sm leading-relaxed text-app-text-muted">{task.summary}</p>
+            )}
+            {task.competencyKeys.length > 0 && (
+              <ul className="mt-3 flex flex-wrap gap-1.5">
+                {task.competencyKeys.map((key) => (
+                  <li key={key}>
+                    <Badge variant="purple" size="md">
+                      {key}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
           </DrawerCard>
         )}
 
@@ -122,21 +202,132 @@ export function StarterWorkTaskDetails({
           </DrawerCard>
         )}
 
-        {task.competencyKeys.length > 0 && (
-          <DrawerCard label="Skills" icon={Sparkles} index={2}>
-            <p className="mb-3 text-sm text-app-text-muted">Each one becomes a prerequisite.</p>
-            <ul className="flex flex-wrap gap-1.5">
-              {task.competencyKeys.map((key) => (
-                <li key={key}>
-                  <Badge variant="purple" size="md">
-                    {key}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
+        <DrawerCard label="Where it stands" icon={Sparkles} index={2}>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-app-text">
+                  {unseen ? "Not looked at yet" : "Looked at"}
+                </p>
+                <p className="text-xs text-app-text-muted">
+                  {unseen
+                    ? "Hires can already pick it, it just sits lower on their list."
+                    : "Ranked normally for hires."}
+                </p>
+              </div>
+              {unseen ? (
+                <Badge variant="brand" size="md">
+                  Not looked at
+                </Badge>
+              ) : (
+                <Badge variant="success" size="md" className="gap-1">
+                  <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                  Looked at
+                </Badge>
+              )}
+            </div>
+
+            {/* Only a definite `true` means somebody has this — `null` is "we don't know", not
+                "nobody", so there is nothing to show for it. */}
+            {task.sourceHasAssignee === true && (
+              <div className="flex items-center justify-between gap-3 border-t border-app-border pt-3">
+                <div>
+                  <p className="text-sm font-semibold text-app-text">Someone is on this</p>
+                  <p className="text-xs text-app-text-muted">
+                    The tracker shows somebody assigned when reconciliation last checked.
+                  </p>
+                </div>
+                <Badge variant="neutral" size="md" className="gap-1">
+                  <UserRound className="h-3 w-3" aria-hidden="true" />
+                  Assigned
+                </Badge>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3 border-t border-app-border pt-3">
+              <div>
+                <p className="text-sm font-semibold text-app-text">Use as Task 0</p>
+                <p className="text-xs text-app-text-muted">
+                  Handed to a new hire as their very first task, on any project.
+                </p>
+              </div>
+              {canAct ? (
+                <AccountEnabledToggle
+                  enabled={task.taskZeroEligible}
+                  disabled={isTogglingZero}
+                  ariaLabel="Use as Task 0"
+                  onChange={(eligible) => void handleToggleTaskZero(eligible)}
+                />
+              ) : (
+                <Badge variant={task.taskZeroEligible ? "purple" : "neutral"} size="md">
+                  {task.taskZeroEligible ? "Task 0" : "Not Task 0"}
+                </Badge>
+              )}
+            </div>
+
+            <div className="border-t border-app-border pt-3">
+              <p className="text-sm font-semibold text-app-text">Visible for</p>
+              <p className="text-xs text-app-text-muted">
+                Every project — the pool is shared, and any hire can claim it.
+              </p>
+            </div>
+          </div>
+        </DrawerCard>
+
+        {canAct && (
+          <DrawerCard label="Orientation" icon={PencilLine} index={3}>
+            {!projectId ? (
+              <p className="text-sm text-app-text-muted">
+                Pick a project to read or write this task&apos;s orientation.
+              </p>
+            ) : orientation.loading ? (
+              <p className="text-sm text-app-text-muted">Loading…</p>
+            ) : orientation.error ? (
+              <p className="text-sm text-app-text-muted">Orientation unavailable right now.</p>
+            ) : (
+              <>
+                <p className="text-sm text-app-text-muted">
+                  {orientation.data?.packet
+                    ? `A guide is written, updated ${formatRelativeDate(orientation.data.packet.assembledAt)}.`
+                    : "No guide yet. Hires get an AI orientation until you write one."}
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3"
+                  icon={<PencilLine className="h-4 w-4" aria-hidden="true" />}
+                  onClick={() => setIsEditingOrientation(true)}
+                >
+                  {orientation.data?.packet ? "Edit orientation" : "Write orientation"}
+                </Button>
+              </>
+            )}
           </DrawerCard>
         )}
       </div>
+
+      {isEditingOrientation && projectId && orientation.data && (
+        <OrientationEditor
+          taskTitle={task.title}
+          taskUrl={task.sourceUrl}
+          initial={orientation.data.packet}
+          onSave={async (input) => {
+            await orientationService.authorTaskOrientation(task.id, projectId, input);
+            refetchOrientation();
+            return true;
+          }}
+          onRevert={
+            orientation.data.packet
+              ? async () => {
+                  await orientationService.revertTaskOrientation(task.id, projectId);
+                  refetchOrientation();
+                  return true;
+                }
+              : undefined
+          }
+          onClose={() => setIsEditingOrientation(false)}
+        />
+      )}
     </DetailsSideDrawer>
   );
 }

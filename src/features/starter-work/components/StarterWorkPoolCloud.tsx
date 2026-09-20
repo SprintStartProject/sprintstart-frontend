@@ -1,289 +1,468 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
 import {
+  Archive,
+  CheckCircle2,
   ChevronRight,
   Cloud,
+  GitBranch,
   List as ListIcon,
-  Loader2,
   PackageOpen,
-  PencilLine,
+  PenLine,
+  RefreshCw,
+  Ticket,
+  UserRound,
 } from "lucide-react";
-import { Badge } from "../../../components/ui/Badge";
+import { Badge, type BadgeVariant } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Pagination } from "../../../components/ui/Pagination";
-import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { useToast } from "../../../context/useToast";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { useIsSmUp } from "../../../hooks/useIsSmUp";
-import { orientationService } from "../../../services/orientationService";
+import { queryKeys } from "../../../services/queryKeys";
+import { starterWorkService } from "../../../services/starterWorkService";
 import { centralSpringToken } from "../../../styles/tokens";
-import { OrientationEditor } from "../../orientation/components/OrientationEditor";
-import type { MyOrientation } from "../../orientation/types";
 import { useProjectContext } from "../../projects/useProjectContext";
-import { parseCandidateSource, trackerLabel } from "../sourceId";
+import { formatRelativeDate } from "../format";
+import { parseCandidateSource, stripRedundantIssuePrefix, trackerLabel } from "../sourceId";
 import type { StarterWorkTask } from "../types";
 
-/** Cloud cards need more breathing room than the compact issue-style list rows. */
-const CLOUD_PAGE_SIZE = 5;
-const LIST_PAGE_SIZE = 3;
-/** Full width, the list lays its rows out two-up, so one page holds a 2×3 grid instead of three. */
-const LIST_PAGE_SIZE_WIDE = 6;
+export type PoolStatusFilter = "all" | "unseen" | "seen" | "taskZero" | "closed";
+
+const STATUS_FILTER_ORDER: PoolStatusFilter[] = ["all", "unseen", "seen", "taskZero", "closed"];
+
+const STATUS_FILTER_LABELS: Record<PoolStatusFilter, string> = {
+  all: "All",
+  unseen: "New",
+  seen: "Looked at",
+  taskZero: "Task 0",
+  closed: "Closed",
+};
+
+/** One page fills the cloud with twelve cards, or the list's matching stack of ten — a compact row
+ *  holds more than a card does. */
+const CLOUD_PAGE_SIZE = 12;
+const LIST_PAGE_SIZE = 10;
+
+/** The cloud is always four columns of three — used to know which slots sit in the same column. */
+const CLOUD_GRID_COLUMNS = 4;
+const CLOUD_GRID_ROWS = CLOUD_PAGE_SIZE / CLOUD_GRID_COLUMNS;
+
+/** How far a card can be pulled right from its cell's left edge, as a percent of the cell's width —
+ *  its own width is 70%, so up to 30% of the cell is free to shift into. */
+const CLOUD_MAX_OFFSET_PERCENT = 30;
+
+/** The least two vertically stacked cards in the same column are ever allowed to differ by — below
+ *  this, a card gets nudged aside so the column never reads as a straight stack of edges. */
+const CLOUD_MIN_COLUMN_GAP_PERCENT = 10;
+
+/** Where one card sits inside its grid cell: a left offset, never a fixed slot — always level and
+ *  never nudged up or down, so every card stays upright and every row reads as a straight line. */
+type CloudSlotStyle = { offsetPercent: number };
+
+/** A small seeded PRNG (mulberry32) — deterministic, so a layout never reshuffles on re-render. */
+function mulberry32(seed: number) {
+  let state = seed;
+  return function next() {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * The three offsets for one column, at least `CLOUD_MIN_COLUMN_GAP_PERCENT` apart by construction
+ * rather than by retrying a random draw until it happens to clear that gap — with three rows sharing
+ * a 0–30 range and a required 10-point gap, rejecting-and-redrawing can run out of attempts before it
+ * finds a spot, which is exactly what let two rows in the same column land on top of each other
+ * before. Instead: draw `CLOUD_GRID_ROWS` values in whatever's left over once the gaps themselves are
+ * reserved, sort them, and lay them out back to back with the gaps between — which mathematically
+ * cannot place any two closer than the gap — then shuffle which row gets which resulting position.
+ */
+function buildColumnOffsets(random: () => number): number[] {
+  const slack = CLOUD_MAX_OFFSET_PERCENT - (CLOUD_GRID_ROWS - 1) * CLOUD_MIN_COLUMN_GAP_PERCENT;
+  const spaced = Array.from({ length: CLOUD_GRID_ROWS }, () => random() * slack)
+    .sort((a, b) => a - b)
+    .map((value, rank) => value + rank * CLOUD_MIN_COLUMN_GAP_PERCENT);
+
+  for (let index = spaced.length - 1; index > 0; index--) {
+    const swapWith = Math.floor(random() * (index + 1));
+    [spaced[index], spaced[swapWith]] = [spaced[swapWith], spaced[index]];
+  }
+  return spaced;
+}
+
+/** One set of twelve left-offsets, built column by column so every column gets its own guaranteed
+ *  spread rather than being assembled from independently-drawn rows. */
+function buildCandidateOffsets(random: () => number, slotCount: number): number[] {
+  const offsets: number[] = new Array<number>(slotCount);
+  for (let columnIndex = 0; columnIndex < CLOUD_GRID_COLUMNS; columnIndex++) {
+    buildColumnOffsets(random).forEach((offset, rowIndex) => {
+      offsets[rowIndex * CLOUD_GRID_COLUMNS + columnIndex] = offset;
+    });
+  }
+  return offsets;
+}
+
+/** How unlike two arrangements are, checked both as they are and mirrored left-right — a pair that
+ *  merely looks flipped is just as much a repeat, to the eye, as an outright duplicate. */
+function offsetSetDistance(a: number[], b: number[]): number {
+  let direct = 0;
+  let mirrored = 0;
+  for (let index = 0; index < a.length; index++) {
+    direct += Math.abs(a[index] - b[index]);
+    mirrored += Math.abs(a[index] - (CLOUD_MAX_OFFSET_PERCENT - b[index]));
+  }
+  return Math.min(direct, mirrored) / a.length;
+}
+
+/**
+ * Five fixed arrangements for a full page, not one regenerated at random on every render —
+ * regenerating would make cards jump every time something unrelated re-renders the page. Sampling
+ * five independent arrangements occasionally left two that read as the same shape, or as a mirror of
+ * one another, so instead this draws a larger pool from one continuous PRNG stream and greedily
+ * keeps whichever candidate is least like anything already picked, guaranteeing all five stay
+ * visibly distinct from each other (and from their own left-right flip).
+ */
+function buildCloudLayouts(
+  layoutCount: number,
+  slotCount: number,
+  candidatePoolSize: number,
+): CloudSlotStyle[][] {
+  const random = mulberry32(20240917);
+  const candidates = Array.from({ length: candidatePoolSize }, () =>
+    buildCandidateOffsets(random, slotCount),
+  );
+
+  const selected = [candidates[0]];
+  while (selected.length < layoutCount) {
+    let bestIndex = -1;
+    let bestScore = -Infinity;
+    candidates.forEach((candidate, index) => {
+      if (selected.includes(candidate)) return;
+      const score = Math.min(...selected.map((chosen) => offsetSetDistance(candidate, chosen)));
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    });
+    selected.push(candidates[bestIndex]);
+  }
+
+  return selected.map((offsets) =>
+    offsets.map((offsetPercent) => ({ offsetPercent: Math.round(offsetPercent * 10) / 10 })),
+  );
+}
+
+const CLOUD_LAYOUTS: CloudSlotStyle[][] = buildCloudLayouts(5, CLOUD_PAGE_SIZE, 40);
 
 type PoolView = "cloud" | "list";
 
-type CloudSlot = {
-  left: string;
-  top: string;
-  width: string;
-  height: string;
-};
-
-/**
- * Five collision-free compositions for one five-card cloud page.
- *
- * A page change picks a different composition at random. The positions themselves stay fixed while
- * that page is visible, so normal renders never make cards jump. Below `xl` the custom properties
- * are ignored and the same cards fall back to a regular responsive grid.
- */
-const CLOUD_LAYOUTS: CloudSlot[][] = [
-  [
-    { left: "0%", top: "0%", width: "29%", height: "8.5rem" },
-    { left: "35%", top: "5%", width: "29%", height: "8.5rem" },
-    { left: "70%", top: "2%", width: "30%", height: "8.5rem" },
-    { left: "7%", top: "57%", width: "32%", height: "8.5rem" },
-    { left: "51%", top: "54%", width: "33%", height: "8.5rem" },
-  ],
-  [
-    { left: "2%", top: "7%", width: "30%", height: "8.5rem" },
-    { left: "36%", top: "0%", width: "30%", height: "8.5rem" },
-    { left: "70%", top: "8%", width: "30%", height: "8.5rem" },
-    { left: "15%", top: "54%", width: "31%", height: "8.5rem" },
-    { left: "55%", top: "57%", width: "32%", height: "8.5rem" },
-  ],
-  [
-    { left: "0%", top: "0%", width: "30%", height: "8.5rem" },
-    { left: "34%", top: "9%", width: "30%", height: "8.5rem" },
-    { left: "69%", top: "3%", width: "31%", height: "8.5rem" },
-    { left: "5%", top: "57%", width: "33%", height: "8.5rem" },
-    { left: "48%", top: "54%", width: "33%", height: "8.5rem" },
-  ],
-  [
-    { left: "4%", top: "5%", width: "30%", height: "8.5rem" },
-    { left: "38%", top: "0%", width: "30%", height: "8.5rem" },
-    { left: "72%", top: "8%", width: "28%", height: "8.5rem" },
-    { left: "0%", top: "55%", width: "32%", height: "8.5rem" },
-    { left: "42%", top: "57%", width: "34%", height: "8.5rem" },
-  ],
-  [
-    { left: "0%", top: "8%", width: "29%", height: "8.5rem" },
-    { left: "35%", top: "0%", width: "31%", height: "8.5rem" },
-    { left: "71%", top: "4%", width: "29%", height: "8.5rem" },
-    { left: "12%", top: "54%", width: "33%", height: "8.5rem" },
-    { left: "56%", top: "57%", width: "32%", height: "8.5rem" },
-  ],
-];
-
-/** Full width shows the small five-card composition twice, so a page holds ten. */
-const CLOUD_PAGE_SIZE_WIDE = 10;
-
-/**
- * The full-width cloud is the small composition shown twice, side by side. Each slot's horizontal
- * position and width are scaled into one half and the same set is offset into the other; the
- * vertical placement is untouched, so it reads as two of the same cloud rather than a new shape.
- *
- * The scale is a touch under half (and the right half starts a touch past centre) so the two clouds
- * leave a small gutter down the middle instead of meeting edge to edge.
- */
-const CLOUD_HALF_SCALE = 0.48;
-const CLOUD_RIGHT_OFFSET = "52%";
-
-function widenCloudLayout(layout: CloudSlot[]): CloudSlot[] {
-  const left = layout.map((slot) => ({
-    ...slot,
-    left: `calc(${slot.left} * ${CLOUD_HALF_SCALE})`,
-    width: `calc(${slot.width} * ${CLOUD_HALF_SCALE})`,
-  }));
-  const right = layout.map((slot) => ({
-    ...slot,
-    left: `calc(${CLOUD_RIGHT_OFFSET} + ${slot.left} * ${CLOUD_HALF_SCALE})`,
-    width: `calc(${slot.width} * ${CLOUD_HALF_SCALE})`,
-  }));
-  return [...left, ...right];
-}
-
-const CLOUD_LAYOUTS_WIDE: CloudSlot[][] = CLOUD_LAYOUTS.map(widenCloudLayout);
-
-type CloudSlotStyle = CSSProperties & {
-  "--cloud-left": string;
-  "--cloud-top": string;
-  "--cloud-width": string;
-  "--cloud-height": string;
-};
-
 type StarterWorkPoolCloudProps = {
-  /** Reviewed tasks shown in the pool; the page removes the still-unreviewed queue first. */
+  /** The whole live pool — reviewed and not. */
   tasks: StarterWorkTask[];
   isLoading: boolean;
   error: string | null;
-  /** HR reads the pool; only PM/ADMIN can open the orientation editor. */
+  /** HR reads the pool; only PM/ADMIN can act from the task's detail drawer. */
   canAct: boolean;
+  /** Reconciles the pool against its trackers now. Omitted hides the sync control entirely. */
+  onSync?: () => void;
+  isSyncing?: boolean;
+  /** Opens the task's detail drawer. Every task opens it, HR included — the drawer itself is read-only for them. */
+  onOpenTask: (task: StarterWorkTask) => void;
   /**
-   * Whether the pool spans the full content width (its own tab, or the overview with no open
-   * reviews). When it does, the list view lays its rows out in a two-column grid rather than a
-   * single stacked column, and pages six at a time to fill a 2×3 grid.
+   * Tasks reconciliation found closed at their source — shown under the "Closed" filter tab
+   * instead of a separate box under the pool. Not sticky: a task leaves this list on its own once
+   * its source issue reopens. Defaults to empty, which simply keeps the tab hidden.
    */
-  fullWidth?: boolean;
+  closedTasks?: StarterWorkTask[];
+  isClosedLoading?: boolean;
 };
 
 type PoolTaskProps = {
   task: StarterWorkTask;
-  canOpen: boolean;
-  isOpening: boolean;
-  isBusy: boolean;
   onOpen: (task: StarterWorkTask) => void;
+  /**
+   * True inside the "Closed" filter: dims the row/card and swaps the unseen/seen marker and the
+   * summary line for an archive icon and a "Closed …" timestamp, since neither of those mean
+   * anything for a task that already left the live pool.
+   */
+  closed?: boolean;
 };
 
-/** Placeholder for one pool row, matching `PoolListRow`'s title/description/meta shape. */
+/** Placeholder for one pool row, matching `PoolListRow`'s marker/title/description/badge shape. */
 function PoolRowSkeleton() {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4">
+    <div className="flex items-center gap-3 p-4">
+      <SkeletonBlock className="h-2 w-2 shrink-0 rounded-full" />
       <div className="min-w-0 flex-1">
         <SkeletonLine className="w-2/3" />
         <SkeletonLine className="mt-1.5 w-1/2" />
-        <SkeletonLine className="mt-2 h-5 w-20" />
       </div>
+      <SkeletonBlock className="h-5 w-16 shrink-0 rounded-full" />
     </div>
   );
 }
 
-/** Pick any of the other four layouts, so every page change is visibly different. */
-function nextCloudLayout(current: number): number {
-  const offset = 1 + Math.floor(Math.random() * (CLOUD_LAYOUTS.length - 1));
-  return (current + offset) % CLOUD_LAYOUTS.length;
-}
+/** Icon per known tracker, matching the icons Data Ingestion uses for the same systems. */
+const TRACKER_ICONS: Record<string, LucideIcon> = {
+  GITHUB: GitBranch,
+  JIRA: Ticket,
+};
 
-/** Shared source metadata used by both representations of a pool task. */
-function PoolTaskMeta({ task }: { task: StarterWorkTask }) {
+/** Badge colour per known tracker, so a scan of the pool tells GitHub and Jira apart at a glance. */
+const TRACKER_BADGE_VARIANTS: Record<string, BadgeVariant> = {
+  GITHUB: "brand",
+  JIRA: "orange",
+};
+
+/**
+ * Where a pool task came from, shared by the card, the list row, and — from here on — anything
+ * else that shows a pool task. A known tracker reads as one small coloured badge (its number or
+ * key, never the full path — that stays in the tooltip and the drawer, where there is room for
+ * it), so every card carries at least a touch of colour instead of reading as pure grayscale.
+ * A hand-authored task has no tracker to colour, so it stays a plain muted line.
+ */
+function PoolTaskSourceBadge({ task }: { task: StarterWorkTask }) {
   const parsed = parseCandidateSource(task.sourceId);
-  const { trackerCode, hasKnownTracker } = parsed;
+
+  if (!parsed.hasKnownTracker) {
+    return (
+      <span className="flex w-fit min-w-0 shrink-0 items-center gap-1.5 self-center text-xs text-app-text-subtle">
+        <PenLine className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span className="truncate">Written by hand</span>
+      </span>
+    );
+  }
+
+  const Icon = TRACKER_ICONS[parsed.trackerCode.toUpperCase()];
+  const variant = TRACKER_BADGE_VARIANTS[parsed.trackerCode.toUpperCase()] ?? "brand";
+  const identifier = parsed.numberLabel ?? trackerLabel(parsed.trackerCode);
+  const fullSource =
+    [parsed.repoLabel, parsed.numberLabel].filter(Boolean).join(" ") ||
+    trackerLabel(parsed.trackerCode);
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <Badge variant="brand" size="sm">
-        {hasKnownTracker ? trackerLabel(trackerCode) : "Custom"}
-      </Badge>
-      {hasKnownTracker && parsed.numberLabel && (
-        <Badge variant="neutral" size="sm">
-          {parsed.numberLabel}
-        </Badge>
-      )}
-      {hasKnownTracker && parsed.repo && (
-        <span className="min-w-0 truncate text-xs text-app-text-subtle" title={parsed.repo}>
-          {parsed.repo}
-        </span>
-      )}
-    </div>
+    <Badge
+      variant={variant}
+      size="md"
+      title={fullSource}
+      className="w-fit min-w-0 shrink gap-1 self-center"
+    >
+      {Icon && <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />}
+      <span className="truncate">{identifier}</span>
+    </Badge>
   );
 }
 
-/** A cloud card whose stretched button makes the entire surface open the orientation drawer. */
-function PoolCloudCard({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
+/**
+ * At most one badge for the state that most needs flagging: Task 0 first, then an assignee the
+ * tracker already reports — never both, so a card carries the source badge above and one more
+ * colour at most, rather than turning into a row of pills. Renders nothing when neither applies.
+ */
+function PoolTaskBadges({ task }: { task: StarterWorkTask }) {
+  if (task.taskZeroEligible) {
+    return (
+      <Badge variant="purple" size="md" className="w-fit shrink-0 self-center">
+        Task 0
+      </Badge>
+    );
+  }
+
+  // Only a definite `true` means somebody has this — `null` is "we don't know", not "nobody".
+  if (task.sourceHasAssignee === true) {
+    return (
+      <Badge variant="neutral" size="md" className="w-fit shrink-0 gap-1 self-center">
+        <UserRound className="h-3 w-3" aria-hidden="true" />
+        Someone is on this
+      </Badge>
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Whether nobody has looked at this task yet (a pulsing dot) or somebody already has (a
+ * checkmark) — the same distinction the pool has always drawn, just quieter than a full badge. The
+ * pulse is a plain CSS animation, which the app's global `prefers-reduced-motion` rule already
+ * collapses to a static dot.
+ */
+function PoolStatusMarker({ unseen }: { unseen: boolean }) {
+  if (unseen) {
+    return (
+      <span className="relative flex h-2 w-2 shrink-0" role="img" aria-label="Not looked at yet">
+        <span
+          aria-hidden="true"
+          className="absolute inline-flex h-full w-full animate-ping rounded-full bg-app-brand opacity-75"
+        />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-app-brand" />
+      </span>
+    );
+  }
+
+  return (
+    <CheckCircle2
+      role="img"
+      aria-label="Looked at"
+      className="h-4 w-4 shrink-0 text-app-success-text"
+    />
+  );
+}
+
+/** "Closed 2 days ago" for a task shown under the Closed filter, or null with no timestamp to phrase one from. */
+function closedLineFor(task: StarterWorkTask): string | null {
+  return task.sourceCheckedAt ? `Closed ${formatRelativeDate(task.sourceCheckedAt)}` : null;
+}
+
+/** A cloud card whose stretched button makes the entire surface open the task's detail drawer. */
+function PoolCloudCard({ task, onOpen, closed = false }: PoolTaskProps) {
+  const unseen = !closed && !task.reviewed;
   const description = task.summary?.trim();
+  const closedLine = closed ? closedLineFor(task) : null;
+  const displayTitle = stripRedundantIssuePrefix(
+    task.title,
+    parseCandidateSource(task.sourceId).numberLabel,
+  );
 
   return (
     <SpotlightCard
       roundedClassName="rounded-2xl"
-      className="h-full focus-within:ring-2 focus-within:ring-app-focus"
+      className={`transition-shadow focus-within:ring-2 focus-within:ring-app-focus hover:shadow-xl ${
+        unseen ? "border-dashed border-app-border-muted" : ""
+      } ${closed ? "opacity-70" : ""}`}
     >
-      {canOpen && (
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onOpen(task)}
-          aria-label={`Edit orientation for ${task.title}`}
-          className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
+      {/* A soft always-on glow, not the mouse-tracked spotlight — the cue that this one is new has
+          to read before the reader's cursor ever reaches it. */}
+      {unseen && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-10 -left-10 z-0 h-28 w-28 rounded-full bg-app-brand/25 blur-2xl"
         />
       )}
 
-      <article className="pointer-events-none relative z-10 flex h-full flex-col gap-2 p-4">
-        <div className="flex items-start gap-2">
-          <h3
-            className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-semibold text-app-text"
-            title={task.title}
-          >
-            {task.title}
-          </h3>
-          {canOpen && (
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-text-muted">
-              {isOpening ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <PencilLine className="h-4 w-4" aria-hidden="true" />
-              )}
-            </span>
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        aria-label={`Open details for ${task.title}`}
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      />
+
+      <article className="pointer-events-none relative z-10 flex h-full flex-col gap-1 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <PoolTaskSourceBadge task={task} />
+          {closed ? (
+            <Archive
+              role="img"
+              aria-label="Closed in the tracker"
+              className="h-4 w-4 shrink-0 text-app-text-subtle"
+            />
+          ) : (
+            <PoolStatusMarker unseen={unseen} />
           )}
         </div>
 
-        {description && (
-          <p className="truncate text-xs leading-relaxed text-app-text-muted" title={description}>
-            {description}
-          </p>
+        <h3
+          className="line-clamp-2 text-sm leading-snug font-semibold text-app-text"
+          title={task.title}
+        >
+          {displayTitle}
+        </h3>
+
+        {closedLine ? (
+          <p className="line-clamp-1 text-xs leading-relaxed text-app-text-subtle">{closedLine}</p>
+        ) : (
+          description && (
+            <p
+              className="line-clamp-1 text-xs leading-relaxed text-app-text-muted"
+              title={description}
+            >
+              {description}
+            </p>
+          )
         )}
 
-        <div className="mt-auto pt-1">
-          <PoolTaskMeta task={task} />
+        <div className="mt-auto pt-0.5">
+          <PoolTaskBadges task={task} />
         </div>
       </article>
     </SpotlightCard>
   );
 }
 
-/** Pool task in the same compact row language as the issue browser directly below it. */
-function PoolListRow({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps) {
+/**
+ * Pool task row: a single grouped list stacks these with `divide-y`, so each row only has to lay
+ * out its own content — marker, title/summary, then the trailing badges and a chevron. Below `sm`
+ * the trailing group wraps under the title instead of staying pinned to the row's right edge.
+ */
+function PoolListRow({ task, onOpen, closed = false }: PoolTaskProps) {
+  const unseen = !closed && !task.reviewed;
   const description = task.summary?.trim();
+  const closedLine = closed ? closedLineFor(task) : null;
+  const displayTitle = stripRedundantIssuePrefix(
+    task.title,
+    parseCandidateSource(task.sourceId).numberLabel,
+  );
 
   return (
-    <li className="group relative h-full" data-testid={`pool-list-task-${task.id}`}>
-      {canOpen && (
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onOpen(task)}
-          aria-label={`Edit orientation for ${task.title}`}
-          className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
-        />
-      )}
+    <li
+      className={`group relative ${closed ? "opacity-70" : ""}`}
+      data-testid={`pool-list-task-${task.id}`}
+    >
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        aria-label={`Open details for ${task.title}`}
+        className="absolute inset-0 z-0 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset"
+      />
 
-      {/* h-full so that side by side in the full-width grid, the row's two cards match the taller
-          one's height; in the single stacked column it is a no-op. */}
-      <div className="pointer-events-none relative z-10 flex h-full items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong">
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold text-app-text" title={task.title}>
-            {task.title}
-          </h3>
-          {description && (
-            <p className="mt-1 truncate text-xs text-app-text-muted" title={description}>
-              {description}
-            </p>
+      <div className="pointer-events-none relative z-10 flex flex-col gap-2 p-4 transition-colors group-hover:bg-app-surface-hover sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex w-5 shrink-0 items-center justify-center">
+          {closed ? (
+            <Archive
+              role="img"
+              aria-label="Closed in the tracker"
+              className="h-4 w-4 shrink-0 text-app-text-subtle"
+            />
+          ) : (
+            <PoolStatusMarker unseen={unseen} />
           )}
-          <div className="mt-1.5">
-            <PoolTaskMeta task={task} />
-          </div>
         </div>
 
-        {canOpen && (
-          <span className="flex shrink-0 items-center gap-2 self-center text-app-text-muted">
-            {isOpening ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <PencilLine className="h-4 w-4" aria-hidden="true" />
-            )}
-            <ChevronRight className="h-4 w-4 text-app-text-disabled" aria-hidden="true" />
-          </span>
-        )}
+        <div className="min-w-0 flex-1">
+          <h3
+            className={`truncate text-sm text-app-text ${unseen ? "font-semibold" : "font-medium"}`}
+            title={task.title}
+          >
+            {displayTitle}
+          </h3>
+          {closedLine ? (
+            <p className="truncate text-xs text-app-text-subtle">{closedLine}</p>
+          ) : (
+            description && (
+              <p className="truncate text-xs text-app-text-muted" title={description}>
+                {description}
+              </p>
+            )
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 pl-8 sm:flex-nowrap sm:pl-0">
+          <PoolTaskBadges task={task} />
+          <PoolTaskSourceBadge task={task} />
+          <ChevronRight
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-app-text-subtle transition-transform group-hover:translate-x-0.5"
+          />
+        </div>
       </div>
     </li>
   );
@@ -292,30 +471,32 @@ function PoolListRow({ task, canOpen, isOpening, isBusy, onOpen }: PoolTaskProps
 /**
  * The reviewed starter-work pool with interchangeable cloud and list views.
  *
- * Cloud cards use one of five compositions and list rows deliberately mirror the issue browser.
- * Both representations make the whole task surface the orientation trigger, while HR keeps a
- * non-interactive read-only view matching the backend's authoring permissions.
+ * The cloud lays its cards out as a real CSS masonry (see the render below); list rows share the
+ * same content structure in the issue browser's row language. Both representations make the whole
+ * task surface the drawer trigger — HR opens the same read-only drawer, matching the backend's
+ * authoring permissions on what it can actually do there.
  */
 export function StarterWorkPoolCloud({
   tasks,
   isLoading,
   error,
   canAct,
-  fullWidth = false,
+  onSync,
+  isSyncing = false,
+  onOpenTask,
+  closedTasks = [],
+  isClosedLoading = false,
 }: StarterWorkPoolCloudProps) {
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId, selectedProject } = useProjectContext();
   const prefersReducedMotion = useReducedMotion();
   const { error: showErrorToast } = useToast();
   const showLoadingSkeleton = useDelayedFlag(isLoading);
+  const showClosedLoadingSkeleton = useDelayedFlag(isClosedLoading);
 
   const [view, setView] = useState<PoolView>("cloud");
-  const [layoutIndex, setLayoutIndex] = useState(0);
-  const [openingId, setOpeningId] = useState<string | null>(null);
-  const [editing, setEditing] = useState<{
-    task: StarterWorkTask;
-    orientation: MyOrientation;
-  } | null>(null);
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<PoolStatusFilter>("all");
+  const [onlyProject, setOnlyProject] = useState(false);
 
   // The cloud only reads as a cloud once there is room to scatter its cards. Below `sm` there is
   // not, so the pool falls back to the list regardless of the picked view, and the view toggle is
@@ -323,178 +504,335 @@ export function StarterWorkPoolCloud({
   const isSmUp = useIsSmUp();
   const effectiveView: PoolView = isSmUp ? view : "list";
 
-  const listPageSize = fullWidth ? LIST_PAGE_SIZE_WIDE : LIST_PAGE_SIZE;
-  const cloudPageSize = fullWidth ? CLOUD_PAGE_SIZE_WIDE : CLOUD_PAGE_SIZE;
-  const pageSize = effectiveView === "cloud" ? cloudPageSize : listPageSize;
-  const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
+  // Which of the five scattered arrangements is showing: a fresh pick each time the pool mounts,
+  // then cycling to the next one as the reader pages, so paging through never repeats a shape.
+  const [cloudLayoutSeed] = useState(() => Math.floor(Math.random() * CLOUD_LAYOUTS.length));
+
+  // The same project-scoped query `CorpusIssueBrowser` fetches, read here purely to know which
+  // repos/Jira projects belong to the selected project's corpus — sharing the cache key means a
+  // browser already open on this project costs this chip nothing extra.
+  const { data: candidates } = useQuery({
+    queryKey: queryKeys.starterWork.corpusIssues(selectedProjectId),
+    queryFn: () => starterWorkService.fetchCandidates(selectedProjectId),
+    enabled: Boolean(selectedProjectId),
+  });
+
+  const projectGroupKeys = useMemo(() => {
+    const keys = new Set<string>();
+    (candidates ?? []).forEach((candidate) => {
+      const groupKey = parseCandidateSource(candidate.sourceId).groupKey;
+      if (groupKey) keys.add(groupKey);
+    });
+    return keys;
+  }, [candidates]);
+
+  // Unseen tasks sort first, within an otherwise stable order — a page change never has to explain
+  // why a task moved for no reason a reader can see.
+  const sortedTasks = useMemo(() => {
+    const withUnseenFirst = [...tasks];
+    withUnseenFirst.sort((a, b) => {
+      const aUnseen = !a.reviewed;
+      const bUnseen = !b.reviewed;
+      return aUnseen === bUnseen ? 0 : aUnseen ? -1 : 1;
+    });
+    return withUnseenFirst;
+  }, [tasks]);
+
+  // The newest point at which reconciliation compared any of these tasks against its source, for
+  // the "Last checked" line below — null when nothing has ever been checked, which is the normal
+  // state for a pool nobody has synced yet.
+  const lastCheckedAt = useMemo(
+    () =>
+      tasks.reduce<string | null>((latest, current) => {
+        if (!current.sourceCheckedAt) return latest;
+        if (!latest || current.sourceCheckedAt > latest) return current.sourceCheckedAt;
+        return latest;
+      }, null),
+    [tasks],
+  );
+
+  // Scoped by "Only {project}" alone, so the status filter's own counts (below) reflect what
+  // picking each one would show without also baking in the status filter that is currently active.
+  const projectScopedTasks = useMemo(() => {
+    if (!onlyProject) return sortedTasks;
+    return sortedTasks.filter((task) => {
+      const groupKey = parseCandidateSource(task.sourceId).groupKey;
+      return groupKey !== null && projectGroupKeys.has(groupKey);
+    });
+  }, [sortedTasks, onlyProject, projectGroupKeys]);
+
+  // Most recently closed first — "Only {project}" scopes this the same way it scopes the live
+  // pool, so the tab's own count always matches what picking it would actually show.
+  const projectScopedClosedTasks = useMemo(() => {
+    const mostRecentlyClosedFirst = [...closedTasks].sort((a, b) => {
+      if (!a.sourceCheckedAt) return 1;
+      if (!b.sourceCheckedAt) return -1;
+      return b.sourceCheckedAt.localeCompare(a.sourceCheckedAt);
+    });
+    if (!onlyProject) return mostRecentlyClosedFirst;
+    return mostRecentlyClosedFirst.filter((task) => {
+      const groupKey = parseCandidateSource(task.sourceId).groupKey;
+      return groupKey !== null && projectGroupKeys.has(groupKey);
+    });
+  }, [closedTasks, onlyProject, projectGroupKeys]);
+
+  const statusCounts = useMemo(
+    () => ({
+      all: projectScopedTasks.length,
+      unseen: projectScopedTasks.filter((task) => !task.reviewed).length,
+      seen: projectScopedTasks.filter((task) => task.reviewed).length,
+      taskZero: projectScopedTasks.filter((task) => task.taskZeroEligible).length,
+      closed: projectScopedClosedTasks.length,
+    }),
+    [projectScopedTasks, projectScopedClosedTasks],
+  );
+
+  // Kept out of the bar entirely below its first closed task — a tab that is always empty is just
+  // clutter — except while it is the active filter, so picking it and later syncing it away never
+  // yanks the bar out from under the reader mid-look.
+  const statusFilterOptions: SegmentedTabOption<PoolStatusFilter>[] = STATUS_FILTER_ORDER.filter(
+    (value) => value !== "closed" || statusCounts.closed > 0 || statusFilter === "closed",
+  ).map((value) => ({
+    value,
+    label: STATUS_FILTER_LABELS[value],
+    icon: value === "closed" ? <Archive className="h-3.5 w-3.5" aria-hidden="true" /> : undefined,
+    count: statusCounts[value],
+  }));
+
+  const isViewingClosed = statusFilter === "closed";
+
+  const filteredTasks = useMemo(() => {
+    if (isViewingClosed) return projectScopedClosedTasks;
+    return projectScopedTasks.filter((task) => {
+      if (statusFilter === "unseen") return !task.reviewed;
+      if (statusFilter === "seen") return task.reviewed;
+      if (statusFilter === "taskZero") return task.taskZeroEligible;
+      return true;
+    });
+  }, [projectScopedTasks, projectScopedClosedTasks, isViewingClosed, statusFilter]);
+
+  const activeIsLoading = isViewingClosed ? isClosedLoading : isLoading;
+  const activeShowLoadingSkeleton = isViewingClosed
+    ? showClosedLoadingSkeleton
+    : showLoadingSkeleton;
+
+  const pageSize = effectiveView === "cloud" ? CLOUD_PAGE_SIZE : LIST_PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageItems = useMemo(
-    () => tasks.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [tasks, safePage, pageSize],
+    () => filteredTasks.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredTasks, safePage, pageSize],
   );
+
+  const cloudLayout = CLOUD_LAYOUTS[(cloudLayoutSeed + (safePage - 1)) % CLOUD_LAYOUTS.length];
 
   useEffect(() => {
     if (!error) return;
     showErrorToast("Pool unavailable", { description: error });
   }, [error, showErrorToast]);
 
-  const openEditor = async (task: StarterWorkTask) => {
-    if (!selectedProjectId) return;
-    setOpeningId(task.id);
-    try {
-      const orientation = await orientationService.fetchTaskOrientation(task.id, selectedProjectId);
-      setEditing({ task, orientation });
-    } catch (err) {
-      showErrorToast("Orientation unavailable", {
-        description: err instanceof Error ? err.message : "Please try again.",
-      });
-    } finally {
-      setOpeningId(null);
-    }
-  };
-
   const changeView = (nextView: PoolView) => {
     setView(nextView);
+    setPage(1);
+  };
+
+  const changeStatusFilter = (nextFilter: PoolStatusFilter) => {
+    setStatusFilter(nextFilter);
+    setPage(1);
+  };
+
+  const toggleOnlyProject = () => {
+    setOnlyProject((current) => !current);
     setPage(1);
   };
 
   const changePage = (nextPage: number) => {
     if (nextPage === safePage) return;
     setPage(nextPage);
-    if (effectiveView === "cloud") setLayoutIndex((current) => nextCloudLayout(current));
   };
-
-  const canOpenTask = canAct && Boolean(selectedProjectId);
 
   return (
     <section className="@container" data-testid="starter-work-pool" aria-label="Tasks in the pool">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-semibold tracking-tight text-app-text">In the pool</h2>
         {tasks.length > 0 && (
-          <Badge variant="neutral" size="sm" className="tabular-nums">
+          <Badge variant="neutral" size="md" className="tabular-nums">
             {tasks.length}
           </Badge>
         )}
         <InfoHint
           label="About the pool"
-          text="Every pooled task stays claimable. Review lifts its rank; edit orientation to write the guide."
+          text="Review lifts a task's rank; edit orientation to write its guide."
         />
 
-        <div
-          className="ml-auto hidden items-center gap-1 rounded-xl border border-app-border bg-app-surface-muted p-1 sm:flex"
-          role="group"
-          aria-label="Pool view"
-        >
-          <Button
-            variant={view === "cloud" ? "secondary" : "ghost"}
-            size="sm"
-            iconOnly
-            aria-label="Cloud view"
-            aria-pressed={view === "cloud"}
-            title="Cloud view"
-            onClick={() => changeView("cloud")}
+        <div className="ml-auto flex items-center gap-2">
+          {/* Nothing to say before the first sync ever runs — a pool that has never been checked
+              is a normal starting state, not a problem worth a line about. */}
+          {lastCheckedAt && (
+            <span className="text-xs text-app-text-subtle">
+              Checked {formatRelativeDate(lastCheckedAt)}
+            </span>
+          )}
+
+          {canAct && onSync && (
+            <Button
+              variant="ghost"
+              size="sm"
+              loading={isSyncing}
+              onClick={onSync}
+              icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+            >
+              {isSyncing ? "Syncing…" : "Sync"}
+            </Button>
+          )}
+
+          <div
+            className="hidden items-center gap-1 rounded-xl border border-app-border bg-app-surface-muted p-1 sm:flex"
+            role="group"
+            aria-label="Pool view"
           >
-            <Cloud className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <Button
-            variant={view === "list" ? "secondary" : "ghost"}
-            size="sm"
-            iconOnly
-            aria-label="List view"
-            aria-pressed={view === "list"}
-            title="List view"
-            onClick={() => changeView("list")}
-          >
-            <ListIcon className="h-4 w-4" aria-hidden="true" />
-          </Button>
+            <Button
+              variant={view === "cloud" ? "secondary" : "ghost"}
+              size="sm"
+              iconOnly
+              aria-label="Cloud view"
+              aria-pressed={view === "cloud"}
+              title="Cloud view"
+              onClick={() => changeView("cloud")}
+            >
+              <Cloud className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant={view === "list" ? "secondary" : "ghost"}
+              size="sm"
+              iconOnly
+              aria-label="List view"
+              aria-pressed={view === "list"}
+              title="List view"
+              onClick={() => changeView("list")}
+            >
+              <ListIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {showLoadingSkeleton ? (
+      <p className="mb-4 text-sm text-app-text-subtle">
+        Visible to every new hire on this project, claimable the moment it lands here.
+      </p>
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <SegmentedTabs
+          value={statusFilter}
+          options={statusFilterOptions}
+          onChange={changeStatusFilter}
+          layoutId="starter-work-pool-status-pill"
+          ariaLabel="Filter pool tasks"
+        />
+        {selectedProject && projectGroupKeys.size > 0 && (
+          <Button
+            variant={onlyProject ? "secondary" : "ghost"}
+            size="sm"
+            aria-pressed={onlyProject}
+            onClick={toggleOnlyProject}
+          >
+            Only {selectedProject.name}
+          </Button>
+        )}
+      </div>
+
+      {isViewingClosed && (
+        <p className="mb-4 text-sm text-app-text-subtle">
+          These came back closed from their tracker. They return to the pool on their own if the
+          issue reopens.
+        </p>
+      )}
+
+      {activeShowLoadingSkeleton ? (
         <SkeletonGroup
           label="Loading the pool"
-          className={
-            fullWidth ? "grid grid-cols-1 gap-2.5 @min-[38rem]:grid-cols-2" : "space-y-2.5"
-          }
+          className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-app-surface"
         >
-          {Array.from({ length: fullWidth ? 6 : 3 }).map((_, index) => (
+          {Array.from({ length: 6 }).map((_, index) => (
             <PoolRowSkeleton key={index} />
           ))}
         </SkeletonGroup>
-      ) : isLoading ? null : tasks.length === 0 ? (
+      ) : activeIsLoading ? null : !isViewingClosed && tasks.length === 0 ? (
         <EmptyState icon={<PackageOpen className="h-8 w-8" aria-hidden="true" />}>
-          Nothing has been vouched for yet. Review a task on the left and it lands here.
+          Nothing here yet. Mine or add a task and it lands here, claimable right away.
+        </EmptyState>
+      ) : filteredTasks.length === 0 ? (
+        <EmptyState icon={<PackageOpen className="h-8 w-8" aria-hidden="true" />}>
+          No tasks match this filter.
         </EmptyState>
       ) : (
         <>
           {effectiveView === "cloud" ? (
-            <div
-              data-pool-flight-target
-              className="relative overflow-hidden rounded-2xl @min-[38rem]:min-h-[22rem]"
-            >
+            <div data-pool-flight-target className="relative overflow-hidden rounded-2xl">
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-4 hidden opacity-40 @min-[38rem]:block"
+                className="pointer-events-none absolute inset-4 opacity-40"
                 style={{
                   backgroundImage: "radial-gradient(var(--border-strong) 1px, transparent 1px)",
                   backgroundSize: "24px 24px",
                   maskImage: "linear-gradient(to bottom, black, transparent 92%)",
                 }}
               />
+              {/* A very soft brand shimmer behind the dot grid, centred rather than mouse-tracked
+                  like a card's own spotlight — this one just says "something lives here". */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 opacity-70"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(ellipse at center, var(--brand-glow), transparent 65%)",
+                }}
+              />
 
-              <ul
-                className="relative z-10 grid grid-cols-1 gap-3 sm:grid-cols-2 @min-[38rem]:m-4 @min-[38rem]:block @min-[38rem]:min-h-80"
+              {/*
+                A real 4-column CSS grid, not absolute-positioned percentages: `items-start` keeps
+                every row on one horizontal line (each card sits flush with the top of its row and
+                simply keeps its own natural height below that line), while each card is held to 70%
+                of its cell's width and pulled right by a percentage from `cloudLayout` (one of five
+                seeded arrangements, picked in `cloudLayoutSeed` above; see `buildCloudLayouts` for
+                why no two columns ever end up stacked on the same edge). That left offset is the
+                only thing that varies from card to card — every card stays level and every row stays
+                in line — so the cloud reads as scattered without any card drifting or tilting out of
+                place the way an absolutely-positioned or rotated card could.
+              */}
+              <div
+                className="relative z-10 grid grid-cols-4 items-start gap-4 p-4"
                 data-testid="pool-task-cloud"
-                data-cloud-layout={layoutIndex}
               >
                 <AnimatePresence initial={false} mode="popLayout">
                   {pageItems.map((task, index) => {
-                    const layout = fullWidth
-                      ? CLOUD_LAYOUTS_WIDE[layoutIndex]
-                      : CLOUD_LAYOUTS[layoutIndex];
-                    const slot = layout[index];
-                    const slotStyle: CloudSlotStyle = {
-                      "--cloud-left": slot.left,
-                      "--cloud-top": slot.top,
-                      "--cloud-width": slot.width,
-                      "--cloud-height": slot.height,
-                    };
+                    const slotStyle = cloudLayout[index] ?? cloudLayout[0];
 
                     return (
-                      <motion.li
+                      <motion.div
                         key={task.id}
                         layout={!prefersReducedMotion}
                         initial={
-                          prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }
+                          prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.96 }
                         }
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94 }}
-                        transition={centralSpringToken}
-                        style={slotStyle}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                        transition={{ ...centralSpringToken, delay: index * 0.04 }}
+                        whileHover={prefersReducedMotion ? undefined : { y: -4 }}
                         data-testid={`pool-task-${task.id}`}
-                        data-cloud-slot={index}
-                        className={`min-h-32 @min-[38rem]:absolute @min-[38rem]:top-[var(--cloud-top)] @min-[38rem]:left-[var(--cloud-left)] @min-[38rem]:h-[var(--cloud-height)] @min-[38rem]:w-[var(--cloud-width)] ${
-                          fullWidth ? "@min-[38rem]:min-w-36" : "@min-[38rem]:min-w-40"
-                        }`}
+                        className="w-[70%]"
+                        style={{ marginLeft: `${slotStyle.offsetPercent}%` }}
                       >
-                        <PoolCloudCard
-                          task={task}
-                          canOpen={canOpenTask}
-                          isOpening={openingId === task.id}
-                          isBusy={openingId !== null}
-                          onOpen={(selected) => void openEditor(selected)}
-                        />
-                      </motion.li>
+                        <PoolCloudCard task={task} onOpen={onOpenTask} closed={isViewingClosed} />
+                      </motion.div>
                     );
                   })}
                 </AnimatePresence>
-              </ul>
+              </div>
             </div>
           ) : (
             <ul
-              className={
-                fullWidth ? "grid grid-cols-1 gap-2.5 @min-[38rem]:grid-cols-2" : "space-y-2.5"
-              }
+              className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-app-surface"
               data-testid="pool-task-list"
               data-pool-flight-target
             >
@@ -502,10 +840,8 @@ export function StarterWorkPoolCloud({
                 <PoolListRow
                   key={task.id}
                   task={task}
-                  canOpen={canOpenTask}
-                  isOpening={openingId === task.id}
-                  isBusy={openingId !== null}
-                  onOpen={(selected) => void openEditor(selected)}
+                  onOpen={onOpenTask}
+                  closed={isViewingClosed}
                 />
               ))}
             </ul>
@@ -518,34 +854,6 @@ export function StarterWorkPoolCloud({
             className="mt-5"
           />
         </>
-      )}
-
-      {editing && selectedProjectId && (
-        <OrientationEditor
-          taskTitle={editing.task.title}
-          taskUrl={editing.task.sourceUrl}
-          initial={editing.orientation.packet}
-          onSave={async (input) => {
-            await orientationService.authorTaskOrientation(
-              editing.task.id,
-              selectedProjectId,
-              input,
-            );
-            return true;
-          }}
-          onRevert={
-            editing.orientation.packet
-              ? async () => {
-                  await orientationService.revertTaskOrientation(
-                    editing.task.id,
-                    selectedProjectId,
-                  );
-                  return true;
-                }
-              : undefined
-          }
-          onClose={() => setEditing(null)}
-        />
       )}
     </section>
   );

@@ -21,6 +21,23 @@ function formatLocalDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Resolves the display metadata for a source system.
+ *
+ * `SOURCE_META` is typed as a complete record, so the fallback branch is
+ * unreachable per the type; it stays as runtime defense against unmapped or
+ * unexpected source values arriving over the wire.
+ */
+function getSourceMeta(source: SourceSystem) {
+  return (
+    SOURCE_META[source] ?? {
+      type: source,
+      description: source,
+      icon: Filter,
+    }
+  );
+}
+
 type ChatComposerProps = {
   /** Current draft text. */
   value: string;
@@ -212,6 +229,14 @@ export function ChatComposer({
         : "border border-app-border bg-app-surface text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
     }`;
 
+  // Shared wrapper for the From/To date inputs: both must show the same
+  // invalid-range treatment (danger border) as the error text below them.
+  const dateRangeWrapperClass = `flex flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors focus-within:ring-1 focus-within:ring-app-focus ${
+    rangeInvalid
+      ? "border-app-danger-border focus-within:border-app-danger-border"
+      : "border-app-border bg-app-surface focus-within:border-app-brand-border-strong"
+  }`;
+
   return (
     <footer className="app-page-frame shrink-0 border-t border-app-border bg-app-bg py-4">
       <QueuedMessages
@@ -238,12 +263,7 @@ export function ChatComposer({
             </span>
 
             {sourceSystems.map((source) => {
-              // Fallback serves as runtime defense against unmapped or unexpected source values
-              const meta = SOURCE_META[source] ?? {
-                type: source,
-                description: source,
-                icon: Filter,
-              };
+              const meta = getSourceMeta(source);
               const Icon = meta.icon;
               return (
                 <button
@@ -335,8 +355,12 @@ export function ChatComposer({
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={centralSpringToken}
                 onKeyDown={(e) => {
-                  // Prevent Enter key in inputs from triggering implicit form submission,
-                  // while preserving keyboard activation for buttons inside the popover.
+                  // Single guard for implicit form submission: Enter inside an
+                  // input of the popover (e.g. the date fields) is cancelled
+                  // before it bubbles further, while Enter on buttons keeps
+                  // its keyboard activation. This one handler covers every
+                  // input the popover contains — individual inputs must not
+                  // add their own copy.
                   if (e.key === "Enter" && (e.target as HTMLElement)?.tagName === "INPUT") {
                     e.preventDefault();
                     e.stopPropagation();
@@ -400,12 +424,7 @@ export function ChatComposer({
                     <div className="grid grid-cols-2 gap-2">
                       {availableSources.map((source) => {
                         const selected = sourceSystems.includes(source);
-                        // Fallback serves as runtime defense against unmapped or unexpected source values
-                        const meta = SOURCE_META[source] ?? {
-                          type: source,
-                          description: source,
-                          icon: Filter,
-                        };
+                        const meta = getSourceMeta(source);
                         const Icon = meta.icon;
 
                         return (
@@ -503,13 +522,7 @@ export function ChatComposer({
 
                   {/* Custom Inputs */}
                   <div className="flex items-center gap-2 pt-1">
-                    <div
-                      className={`flex flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors focus-within:ring-1 focus-within:ring-app-focus ${
-                        rangeInvalid
-                          ? "border-app-danger-border focus-within:border-app-danger-border"
-                          : "border-app-border bg-app-surface focus-within:border-app-brand-border-strong"
-                      }`}
-                    >
+                    <div className={dateRangeWrapperClass}>
                       <span className="text-[10px] font-semibold tracking-wide text-app-text-disabled uppercase">
                         From
                       </span>
@@ -520,25 +533,13 @@ export function ChatComposer({
                         max={to || undefined}
                         value={from}
                         onChange={(e) => setFrom(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }
-                        }}
                         className="w-full min-w-0 bg-transparent text-xs text-app-text outline-none"
                       />
                     </div>
 
                     <span className="text-xs text-app-text-disabled">→</span>
 
-                    <div
-                      className={`flex flex-1 items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors focus-within:ring-1 focus-within:ring-app-focus ${
-                        rangeInvalid
-                          ? "border-app-danger-border focus-within:border-app-danger-border"
-                          : "border-app-border bg-app-surface focus-within:border-app-brand-border-strong"
-                      }`}
-                    >
+                    <div className={dateRangeWrapperClass}>
                       <span className="text-[10px] font-semibold tracking-wide text-app-text-disabled uppercase">
                         To
                       </span>
@@ -549,12 +550,6 @@ export function ChatComposer({
                         min={from || undefined}
                         value={to}
                         onChange={(e) => setTo(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }
-                        }}
                         className="w-full min-w-0 bg-transparent text-xs text-app-text outline-none"
                       />
                     </div>

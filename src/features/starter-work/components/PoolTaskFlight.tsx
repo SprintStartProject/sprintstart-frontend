@@ -9,8 +9,8 @@ type PoolTaskFlightProps = {
 };
 
 /**
- * How many frames to keep looking for the pool before giving up. The launch switches to Overview
- * first, and `SlidingTabPanel` runs a ~180ms `mode="wait"` exit before the incoming panel (which
+ * How many frames to keep looking for the pool before giving up. The launch switches to the
+ * Starter work tab first, and `SlidingTabPanel` runs a ~180ms `mode="wait"` exit before the incoming panel (which
  * holds the pool) mounts. A short budget would expire mid-transition and drop the arc whenever it
  * was launched from another tab, so this covers the switch with room to spare while still bailing
  * quickly when the pool genuinely is not there.
@@ -28,7 +28,7 @@ function findPoolTarget(): PoolFlightRect | null {
  * A fixed, portaled card ghost that morphs from the successful action into the visible pool.
  *
  * The source rectangle is captured at click time, while the destination is measured after React
- * has switched back to Overview. This lets drawer and tab actions use the same transition without
+ * has switched back to the Starter work tab. This lets drawer and tab actions use the same transition without
  * coupling the animation to either layout. It never intercepts input and is decorative to assistive
  * technology. Reduced-motion users skip the travel entirely.
  */

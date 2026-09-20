@@ -34,7 +34,7 @@ export function loadStarterWorkReviewQueue(): Promise<StarterWorkTask[]> {
  *
  * `generate` and `create` share one mutation (and one `error` slot) because both are "soft"
  * failures the caller reports as a toast rather than reacting to; `approve` and `reject` stay
- * plain functions that re-throw, because their callers (`StarterWorkPage`) need the rejection
+ * plain functions that re-throw, because their callers (`StarterWorkSection`) need the rejection
  * to settle a card or keep a drawer open.
  */
 export function useStarterWorkReview() {

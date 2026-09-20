@@ -15,17 +15,15 @@ import { useOpenEscalationCount } from "../../features/knowledge-request/useOpen
 import { useUnseenSkipAnswerCount } from "../../features/onboarding/hooks/useUnseenSkipAnswerCount";
 import {
   AdminIcon,
-  ArrivalStepsIcon,
-  BlueprintsIcon,
   BoardIcon,
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
+  HireSetupIcon,
   InboxIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
-  StarterWorkIcon,
   type SidebarIcon,
 } from "./SidebarNavIcons";
 import { SidebarLogo } from "./SidebarLogo";
@@ -118,26 +116,13 @@ const projectManagerNavItems: SidebarNavItem[] = [
     path: "/data-ingestion",
     icon: DataIngestionIcon,
   },
-  // After the material it is written from. A blueprint is authored against what
-  // the project has already told the system about itself, so a PM setting one up
-  // for the first time meets the two in the order they are done in.
+  // Arrival authoring and Starter Work review, as tabs of one page — set up here by the PM,
+  // which is why it sits with the other things a PM prepares rather than in the hire's own list.
+  // `canAccessRoute` keeps it off a hire's sidebar.
   {
-    label: "Blueprints",
-    path: "/blueprints",
-    icon: BlueprintsIcon,
-  },
-  // The steps a new hire is walked through on arrival — set up here by the PM,
-  // which is why it sits with the other things a PM prepares rather than in the
-  // hire's own list. `canAccessRoute` keeps it off a hire's sidebar.
-  {
-    label: "Arrival Steps",
-    path: "/arrival-steps",
-    icon: ArrivalStepsIcon,
-  },
-  {
-    label: "Starter Work",
-    path: "/starter-work",
-    icon: StarterWorkIcon,
+    label: "Hire Setup",
+    path: "/hire-setup",
+    icon: HireSetupIcon,
   },
   // The escalation inbox, surfaced as its own entry while it is being evaluated
   // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`
