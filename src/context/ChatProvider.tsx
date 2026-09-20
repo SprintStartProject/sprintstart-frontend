@@ -673,51 +673,40 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               const draft = draftRef.current;
               if (draft) {
                 // Paragraph break between any pre-tool preamble and the
-                // post-tool answer — at the first token after tool activity,
-                // and only when there is preamble to separate. Re-arms on
-                // every `tool_use`, so a multi-tool turn separates each round.
-                // trimEnd first: a preamble that already ends in a space or a
-                // newline would otherwise leave a trailing space before the
-                // break, or stack three-plus newlines, purely depending on how
-                // the model happened to chunk it.
+                // post-tool answer — at the first content-bearing token
+                // after tool activity, and only when there is preamble to
+                // separate. Re-arms on every `tool_use`, so a multi-tool
+                // turn separates each round.
+                // trimEnd first: a preamble that already ends in a space or
+                // a newline would otherwise leave a trailing space before
+                // the break, or stack three-plus newlines, purely depending
+                // on how the model happened to chunk it.
                 //
                 // Except when the break would land mid-word (#231): a tool
-                // round whose preamble was cut off upstream (provider token
-                // cap, dropped stream) leaves text like "…Bas" right before
-                // the `tool_use` event, and the post-tool answer then
-                // continues that word with "ierend…". Rendering the break
-                // there shows "Bas" and "ierend" as separate paragraphs. A
-                // paragraph never starts lowercase, so a letter followed by
-                // a lowercase letter is a continuation, not a boundary —
-                // append it to the word instead. Uppercase, digits and
-                // punctuation keep the break, so real preamble/answer
-                // boundaries are unaffected.
-                //
-                // This is a text-only heuristic, and it deliberately trades
-                // one wrong output for another. The two shapes — a word cut
-                // off mid-word, and two complete words separated by a space —
-                // are byte-identical here: the cut can arrive with or without
-                // the trailing space ("…Bas" and "…Bas " both occur, see the
-                // tests), and a `tool_use` can just as easily land after a
-                // complete word mid-sentence ("Let me check the wiki and " +
-                // "then get back to you."). Gluing that shape silently merges
-                // two real words ("andthen"); keeping the break on it produces
-                // a visible, obviously-wrong paragraph split. Gluing is
-                // accepted because a model that was about to continue the
-                // same sentence usually resumes lowercase, while a genuine
-                // preamble/answer restart almost always opens a sentence —
-                // and the merged-word shape is accepted in writing here, with
-                // a test pinning it, so a future upstream truncation flag
-                // (follow-up of #231) can replace the guess.
-                //
-                // Only cased scripts can trigger the glue: the continuation
-                // test requires an actual lowercase letter, so languages
-                // without case (CJK, Thai, Arabic, Hebrew) still reproduce
-                // the #231 split. Known limitation, deferred until the
-                // upstream flag removes the guesswork entirely.
-                if (sawToolUseRef.current && draft.content.trim() !== "") {
+                // round cut off upstream (provider token cap, dropped
+                // stream) can leave its preamble ending flush against a
+                // word ("…Bas"), with the post-tool answer continuing that
+                // word ("ierend…") — the break would render them as
+                // separate paragraphs. Glue only when the preamble has no
+                // trailing whitespace, ends in a letter, and the token
+                // resumes lowercase. A mid-word cut always ends flush (the
+                // word's remaining letters follow without a space), so
+                // trailing whitespace means the model finished a word and
+                // was interrupted between words — a real boundary, which
+                // keeps its break ("…wiki and " + "then…"). Uppercase,
+                // digits and punctuation starts keep it too. Content-free
+                // tokens (empty / whitespace-only) carry no word to judge:
+                // they are appended verbatim and the flag stays armed for
+                // the next real token. Only cased scripts can glue (CJK,
+                // Thai, Arabic, Hebrew keep the break) — deferred until the
+                // upstream truncation flag (follow-up of #231) removes the
+                // guesswork.
+                if (token.trim() !== "" && sawToolUseRef.current && draft.content.trim() !== "") {
                   const trimmed = draft.content.trimEnd();
-                  const continuesWord = /\p{L}$/u.test(trimmed) && /^\p{Ll}/u.test(token);
+                  const continuesWord =
+                    !/\s$/u.test(draft.content) &&
+                    /\p{L}$/u.test(trimmed) &&
+                    /^\p{Ll}/u.test(token);
                   draft.content = continuesWord ? trimmed : `${trimmed}\n\n`;
                   sawToolUseRef.current = false;
                 }
