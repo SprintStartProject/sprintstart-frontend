@@ -5,6 +5,7 @@ import type {
   Board,
   BoardCard,
   DiagramContent,
+  PathStepContent,
 } from "../features/board/types";
 
 const BASE = "/api/v1/onboarding";
@@ -41,6 +42,26 @@ export const boardService = {
   async refreshDiagram(cardId: string): Promise<DiagramContent> {
     return await apiClient.fetch<DiagramContent>(
       `${BASE}/me/board/cards/${encodeURIComponent(cardId)}/diagram`,
+    );
+  },
+
+  /**
+   * Ticks, or unticks, one task of the hire's current path step — from the board.
+   *
+   * Writes to the path itself, never to the board: the step's status is deliberately left alone by
+   * this endpoint, so ticking a task from the board can never settle a step the hire has not
+   * actually finished. Takes only `{done}`, not the task's `position`/`title`/`description`, so a
+   * board card that is behind the path it was hydrated from cannot write stale copies of those back.
+   *
+   * @param cardId The PATH_STEP card the task is shown on.
+   * @param taskId The task to tick.
+   * @throws ApiError 404 when the card is not theirs, not a PATH_STEP card, its step is gone, or
+   *   the task does not belong to that step.
+   */
+  async tickPathStepTask(cardId: string, taskId: string, done: boolean): Promise<PathStepContent> {
+    return await apiClient.fetch<PathStepContent>(
+      `${BASE}/me/board/cards/${encodeURIComponent(cardId)}/tasks/${encodeURIComponent(taskId)}`,
+      { method: "PATCH", body: JSON.stringify({ done }) },
     );
   },
 
