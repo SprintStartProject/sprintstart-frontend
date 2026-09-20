@@ -173,24 +173,11 @@ type StarterWorkPoolCloudProps = {
   error: string | null;
   /** HR reads the pool; only PM/ADMIN can act from the task's detail drawer. */
   canAct: boolean;
-  /**
-   * Accepted for the caller that spans the pool across the full content width. The cloud's grid and
-   * the list's two-column layout are already sized for that width unconditionally, so this currently
-   * has nothing left to toggle — it stays in the prop list only so that caller keeps compiling.
-   */
-  fullWidth?: boolean;
   /** Reconciles the pool against its trackers now. Omitted hides the sync control entirely. */
   onSync?: () => void;
   isSyncing?: boolean;
   /** Opens the task's detail drawer. Every task opens it, HR included — the drawer itself is read-only for them. */
   onOpenTask: (task: StarterWorkTask) => void;
-  /**
-   * Starts the filter chips on something other than "All" — the Overview tab's "Choose Task 0"
-   * card lands here with `"taskZero"` already applied, rather than a PM having to click it again.
-   * Only consulted for the initial `useState`; changing it after mount does nothing, matching how
-   * every other filter here behaves.
-   */
-  initialStatusFilter?: PoolStatusFilter;
   /**
    * Tasks reconciliation found closed at their source — shown under the "Closed" filter tab
    * instead of a separate box under the pool. Not sticky: a task leaves this list on its own once
@@ -497,7 +484,6 @@ export function StarterWorkPoolCloud({
   onSync,
   isSyncing = false,
   onOpenTask,
-  initialStatusFilter,
   closedTasks = [],
   isClosedLoading = false,
 }: StarterWorkPoolCloudProps) {
@@ -509,7 +495,7 @@ export function StarterWorkPoolCloud({
 
   const [view, setView] = useState<PoolView>("cloud");
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<PoolStatusFilter>(initialStatusFilter ?? "all");
+  const [statusFilter, setStatusFilter] = useState<PoolStatusFilter>("all");
   const [onlyProject, setOnlyProject] = useState(false);
 
   // The cloud only reads as a cloud once there is room to scatter its cards. Below `sm` there is

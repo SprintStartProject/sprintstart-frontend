@@ -159,6 +159,10 @@ export function ArrivalStepAuthoring({
           hasProject={hasProject}
           projectName={projectName}
           derivable={derivable}
+          existingKeys={{
+            company: (company ?? []).map((step) => step.key.toLowerCase()),
+            project: (project ?? []).map((step) => step.key.toLowerCase()),
+          }}
           onAddDerivable={async (derivation) => {
             const ok = await addDerivable(derivation);
             if (ok) showSuccessToast("Step added");

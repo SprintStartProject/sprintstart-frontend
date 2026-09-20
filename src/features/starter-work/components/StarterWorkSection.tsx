@@ -345,7 +345,6 @@ export function StarterWorkSection({ actionsPortalTarget = null }: StarterWorkSe
         isLoading={isPoolLoading}
         error={poolError}
         canAct={canAct}
-        fullWidth
         onSync={() => void handleSync()}
         isSyncing={isSyncing}
         onOpenTask={toggleSelectedTask}

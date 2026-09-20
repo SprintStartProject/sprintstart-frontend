@@ -12,7 +12,7 @@ import type { ProposalStatus } from "../types";
  * in sync without coupling their local state.
  *
  * `status` defaults to `LIVE` — what nearly every caller wants — but also takes `STALE` for the
- * collapsed "Closed in the tracker" list and the Overview tab's count of it.
+ * pool's "Closed" tab and its count.
  *
  * `reload` no longer takes a `preserveContent` option: react-query already keeps the pool on
  * screen during a refetch (`isLoading` only reports a load with nothing to show yet), which is

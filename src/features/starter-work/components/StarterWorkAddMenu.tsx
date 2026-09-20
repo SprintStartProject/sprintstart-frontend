@@ -145,16 +145,12 @@ function MenuItem({
   icon: Icon,
   title,
   description,
-  disabled = false,
-  disabledHint,
   testId,
   onClick,
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
-  disabled?: boolean;
-  disabledHint?: string;
   testId: string;
   onClick: () => void;
 }) {
@@ -163,10 +159,8 @@ function MenuItem({
       type="button"
       role="menuitem"
       data-testid={testId}
-      disabled={disabled}
-      title={disabledHint}
       onClick={onClick}
-      className="flex w-full items-start gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+      className="flex w-full items-start gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-app-surface-hover"
     >
       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-brand-soft text-app-brand-text">
         <Icon className="h-4 w-4" aria-hidden="true" />

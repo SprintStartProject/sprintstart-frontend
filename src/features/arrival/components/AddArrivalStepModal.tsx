@@ -28,6 +28,10 @@ type AddArrivalStepModalProps = {
   hasProject: boolean;
   projectName: string | null;
   derivable: DerivableArrivalStep[];
+  /** The keys each list already holds, so a custom key that would collide is caught here rather
+   * than coming back as a server 409. A key reused across the two lists is not a collision — that
+   * is how a project overrides a company step — so the two are checked separately. */
+  existingKeys: Record<ArrivalScope, string[]>;
   onAddDerivable: (derivation: DerivableArrivalStep) => Promise<boolean>;
   onCreate: (
     request: { key: string; title: string; description?: string; href?: string },
@@ -50,6 +54,7 @@ export function AddArrivalStepModal({
   hasProject,
   projectName,
   derivable,
+  existingKeys,
   onAddDerivable,
   onCreate,
   onClose,
@@ -75,7 +80,10 @@ export function AddArrivalStepModal({
   const selectedDerivation = derivable.find((derivation) => derivation.key === selectedKey) ?? null;
 
   const key = manualKey ?? slugifyStepKey(title);
-  const canSubmitCustom = key.trim().length > 0 && title.trim().length > 0;
+  const targetScope: ArrivalScope = hasProject ? who : "company";
+  const isDuplicateKey =
+    key.trim().length > 0 && existingKeys[targetScope].includes(key.trim().toLowerCase());
+  const canSubmitCustom = key.trim().length > 0 && title.trim().length > 0 && !isDuplicateKey;
 
   const stepIndex = phase === "kind" ? 0 : 1;
 
@@ -104,7 +112,7 @@ export function AddArrivalStepModal({
         description: description.trim() || undefined,
         href: href.trim() || undefined,
       },
-      hasProject ? who : "company",
+      targetScope,
     );
     setSubmitting(false);
     if (ok) onClose();
@@ -342,6 +350,9 @@ export function AddArrivalStepModal({
                   <Field
                     label="Key"
                     hint="A short id, fixed once saved — it is what people's records point at."
+                    error={
+                      isDuplicateKey ? "A step with this key is already on that list." : undefined
+                    }
                   >
                     <Input
                       value={key}

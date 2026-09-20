@@ -44,6 +44,12 @@ function reorderByKeys(steps: ArrivalStep[], keys: string[]): ArrivalStep[] {
   return reordered.every((step): step is ArrivalStep => step !== undefined) ? reordered : steps;
 }
 
+/** A company step and the project step that overrides it share one key, so the key alone does not
+ * identify a row — everything that addresses a single row goes through the scoped id instead. */
+function rowId(scope: ArrivalScope, key: string): string {
+  return `${scope}:${key}`;
+}
+
 function centerOf(element: HTMLElement): { x: number; y: number } {
   const rect = element.getBoundingClientRect();
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -97,13 +103,13 @@ export function ArrivalStepThread({
   const [projectOrder, setProjectOrder] = useState<string[]>(() =>
     projectSteps.map((step) => step.key),
   );
-  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+  const [draggingRowId, setDraggingRowId] = useState<string | null>(null);
   const [draggingScope, setDraggingScope] = useState<ArrivalScope | null>(null);
   // Briefly rings the row that a drop just settled, cleared on its own after the pulse plays.
-  const [justDroppedKey, setJustDroppedKey] = useState<string | null>(null);
+  const [justDroppedRowId, setJustDroppedRowId] = useState<string | null>(null);
 
   // Measured on mount/render via each row's ref, read back during a drag to work out which row the
-  // one in hand is currently over.
+  // one in hand is currently over. Keyed by scoped row id, not by step key.
   const rowElements = useRef(new Map<string, HTMLElement>());
   const lastMoveAt = useRef(0);
   const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -202,22 +208,22 @@ export function ArrivalStepThread({
       }))
     : [];
 
-  const registerRow = (key: string, element: HTMLElement | null) => {
-    if (element) rowElements.current.set(key, element);
-    else rowElements.current.delete(key);
+  const registerRow = (id: string, element: HTMLElement | null) => {
+    if (element) rowElements.current.set(id, element);
+    else rowElements.current.delete(id);
   };
 
-  const settle = (key: string) => {
-    setJustDroppedKey(key);
+  const settle = (id: string) => {
+    setJustDroppedRowId(id);
     if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
-    settleTimeoutRef.current = setTimeout(() => setJustDroppedKey(null), 650);
+    settleTimeoutRef.current = setTimeout(() => setJustDroppedRowId(null), 650);
   };
 
   /** Called on every pointer-move frame a drag is live for. Finds which other row in the same
    * section the one in hand now sits over — by its measured center, not by whichever element the
    * pointer happens to be over — and, past the cooldown, moves it there. */
   const handleRowDrag = (key: string, scope: ArrivalScope) => {
-    const dragged = rowElements.current.get(key);
+    const dragged = rowElements.current.get(rowId(scope, key));
     if (!dragged) return;
 
     const now = performance.now();
@@ -229,7 +235,7 @@ export function ArrivalStepThread({
 
     for (const candidateKey of order) {
       if (candidateKey === key) continue;
-      const candidate = rowElements.current.get(candidateKey);
+      const candidate = rowElements.current.get(rowId(scope, candidateKey));
       if (candidate && contains(candidate, x, y)) {
         setOrder((current) => moveTo(current, key, candidateKey));
         lastMoveAt.current = now;
@@ -240,19 +246,19 @@ export function ArrivalStepThread({
 
   const handleRowDragStart = (key: string, scope: ArrivalScope) => {
     lastMoveAt.current = 0;
-    setDraggingKey(key);
+    setDraggingRowId(rowId(scope, key));
     setDraggingScope(scope);
   };
 
   const handleRowDragEnd = (key: string, scope: ArrivalScope) => {
-    setDraggingKey(null);
+    setDraggingRowId(null);
     setDraggingScope(null);
 
     const finalOrder = scope === "company" ? companyOrder : projectOrder;
     const serverOrder = (scope === "company" ? companySteps : projectSteps).map((step) => step.key);
     if (!sameKeys(finalOrder, serverOrder)) {
       onReorder(finalOrder, scope);
-      settle(key);
+      settle(rowId(scope, key));
     }
   };
 
@@ -263,10 +269,11 @@ export function ArrivalStepThread({
       {hasProject && <ThreadSectionLabel text="For everyone" />}
       <ThreadSection
         entries={companyEntries}
+        scope="company"
         readOnly={readOnly}
         projectName={projectName}
-        draggingKey={draggingKey}
-        justDroppedKey={justDroppedKey}
+        draggingRowId={draggingRowId}
+        justDroppedRowId={justDroppedRowId}
         prefersReducedMotion={Boolean(prefersReducedMotion)}
         registerRow={registerRow}
         onDragStartRow={(key) => handleRowDragStart(key, "company")}
@@ -282,10 +289,11 @@ export function ArrivalStepThread({
             <ThreadSectionLabel text={`Only in ${projectDisplayName}`} />
             <ThreadSection
               entries={projectEntries}
+              scope="project"
               readOnly={readOnly}
               projectName={projectName}
-              draggingKey={draggingKey}
-              justDroppedKey={justDroppedKey}
+              draggingRowId={draggingRowId}
+              justDroppedRowId={justDroppedRowId}
               prefersReducedMotion={Boolean(prefersReducedMotion)}
               registerRow={registerRow}
               onDragStartRow={(key) => handleRowDragStart(key, "project")}
@@ -326,10 +334,11 @@ function ThreadSectionLabel({ text, muted = false }: { text: string; muted?: boo
  */
 function ThreadSection({
   entries,
+  scope,
   readOnly,
   projectName,
-  draggingKey,
-  justDroppedKey,
+  draggingRowId,
+  justDroppedRowId,
   prefersReducedMotion,
   registerRow,
   onDragStartRow,
@@ -339,12 +348,13 @@ function ThreadSection({
   onEdit,
 }: {
   entries: StepEntry[];
+  scope: ArrivalScope;
   readOnly: boolean;
   projectName: string | null;
-  draggingKey: string | null;
-  justDroppedKey: string | null;
+  draggingRowId: string | null;
+  justDroppedRowId: string | null;
   prefersReducedMotion: boolean;
-  registerRow: (key: string, element: HTMLElement | null) => void;
+  registerRow: (id: string, element: HTMLElement | null) => void;
   onDragStartRow: (key: string) => void;
   onDragRow: (key: string) => void;
   onDragEndRow: (key: string) => void;
@@ -377,10 +387,10 @@ function ThreadSection({
           entry={entry}
           readOnly={readOnly}
           projectName={projectName}
-          isDraggingThis={draggingKey === entry.step.key}
-          justDropped={justDroppedKey === entry.step.key}
+          isDraggingThis={draggingRowId === rowId(scope, entry.step.key)}
+          justDropped={justDroppedRowId === rowId(scope, entry.step.key)}
           prefersReducedMotion={prefersReducedMotion}
-          registerElement={(element) => registerRow(entry.step.key, element)}
+          registerElement={(element) => registerRow(rowId(scope, entry.step.key), element)}
           onDragStart={() => onDragStartRow(entry.step.key)}
           onDrag={() => onDragRow(entry.step.key)}
           onDragEnd={() => onDragEndRow(entry.step.key)}

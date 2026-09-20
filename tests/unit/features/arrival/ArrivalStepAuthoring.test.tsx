@@ -266,6 +266,51 @@ describe("ArrivalStepAuthoring", () => {
     });
   });
 
+  it("refuses a custom key that the target list already holds", async () => {
+    mockLists([step({ key: "vpn", title: "Request VPN access" })], []);
+
+    render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Custom");
+
+    fireEvent.change(within(dialog).getByPlaceholderText("Request VPN access"), {
+      target: { value: "Request VPN access again" },
+    });
+    fireEvent.change(within(dialog).getByPlaceholderText("vpn-access"), {
+      target: { value: "vpn" },
+    });
+
+    expect(
+      within(dialog).getByText("A step with this key is already on that list."),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
+    expect(arrivalService.createStep).not.toHaveBeenCalled();
+  });
+
+  it("still allows a project step that reuses a company key, since that is an override", async () => {
+    mockLists([step({ key: "vpn", title: "Request VPN access" })], []);
+
+    render(<ArrivalStepAuthoring projectId="p1" projectName="Apollo" />);
+    const dialog = await openAddWizard("Custom");
+
+    fireEvent.change(within(dialog).getByPlaceholderText("Request VPN access"), {
+      target: { value: "Request VPN access with the staging profile" },
+    });
+    fireEvent.change(within(dialog).getByPlaceholderText("vpn-access"), {
+      target: { value: "vpn" },
+    });
+
+    expect(
+      within(dialog).queryByText("A step with this key is already on that list."),
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
+
+    await waitFor(() => {
+      expect(arrivalService.createStep).toHaveBeenCalledWith(
+        expect.objectContaining({ key: "vpn", projectId: "p1" }),
+      );
+    });
+  });
+
   it("edits a company step's wording directly outside a project view", async () => {
     render(<ArrivalStepAuthoring />);
     fireEvent.click(await screen.findByRole("button", { name: /Edit "Request VPN access"/ }));

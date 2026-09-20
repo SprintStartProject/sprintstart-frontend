@@ -84,7 +84,15 @@ export function StarterWorkTriage({ tasks, onApprove, onReject, onClose }: Start
       bodyClassName="overflow-x-hidden px-5 py-5 sm:px-8 sm:py-7"
     >
       <div className="mb-5 flex items-center gap-3">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-app-neutral-bg">
+        <div
+          role="progressbar"
+          aria-label="Tasks gone through"
+          aria-valuemin={0}
+          aria-valuemax={items.length}
+          aria-valuenow={position}
+          aria-valuetext={isDone ? "Done" : `${position + 1} of ${items.length}`}
+          className="h-1.5 flex-1 overflow-hidden rounded-full bg-app-neutral-bg"
+        >
           <div
             className="h-full rounded-full bg-app-brand transition-[width] duration-300"
             style={{ width: `${progressPct}%` }}
