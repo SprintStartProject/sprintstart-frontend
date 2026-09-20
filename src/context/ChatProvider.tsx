@@ -692,6 +692,29 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 // append it to the word instead. Uppercase, digits and
                 // punctuation keep the break, so real preamble/answer
                 // boundaries are unaffected.
+                //
+                // This is a text-only heuristic, and it deliberately trades
+                // one wrong output for another. The two shapes — a word cut
+                // off mid-word, and two complete words separated by a space —
+                // are byte-identical here: the cut can arrive with or without
+                // the trailing space ("…Bas" and "…Bas " both occur, see the
+                // tests), and a `tool_use` can just as easily land after a
+                // complete word mid-sentence ("Let me check the wiki and " +
+                // "then get back to you."). Gluing that shape silently merges
+                // two real words ("andthen"); keeping the break on it produces
+                // a visible, obviously-wrong paragraph split. Gluing is
+                // accepted because a model that was about to continue the
+                // same sentence usually resumes lowercase, while a genuine
+                // preamble/answer restart almost always opens a sentence —
+                // and the merged-word shape is accepted in writing here, with
+                // a test pinning it, so a future upstream truncation flag
+                // (follow-up of #231) can replace the guess.
+                //
+                // Only cased scripts can trigger the glue: the continuation
+                // test requires an actual lowercase letter, so languages
+                // without case (CJK, Thai, Arabic, Hebrew) still reproduce
+                // the #231 split. Known limitation, deferred until the
+                // upstream flag removes the guesswork entirely.
                 if (sawToolUseRef.current && draft.content.trim() !== "") {
                   const trimmed = draft.content.trimEnd();
                   const continuesWord = /\p{L}$/u.test(trimmed) && /^\p{Ll}/u.test(token);

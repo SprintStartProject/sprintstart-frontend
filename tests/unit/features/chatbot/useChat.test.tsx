@@ -1177,6 +1177,60 @@ describe("useChat", () => {
     });
   });
 
+  // Documents a deliberate trade-off, not a desired outcome: the glue rule
+  // cannot tell a word cut off mid-word from two complete words separated by
+  // a space — both shapes are byte-identical once streamed, and a tool call
+  // can land after a complete word mid-sentence just as easily as after a
+  // truncation. Here a genuine boundary ("... wiki and " / "then ...") gets
+  // merged into "andthen". This test pins that accepted behaviour so it is
+  // never mistaken for an oversight; it should be replaced when the upstream
+  // truncation flag (follow-up of #231) removes the guesswork.
+  it("glues across a real word boundary when the preamble ends without punctuation (known trade-off)", async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Let me check the wiki and "}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"then get back to you."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toBe(
+        "Let me check the wiki andthen get back to you.",
+      );
+    });
+  });
+
   it("keeps the paragraph break when the post-tool token starts uppercase", async () => {
     // The glue rule only covers lowercase continuations. A post-tool answer
     // starting with a capital letter is a real boundary and keeps its break —
