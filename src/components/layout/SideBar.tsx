@@ -15,6 +15,7 @@ import { useOpenEscalationCount } from "../../features/knowledge-request/useOpen
 import { useUnseenSkipAnswerCount } from "../../features/onboarding/hooks/useUnseenSkipAnswerCount";
 import {
   AdminIcon,
+  BlueprintsIcon,
   BoardIcon,
   ChatIcon,
   DashboardIcon,
@@ -115,6 +116,14 @@ const projectManagerNavItems: SidebarNavItem[] = [
     label: "Data Ingestion",
     path: "/data-ingestion",
     icon: DataIngestionIcon,
+  },
+  // After the material it is written from. A blueprint is authored against what
+  // the project has already told the system about itself, so a PM setting one up
+  // for the first time meets the two in the order they are done in.
+  {
+    label: "Blueprints",
+    path: "/blueprints",
+    icon: BlueprintsIcon,
   },
   // Arrival authoring and Starter Work review, as tabs of one page — set up here by the PM,
   // which is why it sits with the other things a PM prepares rather than in the hire's own list.
