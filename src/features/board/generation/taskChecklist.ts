@@ -27,7 +27,7 @@
  * press, and why that is a thing to be careful with rather than an oversight.
  */
 
-import { listItemsIn } from "./checklistFromMarkdown";
+import { stepsIn, type StatedStep } from "./checklistFromMarkdown";
 import type { AuthoredCardRequest } from "../types";
 
 /** The parts of a task this needs, so a suggested task and a claimed one can both be passed in. */
@@ -49,14 +49,20 @@ export const MAX_TASK_ITEMS = 25;
  * The steps a task already states, in the order it states them. Empty when it states none.
  *
  * Checklist items and acceptance criteria both, because a task that separates them is a task whose
- * steps are in two places — see `listItemsIn`. What comes back is verbatim apart from markdown
- * syntax: nothing is summarised, ordered or invented.
+ * steps are in two places — and only lists that are steps, not references or scope notes; see
+ * `stepsIn` for where that line is drawn. What comes back is verbatim apart from markdown syntax:
+ * nothing is summarised, ordered or invented.
  *
  * The predicate as much as the content. A caller asks this first to find out whether there is a
  * checklist to offer at all, which is the whole of the no-structure branch: there isn't one.
  */
 export function taskSteps(task: TaskForChecklist): string[] {
-  return listItemsIn(task.summary ?? "").slice(0, MAX_TASK_ITEMS);
+  return statedSteps(task).map((step) => step.text);
+}
+
+/** The same steps, still carrying which of them the task has already ticked. */
+function statedSteps(task: TaskForChecklist): StatedStep[] {
+  return stepsIn(task.summary ?? "").slice(0, MAX_TASK_ITEMS);
 }
 
 /**
@@ -70,12 +76,12 @@ export function taskSteps(task: TaskForChecklist): string[] {
  * for the task they know the name of.
  */
 export function checklistFromTask(task: TaskForChecklist): AuthoredCardRequest | null {
-  const steps = taskSteps(task);
+  const steps = statedSteps(task);
   if (steps.length === 0) return null;
 
   return {
     kind: "CHECKLIST",
     title: task.title.trim(),
-    items: steps.map((text) => ({ text, done: false })),
+    items: steps.map(({ text, done }) => ({ text, done })),
   };
 }

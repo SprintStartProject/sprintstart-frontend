@@ -83,8 +83,24 @@ export function extractChecklist(markdown: string): ExtractedChecklist | null {
   return best;
 }
 
+/** A line of a task, and whether the task already has it ticked. */
+export type StatedStep = { text: string; done: boolean };
+
+/** A task-list checkbox — `- [ ]`, `- [x]` — at the start of a list item. */
+const CHECKBOX = /^\s{0,6}(?:[-*+]|\d+[.)])\s+\[([ xX])\]/;
+
+/** A line that is nothing but bold text — how people head a section without a `#`. */
+const BOLD_LINE = /^\s*(?:\*\*|__)(.+?)(?:\*\*|__)\s*[:：]?\s*$/;
+
 /**
- * Every list item in a piece of markdown, in the order they appear.
+ * Section names whose lists are things to do. Anything else — References, Affected services, Out
+ * of scope, Notes — is a list *about* the task, and ticking it off would mean nothing.
+ */
+const STEP_SECTION =
+  /\b(?:steps?|tasks?|to-?dos?|checklist|acceptance criteria|definition of done|how to)\b/i;
+
+/**
+ * The steps a task body states, in the order it states them, with what it has already ticked.
  *
  * The looser reading of the same lines {@link extractChecklist} groups into blocks, and the two
  * wants are genuinely different. A buddy reply is prose that *may* contain a list, so the question
@@ -92,16 +108,50 @@ export function extractChecklist(markdown: string): ExtractedChecklist | null {
  * checklist items and its acceptance criteria are both lists of things to do, separated by the
  * headings between them, and taking only the longest block would drop half the task.
  *
- * No minimum here either, for the same reason — one acceptance criterion is still the task saying
- * what has to be true.
+ * But not every list in a task is a list of things to do, and a card that asks the hire to tick
+ * off two reference links is a card that has misread the task. So a line counts when either:
+ *
+ * - **it is a checkbox**, wherever it sits — somebody wrote it to be ticked; or
+ * - **it is under a section named for steps** — "Steps", "Tasks", "Acceptance Criteria",
+ *   "Definition of Done" — or under no section name at all, where a bare list in a task is the
+ *   task's list.
+ *
+ * A section is named by a markdown heading or a line that is only bold text, and its name holds
+ * until the next one. A lead-in sentence ending in a colon does not name one: "To reproduce:" and
+ * "It fails when:" introduce steps as often as "See also:" introduces links, and a rule that
+ * guessed from the wording would drop real steps to catch the odd reference list.
+ *
+ * A ticked box stays ticked. The task already records that line as done, and a fresh checkbox
+ * beside it would tell a new hire to repeat work somebody has finished.
+ *
+ * No minimum, either — one acceptance criterion is still the task saying what has to be true.
  */
-export function listItemsIn(markdown: string): string[] {
-  return markdown
-    .split("\n")
-    .map((line) => LIST_ITEM.exec(line))
-    .filter((match): match is RegExpExecArray => match !== null)
-    .map((match) => plain(match[1]))
-    .filter((text) => text.length > 0);
+export function stepsIn(markdown: string): StatedStep[] {
+  const steps: StatedStep[] = [];
+  let section: string | null = null;
+
+  for (const line of markdown.split("\n")) {
+    const item = LIST_ITEM.exec(line);
+    if (item) {
+      const box = CHECKBOX.exec(line);
+      const counts = box !== null || section === null || STEP_SECTION.test(section);
+      const text = plain(item[1]);
+      if (counts && text.length > 0) steps.push({ text, done: box !== null && box[1] !== " " });
+      continue;
+    }
+
+    const name = sectionName(line);
+    if (name !== null) section = name;
+  }
+
+  return steps;
+}
+
+/** The section a line opens, or null when it opens none. */
+function sectionName(line: string): string | null {
+  const match = HEADING.exec(line) ?? BOLD_LINE.exec(line);
+
+  return match ? plain(match[1]) : null;
 }
 
 /**

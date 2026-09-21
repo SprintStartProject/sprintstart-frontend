@@ -85,6 +85,81 @@ describe("checklistFromTask", () => {
   });
 
   /**
+   * A box the task has already ticked is work somebody finished. A fresh box beside it would ask
+   * a new hire to do it again.
+   */
+  describe("what the task has already ticked", () => {
+    it("keeps a ticked box ticked", () => {
+      const request = checklistFromTask({
+        title: "Fix the login redirect",
+        summary: "- [x] Reproduce it locally\n- [X] Find the handler\n- [ ] Fix it",
+      });
+
+      expect(request?.kind === "CHECKLIST" && request.items).toEqual([
+        { text: "Reproduce it locally", done: true },
+        { text: "Find the handler", done: true },
+        { text: "Fix it", done: false },
+      ]);
+    });
+
+    it("leaves a plain bullet unticked", () => {
+      const request = checklistFromTask({ title: "Fix it", summary: "- Reproduce it locally" });
+
+      expect(request?.kind === "CHECKLIST" && request.items).toEqual([
+        { text: "Reproduce it locally", done: false },
+      ]);
+    });
+  });
+
+  /**
+   * Not every list in a task is a list of things to do. References, affected services and scope
+   * notes are lists *about* the task, and a card asking the hire to tick off two links has
+   * misread it.
+   */
+  describe("which lists are steps", () => {
+    it("leaves out a list under a heading that is not about steps", () => {
+      expect(
+        items({
+          title: "Fix the login redirect",
+          summary:
+            "## Steps\n- Reproduce it locally\n- Fix it\n\n" +
+            "## References\n- https://example.test/runbook\n- https://example.test/design",
+        }),
+      ).toEqual(["Reproduce it locally", "Fix it"]);
+    });
+
+    it("reads a bold line as a section heading too", () => {
+      expect(
+        items({
+          title: "Fix the login redirect",
+          summary:
+            "**Acceptance criteria**\n- The query string survives\n\n" +
+            "**Affected services**\n- auth\n- gateway",
+        }),
+      ).toEqual(["The query string survives"]);
+    });
+
+    /** A checkbox is somebody saying "tick this", wherever they put it. */
+    it("keeps a checkbox whatever section it is in", () => {
+      expect(
+        items({
+          title: "Fix the login redirect",
+          summary: "## Notes\n- Seen on staging only\n- [ ] Confirm it on production",
+        }),
+      ).toEqual(["Confirm it on production"]);
+    });
+
+    it("offers nothing for a task whose only lists are references", () => {
+      expect(
+        checklistFromTask({
+          title: "Fix the login redirect",
+          summary: "The redirect drops the query string.\n\n## References\n- #123\n- #124",
+        }),
+      ).toBeNull();
+    });
+  });
+
+  /**
    * A new hire looking at "Fix the login redirect" with a checkbox beside it has been handed the
    * title back. The steps for a task that states none are the mentor's to write.
    */
