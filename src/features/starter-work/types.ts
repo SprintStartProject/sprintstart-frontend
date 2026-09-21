@@ -28,7 +28,7 @@ export type StarterWorkTask = {
   status: ProposalStatus;
   /** Whether a person has looked at this task. Unreviewed is claimable, just ranked lower. */
   reviewed: boolean;
-  /** Whether a PM has flagged this task as suitable for a hire's automatic first task (Task 0). */
+  /** Whether a PM has flagged this task as a good first one for somebody (Task 0). A hint, not a gate. */
   taskZeroEligible: boolean;
   /**
    * Whether the issue had somebody on it when reconciliation last looked. Three-valued: null

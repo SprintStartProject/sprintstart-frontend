@@ -18,6 +18,12 @@ export type ProposedActionStatus = "idle" | "confirming" | "resolved" | "error" 
 export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
 
 /**
+ * The backend's `flag_to_pm` action. Its `question` is the message that goes to the PM, so the
+ * confirm shows it: this one leaves the product and arrives in somebody's inbox in the hire's name.
+ */
+export const BUDDY_ACTION_FLAG_TO_PM = "flag_to_pm";
+
+/**
  * The actions that change the hire's onboarding path.
  *
  * Listed once, here, because two surfaces need the same answer: confirming one of these has to tell
@@ -40,7 +46,10 @@ export type ProposedAction = {
   action: string;
   /** The button text ("Work toward this task"). */
   label: string;
-  /** Carried through only for flag-to-PM: the question the buddy composed. */
+  /**
+   * Carried through only for flag-to-PM: the question the buddy composed, and the one that is
+   * actually sent. Shown under the button — see `BuddyActionProposals`.
+   */
   question?: string;
   /**
    * The goal-claim confirm payload (`claim_goal`), echoed back verbatim so the action runs

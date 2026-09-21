@@ -144,6 +144,42 @@ describe("BuddyActionProposals", () => {
     expect(screen.queryByTestId("buddy-orientation-card")).not.toBeInTheDocument();
   });
 
+  it("shows the question a flag will send, not just the button", () => {
+    // The button only says that something will be flagged. What lands in the PM's inbox is
+    // the question the buddy composed, and the hire sends it in their name.
+    render(
+      <BuddyActionProposals
+        messageId="m1"
+        actions={[
+          action({
+            action: "flag_to_pm",
+            label: "Flag this to your PM",
+            question: "Who owns the staging database credentials?",
+          }),
+        ]}
+        onConfirm={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Sends to your PM: “Who owns the staging database credentials?”"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no message line for an action that sends nobody anything", () => {
+    render(
+      <BuddyActionProposals
+        messageId="m1"
+        actions={[action({ action: "claim_goal", label: "Work toward this task", taskId: "t1" })]}
+        onConfirm={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/Sends to your PM/)).not.toBeInTheDocument();
+  });
+
   it("shows the whole skip reason before the hire sends it in their name", () => {
     render(
       <BuddyActionProposals

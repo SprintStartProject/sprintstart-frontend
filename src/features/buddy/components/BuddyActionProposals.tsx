@@ -1,6 +1,6 @@
 import { Check, Loader2, X } from "lucide-react";
 import type { ProposedAction } from "../types";
-import { BUDDY_ACTION_OPEN_ORIENTATION } from "../types";
+import { BUDDY_ACTION_FLAG_TO_PM, BUDDY_ACTION_OPEN_ORIENTATION } from "../types";
 import { BuddyOrientationCard } from "./BuddyOrientationCard";
 
 type BuddyActionProposalsProps = {
@@ -100,11 +100,18 @@ export function BuddyActionProposals({
                 Not now
               </button>
             </div>
-            {/* A skip request is sent to a person in the hire's name, so the words go on screen
-                before the click -- the label only names the step. */}
+            {/* Anything that leaves the product in the hire's name shows its words before the
+                click -- the label only names the kind of thing it is. A skip request carries the
+                reason; a flag to the PM carries the question the buddy composed, which is the whole
+                of what that person will read. */}
             {action.reason && (
               <p className="px-1 text-xs break-words text-app-text-muted">
                 Your reason: &ldquo;{action.reason}&rdquo;
+              </p>
+            )}
+            {action.action === BUDDY_ACTION_FLAG_TO_PM && action.question && (
+              <p className="px-1 text-xs break-words text-app-text-muted">
+                Sends to your PM: &ldquo;{action.question}&rdquo;
               </p>
             )}
             {action.status === "error" && (
