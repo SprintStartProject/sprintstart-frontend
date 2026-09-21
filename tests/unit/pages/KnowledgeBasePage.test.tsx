@@ -50,14 +50,14 @@ vi.mock("../../../src/features/knowledge-base/components", () => ({
   ArtifactFilters: ({
     searchQuery,
     onSearchChange,
-    activeTab,
-    onTabChange,
+    selectedSources,
+    onToggleSource,
     onRefresh,
   }: {
     searchQuery: string;
     onSearchChange: (q: string) => void;
-    activeTab: string;
-    onTabChange: (t: string) => void;
+    selectedSources?: ReadonlySet<string>;
+    onToggleSource?: (source: string) => void;
     onRefresh?: () => void;
   }) => (
     <div data-testid="artifact-filters">
@@ -66,13 +66,13 @@ vi.mock("../../../src/features/knowledge-base/components", () => ({
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
       />
-      <button data-testid="kb-tab-uploads" onClick={() => onTabChange("UPLOADS")}>
+      <button data-testid="kb-filter-upload" onClick={() => onToggleSource?.("UPLOAD")}>
         Uploads
       </button>
       <button data-testid="kb-refresh" onClick={() => onRefresh?.()}>
         Refresh
       </button>
-      <span data-testid="active-tab">{activeTab}</span>
+      <span data-testid="active-facets">{[...(selectedSources ?? [])].join(",")}</span>
     </div>
   ),
   ArtifactList: ({ artifacts }: { artifacts: Artifact[] }) => (
@@ -197,7 +197,10 @@ describe("KnowledgeBasePage", () => {
       </MemoryRouter>,
     );
 
-    expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    // The skeleton only appears after a short delay, so it never flashes on a fast load.
+    await waitFor(() => {
+      expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
+    });
     expect(screen.queryByText("No project available")).not.toBeInTheDocument();
   });
 
@@ -243,7 +246,7 @@ describe("KnowledgeBasePage", () => {
     });
   });
 
-  it("filters artifacts by tab (UPLOADS)", async () => {
+  it("filters artifacts by source", async () => {
     const artifacts: Artifact[] = [
       makeArtifact({ id: "a1", title: "github-file.md", sourceSystem: "GITHUB" }),
       makeArtifact({ id: "a2", title: "uploaded-file.pdf", sourceSystem: "UPLOAD" }),
@@ -260,7 +263,7 @@ describe("KnowledgeBasePage", () => {
       expect(screen.getAllByTestId("artifact-card")).toHaveLength(2);
     });
 
-    await userEvent.click(screen.getByTestId("kb-tab-uploads"));
+    await userEvent.click(screen.getByTestId("kb-filter-upload"));
 
     await waitFor(() => {
       expect(screen.getAllByTestId("artifact-card")).toHaveLength(1);

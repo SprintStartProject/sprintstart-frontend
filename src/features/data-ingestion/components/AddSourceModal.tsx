@@ -4,8 +4,9 @@ import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
 import { useToast } from "../../../context/useToast.ts";
-import { useFetch } from "../../../hooks/useFetch.ts";
+import { useQueryFetch } from "../../../hooks/useQueryFetch.ts";
 import { getTeamOverview } from "../../../services/teamManagementService.ts";
+import { queryKeys } from "../../../services/queryKeys.ts";
 import {
   addDraftSource,
   connectDraftSources,
@@ -115,12 +116,10 @@ export function AddSourceModal({
   // when the owner control is not going to be shown. `getTeamOverview` asks for a hard
   // `size=100`, so a project past a hundred members would quietly lose the tail of the list —
   // fine for now, and the reason to reach for a searchable picker when it stops being.
-  const { data: teamUsers } = useFetch(
-    () =>
-      canAssignOwners && projectId
-        ? getTeamOverview(undefined, undefined, [projectId])
-        : Promise.resolve([]),
-    [canAssignOwners, projectId],
+  const { data: teamUsers } = useQueryFetch(
+    queryKeys.teamOverview.filtered(projectId),
+    () => getTeamOverview(undefined, undefined, [projectId as string]),
+    { enabled: canAssignOwners && Boolean(projectId) },
   );
 
   const ownerOptions = useMemo(

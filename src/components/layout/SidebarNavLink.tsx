@@ -1,8 +1,11 @@
 import { motion, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
 import { useLayoutEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import type { SidebarIcon } from "./SidebarNavIcons";
 import { slidingIndicatorSpringToken } from "../../styles/tokens";
+import { prefetchRoute } from "../../services/routePrefetch";
+import { useProjectContext } from "../../features/projects/useProjectContext";
 
 /**
  * Scale applied to the item directly under the pointer.
@@ -208,6 +211,9 @@ export function SidebarNavLink({
   const prefersReducedMotion = useReducedMotion();
   const indicatorTransition = prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken;
 
+  const queryClient = useQueryClient();
+  const { selectedProjectId } = useProjectContext();
+
   /**
    * One marker language for the whole sidebar: an entry with work waiting
    * behind it has an amber icon that stirs every few seconds, whether what is
@@ -331,6 +337,11 @@ export function SidebarNavLink({
         to={to}
         end={end}
         onClick={onNavigate}
+        // Pointerdown rather than hover: a sweep across the sidebar passes over several
+        // entries in one motion, and prefetching all of them would spend requests on
+        // entries nobody meant to visit. A press is committed — by the time the browser
+        // paints the new route, the request is already a beat ahead of it.
+        onPointerDown={() => prefetchRoute(queryClient, to, selectedProjectId || null)}
         className={({ isActive }) =>
           `${BASE_LINK_CLASS} ${getLinkStateClass(isActive || forceActive)}`
         }

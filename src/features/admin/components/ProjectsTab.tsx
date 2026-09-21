@@ -1,4 +1,4 @@
-import { ChevronRight, FileText, Folder, UserCog, Users } from "lucide-react";
+import { ChevronRight, FileText, Folder, Tag, UserCog, Users } from "lucide-react";
 import { getProjectSourcesCount, getProjectUsersCount } from "../data";
 import type { ProjectManager } from "../../../services/projectService";
 import type { ProjectOverview, ProjectSource } from "../types";
@@ -144,6 +144,10 @@ export function ProjectsTab({
                     <span className="truncate">
                       {project.manager ? getManagerName(project.manager) : "No manager"}
                     </span>
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <Tag className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{project.industry || "No industry"}</span>
                   </span>
                 </div>
               </div>

@@ -4,6 +4,7 @@ import { useContext, type ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useChat } from "../../../../src/features/chatbot/hooks/useChat";
 import { ChatProvider } from "../../../../src/context/ChatProvider";
+import { ToastProvider } from "../../../../src/context/ToastProvider";
 import { ChatContext } from "../../../../src/context/ChatContext";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
@@ -64,6 +65,19 @@ vi.mock("../../../../src/features/projects/useProjectContext", async () => {
 });
 
 const wrapper = ({ children }: { children: ReactNode }) => <ChatProvider>{children}</ChatProvider>;
+
+/**
+ * The same tree plus the toast stack, for the tests that assert on a toast.
+ *
+ * Only the failure paths need it: `useToastApi` returns inert no-ops outside a
+ * provider (by design, so a component can be tested without one), which would
+ * make "did it toast?" unanswerable rather than false.
+ */
+const toastWrapper = ({ children }: { children: ReactNode }) => (
+  <ToastProvider>
+    <ChatProvider>{children}</ChatProvider>
+  </ToastProvider>
+);
 
 const HANDOFF_QUESTION = "What should I work on next?";
 
@@ -317,12 +331,15 @@ describe("useChat", () => {
       expect(result.current.chats).toEqual([]);
     });
 
-    await act(async () => {
-      await result.current.addMessage("My new prompt");
+    act(() => {
+      result.current.addMessage("My new prompt");
     });
 
     await waitFor(() => {
       expect(result.current.messages.length).toBe(2);
+      // `addMessage` returns void — a queued message has no stream to await — so
+      // the answer has to be waited for rather than the send.
+      expect(result.current.messages[1]?.content).toBe("Hello world");
     });
 
     const userMsg = result.current.messages[0];
@@ -340,7 +357,7 @@ describe("useChat", () => {
     expect(result.current.isStreaming).toBe(false);
   });
 
-  it("surfaces stream errors on the assistant message", async () => {
+  it("keeps the partial answer and reports a stream failure as a toast", async () => {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
@@ -382,26 +399,33 @@ describe("useChat", () => {
       ),
     );
 
-    const { result } = renderHook(() => useChat(), { wrapper });
+    const { result } = renderHook(() => useChat(), { wrapper: toastWrapper });
 
     await waitFor(() => {
       expect(result.current.chats).toEqual([]);
     });
 
-    await act(async () => {
-      await result.current.addMessage("My prompt");
+    act(() => {
+      result.current.addMessage("My prompt");
     });
 
     await waitFor(() => {
       expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toBe("partial");
     });
 
     const aiMsg = result.current.messages[1];
     expect(aiMsg.role).toBe("ASSISTANT");
+    // What did arrive stays where it is; only the failure moves.
     expect(aiMsg.content).toBe("partial");
-    expect(aiMsg.error).toBe("LLM overload");
+    expect(aiMsg.notice).toBeUndefined();
     expect(result.current.isStreaming).toBe(false);
     expect(result.current.streamingMessageId).toBeNull();
+
+    // …and it is reported where it cannot be scrolled past.
+    expect(await screen.findByText("The answer failed")).toBeInTheDocument();
+    expect(screen.getByText("LLM overload")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
   it("exposes stopStreaming function that can abort a stream", async () => {
@@ -456,19 +480,23 @@ describe("useChat", () => {
 
     expect(typeof result.current.stopStreaming).toBe("function");
 
-    await act(async () => {
-      await result.current.addMessage("My prompt");
+    act(() => {
+      result.current.addMessage("My prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages[1]?.content).toBe("partial");
     });
 
     await waitFor(() => {
       expect(result.current.isStreaming).toBe(false);
     });
 
-    // Partial content stays visible
+    // Partial content stays visible, and a turn with content carries no notice.
     const aiMsg = result.current.messages[1];
     expect(aiMsg).toBeTruthy();
     expect(aiMsg.content).toBe("partial");
-    expect(aiMsg.error).toBeUndefined();
+    expect(aiMsg.notice).toBeUndefined();
   });
 
   it("clears isThinking when stopStreaming is called before the first token (B9)", async () => {
@@ -733,7 +761,7 @@ describe("useChat", () => {
     expect(result.current.chats).toEqual([{ id: "chat2", userId: "user1" }]);
   });
 
-  it("attaches stopped error message when stopped during reasoning before first content token", async () => {
+  it("marks a stopped turn as stopped rather than failed", async () => {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
@@ -795,7 +823,9 @@ describe("useChat", () => {
     await waitFor(() => {
       const assistantMsg = result.current.messages.find((m) => m.role === "ASSISTANT");
       expect(assistantMsg?.reasoning).toBe("Thinking deep...");
-      expect(assistantMsg?.error).toBe("Stopped before the assistant replied.");
+      // A notice, not an error: the user did this, so it is not reported as a
+      // failure (and does not raise a toast).
+      expect(assistantMsg?.notice).toBe("stopped");
     });
   });
 
@@ -983,12 +1013,13 @@ describe("useChat", () => {
       expect(result.current.chats).toEqual([]);
     });
 
-    await act(async () => {
-      await result.current.addMessage("My new prompt");
+    act(() => {
+      result.current.addMessage("My new prompt");
     });
 
     await waitFor(() => {
       expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("Blockers were the auth work.");
     });
 
     const aiMsg = result.current.messages[1];
@@ -1034,17 +1065,272 @@ describe("useChat", () => {
       expect(result.current.chats).toEqual([]);
     });
 
-    await act(async () => {
-      await result.current.addMessage("My new prompt");
+    act(() => {
+      result.current.addMessage("My new prompt");
     });
 
     await waitFor(() => {
       expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("Auth work blocked us.");
     });
 
     // The flag re-arms on every `tool_use`, so both rounds get their own break.
     expect(result.current.messages[1].content).toBe(
       "Let me look.\n\nFound the retro.\n\nAuth work blocked us.",
     );
+  });
+
+  it("appends post-tool tokens to a mid-word preamble without a break (#231)", async () => {
+    // Reproduces the wire shape from issue #231: the tool round's preamble
+    // was cut off mid-word upstream, so the post-tool answer continues the
+    // truncated word ("…Bas" + "ierend…"). The break must not split it.
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Gerne, ich schaue kurz nach. Bas"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"ierend auf den Dokumenten."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("Basierend auf den Dokumenten.");
+    });
+
+    expect(result.current.messages[1].content).toBe(
+      "Gerne, ich schaue kurz nach. Basierend auf den Dokumenten.",
+    );
+  });
+
+  it("keeps the paragraph break when the preamble ends with trailing whitespace", async () => {
+    // Trailing whitespace means the model finished a word and was
+    // interrupted between words — a real boundary, not a mid-word cut: a
+    // cut ends flush against the word, the word's remaining letters follow
+    // without a space. The break stays, so a complete word is never glued
+    // to the answer's first word ("andthen").
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Let me check the wiki and "}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"then get back to you."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toBe(
+        "Let me check the wiki and\n\nthen get back to you.",
+      );
+    });
+  });
+
+  it("still glues when an empty token arrives between tool_use and the answer (#231)", async () => {
+    // chatService dispatches onToken for every defined content, including
+    // "". A content-free token must not consume the boundary decision — it
+    // would insert the break and clear the flag before the real
+    // continuation arrives, re-creating the exact #231 split.
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Gerne, ich schaue kurz nach. Bas"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"token","content":""}\n\n'));
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"ierend auf den Dokumenten."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toBe(
+        "Gerne, ich schaue kurz nach. Basierend auf den Dokumenten.",
+      );
+    });
+  });
+
+  it("appends a whitespace-only token verbatim and defers the boundary decision", async () => {
+    // Same guard, whitespace-only variant: the token carries formatting, so
+    // it is appended while the flag stays armed; the decision falls to the
+    // first content-bearing token, which sees trailing whitespace and keeps
+    // the break — with no stray space left after it.
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Gerne, ich schaue kurz nach. Bas"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"token","content":" "}\n\n'));
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"ierend auf den Dokumenten."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toBe(
+        "Gerne, ich schaue kurz nach. Bas\n\nierend auf den Dokumenten.",
+      );
+    });
+  });
+
+  it("keeps the paragraph break when the post-tool token starts uppercase", async () => {
+    // The glue rule only covers lowercase continuations. A post-tool answer
+    // starting with a capital letter is a real boundary and keeps its break —
+    // this also covers a model restarting after a mid-word cut ("…Ba" +
+    // "New thought."), where gluing would produce "…BaNew thought.".
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"Let me look. Ba"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"tool_use","name":"retrieve","kind":"tool"}\n\n'),
+        );
+        controller.enqueue(
+          encoder.encode('data: {"type":"token","content":"New findings came up."}\n\n'),
+        );
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      result.current.addMessage("My new prompt");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.length).toBe(2);
+      expect(result.current.messages[1]?.content).toContain("New findings came up.");
+    });
+
+    expect(result.current.messages[1].content).toBe("Let me look. Ba\n\nNew findings came up.");
   });
 });

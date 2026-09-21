@@ -1,7 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { Check, Database, FolderKanban, Loader2, Search, Users } from "lucide-react";
+import { Check, Database, Loader2, Search, ShieldCheck, Users } from "lucide-react";
+import { Badge } from "../../../components/ui/Badge";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
+import { UserAvatar } from "../../../components/common/UserAvatar";
+import { monogramLetters, monogramTint } from "../projectMonogram";
 import type { SelectableProject } from "../ProjectContext";
 
 type ProjectSwitcherModalProps = {
@@ -20,19 +23,38 @@ type ProjectGroup = {
 };
 
 /**
- * The management line shown on a card: "Managed by you" when the current user
- * manages the project, otherwise the assigned project manager's name. Returns
- * `null` when the current user does not manage it and no PM is assigned — an
- * admin reaching every project should not be labelled as managing all of them.
+ * Who runs the project: the `Manager` badge when it is the current user, and
+ * otherwise the assigned PM with their avatar, the way a person is shown
+ * everywhere else in the app.
+ *
+ * Renders nothing when the current user does not manage it and no PM is
+ * assigned — an admin reaching every project should not be labelled as
+ * managing all of them.
  */
-function getManagerLabel(project: SelectableProject): string | null {
-  if (project.isManaged) return "Managed by you";
+function ManagerLine({ project }: { project: SelectableProject }) {
+  if (project.isManaged) {
+    return (
+      <Badge variant="brand" size="sm" className="mt-1.5 w-fit">
+        <ShieldCheck aria-hidden="true" className="mr-1 h-3 w-3" />
+        Manager
+      </Badge>
+    );
+  }
 
   const manager = project.manager;
   if (!manager) return null;
 
-  const fullName = `${manager.firstName} ${manager.lastName}`.trim();
-  return `Managed by ${fullName || manager.username}`;
+  const fullName = `${manager.firstName} ${manager.lastName}`.trim() || manager.username;
+
+  return (
+    <span className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-app-text-muted">
+      <UserAvatar size={18} fallbackName={fullName} seed={manager.id} />
+      {/* The avatar carries "this is a person" visually; the words are there
+          for anyone who only hears the card read out. */}
+      <span className="sr-only">Managed by</span>
+      <span className="truncate">{fullName}</span>
+    </span>
+  );
 }
 
 function matchesSearch(project: SelectableProject, search: string): boolean {
@@ -73,8 +95,6 @@ function ProjectCard({
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const managerLabel = getManagerLabel(project);
-
   return (
     <button
       type="button"
@@ -90,32 +110,20 @@ function ProjectCard({
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
+        {/* The monogram keeps its own tint when the card is selected: it
+            identifies the project, so it is the one thing on the card that
+            should not change with selection state. */}
         <span
-          className={[
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors",
-            isSelected
-              ? "bg-app-brand text-white"
-              : "bg-app-surface-muted text-app-text-muted group-hover:text-app-text",
-          ].join(" ")}
+          aria-hidden="true"
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold ${monogramTint(project.id)}`}
         >
-          <FolderKanban className="h-5 w-5" />
+          {monogramLetters(project.name)}
         </span>
 
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-semibold text-app-text">{project.name}</span>
 
-          {managerLabel ? (
-            <span
-              className={[
-                "mt-1 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
-                project.isManaged
-                  ? "bg-app-brand-soft text-app-brand-text"
-                  : "bg-app-surface-muted text-app-text-muted",
-              ].join(" ")}
-            >
-              {managerLabel}
-            </span>
-          ) : null}
+          <ManagerLine project={project} />
         </span>
 
         {isSelected ? <Check className="h-4 w-4 shrink-0 text-app-brand" /> : null}
@@ -197,18 +205,21 @@ export function ProjectSwitcherModal({
       closeLabel="Close project switcher"
       bodyClassName="px-7 pb-7 pt-5"
     >
-      <Input
-        ref={searchRef}
-        type="search"
-        aria-label="Search projects"
-        autoComplete="off"
-        placeholder="Search projects..."
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        onKeyDown={handleSearchKeyDown}
-        icon={<Search className="h-4 w-4" />}
-        className="mb-5"
-      />
+      {/* The margin sits on a wrapper: on the input itself it would stretch the
+          field's positioning box and push the search icon below centre. */}
+      <div className="mb-5">
+        <Input
+          ref={searchRef}
+          type="search"
+          aria-label="Search projects"
+          autoComplete="off"
+          placeholder="Search projects..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          icon={<Search className="h-4 w-4" />}
+        />
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-app-text-muted">

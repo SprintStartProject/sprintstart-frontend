@@ -1,9 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { useMotionValue } from "framer-motion";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SidebarNavLink } from "../../../../src/components/layout/SidebarNavLink";
 import { InboxIcon } from "../../../../src/components/layout/SidebarNavIcons";
+import { createProjectContextValue } from "../../setup/projectContext";
+
+vi.mock("../../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => createProjectContextValue(),
+}));
 
 function Harness({
   initialRoute = "/",

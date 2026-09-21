@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { starterWorkService } from "../../../services/starterWorkService";
+import { queryKeys } from "../../../services/queryKeys";
 import type {
   CreateStarterWorkTaskInput,
   GenerateStarterWorkResult,
@@ -13,19 +15,43 @@ function toMessage(error: unknown, fallback: string): string {
 /** How a task reached the pool without being mined: written from scratch, or picked from the corpus. */
 export type TaskOrigin = "authored" | "picked";
 
+type ReviewAction =
+  { kind: "generate"; projectId: string } | { kind: "create"; input: CreateStarterWorkTaskInput };
+
+const NO_TASKS: StarterWorkTask[] = [];
+
+/** The review queue's loader, shared with route prefetch so the two never drift apart. */
+export function loadStarterWorkReviewQueue(): Promise<StarterWorkTask[]> {
+  return starterWorkService.fetchUnreviewed().then((proposed) => proposed.tasks);
+}
+
 /**
  * Owns the PM's starter-work review queue: mining new proposals and deciding on each one.
  *
  * Mirrors `useGraphAuthoring` deliberately -- it is the same lifecycle, and a PM reviewing AI
- * output should not have to learn two different shapes. A decided task leaves local state
+ * output should not have to learn two different shapes. A decided task leaves the cache
  * immediately rather than waiting on a refetch.
+ *
+ * `generate` and `create` share one mutation (and one `error` slot) because both are "soft"
+ * failures the caller reports as a toast rather than reacting to; `approve` and `reject` stay
+ * plain functions that re-throw, because their callers (`StarterWorkSection`) need the rejection
+ * to settle a card or keep a drawer open.
  */
 export function useStarterWorkReview() {
-  const [tasks, setTasks] = useState<StarterWorkTask[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [generateResult, setGenerateResult] = useState<GenerateStarterWorkResult | null>(null);
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.starterWork.review();
+
+  const {
+    data,
+    isLoading,
+    isError,
+    error: loadError,
+    refetch,
+  } = useQuery({
+    queryKey,
+    queryFn: loadStarterWorkReviewQueue,
+  });
+
   // A hand-authored task never joins the unreviewed queue below -- somebody already vouched
   // for it by writing it. This holds the just-created one so the page can confirm it, rather
   // than the PM wondering where it went.
@@ -34,56 +60,51 @@ export function useStarterWorkReview() {
   // it out of the corpus" are different things to have just done, and the confirmation should
   // describe the one that happened.
   const [createdVia, setCreatedVia] = useState<TaskOrigin>("authored");
+  const [generateResult, setGenerateResult] = useState<GenerateStarterWorkResult | null>(null);
 
-  const loadProposed = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const proposed = await starterWorkService.fetchUnreviewed();
-      setTasks(proposed.tasks);
-    } catch (err) {
-      setError(toMessage(err, "Could not load starter tasks."));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void (async () => {
-      await loadProposed();
-    })();
-  }, [loadProposed]);
+  const actionMutation = useMutation({
+    mutationFn: async (action: ReviewAction) => {
+      if (action.kind === "generate") {
+        return {
+          kind: "generate" as const,
+          result: await starterWorkService.generate(action.projectId),
+        };
+      }
+      return { kind: "create" as const, task: await starterWorkService.create(action.input) };
+    },
+    onSuccess: async (result) => {
+      if (result.kind === "generate") {
+        setGenerateResult(result.result);
+        await refetch();
+      } else {
+        setCreatedTask(result.task);
+        setCreatedVia("authored");
+      }
+    },
+  });
 
   const generate = useCallback(
     async (projectId: string) => {
-      setIsGenerating(true);
-      setError(null);
-      setGenerateResult(null);
       try {
-        const result = await starterWorkService.generate(projectId);
-        setGenerateResult(result);
-        await loadProposed();
-      } catch (err) {
-        setError(toMessage(err, "Could not mine starter tasks."));
-      } finally {
-        setIsGenerating(false);
+        await actionMutation.mutateAsync({ kind: "generate", projectId });
+      } catch {
+        // Surfaced below via `error`; callers don't need the rejection.
       }
     },
-    [loadProposed],
+    [actionMutation],
   );
 
-  const create = useCallback(async (input: CreateStarterWorkTaskInput): Promise<boolean> => {
-    setError(null);
-    try {
-      const created = await starterWorkService.create(input);
-      setCreatedTask(created);
-      setCreatedVia("authored");
-      return true;
-    } catch (err) {
-      setError(toMessage(err, "Could not create this task."));
-      return false;
-    }
-  }, []);
+  const create = useCallback(
+    async (input: CreateStarterWorkTaskInput): Promise<boolean> => {
+      try {
+        await actionMutation.mutateAsync({ kind: "create", input });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [actionMutation],
+  );
 
   /**
    * Confirms a task the issue browser just put in the pool.
@@ -97,20 +118,41 @@ export function useStarterWorkReview() {
     setCreatedVia("picked");
   }, []);
 
-  const approve = useCallback(async (id: string) => {
-    await starterWorkService.markReviewed(id);
-    setTasks((prev) => prev.filter((task) => task.id !== id));
-  }, []);
+  const approve = useCallback(
+    async (id: string) => {
+      await starterWorkService.markReviewed(id);
+      queryClient.setQueryData(queryKey, (prev: StarterWorkTask[] | undefined) =>
+        prev?.filter((task) => task.id !== id),
+      );
+    },
+    [queryClient, queryKey],
+  );
 
-  const reject = useCallback(async (id: string, reason?: string) => {
-    await starterWorkService.reject(id, reason);
-    setTasks((prev) => prev.filter((task) => task.id !== id));
-  }, []);
+  const reject = useCallback(
+    async (id: string, reason?: string) => {
+      await starterWorkService.reject(id, reason);
+      queryClient.setQueryData(queryKey, (prev: StarterWorkTask[] | undefined) =>
+        prev?.filter((task) => task.id !== id),
+      );
+    },
+    [queryClient, queryKey],
+  );
+
+  const error = actionMutation.isError
+    ? toMessage(
+        actionMutation.error,
+        actionMutation.variables?.kind === "generate"
+          ? "Could not mine starter tasks."
+          : "Could not create this task.",
+      )
+    : isError
+      ? toMessage(loadError, "Could not load starter tasks.")
+      : null;
 
   return {
-    tasks,
+    tasks: data ?? NO_TASKS,
     isLoading,
-    isGenerating,
+    isGenerating: actionMutation.isPending && actionMutation.variables?.kind === "generate",
     error,
     generateResult,
     createdTask,

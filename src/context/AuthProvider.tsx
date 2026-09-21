@@ -4,13 +4,20 @@ import { userService } from "../services/userService";
 import type { UserProfile } from "../services/types";
 import { AuthContext, type AuthStatus, type LoginOptions } from "./AuthContext";
 import keycloak from "../config/keycloak";
-import { markSigningOut } from "../bootSplash";
+import { queryClient } from "../services/queryClient";
+import { clearSigningOut, markSigningOut } from "../bootSplash";
 import { buildRedirectUri, clearRedirectTarget, storeRedirectTarget } from "../auth/redirectUtils";
 /**
  * Provider component that manages the global authentication state via Keycloak.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>("loading");
+  // The boot script (index.html) detects a logout return, or a failed silent SSO check,
+  // before React mounts and leaves this flag for the first render to pick up, so the guard
+  // can keep that load blank instead of flashing its loading skeleton before settling into
+  // authenticated/unauthenticated.
+  const [status, setStatus] = useState<AuthStatus>(() =>
+    window.__bootSigningOut ? "signingOut" : "loading",
+  );
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const isInitialized = useRef(false);
 
@@ -77,6 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         setStatus("unauthenticated");
+      } finally {
+        clearSigningOut();
       }
     };
 
@@ -103,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // what stops the boot splash starting a launch for somebody leaving.
     markSigningOut();
     clearRedirectTarget();
+    queryClient.clear();
     await keycloak.logout({ redirectUri: `${window.location.origin}/login` });
   };
 

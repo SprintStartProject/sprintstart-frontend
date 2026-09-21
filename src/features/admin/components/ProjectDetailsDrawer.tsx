@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertCircle, FileText, Folder, Link2, Loader2, Trash2 } from "lucide-react";
+import { AlertCircle, FileText, Folder, Link2, Loader2, Tag, Trash2 } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -9,6 +9,7 @@ import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
 import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
+import { ProjectIndustryPanel } from "../../projects/industry/ProjectIndustryPanel";
 import { getProjectEditFormState, getProjectSourcesCount, getProjectUsersCount } from "../data";
 import {
   applyPeopleChanges,
@@ -200,6 +201,43 @@ export function ProjectDetailsDrawer({
     }
   };
 
+  // Re-fetches and adopts the whole project, but only into `draftProject` -
+  // never `resetDrafts`, which would also wipe the unrelated people draft.
+  // The name/description draft itself is only replaced while untouched, so an
+  // admin's in-progress edits (or queued people changes) survive a
+  // re-evaluation rather than being silently discarded.
+  const handleIndustryEvaluated = async () => {
+    try {
+      const updatedProject = await projectService.getProjectById(project.id);
+      applyProjectUpdate(updatedProject);
+      if (!hasEditedDetailsRef.current) {
+        setDraftProject(getProjectEditFormState(updatedProject));
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't refresh the project after evaluation.",
+      );
+    }
+  };
+
+  // Same reload-and-adopt approach as `handleIndustryEvaluated`, plus the
+  // actual persist call. Rethrows so `ProjectIndustryPanel` keeps its edit
+  // field open (with the typed value) for the user to retry.
+  const handleSaveIndustry = async (industry: string) => {
+    try {
+      await projectService.setProjectIndustry(project.id, industry);
+      const updatedProject = await projectService.getProjectById(project.id);
+      applyProjectUpdate(updatedProject);
+      if (!hasEditedDetailsRef.current) {
+        setDraftProject(getProjectEditFormState(updatedProject));
+      }
+      toast.success(`Industry set to "${industry}"`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't save the project's industry.");
+      throw error;
+    }
+  };
+
   const confirmDeleteProject = async () => {
     setIsDeleting(true);
 
@@ -312,7 +350,21 @@ export function ProjectDetailsDrawer({
               </div>
             </DrawerCard>
 
-            <DrawerCard index={1}>
+            <DrawerCard label="Industry" icon={Tag} index={1}>
+              <ProjectIndustryPanel
+                projectId={project.id}
+                industry={visibleProject.industry}
+                industryConfidence={visibleProject.industryConfidence}
+                industryCustom={visibleProject.industryCustom}
+                canEvaluate={canManageLifecycle}
+                canEdit={canManageLifecycle}
+                onSave={handleSaveIndustry}
+                disabled={isSaving}
+                onEvaluated={() => void handleIndustryEvaluated()}
+              />
+            </DrawerCard>
+
+            <DrawerCard index={2}>
               <ProjectPeopleSection
                 members={visibleUsers}
                 manager={projectDetails?.manager ?? null}
@@ -325,7 +377,7 @@ export function ProjectDetailsDrawer({
               />
             </DrawerCard>
 
-            <DrawerCard label="Connected sources" icon={Link2} index={2}>
+            <DrawerCard label="Connected sources" icon={Link2} index={3}>
               <SourceList
                 sources={visibleProject.sources}
                 onOpenSourceDetails={
@@ -337,7 +389,7 @@ export function ProjectDetailsDrawer({
             </DrawerCard>
 
             {canManageLifecycle && (
-              <DrawerCard label="Danger zone" variant="danger" index={3}>
+              <DrawerCard label="Danger zone" variant="danger" index={4}>
                 <p className="text-sm text-app-danger-text">
                   Deleting a project removes it and all of its user assignments. Connected sources
                   are kept and stay available to other projects.

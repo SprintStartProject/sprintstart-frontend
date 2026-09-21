@@ -29,6 +29,9 @@ function task(id: string, summary: string | null): StarterWorkTask {
     competencyKeys: [],
     status: "LIVE",
     reviewed: true,
+    taskZeroEligible: false,
+    sourceHasAssignee: null,
+    sourceCheckedAt: null,
   };
 }
 
@@ -38,7 +41,7 @@ describe("StarterWorkPoolCloud descriptions", () => {
     mockViewport();
   });
 
-  it("renders a real description as one truncated line and omits blank descriptions", async () => {
+  it("renders a real description clamped to one line and omits blank descriptions", async () => {
     const user = userEvent.setup();
     const description = "A meaningful description that previews what the task is about.";
 
@@ -48,11 +51,12 @@ describe("StarterWorkPoolCloud descriptions", () => {
         isLoading={false}
         error={null}
         canAct={false}
+        onOpenTask={vi.fn()}
       />,
     );
 
     const cloudDescription = screen.getByText(description);
-    expect(cloudDescription).toHaveClass("truncate");
+    expect(cloudDescription).toHaveClass("line-clamp-1");
     expect(cloudDescription).toHaveAttribute("title", description);
     expect(screen.getByTestId("pool-task-2").querySelector("p")).toBeNull();
 

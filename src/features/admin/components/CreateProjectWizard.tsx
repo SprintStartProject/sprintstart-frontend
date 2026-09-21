@@ -109,6 +109,7 @@ export function CreateProjectWizard({
   // be stale). Cleared as soon as the name is edited.
   const [nameServerError, setNameServerError] = useState("");
   const [description, setDescription] = useState("");
+  const [industry, setIndustry] = useState("");
   const [managerId, setManagerId] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(() => new Set());
 
@@ -271,6 +272,7 @@ export function CreateProjectWizard({
     setNameServerError("");
     setConfirmingClose(false);
     setDescription("");
+    setIndustry("");
     setManagerId("");
     setSelectedUserIds(new Set());
     setSources([]);
@@ -310,6 +312,7 @@ export function CreateProjectWizard({
   const isDirty =
     trimmedName.length > 0 ||
     description.trim().length > 0 ||
+    industry.trim().length > 0 ||
     Boolean(managerId) ||
     selectedUserIds.size > 0 ||
     sources.length > 0;
@@ -507,9 +510,12 @@ export function CreateProjectWizard({
   const ensureProject = async (): Promise<string> => {
     if (createdProjectId) return createdProjectId;
 
+    const trimmedIndustry = industry.trim();
+
     const project = await projectService.createProject({
       name: trimmedName,
       description: description.trim() || undefined,
+      industry: trimmedIndustry || undefined,
     });
 
     // Members before the manager: assigning a manager also makes them a member,
@@ -797,6 +803,7 @@ export function CreateProjectWizard({
               name={name}
               nameError={nameError}
               description={description}
+              industry={industry}
               managerId={managerId}
               managerCandidates={managerCandidates}
               isLoadingCandidates={isLoadingCandidates}
@@ -804,6 +811,7 @@ export function CreateProjectWizard({
               onNameChange={handleNameChange}
               onNameBlur={() => setNameTouched(true)}
               onDescriptionChange={setDescription}
+              onIndustryChange={setIndustry}
               onManagerChange={setManagerId}
               onSubmit={goForward}
             />
@@ -893,6 +901,7 @@ export function CreateProjectWizard({
             <WizardReviewStep
               name={name}
               description={description}
+              industry={industry}
               manager={reviewManager}
               members={reviewMembers}
               sources={sources}

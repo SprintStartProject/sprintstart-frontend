@@ -32,8 +32,16 @@ type SegmentedTabsProps<TValue extends string> = {
    */
   layoutId: string;
   ariaLabel: string;
-  /** Stretch options to fill the row instead of sizing them to their label. */
+  /** Stretch options to fill the row instead of sizing them to their label. Ignored when `wrap` is true. */
   fullWidth?: boolean;
+  /** Allow options to wrap into multiple rows when they exceed container width. */
+  wrap?: boolean;
+  /**
+   * Visual size variant.
+   * - `md` (default): Standard height with text-sm, rounded-xl pills, and px-4 py-2.
+   * - `sm`: Compact height with text-xs, rounded-lg pills, and px-3 py-1.5 for secondary underfilter rows.
+   */
+  size?: "sm" | "md";
   className?: string;
 };
 
@@ -79,16 +87,20 @@ export function SegmentedTabs<TValue extends string>({
   layoutId,
   ariaLabel,
   fullWidth = false,
+  wrap = false,
+  size = "md",
   className = "",
 }: SegmentedTabsProps<TValue>) {
   const [hovered, setHovered] = useState<TValue | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const rowRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
+  const isCompact = size === "sm";
 
   // Brings the selected option back into the row when it is off either edge, and does nothing
   // when it is already visible -- so an ordinary click on a visible tab never scrolls anything.
   useEffect(() => {
+    if (wrap) return;
     const row = rowRef.current;
     const active = activeRef.current;
     if (!row || !active) return;
@@ -116,18 +128,24 @@ export function SegmentedTabs<TValue extends string>({
     } else {
       row.scrollLeft = target;
     }
-  }, [value, prefersReducedMotion]);
+  }, [value, prefersReducedMotion, wrap]);
 
   return (
     <div
       ref={rowRef}
       role="group"
       aria-label={ariaLabel}
-      // `p-1` is what a magnified option grows into: the row may scroll
+      // `p-1` (or `p-0.5` on sm) is what a magnified option grows into: the row may scroll
       // horizontally, and overflow clips at the padding box.
       className={`${
-        fullWidth ? "flex w-full" : "inline-flex max-w-full"
-      } [scrollbar-width:none]! gap-1 overflow-x-auto rounded-2xl border border-app-border/70 bg-app-bg-soft/70 p-1 backdrop-blur-md [&::-webkit-scrollbar]:hidden ${className}`}
+        wrap
+          ? "flex w-full flex-wrap"
+          : fullWidth
+            ? "flex w-full [scrollbar-width:none]! overflow-x-auto [&::-webkit-scrollbar]:hidden"
+            : "inline-flex max-w-full [scrollbar-width:none]! overflow-x-auto [&::-webkit-scrollbar]:hidden"
+      } gap-1 ${
+        isCompact ? "rounded-xl p-0.5" : "rounded-2xl p-1"
+      } border border-app-border/70 bg-app-bg-soft/70 backdrop-blur-md ${className}`}
     >
       {options.map((option) => {
         const isActive = value === option.value;
@@ -145,8 +163,14 @@ export function SegmentedTabs<TValue extends string>({
             onHoverEnd={() => setHovered((current) => (current === option.value ? null : current))}
             animate={{ scale: isMagnified ? TAB_HOVER_SCALE : 1 }}
             transition={dockMagnifySpringToken}
-            className={`group relative inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-              fullWidth ? "flex-1" : ""
+            className={`group relative inline-flex ${
+              wrap ? "min-w-fit" : "shrink-0"
+            } items-center justify-center ${
+              isCompact
+                ? "gap-1.5 rounded-lg px-3 py-1.5 text-xs"
+                : "gap-2 rounded-xl px-4 py-2 text-sm"
+            } font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+              fullWidth && !wrap ? "flex-1" : ""
             } ${isActive ? "text-white" : "text-app-text-muted hover:text-app-text"}`}
           >
             {isActive ? (
@@ -154,12 +178,18 @@ export function SegmentedTabs<TValue extends string>({
                 aria-hidden="true"
                 layoutId={layoutId}
                 transition={prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken}
-                className="absolute inset-0 rounded-xl bg-app-brand shadow-[0_6px_18px_-8px_var(--color-app-brand)]"
+                className={`absolute inset-0 ${
+                  isCompact
+                    ? "rounded-lg shadow-[0_4px_12px_-4px_var(--color-app-brand)]"
+                    : "rounded-xl shadow-[0_6px_18px_-8px_var(--color-app-brand)]"
+                } bg-app-brand`}
               />
             ) : (
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-xl bg-app-surface opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100"
+                className={`pointer-events-none absolute inset-0 ${
+                  isCompact ? "rounded-lg" : "rounded-xl"
+                } bg-app-surface opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100`}
               />
             )}
 
@@ -174,9 +204,9 @@ export function SegmentedTabs<TValue extends string>({
               // actually centres them: the count's smaller font
               // otherwise brings a smaller line box.
               <span
-                className={`relative z-10 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] leading-none font-bold tabular-nums ${
-                  isActive ? "bg-white/20 text-white" : "bg-app-surface text-app-text-subtle"
-                }`}
+                className={`relative z-10 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 leading-none font-bold tabular-nums ${
+                  isCompact ? "min-w-4 text-[10px]" : "min-w-5 text-[11px]"
+                } ${isActive ? "bg-white/20 text-white" : "bg-app-surface text-app-text-subtle"}`}
               >
                 {option.count}
               </span>

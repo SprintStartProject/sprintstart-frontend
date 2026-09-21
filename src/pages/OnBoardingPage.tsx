@@ -2,7 +2,8 @@
 // OnBoardingPage.tsx
 // ============================================================
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
@@ -23,6 +24,7 @@ import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { onboardingService } from "../services/onboardingService";
+import { queryKeys } from "../services/queryKeys";
 import { ApiError } from "../services/apiClient";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { StepOriginBadge } from "../features/onboarding/components/StepOriginBadge";
@@ -45,7 +47,7 @@ import {
   GitBranch,
   ListChecks,
 } from "lucide-react";
-import { PageHeader } from "../components/layout/PageHeader";
+import { PageShell } from "../components/layout/PageShell";
 import { DinoGame } from "../features/chatbot/components/DinoGame";
 import { QuestionModal } from "../features/onboarding/components/QuestionModal";
 import { useMoments } from "../features/moments";
@@ -133,6 +135,11 @@ export function OnBoardingPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const invalidateMyOnboardingStatus = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() }),
+    [queryClient],
+  );
 
   // The project the user currently has selected. Path generation is
   // project-scoped, so a regenerated path is rebuilt from this project's active
@@ -251,6 +258,7 @@ export function OnBoardingPage() {
       }
     }
     if (answered) {
+      void invalidateMyOnboardingStatus();
       void refreshPath();
     }
   };
@@ -279,6 +287,7 @@ export function OnBoardingPage() {
         onStage: (name, detail) => setGenerationStage({ name, detail }),
         onPath: (path) => {
           setOnBoardingPath(path);
+          void invalidateMyOnboardingStatus();
           setSelectedPhaseIndex(findActivePhaseIndex(path));
         },
         onDone: () => setLoadingState("success"),
@@ -532,6 +541,7 @@ export function OnBoardingPage() {
   const startStep = async (stepId: string) => {
     try {
       await onboardingService.startStep(stepId);
+      await invalidateMyOnboardingStatus();
     } catch (err) {
       console.error("Failed to start onboarding step:", err);
     }
@@ -569,12 +579,18 @@ export function OnBoardingPage() {
     (loadingState === "empty" && isProjectLoading)
   ) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <div className="flex flex-col items-center gap-4 text-app-text-muted">
-          <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
-          <p className="text-sm">Loading onboarding path...</p>
+      <PageShell
+        icon={Sparkles}
+        title="Your onboarding journey"
+        subtitle="Follow your personalized path, continue the next task and review completed steps."
+      >
+        <div className="flex min-h-96 items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-app-text-muted">
+            <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+            <p className="text-sm">Loading onboarding path...</p>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -609,18 +625,24 @@ export function OnBoardingPage() {
   // ── RENDER: ERROR STATE ────────────────────────────────────
   if (loadingState === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg p-8">
-        <div className="max-w-md text-center">
-          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
-          <h2 className="mb-2 text-lg font-semibold text-app-text">
-            Onboarding could not be loaded
-          </h2>
-          <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
-          <Button variant="primary" onClick={() => window.location.reload()}>
-            Try again
-          </Button>
+      <PageShell
+        icon={Sparkles}
+        title="Your onboarding journey"
+        subtitle="Follow your personalized path, continue the next task and review completed steps."
+      >
+        <div className="flex min-h-96 items-center justify-center p-8">
+          <div className="max-w-md text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-app-danger-solid" />
+            <h2 className="mb-2 text-lg font-semibold text-app-text">
+              Onboarding could not be loaded
+            </h2>
+            <p className="mb-6 text-sm text-app-text-muted">{errorMessage}</p>
+            <Button variant="primary" onClick={() => window.location.reload()}>
+              Try again
+            </Button>
+          </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -665,9 +687,15 @@ export function OnBoardingPage() {
   // ── RENDER: EMPTY STATE ────────────────────────────────────
   if (!OnBoardingPathEndpoint) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-app-bg">
-        <p className="text-sm text-app-text-muted">No onboarding path found.</p>
-      </div>
+      <PageShell
+        icon={Sparkles}
+        title="Your onboarding journey"
+        subtitle="Follow your personalized path, continue the next task and review completed steps."
+      >
+        <div className="flex min-h-96 items-center justify-center">
+          <p className="text-sm text-app-text-muted">No onboarding path found.</p>
+        </div>
+      </PageShell>
     );
   }
 
@@ -713,105 +741,103 @@ export function OnBoardingPage() {
   }
 
   // ── RENDER: SUCCESS STATE ──────────────────────────────────
-  return (
-    <div className="min-h-screen bg-app-bg">
-      {/* ── HEADER ───────────────────────────────────────── */}
-      <div className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="app-page-content py-4">
-          <PageHeader
-            icon={Sparkles}
-            title="Your onboarding journey"
-            subtitle="Follow your personalized path, continue the next task and review completed steps."
-            className="mb-4"
-            actions={
-              <>
-                {generationIssues.length > 0 && (
-                  <span
-                    role="status"
-                    aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
-                  >
-                    <Badge variant="warning" size="sm" title={generationIssueSummary}>
-                      <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                      {generationIssues.length}
-                    </Badge>
-                  </span>
-                )}
-                <Button
-                  variant="secondary"
-                  iconOnly
-                  onClick={() => void generatePath()}
-                  aria-label="Regenerate path with AI"
-                  title="Regenerate path with AI"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
+  const headerActions = (
+    <>
+      {generationIssues.length > 0 && (
+        <span
+          role="status"
+          aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
+        >
+          <Badge variant="warning" size="sm" title={generationIssueSummary}>
+            <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+            {generationIssues.length}
+          </Badge>
+        </span>
+      )}
+      <Button
+        variant="secondary"
+        iconOnly
+        onClick={() => void generatePath()}
+        aria-label="Regenerate path with AI"
+        title="Regenerate path with AI"
+      >
+        <RefreshCw className="h-4 w-4" />
+      </Button>
 
-                <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
-                  <div className="text-3xl font-bold text-app-brand">{totalPercentage}%</div>
-                  <div className="text-xs font-medium text-app-brand-text">overall</div>
-                </div>
-              </>
-            }
-          />
+      <div className="rounded-2xl border border-app-brand-border bg-app-brand-soft px-4 py-2 text-right">
+        <div className="text-3xl font-bold text-app-brand">{totalPercentage}%</div>
+        <div className="text-xs font-medium text-app-brand-text">overall</div>
+      </div>
+    </>
+  );
 
-          {/* Total progress bar */}
-          <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
+  const headerBandExtra = (
+    <>
+      {/* Total progress bar */}
+      <ProgressBar value={totalProgress.completed} max={totalProgress.total} />
 
-          {/* Phase tabs */}
-          <div
-            ref={phaseTabsRef}
-            className="mt-4 flex w-full max-w-full min-w-0 gap-3 overflow-x-auto pb-2"
-            aria-label="Onboarding phases"
-          >
-            {OnBoardingPathEndpoint.phases.map((phase, index) => {
-              const progress = getPhaseProgress(phase);
-              const isSelected = selectedPhaseIndex === index;
+      {/* Phase tabs */}
+      <div
+        ref={phaseTabsRef}
+        className="mt-4 flex w-full max-w-full min-w-0 gap-3 overflow-x-auto pb-2"
+        aria-label="Onboarding phases"
+      >
+        {OnBoardingPathEndpoint.phases.map((phase, index) => {
+          const progress = getPhaseProgress(phase);
+          const isSelected = selectedPhaseIndex === index;
 
-              return (
-                <button
-                  key={phase.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => {
-                    setSelectedPhaseIndex(index);
-                    clearLink();
-                  }}
-                  className={`min-w-64 flex-1 rounded-2xl border p-4 text-left transition-all duration-200 motion-reduce:hover:scale-100 ${
-                    isSelected
-                      ? "border-app-brand bg-app-brand-soft"
-                      : "border-app-border bg-app-surface hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg"
+          return (
+            <button
+              key={phase.id}
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => {
+                setSelectedPhaseIndex(index);
+                clearLink();
+              }}
+              className={`min-w-64 flex-1 rounded-2xl border p-4 text-left transition-all duration-200 motion-reduce:hover:scale-100 ${
+                isSelected
+                  ? "border-app-brand bg-app-brand-soft"
+                  : "border-app-border bg-app-surface hover:scale-[1.02] hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg"
+              }`}
+            >
+              <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-app-text">
+                {phase.locked && <Lock className="h-3.5 w-3.5 shrink-0 text-app-text-disabled" />}
+                <span className="truncate">{phase.title}</span>
+              </div>
+              <ProgressBar value={progress.completed} max={progress.total} />
+              <div className="mt-2 flex justify-between">
+                <span className="text-xs text-app-text-muted">
+                  {progress.completed}/{progress.total} items
+                </span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    progress.percentage === 100
+                      ? "bg-app-success-bg text-app-success-text"
+                      : "bg-app-surface-muted text-app-text-muted"
                   }`}
                 >
-                  <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-app-text">
-                    {phase.locked && (
-                      <Lock className="h-3.5 w-3.5 shrink-0 text-app-text-disabled" />
-                    )}
-                    <span className="truncate">{phase.title}</span>
-                  </div>
-                  <ProgressBar value={progress.completed} max={progress.total} />
-                  <div className="mt-2 flex justify-between">
-                    <span className="text-xs text-app-text-muted">
-                      {progress.completed}/{progress.total} items
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        progress.percentage === 100
-                          ? "bg-app-success-bg text-app-success-text"
-                          : "bg-app-surface-muted text-app-text-muted"
-                      }`}
-                    >
-                      {progress.percentage}%
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  {progress.percentage}%
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
+    </>
+  );
 
-      {/* ── MAIN CONTENT ─────────────────────────────────── */}
-      <main className="app-page-content py-6 pt-8 pb-24">
+  return (
+    <>
+      <PageShell
+        icon={Sparkles}
+        title="Your onboarding journey"
+        subtitle="Follow your personalized path, continue the next task and review completed steps."
+        frame="content"
+        actions={headerActions}
+        bandExtra={headerBandExtra}
+        mainClassName="py-6 pt-8 pb-24"
+      >
         <div className="mb-6 flex flex-wrap gap-2" aria-label="Onboarding view">
           <Button
             size="sm"
@@ -1158,7 +1184,7 @@ export function OnBoardingPage() {
             </div>
           </>
         )}
-      </main>
+      </PageShell>
 
       {/* Per-question answer modal. Opened by the card's own button, never by a link. */}
       {questionToAnswer && (
@@ -1168,6 +1194,6 @@ export function OnBoardingPage() {
           onClose={closeQuestionModal}
         />
       )}
-    </div>
+    </>
   );
 }

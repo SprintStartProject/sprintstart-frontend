@@ -56,18 +56,21 @@ export function FlagToPmButton({
   // compete with the composer for attention. Only what it opens wears the new look.
   if (!isOpen && status !== "sent") {
     return (
-      <button
-        type="button"
+      // The same quiet `xs` action as "Copy" and "Keep on my board" under the buddy's replies, so
+      // the actions under a question and under an answer are one family rather than a text link
+      // on one side and a toolbar button on the other.
+      <Button
+        variant="ghost"
+        size="xs"
+        icon={<Flag className="h-3.5 w-3.5" aria-hidden="true" />}
         onClick={() => {
           setQuestion(defaultQuestion);
           setIsOpen(true);
           setStatus("idle");
         }}
-        className="flex items-center gap-1.5 rounded text-xs text-app-text-disabled transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
       >
-        <Flag className="h-3.5 w-3.5" aria-hidden="true" />
         {triggerLabel}
-      </button>
+      </Button>
     );
   }
 

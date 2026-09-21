@@ -19,6 +19,8 @@ type BuddyThreadProps = {
   dismissAction: (messageId: string, actionId: string) => void;
   /** Names above the bubbles — on for the page, off in the dock. */
   showNames?: boolean;
+  /** The dock's narrow layout — see `BuddyMessage`'s `compact`. */
+  compact?: boolean;
   /** Rendered above the first message: what came back from the hire's PM. */
   before?: ReactNode;
   /**
@@ -92,6 +94,7 @@ export function BuddyThread({
   confirmAction,
   dismissAction,
   showNames = false,
+  compact = false,
   before,
   lastMessageFooter,
   renderQuestionAction,
@@ -183,6 +186,7 @@ export function BuddyThread({
             <BuddyMessage
               speaker={isUser ? "YOU" : "BUDDY"}
               showName={showNames}
+              compact={compact}
               isStreaming={message.id === streamingId}
               error={message.error}
               footer={

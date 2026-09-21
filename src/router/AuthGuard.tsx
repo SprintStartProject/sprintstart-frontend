@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { PageShellSkeleton } from "../components/layout/PageShell";
 import {
   getDefaultRoute,
   getMatchingProtectedRoute,
@@ -51,16 +52,18 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
       setCheckingSkillAssessment(true);
 
-      // Nothing here may throw past this point: the guard renders a full-screen spinner
-      // while it runs, so an unhandled rejection leaves the whole app on that spinner.
+      // Nothing here may throw past this point: the guard renders a loading skeleton
+      // while it runs, so an unhandled rejection leaves the whole app on that skeleton.
       // A user whose overview cannot be read (no onboarding path, or a role that may not
       // read it) simply has no assessment to prompt for — that is not a reason to lock
       // them out of the app.
       try {
         const teamMember = await getMyTeamOverview();
-        const completed = await hasCompletedSkillAssessment(teamMember.userId);
         const promptState = getSkillAssessmentPromptState(teamMember.userId);
-        const allSkills = await getSkills();
+        const [completed, allSkills] = await Promise.all([
+          hasCompletedSkillAssessment(teamMember.userId),
+          getSkills(),
+        ]);
 
         const hasSkillsForRoles = teamMember.roles.some((role) =>
           allSkills.some(
@@ -82,12 +85,19 @@ export function AuthGuard({ children }: AuthGuardProps) {
     void checkSkillAssessment();
   }, [status, profile?.id]);
 
+  // A logout return, or a failed silent SSO check, keeps that load blank until auth
+  // settles, just like its suppressed splash -- see `AuthProvider`'s initial state for
+  // how the boot script's flag becomes this.
+  if (status === "signingOut") return null;
+
+  // `PageShellSkeleton` previews the header/band every *other* route settles into --
+  // wrong here, since `LoginPage` has no header at all. Landing on `/login` while still
+  // `loading` (the redirect chain above can take a moment to resolve once it is back)
+  // would otherwise flash that mismatched band right before the login card replaces it.
+  if (status === "loading" && location.pathname === "/login") return null;
+
   if (status === "loading" || checkingSkillAssessment) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-app-bg">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-app-brand border-t-transparent" />
-      </div>
-    );
+    return <PageShellSkeleton />;
   }
 
   if (status === "unauthenticated" && location.pathname !== "/login") {

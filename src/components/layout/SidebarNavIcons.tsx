@@ -5,12 +5,12 @@ import {
   Briefcase,
   ChartColumn,
   Database,
+  DoorOpen,
   Inbox,
   LayoutDashboard,
   MessageSquare,
   PlaneLanding,
   Rocket,
-  Target,
   Terminal,
 } from "lucide-react";
 
@@ -285,48 +285,57 @@ export function DataIngestionIcon({ isActive }: SidebarIconProps) {
   );
 }
 
-/** Starter Work: the sight locks on — rings close in, then the bullseye lands. */
-export function StarterWorkIcon({ isActive }: SidebarIconProps) {
+/**
+ * Hire Setup: the door swings open, then the threshold settles in at its foot.
+ *
+ * Same silhouette as the page's own header icon, which is what makes the sidebar entry and the
+ * page recognisably the same thing.
+ */
+export function HireSetupIcon({ isActive }: SidebarIconProps) {
   const playKey = usePlayOnActivate(isActive);
   const hasPlayed = playKey > 0;
   const prefersReducedMotion = useReducedMotion();
 
-  if (prefersReducedMotion) return <Target className={ICON_CLASS} />;
+  if (prefersReducedMotion) return <DoorOpen className={ICON_CLASS} />;
 
   return (
     <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
-      {/* The two outer rings close inward with a short stagger, so the
-                target reads as a sight settling rather than three circles
-                fading in together. Scaled about the centre they share. */}
-      {[
-        { r: 10, delay: 0 },
-        { r: 6, delay: 0.07 },
-      ].map((ring) => (
-        <motion.circle
-          key={ring.r}
-          cx={12}
-          cy={12}
-          r={ring.r}
-          style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
-          initial={hasPlayed ? { scale: 1.35, opacity: 0 } : false}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ ...bounce, delay: ring.delay }}
-        />
-      ))}
+      {/* The frame is fixed, so the door has something to swing out of. */}
+      <path d="M11 4H8a2 2 0 0 0-2 2v14" />
 
-      {/* The bullseye lands last and overshoots, so the lock-on has a
-                beat of impact instead of merely appearing. Filled rather
-                than stroked: a 2px ring at r=2 is nearly a dot anyway. */}
-      <motion.circle
-        cx={12}
-        cy={12}
-        r={2}
-        fill="currentColor"
-        stroke="none"
-        style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
+      {/* The door itself swings open from flush against the frame, pivoting on its hinge at
+                the left edge, and overshoots slightly before settling. */}
+      <motion.path
+        d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"
+        style={{ transformOrigin: "11px 12px", transformBox: "view-box" }}
+        initial={hasPlayed ? { scaleX: 0.1, opacity: 0 } : false}
+        animate={hasPlayed ? { scaleX: [0.1, 1.15, 1], opacity: 1 } : { scaleX: 1, opacity: 1 }}
+        transition={{ duration: 0.45, ease: "easeOut", times: [0, 0.7, 1] }}
+      />
+
+      {/* The handle pops in once the door has settled open. */}
+      <motion.path
+        d="M14 12h.01"
+        style={{ transformOrigin: "14px 12px", transformBox: "view-box" }}
         initial={hasPlayed ? { scale: 0 } : false}
-        animate={hasPlayed ? { scale: [0, 1.5, 1] } : { scale: 1 }}
-        transition={{ duration: 0.4, delay: 0.16, ease: "easeOut", times: [0, 0.6, 1] }}
+        animate={hasPlayed ? { scale: [0, 1.6, 1] } : { scale: 1 }}
+        transition={{ duration: 0.3, delay: 0.3, ease: "easeOut", times: [0, 0.6, 1] }}
+      />
+
+      {/* The threshold draws outward from the doorway last, the floor arriving under it. */}
+      <motion.path
+        d="M11 20H2"
+        style={{ transformOrigin: "11px 20px", transformBox: "view-box" }}
+        initial={hasPlayed ? { scaleX: 0 } : false}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 0.25, delay: 0.36, ease: "easeOut" }}
+      />
+      <motion.path
+        d="M22 20h-3"
+        style={{ transformOrigin: "19px 20px", transformBox: "view-box" }}
+        initial={hasPlayed ? { scaleX: 0 } : false}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 0.25, delay: 0.36, ease: "easeOut" }}
       />
     </IconFrame>
   );

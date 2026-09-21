@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { isOnboardingAccessible } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
 import { ApiError } from "../../../services/apiClient";
 import { onboardingService } from "../../../services/onboardingService";
+import { queryKeys } from "../../../services/queryKeys";
 import {
   countPathProgress,
   resolveNextAction,
@@ -21,6 +22,9 @@ export type MyOnboardingStatus =
   | { state: "ready"; progress: PathProgress; nextAction: OnboardingNextAction };
 
 const ABSENT: MyOnboardingStatus = { state: "absent" };
+
+type OnboardingQueryResult =
+  { kind: "absent" } | { kind: "ready"; progress: PathProgress; nextAction: OnboardingNextAction };
 
 /**
  * How far the signed-in user is through their own onboarding, and what comes next.
@@ -44,43 +48,35 @@ export function useMyOnboardingStatus(): MyOnboardingStatus {
   const { profile } = useAuth();
   const isAvailable = isOnboardingAccessible(profile);
 
-  const [status, setStatus] = useState<MyOnboardingStatus>({ state: "loading" });
-
-  useEffect(() => {
-    // Nothing to ask about — the gate below reports `absent` without a request.
-    if (!isAvailable) return;
-
-    let isCurrentRequest = true;
-
-    async function load() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: queryKeys.onboarding.myStatus(profile?.id ?? ""),
+    queryFn: async (): Promise<OnboardingQueryResult> => {
       try {
         const path = await onboardingService.fetchPath();
         const nextAction = resolveNextAction(path);
 
-        if (!isCurrentRequest) return;
-
-        setStatus({
-          state: "ready",
+        return {
+          kind: "ready",
           progress: countPathProgress(path),
           nextAction,
-        });
+        };
       } catch (error) {
-        if (!isCurrentRequest) return;
-
-        setStatus({
-          state: error instanceof ApiError && error.status === 404 ? "absent" : "error",
-        });
+        if (error instanceof ApiError && error.status === 404) {
+          return { kind: "absent" };
+        }
+        throw error;
       }
-    }
-
-    void load();
-
-    return () => {
-      isCurrentRequest = false;
-    };
-  }, [isAvailable]);
+    },
+    enabled: isAvailable,
+  });
 
   // Derived rather than stored, so a profile that loses its onboarding (role removed,
   // journey completed) can never leave a stale card behind.
-  return isAvailable ? status : ABSENT;
+  if (!isAvailable) return ABSENT;
+  if (isLoading) return { state: "loading" };
+  if (isError) return { state: "error" };
+  if (data?.kind === "absent") return ABSENT;
+  if (data?.kind === "ready")
+    return { state: "ready", progress: data.progress, nextAction: data.nextAction };
+  return { state: "loading" };
 }

@@ -138,4 +138,36 @@ describe("useBoard", () => {
     expect(result.current.board?.cards).toHaveLength(1);
     expect(result.current.dismissingId).toBeNull();
   });
+  it("does not let an older refresh overwrite a saved card edit", async () => {
+    let finishRefresh: (value: Board) => void = () => {};
+    vi.mocked(boardService.fetchBoard)
+      .mockResolvedValueOnce(board(["c1"]))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Board>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      );
+    vi.mocked(boardService.editCard).mockResolvedValue(note("c1", "saved"));
+
+    const { result } = renderHook(() => useBoard("p1"));
+    await waitFor(() => expect(result.current.board?.cards).toHaveLength(1));
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(boardService.fetchBoard).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      await result.current.editCard("c1", { kind: "NOTE", text: "saved" });
+    });
+
+    await act(async () => {
+      finishRefresh(board(["c1"]));
+      await Promise.resolve();
+    });
+
+    expect(result.current.board?.cards[0].content).toEqual({
+      kind: "NOTE",
+      text: "saved",
+    });
+  });
 });

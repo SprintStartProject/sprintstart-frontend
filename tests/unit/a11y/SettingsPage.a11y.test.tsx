@@ -23,7 +23,7 @@ vi.mock("../../../src/context/useAuth", () => ({
   }),
 }));
 
-// The Moments section reads the celebratory layer, which lives behind its own
+// The Appearance section reads the celebratory layer, which lives behind its own
 // provider. Stubbed rather than mounted: the toggle's markup is what axe needs
 // to see, and the real provider would drag the overlays and the boot-splash
 // hand-over into a page that is not being tested for either.

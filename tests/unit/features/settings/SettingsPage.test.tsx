@@ -43,7 +43,7 @@ vi.mock("../../../../src/features/settings/hooks/useGithubTokens", () => ({
   }),
 }));
 
-// The Moments section reads the celebratory layer, which lives behind its own
+// The Appearance section reads the celebratory layer, which lives behind its own
 // provider. This test is about which sections a permission group sees, not
 // about the rocket pet, so the hook is stubbed rather than the whole provider
 // mounted — same as the onboarding page tests do.
@@ -94,7 +94,7 @@ describe("SettingsPage", () => {
 
     expect(screen.getAllByText("User Profile").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Appearance").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Moments").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Moments")).not.toBeInTheDocument();
     expect(screen.getAllByText("Access Tokens").length).toBeGreaterThan(0);
   });
 

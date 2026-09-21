@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { getTeamOverview, onPmAttentionChanged } from "../../services/teamManagementService";
 import { MIN_REFRESH_INTERVAL_MS, useRateLimitedRead } from "../../hooks/useRateLimitedRead";
+import { queryKeys } from "../../services/queryKeys";
+import type { TeamOverviewUser } from "./types";
 
 export { MIN_REFRESH_INTERVAL_MS };
+
+const NO_USERS: TeamOverviewUser[] = [];
 
 /**
  * Whether the PM Dashboard has anything waiting: a pending skip request, or
@@ -18,6 +23,11 @@ export { MIN_REFRESH_INTERVAL_MS };
  * request, and the service already folds unread feedback into `hasFeedback`.
  * There is no lighter endpoint for either.
  *
+ * Reads under `queryKeys.teamOverview.filtered`, the same key (and the same
+ * `getTeamOverview` call) `TeamOverviewWidget` uses -- the sidebar badge and the
+ * dashboard card share one cache entry instead of each firing their own request
+ * for the same project's overview.
+ *
  * The freshness machinery — rate limiting, revalidating on tab focus, surviving
  * StrictMode's double-invoke — lives in {@link useRateLimitedRead}, which was
  * extracted from this hook when the escalation inbox needed the same thing.
@@ -31,25 +41,25 @@ export function usePmAttentionFlag(
   enabled: boolean,
   refreshKey?: string,
 ): boolean {
-  // Bumped when the user acts on the very thing the badge points at, so the
-  // recheck is immediate rather than waiting for the rate limit to lapse. Stays
-  // here rather than in the generic hook: it is this signal's own bus.
-  const [changeNonce, setChangeNonce] = useState(0);
+  const queryClient = useQueryClient();
+  const isActive = enabled && Boolean(projectId);
 
-  useEffect(
-    () =>
-      onPmAttentionChanged(() => {
-        setChangeNonce((current) => current + 1);
-      }),
-    [],
+  // Re-subscribed on a project switch so the closure always invalidates the
+  // project actually on screen. What used to be a local nonce bumped on this
+  // event is now a direct cache invalidation of that project's own query.
+  useEffect(() => {
+    if (!projectId) return;
+    return onPmAttentionChanged(() => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamOverview.filtered(projectId) });
+    });
+  }, [queryClient, projectId]);
+
+  const users = useRateLimitedRead(
+    queryKeys.teamOverview.filtered(projectId ?? null),
+    () => getTeamOverview(undefined, undefined, [projectId as string]),
+    NO_USERS,
+    { enabled: isActive, refreshKey },
   );
 
-  return useRateLimitedRead(
-    async () => {
-      const users = await getTeamOverview(undefined, undefined, [projectId as string]);
-      return users.some((user) => user.hasFeedback || user.currentStep?.skip?.status === "PENDING");
-    },
-    false,
-    { key: projectId, enabled, refreshKey, nonce: changeNonce },
-  );
+  return users.some((user) => user.hasFeedback || user.currentStep?.skip?.status === "PENDING");
 }

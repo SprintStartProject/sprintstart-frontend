@@ -11,6 +11,7 @@ type WizardDetailsStepProps = {
   /** Validation message for the name field; its presence flags the error state. */
   nameError?: string;
   description: string;
+  industry: string;
   managerId: string;
   managerCandidates: ProjectManager[];
   isLoadingCandidates: boolean;
@@ -19,6 +20,7 @@ type WizardDetailsStepProps = {
   /** Marks the name field as touched so a blank-name error can appear on leave. */
   onNameBlur?: () => void;
   onDescriptionChange: (value: string) => void;
+  onIndustryChange: (value: string) => void;
   onManagerChange: (value: string) => void;
   /** Advances to the next step, so Enter in a field submits the wizard's step. */
   onSubmit: () => void;
@@ -39,6 +41,7 @@ export function WizardDetailsStep({
   name,
   nameError,
   description,
+  industry,
   managerId,
   managerCandidates,
   isLoadingCandidates,
@@ -46,11 +49,13 @@ export function WizardDetailsStep({
   onNameChange,
   onNameBlur,
   onDescriptionChange,
+  onIndustryChange,
   onManagerChange,
   onSubmit,
 }: WizardDetailsStepProps) {
   const nameInputId = useId();
   const descriptionInputId = useId();
+  const industryInputId = useId();
   const managerLabelId = useId();
 
   const noManagerLabel = isLoadingCandidates
@@ -91,6 +96,18 @@ export function WizardDetailsStep({
           minRows={4}
           maxRows={12}
           placeholder="What is this project about?"
+        />
+      </Field>
+
+      <Field
+        label="Industry"
+        controlId={industryInputId}
+        hint="Optional. Leave empty and set or evaluate it later from the project's admin drawer."
+      >
+        <Input
+          value={industry}
+          onChange={(event) => onIndustryChange(event.target.value)}
+          placeholder="e.g. Fintech / Banking"
         />
       </Field>
 

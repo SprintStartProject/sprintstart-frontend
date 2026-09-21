@@ -85,5 +85,12 @@ export default defineConfig([
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    // A `render` re-export for tests, not a component boundary the dev server hot-reloads.
+    files: ["tests/unit/setup/rtl.tsx"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
   prettier,
 ]);

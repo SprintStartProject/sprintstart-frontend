@@ -12,9 +12,10 @@ import {
   TrendingDown,
   type LucideIcon,
 } from "lucide-react";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useAttention } from "../hooks/useAttention";
 import { ClickableCard } from "../../../components/common/ClickableCard";
@@ -94,19 +95,17 @@ export function OnboardingMetricsWidget() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const {
     data: metrics,
     loading,
     error,
-  } = useFetch(
-    () =>
-      selectedProjectId
-        ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
-        : Promise.resolve(null),
-    [selectedProjectId, refreshKey],
+    refetch: refetchMetrics,
+  } = useQueryFetch(queryKeys.onboardingMetrics.project(selectedProjectId), () =>
+    selectedProjectId
+      ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
+      : Promise.resolve(null),
   );
 
   const {
@@ -121,7 +120,7 @@ export function OnboardingMetricsWidget() {
   const handleRefresh = async () => {
     if (!selectedProjectId) return;
     setRefreshing(true);
-    setRefreshKey((key) => key + 1);
+    refetchMetrics();
     try {
       await reloadAttention();
     } catch {
