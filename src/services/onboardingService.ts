@@ -98,7 +98,10 @@ export const onboardingService = {
       }
     }
 
-    handlers.onDone();
+    // Falling out of the loop means the body ended without `done` or `error`, which the backend
+    // never does on purpose. Reporting a finished path here told members their path was ready
+    // while it was still being built.
+    handlers.onInterrupted?.();
   },
 
   /**

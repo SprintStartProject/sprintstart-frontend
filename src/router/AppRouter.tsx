@@ -151,8 +151,25 @@ export function AppRouter() {
               <Route path="/buddy" element={<BuddyPage />} />
             </Route>
             <Route path="/onboarding" element={<OnBoardingPage />} />
-            <Route path="/blueprints" element={<BlueprintPathsPage />} />
-            <Route path="/blueprints/:pathId" element={<BlueprintPathDetailPage />} />
+            {/* Guarded for the same reason as `/hire-setup` below: the policy calls authoring
+              PM/HR/ADMIN-only and the sidebar merely hides it, which leaves the URL. Both
+              addresses share one policy entry -- `routePrefixes` maps `/blueprints/` onto it. */}
+            <Route
+              path="/blueprints"
+              element={
+                <ManagerAreaGuard route="/blueprints">
+                  <BlueprintPathsPage />
+                </ManagerAreaGuard>
+              }
+            />
+            <Route
+              path="/blueprints/:pathId"
+              element={
+                <ManagerAreaGuard route="/blueprints">
+                  <BlueprintPathDetailPage />
+                </ManagerAreaGuard>
+              }
+            />
             <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
             {/* The old address of a step page: opens the path with that step unfolded. */}
             <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />

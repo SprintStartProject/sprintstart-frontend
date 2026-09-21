@@ -75,6 +75,19 @@ describe("accessPolicy", () => {
       expect(canAccessRoute(pmProfile, "/insights/knowledge-requests", true)).toBe(true);
     });
 
+    it("gates a PM out of blueprint authoring for a project they only belong to", () => {
+      const pmProfile = createMockProfile(PermissionGroup.PM);
+
+      // Both pages build their scope from the selected project, so the same rule applies
+      // as for the team and insights routes above.
+      expect(canAccessRoute(pmProfile, "/blueprints", false)).toBe(false);
+      expect(canAccessRoute(pmProfile, "/blueprints", true)).toBe(true);
+      // A hire never gets there, whichever project is selected.
+      expect(canAccessRoute(createMockProfile(PermissionGroup.USER), "/blueprints", true)).toBe(
+        false,
+      );
+    });
+
     it("leaves routes outside the manager-scoped set ungated for a PM", () => {
       const pmProfile = createMockProfile(PermissionGroup.PM);
 

@@ -25,6 +25,7 @@ import {
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
+import { useDialogFocus } from "../../../components/ui/useDialogFocus.ts";
 import {
   SWIPE_IGNORE_ATTRIBUTE,
   useHorizontalWheelNavigation,
@@ -598,8 +599,18 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
 
       event.preventDefault();
       setSelectedId(next);
+      // Focus follows the ring, and the view follows both.
+      //
+      // Enter is handled on the focused node, so a ring that moved on its own meant the ring sat
+      // on one node and Enter opened another -- whichever had last been focused. And the ring can
+      // walk off the visible canvas, which is the same problem one step later.
+      const surface = event.currentTarget;
+      window.requestAnimationFrame(() => {
+        surface.querySelector<HTMLElement>(`[data-journey-node="${next}"]`)?.focus();
+        void camera.current?.revealNode(next);
+      });
     },
-    [entryPoints, nodes, positions, selectedId],
+    [camera, entryPoints, nodes, positions, selectedId],
   );
 
   const openNode = openNodeId ? (nodeById.get(openNodeId) ?? null) : null;
@@ -1146,6 +1157,11 @@ function NodeCover({
   onGo: (side: "previous" | "next") => void;
   children: ReactNode;
 }) {
+  // A node opened until it is a page is a dialog, whatever it is drawn on: focus moves into it,
+  // Tab stays inside, and focus goes back to the node when it closes. Without that, Enter on a
+  // node left focus on the node this page now covers.
+  const pageRef = useDialogFocus<HTMLElement>(true);
+
   return (
     /*
       Pressing beside the page closes it. Dismissing a layer that way is the one gesture nobody has
@@ -1163,11 +1179,15 @@ function NodeCover({
       }}
     >
       <motion.section
+        ref={pageRef}
+        role="dialog"
+        aria-modal="true"
         aria-label={title}
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface shadow-2xl"
+        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface shadow-2xl outline-none"
       >
         <header className="border-b border-app-border bg-app-brand-soft/30 px-4 py-3 sm:px-6">
           <nav

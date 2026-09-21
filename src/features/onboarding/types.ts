@@ -283,4 +283,10 @@ export interface OnboardingPersonalizeHandlers {
   onDone: () => void;
   /** `reason` is a code for failures the client can explain, e.g. `not-enough-knowledge`. */
   onError?: (message: string, reason?: string) => void;
+  /**
+   * The stream ended without `done` or `error`. The backend always terminates with one of the
+   * two, so this means the connection was cut -- an idle proxy, a restart, a dropped network --
+   * while the run itself carries on detached. Not a finished path.
+   */
+  onInterrupted?: () => void;
 }

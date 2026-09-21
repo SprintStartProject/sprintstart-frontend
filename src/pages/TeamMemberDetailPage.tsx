@@ -1,15 +1,13 @@
 import {
-  Check,
   MessageSquareText,
   Pencil,
   Plus,
-  SkipForward,
   ThumbsDown,
   ThumbsUp,
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
 import type {
@@ -68,6 +66,7 @@ import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
 } from "../features/team-management/components/detail/PhaseCheckAdminModal";
+import { SkipReview } from "../features/team-management/components/detail/SkipReview";
 import { StepDetailsPanel } from "../features/team-management/components/detail/StepDetailsPanel";
 import { useProjectContext } from "../features/projects/useProjectContext";
 
@@ -150,7 +149,11 @@ export function TeamMemberDetailPage() {
   const [stepTasksById, setStepTasksById] = useState<Record<string, OnboardingTaskEndpoint[]>>({});
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [markingFeedbackId, setMarkingFeedbackId] = useState<string | null>(null);
-  const [reviewingSkipAction, setReviewingSkipAction] = useState<"accept" | "deny" | null>(null);
+  // Keyed on the skip, not on the page: the same request is answerable from the card below and
+  // from the step it belongs to. The ref is the guard (a second click in the same tick still sees
+  // it), the state is what disables both controls.
+  const skipsInReview = useRef(new Set<string>());
+  const [reviewingSkipIds, setReviewingSkipIds] = useState<readonly string[]>([]);
   // `feedbackError` stays for the feedback *load* failure (shown inline where the
   // list would be); every action outcome on this page is a toast instead.
   const [feedbackError, setFeedbackError] = useState("");
@@ -359,8 +362,15 @@ export function TeamMemberDetailPage() {
   /**
    * Answers a skip request -- the current step's from the card below, or any step's from where the
    * step is shown. Phases run side by side, so the one waiting is not always the current step.
+   *
+   * One decision per request, and only one in flight: both surfaces can be on screen at once, the
+   * answer cannot be retried once it is in, and a skip accepted and declined within the same
+   * second would be settled by whichever call the server happened to finish last.
    */
   async function reviewSkip(skipId: string, action: "accept" | "deny", comment = "") {
+    if (skipsInReview.current.has(skipId)) return;
+    skipsInReview.current.add(skipId);
+    setReviewingSkipIds([...skipsInReview.current]);
     try {
       if (action === "accept") {
         await acceptOnboardingSkipRequest(skipId, comment);
@@ -370,6 +380,9 @@ export function TeamMemberDetailPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
       return;
+    } finally {
+      skipsInReview.current.delete(skipId);
+      setReviewingSkipIds([...skipsInReview.current]);
     }
     toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
     // Told apart from a failed decision: the answer is in, and retrying it would be refused.
@@ -377,28 +390,6 @@ export function TeamMemberDetailPage() {
       await Promise.all([refreshMember(), refreshOnboardingPath()]);
     } catch {
       toast.error("The answer was saved, but the page could not refresh. Reload to see it.");
-    }
-  }
-
-  async function handleSkipReview(action: "accept" | "deny") {
-    const skipId = user?.currentStep?.skip?.id;
-    if (!skipId) return;
-
-    setReviewingSkipAction(action);
-
-    try {
-      if (action === "accept") {
-        await acceptOnboardingSkipRequest(skipId);
-      } else {
-        await denyOnboardingSkipRequest(skipId);
-      }
-
-      await Promise.all([refreshMember(), refreshOnboardingPath()]);
-      toast.success(action === "accept" ? "Skip request approved" : "Skip request denied");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
-    } finally {
-      setReviewingSkipAction(null);
     }
   }
 
@@ -775,55 +766,16 @@ export function TeamMemberDetailPage() {
                 )}
               </div>
 
+              {/* The same control the step panel and the graph aside use, rather than a second
+                  pair of buttons with their own wording, their own busy state and no comment
+                  field. The card supplies which step it is about. */}
               {pendingSkip && (
-                <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 gap-3">
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                        <SkipForward className="h-4 w-4" />
-                      </span>
-
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-app-text">Skip request</p>
-                          <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                            Pending
-                          </span>
-                        </div>
-
-                        {user.currentStep?.title && (
-                          <p className="mt-1 text-xs text-app-text-muted">
-                            {user.currentStep.title}
-                          </p>
-                        )}
-
-                        <p className="mt-2 text-sm text-app-text">{pendingSkip.reason}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleSkipReview("accept")}
-                        disabled={reviewingSkipAction !== null}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-app-success-solid px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-app-success-solid/90 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        {reviewingSkipAction === "accept" ? "Accepting..." : "Accept"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => void handleSkipReview("deny")}
-                        disabled={reviewingSkipAction !== null}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        {reviewingSkipAction === "deny" ? "Denying..." : "Deny"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <SkipReview
+                  reason={pendingSkip.reason}
+                  meta={user.currentStep?.title}
+                  disabled={reviewingSkipIds.includes(pendingSkip.id)}
+                  onReview={(action, comment) => reviewSkip(pendingSkip.id, action, comment)}
+                />
               )}
 
               {loadingFeedback ? (

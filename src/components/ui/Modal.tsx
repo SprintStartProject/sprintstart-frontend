@@ -1,9 +1,10 @@
 import { X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { getModalDialogVariants, modalBackdropVariants } from "../../styles/tokens";
 import { Button } from "./Button";
+import { useDialogFocus } from "./useDialogFocus";
 import { useScrollLock } from "./useScrollLock";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
@@ -53,21 +54,6 @@ const sizeClassNames: Record<ModalSize, string> = {
   xl: "max-w-4xl",
 };
 
-const focusableSelector = [
-  "a[href]",
-  "button:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
-
-function getFocusableElements(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelector)).filter(
-    (element) => !element.hasAttribute("aria-hidden"),
-  );
-}
-
 /**
  * Portal-based dialog overlay — the core modal primitive for all dialogs.
  * Supports configurable size (sm/md/lg/xl), role (dialog/alertdialog),
@@ -96,8 +82,9 @@ export function Modal({
   testId,
   onClose,
 }: ModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+  // Moving focus in, keeping Tab inside and putting focus back is shared with the canvas covers,
+  // which are dialogs drawn over a graph rather than overlays in a portal.
+  const dialogRef = useDialogFocus<HTMLDivElement>(isOpen);
   const prefersReducedMotion = useReducedMotion();
 
   // Without this the page behind a dialog still scrolls under the pointer,
@@ -106,63 +93,10 @@ export function Modal({
   useScrollLock(isOpen);
 
   useEffect(() => {
-    if (!isOpen) return;
-
-    previouslyFocusedElement.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    window.requestAnimationFrame(() => {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-
-      // The autofocus runs a frame late, so a keyboard user (or a test
-      // typing into the dialog) may already have moved focus inside it by
-      // now. Don't yank it back to the first control in that case.
-      const active = document.activeElement;
-      if (active && active !== dialog && dialog.contains(active)) return;
-
-      const [firstFocusable] = getFocusableElements(dialog);
-      (firstFocusable ?? dialog).focus();
-    });
-
-    return () => {
-      previouslyFocusedElement.current?.focus();
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !closeOnEscape || isDismissDisabled) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && closeOnEscape && !isDismissDisabled) {
-        onClose();
-        return;
-      }
-
-      if (event.key !== "Tab") {
-        return;
-      }
-
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-
-      const focusableElements = getFocusableElements(dialog);
-      if (focusableElements.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (event.shiftKey && document.activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && document.activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
+      if (event.key === "Escape") onClose();
     }
 
     document.addEventListener("keydown", handleKeyDown);

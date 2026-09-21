@@ -32,6 +32,13 @@ import { TaskCheckItem } from "../TaskCheckItem";
 
 type Props = {
   stepId: string;
+  /**
+   * What the path says this step's status is. Not rendered -- the loaded step is what is shown --
+   * but a change re-reads the step, which is how a start that happened outside this component
+   * lands here. Opening a WAITING step fires `PUT /start` and this `GET` in the same tick, so the
+   * read frequently came back WAITING and left "Start step" on a step that had already begun.
+   */
+  stepStatus?: OnboardingStepDetail["status"];
   /** Re-reads the path after anything that changes it: a start, a completion, a skip request. */
   onPathChanged: () => Promise<void> | void;
   /** Where "continue" leads once the step is behind the member; the page works it out. */
@@ -58,6 +65,7 @@ function minutesBetween(from: string, to: number): number {
  */
 export function StepWorkspace({
   stepId,
+  stepStatus,
   onPathChanged,
   continueLabel,
   onContinue,
@@ -107,7 +115,7 @@ export function StepWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [stepId]);
+  }, [stepId, stepStatus]);
 
   if (error) {
     return (

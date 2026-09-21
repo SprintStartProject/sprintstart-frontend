@@ -529,6 +529,7 @@ export function OnBoardingPage() {
       <StepWorkspace
         key={item.id}
         stepId={item.id}
+        stepStatus={item.step.status}
         layout={layout}
         onPathChanged={refreshPath}
         continueLabel={next.label}

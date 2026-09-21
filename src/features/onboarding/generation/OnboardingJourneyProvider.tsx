@@ -12,12 +12,19 @@ import { describeGenerationError } from "./generationErrors";
 import {
   asFailureReason,
   OnboardingJourneyContext,
+  type GenerationFailureReason,
   type GenerationPhaseProgress,
   type OnboardingAvailability,
   type OnboardingGeneration,
   type OnboardingJourneyValue,
   type UnavailableReason,
 } from "./OnboardingJourneyContext";
+
+/** How often a cut stream re-attaches to the same run before the member is told it is gone. */
+const MAX_REATTACHES = 3;
+
+const CONNECTION_LOST =
+  "The connection to the build was lost. It may still be running -- open onboarding again in a moment.";
 
 function phaseStateOf(detail: string): GenerationPhaseProgress["state"] {
   if (/^waiting/i.test(detail)) return "waiting";
@@ -73,7 +80,14 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
   // Stop watching when the provider goes away (sign-out). The backend keeps building regardless.
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const startGeneration = useCallback((projectId: string) => {
+  /**
+   * Re-attaches to a run whose stream was cut, before the member is told the connection is gone.
+   * The backend runs the generation detached from the stream, so attaching again replays the
+   * stages it has already reported.
+   */
+  const watchRef = useRef<(projectId: string, attempt: number) => void>(() => {});
+
+  const watchGeneration = useCallback((projectId: string, attempt: number) => {
     if (runningRef.current) return;
     runningRef.current = true;
     const controller = new AbortController();
@@ -85,6 +99,36 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
     const finish = (next: OnboardingGeneration) => {
       runningRef.current = false;
       setGeneration(next);
+    };
+
+    const succeed = (path: OnboardingPathEndpoint | null) => {
+      finish({ status: "done", path });
+      setAvailability("path");
+      setUnavailableReason(null);
+      if (!pathnameRef.current.startsWith("/onboarding")) {
+        toastRef.current.success("Your onboarding path is ready", {
+          description: "Every phase has been put together for you.",
+          action: { label: "Open", onClick: () => void navigateRef.current("/onboarding") },
+        });
+      }
+    };
+
+    const fail = (message: string, reason?: GenerationFailureReason) => {
+      finish({ status: "error", message, reason });
+      if (!pathnameRef.current.startsWith("/onboarding")) {
+        toastRef.current.error("Your onboarding path could not be built", {
+          description: message,
+        });
+      }
+    };
+
+    const lost = () => {
+      finish({ status: "error", message: CONNECTION_LOST });
+      if (!pathnameRef.current.startsWith("/onboarding")) {
+        toastRef.current.error("The connection to your path build was lost", {
+          description: CONNECTION_LOST,
+        });
+      }
     };
 
     void onboardingService
@@ -116,25 +160,42 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
           onPath: (path) => {
             builtPath = path;
           },
-          onDone: () => {
-            finish({ status: "done", path: builtPath });
-            setAvailability("path");
-            setUnavailableReason(null);
-            if (!pathnameRef.current.startsWith("/onboarding")) {
-              toastRef.current.success("Your onboarding path is ready", {
-                description: "Every phase has been put together for you.",
-                action: { label: "Open", onClick: () => void navigateRef.current("/onboarding") },
-              });
-            }
-          },
+          onDone: () => succeed(builtPath),
           onError: (message, reason) => {
-            const readable = describeGenerationError(message);
-            finish({ status: "error", message: readable, reason: asFailureReason(reason) });
-            if (!pathnameRef.current.startsWith("/onboarding")) {
-              toastRef.current.error("Your onboarding path could not be built", {
-                description: readable,
-              });
+            fail(describeGenerationError(message), asFailureReason(reason));
+          },
+          onInterrupted: () => {
+            if (controller.signal.aborted) {
+              runningRef.current = false;
+              return;
             }
+            // The run outlives its stream, so ask what actually happened rather than calling a
+            // dropped connection a finished path.
+            void onboardingService
+              .fetchGenerationStatus(projectId)
+              .then(async (status) => {
+                if (controller.signal.aborted) {
+                  runningRef.current = false;
+                  return;
+                }
+                if (status.running) {
+                  if (attempt >= MAX_REATTACHES) {
+                    lost();
+                    return;
+                  }
+                  runningRef.current = false;
+                  watchRef.current(projectId, attempt + 1);
+                  return;
+                }
+                // Not running any more: it either finished while we were away, or it never got
+                // there. The path is the only honest answer.
+                try {
+                  succeed(await onboardingService.fetchPath());
+                } catch {
+                  lost();
+                }
+              })
+              .catch(() => lost());
           },
         },
         controller.signal,
@@ -150,6 +211,15 @@ export function OnboardingJourneyProvider({ children }: { children: ReactNode })
         });
       });
   }, []);
+
+  useEffect(() => {
+    watchRef.current = watchGeneration;
+  }, [watchGeneration]);
+
+  const startGeneration = useCallback(
+    (projectId: string) => watchGeneration(projectId, 0),
+    [watchGeneration],
+  );
 
   const clearGeneration = useCallback(() => {
     if (runningRef.current) return;
