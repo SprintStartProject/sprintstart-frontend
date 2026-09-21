@@ -106,8 +106,8 @@ export function ProjectIndustryWidget() {
   if (!selectedProjectId) return null;
 
   return (
-    <PmCard aria-label="Industry" className="h-full">
-      <PmCardHeader icon={Tag} title="Industry" />
+    <PmCard aria-label="Industry" tone="neutral" className="h-full">
+      <PmCardHeader icon={Tag} tone="neutral" title="Industry" />
 
       {error ? (
         <p className="text-sm text-app-text-muted">{error}</p>

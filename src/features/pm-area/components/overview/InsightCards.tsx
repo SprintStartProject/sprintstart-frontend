@@ -109,7 +109,7 @@ export function QuestionsCard() {
                   className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-app-surface-muted"
                 >
                   <span
-                    className="block h-full rounded-full bg-gradient-to-r from-app-progress-fill to-app-progress-fill-end transition-[width] duration-700"
+                    className={`block h-full rounded-full transition-[width] duration-700 ${group.trend === "RISING" ? "bg-app-warning-solid" : "bg-app-indigo-text/70"}`}
                     style={{ width: `${highest > 0 ? (group.count / highest) * 100 : 0}%` }}
                   />
                 </span>

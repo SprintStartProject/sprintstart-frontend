@@ -670,7 +670,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           {/* Only while something is open: an empty "waiting on you" card at the top of every
               profile would push the path down to say nothing. */}
           {openItemCount > 0 && (
-            <PmCard aria-label="Waiting on you">
+            <PmCard aria-label="Waiting on you" tone="warning">
               <PmCardHeader
                 icon={Hand}
                 tone="warning"

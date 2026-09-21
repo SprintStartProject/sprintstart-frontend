@@ -57,8 +57,8 @@ export function MemberGapsPanel({
         )}
       </PmCard>
 
-      <PmCard aria-label="Gaps">
-        <PmCardHeader icon={SearchX} title="Gaps" />
+      <PmCard aria-label="Gaps" tone="pink">
+        <PmCardHeader icon={SearchX} tone="pink" title="Gaps" />
 
         <div className="space-y-4">
           <SkillGapsSection skillGaps={skillGaps} />

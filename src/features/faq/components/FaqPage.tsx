@@ -148,6 +148,9 @@ export function FaqPage({ groupId }: { groupId?: string }) {
   const visible = hideOneOffs ? allGroups.filter((group) => group.count > 1) : allGroups;
   const sorted = [...visible].sort(SORTERS[sortBy]);
   const selectedGroup = allGroups.find((group) => group.groupId === groupId) ?? null;
+  // The bar under each row is measured against the most asked question, so the list reads as a
+  // ranking at a glance — the same bars the overview's card draws.
+  const highestCount = allGroups.reduce((max, group) => Math.max(max, group.count), 0);
 
   const openGroup = (group: FAQGroup) => void navigate(`/insights/faq/${group.groupId}`);
   const closeGroup = () => void navigate("/insights/faq");
@@ -188,18 +191,21 @@ export function FaqPage({ groupId }: { groupId?: string }) {
       <div className="space-y-5">
         <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <PmStat
+            tone="indigo"
             icon={MessageSquareMore}
             label="Questions tracked"
             value={hasData ? totalGroups : "—"}
             hint={hasData ? `${oneOffCount} asked only once` : "Loading"}
           />
           <PmStat
+            tone="indigo"
             icon={MessageSquareMore}
             label="Times asked"
             value={hasData ? totalQuestions : "—"}
             hint="Across every wording"
           />
           <PmStat
+            tone="indigo"
             icon={TrendingUp}
             label="Picking up"
             value={hasData ? risingCount : "—"}
@@ -207,6 +213,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
             attention={risingCount > 0}
           />
           <PmStat
+            tone="indigo"
             icon={FileText}
             label="Linked documents"
             value={hasData ? totalDocuments : "—"}
@@ -270,8 +277,9 @@ export function FaqPage({ groupId }: { groupId?: string }) {
             </p>
           ) : (
             <ul className="divide-y divide-app-border-muted px-3 py-1.5">
-              {sorted.map((group) => {
+              {sorted.map((group, index) => {
                 const selected = group.groupId === groupId;
+                const rising = group.trend === "RISING";
 
                 return (
                   <li key={group.groupId} className="py-0.5">
@@ -283,6 +291,19 @@ export function FaqPage({ groupId }: { groupId?: string }) {
                         selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
                       }`}
                     >
+                      {/* A rank only means something while the list is ordered by how often. */}
+                      {sortBy === "count" && (
+                        <span
+                          aria-hidden="true"
+                          className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums sm:flex ${
+                            index < 3
+                              ? "bg-app-indigo-bg text-app-indigo-text"
+                              : "bg-app-surface-muted text-app-text-subtle"
+                          }`}
+                        >
+                          {index + 1}
+                        </span>
+                      )}
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm leading-snug font-semibold text-app-text">
                           {group.title}
@@ -310,10 +331,27 @@ export function FaqPage({ groupId }: { groupId?: string }) {
                             </span>
                           )}
                         </span>
+                        <span
+                          aria-hidden="true"
+                          className="mt-2.5 block h-1 max-w-md overflow-hidden rounded-full bg-app-surface-muted"
+                        >
+                          <span
+                            className={`block h-full rounded-full ${
+                              rising ? "bg-app-warning-solid" : "bg-app-indigo-text/70"
+                            }`}
+                            style={{
+                              width: `${highestCount > 0 ? (group.count / highestCount) * 100 : 0}%`,
+                            }}
+                          />
+                        </span>
                       </span>
 
                       <span className="flex shrink-0 flex-col items-end">
-                        <span className="text-2xl leading-none font-bold text-app-text tabular-nums">
+                        <span
+                          className={`text-2xl leading-none font-bold tabular-nums ${
+                            rising ? "text-app-warning-text" : "text-app-text"
+                          }`}
+                        >
                           {group.count}
                         </span>
                         <span className="mt-1 text-[11px] text-app-text-subtle">asked</span>

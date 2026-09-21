@@ -5,7 +5,7 @@ import {
   FolderKanban,
   Gauge,
   Hourglass,
-  Inbox,
+  GitPullRequest,
   RefreshCw,
   Rocket,
   Search,
@@ -306,18 +306,21 @@ export function OnboardingMetricsPage() {
               </h2>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <PmStat
+                  tone="cyan"
                   icon={Rocket}
                   label="Median time to first accepted work"
                   value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
                   hint={`${metrics.hiresWithAcceptedContribution} of ${metrics.memberCount} have had work accepted`}
                 />
                 <PmStat
+                  tone="cyan"
                   icon={Clock}
                   label="Median first-review wait"
                   value={formatDuration(metrics.medianHoursToFirstResponse)}
                   hint="Opened → first response"
                 />
                 <PmStat
+                  tone="cyan"
                   icon={Hourglass}
                   label="90th-percentile review wait"
                   value={formatDuration(metrics.p90HoursToFirstResponse)}
@@ -325,7 +328,8 @@ export function OnboardingMetricsPage() {
                   attention={metrics.p90HoursToFirstResponse !== null}
                 />
                 <PmStat
-                  icon={Inbox}
+                  tone="cyan"
+                  icon={GitPullRequest}
                   label="Waiting on a review"
                   value={metrics.waitingOnResponseCount}
                   attention={metrics.waitingOnResponseCount > 0}
