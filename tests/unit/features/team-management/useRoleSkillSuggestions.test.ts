@@ -10,22 +10,14 @@ vi.mock("../../../../src/services/teamManagementService", async (importOriginal)
   return { ...actual, suggestSkillsForRole: vi.fn() };
 });
 
-const existingSkill = {
-  id: "skill-1",
-  name: "TypeScript",
-  roleIds: ["role-1"],
-  status: "ACTIVE" as const,
-  category: "TECHNICAL",
-  universal: false,
-};
-
-const suggestedSkill = {
-  id: "skill-2",
+const suggestion = {
+  skillId: "skill-2",
   name: "React",
-  roleIds: ["role-1"],
-  status: "ACTIVE" as const,
   category: "TECHNICAL",
-  universal: false,
+  reason: "The role builds a web interface",
+  confidence: "high",
+  isNew: false,
+  chunkIds: ["chunk-1"],
 };
 
 describe("useRoleSkillSuggestions", () => {
@@ -33,20 +25,25 @@ describe("useRoleSkillSuggestions", () => {
     vi.clearAllMocks();
   });
 
-  it("returns the complete list and diffs newly added skill IDs", async () => {
-    vi.mocked(suggestSkillsForRole).mockResolvedValue([existingSkill, suggestedSkill]);
+  it("returns reviewable suggestions and forwards project context", async () => {
+    vi.mocked(suggestSkillsForRole).mockResolvedValue([suggestion]);
     const { result } = renderHook(() => useRoleSkillSuggestions());
 
     let outcome: Awaited<ReturnType<typeof result.current.suggest>> | undefined;
     await act(async () => {
-      outcome = await result.current.suggest("role-1", ["skill-1"]);
+      outcome = await result.current.suggest("role-1", {
+        projectId: "project-1",
+        industry: "Fintech",
+      });
     });
 
-    expect(suggestSkillsForRole).toHaveBeenCalledWith("role-1");
+    expect(suggestSkillsForRole).toHaveBeenCalledWith("role-1", {
+      projectId: "project-1",
+      industry: "Fintech",
+    });
     expect(outcome).toEqual({
       ok: true,
-      skills: [existingSkill, suggestedSkill],
-      addedSkillIds: ["skill-2"],
+      suggestions: [suggestion],
     });
     expect(result.current.isSuggesting).toBeNull();
   });
@@ -57,7 +54,7 @@ describe("useRoleSkillSuggestions", () => {
 
     let outcome: Awaited<ReturnType<typeof result.current.suggest>> | undefined;
     await act(async () => {
-      outcome = await result.current.suggest("role-1", []);
+      outcome = await result.current.suggest("role-1");
     });
 
     expect(outcome).toEqual({
@@ -72,7 +69,7 @@ describe("useRoleSkillSuggestions", () => {
 
     let outcome: Awaited<ReturnType<typeof result.current.suggest>> | undefined;
     await act(async () => {
-      outcome = await result.current.suggest("role-1", []);
+      outcome = await result.current.suggest("role-1");
     });
 
     expect(outcome).toEqual({

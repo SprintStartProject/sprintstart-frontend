@@ -4,6 +4,7 @@ import skillsMock from "../mocks/skillsMock.json";
 import type {
   ProjectRole,
   Skill,
+  SkillSuggestion,
   TeamOverviewUser,
   SkillLevel,
   SkillStatus,
@@ -178,18 +179,13 @@ export async function getProjectRoles(): Promise<ProjectRole[]> {
   }
 }
 
-export async function createProjectRole(
-  name: string,
-  description: string,
-  options?: { projectId?: string },
-): Promise<ProjectRole> {
+export async function createProjectRole(name: string, description: string): Promise<ProjectRole> {
   try {
     return await apiClient.fetch<ProjectRole>("/api/v1/projectRoles", {
       method: "POST",
       body: JSON.stringify({
         name,
         description,
-        ...(options?.projectId ? { projectId: options.projectId } : {}),
       }),
     });
   } catch {
@@ -556,16 +552,60 @@ export async function updateSkill(
   return toSkill(response);
 }
 
+export type SuggestSkillsContext = {
+  projectId?: string;
+  industry?: string;
+};
+
+type SkillSuggestionsResponseDto = {
+  suggestions: SkillSuggestion[];
+};
+
+export type AcceptSkillSuggestionRequest = {
+  skillId?: string;
+  name?: string;
+  category?: string | null;
+};
+
 /**
- * Asks the AI service for skills for a role.
+ * Requests reviewable AI suggestions without changing the role's persisted skills.
  *
- * The endpoint immediately links its suggestions on the server and returns the
- * role's complete skill list, not only the newly suggested entries.
+ * Project context is optional. When supplied, the backend authorizes it before using
+ * its industry and artifact corpus. Failures propagate so the review panel can show
+ * an actionable error instead of pretending that the AI returned no suggestions.
  */
-export async function suggestSkillsForRole(roleId: string): Promise<Skill[]> {
-  const response = await apiClient.fetch<SkillResponseDto[]>(
+export async function suggestSkillsForRole(
+  roleId: string,
+  context?: SuggestSkillsContext,
+): Promise<SkillSuggestion[]> {
+  const hasContext = Boolean(context?.projectId || context?.industry);
+  const response = await apiClient.fetch<SkillSuggestionsResponseDto>(
     `/api/v1/projectRoles/${roleId}/skills/suggest`,
-    { method: "POST" },
+    {
+      method: "POST",
+      ...(hasContext ? { body: JSON.stringify(context) } : {}),
+    },
+  );
+
+  return response.suggestions;
+}
+
+/**
+ * Persists one reviewed suggestion and returns the role's complete updated skill list.
+ *
+ * Existing catalog entries are accepted by ID. New suggestions are accepted by name
+ * and optional category so the backend can create and link a non-universal skill.
+ */
+export async function acceptSkillSuggestion(
+  roleId: string,
+  request: AcceptSkillSuggestionRequest,
+): Promise<Skill[]> {
+  const response = await apiClient.fetch<SkillResponseDto[]>(
+    `/api/v1/projectRoles/${roleId}/skills/suggestions/accept`,
+    {
+      method: "POST",
+      body: JSON.stringify(request),
+    },
   );
 
   return response.map(toSkill);

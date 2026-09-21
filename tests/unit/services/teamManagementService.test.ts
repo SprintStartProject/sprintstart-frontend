@@ -4,6 +4,7 @@ import {
   getTeamMember,
   getProjectRoles,
   createProjectRole,
+  acceptSkillSuggestion,
   assignProjectRoleToUser,
   createSkill,
   deleteSkill,
@@ -68,30 +69,72 @@ describe("teamManagementService", () => {
     expect(newRole.id).toBe("new-role-1");
   });
 
-  it("createProjectRole only includes projectId when provided", async () => {
-    const bodies: unknown[] = [];
+  it("createProjectRole sends only the role fields supported by the backend", async () => {
+    let capturedBody: unknown;
     server.use(
       http.post("/api/v1/projectRoles", async ({ request }) => {
-        const body = (await request.json()) as { name: string; description: string };
-        bodies.push(body);
-        return HttpResponse.json({ id: `role-${bodies.length}`, ...body });
+        capturedBody = await request.json();
+        return HttpResponse.json({
+          id: "role-1",
+          name: "Developer",
+          description: "Builds features",
+        });
       }),
     );
 
-    await createProjectRole("Tester", "QA");
-    await createProjectRole("Developer", "Builds features", { projectId: "project-1" });
+    await createProjectRole("Developer", "Builds features");
 
-    expect(bodies).toEqual([
-      { name: "Tester", description: "QA" },
-      { name: "Developer", description: "Builds features", projectId: "project-1" },
+    expect(capturedBody).toEqual({
+      name: "Developer",
+      description: "Builds features",
+    });
+  });
+
+  it("suggestSkillsForRole posts project context and reads the response wrapper", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post("/api/v1/projectRoles/role1/skills/suggest", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({
+          suggestions: [
+            {
+              skillId: "skill-ai-1",
+              name: "Prompt Engineering",
+              category: "AI",
+              reason: "Useful for the role",
+              confidence: "high",
+              isNew: false,
+              chunkIds: ["chunk-1"],
+            },
+          ],
+        });
+      }),
+    );
+
+    const suggestions = await suggestSkillsForRole("role1", {
+      projectId: "project-1",
+      industry: "Fintech",
+    });
+
+    expect(capturedBody).toEqual({ projectId: "project-1", industry: "Fintech" });
+    expect(suggestions).toEqual([
+      {
+        skillId: "skill-ai-1",
+        name: "Prompt Engineering",
+        category: "AI",
+        reason: "Useful for the role",
+        confidence: "high",
+        isNew: false,
+        chunkIds: ["chunk-1"],
+      },
     ]);
   });
 
-  it("suggestSkillsForRole posts to the role endpoint and maps the complete list", async () => {
-    let requestMethod = "";
+  it("acceptSkillSuggestion posts the reviewed item and maps the updated role skills", async () => {
+    let capturedBody: unknown;
     server.use(
-      http.post("/api/v1/projectRoles/role1/skills/suggest", ({ request }) => {
-        requestMethod = request.method;
+      http.post("/api/v1/projectRoles/role1/skills/suggestions/accept", async ({ request }) => {
+        capturedBody = await request.json();
         return HttpResponse.json([
           {
             id: "skill-ai-1",
@@ -99,27 +142,27 @@ describe("teamManagementService", () => {
             roleIds: ["role1"],
             status: "ACTIVE",
             category: "AI",
-            universal: true,
+            universal: false,
           },
         ]);
       }),
     );
 
-    const skills = await suggestSkillsForRole("role1");
+    const skills = await acceptSkillSuggestion("role1", {
+      name: "Prompt Engineering",
+      category: "AI",
+    });
 
-    expect(requestMethod).toBe("POST");
-    expect(skills).toEqual([
-      {
-        id: "skill-ai-1",
-        name: "Prompt Engineering",
-        roleIds: ["role1"],
-        status: "ACTIVE",
-        category: "AI",
-        universal: true,
-      },
-    ]);
+    expect(capturedBody).toEqual({ name: "Prompt Engineering", category: "AI" });
+    expect(skills[0]).toEqual({
+      id: "skill-ai-1",
+      name: "Prompt Engineering",
+      roleIds: ["role1"],
+      status: "ACTIVE",
+      category: "AI",
+      universal: false,
+    });
   });
-
   it("suggestSkillsForRole propagates backend failures without a mock fallback", async () => {
     server.use(
       http.post("/api/v1/projectRoles/role1/skills/suggest", () =>

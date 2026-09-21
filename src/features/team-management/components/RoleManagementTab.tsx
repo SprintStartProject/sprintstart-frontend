@@ -2,7 +2,6 @@ import { Check, Minus, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
-import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { SaveButton } from "../../../components/ui/SaveButton";
 import { Input } from "../../../components/ui/Input";
@@ -11,30 +10,24 @@ import { UserAvatar } from "../../../components/common/UserAvatar";
 import { useAuth } from "../../../context/useAuth";
 import { useToast } from "../../../context/useToast";
 import { RoleCard } from "./RoleCard";
+import { SkillSuggestionPanel } from "./SkillSuggestionPanel";
+import { skillSuggestionKey } from "../skillSuggestion";
 import {
+  acceptSkillSuggestion,
   assignProjectRoleToUser,
   createProjectRole,
-  createSkill,
   deleteProjectRole,
   deleteSkill,
   getSkills,
   getSkillsByRoleId,
   reactivateSkill,
   unassignProjectRoleFromUser,
-  updateRoleSkills,
 } from "../../../services/teamManagementService";
 import { parseApiError } from "../../../services/apiError";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { useRoleSkillSuggestions } from "../useRoleSkillSuggestions";
 import { isSkillLinkedToRole } from "../types";
-import type { ProjectRole, Skill, TeamOverviewUser } from "../types";
-
-type AiRemovalRequest = {
-  roleId: string;
-  removedSkillIds: string[];
-  skillIdsToKeep: string[];
-  orphanSkillNames: string[];
-};
+import type { ProjectRole, Skill, SkillSuggestion, TeamOverviewUser } from "../types";
 
 type RoleManagementTabProps = {
   /** Roles of the current project, owned by the page so both tabs agree. */
@@ -73,7 +66,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const toast = useToast();
   const { profile } = useAuth();
-  const { selectedProjectId, hasSelectedProject } = useProjectContext();
+  const { selectedProjectId, selectedProject, hasSelectedProject } = useProjectContext();
   const { isSuggesting, suggest } = useRoleSkillSuggestions();
 
   const [roleName, setRoleName] = useState("");
@@ -85,11 +78,11 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
   const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null);
   const [retireSkillId, setRetireSkillId] = useState<string | null>(null);
-  const [aiAddedSkillIds, setAiAddedSkillIds] = useState<Set<string>>(new Set());
-  const [skillIdsBeforeSuggest, setSkillIdsBeforeSuggest] = useState<string[]>([]);
-  const [aiRemovalRequest, setAiRemovalRequest] = useState<AiRemovalRequest | null>(null);
-  const [updatingAiSkills, setUpdatingAiSkills] = useState(false);
-
+  const [showSuggestionPanel, setShowSuggestionPanel] = useState(false);
+  const [skillSuggestions, setSkillSuggestions] = useState<SkillSuggestion[]>([]);
+  const [selectedSuggestionKeys, setSelectedSuggestionKeys] = useState<Set<string>>(new Set());
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [applyingSuggestions, setApplyingSuggestions] = useState(false);
   // Ids ticked in the member list, and the snapshot taken when the role was
   // opened so confirming can send only the difference.
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -183,9 +176,10 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       .filter((user) => user.roles.some((role) => role.id === roleId))
       .map((user) => user.userId);
 
-    setAiAddedSkillIds(new Set());
-    setSkillIdsBeforeSuggest([]);
-    setAiRemovalRequest(null);
+    setShowSuggestionPanel(false);
+    setSkillSuggestions([]);
+    setSelectedSuggestionKeys(new Set());
+    setSuggestionError(null);
     setSelectedRoleId(roleId);
     setSelectedUserIds(assignedUserIds);
     setOriginalUserIds(assignedUserIds);
@@ -195,9 +189,10 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   function closeRole() {
     captureRolesHeight();
     setSelectedRoleId(null);
-    setAiAddedSkillIds(new Set());
-    setSkillIdsBeforeSuggest([]);
-    setAiRemovalRequest(null);
+    setShowSuggestionPanel(false);
+    setSkillSuggestions([]);
+    setSelectedSuggestionKeys(new Set());
+    setSuggestionError(null);
     setSelectedUserIds([]);
     setOriginalUserIds([]);
     setSkillName("");
@@ -222,33 +217,20 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     setCreatingRole(true);
 
     try {
-      const newRole = await createProjectRole(
-        roleName.trim(),
-        roleDescription.trim(),
-        hasSelectedProject ? { projectId: selectedProjectId } : undefined,
-      );
+      const newRole = await createProjectRole(roleName.trim(), roleDescription.trim());
 
       setRoleName("");
       setRoleDescription("");
       await onDataChanged();
       openRole(newRole.id);
       toast.success("Role created");
-
-      try {
-        const roleSkills = await getSkillsByRoleId(newRole.id);
-        replaceRoleSkills(newRole.id, roleSkills);
-        setSkillIdsBeforeSuggest([]);
-        setAiAddedSkillIds(new Set(roleSkills.map(({ id }) => id)));
-      } catch {
-        toast.warning("Role created, but its skills couldn't be loaded");
-      }
+      await requestSkillSuggestions(newRole.id);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't create the role.");
     } finally {
       setCreatingRole(false);
     }
   }
-
   async function confirmDeleteRole() {
     if (!deleteRoleId) return;
 
@@ -282,23 +264,19 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     setAddingSkill(true);
 
     try {
-      const newSkill = await createSkill(skillName.trim(), [selectedRole.id]);
+      const roleSkills = await acceptSkillSuggestion(selectedRole.id, {
+        name: skillName.trim(),
+      });
 
-      setSkills((current) =>
-        current.some((skill) => skill.id === newSkill.id)
-          ? current.map((skill) => (skill.id === newSkill.id ? newSkill : skill))
-          : [...current, newSkill],
-      );
-
+      replaceRoleSkills(selectedRole.id, roleSkills);
       setSkillName("");
       toast.success("Skill added");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't add the skill.");
+      toast.error(parseApiError(error, "Couldn't add the skill."));
     } finally {
       setAddingSkill(false);
     }
   }
-
   async function confirmRetireSkill() {
     if (!retireSkillId) return;
 
@@ -372,7 +350,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   );
 
   const selectedRoleSkills = selectedRole ? getRoleSkills(selectedRole.id) : [];
-  const selectedAiAddedSkills = selectedRoleSkills.filter((skill) => aiAddedSkillIds.has(skill.id));
   const canSuggestSkills =
     profile?.permissionGroup === "ADMIN" || profile?.permissionGroup === "PM";
 
@@ -394,87 +371,98 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     });
   }
 
-  async function handleSuggestSkills() {
-    if (!selectedRole || isSuggesting) return;
+  async function requestSkillSuggestions(roleId: string) {
+    setShowSuggestionPanel(true);
+    setSuggestionError(null);
+    setSkillSuggestions([]);
+    setSelectedSuggestionKeys(new Set());
 
-    const currentSkillIds = selectedRoleSkills.map(({ id }) => id);
-    const result = await suggest(selectedRole.id, currentSkillIds);
+    const context = hasSelectedProject
+      ? {
+          projectId: selectedProjectId,
+          ...(selectedProject?.industry ? { industry: selectedProject.industry } : {}),
+        }
+      : undefined;
+    const result = await suggest(roleId, context);
 
     if (!result.ok) {
-      toast.error(result.message);
+      setSuggestionError(result.message);
       return;
     }
 
-    replaceRoleSkills(selectedRole.id, result.skills);
-    setSkillIdsBeforeSuggest(currentSkillIds);
-    setAiAddedSkillIds(new Set(result.addedSkillIds));
+    const uniqueSuggestions = Array.from(
+      new Map(result.suggestions.map((item) => [skillSuggestionKey(item), item])).values(),
+    );
 
-    if (result.addedSkillIds.length > 0) {
-      toast.success(`${result.addedSkillIds.length} skills added`);
-    } else {
-      toast.info("No new skills suggested for this role");
-    }
+    setSkillSuggestions(uniqueSuggestions);
+    setSelectedSuggestionKeys(new Set(uniqueSuggestions.map(skillSuggestionKey)));
   }
 
-  async function applyAiRemoval(request: AiRemovalRequest) {
-    if (updatingAiSkills) return;
+  function toggleSuggestion(key: string) {
+    setSelectedSuggestionKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
-    setUpdatingAiSkills(true);
+  async function handleApplySuggestions() {
+    if (!selectedRole || applyingSuggestions) return;
+
+    const currentIds = new Set(selectedRoleSkills.map(({ id }) => id));
+    const currentNames = new Set(
+      selectedRoleSkills.map(({ name }) => name.trim().toLocaleLowerCase()),
+    );
+    const accepted = skillSuggestions.filter(
+      (suggestion) =>
+        selectedSuggestionKeys.has(skillSuggestionKey(suggestion)) &&
+        !(suggestion.skillId && currentIds.has(suggestion.skillId)) &&
+        !currentNames.has(suggestion.name.trim().toLocaleLowerCase()),
+    );
+
+    if (accepted.length === 0) return;
+
+    setApplyingSuggestions(true);
+    setSuggestionError(null);
 
     try {
-      const roleSkills = await updateRoleSkills(request.roleId, request.skillIdsToKeep);
-      replaceRoleSkills(request.roleId, roleSkills);
-      setAiAddedSkillIds((current) => {
-        const next = new Set(current);
-        request.removedSkillIds.forEach((id) => next.delete(id));
-        return next;
-      });
-      setAiRemovalRequest(null);
+      let roleSkills = selectedRoleSkills;
+
+      for (const suggestion of accepted) {
+        roleSkills = await acceptSkillSuggestion(
+          selectedRole.id,
+          suggestion.skillId
+            ? { skillId: suggestion.skillId }
+            : { name: suggestion.name, category: suggestion.category },
+        );
+      }
+
+      replaceRoleSkills(selectedRole.id, roleSkills);
+      setShowSuggestionPanel(false);
+      setSkillSuggestions([]);
+      setSelectedSuggestionKeys(new Set());
       toast.success(
-        request.removedSkillIds.length === 1 ? "AI addition discarded" : "AI additions discarded",
+        accepted.length === 1
+          ? "1 suggested skill added"
+          : `${accepted.length} suggested skills added`,
       );
     } catch (error) {
-      toast.error(parseApiError(error, "Could not discard the AI-suggested skills."));
+      try {
+        replaceRoleSkills(selectedRole.id, await getSkillsByRoleId(selectedRole.id));
+      } catch {
+        // The original apply error is the actionable one; a refresh failure must not hide it.
+      }
+      setSuggestionError(
+        parseApiError(
+          error,
+          "Some suggestions may have been added. Review the role skills and try again.",
+        ),
+      );
     } finally {
-      setUpdatingAiSkills(false);
+      setApplyingSuggestions(false);
     }
   }
-
-  function requestAiRemoval(removedSkillIds: string[], skillIdsToKeep: string[]) {
-    if (!selectedRole || removedSkillIds.length === 0) return;
-
-    const removedIds = new Set(removedSkillIds);
-    const orphanSkillNames = selectedRoleSkills
-      .filter((skill) => removedIds.has(skill.id) && skill.roleIds.length === 1)
-      .map(({ name }) => name);
-    const request: AiRemovalRequest = {
-      roleId: selectedRole.id,
-      removedSkillIds,
-      skillIdsToKeep,
-      orphanSkillNames,
-    };
-
-    if (orphanSkillNames.length > 0) {
-      setAiRemovalRequest(request);
-    } else {
-      void applyAiRemoval(request);
-    }
-  }
-
-  function discardAiSkill(skillId: string) {
-    requestAiRemoval(
-      [skillId],
-      selectedRoleSkills.filter(({ id }) => id !== skillId).map(({ id }) => id),
-    );
-  }
-
-  function discardAllAiSkills() {
-    requestAiRemoval(
-      selectedAiAddedSkills.map(({ id }) => id),
-      skillIdsBeforeSuggest,
-    );
-  }
-
   const getRoleMembers = useCallback(
     (roleId: string) =>
       users.filter((user) => user.roles.some((userRole) => userRole.id === roleId)),
@@ -670,7 +658,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                     loading={creatingRole}
                     icon={<Plus className="h-4 w-4" />}
                   >
-                    {creatingRole ? "Creating role and suggesting skills…" : "Create role"}
+                    {creatingRole ? "Creating role…" : "Create role"}
                   </Button>
                 </div>
               </div>
@@ -726,7 +714,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                 {/* Members take the room, skills sit in a narrow column
                             beside them: the member grid is the part that grows
                             with the team, the skill list stays short. */}
-                <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_28rem]">
                   <div className="min-w-0">
                     <h4 className="text-sm font-semibold text-app-text">Members</h4>
                     <p className="mt-1 text-xs leading-relaxed text-app-text-muted">
@@ -860,11 +848,11 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                           size="sm"
                           data-testid="suggest-skills-button"
                           loading={isSuggesting === selectedRole.id}
-                          disabled={updatingAiSkills}
+                          disabled={applyingSuggestions}
                           icon={<Sparkles className="h-3.5 w-3.5" />}
-                          onClick={() => void handleSuggestSkills()}
+                          onClick={() => void requestSkillSuggestions(selectedRole.id)}
                         >
-                          Suggest skills
+                          {showSuggestionPanel ? "Refresh suggestions" : "Suggest skills"}
                         </Button>
                       )}
                     </div>
@@ -873,83 +861,46 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                     </p>
 
                     <div className="flex flex-wrap gap-2">
-                      {selectedRoleSkills.map((skill) => {
-                        const isAiAdded = aiAddedSkillIds.has(skill.id);
-
-                        return (
-                          <span
-                            key={skill.id}
-                            aria-label={`${skill.name}${isAiAdded ? ", AI suggested" : ""}`}
-                            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${
-                              isAiAdded
-                                ? "border-app-brand bg-app-brand-soft text-app-text"
-                                : skill.status === "RETIRED"
-                                  ? "border-app-warning-border bg-app-warning-bg text-app-warning-text"
-                                  : "border-app-border bg-app-bg text-app-text"
-                            }`}
-                          >
-                            {isAiAdded && <Sparkles className="h-3 w-3" aria-hidden="true" />}
-                            {skill.name}
-                            {isAiAdded && (
-                              <Badge variant="brand" size="sm">
-                                AI
-                              </Badge>
-                            )}
-
-                            {isAiAdded ? (
+                      {selectedRoleSkills.map((skill) => (
+                        <span
+                          key={skill.id}
+                          aria-label={skill.name}
+                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${
+                            skill.status === "RETIRED"
+                              ? "border-app-warning-border bg-app-warning-bg text-app-warning-text"
+                              : "border-app-border bg-app-bg text-app-text"
+                          }`}
+                        >
+                          {skill.name}
+                          {skill.status === "RETIRED" ? (
+                            <>
+                              <span className="font-medium">Retired</span>
                               <button
                                 type="button"
-                                aria-label={`Remove AI-suggested ${skill.name}`}
-                                disabled={updatingAiSkills}
-                                onClick={() => discardAiSkill(skill.id)}
-                                className="text-app-text-muted transition-colors hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-50"
+                                aria-label={`Reactivate ${skill.name}`}
+                                onClick={() => void handleReactivateSkill(skill)}
+                                className="text-app-text-muted transition-colors hover:text-app-success-text"
                               >
-                                <X className="h-3 w-3" />
+                                <RotateCcw className="h-3 w-3" />
                               </button>
-                            ) : skill.status === "RETIRED" ? (
-                              <>
-                                <span className="font-medium">Retired</span>
-                                <button
-                                  type="button"
-                                  aria-label={`Reactivate ${skill.name}`}
-                                  onClick={() => void handleReactivateSkill(skill)}
-                                  className="text-app-text-muted transition-colors hover:text-app-success-text"
-                                >
-                                  <RotateCcw className="h-3 w-3" />
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                aria-label={`Retire ${skill.name}`}
-                                onClick={() => setRetireSkillId(skill.id)}
-                                className="text-app-text-muted transition-colors hover:text-app-danger-text"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            )}
-                          </span>
-                        );
-                      })}
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              aria-label={`Retire ${skill.name}`}
+                              onClick={() => setRetireSkillId(skill.id)}
+                              className="text-app-text-muted transition-colors hover:text-app-danger-text"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </span>
+                      ))}
 
                       {selectedRoleSkills.length === 0 && (
                         <p className="text-xs text-app-text-muted">No skills added yet.</p>
                       )}
                     </div>
-
-                    {selectedAiAddedSkills.length > 0 && (
-                      <div className="mt-3 flex justify-end">
-                        <Button
-                          variant="dangerSoft"
-                          size="sm"
-                          disabled={updatingAiSkills}
-                          onClick={discardAllAiSkills}
-                        >
-                          Discard AI additions
-                        </Button>
-                      </div>
-                    )}
-
                     <div className="mt-4 space-y-2">
                       <label htmlFor="new-skill-name" className="sr-only">
                         Add skill to {selectedRole.name}
@@ -972,6 +923,22 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                         </Button>
                       </div>
                     </div>
+                    <AnimatePresence initial={false}>
+                      {showSuggestionPanel && (
+                        <SkillSuggestionPanel
+                          currentSkills={selectedRoleSkills}
+                          suggestions={skillSuggestions}
+                          selectedKeys={selectedSuggestionKeys}
+                          isLoading={isSuggesting === selectedRole.id}
+                          isApplying={applyingSuggestions}
+                          errorMessage={suggestionError}
+                          onToggle={toggleSuggestion}
+                          onApply={() => void handleApplySuggestions()}
+                          onRetry={() => void requestSkillSuggestions(selectedRole.id)}
+                          onClose={() => setShowSuggestionPanel(false)}
+                        />
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
               </section>
@@ -1009,28 +976,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
           if (retireSkillId) {
             void confirmRetireSkill();
           }
-        }}
-      />
-
-      <AlertDialog
-        isOpen={Boolean(aiRemovalRequest)}
-        title="Remove AI-suggested skills?"
-        description={
-          <>
-            Removing these links will leave the following skills in the catalog without any role:{" "}
-            <span className="font-medium text-app-text">
-              {aiRemovalRequest?.orphanSkillNames.join(", ")}
-            </span>
-            . They will not be deleted, but they will remain as unlinked catalog entries.
-          </>
-        }
-        confirmLabel="Remove links"
-        variant="danger"
-        isLoading={updatingAiSkills}
-        loadingLabel="Removing..."
-        onClose={() => setAiRemovalRequest(null)}
-        onConfirm={() => {
-          if (aiRemovalRequest) void applyAiRemoval(aiRemovalRequest);
         }}
       />
     </>
