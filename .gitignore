@@ -60,3 +60,7 @@ CLAUDE.local.md
 
 # Hermes agent working files (per-developer)
 .hermes/
+
+# Agent-session worktrees and their JetBrains include file (per-developer)
+.worktrees/
+.worktreeinclude
