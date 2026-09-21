@@ -362,6 +362,9 @@ export function TeamManagementPage() {
                   placeholder="Search by name or step…"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                  // Same shape and surface as the role filter beside it (`FilterSelect`), which
+                  // the small input size otherwise undercuts with tighter corners.
+                  className="rounded-xl! border-app-border/70! bg-app-surface/70! backdrop-blur-md hover:border-app-brand-border-strong! focus:border-app-brand-border-strong!"
                 />
               </div>
 
