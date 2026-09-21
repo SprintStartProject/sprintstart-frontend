@@ -148,14 +148,17 @@ export function PmDashboardPage() {
         onOpenMember={openMember}
       />
 
-      <div className="grid items-stretch gap-5 md:grid-cols-2 2xl:grid-cols-4">
-        <OnboardingHealthCard />
+      {/* The three knowledge readouts get a row of their own, so none of them is squeezed. */}
+      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
         <EscalationsCard />
         <QuestionsCard />
         <KnowledgeGapsCard />
       </div>
 
-      <div className="grid items-stretch gap-5 lg:grid-cols-2">
+      {/* The project's plumbing: onboarding figures and ingestion full, industry at half — it is
+          one label, not a readout. */}
+      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)]">
+        <OnboardingHealthCard />
         <IngestionStatusWidget />
         <ProjectIndustryWidget />
       </div>
