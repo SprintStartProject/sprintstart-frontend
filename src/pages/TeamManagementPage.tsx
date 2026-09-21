@@ -14,7 +14,7 @@ import { useAttention } from "../features/onboarding-metrics/hooks/useAttention"
 import { buildAttentionQueue } from "../features/pm-area/attentionQueue";
 import { MemberRow } from "../features/pm-area/components/MemberRow";
 import { PmSectionHeader } from "../features/pm-area/components/PmCard";
-import { daysOnStep, isAtRisk, memberName } from "../features/pm-area/memberStatus";
+import { daysOnStep, memberName } from "../features/pm-area/memberStatus";
 import { ROSTER_COLUMNS } from "../features/pm-area/rosterLayout";
 import { useMemberPeek } from "../features/pm-area/useMemberPeek";
 import { useTeamRoster } from "../features/pm-area/useTeamRoster";
@@ -31,22 +31,23 @@ import { queryKeys } from "../services/queryKeys";
 import { getProjectRoles } from "../services/teamManagementService";
 
 /**
- * One question per chip: everyone, who needs the manager (any reason — a skip, feedback, a
- * waiting review, drifting, a long step), and who has been on one step too long.
+ * Two chips: everyone, and who needs the manager (any reason — a skip, feedback, a waiting
+ * review, drifting, a long step).
  *
  * "Waiting on you" used to be a chip of its own beside "Needs you", but it was only the first
  * half of it (skips and feedback), and two chips that mostly list the same people read as one
  * too many. The reasons column in every row says which kind of "needs you" it is. The stage
- * chips (not started / underway / done) went too — the progress column and the sort answer that.
+ * chips (not started / underway / done) went too — the progress column and the sort answer
+ * that — and so did "Long on a step": everyone on a step too long is in "Needs you" already, and
+ * "Longest on step" sorts them to the top.
  */
-type StatusFilter = "all" | "attention" | "stuck";
+type StatusFilter = "all" | "attention";
 
-const STATUS_FILTERS: readonly StatusFilter[] = ["all", "attention", "stuck"];
+const STATUS_FILTERS: readonly StatusFilter[] = ["all", "attention"];
 
 const STATUS_LABEL: Record<StatusFilter, string> = {
   all: "Everyone",
   attention: "Needs you",
-  stuck: "Long on a step",
 };
 
 const SORT_OPTIONS: FilterSelectOption<TeamOverviewFilters["sortBy"]>[] = [
@@ -59,15 +60,15 @@ const SORT_OPTIONS: FilterSelectOption<TeamOverviewFilters["sortBy"]>[] = [
 /** The dot each chip carries — the same colours the overview uses for these states. */
 const STATUS_DOT: Partial<Record<StatusFilter, string>> = {
   attention: "bg-app-warning-solid",
-  stuck: "bg-app-orange-text",
 };
 
 /**
  * Reads `?filter=` into a chip. Links from before the chips were merged still land somewhere
- * sensible: "waiting" was a part of "needs you", and the stage filters have no chip any more.
+ * sensible: "waiting" and "stuck" were parts of "needs you", and the stage filters have no chip
+ * any more.
  */
 function parseStatusFilter(value: string | null): StatusFilter {
-  if (value === "waiting") return "attention";
+  if (value === "waiting" || value === "stuck") return "attention";
   return value !== null && (STATUS_FILTERS as readonly string[]).includes(value)
     ? (value as StatusFilter)
     : "all";
@@ -184,8 +185,6 @@ export function TeamManagementPage() {
         return true;
       case "attention":
         return attentionById.has(member.userId);
-      case "stuck":
-        return isAtRisk(member);
     }
   };
 
@@ -289,7 +288,7 @@ export function TeamManagementPage() {
       <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
         {activeTab === "members" ? (
           <div className="space-y-4">
-            {/* One row: search, the three status chips, then role and sort on the right. */}
+            {/* One row: search, the status chips, then role and sort on the right. */}
             <div className="flex flex-wrap items-center gap-2">
               <Input
                 size="sm"
