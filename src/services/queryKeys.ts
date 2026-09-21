@@ -28,9 +28,14 @@ export const queryKeys = {
     byProject: (projectId: string) => ["attention", projectId] as const,
   },
   starterWork: {
+    // Bare, so `invalidateQueries({ queryKey: pool() })` prefix-matches every status's cache —
+    // a reconcile can move a task between LIVE and STALE, and both need to come back in step.
     pool: () => ["starter-work", "pool"] as const,
+    poolByStatus: (status: string) => ["starter-work", "pool", status] as const,
     review: () => ["starter-work", "review"] as const,
     corpusIssues: (projectId: string) => ["starter-work", "corpus", projectId] as const,
+    taskOrientation: (taskId: string, projectId: string) =>
+      ["starter-work", "orientation", taskId, projectId] as const,
   },
   profile: {
     mine: (userId: string) => ["profile", userId] as const,

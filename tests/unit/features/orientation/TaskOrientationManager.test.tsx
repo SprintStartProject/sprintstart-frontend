@@ -36,6 +36,9 @@ const approvedTask: StarterWorkTask = {
   competencyKeys: [],
   status: "LIVE",
   reviewed: true,
+  taskZeroEligible: false,
+  sourceHasAssignee: null,
+  sourceCheckedAt: null,
 };
 
 describe("TaskOrientationManager", () => {

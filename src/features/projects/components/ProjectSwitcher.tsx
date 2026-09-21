@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronsUpDown, FolderKanban } from "lucide-react";
+import { ChevronsUpDown, FolderKanban, ShieldCheck } from "lucide-react";
 import { useProjectContext } from "../useProjectContext";
 import { ProjectSwitcherModal } from "./ProjectSwitcherModal";
+import { Badge } from "../../../components/ui/Badge";
+import { ShortcutHint } from "../../../components/ui/ShortcutHint";
+import { monogramLetters, monogramTint } from "../projectMonogram";
 import { hoverSpringToken } from "../../../styles/tokens";
+
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+const SWITCHER_CHORD = IS_MAC ? "⌘ + K" : "Ctrl + K";
 
 type ProjectSwitcherProps = {
   className?: string;
@@ -61,11 +67,6 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
   };
 
   const triggerLabel = selectedProject?.name ?? "Select a project";
-  const triggerHint = !selectedProject
-    ? "No project selected"
-    : selectedProject.isManaged
-      ? "Managed by you"
-      : "Member";
 
   return (
     <div className={className}>
@@ -74,25 +75,51 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         aria-label={`Switch project. Current project: ${triggerLabel}`}
+        title={`Switch project (${SWITCHER_CHORD})`}
         onClick={() => setIsOpen(true)}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         transition={hoverSpringToken}
         className="group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 px-[10px] text-left backdrop-blur-md transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-app-brand-soft transition-colors group-hover:bg-app-brand group-hover:text-white">
-          <FolderKanban className="h-[18px] w-[18px] text-app-brand transition-colors group-hover:text-white" />
-        </span>
-
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-semibold text-app-text">{triggerLabel}</span>
-
-          <span className="truncate text-[10px] font-medium tracking-[0.18em] text-app-text-muted uppercase">
-            {triggerHint}
+        {selectedProject ? (
+          <span
+            aria-hidden="true"
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-xs font-semibold ${monogramTint(selectedProject.id)}`}
+          >
+            {monogramLetters(selectedProject.name)}
           </span>
+        ) : (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-app-surface-muted">
+            <FolderKanban className="h-[18px] w-[18px] text-app-text-muted" />
+          </span>
+        )}
+
+        <span className="flex min-w-0 flex-col gap-[3px]">
+          <span className="truncate text-sm leading-tight font-semibold text-app-text">
+            {triggerLabel}
+          </span>
+
+          {/* The same two badges the project details drawer uses for a person's
+              role, so "manager" looks the same wherever it is stated. */}
+          {!selectedProject ? (
+            <span className="truncate text-xs text-app-text-muted">No project selected</span>
+          ) : selectedProject.isManaged ? (
+            <Badge variant="brand" size="sm" className="w-fit">
+              <ShieldCheck aria-hidden="true" className="mr-1 h-3 w-3" />
+              Manager
+            </Badge>
+          ) : (
+            <Badge variant="neutral" size="sm" className="w-fit">
+              Member
+            </Badge>
+          )}
         </span>
 
-        <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 text-app-text-muted transition-colors group-hover:text-app-text" />
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+          <ShortcutHint keys={SWITCHER_CHORD} className="border-app-border text-app-text-muted" />
+          <ChevronsUpDown className="h-4 w-4 text-app-text-muted transition-colors group-hover:text-app-text" />
+        </span>
       </motion.button>
 
       <ProjectSwitcherModal

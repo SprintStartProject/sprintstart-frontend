@@ -2,11 +2,38 @@ import { useState, useMemo, useCallback, useDeferredValue } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { Artifact } from "../types";
-import type { KnowledgeTab } from "../tabs";
+import type { Artifact, SourceSystem } from "../types";
+import {
+  DEFAULT_FORMAT_ORDER,
+  DEFAULT_SOURCE_ORDER,
+  FORMAT_LABELS,
+  KNOWLEDGE_TABS,
+  type KnowledgeTab,
+  SOURCE_LABELS,
+  isUpload,
+  matchesFormat,
+  type UploadFormat,
+} from "../tabs";
+import { getArtifactRepository, matchesRepository } from "../githubMetadata";
 
 const ITEMS_PER_PAGE = 20;
 const NO_ARTIFACTS: Artifact[] = [];
+const NO_SOURCES: ReadonlySet<SourceSystem> = new Set<SourceSystem>();
+const NO_REPOSITORIES: ReadonlySet<string> = new Set<string>();
+
+/** A single selectable option in a facet, with the count it would yield if added. */
+export interface FacetOption<TValue extends string> {
+  value: TValue;
+  label: string;
+  count: number;
+}
+
+/** An option for the top-level artifact type tabs in SegmentedTabs. */
+export interface TabOption {
+  value: KnowledgeTab;
+  label: string;
+  count: number;
+}
 
 /** The knowledge-base query's loader, shared with route prefetch so the two never drift apart. */
 export function loadKnowledgeBaseArtifacts(projectId: string): Promise<Artifact[]> {
@@ -16,9 +43,12 @@ export function loadKnowledgeBaseArtifacts(projectId: string): Promise<Artifact[
 /**
  * State + data layer for the Knowledge Base page.
  *
- * Owns artifact fetching, client-side filtering (search + tab), and
- * pagination. UI-only state (which drawer is open, which modal is open) stays
- * in the page.
+ * Owns artifact fetching, client-side filtering and pagination. Filtering is
+ * three independent facets — sources, artifact types, and (for uploads only)
+ * file format — combined with AND across facets and OR within one; an empty
+ * facet means "everything", which is what makes a clear-all the same operation
+ * as never having filtered. UI-only state (which drawer is open, which modal is
+ * open) stays in the page.
  *
  * @param projectId The project to scope artifact fetching to. When null, no
  *   fetch is attempted and the page should render its empty state.
@@ -56,9 +86,199 @@ export function useKnowledgeBase(projectId: string | null) {
   // Deferred so rapid typing doesn't re-filter the whole list on every keystroke;
   // React batches the filter to a lower-priority render.
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const [activeTab, setActiveTab] = useState<KnowledgeTab>("ALL");
 
+  const [activeTab, setActiveTab] = useState<KnowledgeTab>("ALL");
+  const [selectedSources, setSelectedSources] = useState<ReadonlySet<SourceSystem>>(NO_SOURCES);
+  const [selectedFormat, setSelectedFormat] = useState<UploadFormat | null>(null);
+  const [selectedRepositories, setSelectedRepositories] =
+    useState<ReadonlySet<string>>(NO_REPOSITORIES);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Helper to match text search across title, sourceId, and sourceUrl
+  const matchesSearch = useCallback((artifact: Artifact, query: string): boolean => {
+    if (!query) return true;
+    const searchableText = [artifact.title ?? "", artifact.sourceId, artifact.sourceUrl ?? ""]
+      .join(" ")
+      .toLowerCase();
+    return searchableText.includes(query.toLowerCase());
+  }, []);
+
+  const passesTab = useCallback(
+    (artifact: Artifact): boolean => {
+      if (activeTab === "ALL") return true;
+      return artifact.artifactType === activeTab;
+    },
+    [activeTab],
+  );
+
+  const passesSources = useCallback(
+    (artifact: Artifact): boolean => {
+      if (selectedSources.size === 0) return true;
+      return selectedSources.has(artifact.sourceSystem);
+    },
+    [selectedSources],
+  );
+
+  const passesFormat = useCallback(
+    (artifact: Artifact): boolean => {
+      if (selectedFormat === null) return true;
+      return matchesFormat(artifact, selectedFormat);
+    },
+    [selectedFormat],
+  );
+
+  const passesRepository = useCallback(
+    (artifact: Artifact): boolean => matchesRepository(artifact, selectedRepositories),
+    [selectedRepositories],
+  );
+
+  /**
+   * Top-level tabs for SegmentedTabs.
+   *
+   * Options are scoped to artifact types available from the selected sources
+   * (plus "ALL" and whatever tab is active, so an active tab never disappears).
+   * Each tab's count reflects the current search, source selection, and format facet.
+   */
+  const tabOptions = useMemo<TabOption[]>(() => {
+    const presentTypes = new Set(
+      artifacts.filter(passesSources).map((artifact) => artifact.artifactType),
+    );
+    const reachableTabs = KNOWLEDGE_TABS.filter(
+      (tab) =>
+        tab.id === "ALL" ||
+        tab.id === activeTab ||
+        (tab.type !== undefined && presentTypes.has(tab.type)),
+    );
+
+    return reachableTabs.map((tab) => ({
+      value: tab.id,
+      label: tab.label,
+      count: artifacts.filter(
+        (artifact) =>
+          (tab.id === "ALL" || artifact.artifactType === tab.id) &&
+          matchesSearch(artifact, deferredSearchQuery) &&
+          passesSources(artifact) &&
+          passesFormat(artifact) &&
+          passesRepository(artifact),
+      ).length,
+    }));
+  }, [
+    artifacts,
+    activeTab,
+    deferredSearchQuery,
+    matchesSearch,
+    passesSources,
+    passesFormat,
+    passesRepository,
+  ]);
+
+  /** Sources present in the project (plus any selected one, so a filter is never invisible). */
+  const sourceOptions = useMemo<FacetOption<SourceSystem>[]>(() => {
+    const present = new Set(artifacts.map((artifact) => artifact.sourceSystem));
+    return DEFAULT_SOURCE_ORDER.filter(
+      (source) => present.has(source) || selectedSources.has(source),
+    ).map((source) => ({
+      value: source,
+      label: SOURCE_LABELS[source],
+      count: artifacts.filter(
+        (artifact) =>
+          artifact.sourceSystem === source &&
+          matchesSearch(artifact, deferredSearchQuery) &&
+          passesTab(artifact) &&
+          passesFormat(artifact) &&
+          passesRepository(artifact),
+      ).length,
+    }));
+  }, [
+    artifacts,
+    deferredSearchQuery,
+    matchesSearch,
+    passesTab,
+    passesFormat,
+    passesRepository,
+    selectedSources,
+  ]);
+
+  /**
+   * File formats, offered only while Uploads is part of the source selection.
+   *
+   * Empty means "this facet does not apply right now", which is exactly the
+   * condition the filter UI renders the section on — so the rule lives here once
+   * instead of being re-derived by every caller.
+   */
+  const formatOptions = useMemo<FacetOption<UploadFormat>[]>(() => {
+    if (!selectedSources.has("UPLOAD")) return [];
+
+    // No passesRepository here: the candidates are uploads, and
+    // matchesRepository passes every non-GitHub artifact — the condition could
+    // never exclude anything, it only pulled a dependency in for nothing.
+    const uploads = artifacts.filter(
+      (artifact) =>
+        isUpload(artifact) && matchesSearch(artifact, deferredSearchQuery) && passesTab(artifact),
+    );
+
+    // Same rule as the types: a format no upload in scope can produce is not
+    // offered, but one the reader already chose stays so it can be unchosen.
+    return DEFAULT_FORMAT_ORDER.filter(
+      (format) => selectedFormat === format || uploads.some((a) => matchesFormat(a, format)),
+    ).map((format) => ({
+      value: format,
+      label: FORMAT_LABELS[format],
+      count: uploads.filter((artifact) => matchesFormat(artifact, format)).length,
+    }));
+  }, [artifacts, deferredSearchQuery, matchesSearch, passesTab, selectedSources, selectedFormat]);
+
+  /**
+   * Repositories behind the project's GitHub artifacts, offered only while
+   * GitHub is part of the source selection.
+   *
+   * Same contract as `formatOptions`: empty means "this facet does not apply
+   * right now", which is the condition the filter UI renders the section on.
+   * Alphabetical because repository names are unbounded, unlike the fixed enum
+   * facets. A choice that no longer appears in scope stays so it can be
+   * unchosen.
+   */
+  const repositoryOptions = useMemo<FacetOption<string>[]>(() => {
+    if (!selectedSources.has("GITHUB")) return [];
+
+    // Candidates are the GitHub artifacts the current tab and search admit;
+    // the format facet cannot exclude them (matchesFormat passes every
+    // non-upload), so it is deliberately not applied here.
+    const githubCandidates = artifacts.filter(
+      (artifact) =>
+        artifact.sourceSystem === "GITHUB" &&
+        matchesSearch(artifact, deferredSearchQuery) &&
+        passesTab(artifact),
+    );
+
+    const repos = new Set<string>();
+    for (const artifact of githubCandidates) {
+      const repository = getArtifactRepository(artifact);
+      if (repository !== null) repos.add(repository);
+    }
+
+    // Count through the predicate the list itself uses, one candidate selection
+    // at a time: bucketing on getArtifactRepository alone never counted the
+    // owning org's profile, so checking a repo delivered one more row (per
+    // owning org) than the number beside it promised.
+    const offered = new Set([...repos, ...selectedRepositories]);
+    return [...offered]
+      .sort((a, b) => a.localeCompare(b))
+      .map((repository) => ({
+        value: repository,
+        label: repository,
+        count: githubCandidates.filter((artifact) =>
+          matchesRepository(artifact, new Set([repository])),
+        ).length,
+      }));
+  }, [
+    artifacts,
+    deferredSearchQuery,
+    matchesSearch,
+    passesTab,
+    selectedSources,
+    selectedRepositories,
+  ]);
 
   // Paging resets when the project scope changes. This deliberately does not live
   // in `fetchArtifacts`: that function doubles as the Refresh handler, and hitting
@@ -67,45 +287,32 @@ export function useKnowledgeBase(projectId: string | null) {
   if (pagedProjectId !== projectId) {
     setPagedProjectId(projectId);
     setCurrentPage(1);
+    setActiveTab("ALL");
+    setSelectedSources(NO_SOURCES);
+    setSelectedFormat(null);
+    setSelectedRepositories(NO_REPOSITORIES);
   }
 
-  const filteredArtifacts = useMemo(() => {
-    return artifacts.filter((artifact) => {
-      const searchableText = [artifact.title ?? "", artifact.sourceId, artifact.sourceUrl ?? ""]
-        .join(" ")
-        .toLowerCase();
-
-      const matchesSearch =
-        !deferredSearchQuery || searchableText.includes(deferredSearchQuery.toLowerCase());
-
-      let matchesTab = false;
-      switch (activeTab) {
-        case "ALL":
-          matchesTab = true;
-          break;
-        case "UPLOADS":
-          matchesTab = artifact.sourceSystem === "UPLOAD";
-          break;
-        case "PR":
-          matchesTab = artifact.artifactType === "PULL_REQUEST";
-          break;
-        case "ISSUES":
-          matchesTab = artifact.artifactType === "ISSUE";
-          break;
-        case "FILES":
-          matchesTab = artifact.sourceSystem === "GITHUB" && artifact.artifactType === "FILE";
-          break;
-        case "COMMITS":
-          matchesTab = artifact.artifactType === "COMMIT";
-          break;
-        case "ORGANIZATIONS":
-          matchesTab = artifact.artifactType === "ORG_METADATA";
-          break;
-      }
-
-      return matchesSearch && matchesTab;
-    });
-  }, [artifacts, deferredSearchQuery, activeTab]);
+  const filteredArtifacts = useMemo(
+    () =>
+      artifacts.filter(
+        (artifact) =>
+          matchesSearch(artifact, deferredSearchQuery) &&
+          passesTab(artifact) &&
+          passesSources(artifact) &&
+          passesFormat(artifact) &&
+          passesRepository(artifact),
+      ),
+    [
+      artifacts,
+      deferredSearchQuery,
+      matchesSearch,
+      passesTab,
+      passesSources,
+      passesFormat,
+      passesRepository,
+    ],
+  );
 
   const totalPages = Math.max(1, Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE));
 
@@ -133,12 +340,70 @@ export function useKnowledgeBase(projectId: string | null) {
     setCurrentPage(1);
   }, []);
 
+  const toggleSource = useCallback(
+    (source: SourceSystem) => {
+      const isRemoving = selectedSources.has(source);
+
+      setSelectedSources((current) => {
+        const next = new Set(current);
+        if (isRemoving) {
+          next.delete(source);
+        } else {
+          next.add(source);
+        }
+        return next;
+      });
+
+      // The format facet only describes uploads. With Uploads deselected its
+      // options are not rendered, so a surviving choice would be a filter the
+      // reader can neither see nor clear.
+      if (isRemoving && source === "UPLOAD") {
+        setSelectedFormat(null);
+      }
+
+      // Same rule for the repository facet, which only describes GitHub.
+      if (isRemoving && source === "GITHUB") {
+        setSelectedRepositories(NO_REPOSITORIES);
+      }
+
+      setCurrentPage(1);
+    },
+    [selectedSources],
+  );
+
+  const toggleFormat = useCallback((format: UploadFormat) => {
+    setSelectedFormat((current) => (current === format ? null : format));
+    setCurrentPage(1);
+  }, []);
+
+  const toggleRepository = useCallback((repository: string) => {
+    setSelectedRepositories((current) => {
+      const next = new Set(current);
+      if (next.has(repository)) {
+        next.delete(repository);
+      } else {
+        next.add(repository);
+      }
+      return next;
+    });
+    setCurrentPage(1);
+  }, []);
+
   const handleClearFilters = useCallback(() => {
     setSearchQuery("");
     setActiveTab("ALL");
+    setSelectedSources(NO_SOURCES);
+    setSelectedFormat(null);
+    setSelectedRepositories(NO_REPOSITORIES);
+    setCurrentPage(1);
   }, []);
 
-  const hasActiveFilters = searchQuery !== "" || activeTab !== "ALL";
+  const hasActiveFilters =
+    searchQuery !== "" ||
+    activeTab !== "ALL" ||
+    selectedSources.size > 0 ||
+    selectedFormat !== null ||
+    selectedRepositories.size > 0;
 
   return {
     artifacts,
@@ -147,12 +412,22 @@ export function useKnowledgeBase(projectId: string | null) {
     fetchArtifacts,
     searchQuery,
     activeTab,
+    tabOptions,
+    sourceOptions,
+    formatOptions,
+    repositoryOptions,
+    selectedSources,
+    selectedFormat,
+    selectedRepositories,
     currentPage,
     totalPages,
     filteredArtifacts,
     paginatedArtifacts,
     handleSearchChange,
     handleTabChange,
+    toggleSource,
+    toggleFormat,
+    toggleRepository,
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,

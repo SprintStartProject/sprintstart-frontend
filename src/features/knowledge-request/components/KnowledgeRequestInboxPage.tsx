@@ -161,7 +161,7 @@ export function KnowledgeRequestInboxPage() {
         ) : (
           <>
             {/* The app's shared segmented control rather than a tab bar of this page's own —
-                same reason ArrivalStepsPage cites: the sliding pill and hover magnify are the
+                same reason ArrivalSection cites: the sliding pill and hover magnify are the
                 house look for switching sections, so the inbox shouldn't grow a second one. */}
             <SegmentedTabs
               value={tab}
