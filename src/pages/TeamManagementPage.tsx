@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, Shield, Users, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, Shield, Users, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -56,6 +56,62 @@ const SORT_OPTIONS: FilterSelectOption<TeamOverviewFilters["sortBy"]>[] = [
   { value: "HIGHEST_PROGRESS", label: "Highest progress" },
   { value: "LOWEST_PROGRESS", label: "Lowest progress" },
 ];
+
+type SortColumn = "step" | "progress";
+
+/** Which column a sort belongs to, and which way it runs. */
+const SORT_COLUMN: Record<TeamOverviewFilters["sortBy"], { column: SortColumn; desc: boolean }> = {
+  LONGEST_STEP: { column: "step", desc: true },
+  SHORTEST_STEP: { column: "step", desc: false },
+  HIGHEST_PROGRESS: { column: "progress", desc: true },
+  LOWEST_PROGRESS: { column: "progress", desc: false },
+};
+
+/**
+ * A column header that sorts the roster by its column — "Where they are" by how long each
+ * member has been on their current step, "Progress" by progress. The first press sorts the way
+ * a manager usually wants it (longest, highest first); pressing the active column again flips it.
+ */
+function SortHeader({
+  column,
+  label,
+  sortLabel,
+  sortBy,
+  onSort,
+}: {
+  column: SortColumn;
+  label: string;
+  /** What the sort actually orders by, for the accessible name and tooltip. */
+  sortLabel: string;
+  sortBy: TeamOverviewFilters["sortBy"];
+  onSort: (next: TeamOverviewFilters["sortBy"]) => void;
+}) {
+  const current = SORT_COLUMN[sortBy];
+  const active = current.column === column;
+  const Icon = !active ? ArrowUpDown : current.desc ? ArrowDown : ArrowUp;
+
+  const toggle = () => {
+    const desc = active ? !current.desc : true;
+    if (column === "step") onSort(desc ? "LONGEST_STEP" : "SHORTEST_STEP");
+    else onSort(desc ? "HIGHEST_PROGRESS" : "LOWEST_PROGRESS");
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={`Sort by ${sortLabel}`}
+      aria-pressed={active}
+      title={`Sort by ${sortLabel}`}
+      className={`-mx-1 inline-flex items-center gap-1 rounded px-1 tracking-wider uppercase transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+        active ? "text-app-text" : "hover:text-app-text"
+      }`}
+    >
+      {label}
+      <Icon aria-hidden="true" className={`h-3 w-3 ${active ? "" : "opacity-50"}`} />
+    </button>
+  );
+}
 
 /** The dot each chip carries — the same colours the overview uses for these states. */
 const STATUS_DOT: Partial<Record<StatusFilter, string>> = {
@@ -288,7 +344,7 @@ export function TeamManagementPage() {
       <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
         {activeTab === "members" ? (
           <div className="space-y-4">
-            {/* One row: search, the status chips, then role and sort on the right. */}
+            {/* One row: search, the status chips, the role filter. Sorting is on the headers. */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Sized on a wrapper: with an icon, `Input` puts its `className` on the <input>
                   inside its own full-width box, so flex sizing given to it never reached the
@@ -321,12 +377,14 @@ export function TeamManagementPage() {
                   disabled={(roles?.length ?? 0) === 0}
                   className="w-40"
                 />
+                {/* Sorting lives on the column headers; below `md` those are hidden, so the
+                    select stands in for them there only. */}
                 <FilterSelect
                   label="Sort team members"
                   value={sortBy}
                   options={SORT_OPTIONS}
                   onChange={setSortBy}
-                  className="w-44"
+                  className="w-44 md:hidden"
                 />
               </div>
             </div>
@@ -336,9 +394,25 @@ export function TeamManagementPage() {
                 className={`hidden gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid ${ROSTER_COLUMNS}`}
               >
                 <span>Member</span>
-                <span>Where they are</span>
+                <span>
+                  <SortHeader
+                    column="step"
+                    label="Where they are"
+                    sortLabel="time on current step"
+                    sortBy={sortBy}
+                    onSort={setSortBy}
+                  />
+                </span>
                 <span>Open with you</span>
-                <span>Progress</span>
+                <span>
+                  <SortHeader
+                    column="progress"
+                    label="Progress"
+                    sortLabel="progress"
+                    sortBy={sortBy}
+                    onSort={setSortBy}
+                  />
+                </span>
                 <span />
               </div>
 
