@@ -203,37 +203,39 @@ export function PmStat({
   to,
   onClick,
 }: PmStatProps) {
+  // One row, not a tall tile: icon, figure, label and hint side by side. The tiles used to be
+  // 7rem tall with a 3xl number, which gave four small figures a whole band of the page.
   const body = (
     <>
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-app-text-muted">
-          {attention && (
-            <span aria-hidden="true" className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-app-warning-solid opacity-60 motion-reduce:animate-none" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-app-warning-solid" />
-            </span>
-          )}
-          <span className="truncate">{label}</span>
+      <span
+        aria-hidden="true"
+        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+          attention ? PM_TONE_SOFT.warning : PM_TONE_SOFT[tone]
+        }`}
+      >
+        <Icon className="h-4 w-4" />
+        {attention && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-app-warning-solid opacity-60 motion-reduce:animate-none" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-app-warning-solid ring-2 ring-app-surface" />
+          </span>
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="text-xl leading-none font-bold tracking-tight text-app-text tabular-nums">
+            {value}
+          </span>
+          <span className="truncate text-[12.5px] font-medium text-app-text-muted">{label}</span>
         </span>
-        <span
-          aria-hidden="true"
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-            attention ? PM_TONE_SOFT.warning : PM_TONE_SOFT[tone]
-          }`}
-        >
-          <Icon className="h-3.5 w-3.5" />
-        </span>
-      </div>
-      <p className="mt-auto pt-2 text-2xl font-bold tracking-tight text-app-text tabular-nums sm:text-3xl">
-        {value}
-      </p>
-      <p className="mt-0.5 truncate text-xs text-app-text-subtle">{hint}</p>
+        <span className="mt-1 block truncate text-xs text-app-text-subtle">{hint}</span>
+      </span>
     </>
   );
 
   const className =
-    "flex h-full min-h-28 flex-col rounded-2xl border border-app-border bg-app-surface p-4 text-left sm:p-[18px]";
-  const interactiveClassName = `${className} transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none motion-reduce:hover:translate-y-0`;
+    "flex h-full items-center gap-3 rounded-2xl border border-app-border bg-app-surface px-3.5 py-3 text-left";
+  const interactiveClassName = `${className} transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-md focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none motion-reduce:hover:translate-y-0`;
 
   if (to) {
     return (

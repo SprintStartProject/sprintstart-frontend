@@ -22,6 +22,7 @@ import {
   memberStage,
   waitingOn,
 } from "../features/pm-area/memberStatus";
+import { ROSTER_COLUMNS } from "../features/pm-area/rosterLayout";
 import { useMemberPeek } from "../features/pm-area/useMemberPeek";
 import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { TEAM_TAB_PARAM } from "../features/pm-area/pmWorkspacePaths";
@@ -236,9 +237,12 @@ export function TeamManagementPage() {
   const showLoadingSkeleton = useDelayedFlag(loading);
 
   const members = useMemo(() => roster ?? [], [roster]);
-  const attentionIds = useMemo(
+  // Who needs the manager and why, by person — the chips count from it and every row shows it.
+  const attentionById = useMemo(
     () =>
-      new Set(buildAttentionQueue(members, attention?.items ?? []).map((entry) => entry.userId)),
+      new Map(
+        buildAttentionQueue(members, attention?.items ?? []).map((entry) => [entry.userId, entry]),
+      ),
     [members, attention],
   );
 
@@ -247,7 +251,7 @@ export function TeamManagementPage() {
       case "all":
         return true;
       case "attention":
-        return attentionIds.has(member.userId);
+        return attentionById.has(member.userId);
       case "waiting":
         return waitingOn(member).length > 0;
       case "stuck":
@@ -301,7 +305,7 @@ export function TeamManagementPage() {
           active
             ? "border-app-brand bg-app-brand text-white"
             : "border-app-border bg-app-surface text-app-text-muted hover:border-app-brand-border-strong hover:text-app-text"
-        }`}
+        } ${!active && roster && statusCounts[filter] === 0 && filter !== "all" ? "opacity-60" : ""}`}
       >
         {dot && (
           <span
@@ -327,15 +331,9 @@ export function TeamManagementPage() {
     );
   };
 
-  // A chip for a state nobody is in only says "0" — it stays while it is the active filter
-  // (so a link from the overview never lands on a filter that is not shown) and otherwise waits
-  // until somebody is in it.
-  const chipGroups = STATUS_GROUPS.map((group) =>
-    group.filter(
-      (filter) =>
-        filter === "all" || filter === statusFilter || !roster || statusCounts[filter] > 0,
-    ),
-  ).filter((group) => group.length > 0);
+  // Every chip always shows, zero or not: a filter that only appears once somebody is in it
+  // reads as "this filter does not exist", and "0 waiting on you" is itself worth seeing.
+  const chipGroups = STATUS_GROUPS;
 
   return (
     <section aria-label="Team">
@@ -369,59 +367,64 @@ export function TeamManagementPage() {
       <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
         {activeTab === "members" ? (
           <div className="space-y-4">
-            {/* One toolbar instead of two rows: search, the status chips, and the role filter
-                only where there is more than one role to tell apart. Sorting moved onto the
-                column headers, where it is on every table a manager already knows. */}
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-              <Input
-                size="sm"
-                icon={<Search className="h-4 w-4" />}
-                aria-label="Search members"
-                placeholder="Search by name or step…"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="min-w-0 xl:w-64 xl:shrink-0"
-              />
-
-              <div
-                role="group"
-                aria-label="Filter members by status"
-                className="flex min-w-0 flex-1 [scrollbar-width:none]! items-center gap-2 overflow-x-auto pb-1 xl:pb-0 [&::-webkit-scrollbar]:hidden"
-              >
-                {chipGroups.map((group, index) => (
-                  <div key={group[0]} className="flex shrink-0 items-center gap-2">
-                    {index > 0 && (
-                      <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
-                    )}
-                    {group.map(statusChip)}
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                {(roles?.length ?? 0) > 1 && (
+            {/* Search and role on one line, every status filter on the next — always all of
+                them, wrapping rather than scrolling, so none hides off the edge. Sorting sits on
+                the column headers, where it is on every table a manager already knows. */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  size="sm"
+                  icon={<Search className="h-4 w-4" />}
+                  aria-label="Search members"
+                  placeholder="Search by name or step…"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="min-w-0 flex-1 sm:max-w-xs"
+                />
+                <div className="ml-auto flex items-center gap-2">
                   <FilterSelect
                     label="Filter team members by role"
                     value={roleId}
                     options={roleOptions}
                     onChange={setRoleId}
+                    disabled={(roles?.length ?? 0) === 0}
                     className="w-40"
                   />
-                )}
-                {/* Below `md` the column headers are hidden, so the sort needs a control of
-                    its own there. */}
-                <FilterSelect
-                  label="Sort team members"
-                  value={sortBy}
-                  options={SORT_OPTIONS}
-                  onChange={setSortBy}
-                  className="w-44 md:hidden"
-                />
+                  {/* Below `md` the column headers are hidden, so the sort needs a control of
+                      its own there. */}
+                  <FilterSelect
+                    label="Sort team members"
+                    value={sortBy}
+                    options={SORT_OPTIONS}
+                    onChange={setSortBy}
+                    className="w-44 md:hidden"
+                  />
+                </div>
+              </div>
+
+              <div
+                role="group"
+                aria-label="Filter members by status"
+                className="flex flex-wrap items-center gap-2"
+              >
+                {chipGroups.map((group, index) => (
+                  <div key={group[0]} className="flex flex-wrap items-center gap-2">
+                    {index > 0 && (
+                      <span
+                        aria-hidden="true"
+                        className="mx-0.5 hidden h-5 w-px bg-app-border sm:block"
+                      />
+                    )}
+                    {group.map(statusChip)}
+                  </div>
+                ))}
               </div>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
-              <div className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_9rem_4.5rem] gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid">
+              <div
+                className={`hidden gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid ${ROSTER_COLUMNS}`}
+              >
                 <span>Member</span>
                 <span>
                   <SortHeader
@@ -431,6 +434,7 @@ export function TeamManagementPage() {
                     onSort={setSortBy}
                   />
                 </span>
+                <span>Open with you</span>
                 <span>
                   <SortHeader
                     column="progress"
@@ -479,6 +483,7 @@ export function TeamManagementPage() {
                         onOpen={openMember}
                         selected={memberId === member.userId}
                         profileLink
+                        reasons={attentionById.get(member.userId)?.reasons ?? []}
                       />
                     </li>
                   ))}

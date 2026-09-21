@@ -1,7 +1,17 @@
-import { ArrowUpRight, ChevronRight, Clock, MessageSquareText, SkipForward } from "lucide-react";
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  MessageSquareText,
+  SkipForward,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import type { TeamOverviewUser } from "../../team-management/types";
+import type { AttentionReason } from "../attentionQueue";
+import { REASON_META } from "../attentionReasons";
+import { ROSTER_COLUMNS } from "../rosterLayout";
 import {
   daysOnStep,
   formatDays,
@@ -74,6 +84,63 @@ export function MemberFlags({ member }: { member: TeamOverviewUser }) {
   );
 }
 
+/** How many open items a roster row spells out before it folds the rest into "+n". */
+const VISIBLE_REASONS = 2;
+
+/**
+ * Everything open with the manager for one member, each as a coloured label with its detail —
+ * the skip's reason in the member's words, not only "Skip request". What the overview's queue
+ * says about a person, said in their row, so the roster answers "who needs what" without
+ * opening anyone.
+ */
+function OpenItems({ member, reasons }: { member: TeamOverviewUser; reasons: AttentionReason[] }) {
+  if (reasons.length === 0) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-app-text-subtle">
+        <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 text-app-success-solid" />
+        Nothing open
+      </span>
+    );
+  }
+
+  const skipReason = member.currentStep?.skip?.reason?.trim();
+  const shown = reasons.slice(0, VISIBLE_REASONS);
+  const folded = reasons.length - shown.length;
+
+  return (
+    <span className="flex min-w-0 flex-col gap-1">
+      {shown.map((reason) => {
+        const meta = REASON_META[reason.kind];
+        const Icon = meta.icon;
+        const detail = reason.kind === "skip" && skipReason ? `“${skipReason}”` : reason.text;
+
+        return (
+          <span key={reason.kind} className="flex min-w-0 items-center gap-1.5 text-xs">
+            <span
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.tone}`}
+            >
+              <Icon aria-hidden="true" className="h-3 w-3" />
+              {meta.label}
+            </span>
+            <span className="min-w-0 truncate text-app-text-muted" title={detail}>
+              {detail}
+            </span>
+          </span>
+        );
+      })}
+      {folded > 0 && (
+        <span className="text-[11px] text-app-text-subtle">
+          +{folded} more:{" "}
+          {reasons
+            .slice(VISIBLE_REASONS)
+            .map((reason) => REASON_META[reason.kind].label.toLowerCase())
+            .join(", ")}
+        </span>
+      )}
+    </span>
+  );
+}
+
 type MemberRowProps = {
   member: TeamOverviewUser;
   onOpen: (userId: string) => void;
@@ -87,6 +154,11 @@ type MemberRowProps = {
    * press on the row and a second one inside the panel.
    */
   profileLink?: boolean;
+  /**
+   * What the member needs from the manager, from the attention queue. The full row shows these
+   * in their own column; without them it falls back to the skip / feedback / stuck flags.
+   */
+  reasons?: AttentionReason[];
 };
 
 /**
@@ -103,6 +175,7 @@ export function MemberRow({
   selected = false,
   density = "full",
   profileLink = false,
+  reasons,
 }: MemberRowProps) {
   const name = memberName(member);
   const percent = progressPercent(member);
@@ -132,7 +205,7 @@ export function MemberRow({
         selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
       } ${
         isFull
-          ? "grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_9rem_4.5rem]"
+          ? `grid-cols-[minmax(0,1fr)_auto] ${ROSTER_COLUMNS}`
           : "grid-cols-[minmax(0,1fr)_auto]"
       }`}
     >
@@ -145,32 +218,66 @@ export function MemberRow({
         />
         <span className="min-w-0">
           <span className="block truncate text-sm font-semibold text-app-text">{name}</span>
-          <span className="block truncate text-xs text-app-text-muted">
-            {isFull
-              ? member.roles.length > 0
-                ? member.roles.map((role) => role.name).join(", ")
-                : "No role yet"
-              : compactLine}
-          </span>
+          {isFull ? (
+            <span className="mt-1 flex min-w-0 flex-wrap gap-1">
+              {member.roles.length > 0 ? (
+                member.roles.map((role) => (
+                  <span
+                    key={role.id}
+                    className="truncate rounded-md bg-app-brand-soft px-1.5 py-0.5 text-[11px] font-medium text-app-brand-text"
+                  >
+                    {role.name}
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs text-app-text-subtle">No role yet</span>
+              )}
+            </span>
+          ) : (
+            <span className="block truncate text-xs text-app-text-muted">{compactLine}</span>
+          )}
         </span>
       </span>
 
       {isFull && (
         <span className="col-span-2 row-start-2 min-w-0 md:col-span-1 md:row-start-auto">
           <span className="block truncate text-sm text-app-text">{stepLine}</span>
-          <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-app-text-muted">
-            {member.currentPhase?.title && stage !== "done" && (
-              <span className="truncate">{member.currentPhase.title}</span>
-            )}
-            {days !== null && stage !== "done" && !isAtRisk(member) && (
-              <span className="shrink-0">· {formatDays(days)} on step</span>
-            )}
-            <MemberFlags member={member} />
-          </span>
+          {stage !== "done" && (
+            <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-app-text-muted">
+              {member.currentPhase?.title && (
+                <span className="truncate">{member.currentPhase.title}</span>
+              )}
+              {days !== null && (
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1 ${
+                    isAtRisk(member) ? "font-medium text-app-orange-text" : ""
+                  }`}
+                >
+                  <Clock aria-hidden="true" className="h-3 w-3" />
+                  {days <= 0 ? "started today" : `${formatDays(days)} on step`}
+                </span>
+              )}
+            </span>
+          )}
         </span>
       )}
 
-      {isFull && <MemberProgressBar percent={percent} className="col-span-2 md:col-span-1" />}
+      {isFull && (
+        <span className="col-span-2 row-start-3 min-w-0 md:col-span-1 md:row-start-auto">
+          {reasons ? (
+            <OpenItems member={member} reasons={reasons} />
+          ) : (
+            <MemberFlags member={member} />
+          )}
+        </span>
+      )}
+
+      {isFull && (
+        <MemberProgressBar
+          percent={percent}
+          className="col-span-2 row-start-4 md:col-span-1 md:row-start-auto"
+        />
+      )}
 
       <span className="col-start-2 row-start-1 flex items-center justify-end gap-2 md:col-start-auto md:row-start-auto">
         {!isFull && <MemberFlags member={member} />}

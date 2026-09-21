@@ -1,44 +1,10 @@
-import {
-  BellRing,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  Hourglass,
-  MessageSquareText,
-  SkipForward,
-  TrendingDown,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { BellRing, CheckCircle2, ChevronRight } from "lucide-react";
 import { UserAvatar } from "../../../../components/common/UserAvatar";
 import { SkeletonGroup, SkeletonLine } from "../../../../components/ui/Skeleton";
 import { isWaitingOnAnswer } from "../../attentionQueue";
-import type { AttentionEntry, AttentionReasonKind } from "../../attentionQueue";
+import type { AttentionEntry } from "../../attentionQueue";
+import { REASON_META } from "../../attentionReasons";
 import { PmCard, PmCardHeader, PmCardLink, PmEyebrow } from "../PmCard";
-
-const REASON_META: Record<AttentionReasonKind, { icon: LucideIcon; tone: string; label: string }> =
-  {
-    skip: {
-      icon: SkipForward,
-      tone: "bg-app-warning-bg text-app-warning-text",
-      label: "Skip request",
-    },
-    feedback: {
-      icon: MessageSquareText,
-      tone: "bg-app-brand-soft text-app-brand-text",
-      label: "Feedback",
-    },
-    "waiting-review": {
-      icon: Hourglass,
-      tone: "bg-app-orange-bg text-app-orange-text",
-      label: "Waiting on review",
-    },
-    drifting: {
-      icon: TrendingDown,
-      tone: "bg-app-danger-bg text-app-danger-text",
-      label: "Drifting",
-    },
-    stuck: { icon: Clock, tone: "bg-app-orange-bg text-app-orange-text", label: "Long on a step" },
-  };
 
 /**
  * How many people the card lists before it hands over to the team page. Kept short on purpose:
