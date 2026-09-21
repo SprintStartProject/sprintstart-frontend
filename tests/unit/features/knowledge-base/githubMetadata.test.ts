@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getArtifactRepository,
+  matchesRepository,
   parseGithubMetadata,
 } from "../../../../src/features/knowledge-base/githubMetadata";
+import type { Artifact } from "../../../../src/features/knowledge-base/types";
 
 describe("parseGithubMetadata", () => {
   afterEach(() => {
@@ -55,9 +57,20 @@ describe("parseGithubMetadata", () => {
   it("returns null when repositoryFullName is missing or not a usable string", () => {
     expect(parseGithubMetadata("{}")).toBeNull();
     expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: 42 }))).toBeNull();
-    expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: null }))).toBeNull();
     expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: "" }))).toBeNull();
     expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: "   " }))).toBeNull();
+    expect(parseGithubMetadata(JSON.stringify({ repositoryFullName: null }))).toBeNull();
+  });
+
+  it("trims the repository name and drops a non-string repositoryId", () => {
+    const parsed = parseGithubMetadata(
+      JSON.stringify({ repositoryId: 42, repositoryFullName: "  owner/repo  " }),
+    );
+
+    expect(parsed?.repositoryFullName).toBe("owner/repo");
+    // The parsed shape may only promise what it validated: repositoryId is
+    // unconsumed, so a non-string payload value must not be typed as a string.
+    expect(parsed?.repositoryId).toBeUndefined();
   });
 });
 
@@ -104,5 +117,85 @@ describe("getArtifactRepository", () => {
     expect(
       getArtifactRepository({ sourceSystem: "GITHUB", artifactType: "FILE", metadata: undefined }),
     ).toBeNull();
+  });
+});
+
+describe("matchesRepository", () => {
+  const repoMetadata = JSON.stringify({
+    repositoryId: "r1",
+    repositoryFullName: "sprintstart/sprintstart-frontend",
+  });
+
+  it("matches everything while nothing is selected", () => {
+    expect(
+      matchesRepository(
+        { sourceSystem: "GITHUB", artifactType: "FILE", metadata: repoMetadata },
+        new Set(),
+      ),
+    ).toBe(true);
+  });
+
+  it("narrows repo-scoped GitHub artifacts to the selected repositories", () => {
+    const artifact: Pick<Artifact, "sourceSystem" | "artifactType" | "metadata"> = {
+      sourceSystem: "GITHUB",
+      artifactType: "FILE",
+      metadata: repoMetadata,
+    };
+
+    expect(matchesRepository(artifact, new Set(["sprintstart/sprintstart-frontend"]))).toBe(true);
+    expect(matchesRepository(artifact, new Set(["other/repo"]))).toBe(false);
+  });
+
+  it("always matches artifacts from other sources", () => {
+    // Other sources are outside the facet's reach (matchesFormat's connector rule).
+    expect(
+      matchesRepository(
+        { sourceSystem: "UPLOAD", artifactType: "FILE", metadata: undefined },
+        new Set(["owner/repo"]),
+      ),
+    ).toBe(true);
+  });
+
+  it("shows the org profile when its org owns a chosen repository", () => {
+    const orgProfile = JSON.stringify({ login: "sprintstart", members: [] });
+
+    expect(
+      matchesRepository(
+        { sourceSystem: "GITHUB", artifactType: "ORG_METADATA", metadata: orgProfile },
+        new Set(["sprintstart/sprintstart-backend"]),
+      ),
+    ).toBe(true);
+  });
+
+  it("hides org profiles of unrelated orgs and GitHub artifacts that name no repository", () => {
+    const orgProfile = JSON.stringify({ login: "sprintstart", members: [] });
+
+    // An org that owns none of the chosen repos must not pose as their content.
+    expect(
+      matchesRepository(
+        { sourceSystem: "GITHUB", artifactType: "ORG_METADATA", metadata: orgProfile },
+        new Set(["daniilperkin-uni/pe2_todo_app"]),
+      ),
+    ).toBe(false);
+    // Repo-scoped artifacts with unusable metadata have no repository to match.
+    expect(
+      matchesRepository(
+        { sourceSystem: "GITHUB", artifactType: "FILE", metadata: "{not json" },
+        new Set(["owner/repo"]),
+      ),
+    ).toBe(false);
+  });
+
+  it("matches owner halves case-insensitively", () => {
+    // GitHub logins are case-insensitive, and the two strings come from
+    // independent payloads — the owning-org rule must survive a capital letter.
+    const orgProfile = JSON.stringify({ login: "sprintstart", members: [] });
+
+    expect(
+      matchesRepository(
+        { sourceSystem: "GITHUB", artifactType: "ORG_METADATA", metadata: orgProfile },
+        new Set(["SprintStart/sprintstart-backend"]),
+      ),
+    ).toBe(true);
   });
 });

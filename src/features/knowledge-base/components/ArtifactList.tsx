@@ -7,11 +7,11 @@ import {
   CircleDot,
   FileCode,
   FileText,
-  GitBranch,
   GitPullRequest,
 } from "lucide-react";
 import type { Artifact, ArtifactType } from "../types";
 import { getArtifactRepository } from "../githubMetadata";
+import { RepositoryBadge } from "./RepositoryBadge";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
 
@@ -80,7 +80,7 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
       roundedClassName="rounded-xl"
       role="button"
       tabIndex={0}
-      aria-label={`View ${artifact.title ?? "artifact"}`}
+      aria-label={`View ${artifact.title ?? "artifact"}${repository ? ` from ${repository}` : ""}`}
       data-testid="artifact-card"
       onClick={() => onSelect(artifact.id)}
       onKeyDown={(e) => {
@@ -95,27 +95,19 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
           {getIcon(artifact.artifactType)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-2">
-            <h3 className="truncate font-semibold text-app-text">{artifact.title ?? "Untitled"}</h3>
-            <span className="rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
+          {/* flex-wrap: on a phone the chips wrap below the title instead of the row
+              overflowing; the title still ellipsizes within its line. */}
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <h3 className="min-w-0 truncate font-semibold text-app-text">
+              {artifact.title ?? "Untitled"}
+            </h3>
+            <span className="shrink-0 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
               {getTypeLabel(artifact.artifactType)}
             </span>
-            <span className="rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
+            <span className="shrink-0 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
               {artifact.sourceSystem}
             </span>
-            {/* Repo names are case-sensitive `owner/repo` identifiers, so unlike the
-                sibling chips this one is not uppercased; it truncates with a tooltip
-                because a long name would otherwise push the row off-width. */}
-            {repository && (
-              <span
-                data-testid="artifact-repo-badge"
-                title={repository}
-                className="flex min-w-0 items-center gap-1 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted"
-              >
-                <GitBranch className="h-3 w-3 shrink-0" aria-hidden="true" />
-                <span className="truncate">{repository}</span>
-              </span>
-            )}
+            {repository && <RepositoryBadge repository={repository} testId="artifact-repo-badge" />}
           </div>
           <div className="mt-2 flex items-center gap-4 text-xs font-medium text-app-text-muted">
             <span>Ingested: {formatDate(artifact.ingestedAt)}</span>

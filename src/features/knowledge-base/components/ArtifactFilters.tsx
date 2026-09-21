@@ -4,6 +4,7 @@ import {
   File,
   FileCode,
   FileText,
+  FolderGit2,
   GitBranch,
   Image as ImageIcon,
   RefreshCw,
@@ -50,10 +51,19 @@ export interface ArtifactFiltersProps {
    * them and the hook owns that rule rather than the toolbar re-deriving it.
    */
   formatOptions: FacetOption<UploadFormat>[];
+  /**
+   * Repositories behind the project's GitHub artifacts, with counts. Empty
+   * unless GitHub is part of the source selection — the facet describes GitHub
+   * only, so the section disappears with it and the hook owns that rule rather
+   * than the toolbar re-deriving it.
+   */
+  repositoryOptions: FacetOption<string>[];
   selectedSources: ReadonlySet<SourceSystem>;
   selectedFormat: UploadFormat | null;
+  selectedRepositories: ReadonlySet<string>;
   onToggleSource: (source: SourceSystem) => void;
   onToggleFormat: (format: UploadFormat) => void;
+  onToggleRepository: (repository: string) => void;
   /** Total count of matching artifacts. */
   resultCount: number;
   /** Whether any filter, facet, or search query is currently non-default. */
@@ -85,7 +95,11 @@ const FORMAT_ICONS: Record<UploadFormat, ReactNode> = {
 /**
  * Summary string for the source multi-select filter trigger.
  */
-function summariseSources(sources: ReadonlySet<SourceSystem>, format: UploadFormat | null): string {
+function summariseSources(
+  sources: ReadonlySet<SourceSystem>,
+  format: UploadFormat | null,
+  repositories: ReadonlySet<string>,
+): string {
   const parts: string[] = [];
 
   if (sources.size === 0) {
@@ -101,6 +115,12 @@ function summariseSources(sources: ReadonlySet<SourceSystem>, format: UploadForm
 
   if (format !== null) {
     parts.push(FORMAT_LABELS[format]);
+  }
+
+  if (repositories.size === 1) {
+    parts.push([...repositories][0]);
+  } else if (repositories.size > 1) {
+    parts.push(`${repositories.size} repositories`);
   }
 
   return parts.join(" · ");
@@ -131,10 +151,13 @@ export function ArtifactFilters({
   tabOptions,
   sourceOptions,
   formatOptions,
+  repositoryOptions,
   selectedSources,
   selectedFormat,
+  selectedRepositories,
   onToggleSource,
   onToggleFormat,
+  onToggleRepository,
   resultCount,
   hasActiveFilters,
   onClearFilters,
@@ -169,14 +192,39 @@ export function ArtifactFilters({
     });
   }
 
+  if (repositoryOptions.length > 0) {
+    sections.push({
+      id: "repositories",
+      label: "Repositories",
+      options: repositoryOptions.map((option) => ({
+        value: option.value,
+        label: option.label,
+        count: option.count,
+        icon: <FolderGit2 className={ICON_CLASS} aria-hidden="true" />,
+      })),
+    });
+  }
+
   const selectedValues = new Set<string>([...selectedSources]);
   if (selectedFormat !== null) selectedValues.add(selectedFormat);
+  for (const repository of selectedRepositories) selectedValues.add(repository);
 
-  const activeCount = selectedSources.size + (selectedFormat !== null ? 1 : 0);
+  const activeCount =
+    selectedSources.size + (selectedFormat !== null ? 1 : 0) + selectedRepositories.size;
+
+  const repositoryValues = new Set(repositoryOptions.map((option) => option.value));
 
   const handleToggle = (value: string) => {
-    if (isSource(value)) onToggleSource(value);
-    else if (isUploadFormat(value)) onToggleFormat(value);
+    if (isSource(value)) {
+      onToggleSource(value);
+    } else if (isUploadFormat(value)) {
+      onToggleFormat(value);
+    } else if (repositoryValues.has(value)) {
+      onToggleRepository(value);
+    }
+    // A value matching no known facet does nothing on purpose: a facet added
+    // later must be wired explicitly instead of silently falling through to
+    // the repository toggle.
   };
 
   return (
@@ -249,7 +297,7 @@ export function ArtifactFilters({
           <div className="min-w-0 flex-1 sm:w-80 sm:flex-none">
             <MultiSelectFilter
               label="Filter sources"
-              summary={summariseSources(selectedSources, selectedFormat)}
+              summary={summariseSources(selectedSources, selectedFormat, selectedRepositories)}
               activeCount={activeCount}
               sections={sections}
               selected={selectedValues}
