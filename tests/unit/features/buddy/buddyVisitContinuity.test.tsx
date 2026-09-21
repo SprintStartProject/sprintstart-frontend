@@ -2,7 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
-import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
+import { BuddyProviderWithStubs } from "./buddyTestHarness";
 import { server } from "../../setup/vitest.setup";
 
 function greetingStream(text: string) {
@@ -55,7 +55,7 @@ describe("buddy visit continuity", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(3);
@@ -94,7 +94,7 @@ describe("buddy visit continuity", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(1);
@@ -108,7 +108,7 @@ describe("buddy visit continuity", () => {
       http.post("/api/v1/onboarding/me/buddy/open/stream", () => greetingStream("Welcome back!")),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     await waitFor(() => {
       expect(result.current.messages[0]?.content).toBe("Welcome back!");

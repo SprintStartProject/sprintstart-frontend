@@ -170,6 +170,51 @@ describe("BuddyActionProposals", () => {
       expect(badge.querySelector("svg")).toBeInTheDocument();
     });
 
+    it("blocks confirmation when the proposal arrived without its details", async () => {
+      const onConfirm = vi.fn();
+      const onDismiss = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[storedAction({ risk: null, preview: null })]}
+          onConfirm={onConfirm}
+          onDismiss={onDismiss}
+        />,
+      );
+
+      // No badge, no preview, no confirm: an approval card for a project mutation must never
+      // guess how loudly to warn, so it refuses to offer the confirmation at all.
+      expect(screen.queryByTestId("buddy-proposal-risk")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Shift Task 0/ })).not.toBeInTheDocument();
+      expect(screen.getByTestId("buddy-proposal-unsupported")).toHaveTextContent(
+        "cannot be confirmed here",
+      );
+      // Declining is still available: a proposal you cannot verify still needs an answer.
+      await userEvent.click(screen.getByRole("button", { name: /Not now/ }));
+      expect(onDismiss).toHaveBeenCalledWith("m1", "s1");
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it("puts the details before the controls and describes the confirm by them", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[storedAction()]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      const preview = screen.getByText("Jonas takes Task 0 instead.");
+      const confirm = screen.getByRole("button", { name: /Shift Task 0/ });
+      // DOM order, not just visual order: a screen reader walking the card meets the offer
+      // before the button that accepts it.
+      expect(
+        preview.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(confirm).toHaveAttribute("aria-describedby", preview.id);
+    });
+
     it("tones the badge down for a standard change", () => {
       render(
         <BuddyActionProposals

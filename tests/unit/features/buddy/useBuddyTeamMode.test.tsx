@@ -1,23 +1,54 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
-import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { ProjectSelectionSlice } from "../../../../src/features/buddy/hooks/useBuddyConversation";
+import { useBuddyConversation } from "../../../../src/features/buddy/hooks/useBuddyConversation";
+import { AuthContext, type AuthContextType } from "../../../../src/context/AuthContext";
+import type { UserProfile } from "../../../../src/services/types";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
 /**
- * Team mode: one hook, two conversations.
- *
- * The dock hook (`useBuddy`) drives both surfaces, so these tests speak to the hire-facing API
- * — `switchTeamProject` and the returned `teamProjectId` — and assert on the wire what the
- * backend contract expects: the team target rides the query string on reads and opens, and the
- * message body on sends. The hire conversation must send none of it.
+ * Team mode, at the hook level. The session is tested directly rather than through
+ * `BuddyProvider` so the *selection slice* is a parameter the test can move — team mode is
+ * bound to the globally selected project, and "the selection moved" is exactly the event these
+ * tests have to be able to fire. The wire contract is asserted as the backend spells it: the
+ * team target rides the query string on reads and opens, and the message body on sends.
  */
 
-/** A one-token greeting for whichever conversation opens — same stub logic as `useBuddy.test`.
- * The token matters: an all-silent open cannot be distinguished from one still to come, and a
- * test that switches on a not-yet-started greeting is switching mid-mount. */
-function silentGreeting() {
+const TEST_USER_ID = "user-1";
+
+function authValue(profileId: string | null = TEST_USER_ID): AuthContextType {
+  const profile = profileId === null ? null : ({ id: profileId } as unknown as UserProfile);
+  return {
+    status: profile ? "authenticated" : "unauthenticated",
+    profile,
+    login: async () => {},
+    logout: async () => {},
+    refetchProfile: async () => {},
+  };
+}
+
+function sel(
+  selectedProjectId: string,
+  canManageSelected: boolean,
+  overrides: Partial<ProjectSelectionSlice> = {},
+): ProjectSelectionSlice {
+  return {
+    selectedProjectId,
+    hasSelectedProject: selectedProjectId !== "",
+    canManageSelected,
+    isLoading: false,
+    setSelectedProjectId: vi.fn(),
+    ...overrides,
+  };
+}
+
+const authWrapper = ({ children }: { children: React.ReactNode }) => (
+  <AuthContext.Provider value={authValue()}>{children}</AuthContext.Provider>
+);
+
+/** A one-token greeting, so "the greeting finished" is observable in the message list. */
+function oneTokenGreeting() {
   const encoder = new TextEncoder();
   return new HttpResponse(
     new ReadableStream({
@@ -31,10 +62,12 @@ function silentGreeting() {
   );
 }
 
-/** A stored team proposal, streamed exactly as the backend spells it on the wire. */
-function storedProposal(proposalId = "p-9", risk = "DESTRUCTIVE") {
+/** A reply carrying a stored team proposal, offer intact. */
+function storedProposal() {
   const encoder = new TextEncoder();
-  const proposalLine = `data: {"type":"action_proposal","proposal_id":"${proposalId}","label":"Shift Task 0","preview":"Jonas takes Task 0 instead.","risk":"${risk}"}\n\n`;
+  const proposalLine =
+    'data: {"type":"action_proposal","proposal_id":"p-9","label":"Shift Task 0",' +
+    '"preview":"Jonas takes Task 0 instead.","risk":"DESTRUCTIVE"}\n\n';
   return new HttpResponse(
     new ReadableStream({
       start(controller) {
@@ -47,370 +80,188 @@ function storedProposal(proposalId = "p-9", risk = "DESTRUCTIVE") {
   );
 }
 
-describe("useBuddy — team mode", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    window.HTMLElement.prototype.scrollIntoView = vi.fn();
-    localStorage.removeItem("buddyTeamProjectId");
-  });
+describe("useBuddyConversation — team mode", () => {
+  let messagesUrl: string;
+  let openUrl: string;
+  let confirmCount: number;
+  let dismissCount: number;
 
-  it("resets the thread and opens the team conversation under the team's query param", async () => {
-    let hireMessageUrl = "";
-    let teamMessageUrl = "";
-    let teamOpenUrl = "";
+  beforeEach(() => {
+    localStorage.clear();
+    messagesUrl = "";
+    openUrl = "";
+    confirmCount = 0;
+    dismissCount = 0;
     server.use(
       http.get("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
-        const search = new URL(request.url).search;
-        if (search.includes("teamProjectId")) {
-          teamMessageUrl = search;
-        } else {
-          hireMessageUrl = search;
-        }
+        messagesUrl = new URL(request.url).search;
         return HttpResponse.json([]);
       }),
       http.post("/api/v1/onboarding/me/buddy/open/stream", ({ request }) => {
-        if (new URL(request.url).search.includes("teamProjectId")) {
-          teamOpenUrl = new URL(request.url).search;
-        }
-        return silentGreeting();
+        openUrl = new URL(request.url).search;
+        return oneTokenGreeting();
       }),
-      http.post("/api/v1/onboarding/me/buddy/messages", () => silentGreeting()),
     );
+  });
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    // The hire conversation opens on mount, without any team param — and the greeting it
-    // writes has finished before a switch is legal (the switcher disables mid-turn, and the
-    // hook refuses one). The greeting message landing is the finish signal.
-    await waitFor(() => expect(hireMessageUrl).toBe(""));
+  it("switches to a managed project: the selection is driven, the thread resets, the team conversation opens", async () => {
+    const setSelectedProjectId = vi.fn();
+    const onLeft = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ selection, onLeft }: { selection: ProjectSelectionSlice; onLeft?: () => void }) =>
+        useBuddyConversation(selection, onLeft),
+      {
+        initialProps: { selection: sel("", false, { setSelectedProjectId }), onLeft },
+        wrapper: authWrapper,
+      },
+    );
+    await act(async () => {
+      await result.current.ensureOpened();
+    });
+
     await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0));
-    expect(teamMessageUrl).toBe("");
+    const hireGreetingId = result.current.messages[0].id;
+
+    // The buddy's own switch drives the global selection and the preference in one commit —
+    // exactly what the real provider batches, which is why the adopt/exit effect never reads
+    // the buddy's switch as an exit.
+    act(() => {
+      result.current.switchTeamProject("p1");
+      rerender({ selection: sel("p1", true, { setSelectedProjectId }), onLeft });
+    });
+
+    expect(setSelectedProjectId).toHaveBeenCalledWith("p1");
+    expect(result.current.isTeamMode).toBe(true);
+    expect(result.current.teamProjectId).toBe("p1");
+    await waitFor(() => expect(messagesUrl).toBe("?teamProjectId=p1"));
+    await waitFor(() => expect(openUrl).toBe("?teamProjectId=p1"));
+    // The hire thread did not survive: the one message is the team conversation's own greeting.
+    await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0));
+    expect(result.current.messages[0].id).not.toBe(hireGreetingId);
+    expect(localStorage.getItem("buddyTeamMode:user-1")).toBe("true");
+    expect(onLeft).not.toHaveBeenCalled();
+  });
+
+  it("persists the preference per user, restores it on remount, and leaves it audibly", async () => {
+    localStorage.setItem("buddyTeamMode:user-1", "true");
+    localStorage.setItem("buddyTeamMode:user-2", "true");
+
+    const onLeft = vi.fn();
+    const { result } = renderHook(
+      ({ selection }: { selection: ProjectSelectionSlice }) =>
+        useBuddyConversation(selection, onLeft),
+      { initialProps: { selection: sel("p1", true) }, wrapper: authWrapper },
+    );
+
+    // user-1's own preference restores and adopts the vouched selection; user-2's is ignored.
+    await waitFor(() => expect(result.current.isTeamMode).toBe(true));
+    await waitFor(() => expect(result.current.teamProjectId).toBe("p1"));
+    await waitFor(() => expect(messagesUrl).toBe("?teamProjectId=p1"));
+    expect(onLeft).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.switchTeamProject(null);
+    });
+    expect(result.current.isTeamMode).toBe(false);
     expect(result.current.teamProjectId).toBeNull();
-
-    // Switching to team mode clears the thread and opens the team conversation.
-    await act(async () => {
-      await result.current.switchTeamProject("proj-1");
-    });
-
-    expect(result.current.teamProjectId).toBe("proj-1");
-    expect(teamMessageUrl).toBe("?teamProjectId=proj-1");
-    expect(teamOpenUrl).toBe("?teamProjectId=proj-1");
-    // The hire thread did not survive the switch — the one message is the team conversation's
-    // own greeting.
-    expect(result.current.messages).toHaveLength(1);
-    expect(result.current.messages[0].content).toBe("Hel");
+    expect(localStorage.getItem("buddyTeamMode:user-1")).toBe("false");
+    expect(localStorage.getItem("buddyTeamMode:user-2")).toBe("true");
+    expect(onLeft).not.toHaveBeenCalled();
+    await waitFor(() => expect(messagesUrl).toBe(""));
   });
 
-  it("persists team mode across a remount", async () => {
-    let requestedUrl = "";
-    server.use(
-      http.get("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
-        requestedUrl = new URL(request.url).search;
-        return HttpResponse.json([]);
-      }),
+  it("does not inherit another user's team preference", () => {
+    localStorage.setItem("buddyTeamMode:user-2", "true");
+    const { result } = renderHook(
+      ({ selection }: { selection: ProjectSelectionSlice }) =>
+        useBuddyConversation(selection, vi.fn()),
+      { initialProps: { selection: sel("p1", true) }, wrapper: authWrapper },
     );
 
-    const first = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
-    await waitFor(() => expect(requestedUrl).toBe(""));
-
-    // The greeting must have finished before a switch is legal — the greeting message landing
-    // is the finish signal (isGreeting is false before the greeting even starts).
-    await waitFor(() => expect(first.result.current.messages.length).toBeGreaterThan(0));
-    await act(async () => {
-      await first.result.current.switchTeamProject("proj-1");
-    });
-    await waitFor(() => expect(requestedUrl).toBe("?teamProjectId=proj-1"));
-
-    // A fresh session — the reload case. The stored project id decides the conversation again.
-    requestedUrl = "";
-    const second = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
-
-    expect(second.result.current.teamProjectId).toBe("proj-1");
-    await waitFor(() => expect(requestedUrl).toBe("?teamProjectId=proj-1"));
-    await waitFor(() => expect(second.result.current.messages.length).toBeGreaterThan(0));
-
-    // Leaving team mode removes the stored marker, so the next session starts in hire mode.
-    await act(async () => {
-      await second.result.current.switchTeamProject(null);
-    });
-    expect(localStorage.getItem("buddyTeamProjectId")).toBeNull();
+    expect(result.current.isTeamMode).toBe(false);
+    expect(result.current.teamProjectId).toBeNull();
   });
 
-  it("confirms a stored proposal by id and shows the backend's own outcome line", async () => {
-    let confirmBody: unknown = null;
-    server.use(
-      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
-      http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
-      http.post("/api/v1/onboarding/me/buddy/messages", () => storedProposal()),
-      http.post("/api/v1/onboarding/me/buddy/proposals/p-9/confirm", async ({ request }) => {
-        // The confirm POST is bodyless by contract — the id is in the URL.
-        const raw = await request.text();
-        confirmBody = raw === "" ? null : JSON.parse(raw);
-        return HttpResponse.json({ ok: true, message: "Task 0 was reassigned to Jonas." });
-      }),
+  it("exits audibly when the selection moves to another project while the buddy is mid-conversation", async () => {
+    // Team mode is live from restore: the preference was left on in a previous session, and
+    // the loaded list vouches for this selection.
+    localStorage.setItem("buddyTeamMode:user-1", "true");
+    const onLeft = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ selection, onLeft }: { selection: ProjectSelectionSlice; onLeft?: () => void }) =>
+        useBuddyConversation(selection, onLeft),
+      { initialProps: { selection: sel("p1", true), onLeft }, wrapper: authWrapper },
     );
-
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
-
     await act(async () => {
-      await result.current.switchTeamProject("proj-1");
+      await result.current.ensureOpened();
     });
+    await waitFor(() => expect(messagesUrl).toBe("?teamProjectId=p1"));
 
-    // The proposal rides a *reply*, so the manager has to ask for something first.
-    act(() => {
-      result.current.setDraft("shift Task 0");
-    });
-    act(() => {
-      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
-    });
-    await waitFor(() => {
-      expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
-    });
+    rerender({ selection: sel("p2", true), onLeft });
 
-    // The proposal arrived as a *stored* one: no tool name, an id, a preview and a risk.
-    const message = result.current.messages.find((m) => m.actions?.length);
-    const action = message?.actions?.[0];
-    expect(action).toEqual(
-      expect.objectContaining({
-        proposalId: "p-9",
-        label: "Shift Task 0",
-        preview: "Jonas takes Task 0 instead.",
-        risk: "DESTRUCTIVE",
-        status: "idle",
-      }),
-    );
-    expect(action && "action" in action).toBe(false);
-
-    act(() => {
-      result.current.confirmAction(message!.id, action!);
-    });
-
-    await waitFor(() => {
-      expect(
-        message && result.current.messages.find((m) => m.id === message.id)?.actions?.[0],
-      ).toEqual(
-        expect.objectContaining({
-          status: "resolved",
-          ok: true,
-          outcome: "Task 0 was reassigned to Jonas.",
-        }),
-      );
-    });
-
-    // The whole confirm payload is the id — the client derived and sent nothing else.
-    expect(confirmBody).toBeNull();
+    await waitFor(() => expect(result.current.isTeamMode).toBe(false));
+    expect(result.current.teamProjectId).toBeNull();
+    expect(onLeft).toHaveBeenCalledTimes(1);
+    // The hire conversation takes over, under no team param.
+    await waitFor(() => expect(messagesUrl).toBe(""));
   });
 
-  it("turns the 404 of an already-settled proposal into a legible outcome, not an error", async () => {
-    server.use(
-      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
-      http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
-      http.post("/api/v1/onboarding/me/buddy/messages", () => storedProposal()),
-      http.post(
-        "/api/v1/onboarding/me/buddy/proposals/p-9/confirm",
-        () => new HttpResponse(null, { status: 404 }),
-      ),
+  it("exits audibly when management of the selected project is lost", async () => {
+    // Team mode is live from restore: the preference was left on in a previous session, and
+    // the loaded list vouches for this selection.
+    localStorage.setItem("buddyTeamMode:user-1", "true");
+    const onLeft = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ selection, onLeft }: { selection: ProjectSelectionSlice; onLeft?: () => void }) =>
+        useBuddyConversation(selection, onLeft),
+      { initialProps: { selection: sel("p1", true), onLeft }, wrapper: authWrapper },
     );
-
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
-
     await act(async () => {
-      await result.current.switchTeamProject("proj-1");
+      await result.current.ensureOpened();
     });
+    await waitFor(() => expect(messagesUrl).toBe("?teamProjectId=p1"));
 
-    act(() => {
-      result.current.setDraft("shift Task 0");
-    });
-    act(() => {
-      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
-    });
-    await waitFor(() => {
-      expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
-    });
+    rerender({ selection: sel("p1", false), onLeft });
 
-    const message = result.current.messages.find((m) => m.actions?.length)!;
-    const action = message.actions![0];
-
-    act(() => {
-      result.current.confirmAction(message.id, action);
-    });
-
-    await waitFor(() => {
-      const settled = result.current.messages.find((m) => m.id === message.id)?.actions?.[0];
-      expect(settled).toEqual(
-        expect.objectContaining({
-          status: "resolved",
-          ok: false,
-          outcome: "This proposal was already settled.",
-        }),
-      );
-    });
+    await waitFor(() => expect(result.current.isTeamMode).toBe(false));
+    expect(result.current.teamProjectId).toBeNull();
+    expect(onLeft).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(messagesUrl).toBe(""));
   });
 
-  it("dismisses a stored proposal at the backend, and keeps it offerable if that fails", async () => {
-    let dismissRequested = false;
-    let failDismiss = true;
-    server.use(
-      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
-      http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
-      http.post("/api/v1/onboarding/me/buddy/messages", () => storedProposal()),
-      http.post("/api/v1/onboarding/me/buddy/proposals/p-9/dismiss", () => {
-        if (failDismiss) return HttpResponse.error();
-        dismissRequested = true;
-        return HttpResponse.json({ ok: true, message: "Nothing changed." });
-      }),
+  it("exits audibly on restore when there is no selection to bind to", async () => {
+    localStorage.setItem("buddyTeamMode:user-1", "true");
+    const onLeft = vi.fn();
+    const { result } = renderHook(
+      ({ selection }: { selection: ProjectSelectionSlice }) =>
+        useBuddyConversation(selection, onLeft),
+      { initialProps: { selection: sel("", false) }, wrapper: authWrapper },
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
-
-    await act(async () => {
-      await result.current.switchTeamProject("proj-1");
-    });
-
-    act(() => {
-      result.current.setDraft("shift Task 0");
-    });
-    act(() => {
-      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
-    });
-    await waitFor(() => {
-      expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
-    });
-
-    const message = result.current.messages.find((m) => m.actions?.length)!;
-    const action = message.actions![0];
-
-    act(() => {
-      result.current.dismissAction(message.id, action.id);
-    });
-
-    // A failed dismissal does not half-happen: the offer stays on the table (idle, retryable).
-    await waitFor(() => {
-      expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
-        "idle",
-      );
-    });
-
-    failDismiss = false;
-    act(() => {
-      result.current.dismissAction(message.id, action.id);
-    });
-
-    await waitFor(() => {
-      expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
-        "dismissed",
-      );
-    });
-    expect(dismissRequested).toBe(true);
+    await waitFor(() => expect(result.current.isTeamMode).toBe(false));
+    expect(result.current.teamProjectId).toBeNull();
+    expect(onLeft).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem("buddyTeamMode:user-1")).toBe("false");
   });
 
-  it("refuses a second confirm of the same proposal within one frame", async () => {
-    let confirmCount = 0;
-    server.use(
-      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
-      http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
-      http.post("/api/v1/onboarding/me/buddy/messages", () => storedProposal()),
-      http.post("/api/v1/onboarding/me/buddy/proposals/p-9/confirm", async () => {
-        // Hold the first call open until both clicks have been processed.
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        confirmCount += 1;
-        return HttpResponse.json({ ok: true, message: "Done." });
-      }),
+  it("reads a blank stored preference as hire mode", () => {
+    localStorage.setItem("buddyTeamMode:user-1", "");
+    const { result } = renderHook(
+      ({ selection }: { selection: ProjectSelectionSlice }) =>
+        useBuddyConversation(selection, vi.fn()),
+      { initialProps: { selection: sel("p1", true) }, wrapper: authWrapper },
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
-
-    await act(async () => {
-      await result.current.switchTeamProject("proj-1");
-    });
-
-    act(() => {
-      result.current.setDraft("shift Task 0");
-    });
-    act(() => {
-      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
-    });
-    await waitFor(() => {
-      expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
-    });
-
-    const message = result.current.messages.find((m) => m.actions?.length)!;
-    const action = message.actions![0];
-
-    // Both clicks land inside the same React frame, before the "confirming" re-render: exactly
-    // the double-fire a disable-on-render alone cannot catch.
-    act(() => {
-      result.current.confirmAction(message.id, action);
-      result.current.confirmAction(message.id, action);
-    });
-
-    await waitFor(() => {
-      expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
-        "resolved",
-      );
-    });
-    expect(confirmCount).toBe(1);
-  });
-
-  it("resolves a dismissal that met an already-settled proposal, instead of offering it forever", async () => {
-    server.use(
-      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
-      http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
-      http.post("/api/v1/onboarding/me/buddy/messages", () => storedProposal()),
-      // Already settled elsewhere: the same 404 a confirm would meet.
-      http.post(
-        "/api/v1/onboarding/me/buddy/proposals/p-9/dismiss",
-        () => new HttpResponse(null, { status: 404 }),
-      ),
-    );
-
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
-
-    await act(async () => {
-      await result.current.switchTeamProject("proj-1");
-    });
-
-    act(() => {
-      result.current.setDraft("shift Task 0");
-    });
-    act(() => {
-      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
-    });
-    await waitFor(() => {
-      expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
-    });
-
-    const message = result.current.messages.find((m) => m.actions?.length)!;
-    const action = message.actions![0];
-
-    act(() => {
-      result.current.dismissAction(message.id, action.id);
-    });
-
-    // A 404 is the backend saying "this proposal is over" — the card must resolve to that
-    // outcome, not return to idle and offer a change that cannot happen any more.
-    await waitFor(() => {
-      expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0]).toEqual(
-        expect.objectContaining({
-          status: "resolved",
-          ok: false,
-          outcome: "This proposal was already settled.",
-        }),
-      );
-    });
+    expect(result.current.isTeamMode).toBe(false);
+    expect(messagesUrl).toBe("");
   });
 
   it("refuses a switch while a greeting is still streaming, even past the first token", async () => {
-    let teamMessageUrl = "";
     server.use(
-      http.get("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
-        const search = new URL(request.url).search;
-        if (search.includes("teamProjectId")) teamMessageUrl = search;
-        return HttpResponse.json([]);
-      }),
-      // Streams one token, then never closes: the composer is already unlocked (`isOpening`
-      // released at the first token) but the greeting is still in flight — exactly the window
-      // this guard exists for.
       http.post(
         "/api/v1/onboarding/me/buddy/open/stream",
         () =>
@@ -420,6 +271,7 @@ describe("useBuddy — team mode", () => {
                 controller.enqueue(
                   new TextEncoder().encode('data: {"type":"token","content":"Hel"}\n\n'),
                 );
+                // Never closes — the greeting stays in flight for the whole test.
               },
             }),
             { headers: { "Content-Type": "text/event-stream" } },
@@ -427,35 +279,306 @@ describe("useBuddy — team mode", () => {
       ),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const setSelectedProjectId = vi.fn();
+    const { result } = renderHook(
+      ({ selection }: { selection: ProjectSelectionSlice }) =>
+        useBuddyConversation(selection, vi.fn()),
+      {
+        initialProps: { selection: sel("", false, { setSelectedProjectId }) },
+        wrapper: authWrapper,
+      },
+    );
+    act(() => {
+      // Not awaited: this stream never resolves, and awaiting it would hang the test. The
+      // in-flight stream is exactly what the test needs — see the refused switch below.
+      void result.current.ensureOpened();
+    });
 
-    // Wait for the greeting to be streaming (composer released, greeting not finished).
+    // The composer unlocked at the first token; the greeting is still being written.
     await waitFor(() => expect(result.current.isOpening).toBe(false));
     expect(result.current.isGreeting).toBe(true);
 
-    await act(async () => {
-      await result.current.switchTeamProject("proj-1");
+    act(() => {
+      result.current.switchTeamProject("p1");
     });
 
-    // Refused: still the hire conversation, and nothing was asked of the team endpoint.
-    expect(result.current.teamProjectId).toBeNull();
-    expect(teamMessageUrl).toBe("");
+    // Refused: still the hire conversation, and nothing was asked of the selection.
+    expect(setSelectedProjectId).not.toHaveBeenCalled();
+    expect(result.current.isTeamMode).toBe(false);
+    expect(messagesUrl).toBe("");
   });
 
-  it("reads a blank stored team project as the hire's own conversation", async () => {
-    let messagesUrl = "";
+  it("refuses a switch while a proposal decision is in flight", async () => {
     server.use(
-      http.get("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
-        messagesUrl = new URL(request.url).search;
-        return HttpResponse.json([]);
+      http.post("/api/v1/onboarding/me/buddy/messages", () => storedProposal()),
+      // The held-open response keeps the decision in flight long enough for a switch to try
+      // to slip through it in the same frame.
+      http.post("/api/v1/onboarding/me/buddy/proposals/p-9/confirm", async () => {
+        confirmCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return HttpResponse.json({ ok: true, message: "Task 0 was reassigned to Jonas." });
       }),
     );
-    // However it got there, a blank marker is no conversation.
-    localStorage.setItem("buddyTeamProjectId", "");
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const setSelectedProjectId = vi.fn();
+    // Team mode is live from restore (the preference was left on in a previous session), so
+    // the decision below is one a team conversation is making.
+    localStorage.setItem("buddyTeamMode:user-1", "true");
+    const { result } = renderHook(
+      ({ selection }: { selection: ProjectSelectionSlice }) =>
+        useBuddyConversation(selection, vi.fn()),
+      {
+        initialProps: { selection: sel("p1", true, { setSelectedProjectId }) },
+        wrapper: authWrapper,
+      },
+    );
+    await act(async () => {
+      await result.current.ensureOpened();
+    });
+    await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0));
 
-    expect(result.current.teamProjectId).toBeNull();
-    await waitFor(() => expect(messagesUrl).toBe(""));
+    act(() => {
+      result.current.setDraft("shift Task 0");
+    });
+    act(() => {
+      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    });
+    await waitFor(() => {
+      expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
+    });
+
+    const message = result.current.messages.find((m) => m.actions?.length)!;
+    const action = message.actions![0];
+    // Both land in one frame: the decision starts, and the switch tries to clear the thread
+    // out from under it before the "deciding" state has even re-rendered.
+    act(() => {
+      result.current.confirmAction(message.id, action);
+      result.current.switchTeamProject("p2");
+    });
+
+    expect(setSelectedProjectId).not.toHaveBeenCalledWith("p2");
+    expect(result.current.isTeamMode).toBe(true);
+    expect(result.current.teamProjectId).toBe("p1");
+
+    await waitFor(() =>
+      expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
+        "resolved",
+      ),
+    );
+  });
+
+  describe("stored proposal decisions", () => {
+    beforeEach(() => {
+      server.use(http.post("/api/v1/onboarding/me/buddy/messages", () => storedProposal()));
+    });
+
+    /** Team mode on, one proposal on the last reply. */
+    async function openTeamWithProposal() {
+      const { result } = renderHook(
+        ({ selection }: { selection: ProjectSelectionSlice }) =>
+          useBuddyConversation(selection, vi.fn()),
+        { initialProps: { selection: sel("p1", true) }, wrapper: authWrapper },
+      );
+      await act(async () => {
+        await result.current.ensureOpened();
+      });
+      await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0));
+      act(() => {
+        result.current.setDraft("shift Task 0");
+      });
+      act(() => {
+        result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+      await waitFor(() => {
+        expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
+      });
+      const message = result.current.messages.find((m) => m.actions?.length)!;
+      return { result, message, action: message.actions![0] };
+    }
+
+    it("confirms a stored proposal by id and shows the backend's own outcome line", async () => {
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/proposals/p-9/confirm", async ({ request }) => {
+          // The confirm POST is bodyless by contract — the id is in the URL.
+          const raw = await request.text();
+          expect(raw).toBe("");
+          confirmCount += 1;
+          return HttpResponse.json({ ok: true, message: "Task 0 was reassigned to Jonas." });
+        }),
+      );
+
+      const { result, message, action } = await openTeamWithProposal();
+
+      act(() => {
+        result.current.confirmAction(message.id, action);
+      });
+
+      await waitFor(() => {
+        const stored = result.current.messages.find((m) => m.id === message.id)?.actions?.[0];
+        expect(stored?.status).toBe("resolved");
+        expect(stored && "outcome" in stored ? stored.outcome : undefined).toBe(
+          "Task 0 was reassigned to Jonas.",
+        );
+      });
+      expect(confirmCount).toBe(1);
+    });
+
+    it("reads a settled proposal's 200 ok:false as the legible outcome, not an error", async () => {
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/proposals/p-9/confirm", () =>
+          HttpResponse.json({ ok: false, message: "This was already confirmed." }),
+        ),
+      );
+
+      const { result, message, action } = await openTeamWithProposal();
+
+      act(() => {
+        result.current.confirmAction(message.id, action);
+      });
+
+      await waitFor(() => {
+        const stored = result.current.messages.find((m) => m.id === message.id)?.actions?.[0];
+        expect(stored?.status).toBe("resolved");
+        expect(stored && "outcome" in stored ? stored.outcome : undefined).toBe(
+          "This was already confirmed.",
+        );
+      });
+    });
+
+    it("resolves a confirm that met a 404 as no longer available", async () => {
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/proposals/p-9/confirm",
+          () => new HttpResponse(null, { status: 404 }),
+        ),
+      );
+
+      const { result, message, action } = await openTeamWithProposal();
+
+      act(() => {
+        result.current.confirmAction(message.id, action);
+      });
+
+      await waitFor(() => {
+        const stored = result.current.messages.find((m) => m.id === message.id)?.actions?.[0];
+        expect(stored?.status).toBe("resolved");
+        expect(stored && "outcome" in stored ? stored.outcome : undefined).toBe(
+          "This proposal is no longer available.",
+        );
+      });
+    });
+
+    it("surfaces the backend's own refusal when a dismissal meets an already-settled proposal", async () => {
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/proposals/p-9/dismiss", () =>
+          HttpResponse.json({ ok: false, message: "This was already confirmed." }),
+        ),
+      );
+
+      const { result, message, action } = await openTeamWithProposal();
+
+      act(() => {
+        result.current.dismissAction(message.id, action.id);
+      });
+
+      // "Dismissed — nothing changed" would be a lie over a change that already happened; the
+      // backend's sentence is the truth the card shows.
+      await waitFor(() => {
+        const stored = result.current.messages.find((m) => m.id === message.id)?.actions?.[0];
+        expect(stored?.status).toBe("resolved");
+        expect(stored && "outcome" in stored ? stored.outcome : undefined).toBe(
+          "This was already confirmed.",
+        );
+      });
+      expect(dismissCount).toBe(0);
+    });
+
+    it("dismisses at the backend, and keeps the offer retryable when that transport-fails", async () => {
+      let failDismiss = true;
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/proposals/p-9/dismiss", () => {
+          if (failDismiss) return HttpResponse.error();
+          dismissCount += 1;
+          return HttpResponse.json({ ok: true, message: "Dismissed — nothing changed." });
+        }),
+      );
+
+      const { result, message, action } = await openTeamWithProposal();
+
+      act(() => {
+        result.current.dismissAction(message.id, action.id);
+      });
+      await waitFor(() => {
+        expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
+          "idle",
+        );
+      });
+
+      failDismiss = false;
+      act(() => {
+        result.current.dismissAction(message.id, action.id);
+      });
+      await waitFor(() => {
+        expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
+          "dismissed",
+        );
+      });
+      expect(dismissCount).toBe(1);
+    });
+
+    it("keeps confirm and dismiss mutually exclusive within one frame", async () => {
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/proposals/p-9/confirm", async () => {
+          confirmCount += 1;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return HttpResponse.json({ ok: true, message: "Done." });
+        }),
+        http.post("/api/v1/onboarding/me/buddy/proposals/p-9/dismiss", () => {
+          dismissCount += 1;
+          return HttpResponse.json({ ok: true, message: "Dismissed — nothing changed." });
+        }),
+      );
+
+      const { result, message, action } = await openTeamWithProposal();
+
+      // Both clicks land inside the same React frame, before any "confirming" re-render —
+      // exactly the race a disable-on-render alone cannot catch.
+      act(() => {
+        result.current.confirmAction(message.id, action);
+        result.current.dismissAction(message.id, action.id);
+      });
+
+      await waitFor(() => {
+        expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
+          "resolved",
+        );
+      });
+      expect(confirmCount).toBe(1);
+      expect(dismissCount).toBe(0);
+    });
+
+    it("refuses a second confirm of the same proposal within one frame", async () => {
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/proposals/p-9/confirm", async () => {
+          confirmCount += 1;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return HttpResponse.json({ ok: true, message: "Done." });
+        }),
+      );
+
+      const { result, message, action } = await openTeamWithProposal();
+
+      act(() => {
+        result.current.confirmAction(message.id, action);
+        result.current.confirmAction(message.id, action);
+      });
+
+      await waitFor(() => {
+        expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
+          "resolved",
+        );
+      });
+      expect(confirmCount).toBe(1);
+    });
   });
 });

@@ -629,7 +629,7 @@ describe("buddyService", () => {
       expect(onActionProposal).not.toHaveBeenCalled();
     });
 
-    it("falls back to STANDARD for an unknown risk instead of warning loudly", async () => {
+    it("fails closed to null risk for an unknown value, and says so on the console", async () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -658,8 +658,45 @@ describe("buddyService", () => {
         onStoredProposal,
       });
 
-      expect(onStoredProposal).toHaveBeenCalledWith(expect.objectContaining({ risk: "STANDARD" }));
+      expect(onStoredProposal).toHaveBeenCalledWith(
+        expect.objectContaining({ risk: null, preview: "y" }),
+      );
       expect(warn).toHaveBeenCalledWith("Buddy sent an unknown proposal risk: COSMIC");
+      warn.mockRestore();
+    });
+
+    it("carries an absent preview as null instead of an invisible empty string", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              'data: {"type":"action_proposal","proposal_id":"prop-3","label":"x","risk":"BULK"}\n\n',
+            ),
+          );
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/messages",
+          () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+        ),
+      );
+
+      const onStoredProposal = vi.fn();
+      await streamMessage("m", {
+        onToken: vi.fn(),
+        onCitation: vi.fn(),
+        onDone: vi.fn(),
+        onStoredProposal,
+      });
+
+      expect(onStoredProposal).toHaveBeenCalledWith(
+        expect.objectContaining({ preview: null, risk: "BULK" }),
+      );
       warn.mockRestore();
     });
 

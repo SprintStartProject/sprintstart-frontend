@@ -98,62 +98,6 @@ describe("BuddyModeSwitcher", () => {
     expect(onSwitch).toHaveBeenLastCalledWith(null);
   });
 
-  it("steps back to hire mode when the stored conversation is no longer this user's", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    // p3 was managed when the conversation was stored; this list no longer carries it.
-    const onSwitch = renderSwitcher("p3", vi.fn(), [project("p1", true), project("p2", false)]);
-
-    // The audit fires once the list is there — no request goes out for a conversation the
-    // manager does not run any more.
-    await vi.waitFor(() => {
-      expect(onSwitch).toHaveBeenCalledWith(null);
-    });
-    expect(warn).toHaveBeenCalled();
-
-    warn.mockRestore();
-  });
-
-  it("waits out a turn in flight before dropping the stored conversation", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const onSwitch = vi.fn();
-    // p3 is stored but no longer managed — and a turn is in flight, so switches are refused.
-    const { rerender } = render(
-      <ProjectContext.Provider value={contextValue([project("p1", true)])}>
-        <BuddyModeSwitcher teamProjectId="p3" onSwitch={onSwitch} disabled />
-      </ProjectContext.Provider>,
-    );
-
-    // No switch can be accepted while the turn is running, so the audit holds its fire rather
-    // than calling one that would be swallowed.
-    await vi.waitFor(() => {});
-    expect(onSwitch).not.toHaveBeenCalled();
-
-    // The turn ends: the same stored conversation is now droppable, and the audit fires.
-    rerender(
-      <ProjectContext.Provider value={contextValue([project("p1", true)])}>
-        <BuddyModeSwitcher teamProjectId="p3" onSwitch={onSwitch} />
-      </ProjectContext.Provider>,
-    );
-
-    await vi.waitFor(() => {
-      expect(onSwitch).toHaveBeenCalledWith(null);
-    });
-    expect(warn).toHaveBeenCalled();
-
-    warn.mockRestore();
-  });
-
-  it("leaves a stored conversation alone while the project list is still loading", () => {
-    const onSwitch = vi.fn();
-    render(
-      <ProjectContext.Provider value={{ ...contextValue([]), isLoading: true }}>
-        <BuddyModeSwitcher teamProjectId="p1" onSwitch={onSwitch} />
-      </ProjectContext.Provider>,
-    );
-
-    expect(onSwitch).not.toHaveBeenCalled();
-  });
-
   it("is inert while a turn is in flight", () => {
     render(
       <ProjectContext.Provider value={contextValue([project("p1", true)])}>

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getMessages,
   streamOpenBuddy,
@@ -8,7 +8,22 @@ import {
   streamMessage,
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
+import { useAuth } from "../../../context/useAuth";
 import type { ActionPatch, BuddyMessageView, ProposedAction } from "../types";
+
+/**
+ * The slice of the global project context the buddy needs to keep team mode honest: team mode
+ * is bound to the globally selected project, and only exists while this user manages it. Passed
+ * in by [BuddyProvider] rather than read here, so the hook stays testable without a provider
+ * above it.
+ */
+export type ProjectSelectionSlice = {
+  selectedProjectId: string;
+  hasSelectedProject: boolean;
+  canManageSelected: boolean;
+  isLoading: boolean;
+  setSelectedProjectId: (projectId: string) => void;
+};
 
 /**
  * What the hire is told when a stream does not finish.
@@ -19,36 +34,34 @@ import type { ActionPatch, BuddyMessageView, ProposedAction } from "../types";
 const REPLY_FAILED = "Your buddy could not finish that reply. Ask again in a moment.";
 const GREETING_FAILED = "Your buddy could not be reached just now.";
 const HISTORY_FAILED = "Your conversation could not be loaded.";
+/** The one sentence for a proposal that no longer exists for this caller (HTTP 404). */
+const PROPOSAL_GONE = "This proposal is no longer available.";
 
-/** Where "which conversation am I in" lives between reloads — the stored project id, or nothing. */
-const TEAM_PROJECT_KEY = "buddyTeamProjectId";
+function isNotFound(e: unknown): boolean {
+  return e instanceof Error && "status" in e && (e as { status: number }).status === 404;
+}
 
 /**
- * The team-mode conversation a manager left open, if they did.
- *
- * Stored raw: whether that project still belongs to this manager is a question only the loaded
- * project list can answer, and the switcher audits it once that list has arrived — this read
- * deliberately trusts and later verifies, because failing to restore a conversation they were
- * having would be worse than briefly showing one they no longer run.
+ * Where "is the buddy in team mode" lives between reloads — scoped to the signed-in user, the
+ * way the project selection is. A shared browser must not hand one manager's team conversation
+ * to the next.
  */
-function readStoredTeamProjectId(): string | null {
-  try {
-    // A blank is no conversation: stored empty (however that happened) must not read as team
-    // mode with an empty target, which would send reads out without the query param while the
-    // UI claimed team mode — until the switcher's audit healed it.
-    const stored = localStorage.getItem(TEAM_PROJECT_KEY);
+function teamModeStorageKey(userId: string): string {
+  return `buddyTeamMode:${userId}`;
+}
 
-    return stored ? stored : null;
+function readStoredTeamMode(userId: string): boolean {
+  try {
+    return localStorage.getItem(teamModeStorageKey(userId)) === "true";
   } catch {
     // Private modes can refuse storage outright. Not a reason to refuse the conversation.
-    return null;
+    return false;
   }
 }
 
-function writeStoredTeamProjectId(projectId: string | null): void {
+function writeStoredTeamMode(userId: string, value: boolean): void {
   try {
-    if (projectId === null) localStorage.removeItem(TEAM_PROJECT_KEY);
-    else localStorage.setItem(TEAM_PROJECT_KEY, projectId);
+    localStorage.setItem(teamModeStorageKey(userId), value ? "true" : "false");
   } catch {
     // Nothing to do: the conversation still switches, it just will not be remembered.
   }
@@ -64,7 +77,10 @@ function writeStoredTeamProjectId(projectId: string | null): void {
  *
  * Nothing is requested until a surface calls [ensureOpened].
  */
-export function useBuddyConversation() {
+export function useBuddyConversation(
+  selection: ProjectSelectionSlice,
+  onTeamModeLeft?: () => void,
+) {
   const [messages, setMessages] = useState<BuddyMessageView[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -95,15 +111,110 @@ export function useBuddyConversation() {
   const [presentedGreetingId, setPresentedGreetingId] = useState<string | null>(null);
 
   /**
-   * Team mode: the managed project this conversation is about, or `null` for the hire's own.
-   *
-   * Held as state (so surfaces re-render around it) *and* as a ref (so the streaming calls read
-   * the current conversation mid-turn without every token re-creating their callbacks). The two
-   * are written together, always in that order — ref first, so a switch that then opens reads
-   * the new conversation and not the one being left.
+   * Whether the manager has pointed the buddy at a project instead of their own onboarding.
+   * Persisted per signed-in user; the *project* it means is never stored independently — it is
+   * whichever project the global context currently vouches for (see the derivation below), so
+   * team mode and the rest of the app can never disagree about which project is being discussed.
    */
-  const [teamProjectId, setTeamProjectId] = useState<string | null>(readStoredTeamProjectId);
-  const teamProjectIdRef = useRef<string | null>(teamProjectId);
+  const [isTeamMode, setIsTeamMode] = useState(false);
+
+  const { profile } = useAuth();
+  const userId = profile?.id ?? null;
+  const userIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    userIdRef.current = userId;
+    // Re-read on every subject change: a logout or an account switch must not inherit the
+    // previous user's preference. Nothing persisted while there is no user to own it.
+    // Deferred to a microtask so the setState never runs synchronously in the effect body.
+    void (async () => {
+      await Promise.resolve();
+      setIsTeamMode(userId === null ? false : readStoredTeamMode(userId));
+    })();
+  }, [userId]);
+
+  /**
+   * Which project the *thread on screen* is bound to — the conversation may lag the derived
+   * target while a switch is pending. `null` means team mode is on but has not adopted a
+   * project yet (a restored preference waiting for the list to vouch).
+   */
+  const teamTargetRef = useRef<string | null>(null);
+
+  const setTeamMode = useCallback((value: boolean) => {
+    setIsTeamMode(value);
+    const id = userIdRef.current;
+
+    if (id !== null) writeStoredTeamMode(id, value);
+    if (!value) teamTargetRef.current = null;
+  }, []);
+
+  /**
+   * The managed project this conversation is about, or `null` for the hire's own. Derived,
+   * never stored: it exists only while the team preference is on *and* the loaded project list
+   * vouches that this user manages the selected project. That derivation is the scoping
+   * guarantee — before the list arrives, or once management is gone, the value collapses to the
+   * hire conversation, so no team-scoped request can go to a project the buddy has no business
+   * touching. Held as a ref alongside the state so the streaming calls read the current
+   * conversation mid-turn without every token re-creating their callbacks.
+   */
+  const teamProjectId =
+    isTeamMode && selection.hasSelectedProject && selection.canManageSelected
+      ? selection.selectedProjectId
+      : null;
+  const teamProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    teamProjectIdRef.current = teamProjectId;
+  }, [teamProjectId]);
+
+  /**
+   * Team mode ends involuntarily when the ground moves under it: the selected project is no
+   * longer manageable, or the manager moved the global selection somewhere else while the buddy
+   * was discussing the old one. The conversation then falls back to the hire thread — audibly,
+   * via [onTeamModeLeft], because a silent fallback is exactly the drift this binding exists to
+   * prevent. Voluntary switches never pass through here: they go through
+   * [switchTeamProject], which binds the new target before the state settles, so this effect
+   * sees a matching pair and stays out of the way.
+   */
+  useEffect(() => {
+    if (!isTeamMode || selection.isLoading) return;
+
+    void (async () => {
+      await Promise.resolve();
+      if (teamTargetRef.current === null) {
+        // A restored preference adopting whatever the loaded list vouches for. Nothing to bind
+        // to — no selection, or none of it manageable — and team mode ends audibly.
+        if (selection.hasSelectedProject && selection.canManageSelected) {
+          teamTargetRef.current = selection.selectedProjectId;
+        } else {
+          setTeamMode(false);
+          onTeamModeLeft?.();
+        }
+        return;
+      }
+
+      if (!selection.canManageSelected || selection.selectedProjectId !== teamTargetRef.current) {
+        setTeamMode(false);
+        onTeamModeLeft?.();
+      }
+    })();
+  }, [
+    isTeamMode,
+    selection.isLoading,
+    selection.hasSelectedProject,
+    selection.canManageSelected,
+    selection.selectedProjectId,
+    setTeamMode,
+    onTeamModeLeft,
+  ]);
+
+  /**
+   * True while a proposal confirm or dismissal is in flight. Unlike the message streams, these
+   * decisions mutate state without setting any of the streaming flags, and every operation that
+   * clears the transcript (a switch, a fresh visit) must wait for them: a manager who confirms
+   * a destructive change and immediately switches projects would otherwise lose the one place
+   * the outcome was going to be shown.
+   */
+  const pendingDecisionsRef = useRef(0);
+  const [isDeciding, setIsDeciding] = useState(false);
 
   const loadedRef = useRef(false);
   // Guards the greeting against overlapping calls — see `startFreshVisit`.
@@ -314,7 +425,9 @@ export function useBuddyConversation() {
     // The button stays enabled while the greeting is written, so a second click would run a
     // second open. The backend replays the greeting it has just written rather than composing
     // another, so the hire would read the identical words twice.
-    if (greetingRef.current) return;
+    // `pendingDecisionsRef` is read alongside the state: a decision and this click can land
+    // in one frame, before the "deciding" state has re-rendered.
+    if (greetingRef.current || isDeciding || pendingDecisionsRef.current > 0) return;
     greetingRef.current = true;
 
     setMessages([]);
@@ -330,7 +443,7 @@ export function useBuddyConversation() {
       greetingRef.current = false;
       setIsOpening(false);
     }
-  }, [greet]);
+  }, [greet, isDeciding]);
 
   /**
    * Marks the turn a reply was streaming into as failed, so the thread says so.
@@ -520,15 +633,29 @@ export function useBuddyConversation() {
    * already confirmed or dismissed (a reload between sessions, or a second tab), and the
    * backend's message says so legibly — not an error to retry.
    */
+  const beginDecision = useCallback(() => {
+    pendingDecisionsRef.current += 1;
+    setIsDeciding(true);
+  }, []);
+
+  const endDecision = useCallback(() => {
+    pendingDecisionsRef.current -= 1;
+    if (pendingDecisionsRef.current === 0) setIsDeciding(false);
+  }, []);
+
   const confirmAction = useCallback(
     (messageId: string, action: ProposedAction) => {
       // Retryable after a transport error; anything already on its way, answered or declined is
       // not confirmable again.
       if (action.status !== "idle" && action.status !== "error") return;
 
+      // One lock per proposal card, shared by both decisions: confirm and dismiss are the two
+      // halves of one question, and letting both run would let the slower response overwrite
+      // the truth the faster one already told.
       const flightKey = `${messageId}:${action.id}`;
       if (inFlightRef.current.has(flightKey)) return;
       inFlightRef.current.add(flightKey);
+      beginDecision();
 
       patchAction(messageId, action.id, { status: "confirming" });
       // Fire-and-forget: the outcome lands back in message state, so the handler stays a plain
@@ -554,29 +681,28 @@ export function useBuddyConversation() {
           });
         } catch (e) {
           console.error(e);
-          // A settled proposal (confirmed or dismissed elsewhere — another tab, or a reload
-          // between sessions) comes back 404. That is a handled state, not a failure: the
-          // backend owns the outcome and says so legibly when it can, and the client sentence
-          // covers the bodyless case. Retrying cannot help, so the card must not offer one.
-          const isNotFound =
-            e instanceof Error && "status" in e && (e as { status: number }).status === 404;
+          // A settled proposal does NOT come back 404 — the backend answers 200 with ok: false
+          // and the exact sentence for what happened (already confirmed, expired, beaten to it).
+          // All of that is handled above. A 404 here means no such proposal exists for this
+          // caller at all: retrying cannot help, so the card resolves legibly instead.
           patchAction(
             messageId,
             action.id,
-            isNotFound
+            isNotFound(e)
               ? {
                   status: "resolved",
                   ok: false,
-                  outcome: "This proposal was already settled.",
+                  outcome: PROPOSAL_GONE,
                 }
               : { status: "error" },
           );
         } finally {
           inFlightRef.current.delete(flightKey);
+          endDecision();
         }
       })();
     },
-    [patchAction],
+    [beginDecision, endDecision, patchAction],
   );
 
   /**
@@ -601,88 +727,126 @@ export function useBuddyConversation() {
 
       if (action.status !== "idle" && action.status !== "error") return;
 
-      const flightKey = `${messageId}:${actionId}:dismiss`;
+      // The confirm's lock, shared: one question, one in-flight decision.
+      const flightKey = `${messageId}:${actionId}`;
       if (inFlightRef.current.has(flightKey)) return;
       inFlightRef.current.add(flightKey);
+      beginDecision();
 
       patchAction(messageId, actionId, { status: "confirming" });
       void (async () => {
         try {
-          await dismissStoredProposal(action.proposalId);
-          patchAction(messageId, actionId, { status: "dismissed" });
-        } catch (e) {
-          console.error(e);
-          // The same 404 rule as the confirm: a proposal already settled (from another tab, or a
-          // reload between sessions) is a handled outcome, not a transport failure. Back to idle
-          // would re-offer a change that cannot happen any more, and every retry would meet the
-          // same 404 — so it resolves, legibly, instead. Any other failure keeps the offer on
-          // the table: the card's own error note would read as if the dismissal had
-          // half-happened, so it goes back to idle and stays retryable.
-          const isNotFound =
-            e instanceof Error && "status" in e && (e as { status: number }).status === 404;
+          // The backend owns the truth here: a 200 with ok: false means the proposal was
+          // already confirmed (or expired, or beaten to it) and its message says exactly what
+          // happened — surfacing that beats claiming "Dismissed — nothing changed" over a
+          // change that may already have happened.
+          const result = await dismissStoredProposal(action.proposalId);
           patchAction(
             messageId,
             actionId,
-            isNotFound
-              ? {
-                  status: "resolved",
-                  ok: false,
-                  outcome: "This proposal was already settled.",
-                }
+            result.ok
+              ? { status: "dismissed" }
+              : { status: "resolved", ok: false, outcome: result.message },
+          );
+        } catch (e) {
+          console.error(e);
+          // 404: no such proposal for this caller. Retrying cannot help, so the card resolves
+          // legibly instead. Any other failure keeps the offer on the table: the card's own
+          // error note would read as if the dismissal had half-happened, so it goes back to
+          // idle and stays retryable.
+          patchAction(
+            messageId,
+            actionId,
+            isNotFound(e)
+              ? { status: "resolved", ok: false, outcome: PROPOSAL_GONE }
               : { status: "idle" },
           );
         } finally {
           inFlightRef.current.delete(flightKey);
+          endDecision();
         }
       })();
     },
-    [messages, patchAction],
+    [beginDecision, endDecision, messages, patchAction],
   );
 
   /**
-   * Switches the conversation between the hire's own buddy and team mode about a managed
-   * project.
+   * The thread on screen always belongs to exactly one conversation, and when the derived
+   * target moves — a switch, a restored preference arriving, an involuntary exit — the thread
+   * is cleared and the new conversation opens exactly as an untouched visit would: read first,
+   * then greeted. The backend keeps the conversations separate, so reusing the latch would show
+   * one inside the other. Mid-turn the move waits: the busy flags are in the dependency list,
+   * so the effect re-runs the moment the turn ends and applies then.
+   */
+  const openedForRef = useRef<string>("hire");
+  useEffect(() => {
+    const target = teamProjectId ?? "hire";
+    if (openedForRef.current === target) return;
+    // `pendingDecisionsRef` is read alongside the state: a decision and this move can land in
+    // one frame, before the "deciding" state has re-rendered.
+    if (
+      isThinking ||
+      isStreaming ||
+      isOpening ||
+      isGreeting ||
+      isDeciding ||
+      pendingDecisionsRef.current > 0
+    )
+      return;
+
+    openedForRef.current = target;
+    teamProjectIdRef.current = teamProjectId;
+
+    setMessages([]);
+    setOpenerAction(null);
+    setOpenError(null);
+    setDraft("");
+    setActiveTool(null);
+    setIsThinking(false);
+    setIsStreaming(false);
+    setPresentedGreetingId(null);
+    // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
+    // the one being switched to, exactly as it did the first time.
+    loadedRef.current = false;
+
+    void ensureOpened();
+  }, [teamProjectId, isThinking, isStreaming, isOpening, isGreeting, isDeciding, ensureOpened]);
+
+  /**
+   * Points the buddy at a managed project (`null` returns to the hire's own onboarding). The
+   * conversation itself is switched by the target effect above; this only sets the preference
+   * and, for a project target, the global selection — team mode and the rest of the app then
+   * agree on the project by construction, because they share it.
    *
-   * **A switch is a different conversation, and it is treated as one**: the thread, the opener,
-   * the failure banner and the read latch all reset, and the new conversation opens exactly as
-   * an untouched visit would — read first, then greeted. The backend keeps the two as separate
-   * conversations, so reusing the latch would show one inside the other.
-   *
-   * Offered only between turns (the switcher disables while one is in flight — same rule, and
-   * the same reason, as the fresh-visit control: a stream cannot call back its callbacks into a
-   * thread that has just been cleared).
+   * Refused while anything is in flight, for the same reason the switcher disables itself: a
+   * stream cannot call its callbacks into a thread that has just been cleared.
    */
   const switchTeamProject = useCallback(
-    async (projectId: string | null) => {
-      // A switch clears the thread under whatever is streaming into it, so it waits for the
-      // turn — the switcher's `disabled` is the affordance, this is the invariant. Without it,
-      // any future caller (a shortcut, a bus event, a test) could clear a live stream by
-      // reaching past the component.
-      if (isThinking || isStreaming || isOpening || isGreeting) return;
+    (projectId: string | null) => {
+      // `pendingDecisionsRef` is read alongside the state: a decision and a switch can land in
+      // one frame, before the "deciding" state has re-rendered.
+      if (
+        isThinking ||
+        isStreaming ||
+        isOpening ||
+        isGreeting ||
+        isDeciding ||
+        pendingDecisionsRef.current > 0
+      )
+        return;
 
-      if (teamProjectIdRef.current === projectId) return;
+      if (projectId === null) {
+        setTeamMode(false);
+        return;
+      }
 
-      // Ref first: everything below reads or resets this conversation, and the open that
-      // follows must address the new one.
-      teamProjectIdRef.current = projectId;
-      setTeamProjectId(projectId);
-      writeStoredTeamProjectId(projectId);
-
-      setMessages([]);
-      setOpenerAction(null);
-      setOpenError(null);
-      setDraft("");
-      setActiveTool(null);
-      setIsThinking(false);
-      setIsStreaming(false);
-      setPresentedGreetingId(null);
-      // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
-      // the one being switched to, exactly as it did the first time.
-      loadedRef.current = false;
-
-      await ensureOpened();
+      selection.setSelectedProjectId(projectId);
+      // Bind the conversation target before the derived value settles, so the adopt/exit
+      // effect sees a matching pair and does not read the buddy's own switch as an exit.
+      teamTargetRef.current = projectId;
+      setTeamMode(true);
     },
-    [ensureOpened, isGreeting, isOpening, isStreaming, isThinking],
+    [isThinking, isStreaming, isOpening, isGreeting, isDeciding, selection, setTeamMode],
   );
 
   const handleSubmit = useCallback(
@@ -711,8 +875,11 @@ export function useBuddyConversation() {
     openError,
 
     // Team mode: which managed project this conversation is about (`null` = the hire's own),
-    // and how to switch between the two.
+    // whether the manager asked for team mode at all, whether a proposal decision is in flight
+    // (it gates every operation that clears the transcript), and how to switch.
     teamProjectId,
+    isTeamMode,
+    isDeciding,
     switchTeamProject,
 
     draft,

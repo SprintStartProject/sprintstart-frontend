@@ -185,20 +185,21 @@ export async function performAction(
 /**
  * The risk carried on a team-mode proposal, read only as far as the wire is trusted.
  *
- * The backend's `BuddyProposalRisk` enum only ever sends the three known values, but this still
- * validates rather than casts: a value that arrives some other way is *not* styled as DESTRUCTIVE
- * on a guess, and equally not styled as BULK — both would be a warning the manager should not be
- * reading. Unknown falls back to STANDARD, the quiet card, and says so on the console so the
- * drift is findable rather than silent.
+ * The backend's `BuddyProposalRisk` enum only ever sends the three known values, but a version
+ * skew, a partial deployment or a malformed event could deliver anything else. This validates
+ * rather than casts, and fails *closed*: an unknown or absent value comes back `null`, and the
+ * card renders an explicit unsupported state instead of a confirmable offer — an approval card
+ * for a project mutation must never guess how loudly to warn. The console note keeps the drift
+ * findable rather than silent.
  */
-function readProposalRisk(risk: string | undefined): ProposalRisk {
+function readProposalRisk(risk: string | undefined): ProposalRisk | null {
   if (risk === "DESTRUCTIVE" || risk === "BULK" || risk === "STANDARD") return risk;
 
   if (risk !== undefined) {
     console.warn(`Buddy sent an unknown proposal risk: ${risk}`);
   }
 
-  return "STANDARD";
+  return null;
 }
 
 /**
@@ -398,7 +399,9 @@ export async function streamMessage(
               handlers.onStoredProposal?.({
                 proposalId: event.proposal_id,
                 label: event.label,
-                preview: event.preview ?? "",
+                // Absent, not blank: a missing preview blocks confirmation on the card rather
+                // than rendering as invisible text.
+                preview: event.preview ?? null,
                 risk: readProposalRisk(event.risk),
               });
             }

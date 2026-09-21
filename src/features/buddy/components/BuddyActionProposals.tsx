@@ -68,51 +68,83 @@ export function BuddyActionProposals({
 
         const isConfirming = action.status === "confirming";
         const isStored = "proposalId" in action;
+        // Fail closed: a proposal whose risk did not survive the stream (or that arrived
+        // without its description) is not confirmable — an approval card for a project
+        // mutation must never guess how loudly to warn, nor confirm what it cannot show.
+        const isUnsupported = isStored && (action.risk === null || !action.preview);
+        const previewId = `buddy-proposal-preview-${action.id}`;
 
         return (
           <div
             key={action.id}
             className="flex max-w-full min-w-0 flex-col gap-1.5 rounded-xl border border-app-border bg-app-bg p-2.5"
           >
+            {/* What the manager is agreeing to comes FIRST, in the buddy's own words, and the
+                confirm button describes it (aria-describedby): the target is the stored id, so
+                this text is the offer's full description — never a summary the client
+                recomposed, and never read after the button that acts on it. */}
+            {isStored && action.preview && (
+              <p id={previewId} className="text-xs leading-relaxed break-words text-app-text-muted">
+                {action.preview}
+              </p>
+            )}
+
             {/* A stored proposal warns about itself before it is even clicked: how much it would
                 change decides how loudly the card speaks, before any confirm happens. */}
-            {isStored && <ProposalRiskBadge risk={action.risk} />}
+            {isStored && action.risk !== null && <ProposalRiskBadge risk={action.risk} />}
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* `action.label` is written by the model, so its length is not ours to
+            {isUnsupported && (
+              <>
+                <p
+                  data-testid="buddy-proposal-unsupported"
+                  className="text-xs leading-relaxed text-app-warning-text"
+                >
+                  This proposal arrived without its details, so it cannot be confirmed here. Ask the
+                  buddy to propose it again.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onDismiss(messageId, action.id)}
+                    disabled={isConfirming}
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-60"
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    Not now
+                  </button>
+                </div>
+              </>
+            )}
+            {!isUnsupported && (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* `action.label` is written by the model, so its length is not ours to
                                 assume. In a 384 px panel an unbreakable one would push the button
                                 past the edge -- hence the wrap and the left alignment that follows
                                 from a label running to two lines. */}
-              <button
-                type="button"
-                onClick={() => onConfirm(messageId, action)}
-                disabled={isConfirming}
-                className="flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-app-brand px-3 py-1.5 text-left text-sm font-medium break-words text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isConfirming ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                )}
-                {action.label}
-              </button>
-              <button
-                type="button"
-                onClick={() => onDismiss(messageId, action.id)}
-                disabled={isConfirming}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-60"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden="true" />
-                Not now
-              </button>
-            </div>
-            {/* What the manager is agreeing to, in the buddy's own words. The confirm target is
-                the stored id — this text is the offer's full description, never a summary the
-                client recomposed. */}
-            {isStored && action.preview !== "" && (
-              <p className="text-xs leading-relaxed break-words text-app-text-muted">
-                {action.preview}
-              </p>
+                <button
+                  type="button"
+                  onClick={() => onConfirm(messageId, action)}
+                  disabled={isConfirming}
+                  aria-describedby={isStored && action.preview ? previewId : undefined}
+                  className="flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-app-brand px-3 py-1.5 text-left text-sm font-medium break-words text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isConfirming ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {action.label}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDismiss(messageId, action.id)}
+                  disabled={isConfirming}
+                  className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-60"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  Not now
+                </button>
+              </div>
             )}
             {action.status === "error" && (
               <p className="text-xs text-app-danger-text">

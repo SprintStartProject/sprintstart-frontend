@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { Select } from "../../../components/ui/Select";
 
@@ -11,12 +11,13 @@ import { Select } from "../../../components/ui/Select";
  * caller's management server-side, so a project a manager merely belongs to would fail on the
  * first team message. Not listed means not offerable.
  *
- * **The restore audit lives here.** The stored team project id is restored raw (so a manager
- * who reloads keeps their conversation — see `useBuddyConversation`), but whether it still
- * belongs to this manager is a question only the loaded project list can answer. Once that list
- * has arrived, a stored id that no managed project vouches for is dropped back to the hire
- * conversation — *loudly*, because a silent fallback would be the exact drift the persisted
- * selection audit warns about: a conversation claiming to be about a project it cannot touch.
+ * **The switcher drives the global selection, not a private copy of it.** Team mode is bound to
+ * the globally selected project (see `useBuddyConversation`), so picking a project here both
+ * switches the app's selection and points the buddy at it — the two contexts cannot disagree,
+ * which is the whole point of the binding. When the selection moves from somewhere else while
+ * the buddy is mid-team-conversation, the session falls back to the hire thread and says why
+ * (a toast, from `BuddyProvider`); this component only ever *offers* the switch, never audits
+ * it — the session owns that, so it holds even when no surface is mounted.
  *
  * Renders nothing for a user who manages nothing: the switcher is not an affordance a hire
  * should even see, and an empty select would suggest one.
@@ -29,41 +30,18 @@ export function BuddyModeSwitcher({
 }: {
   /** The conversation's current team project, or `null` for the hire's own conversation. */
   teamProjectId: string | null;
-  /** Switches the conversation; `null` returns to the hire's own. */
+  /** Switches the conversation; `null` returns to the hire's own conversation. */
   onSwitch: (projectId: string | null) => void;
   /** Off while a turn is in flight — a stream cannot call back into a cleared thread. */
   disabled?: boolean;
   className?: string;
 }) {
-  const { projects, isLoading } = useProjectContext();
+  const { projects } = useProjectContext();
 
   const managedProjects = useMemo(
     () => projects.filter((project) => project.isManaged),
     [projects],
   );
-  const managesStoredProject = useMemo(
-    () => managedProjects.some((project) => project.id === teamProjectId),
-    [managedProjects, teamProjectId],
-  );
-
-  // The audit drops a stored conversation this user no longer runs — but only when a switch
-  // would actually be accepted. Read through a ref so the effect does not re-arm on every
-  // parent render (the callback is usually an inline arrow), and wait out `disabled` (a turn
-  // in flight refuses switches): when the turn ends, the changed `disabled` re-runs the audit
-  // and the fallback still happens — just at a moment it can succeed.
-  const onSwitchRef = useRef(onSwitch);
-  useEffect(() => {
-    onSwitchRef.current = onSwitch;
-  });
-
-  useEffect(() => {
-    if (isLoading || disabled || teamProjectId === null || managesStoredProject) return;
-
-    console.warn(
-      `Buddy team mode dropped a stored project (${teamProjectId}) that this user no longer manages.`,
-    );
-    onSwitchRef.current(null);
-  }, [isLoading, disabled, teamProjectId, managesStoredProject]);
 
   if (managedProjects.length === 0) return null;
 

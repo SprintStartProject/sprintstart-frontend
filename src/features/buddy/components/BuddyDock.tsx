@@ -48,6 +48,9 @@ type BuddyDockProps = Pick<
   | "dismissAction"
   | "suggestions"
   | "startFreshVisit"
+  | "isGreeting"
+  | "isDeciding"
+  | "teamProjectId"
 > & {
   onClose: () => void;
   /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
@@ -129,6 +132,9 @@ export function BuddyDock({
   dismissAction,
   suggestions,
   startFreshVisit,
+  isGreeting,
+  isDeciding,
+  teamProjectId,
   openError,
   onClose,
   lastMessageFooter,
@@ -161,7 +167,7 @@ export function BuddyDock({
   // Mid-turn: the buddy is deciding, running a tool, or writing. Not a spinner's worth of
   // state -- it gates the one control that would pull the thread out from under a reply
   // that is still arriving.
-  const isBusy = isThinking || isStreaming;
+  const isBusy = isThinking || isStreaming || isGreeting || isDeciding;
 
   const viewport = useViewportSize();
   const resting = { ...dockBox(corner, viewport), borderRadius: 20 };
@@ -319,7 +325,11 @@ export function BuddyDock({
             lastMessageFooter={lastMessageFooter}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
-            renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
+            // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+            // team-mode conversation is not one — the offer must not even render there.
+            renderQuestionAction={(question) =>
+              teamProjectId === null ? <BuddyQuestionActions question={question} /> : undefined
+            }
             openError={openError}
             onRetryOpen={onRetryOpen}
             onStartFreshVisit={() => void startFreshVisit()}

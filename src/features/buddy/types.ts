@@ -102,10 +102,17 @@ export type StoredActionProposal = {
   proposalId: string;
   /** The button text, as the buddy phrased the offer. */
   label: string;
-  /** What the manager is agreeing to, in words, as the buddy composed it. */
-  preview: string;
-  /** How loudly the card should warn about the change. */
-  risk: ProposalRisk;
+  /**
+   * What the manager is agreeing to, in words, as the buddy composed it. `null` when the event
+   * arrived without one — which blocks confirmation, see `BuddyActionProposals`.
+   */
+  preview: string | null;
+  /**
+   * How loudly the card should warn about the change. `null` when the event carried no known
+   * risk value — which also blocks confirmation: an approval card for a project mutation must
+   * never guess how loudly to warn.
+   */
+  risk: ProposalRisk | null;
   status: ProposedActionStatus;
   ok?: boolean;
   outcome?: string;
@@ -212,7 +219,7 @@ export type BuddyStreamHandlers = {
   onStoredProposal?: (proposal: {
     proposalId: string;
     label: string;
-    preview: string;
-    risk: ProposalRisk;
+    preview: string | null;
+    risk: ProposalRisk | null;
   }) => void;
 };

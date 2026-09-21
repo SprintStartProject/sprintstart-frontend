@@ -183,6 +183,7 @@ function BuddyMentorHome() {
     teamProjectId,
     switchTeamProject,
     isGreeting,
+    isDeciding,
   } = useBuddySession();
 
   // A greeting written while the hire was somewhere else still gets the buddy thinking and
@@ -278,7 +279,10 @@ function BuddyMentorHome() {
    * the same half `BuddyDock` applies to its own copy.
    */
   const isBusy = isThinking || isStreaming;
-  const canStartFresh = hasUserMessage && !isBusy;
+  // A fresh visit clears the thread, so it waits out everything writing into it — the turn,
+  // the greeting stream (past its first token), and any proposal decision whose outcome line
+  // would otherwise be cleared before it was read.
+  const canStartFresh = hasUserMessage && !isBusy && !isOpening && !isGreeting && !isDeciding;
 
   // The switcher is offered on the page exactly like in the dock — to whoever manages at least
   // one project, and to nobody else, so a hire never meets a row of nothing. Read here rather
@@ -339,7 +343,7 @@ function BuddyMentorHome() {
           <BuddyModeSwitcher
             teamProjectId={teamProjectId}
             onSwitch={(projectId) => void switchTeamProject(projectId)}
-            disabled={isBusy || isOpening || isGreeting}
+            disabled={isBusy || isOpening || isGreeting || isDeciding}
             className="max-w-xs"
           />
         ) : undefined
@@ -385,7 +389,11 @@ function BuddyMentorHome() {
             </Button>
           ) : undefined
         }
-        renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
+        // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+        // team-mode conversation is not one — the offer must not even render there.
+        renderQuestionAction={(question) =>
+          isHireMode ? <BuddyQuestionActions question={question} /> : undefined
+        }
         openError={openError}
         onRetryOpen={() => void retryOpen()}
         onStartFreshVisit={canStartFresh ? startFresh : undefined}

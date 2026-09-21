@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { announceBuddyPageReady } from "../../../../src/features/buddy/aiBuddyBus";
 import { BuddyWidget } from "../../../../src/features/buddy/components/BuddyWidget";
-import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
+import { BuddyProviderWithStubs } from "./buddyTestHarness";
 
 vi.mock("../../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
@@ -37,7 +37,7 @@ function StandInBuddyPage() {
 function renderWidget() {
   return render(
     <MemoryRouter initialEntries={["/board"]}>
-      <BuddyProvider>
+      <BuddyProviderWithStubs>
         <Routes>
           <Route path="/board" element={<p>the board</p>} />
           <Route
@@ -54,7 +54,7 @@ function renderWidget() {
           />
         </Routes>
         <BuddyWidget />
-      </BuddyProvider>
+      </BuddyProviderWithStubs>
     </MemoryRouter>,
   );
 }

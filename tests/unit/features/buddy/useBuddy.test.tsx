@@ -1,7 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
-import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
+import { BuddyProviderWithStubs } from "./buddyTestHarness";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
@@ -51,7 +51,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     expect(result.current.isOpen).toBe(false);
     await waitFor(() => {
@@ -69,7 +69,7 @@ describe("useBuddy", () => {
       ),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -99,7 +99,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -155,7 +155,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.setDraft("what should I work on?");
@@ -173,7 +173,7 @@ describe("useBuddy", () => {
   it("toggles open state", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -212,7 +212,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
