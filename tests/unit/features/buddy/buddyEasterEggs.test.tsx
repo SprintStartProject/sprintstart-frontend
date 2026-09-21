@@ -1,7 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
-import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
+import { BuddyProviderWithStubs } from "./buddyTestHarness";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
@@ -15,7 +15,7 @@ function silentGreeting() {
   return new HttpResponse(
     new ReadableStream({
       start(controller) {
-        controller.enqueue(encoder.encode('data: {"type":"done"}\\n\\n'));
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
         controller.close();
       },
     }),
@@ -33,11 +33,9 @@ describe("buddy easter eggs", () => {
   /** Mounts the session with a silent greeting and waits for it to settle. */
   async function mountConversation() {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
-    server.use(
-      http.post("/api/v1/onboarding/me/buddy/visit", () => new HttpResponse(null, { status: 204 })),
-    );
+    server.use(http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()));
 
-    const harness = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const harness = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
     await waitFor(() => {
       expect(harness.result.current.messages).toHaveLength(0);
     });

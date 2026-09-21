@@ -1,14 +1,19 @@
 import { apiClient } from "./apiClient";
 import keycloak from "../config/keycloak";
-import type { BuddyStreamHandlers } from "../features/buddy/types";
+import type { BuddyStreamHandlers, ProposalRisk } from "../features/buddy/types";
 import type { BuddyMessage } from "../features/buddy/types";
 
 /**
  * Retrieves the current visit's buddy messages, oldest first (the window since the mentor last
  * updated its memory — not the whole transcript).
+ *
+ * @param teamProjectId Pass to read the *team-mode* conversation with a managed project instead
+ *   of the hire's own — the backend keeps the two as separate conversations.
  */
-export async function getMessages(): Promise<BuddyMessage[]> {
-  return await apiClient.fetch<BuddyMessage[]>(`/api/v1/onboarding/me/buddy/messages`);
+export async function getMessages(teamProjectId?: string): Promise<BuddyMessage[]> {
+  const query = teamProjectId ? `?teamProjectId=${encodeURIComponent(teamProjectId)}` : "";
+
+  return await apiClient.fetch<BuddyMessage[]>(`/api/v1/onboarding/me/buddy/messages${query}`);
 }
 
 /** One suggested next step attached to a buddy greeting — one click sends `question`. */
@@ -60,10 +65,18 @@ export interface BuddyOpeningHandlers {
  *
  * Opening twice without the hire saying anything is the same visit: the greeting already there is
  * replayed whole and no model is called.
+ *
+ * @param handlers How the streamed greeting is received.
+ * @param teamProjectId Pass to open a *team-mode* visit with a managed project instead of the
+ *   hire's own conversation — the backend greets a manager about their team there.
  */
-export async function streamOpenBuddy(handlers: BuddyOpeningHandlers): Promise<void> {
+export async function streamOpenBuddy(
+  handlers: BuddyOpeningHandlers,
+  teamProjectId?: string,
+): Promise<void> {
+  const query = teamProjectId ? `?teamProjectId=${encodeURIComponent(teamProjectId)}` : "";
   const outcome = await readBuddyStream(
-    `/api/v1/onboarding/me/buddy/open/stream`,
+    `/api/v1/onboarding/me/buddy/open/stream${query}`,
     undefined,
     (chunk) => {
       switch (chunk.type) {
@@ -138,6 +151,13 @@ interface BuddyStreamChunk {
   /** `reword_checklist_item`: the line as it reads now, and as it would read. */
   line_before?: string;
   line_after?: string;
+  // Team-mode proposal: the stored proposal to confirm or dismiss by id. Present instead of the
+  // per-action payload fields — the client echoes nothing back but this id.
+  proposal_id?: string;
+  // Team-mode proposal: what the manager is agreeing to, in words.
+  preview?: string;
+  // Team-mode proposal: STANDARD, DESTRUCTIVE or BULK — how loudly the card warns.
+  risk?: string;
 }
 
 /** The outcome of confirming a buddy-proposed action — a single line to relay in the thread. */
@@ -194,6 +214,52 @@ export async function performAction(
       lineAfter: extras.lineAfter,
     }),
   });
+}
+
+/**
+ * The risk carried on a team-mode proposal, read only as far as the wire is trusted.
+ *
+ * The backend's `BuddyProposalRisk` enum only ever sends the three known values, but a version
+ * skew, a partial deployment or a malformed event could deliver anything else. This validates
+ * rather than casts, and fails *closed*: an unknown or absent value comes back `null`, and the
+ * card renders an explicit unsupported state instead of a confirmable offer — an approval card
+ * for a project mutation must never guess how loudly to warn. The console note keeps the drift
+ * findable rather than silent.
+ */
+function readProposalRisk(risk: string | undefined): ProposalRisk | null {
+  if (risk === "DESTRUCTIVE" || risk === "BULK" || risk === "STANDARD") return risk;
+
+  if (risk !== undefined) {
+    console.warn(`Buddy sent an unknown proposal risk: ${risk}`);
+  }
+
+  return null;
+}
+
+/**
+ * Confirms a *team-mode* proposal by id. The proposal is stored server-side, so the id is the
+ * whole payload — nothing about the change is re-sent, because what the change is lives on the
+ * backend, which the manager already saw described in the card's preview.
+ *
+ * A proposal that has already been confirmed or dismissed comes back `404` — the caller renders
+ * that as the outcome line, not as an error.
+ */
+export async function confirmStoredProposal(proposalId: string): Promise<BuddyActionResult> {
+  return await apiClient.fetch<BuddyActionResult>(
+    `/api/v1/onboarding/me/buddy/proposals/${encodeURIComponent(proposalId)}/confirm`,
+    { method: "POST" },
+  );
+}
+
+/**
+ * Dismisses a *team-mode* proposal by id. Nothing changes but the proposal — it can no longer be
+ * confirmed. The same `404` rule as `confirmStoredProposal` applies.
+ */
+export async function dismissStoredProposal(proposalId: string): Promise<BuddyActionResult> {
+  return await apiClient.fetch<BuddyActionResult>(
+    `/api/v1/onboarding/me/buddy/proposals/${encodeURIComponent(proposalId)}/dismiss`,
+    { method: "POST" },
+  );
 }
 
 /**
@@ -318,11 +384,20 @@ async function readBuddyStream(
  *
  * @param content The message to send.
  * @param handlers Helper operations handling the output of the buddy's response.
+ * @param teamProjectId Pass to speak in *team mode* about a managed project instead of the hire's
+ *   own conversation. Sent in the body, not the query string — the backend's contract puts the
+ *   team target on the POST body and leaves the hire's own conversation the body-less default.
  */
-export async function streamMessage(content: string, handlers: BuddyStreamHandlers): Promise<void> {
+export async function streamMessage(
+  content: string,
+  handlers: BuddyStreamHandlers,
+  teamProjectId?: string,
+): Promise<void> {
   const outcome = await readBuddyStream(
     `/api/v1/onboarding/me/buddy/messages`,
-    { content },
+    // Omitted, never null: the backend treats an absent field as the hire's own conversation,
+    // and carrying `teamProjectId: null` would send a field the contract does not have.
+    teamProjectId ? { content, teamProjectId } : { content },
     (event) => {
       switch (event.type) {
         case "tool_use":
@@ -350,6 +425,23 @@ export async function streamMessage(content: string, handlers: BuddyStreamHandle
           break;
 
         case "action_proposal":
+          // Team mode stores its proposals server-side and offers them by id, so the presence
+          // of `proposal_id` is what says "this is a stored proposal, confirm goes by id" — a
+          // hire-mode offer carries the tool name to echo instead, and never an id.
+          if (event.proposal_id) {
+            if (event.label) {
+              handlers.onStoredProposal?.({
+                proposalId: event.proposal_id,
+                label: event.label,
+                // Absent, not blank: a missing preview blocks confirmation on the card rather
+                // than rendering as invisible text.
+                preview: event.preview ?? null,
+                risk: readProposalRisk(event.risk),
+              });
+            }
+            break;
+          }
+
           if (event.action && event.label) {
             handlers.onActionProposal?.({
               action: event.action,

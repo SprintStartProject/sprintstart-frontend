@@ -110,6 +110,7 @@ describe("taking a card into the conversation", () => {
             summary: null,
             url: null,
             chosen: true,
+            closedAtSource: false,
           },
         ])}
       />,

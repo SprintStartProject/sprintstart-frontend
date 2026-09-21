@@ -48,6 +48,9 @@ type BuddyDockProps = Pick<
   | "dismissAction"
   | "suggestions"
   | "startFreshVisit"
+  | "isGreeting"
+  | "isDeciding"
+  | "teamProjectId"
 > & {
   onClose: () => void;
   /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
@@ -96,6 +99,12 @@ type BuddyDockProps = Pick<
    * that has been standing in for it fades away and reveals it.
    */
   isRevealing?: boolean;
+  /**
+   * A control rendered in the header beside the title — the conversation switcher. Handed in
+   * like every other prop so the dock stays presentational (and testable without a project
+   * context to read).
+   */
+  headerControl?: ReactNode;
 };
 
 /**
@@ -134,6 +143,9 @@ export function BuddyDock({
   dinoGameActive = false,
   onDinoGameExit,
   startFreshVisit,
+  isGreeting,
+  isDeciding,
+  teamProjectId,
   openError,
   onClose,
   lastMessageFooter,
@@ -146,6 +158,7 @@ export function BuddyDock({
   onHideSuggestions,
   isExpanding = false,
   isRevealing = false,
+  headerControl,
 }: BuddyDockProps) {
   const prefersReducedMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -165,7 +178,7 @@ export function BuddyDock({
   // Mid-turn: the buddy is deciding, running a tool, or writing. Not a spinner's worth of
   // state -- it gates the one control that would pull the thread out from under a reply
   // that is still arriving.
-  const isBusy = isThinking || isStreaming;
+  const isBusy = isThinking || isStreaming || isGreeting || isDeciding;
 
   const viewport = useViewportSize();
   const resting = { ...dockBox(corner, viewport), borderRadius: 20 };
@@ -240,6 +253,12 @@ export function BuddyDock({
             <p className="truncate text-sm font-semibold text-app-text">Buddy</p>
             <p className="truncate text-xs text-app-text-muted">Your onboarding mentor</p>
           </div>
+
+          {/* Hire conversation ↔ team conversations. Rendered by the caller (the widget), like
+                    every other session-driven piece here, so the dock needs no project context
+                    of its own. `max-w-full min-w-0` keeps a long project name from pushing the
+                    fresh-visit button out of a 384 px window. */}
+          {headerControl && <div className="max-w-[11rem] min-w-0 shrink-0">{headerControl}</div>}
 
           {/* Same control, same words and the same promise as the one on `/buddy`: the window is
                     a view of that conversation, so anything it can do to the conversation it has to
@@ -319,7 +338,11 @@ export function BuddyDock({
             lastMessageFooter={lastMessageFooter}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
-            renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
+            // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+            // team-mode conversation is not one — the offer must not even render there.
+            renderQuestionAction={(question) =>
+              teamProjectId === null ? <BuddyQuestionActions question={question} /> : undefined
+            }
             openError={openError}
             onRetryOpen={onRetryOpen}
             dinoGameActive={dinoGameActive}

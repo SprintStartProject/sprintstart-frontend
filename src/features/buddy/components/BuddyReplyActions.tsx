@@ -9,7 +9,10 @@ import { SaveReplyToBoard } from "./SaveReplyToBoard";
 /** Whether the mentor has already offered to keep a list out of this reply. */
 function offersChecklist(message: BuddyMessageView): boolean {
   return (message.actions ?? []).some(
-    (action) => action.action === BUDDY_ACTION_PLACE_CHECKLIST && action.status !== "dismissed",
+    (action) =>
+      "action" in action &&
+      action.action === BUDDY_ACTION_PLACE_CHECKLIST &&
+      action.status !== "dismissed",
   );
 }
 

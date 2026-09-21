@@ -117,6 +117,11 @@ export type CurrentTaskContent = {
   url: string | null;
   /** True when the hire claimed this as their goal, false when it is the Task 0 they were handed. */
   chosen: boolean;
+  /**
+   * True once the issue behind this task is closed where it lives. False when there is no task at
+   * all, which says nothing about anything.
+   */
+  closedAtSource: boolean;
 };
 
 /** One suggested task, with the plain reasons it was suggested. Never a score. */
