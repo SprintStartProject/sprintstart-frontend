@@ -10,7 +10,11 @@ import {
   writeBoardStructure,
   type BoardStructure,
 } from "../../../../src/features/board/layout/boardStructure";
-import type { BoardCard, ChecklistContent } from "../../../../src/features/board/types";
+import type {
+  BoardCard,
+  ChecklistContent,
+  PathStepContent,
+} from "../../../../src/features/board/types";
 
 const EMPTY: BoardStructure = { cards: {}, groupStages: {} };
 
@@ -22,6 +26,31 @@ function checklist(id: string, items: { text: string; done: boolean }[]): BoardC
   };
 
   return { id, kind: "CHECKLIST", owner: "HIRE", position: 0, placedAt: null, content };
+}
+
+function pathStep(id: string, tasks: { finished: boolean }[]): BoardCard {
+  const content: PathStepContent = {
+    kind: "PATH_STEP",
+    stepId: "step-1",
+    phaseTitle: null,
+    title: null,
+    description: null,
+    status: null,
+    isAiAssisted: true,
+    expectedOutcomes: [],
+    tasks: tasks.map((task, index) => ({
+      id: `${id}-${index}`,
+      stepId: "step-1",
+      position: index,
+      title: `task ${index}`,
+      description: "",
+      finished: task.finished,
+    })),
+    resources: [],
+    reason: null,
+  };
+
+  return { id, kind: "PATH_STEP", owner: "AI", position: 0, placedAt: null, content };
 }
 
 function note(id: string): BoardCard {
@@ -63,6 +92,28 @@ describe("isCardDone", () => {
 
   it("honours a hand-set done on a card that cannot report", () => {
     expect(isCardDone(note("a"), structure({ a: { markedDone: true } }))).toBe(true);
+  });
+
+  it("counts a fully ticked path step as done", () => {
+    const card = pathStep("a", [{ finished: true }, { finished: true }]);
+
+    expect(isCardDone(card, EMPTY)).toBe(true);
+  });
+
+  it("honours a hand-set done on a path step with no tasks", () => {
+    // A degraded card (its step is gone) or a live step that simply has no tasks has nothing to
+    // report — unlike CHECKLIST, the hire cannot add tasks themselves, since they belong to the
+    // path. Falling back to the hand-set tick is the only way out other than dismissing the card.
+    const card = pathStep("a", []);
+
+    expect(isCardDone(card, EMPTY)).toBe(false);
+    expect(isCardDone(card, structure({ a: { markedDone: true } }))).toBe(true);
+  });
+
+  it("ignores a hand-set done on a path step that has tasks to report", () => {
+    const card = pathStep("a", [{ finished: false }]);
+
+    expect(isCardDone(card, structure({ a: { markedDone: true } }))).toBe(false);
   });
 });
 
@@ -106,6 +157,26 @@ describe("deriveCardStates", () => {
     const states = deriveCardStates([note("a")], EMPTY);
 
     expect(states.get("a")?.stage).toBe("NOW");
+  });
+
+  it("lets a hand-set done unblock a card behind a taskless path step", () => {
+    // Without the fallback in `isSelfReporting`, a degraded/taskless PATH_STEP card is
+    // permanently OPEN (0 of 0 is never `total > 0`) and blocks whatever the hire put behind it,
+    // with no control anywhere to override it.
+    const first = pathStep("first", []);
+    const second = checklist("second", [{ text: "two", done: false }]);
+
+    const blocked = deriveCardStates(
+      [first, second],
+      structure({ second: { dependsOn: after("first") } }),
+    );
+    expect(blocked.get("second")?.status).toBe("BLOCKED");
+
+    const unblocked = deriveCardStates(
+      [first, second],
+      structure({ first: { markedDone: true }, second: { dependsOn: after("first") } }),
+    );
+    expect(unblocked.get("second")?.status).toBe("OPEN");
   });
 });
 

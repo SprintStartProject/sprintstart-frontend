@@ -53,13 +53,18 @@ export const boardService = {
    * actually finished. Takes only `{done}`, not the task's `position`/`title`/`description`, so a
    * board card that is behind the path it was hydrated from cannot write stale copies of those back.
    *
+   * Returns nothing: the backend builds its response body from the path *before* applying the
+   * write, so it is a pre-write projection a caller could easily mistake for confirmation of the
+   * tick that was just made. Callers re-read instead — `PathStepCard` invalidates `myStatuses` and
+   * the board query rather than rendering anything handed back here.
+   *
    * @param cardId The PATH_STEP card the task is shown on.
    * @param taskId The task to tick.
    * @throws ApiError 404 when the card is not theirs, not a PATH_STEP card, its step is gone, or
    *   the task does not belong to that step.
    */
-  async tickPathStepTask(cardId: string, taskId: string, done: boolean): Promise<PathStepContent> {
-    return await apiClient.fetch<PathStepContent>(
+  async tickPathStepTask(cardId: string, taskId: string, done: boolean): Promise<void> {
+    await apiClient.fetch<PathStepContent>(
       `${BASE}/me/board/cards/${encodeURIComponent(cardId)}/tasks/${encodeURIComponent(taskId)}`,
       { method: "PATCH", body: JSON.stringify({ done }) },
     );

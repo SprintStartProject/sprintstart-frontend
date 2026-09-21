@@ -279,6 +279,14 @@ export type PathStepContent = {
   reason: string | null;
 };
 
+/**
+ * What to call a `PATH_STEP` card when the step behind it did not come with a `title`.
+ *
+ * Shared between the card's own frame title (`PathStepCard`) and `cardName` so the two cannot
+ * drift into saying two different things for the same untitled step.
+ */
+export const PATH_STEP_FALLBACK_TITLE = "A step of your path";
+
 /** Something the hire wrote down, in markdown. Theirs — never quoted back as fact. */
 export type NoteContent = {
   kind: "NOTE";

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { PathStepCard } from "../../../../src/features/board/components/PathStepCard";
@@ -105,7 +105,7 @@ describe("PathStepCard", () => {
   });
 
   it("ticks a task immediately and writes it back through the board's own endpoint", async () => {
-    tickPathStepTask.mockResolvedValue(content());
+    tickPathStepTask.mockResolvedValue(undefined);
 
     renderCard();
     const checkbox = screen.getByRole("checkbox", { name: "Clone the repo" });
@@ -130,8 +130,8 @@ describe("PathStepCard", () => {
     expect(checkbox).toHaveAttribute("aria-checked", "false");
   });
 
-  it("ignores a second click on a task while its tick is still in flight", () => {
-    let release: (value: PathStepContent) => void = () => {};
+  it("ignores a second click on a task while its tick is still in flight", async () => {
+    let release: (value: void) => void = () => {};
     tickPathStepTask.mockReturnValue(
       new Promise((resolve) => {
         release = resolve;
@@ -145,7 +145,41 @@ describe("PathStepCard", () => {
     fireEvent.click(checkbox);
 
     expect(tickPathStepTask).toHaveBeenCalledTimes(1);
-    release(content());
+
+    // The three clicks above land on true, false, true — the same value already in flight — so
+    // settling it should not re-issue a fourth call.
+    await act(async () => {
+      release();
+      await Promise.resolve();
+    });
+    expect(tickPathStepTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-issues a tick once the in-flight write settles if a later click disagreed with it", async () => {
+    let release: (value: void) => void = () => {};
+    tickPathStepTask.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    tickPathStepTask.mockResolvedValueOnce(undefined);
+
+    renderCard();
+    const checkbox = screen.getByRole("checkbox", { name: "Clone the repo" });
+    fireEvent.click(checkbox); // -> true, in flight
+    fireEvent.click(checkbox); // -> false, queued while true is in flight
+
+    expect(tickPathStepTask).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      release();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(tickPathStepTask).toHaveBeenCalledTimes(2);
+    });
+    expect(tickPathStepTask).toHaveBeenNthCalledWith(2, "card-1", "task-1", false);
   });
 
   it("shows the reason and offers no checkboxes or full-step button once the step is gone", () => {

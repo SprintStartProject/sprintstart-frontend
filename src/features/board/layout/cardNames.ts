@@ -1,5 +1,5 @@
 import { readableTitle } from "../generation/pathToCards";
-import type { BoardCard } from "../types";
+import { PATH_STEP_FALLBACK_TITLE, type BoardCard } from "../types";
 
 /**
  * What to call a card when it is being talked about from somewhere else on the board.
@@ -35,7 +35,7 @@ export function cardName(card: BoardCard): string {
     case "MEMORY_RECAP":
       return "What your buddy remembers";
     case "PATH_STEP":
-      return content.title ?? "A step of your path";
+      return content.title ?? PATH_STEP_FALLBACK_TITLE;
     default:
       return "Card";
   }

@@ -252,8 +252,14 @@ export function isSelfReporting(card: BoardCard): boolean {
     case "CHECKLIST":
     case "ARRIVAL_STEPS":
     case "PATH_TO_FIRST_CONTRIBUTION":
-    case "PATH_STEP":
       return true;
+    case "PATH_STEP":
+      // A degraded card (`reason` set) or a live step that simply has no tasks would otherwise be
+      // permanently `OPEN` — zero of zero never reaches `total > 0` in `isCardDone` — which blocks
+      // whatever the hire put behind it with no control anywhere to override it. Unlike `CHECKLIST`,
+      // the hire cannot add items to fix that themselves: the tasks belong to the path. So a card
+      // with nothing to report falls back to the hand-set tick instead of staying stuck.
+      return card.content.tasks.length > 0;
     default:
       return false;
   }

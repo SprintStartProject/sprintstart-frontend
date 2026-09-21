@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
@@ -18,7 +18,7 @@ import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { useCardMarks } from "../marks/useCardMarks";
-import type { BoardCard, PathStepContent } from "../types";
+import { PATH_STEP_FALLBACK_TITLE, type BoardCard, type PathStepContent } from "../types";
 
 type PathStepCardProps = {
   content: PathStepContent;
@@ -46,9 +46,11 @@ type PathStepCardProps = {
  * only ever moves one direction, because a step, once settled, stays settled. A task here can be
  * ticked and unticked from two places — this card and `/onboarding/:stepId` — so an `intent` that
  * stayed forever over the props would start lying the moment the step page changes the same task
- * and the board reloads behind it. The effect below clears an `intent` entry as soon as the props
- * agree with it: the click wins immediately, the server wins eventually, and neither can block the
- * other from ever being true again.
+ * and the board reloads behind it. Each `intent` entry carries the server value it was set against
+ * (`baseline`); the effect below drops the entry as soon as the props move away from that baseline,
+ * in *either* direction — the server confirming the click, or something else changing the same task
+ * first. The click wins immediately, the server wins eventually, and neither can block the other
+ * from ever being true again.
  */
 export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepCardProps) {
   // The path writes this text, so its highlights are matched by their words rather than written
@@ -57,17 +59,25 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // What the hire just clicked, laid over the server's `finished` until the props catch up.
-  const [intent, setIntent] = useState<Record<string, boolean>>({});
-  // Tasks with a tick in flight — a second click on one of these is ignored rather than queued.
-  // `SelectionCheckbox` has no `disabled` prop and is shared with the admin surface, so the guard
-  // lives here rather than adding one there for a single caller.
+  // What the hire just clicked, laid over the server's `finished` until the props catch up. Each
+  // entry remembers the server value it was set against, so the effect below can tell "the server
+  // confirmed it" apart from "nothing has changed yet" without needing a second piece of state.
+  const [intent, setIntent] = useState<Record<string, { value: boolean; baseline: boolean }>>({});
+  // Tasks with a tick in flight — a second click on one of these does not fire a second request;
+  // it updates `latestRequest` instead, which the in-flight write re-issues once it settles, so a
+  // hire who ticks and immediately unticks does not lose the untick. `SelectionCheckbox` has no
+  // `disabled` prop and is shared with the admin surface, so the guard lives here rather than
+  // adding one there for a single caller.
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [failedTaskId, setFailedTaskId] = useState<string | null>(null);
+  // The value a task should end up at, kept outside React state so `runTick`'s `finally` can read
+  // the latest click even when it fired while the previous write was still in flight.
+  const latestRequest = useRef<Record<string, boolean>>({});
 
-  // Drops an `intent` entry the moment the props agree with it, so a tick made from the step page
-  // is not shadowed by a stale optimistic value here — see the doc comment above. Deferred to a
-  // microtask: React 19's lint rejects a synchronous first setState in an effect body.
+  // Drops an `intent` entry the moment the props move away from the server value it was set
+  // against, so a tick made from the step page is not shadowed by a stale optimistic value here —
+  // see the doc comment above. Deferred to a microtask: React 19's lint rejects a synchronous first
+  // setState in an effect body.
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
@@ -78,7 +88,8 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
         const next = { ...current };
         let changed = false;
         for (const task of content.tasks) {
-          if (task.id in next && next[task.id] === task.finished) {
+          const entry = next[task.id];
+          if (entry && task.finished !== entry.baseline) {
             delete next[task.id];
             changed = true;
           }
@@ -91,8 +102,8 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
     };
   }, [content.tasks]);
 
-  const tasks = [...content.tasks]
-    .map((task) => ({ ...task, finished: intent[task.id] ?? task.finished }))
+  const tasks = content.tasks
+    .map((task) => ({ ...task, finished: intent[task.id]?.value ?? task.finished }))
     .sort((a, b) => a.position - b.position);
   const total = tasks.length;
   const done = tasks.filter((task) => task.finished).length;
@@ -104,39 +115,77 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
   // stays on the board and says why, rather than showing tasks and a link that no longer resolve.
   const degraded = content.reason !== null || content.stepId === null;
 
-  async function tick(taskId: string, next: boolean) {
+  function tick(taskId: string, next: boolean) {
+    const server = content.tasks.find((task) => task.id === taskId)?.finished ?? next;
+
+    latestRequest.current[taskId] = next;
+    setIntent((current) => ({
+      ...current,
+      // The baseline is fixed by the *first* click of a run, not overwritten by later ones — it
+      // has to stay the server value from before the hire started clicking so the effect above can
+      // still recognize a change made somewhere else while a click here was still settling.
+      [taskId]: { value: next, baseline: current[taskId]?.baseline ?? server },
+    }));
+    setFailedTaskId((current) => (current === taskId ? null : current));
+
     if (pending.has(taskId)) return;
 
-    setIntent((current) => ({ ...current, [taskId]: next }));
+    void runTick(taskId);
+  }
+
+  async function runTick(taskId: string) {
+    const value = latestRequest.current[taskId];
+    if (value === undefined) return;
+
     setPending((current) => new Set(current).add(taskId));
-    setFailedTaskId((current) => (current === taskId ? null : current));
 
     try {
       // The response is a projection read before the write inside the same call, so it is not
       // trusted to already carry this tick — rendering it could snap a just-ticked box back.
       // `myStatuses` is invalidated instead, which is what keeps the step page and the onboarding
-      // progress indicator in step with what just happened here.
-      await boardService.tickPathStepTask(card.id, taskId, next);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() });
+      // progress indicator in step with what just happened here; the board query is invalidated
+      // too, so `deriveCardStates` stops reading the pre-tick `content.tasks` and the card's own
+      // "N/M done" badge and its successors' `BLOCKED` state agree with what this card now shows.
+      await boardService.tickPathStepTask(card.id, taskId, value);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.onboarding.myStatuses() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.board.all() }),
+      ]);
     } catch {
       setIntent((current) => {
         const { [taskId]: _removed, ...rest } = current;
         return rest;
       });
+      delete latestRequest.current[taskId];
       setFailedTaskId(taskId);
-    } finally {
       setPending((current) => {
         const rest = new Set(current);
         rest.delete(taskId);
         return rest;
       });
+      return;
+    }
+
+    setPending((current) => {
+      const rest = new Set(current);
+      rest.delete(taskId);
+      return rest;
+    });
+
+    // A click that landed while this write was in flight changed what the task should end up at —
+    // re-issue with that value rather than leaving it stranded until some other event refetches
+    // the board.
+    if (latestRequest.current[taskId] === value) {
+      delete latestRequest.current[taskId];
+    } else {
+      void runTick(taskId);
     }
   }
 
   return (
     <BoardCardFrame
       icon={Footprints}
-      title={content.title ?? "A step of your path"}
+      title={content.title ?? PATH_STEP_FALLBACK_TITLE}
       controlLabel="path step"
       card={card}
       subtitle={subtitle.length > 0 ? subtitle : undefined}
@@ -175,7 +224,7 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
                 <li key={task.id} className="flex items-start gap-2.5">
                   <SelectionCheckbox
                     checked={task.finished}
-                    onChange={() => void tick(task.id, !task.finished)}
+                    onChange={() => tick(task.id, !task.finished)}
                     ariaLabel={task.title}
                   />
                   <span
@@ -190,7 +239,7 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
                       </span>
                     )}
                     {failedTaskId === task.id && (
-                      <span className="mt-0.5 block text-xs text-app-danger-text">
+                      <span role="alert" className="mt-0.5 block text-xs text-app-danger-text">
                         That didn&apos;t save. Try again in a moment.
                       </span>
                     )}
