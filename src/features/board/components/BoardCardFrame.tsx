@@ -7,11 +7,14 @@ import {
   CircleDashed,
   Layers,
   Lock,
+  KeyRound,
   Pin,
   PinOff,
+  Waypoints,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { unblocksSaid } from "../../graph-diagram/lockWords";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Collapsible } from "../../../components/ui/Collapsible";
@@ -125,6 +128,8 @@ export function BoardCardFrame({
     onToggleDone,
     stagePicker,
     dependencyPicker,
+    onShowChain,
+    unblocks,
     stack,
     resizeHandle,
   } = useBoardCardControls();
@@ -138,6 +143,7 @@ export function BoardCardFrame({
 
   const placedByBuddy = card.placedAt !== null;
   const blocked = state?.status === "BLOCKED";
+  const freed = unblocksSaid(unblocks ?? 0);
   const done = state?.status === "DONE";
   // Falls back to the generic word rather than to the title when the title is not text: a
   // rendered node cannot go inside "Remove the … card", and "Remove the [object Object] card" is
@@ -238,6 +244,15 @@ export function BoardCardFrame({
                   </Badge>
                 )}
 
+                {/* Only where it is actionable: on a card that is waiting, "frees three" is a
+                    promise about work nobody can start, and on a finished one it is history. */}
+                {!blocked && !done && freed && (
+                  <Badge variant="brand" size="sm" className="gap-1" title={freed}>
+                    <KeyRound className="h-3 w-3" aria-hidden="true" />
+                    {freed}
+                  </Badge>
+                )}
+
                 {/* A badge that is also the way in. `aria-expanded` says what it does, and the
                     count is the reassurance that opening it holds no surprises — a pile whose
                     depth you cannot see is a pile you do not trust to be small. Deliberately not
@@ -290,7 +305,20 @@ export function BoardCardFrame({
                   <span className="font-medium text-app-text">
                     {state.blockedBy.map((blocker) => cardName(blocker)).join(", ")}
                   </span>
-                  .
+                  .{" "}
+                  {/* Naming the next card answers one hop. Two hops back the sentence is true and
+                      useless, because the card it names is itself waiting — so the way to the whole
+                      run sits on the sentence that raises the question. */}
+                  {onShowChain && (
+                    <button
+                      type="button"
+                      onClick={onShowChain}
+                      className="inline-flex items-center gap-1 rounded font-medium text-app-brand-text underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    >
+                      <Waypoints className="h-3 w-3" aria-hidden="true" />
+                      See the whole run
+                    </button>
+                  )}
                 </p>
               )}
             </div>

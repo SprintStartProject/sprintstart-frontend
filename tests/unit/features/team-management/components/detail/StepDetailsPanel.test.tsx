@@ -202,4 +202,36 @@ describe("StepDetailsPanel", () => {
     expect(screen.getByText("Unread")).toBeInTheDocument();
     expect(screen.getByText("Not helpful")).toBeInTheDocument();
   });
+
+  it("marks unread feedback as read from the step itself", async () => {
+    const user = userEvent.setup();
+    const onMarkFeedbackRead = vi.fn();
+    const feedback = {
+      id: "f1",
+      stepId: "step1",
+      helpful: false,
+      message: "Confusing",
+      createdAt: "2026-07-01T00:00:00Z",
+    };
+    const { rerender } = render(
+      <StepDetailsPanel
+        {...defaultProps}
+        feedbackItems={[{ ...feedback, read: false }]}
+        onMarkFeedbackRead={onMarkFeedbackRead}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Mark read" }));
+    expect(onMarkFeedbackRead).toHaveBeenCalledWith("f1");
+
+    rerender(
+      <StepDetailsPanel
+        {...defaultProps}
+        feedbackItems={[{ ...feedback, read: true }]}
+        onMarkFeedbackRead={onMarkFeedbackRead}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Mark read" })).not.toBeInTheDocument();
+    expect(screen.getByText("Read")).toBeInTheDocument();
+  });
 });

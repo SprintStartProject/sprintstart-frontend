@@ -6,9 +6,9 @@ import { onboardingService } from "../../../../../../src/services/onboardingServ
 
 vi.mock("../../../../../../src/services/onboardingService", () => ({
   onboardingService: {
-    fetchPhaseCheckForEditing: vi.fn(),
-    fetchPhaseCheckAttempts: vi.fn(),
-    savePhaseCheck: vi.fn(),
+    fetchPhaseQuestionsForEditing: vi.fn(),
+    fetchQuestionAttempts: vi.fn(),
+    savePhaseQuestions: vi.fn(),
   },
 }));
 
@@ -36,14 +36,9 @@ const shortTextQuestion = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocked.fetchPhaseCheckForEditing.mockResolvedValue({
+  mocked.fetchPhaseQuestionsForEditing.mockResolvedValue({
     phaseId: "phase1",
     questions: [shortTextQuestion],
-  });
-  mocked.fetchPhaseCheckAttempts.mockResolvedValue({
-    userId: "user1",
-    phaseId: "phase1",
-    attempts: [],
   });
 });
 
@@ -57,7 +52,7 @@ describe("PhaseCheckAdminModal", () => {
 
   it("saves the edited questions with positions assigned by order", async () => {
     const user = userEvent.setup();
-    mocked.savePhaseCheck.mockResolvedValue({
+    mocked.savePhaseQuestions.mockResolvedValue({
       phaseId: "phase1",
       questions: [shortTextQuestion],
     });
@@ -68,8 +63,8 @@ describe("PhaseCheckAdminModal", () => {
     await user.type(questionInput, "How do you start it?");
     await user.click(screen.getByRole("button", { name: /save questions/i }));
 
-    await waitFor(() => expect(mocked.savePhaseCheck).toHaveBeenCalled());
-    expect(mocked.savePhaseCheck).toHaveBeenCalledWith("phase1", [
+    await waitFor(() => expect(mocked.savePhaseQuestions).toHaveBeenCalled());
+    expect(mocked.savePhaseQuestions).toHaveBeenCalledWith("phase1", [
       {
         id: "q1",
         position: 0,
@@ -85,7 +80,7 @@ describe("PhaseCheckAdminModal", () => {
 
   it("keeps existing question and option ids, and omits them for newly added ones", async () => {
     const user = userEvent.setup();
-    mocked.fetchPhaseCheckForEditing.mockResolvedValue({
+    mocked.fetchPhaseQuestionsForEditing.mockResolvedValue({
       phaseId: "phase1",
       questions: [
         {
@@ -102,7 +97,7 @@ describe("PhaseCheckAdminModal", () => {
         },
       ],
     });
-    mocked.savePhaseCheck.mockResolvedValue({ phaseId: "phase1", questions: [] });
+    mocked.savePhaseQuestions.mockResolvedValue({ phaseId: "phase1", questions: [] });
     render(<PhaseCheckAdminModal {...defaultProps} />);
 
     await screen.findByDisplayValue("Which one?");
@@ -111,9 +106,9 @@ describe("PhaseCheckAdminModal", () => {
     await user.click(screen.getByRole("button", { name: /save questions/i }));
 
     // The IDs have to survive the round trip: without them the backend recreates every
-    // question, which throws the member's whole phase out of their review pool.
-    await waitFor(() => expect(mocked.savePhaseCheck).toHaveBeenCalled());
-    expect(mocked.savePhaseCheck).toHaveBeenCalledWith("phase1", [
+    // question, which throws away the attempts pointing at it.
+    await waitFor(() => expect(mocked.savePhaseQuestions).toHaveBeenCalled());
+    expect(mocked.savePhaseQuestions).toHaveBeenCalledWith("phase1", [
       {
         id: "q1",
         position: 0,
@@ -139,13 +134,13 @@ describe("PhaseCheckAdminModal", () => {
     await user.click(screen.getByRole("button", { name: /save questions/i }));
 
     expect(await screen.findByText(/needs a sample answer/i)).toBeInTheDocument();
-    // The backend is never asked to store an invalid check.
-    expect(mocked.savePhaseCheck).not.toHaveBeenCalled();
+    // The backend is never asked to store an invalid question.
+    expect(mocked.savePhaseQuestions).not.toHaveBeenCalled();
   });
 
   it("blocks saving a multiple choice question without a correct option", async () => {
     const user = userEvent.setup();
-    mocked.fetchPhaseCheckForEditing.mockResolvedValue({
+    mocked.fetchPhaseQuestionsForEditing.mockResolvedValue({
       phaseId: "phase1",
       questions: [
         {
@@ -169,62 +164,44 @@ describe("PhaseCheckAdminModal", () => {
     await user.click(screen.getByRole("button", { name: /save questions/i }));
 
     expect(await screen.findByText(/needs at least 1 correct option/i)).toBeInTheDocument();
-    expect(mocked.savePhaseCheck).not.toHaveBeenCalled();
+    expect(mocked.savePhaseQuestions).not.toHaveBeenCalled();
   });
 
-  it("shows attempts with the question text joined onto each answer", async () => {
-    mocked.fetchPhaseCheckAttempts.mockResolvedValue({
+  it("shows a question's attempts in the results tab when expanded", async () => {
+    const user = userEvent.setup();
+    mocked.fetchQuestionAttempts.mockResolvedValue({
       userId: "user1",
-      phaseId: "phase1",
+      questionId: "q1",
       attempts: [
         {
           id: "attempt1",
-          passed: false,
+          correct: false,
           createdAt: "2026-07-20T10:00:00Z",
-          correctAnswerCount: 0,
-          questionCount: 1,
-          answers: [
-            {
-              questionId: "q1",
-              selectedOptionIds: [],
-              textAnswer: "npm start",
-              correct: false,
-            },
-          ],
+          selectedOptionIds: [],
+          textAnswer: "npm start",
         },
       ],
     });
     render(<PhaseCheckAdminModal {...defaultProps} initialTab="results" />);
 
-    expect(await screen.findByText("Not passed")).toBeInTheDocument();
-    expect(screen.getByText(/Start command\?/)).toBeInTheDocument();
+    await user.click(await screen.findByText("Start command?"));
+
+    expect(mocked.fetchQuestionAttempts).toHaveBeenCalledWith("user1", "q1");
+    expect(await screen.findByText(/Incorrect/)).toBeInTheDocument();
     expect(screen.getByText(/npm start/)).toBeInTheDocument();
   });
 
-  it("falls back gracefully when an answer references a replaced question", async () => {
-    mocked.fetchPhaseCheckAttempts.mockResolvedValue({
+  it("reports an empty results tab when there are no attempts yet", async () => {
+    mocked.fetchQuestionAttempts.mockResolvedValue({
       userId: "user1",
-      phaseId: "phase1",
-      attempts: [
-        {
-          id: "attempt1",
-          passed: true,
-          createdAt: "2026-07-20T10:00:00Z",
-          correctAnswerCount: 1,
-          questionCount: 1,
-          answers: [
-            {
-              questionId: "gone",
-              selectedOptionIds: [],
-              textAnswer: null,
-              correct: true,
-            },
-          ],
-        },
-      ],
+      questionId: "q1",
+      attempts: [],
     });
+    const user = userEvent.setup();
     render(<PhaseCheckAdminModal {...defaultProps} initialTab="results" />);
 
-    expect(await screen.findByText(/question was replaced/i)).toBeInTheDocument();
+    await user.click(await screen.findByText("Start command?"));
+
+    expect(await screen.findByText(/No attempts on this question yet/i)).toBeInTheDocument();
   });
 });

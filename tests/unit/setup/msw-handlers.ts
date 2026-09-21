@@ -288,13 +288,26 @@ export const handlers = [
               skip: null,
             },
           ],
+          questions: [],
         },
       ],
     }),
   ),
 
+  // Without this, anything rendering `OnboardingJourneyProvider` against MSW fell into the
+  // provider's outage branch and exercised that instead of the real one.
+  http.get("/api/v1/projects/:projectId/onboarding/me/path/generation", () =>
+    HttpResponse.json({
+      running: false,
+      runningProjectId: null,
+      startedAt: null,
+      hasActiveBlueprint: true,
+      activeBlueprintCount: 1,
+    }),
+  ),
+
   http.post(
-    "/api/v1/onboarding/me/path/personalize",
+    "/api/v1/projects/:projectId/onboarding/me/path/personalize",
     () =>
       new HttpResponse(
         sseStream(
@@ -335,6 +348,7 @@ export const handlers = [
                       skip: null,
                     },
                   ],
+                  questions: [],
                 },
               ],
             },

@@ -42,8 +42,9 @@ const board: Board = {
         kind: "PATH_TO_FIRST_CONTRIBUTION",
         moments: [{ key: "JOINED", reachedAt: "2026-07-20T09:00:00Z" }],
         acceptedCount: 0,
-        autonomyReachedAt: null,
-        stalledReason: null,
+        autonomyReachedAt: "2026-08-04T09:00:00Z",
+        // Both lines of `BoardPathNotes` are on screen for this pass, so axe sees them.
+        stalledReason: "a review has been waiting three days",
       },
     },
     {
@@ -79,7 +80,12 @@ describe("BoardPage Accessibility", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByLabelText("Your path here")).toBeInTheDocument());
+    // Waits for real board content. `main` is there from first paint, so waiting for it would
+    // let this pass with the grid entirely broken. The header strip of moments it used to wait
+    // for is gone: that answered "how far through onboarding am I", which the board answers four
+    // other ways -- only the two lines with no second home stayed, in `BoardPathNotes`.
+    await waitFor(() => expect(screen.getByText(/Add a health endpoint/)).toBeInTheDocument());
+    expect(screen.getByText(/a review has been waiting three days/)).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 
