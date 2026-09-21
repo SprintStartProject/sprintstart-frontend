@@ -28,13 +28,13 @@ export type CapturedSelection = {
   /** Where in the app it came from, in words. Null when nothing better than the app name exists. */
   source: string | null;
   /**
-   * The page the selection was on, by its title, independent of {@link source}.
+   * The page the selection was on, by the name its header shows, independent of {@link source}.
+   * Null outside a page — the buddy dock, a drawer — where there is none to name.
    *
    * Kept apart because the two answer different questions and a reader usually wants both: the
-   * heading says which part, the title says which page, and "the bit under Acceptance Criteria" on
-   * its own could be any task in the system. `source` already falls back to this when there is no
-   * heading, so the two are equal as often as not — a caller showing both has to say so only when
-   * they differ.
+   * heading says which part, the page says which page, and "the bit under Deployment" on its own
+   * could be on any page in the app. The nearest heading is often the page's own title, so the
+   * two are equal as often as not — a caller showing both has to say so only when they differ.
    */
   page: string | null;
   /**
@@ -95,7 +95,7 @@ export function captureSelection(selection: Selection | null): CapturedSelection
     quoteText: selectionQuoteText(rawText),
     url: linkFor(anchor, text),
     source: sourceFor(anchor),
-    page: pageTitle(),
+    page: pageTitleFor(anchor),
     origin: originUrl(window.location, text),
     cardId: elementOf(anchor)?.closest("[data-card-id]")?.getAttribute("data-card-id") ?? null,
     inLink: Boolean(elementOf(anchor)?.closest("a")),
@@ -191,14 +191,29 @@ function httpUrl(candidate: string): string | null {
 function sourceFor(node: Node): string | null {
   const heading = nearestHeadingAbove(node);
 
-  return heading ?? pageTitle();
-}
-
-/** The page's own name, or null when the document has not got one. */
-function pageTitle(): string | null {
+  if (heading) return heading;
   const title = normalise(document.title);
 
   return title.length > 0 ? title : null;
+}
+
+/**
+ * The name of the page the selection is on: the title its header shows, or null.
+ *
+ * Read off the page rather than off `document.title`, because the app never changes the document
+ * title — it says "SprintStart" on every route, which names no page at all. Every page draws its
+ * name as the one `<h1>` in its header (`PageHeader`), inside the app's `<main>`, so the first
+ * `<h1>` there is what a hire would call the page.
+ *
+ * Scoped to `<main>` on purpose: the sidebar carries an `<h1>` of its own with the product name
+ * in it, and it comes first in the document. A selection outside `<main>` — the buddy dock, a
+ * drawer portalled to the body — has no page of its own to name, and gets null.
+ */
+function pageTitleFor(node: Node): string | null {
+  const title = elementOf(node)?.closest("main")?.querySelector("h1")?.textContent ?? "";
+  const text = normalise(title);
+
+  return text.length > 0 ? text : null;
 }
 
 /**

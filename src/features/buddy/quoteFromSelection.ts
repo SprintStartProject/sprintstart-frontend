@@ -28,12 +28,12 @@
  * it has is `search_canonical_answers`, which takes *words* and searches this project's own
  * material. So the attribution is written to be searchable rather than clickable: an in-app path
  * with a text fragment on the end is a pointer nothing on the other end can follow, while
- * "Acceptance Criteria, on Fix the login redirect" is two phrases the buddy can go and read the
+ * "Troubleshooting, on Set up your local environment" is two phrases the buddy can go and read the
  * rest of. That is also where the issue draws the line — handing the buddy a reference it resolves
  * itself is the context-reference mechanism, a different feature under different rules.
  *
- * Hence both halves of where it was found: the heading says which part, the page title says which
- * page, and either on its own can send the search after the wrong thing. `origin` stays out.
+ * Hence both halves of where it was found: the heading says which part, the page's own header says
+ * which page (`pageTitleFor` in `selectionCapture.ts`), and either on its own can send the search after the wrong thing. `origin` stays out.
  */
 
 import type { CapturedSelection } from "../board/selection/selectionCapture";
@@ -58,8 +58,8 @@ export const QUOTE_LIMIT = 600;
  *
  * `From <place>` under it, opening with the same word the board's notes use
  * (`board/generation/noteComposition.ts`), so a hire who keeps a selection and a hire who asks
- * about one read the same sentence. Both halves when they differ — *"From Acceptance Criteria, on
- * Fix the login redirect"* — and one when the heading is all there is, or is the page's own name
+ * about one read the same sentence. Both halves when they differ — *"From Troubleshooting, on Set up
+ * your local environment"* — and one when the heading is all there is, or is the page's own name
  * anyway. A hire who does not want the line deletes it, because nothing has been sent.
  *
  * The trailing blank line is where the caret ends up, and it is the whole reason nothing is sent
@@ -77,8 +77,8 @@ export function quoteFromSelection(
 /**
  * The attribution line, or null when the capture could not name anywhere.
  *
- * `source` already falls back to the page title when there was no heading above the selection, so
- * the two arrive equal as often as not — saying it twice would read as a stutter, not as
+ * The nearest heading above a selection is often the page's own title, so the two arrive equal as
+ * often as not — saying it twice would read as a stutter, not as
  * precision.
  */
 function whereFrom(selection: Pick<CapturedSelection, "source" | "page">): string | null {
