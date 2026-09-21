@@ -143,9 +143,6 @@ interface BuddyStreamChunk {
   checklist_items?: string[];
   /** `amend_checklist`: which card of theirs the lines would be added to. */
   card_id?: string;
-  /** `place_link` confirm payload. */
-  link_url?: string;
-  link_label?: string;
   /** `place_note` confirm payload. */
   note_text?: string;
   /** `reword_checklist_item`: the line as it reads now, and as it would read. */
@@ -186,8 +183,6 @@ export async function performAction(
     checklistTitle?: string;
     checklistItems?: string[];
     cardId?: string;
-    linkUrl?: string;
-    linkLabel?: string;
     noteText?: string;
     lineBefore?: string;
     lineAfter?: string;
@@ -207,8 +202,6 @@ export async function performAction(
       checklistTitle: extras.checklistTitle,
       checklistItems: extras.checklistItems,
       cardId: extras.cardId,
-      linkUrl: extras.linkUrl,
-      linkLabel: extras.linkLabel,
       noteText: extras.noteText,
       lineBefore: extras.lineBefore,
       lineAfter: extras.lineAfter,
@@ -456,8 +449,6 @@ export async function streamMessage(
               checklistTitle: event.checklist_title,
               checklistItems: event.checklist_items,
               cardId: event.card_id,
-              linkUrl: event.link_url,
-              linkLabel: event.link_label,
               noteText: event.note_text,
               lineBefore: event.line_before,
               lineAfter: event.line_after,

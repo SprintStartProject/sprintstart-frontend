@@ -116,9 +116,6 @@ export type HireActionProposal = {
    * shows just the addition, because a change nobody can see is one nobody agreed to.
    */
   cardId?: string;
-  /** `place_link` confirm payload: the address and what to call it. */
-  linkUrl?: string;
-  linkLabel?: string;
   /** `place_note` confirm payload: the note's text, shown on the offer before it is kept. */
   noteText?: string;
   /**
@@ -268,8 +265,6 @@ export type BuddyStreamHandlers = {
     checklistTitle?: string;
     checklistItems?: string[];
     cardId?: string;
-    linkUrl?: string;
-    linkLabel?: string;
     noteText?: string;
     lineBefore?: string;
     lineAfter?: string;
