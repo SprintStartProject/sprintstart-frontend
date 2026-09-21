@@ -7,6 +7,14 @@ import { SuggestedTasksCard } from "../../../../src/features/board/components/Su
 import type { CardMark } from "../../../../src/features/board/marks/cardMarks";
 import type { BoardCard } from "../../../../src/features/board/types";
 
+// The task cards offer to keep a task on the hire's own board, and that offer reads the selected
+// project the way every other write to the board does. A harness rendering cards on their own
+// stands one in rather than wrapping the whole board in a provider — see `useProjectContext`
+// for why that hook throws instead of falling back.
+vi.mock("../../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "p1" }),
+}));
+
 const marks: CardMark[] = [];
 
 vi.mock("../../../../src/features/board/marks/useCardMarks", () => ({
@@ -82,6 +90,7 @@ describe("highlights on a card the board re-reads", () => {
           summary: "Roll it out behind a feature flag first.",
           url: null,
           chosen: true,
+          closedAtSource: false,
         }}
         card={card}
       />,

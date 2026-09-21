@@ -9,6 +9,14 @@ vi.mock("../../../../src/features/buddy/aiBuddyBus", () => ({
 
 import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
 
+// The task cards offer to keep a task on the hire's own board, and that offer reads the selected
+// project the way every other write to the board does. A harness rendering cards on their own
+// stands one in rather than wrapping the whole board in a provider — see `useProjectContext`
+// for why that hook throws instead of falling back.
+vi.mock("../../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "p1" }),
+}));
+
 function board(cards: BoardCardContent[]): Board {
   return {
     boardId: "b1",
@@ -110,6 +118,7 @@ describe("taking a card into the conversation", () => {
             summary: null,
             url: null,
             chosen: true,
+            closedAtSource: false,
           },
         ])}
       />,

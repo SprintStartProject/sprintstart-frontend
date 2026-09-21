@@ -55,6 +55,7 @@ describe("SelectionActions accessibility", () => {
 
     expect(await screen.findByRole("toolbar", { name: /selected text/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add to board/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ask the buddy/i })).toBeInTheDocument();
   });
 
   /** Selection is not a mouse-only gesture — shift-arrow makes one too, and must be actionable. */
@@ -70,5 +71,23 @@ describe("SelectionActions accessibility", () => {
     button.focus();
 
     expect(button).toHaveFocus();
+  });
+
+  /**
+   * Both offers, not just the first. A hire who selected something with shift-arrow because a
+   * pointer is not how they work is the hire most likely to be asking what it means.
+   */
+  it("puts both actions in the tab order", async () => {
+    render(
+      <MemoryRouter>
+        <SelectionActions />
+      </MemoryRouter>,
+    );
+    highlight("Run the migration first.");
+
+    const ask = await screen.findByRole("button", { name: /ask the buddy/i });
+    ask.focus();
+
+    expect(ask).toHaveFocus();
   });
 });

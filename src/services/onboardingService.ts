@@ -9,26 +9,25 @@ import type {
   OnboardingResourceEndpoint,
   OnboardingPersonalizeEvent,
   OnboardingPersonalizeHandlers,
-  StepStatus,
-  PhaseCheckEndpoint,
-  PhaseCheckAnswerSubmission,
-  PhaseCheckAttemptResult,
-  ReviewCheckEndpoint,
-  ReviewCheckResult,
-  AdminPhaseCheckEndpoint,
-  UpsertPhaseCheckQuestion,
-  PhaseCheckAttemptsReviewEndpoint,
+  OnboardingGenerationStatus,
+  QuestionAttemptSubmission,
+  QuestionAttemptResult,
+  AdminPhaseQuestionsEndpoint,
+  UpsertQuestion,
+  QuestionAttemptsReviewEndpoint,
 } from "../features/onboarding/types";
-import onboardingStepMock from "../mocks/onboardingStepMock.json";
 
 /**
- * Onboarding path, step, phase check and task CRUD.
+ * Onboarding path, step, question and task CRUD.
  * Streams AI path generation over SSE; falls back to mock data on fetch
- * failures. Phase checks handle question/answer submission and review.
+ * failures. Questions are answered one at a time and own their attempt history.
  */
 export const onboardingService = {
   // ── PATH ─────────────────────────────────────────────────
 
+  /**
+   * Fetches the personalized onboarding path for the current authenticated user from the backend.
+   */
   async fetchPath(): Promise<OnboardingPathEndpoint> {
     return await apiClient.fetch<OnboardingPathEndpoint>(`/api/v1/onboarding/me/path`);
   },
@@ -36,8 +35,21 @@ export const onboardingService = {
   /**
    * Triggers AI generation of the current user's onboarding path and streams
    * progress over SSE. Replaces any existing path once the `path` event arrives.
+   *
+   * The generation runs on the backend independently of this stream: aborting it
+   * (via `signal`) or losing the connection only stops watching. Calling this while
+   * a generation is already running attaches to that one instead of starting another.
+   *
+   * `projectId` is interpolated into the URL because path generation is
+   * project-scoped: the path is copied from the active blueprint of the project
+   * the user has selected. Hook it to the selected project so the generated
+   * path matches the project the user is looking at.
    */
-  async personalizePath(handlers: OnboardingPersonalizeHandlers): Promise<void> {
+  async personalizePath(
+    projectId: string,
+    handlers: OnboardingPersonalizeHandlers,
+    signal?: AbortSignal,
+  ): Promise<void> {
     try {
       if (keycloak.authenticated) {
         await keycloak.updateToken(30);
@@ -48,11 +60,12 @@ export const onboardingService = {
       return;
     }
 
-    const res = await fetch(`/api/v1/onboarding/me/path/personalize`, {
+    const res = await fetch(`/api/v1/projects/${projectId}/onboarding/me/path/personalize`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${keycloak.token}`,
       },
+      signal,
     });
 
     if (!res.ok) {
@@ -79,23 +92,35 @@ export const onboardingService = {
           handlers.onDone();
           return;
         case "error":
-          handlers.onError?.(event.message ?? "Unknown error");
+          handlers.onError?.(event.message ?? "Unknown error", event.reason ?? undefined);
           return;
       }
     }
 
-    handlers.onDone();
+    // Falling out of the loop means the body ended without `done` or `error`, which the backend
+    // never does on purpose. Reporting a finished path here told members their path was ready
+    // while it was still being built.
+    handlers.onInterrupted?.();
+  },
+
+  /**
+   * Whether a path generation is running for the current user -- started in another tab, or in
+   * this one before a reload -- and whether the project has the active blueprint a new one needs.
+   */
+  async fetchGenerationStatus(projectId: string): Promise<OnboardingGenerationStatus> {
+    return await apiClient.fetch<OnboardingGenerationStatus>(
+      `/api/v1/projects/${projectId}/onboarding/me/path/generation`,
+    );
   },
 
   // ── STEP ─────────────────────────────────────────────────
 
+  /**
+   * One step with its details. Failures propagate: the step view shows its own error state, and a
+   * stand-in step would offer to complete or skip something that does not exist.
+   */
   async fetchStep(stepId: string): Promise<OnboardingStepDetail> {
-    try {
-      return await apiClient.fetch<OnboardingStepDetail>(`/api/v1/onboarding/me/steps/${stepId}`);
-    } catch (error) {
-      console.error(`Error fetching onboarding step with ID ${stepId}:`, error);
-      return onboardingStepMock as OnboardingStepDetail;
-    }
+    return await apiClient.fetch<OnboardingStepDetail>(`/api/v1/onboarding/me/steps/${stepId}`);
   },
 
   /**
@@ -109,26 +134,18 @@ export const onboardingService = {
     });
   },
 
-  async updateStepStatus(step: OnboardingStepDetail, newStatus: StepStatus): Promise<void> {
-    if (newStatus === "FINISHED") {
-      await apiClient.fetch(`/api/v1/onboarding/me/steps/${step.id}/complete`, {
-        method: "PUT",
-      });
-      return;
-    }
-
-    await apiClient.fetch(`/api/v1/onboarding/me/steps/${step.id}`, {
+  /**
+   * Marks a step done.
+   *
+   * Narrowed from a general `updateStepStatus`: every other status went to `PUT /steps/{id}` with
+   * `status` and `skip` in the body, which `UpdateOnboardingStepRequest` does not have. Spring
+   * ignores unknown properties, so those calls returned 200 and changed nothing -- while also
+   * truncating `expectedOutcomes` to its first entry. A member has exactly one status to set, and
+   * this is it.
+   */
+  async completeStep(stepId: string): Promise<void> {
+    await apiClient.fetch(`/api/v1/onboarding/me/steps/${stepId}/complete`, {
       method: "PUT",
-      body: JSON.stringify({
-        position: step.position,
-        title: step.title,
-        description: step.description,
-        type: step.type ?? "TASK",
-        estimatedMinutes: step.estimatedMinutes,
-        expectedOutcome: step.expectedOutcomes?.[0] ?? "",
-        status: newStatus,
-        skip: step.skip ?? null,
-      }),
     });
   },
 
@@ -147,76 +164,49 @@ export const onboardingService = {
     );
   },
 
-  // ── PHASE KNOWLEDGE CHECKS ────────────────────────────────
-
-  /**
-   * Loads the knowledge check of a phase for the current user.
-   * Never contains correct answers — those only come back from submitPhaseCheck.
-   */
-  async fetchPhaseCheck(phaseId: string): Promise<PhaseCheckEndpoint> {
-    return await apiClient.fetch<PhaseCheckEndpoint>(
-      `/api/v1/onboarding/me/phases/${phaseId}/checks`,
-    );
+  /** Records that the member has seen the PM's answer to a skip request. */
+  async markSkipAnswerSeen(skipId: string): Promise<void> {
+    await apiClient.fetch(`/api/v1/onboarding/me/skips/${skipId}/seen`, { method: "POST" });
   },
 
+  // ── KNOWLEDGE-CHECK QUESTIONS ───────────────────────────
+
   /**
-   * Submits the user's answers for a phase knowledge check. The result says
-   * whether the attempt passed and reveals the correct answers per question.
+   * Submits the user's answer to one question. The result says whether it was correct
+   * and reveals the correct answer, explanation, and (for short text) AI feedback.
    */
-  async submitPhaseCheck(
-    phaseId: string,
-    answers: PhaseCheckAnswerSubmission[],
-  ): Promise<PhaseCheckAttemptResult> {
-    return await apiClient.fetch<PhaseCheckAttemptResult>(
-      `/api/v1/onboarding/me/phases/${phaseId}/checks/attempts`,
+  async submitQuestionAttempt(
+    questionId: string,
+    answer: QuestionAttemptSubmission,
+  ): Promise<QuestionAttemptResult> {
+    return await apiClient.fetch<QuestionAttemptResult>(
+      `/api/v1/onboarding/me/questions/${questionId}/attempts`,
       {
         method: "POST",
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify(answer),
       },
     );
   },
 
-  // ── REVIEW CHECK ──────────────────────────────────────────
-
   /**
-   * Loads the current user's review pool: questions they got wrong in earlier phases
-   * and still have to answer correctly once. Never contains correct answers.
-   */
-  async fetchReviewCheck(): Promise<ReviewCheckEndpoint> {
-    return await apiClient.fetch<ReviewCheckEndpoint>("/api/v1/onboarding/me/review-check");
-  },
-
-  /**
-   * Submits answers for the review pool. Correctly answered questions leave the pool
-   * permanently, wrong ones stay open. Answering only some open questions is allowed,
-   * so the pool can be worked through in several sittings.
-   */
-  async submitReviewCheck(answers: PhaseCheckAnswerSubmission[]): Promise<ReviewCheckResult> {
-    return await apiClient.fetch<ReviewCheckResult>("/api/v1/onboarding/me/review-check/attempts", {
-      method: "POST",
-      body: JSON.stringify({ answers }),
-    });
-  },
-
-  /**
-   * Loads a phase check for admin editing screens, including correct answers.
+   * Loads a phase's questions for admin editing screens, including correct answers.
    * Requires ADMIN/PM/HR role.
    */
-  async fetchPhaseCheckForEditing(phaseId: string): Promise<AdminPhaseCheckEndpoint> {
-    return await apiClient.fetch<AdminPhaseCheckEndpoint>(
-      `/api/v1/onboarding/phases/${phaseId}/checks`,
+  async fetchPhaseQuestionsForEditing(phaseId: string): Promise<AdminPhaseQuestionsEndpoint> {
+    return await apiClient.fetch<AdminPhaseQuestionsEndpoint>(
+      `/api/v1/onboarding/phases/${phaseId}/questions`,
     );
   },
 
   /**
-   * Replaces all knowledge check questions of a phase. Requires ADMIN/PM/HR role.
+   * Replaces all knowledge-check questions of a phase. Requires ADMIN/PM/HR role.
    */
-  async savePhaseCheck(
+  async savePhaseQuestions(
     phaseId: string,
-    questions: UpsertPhaseCheckQuestion[],
-  ): Promise<AdminPhaseCheckEndpoint> {
-    return await apiClient.fetch<AdminPhaseCheckEndpoint>(
-      `/api/v1/onboarding/phases/${phaseId}/checks`,
+    questions: UpsertQuestion[],
+  ): Promise<AdminPhaseQuestionsEndpoint> {
+    return await apiClient.fetch<AdminPhaseQuestionsEndpoint>(
+      `/api/v1/onboarding/phases/${phaseId}/questions`,
       {
         method: "PUT",
         body: JSON.stringify({ questions }),
@@ -225,26 +215,15 @@ export const onboardingService = {
   },
 
   /**
-   * Loads a user's open review pool so admins, PMs, or HR can see which earlier
-   * questions still keep that user from finishing onboarding. Never contains correct
-   * answers — use fetchPhaseCheckForEditing for those. Requires ADMIN/PM/HR role.
+   * Loads a user's attempts on one question so admins, PMs, or HR can review how the
+   * answer was reached. Requires ADMIN/PM/HR role.
    */
-  async fetchUserReviewCheck(userId: string): Promise<ReviewCheckEndpoint> {
-    return await apiClient.fetch<ReviewCheckEndpoint>(
-      `/api/v1/onboarding/users/${userId}/review-check`,
-    );
-  },
-
-  /**
-   * Loads a user's submitted check attempts for a phase so admins, PMs, or HR
-   * can review the results. Requires ADMIN/PM/HR role.
-   */
-  async fetchPhaseCheckAttempts(
+  async fetchQuestionAttempts(
     userId: string,
-    phaseId: string,
-  ): Promise<PhaseCheckAttemptsReviewEndpoint> {
-    return await apiClient.fetch<PhaseCheckAttemptsReviewEndpoint>(
-      `/api/v1/onboarding/users/${userId}/phases/${phaseId}/checks/attempts`,
+    questionId: string,
+  ): Promise<QuestionAttemptsReviewEndpoint> {
+    return await apiClient.fetch<QuestionAttemptsReviewEndpoint>(
+      `/api/v1/onboarding/users/${userId}/questions/${questionId}/attempts`,
     );
   },
 

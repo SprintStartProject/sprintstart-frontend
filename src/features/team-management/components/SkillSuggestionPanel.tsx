@@ -2,6 +2,7 @@ import { Check, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { Checkbox } from "../../../components/ui/Checkbox";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Spinner } from "../../../components/ui/Spinner";
 import { skillSuggestionKey } from "../skillSuggestion";
@@ -133,7 +134,7 @@ export function SkillSuggestionPanel({
             </div>
           )}
 
-          <div className="mt-4 space-y-2">
+          <div className="app-scrollbar mt-4 max-h-[26rem] space-y-2 overflow-y-auto pr-1">
             <AnimatePresence initial={false}>
               {reviewableSuggestions.map((suggestion) => {
                 const key = skillSuggestionKey(suggestion);
@@ -152,22 +153,20 @@ export function SkillSuggestionPanel({
                         : "border-app-border bg-app-surface-muted"
                     }`}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={checked}
                       disabled={isApplying}
                       onChange={() => onToggle(key)}
                       aria-label={`Accept ${suggestion.name}`}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-app-brand focus-visible:ring-2 focus-visible:ring-app-focus"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="text-sm font-medium text-app-text">{suggestion.name}</span>
-                        <Badge variant={confidenceVariant(suggestion.confidence)} size="sm">
+                        <Badge variant={confidenceVariant(suggestion.confidence)} size="md">
                           {suggestion.confidence || "medium"} confidence
                         </Badge>
                         {suggestion.isNew && (
-                          <Badge variant="brand" size="sm">
+                          <Badge variant="brand" size="md">
                             New skill
                           </Badge>
                         )}

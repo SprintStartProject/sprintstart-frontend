@@ -43,6 +43,7 @@ export const queryKeys = {
   onboarding: {
     myStatuses: () => ["onboarding", "my-status"] as const,
     myStatus: (userId: string) => ["onboarding", "my-status", userId] as const,
+    unseenSkipAnswers: (userId: string) => ["onboarding", "unseen-skip-answers", userId] as const,
   },
   projectInsights: {
     byProjectIds: (projectIds: string) => ["project-insights", projectIds] as const,
@@ -62,6 +63,10 @@ export const queryKeys = {
   },
   board: {
     byProject: (projectId: string) => ["board", projectId] as const,
+    // Bare, like `starterWork.pool()` above — lets an invalidation prefix-match every project's
+    // board cache without threading a `projectId` through a caller (`PathStepCard`'s tick) that
+    // has no reason to know which project it is looking at.
+    all: () => ["board"] as const,
   },
   attestations: {
     // Not scoped by user id, like `atlassianCredentials.mine` above: the
