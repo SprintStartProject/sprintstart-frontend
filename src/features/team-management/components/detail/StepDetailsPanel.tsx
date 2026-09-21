@@ -16,6 +16,8 @@ import { Input } from "../../../../components/ui/Input";
 import { DragHandle } from "../../../../components/ui/DragHandle";
 import { SidePanel } from "../../../../components/ui/SidePanel";
 import { StepOriginBadge } from "../../../onboarding/components/StepOriginBadge";
+import { isSkipPending } from "../../../onboarding/journey";
+import { isFeedbackUnread } from "../../feedbackState";
 import type { OnboardingStepEndpoint, OnboardingTaskEndpoint } from "../../../onboarding/types";
 import type { OnboardingFeedback } from "../../../../services/teamManagementService";
 import { SkipReview, type SkipReviewAction } from "./SkipReview";
@@ -109,10 +111,7 @@ export function StepDetailsPanel({
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const skipStatus = getSkipStatus(step);
-  const skipAwaitsReview =
-    !!step.skip?.id &&
-    (step.skip.accepted === null || step.skip.accepted === undefined) &&
-    step.status !== "SKIPPED";
+  const skipAwaitsReview = !!step.skip?.id && isSkipPending(step.skip) && step.status !== "SKIPPED";
   return (
     <SidePanel
       isOpen
@@ -320,8 +319,8 @@ export function StepDetailsPanel({
           ? feedbackItems.map((feedback) => {
               const rating = getFeedbackRating(feedback.helpful);
               // Feedback built from the step alone carries no read state -- neither badge nor button.
-              const isUnread = feedback.read === false && !feedback.readAt;
-              const isRead = feedback.read === true || !!feedback.readAt;
+              const isUnread = isFeedbackUnread(feedback);
+              const isRead = !isUnread;
 
               return (
                 <div

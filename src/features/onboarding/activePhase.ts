@@ -16,11 +16,13 @@ import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "./types";
  * still the phase the member is standing in.
  */
 export function isPhaseOpen(phase: OnboardingPhaseEndpoint): boolean {
-  const hasOpenStep = phase.steps.some(
+  // Hedged like `journey.ts` does: this is on the hot path of `phaseState`, so one phase arriving
+  // without its collections would take the page down rather than read as having nothing in it.
+  const hasOpenStep = (phase.steps ?? []).some(
     (step) => step.status !== "FINISHED" && step.status !== "SKIPPED",
   );
 
-  return hasOpenStep || phase.questions.some((question) => question.status !== "PASSED");
+  return hasOpenStep || (phase.questions ?? []).some((question) => question.status !== "PASSED");
 }
 
 /**

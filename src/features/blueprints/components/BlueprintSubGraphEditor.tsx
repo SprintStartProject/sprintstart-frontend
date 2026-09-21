@@ -739,38 +739,43 @@ function StepDetails({
           step.blueprintTasks
             .toSorted((left, right) => left.position - right.position)
             .map((task) => (
-              <div
-                key={task.id}
-                className="flex cursor-pointer justify-between gap-2 rounded-lg bg-app-surface-muted p-3"
-                role="button"
-                tabIndex={0}
-                onClick={() => onEditTask(task)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onEditTask(task);
-                  }
-                }}
-              >
-                <div>
-                  <p className="font-medium text-app-text">{task.title}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-app-text-muted">{task.description}</p>
+              // The row inside the item, not instead of it: a `ul` whose children are
+              // `role="button"` is announced as an empty list.
+              <li key={task.id}>
+                <div
+                  className="flex cursor-pointer justify-between gap-2 rounded-lg bg-app-surface-muted p-3"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onEditTask(task)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onEditTask(task);
+                    }
+                  }}
+                >
+                  <div>
+                    <p className="font-medium text-app-text">{task.title}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
+                      {task.description}
+                    </p>
+                  </div>
+                  {editable ? (
+                    <Button
+                      aria-label={`Delete task ${task.title}`}
+                      iconOnly
+                      size="sm"
+                      variant="dangerGhost"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemoveTask(task);
+                      }}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                 </div>
-                {editable ? (
-                  <Button
-                    aria-label={`Delete task ${task.title}`}
-                    iconOnly
-                    size="sm"
-                    variant="dangerGhost"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRemoveTask(task);
-                    }}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                ) : null}
-              </div>
+              </li>
             ))
         ) : (
           <EmptyDetailListItem>No tasks have been added.</EmptyDetailListItem>
@@ -793,40 +798,41 @@ function StepDetails({
       >
         {step.blueprintResources.length ? (
           step.blueprintResources.map((resource) => (
-            <div
-              key={resource.id}
-              className="flex cursor-pointer items-start justify-between gap-3 rounded-lg bg-app-surface-muted p-3"
-              role="button"
-              tabIndex={0}
-              onClick={() => onEditResource(resource)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onEditResource(resource);
-                }
-              }}
-            >
-              <div>
-                <p className="font-medium text-app-text">{resource.title}</p>
-                <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
-                  {resource.description}
-                </p>
+            <li key={resource.id}>
+              <div
+                className="flex cursor-pointer items-start justify-between gap-3 rounded-lg bg-app-surface-muted p-3"
+                role="button"
+                tabIndex={0}
+                onClick={() => onEditResource(resource)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onEditResource(resource);
+                  }
+                }}
+              >
+                <div>
+                  <p className="font-medium text-app-text">{resource.title}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
+                    {resource.description}
+                  </p>
+                </div>
+                {editable ? (
+                  <Button
+                    aria-label={`Delete resource ${resource.title}`}
+                    iconOnly
+                    size="sm"
+                    variant="dangerGhost"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRemoveResource(resource);
+                    }}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                ) : null}
               </div>
-              {editable ? (
-                <Button
-                  aria-label={`Delete resource ${resource.title}`}
-                  iconOnly
-                  size="sm"
-                  variant="dangerGhost"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRemoveResource(resource);
-                  }}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-              ) : null}
-            </div>
+            </li>
           ))
         ) : (
           <EmptyDetailListItem>No resources have been added.</EmptyDetailListItem>

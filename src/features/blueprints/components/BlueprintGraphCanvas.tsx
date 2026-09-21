@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -116,7 +117,11 @@ type Props<TNode extends BlueprintGraphCanvasNode> = {
   ariaLabel?: string;
   /** Headline for the overlay drawn when nothing is placed. */
   emptyTitle?: string;
-  onNodeClick: (node: TNode) => void;
+  /**
+   * Opening a node. Left out on a canvas that only shows a picture -- the board's chain panel --
+   * where the nodes then stop being tab stops that do nothing when pressed.
+   */
+  onNodeClick?: (node: TNode) => void;
   onPositionChange: (node: TNode, x: number, y: number) => Promise<void>;
   onAddBlocker: (node: TNode, blockerId: string) => Promise<void>;
   onRemoveBlocker: (node: TNode, blockerId: string) => Promise<void>;
@@ -318,11 +323,21 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
    */
   const layout = useMemo(() => resolveLayout(nodes, BLUEPRINT_LAYOUT, NODE_SIZE), [nodes]);
 
-  /** Moves shown before the server has them; dropped when fresh nodes arrive. */
+  /**
+   * Moves shown before the server has them; dropped when fresh coordinates arrive.
+   *
+   * Keyed on what the nodes say, not on the identity of the array. The page hands this a freshly
+   * sorted copy on every render, so an identity check threw away the optimistic position of a card
+   * whose save was still in flight whenever anything else on the page changed -- typing in the
+   * "Add phase" modal did it on every keystroke.
+   */
   const [overrides, setOverrides] = useState<Record<string, GraphPoint>>({});
-  const [lastNodes, setLastNodes] = useState(nodes);
-  if (lastNodes !== nodes) {
-    setLastNodes(nodes);
+  const positionsKey = nodes
+    .map((node) => `${node.id}:${node.graphX ?? ""}:${node.graphY ?? ""}`)
+    .join("|");
+  const [lastPositionsKey, setLastPositionsKey] = useState(positionsKey);
+  if (lastPositionsKey !== positionsKey) {
+    setLastPositionsKey(positionsKey);
     setOverrides({});
   }
 
@@ -714,7 +729,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
       const node = nodeById.get(id);
       if (!node) return;
       if (!renderNodeDetail) {
-        onNodeClick(node);
+        onNodeClick?.(node);
         return;
       }
       // The camera lands first and the node opens into what it landed on. Telling the caller first
@@ -724,7 +739,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
       void (async () => {
         await camera.current?.zoomIntoNode(id, 380);
         setFlyingInto(null);
-        onNodeClick(node);
+        onNodeClick?.(node);
       })();
     },
     [nodeById, onNodeClick, renderNodeDetail],
@@ -808,14 +823,20 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
             // and the dimming around it — is drawn below from the same `focus` that already decides
             // the arrow colours, so nothing is lost by holding it in one place.
             selectedId={null}
-            onSelect={(id) => {
-              if (id === null) {
-                setSelectedId(null);
-                return;
-              }
-              setSelectedId(id);
-              openNodeById(id);
-            }}
+            // Absent where nothing can be opened or arranged, which is what makes the nodes
+            // ordinary pictures rather than controls (see `onNodeClick`).
+            onSelect={
+              onNodeClick || renderNodeDetail || editable
+                ? (id) => {
+                    if (id === null) {
+                      setSelectedId(null);
+                      return;
+                    }
+                    setSelectedId(id);
+                    openNodeById(id);
+                  }
+                : undefined
+            }
             spotlightId={flyingInto}
             cover={
               detail && openNode ? (
@@ -845,7 +866,9 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
             // the first one is about to replace, and come back as a conflict.
             canMove={editable && !isSaving}
             onMove={handleMove}
-            canConnect={editable}
+            // Not while a save is in flight, for the same reason moves are not: two quick drags
+            // off the same node would send the same revision twice.
+            canConnect={canAuthor}
             onConnect={handleConnect}
             onDisconnect={editable ? handleDisconnect : undefined}
             onCanvasDoubleClick={
@@ -1252,6 +1275,11 @@ function NodeCover({
  * locked phase asking why.
  */
 function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => void }) {
+  // Per instance: two canvases mounted at once (the board's read-only window beside an editor)
+  // would otherwise define the same marker id twice, and the second arrow would point at the
+  // first one's definition.
+  const arrowId = `${useId()}-legend-arrow`;
+
   return (
     <div className="relative flex max-w-96 flex-col gap-2 rounded-2xl border border-app-border bg-app-surface/95 p-3 pr-8 text-[11px] leading-snug text-app-text-muted shadow-md backdrop-blur">
       <button
@@ -1265,14 +1293,7 @@ function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => 
       <span className="flex items-center gap-2">
         <svg width="34" height="10" aria-hidden="true" className="shrink-0 overflow-visible">
           <defs>
-            <marker
-              id="legend-arrow"
-              markerWidth="8"
-              markerHeight="8"
-              refX="7"
-              refY="2.5"
-              orient="auto"
-            >
+            <marker id={arrowId} markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
               <path d="M0,0 L0,5 L7,2.5 z" className="fill-app-text-muted" />
             </marker>
           </defs>
@@ -1283,7 +1304,7 @@ function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => 
             strokeWidth="1.5"
             strokeLinecap="round"
             className="stroke-app-text-muted"
-            markerEnd="url(#legend-arrow)"
+            markerEnd={`url(#${arrowId})`}
           />
         </svg>
         {LOCK_SENTENCE}

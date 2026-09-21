@@ -28,9 +28,11 @@ export function BlueprintShapeStrip({
       preserveAspectRatio="xMidYMid meet"
       className={`overflow-visible ${className}`}
     >
-      {shape.edges.map((d) => (
+      {shape.edges.map((d, index) => (
         <path
-          key={d}
+          // The index, not the path data: two geometrically identical arrows in one thumbnail
+          // (the same offset between two different pairs of nodes) collided on a `d` key.
+          key={`${index}:${d}`}
           d={d}
           fill="none"
           strokeWidth="1.25"

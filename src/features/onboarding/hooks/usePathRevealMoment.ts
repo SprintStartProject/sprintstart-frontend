@@ -50,10 +50,10 @@ function isPathUntouched(path: OnboardingPathEndpoint): boolean {
   if (path.phases.length === 0) return false;
   return path.phases.every(
     (phase) =>
-      phase.questions.every(
+      (phase.questions ?? []).every(
         (question) => question.status === "LOCKED" || question.status === "OPEN",
       ) &&
-      phase.steps.every(
+      (phase.steps ?? []).every(
         (step) =>
           step.startedAt === null &&
           step.completedAt === null &&

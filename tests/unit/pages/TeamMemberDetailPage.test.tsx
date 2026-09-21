@@ -90,10 +90,6 @@ vi.mock("../../../src/features/team-management/components/detail/StepDetailsPane
   StepDetailsPanel: () => <div data-testid="step-details-panel">Step Details</div>,
 }));
 
-vi.mock("../../../src/features/team-management/components/detail/AddCustomStepModal", () => ({
-  AddCustomStepModal: () => <div data-testid="add-custom-step-modal">Add Step</div>,
-}));
-
 vi.mock("../../../src/features/team-management/components/detail/MemberDetailDialogs", () => ({
   MemberDetailDialogs: (props: {
     roleToRemove: ProjectRole | null;

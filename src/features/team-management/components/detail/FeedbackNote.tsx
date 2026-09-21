@@ -1,6 +1,7 @@
 import { Check, MessageSquareText, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Button } from "../../../../components/ui/Button";
 import type { OnboardingFeedback } from "../../../../services/teamManagementService";
+import { isFeedbackUnread } from "../../feedbackState";
 
 /**
  * A member's feedback on a step, where the PM is looking at the step -- coloured by what it says,
@@ -15,7 +16,7 @@ export function FeedbackNote({
   marking?: boolean;
   onMarkRead?: (feedbackId: string) => void;
 }) {
-  const isUnread = feedback.read === false && !feedback.readAt;
+  const isUnread = isFeedbackUnread(feedback);
   const tone =
     feedback.helpful === true
       ? {

@@ -14,14 +14,14 @@ import {
   ThumbsUp,
   Trophy,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../../../components/ui/Button";
 import { Textarea } from "../../../../components/ui/Textarea";
 import { useToast } from "../../../../context/useToast";
 import { onboardingService } from "../../../../services/onboardingService";
 import { centralSpringToken } from "../../../../styles/tokens";
 import { useMoments } from "../../../moments";
-import { formatMinutes } from "../../journey";
+import { formatMinutes, isSkipPending } from "../../journey";
 import type {
   OnboardingResourceEndpoint,
   OnboardingStepDetail,
@@ -41,6 +41,15 @@ type Props = {
   stepStatus?: OnboardingStepDetail["status"];
   /** Re-reads the path after anything that changes it: a start, a completion, a skip request. */
   onPathChanged: () => Promise<void> | void;
+  /**
+   * The member is looking at an answered skip request whose answer is still marked new.
+   *
+   * Called from here rather than from whatever opened the step: "opened" includes "Up next",
+   * "Continue" and "Start now", so the answer was marked seen as part of moving the member on --
+   * before it had been drawn -- and a deep link, which sets the open step directly, never marked
+   * it at all.
+   */
+  onSkipAnswerSeen?: (skipId: string) => void;
   /** Where "continue" leads once the step is behind the member; the page works it out. */
   continueLabel: string;
   onContinue: () => void;
@@ -67,6 +76,7 @@ export function StepWorkspace({
   stepId,
   stepStatus,
   onPathChanged,
+  onSkipAnswerSeen,
   continueLabel,
   onContinue,
   layout = "inline",
@@ -90,6 +100,12 @@ export function StepWorkspace({
     return () => window.clearInterval(timer);
   }, []);
 
+  // Through a ref, so that a new handler identity does not re-read the step.
+  const onSkipAnswerSeenRef = useRef(onSkipAnswerSeen);
+  useEffect(() => {
+    onSkipAnswerSeenRef.current = onSkipAnswerSeen;
+  }, [onSkipAnswerSeen]);
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -100,6 +116,9 @@ export function StepWorkspace({
       .then(([detail, fetchedTasks, fetchedResources]) => {
         if (cancelled) return;
         setStep(detail);
+        if (detail.skip && detail.skip.accepted !== null && !detail.skip.answerSeenAt) {
+          onSkipAnswerSeenRef.current?.(detail.skip.id);
+        }
         setTasks([...fetchedTasks].sort((left, right) => left.position - right.position));
         setResources(fetchedResources);
         setSkipReason(detail.skip?.reason ?? "");
@@ -138,7 +157,7 @@ export function StepWorkspace({
   const doneTasks = tasks.filter((task) => task.finished).length;
   const allTasksDone = doneTasks === tasks.length;
   const isBehind = step.status === "FINISHED" || step.status === "SKIPPED";
-  const skipPending = !!step.skip && step.skip.accepted === null;
+  const skipPending = isSkipPending(step.skip);
   const skipDeclined = !!step.skip && step.skip.accepted === false && step.status !== "SKIPPED";
   const skipApproved = !!step.skip && step.skip.accepted === true;
   const isFocus = layout === "focus";
@@ -177,7 +196,7 @@ export function StepWorkspace({
   const complete = async () => {
     setBusy("complete");
     try {
-      await onboardingService.updateStepStatus(step, "FINISHED");
+      await onboardingService.completeStep(step.id);
       setStep({ ...step, status: "FINISHED", completedAt: new Date().toISOString() });
       await onPathChanged();
     } catch (reason) {

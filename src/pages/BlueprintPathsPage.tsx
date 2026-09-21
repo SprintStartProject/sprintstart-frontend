@@ -26,7 +26,11 @@ import { BlueprintShapeStrip } from "../features/blueprints/components/Blueprint
 import { BlueprintVersionRail } from "../features/blueprints/components/BlueprintVersionRail.tsx";
 import { groupBlueprints, type BlueprintRow } from "../features/blueprints/pathLifecycle.ts";
 import { pathShape, shapeWord, type PathShape } from "../features/blueprints/pathShape.ts";
-import type { BlueprintPath, BlueprintPathOverview } from "../features/blueprints/types.ts";
+import type {
+  BlueprintGraphNode,
+  BlueprintPath,
+  BlueprintPathOverview,
+} from "../features/blueprints/types.ts";
 import { blueprintService, type BlueprintScope } from "../services/blueprintService.ts";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import { useAuth } from "../context/useAuth.ts";
@@ -47,14 +51,27 @@ type PathContents = {
   shapeWord: string;
 };
 
-function summarise(path: BlueprintPath): PathContents {
-  const nodes = path.blueprintPhases.map((phase) => ({
-    id: phase.id,
-    graphX: phase.graphX,
-    graphY: phase.graphY,
-    blockerIds: phase.blockerIds,
-    position: phase.position,
-  }));
+/**
+ * What one blueprint holds, and what it looks like.
+ *
+ * The shape needs the graph, not the path: `GET /paths/{id}` carries no `graphX`, `graphY` or
+ * `blockerIds` (only the graph endpoint does), and `toBlueprintPhase` fills those in as `null` and
+ * `[]`. Summarising the path alone therefore drew every blueprint as a grid of unconnected dots
+ * and described every one of them as "no order between any of them" -- which is the single fact
+ * the thumbnail exists to convey. The detail page merges the two the same way, see `withGraphNodes`.
+ */
+function summarise(path: BlueprintPath, graphNodes: BlueprintGraphNode[]): PathContents {
+  const nodesById = new Map(graphNodes.map((node) => [node.id, node]));
+  const nodes = path.blueprintPhases.map((phase) => {
+    const node = nodesById.get(phase.id);
+    return {
+      id: phase.id,
+      graphX: node?.graphX ?? phase.graphX,
+      graphY: node?.graphY ?? phase.graphY,
+      blockerIds: node?.blockerIds ?? phase.blockerIds,
+      position: phase.position,
+    };
+  });
 
   return {
     phases: path.blueprintPhases.length,
@@ -153,10 +170,11 @@ export function BlueprintPathsPage() {
     const summaries = await Promise.all(
       overviews.slice(0, CONTENTS_FETCH_LIMIT).map(async (overview) => {
         try {
-          return [
-            overview.id,
-            summarise(await blueprintService.getPath(scope, overview.id)),
-          ] as const;
+          const [path, graph] = await Promise.all([
+            blueprintService.getPath(scope, overview.id),
+            blueprintService.getGraph(scope, overview.id),
+          ]);
+          return [overview.id, summarise(path, graph.nodes)] as const;
         } catch {
           return null;
         }

@@ -22,14 +22,14 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { PageShell } from "../components/layout/PageShell";
 import { AlertDialog } from "../components/ui/AlertDialog";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { SegmentedTabs } from "../components/ui/SegmentedTabs";
-import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { SLIDING_PANEL_EXIT_MS, SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useToast } from "../context/useToast";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { GenerationScreen } from "../features/onboarding/components/journey/GenerationScreen";
@@ -76,8 +76,8 @@ import { GenerationIssueSummary } from "../features/onboarding/components/Genera
 import { issueStatusLabel, retryCouldHelp } from "../features/onboarding/generationIssues";
 import {
   notifySkipAnswerSeen,
-  unseenSkipAnswerOf,
   withSkipAnswerSeen,
+  withSkipAnswerUnseen,
 } from "../features/onboarding/skipAnswers";
 import {
   HIRE_JOURNEY_VIEW_KEY,
@@ -140,6 +140,7 @@ export function OnBoardingPage() {
   // `/onboarding/:stepId` -- the old address of a step page -- now opens the path with that step
   // unfolded, so links from the dashboard and the buddy keep landing on the step.
   const { stepId: routeStepId } = useParams<{ stepId?: string }>();
+  const navigate = useNavigate();
   const toast = useToast();
   const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
   const {
@@ -182,6 +183,23 @@ export function OnBoardingPage() {
   // The item unfolded in the list, and the one zoomed into on the graph.
   const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
   const [graphItemId, setGraphItemId] = useState<string | null>(null);
+  /**
+   * Whether the list is on screen because this visit arrived for a step, a question or the phase
+   * chooser, rather than because the member wanted it.
+   *
+   * Without the distinction, one click on the dashboard's next-step card wrote "list" over a
+   * member's remembered graph -- for good, and again every time they used that card. Choosing a
+   * view clears it, and only then is the choice remembered.
+   */
+  const arrivedInForcedList = useRef(
+    Boolean(routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase),
+  );
+  const chooseViewMode = useCallback((mode: ViewMode) => {
+    arrivedInForcedList.current = false;
+    setViewMode(mode);
+  }, []);
+  const chooserScrollTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(chooserScrollTimer.current), []);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   // Set when the page itself moves the member on, so the item they land on is scrolled to.
   const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
@@ -285,6 +303,38 @@ export function OnBoardingPage() {
     clearGeneration();
   }, [clearGeneration, generation, loadingState, path, toast]);
 
+  /**
+   * The step in the address, whenever it changes and whenever the path does.
+   *
+   * Two things were wrong with seeding this once from the first render. A step id the path does
+   * not hold -- a stale link, a step from a rebuilt path, somebody else's -- rendered an arbitrary
+   * phase with nothing unfolded, no message and the dead id still in the address. And a *second*
+   * link arriving while the page was already mounted was ignored, because `/onboarding` and
+   * `/onboarding/:stepId` are the same component in the same position.
+   */
+  useEffect(() => {
+    if (loadingState !== "success" || !routeStepId || !path) return;
+    const owningPhase = path.phases.find((phase) =>
+      phase.steps.some((step) => step.id === routeStepId),
+    );
+    // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
+    // and this is the pattern the repo already passes with.
+    queueMicrotask(() => {
+      if (!owningPhase) {
+        toast.error("That step is not on your path", {
+          description: "It may have been replaced when your path was rebuilt.",
+        });
+        void navigate("/onboarding", { replace: true });
+        return;
+      }
+      if (expandedItemId === routeStepId) return;
+      setSelectedPhaseId(owningPhase.id);
+      setViewMode("list");
+      scrollToItemRef.current = routeStepId;
+      setExpandedItemId(routeStepId);
+    });
+  }, [expandedItemId, loadingState, navigate, path, routeStepId, toast]);
+
   // Brings the chooser into view when the member was sent to pick a phase, once per visit.
   const hasShownChooserRef = useRef(false);
   useEffect(() => {
@@ -310,15 +360,19 @@ export function OnBoardingPage() {
   // A remembered phase that is not in this path (a rebuilt path, another project) opens the map.
   const openGraphPhaseId = phases.some((phase) => phase.id === graphPhaseId) ? graphPhaseId : null;
   useEffect(() => {
-    if (loadingState !== "success") return;
+    if (loadingState !== "success" || arrivedInForcedList.current) return;
     writeJourneyView(HIRE_JOURNEY_VIEW_KEY, { mode: viewMode, graphPhaseId: openGraphPhaseId });
   }, [loadingState, openGraphPhaseId, viewMode]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
     order: VIEW_ORDER,
     value: viewMode,
-    onChange: setViewMode,
-    enabled: loadingState === "success",
+    onChange: chooseViewMode,
+    // Not while a step or a question is open. The two views are the two halves of a
+    // `SlidingTabPanel`, which unmounts the one being left -- so a stray sideways flick took a
+    // typed short answer, a grading result, a half-written skip reason or feedback comment with
+    // it. Switching deliberately, from the tab bar, still does that; a gesture should not.
+    enabled: loadingState === "success" && expandedItemId === null && graphItemId === null,
   });
 
   // ── Derived ─────────────────────────────────────────────────
@@ -365,25 +419,36 @@ export function OnBoardingPage() {
     }
   };
 
-  /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
   /**
-   * Opening a step whose skip request was answered is looking at the answer: its "new" marker goes
-   * at once, and the server is told so the marker stays gone on every device.
+   * The answer to a skip request has been drawn for the member, so its "new" marker goes -- here
+   * and, so it stays gone on every device, on the server.
+   *
+   * Called by the step workspace once it has the answer on screen. Doing it from `openItem`
+   * marked answers seen on the way past: "Continue" and "Up next" open steps too, and a deep link
+   * opens one without going through it at all.
    */
-  const acknowledgeSkipAnswer = (item: PhaseItem) => {
-    if (item.kind !== "step" || !item.step.skip || !unseenSkipAnswerOf(item)) return;
-    const skipId = item.step.skip.id;
-    setPath((current) =>
-      current ? withSkipAnswerSeen(current, skipId, new Date().toISOString()) : current,
-    );
-    onboardingService
-      .markSkipAnswerSeen(skipId)
-      .then(notifySkipAnswerSeen)
-      .catch((error: unknown) => console.error("Failed to mark skip answer as seen:", error));
-  };
+  const acknowledgeSkipAnswer = useCallback(
+    (skipId: string) => {
+      const seenAt = new Date().toISOString();
+      setPath((current) => (current ? withSkipAnswerSeen(current, skipId, seenAt) : current));
+      onboardingService
+        .markSkipAnswerSeen(skipId)
+        .then(notifySkipAnswerSeen)
+        .catch((error: unknown) => {
+          console.error("Failed to mark skip answer as seen:", error);
+          // Put back, rather than left gone for the session and back after a reload -- and
+          // disagreeing with the sidebar's count in the meantime.
+          setPath((current) => (current ? withSkipAnswerUnseen(current, skipId) : current));
+          toast.error("The answer is still marked new", {
+            description: "It could not be marked as seen. It will still be there next time.",
+          });
+        });
+    },
+    [toast],
+  );
 
+  /** Start, continue or answer: the item opens where it is -- unfolded in the list, or on the graph. */
   const openItem = (item: PhaseItem) => {
-    acknowledgeSkipAnswer(item);
     const phase = phaseOf(item);
     if (phase) setSelectedPhaseId(phase.id);
     if (viewMode === "graph") {
@@ -440,13 +505,16 @@ export function OnBoardingPage() {
           setGraphItemId(null);
           setGraphPhaseId(null);
           // The chooser lives in the list; from inside the graph there is nothing to scroll to.
-          setViewMode("list");
-          window.setTimeout(
+          chooseViewMode("list");
+          // After the panel that holds it has slid in. Tracked so leaving the page cancels it --
+          // it was the one timer in this file that outlived the component that set it.
+          window.clearTimeout(chooserScrollTimer.current);
+          chooserScrollTimer.current = window.setTimeout(
             () =>
               document
                 .querySelector("#phase-chooser")
                 ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
-            150,
+            SLIDING_PANEL_EXIT_MS,
           );
         },
       };
@@ -532,6 +600,7 @@ export function OnBoardingPage() {
         stepStatus={item.step.status}
         layout={layout}
         onPathChanged={refreshPath}
+        onSkipAnswerSeen={acknowledgeSkipAnswer}
         continueLabel={next.label}
         onContinue={next.run}
       />
@@ -705,7 +774,7 @@ export function OnBoardingPage() {
             layoutId="onboarding-view-mode"
             ariaLabel="Onboarding view"
             value={viewMode}
-            onChange={setViewMode}
+            onChange={chooseViewMode}
             options={[
               { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
               { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
@@ -800,10 +869,8 @@ export function OnBoardingPage() {
                 const item = itemId
                   ? phases.flatMap(phaseItems).find((candidate) => candidate.id === itemId)
                   : undefined;
-                if (item) {
-                  acknowledgeSkipAnswer(item);
-                  void beginStepIfWaiting(item);
-                }
+                // The answer, if there is one, is acknowledged by the workspace that draws it.
+                if (item) void beginStepIfWaiting(item);
               }}
               renderItemFocus={(item) => renderItemBody(item, "focus")}
               showMemberUpdates

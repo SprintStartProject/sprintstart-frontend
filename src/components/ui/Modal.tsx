@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, type ReactNode } from "react";
+import { SWIPE_IGNORE_ATTRIBUTE } from "../../hooks/useHorizontalWheelNavigation";
 import { getModalDialogVariants, modalBackdropVariants } from "../../styles/tokens";
 import { Button } from "./Button";
 import { useDialogFocus } from "./useDialogFocus";
@@ -38,6 +39,15 @@ type ModalProps = {
   contentInsetRight?: number;
   titleId?: string;
   descriptionId?: string;
+  /**
+   * A failure that belongs to what is in the dialog, shown just above the footer.
+   *
+   * Without it, forms in a dialog reported their failures through whatever page-wide error bar
+   * their page had -- which renders in the page body, underneath the open overlay. The spinner
+   * stopped, the dialog stayed open with the typed text still in it, and nothing on screen said
+   * why.
+   */
+  errorMessage?: ReactNode;
   /**
    * `data-testid` for the dialog itself, and — suffixed with `-close` — for
    * its close button. Present because standards §5 requires E2E-targeted
@@ -79,6 +89,7 @@ export function Modal({
   contentInsetRight = 0,
   titleId = "modal-title",
   descriptionId = "modal-description",
+  errorMessage,
   testId,
   onClose,
 }: ModalProps) {
@@ -138,6 +149,9 @@ export function Modal({
             data-testid={testId}
             role={role}
             aria-modal="true"
+            // A sideways flick inside a dialog is a flick inside a dialog. Without this it reached
+            // the page underneath, where it switches tabs behind the open overlay.
+            {...{ [SWIPE_IGNORE_ATTRIBUTE]: "" }}
             aria-labelledby={titleId}
             aria-describedby={description ? descriptionId : undefined}
             tabIndex={-1}
@@ -185,6 +199,17 @@ export function Modal({
             {children && (
               <div className={`relative z-10 min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>
                 {children}
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="relative z-10 shrink-0 px-5 pt-1 pb-4 sm:px-7">
+                <p
+                  role="alert"
+                  className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
+                >
+                  {errorMessage}
+                </p>
               </div>
             )}
 

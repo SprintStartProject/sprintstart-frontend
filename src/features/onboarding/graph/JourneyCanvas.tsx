@@ -921,6 +921,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   }, [bounds, nodes.length]);
 
   const gridSize = 24 * viewport.zoom;
+  const isInteractive = Boolean(onSelect || onOpen || canMove || canConnect);
 
   const canvas = (
     <div
@@ -1058,10 +1059,13 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               <div
                 key={node.id}
                 data-journey-node={node.id}
-                role="button"
-                tabIndex={0}
-                aria-label={nodeLabel(node)}
-                aria-pressed={selected}
+                // A node is a control where there is something to select or open, and a picture
+                // where there is not: a read-only canvas used to hand a keyboard a tab stop per
+                // node, each of which did nothing.
+                role={isInteractive ? "button" : undefined}
+                tabIndex={isInteractive ? 0 : undefined}
+                aria-label={isInteractive ? nodeLabel(node) : undefined}
+                aria-pressed={isInteractive ? selected : undefined}
                 className={`group/node absolute rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-app-focus ${
                   canMove ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                 } ${dragging ? "z-30" : selected ? "z-20" : "z-10"}`}

@@ -36,12 +36,16 @@ function notifyOpenEscalationsChanged(): void {
 /**
  * Set once this deployment has answered 404 for the open-escalation count.
  *
- * Deliberately module-wide and never reset: the shape of the backend does not change while the tab
- * is open. It exists because a frontend branch can sit ahead of the backend branch it is run
- * against — which is the normal state during a feature that spans both repos — and a badge is not
- * worth a 404 in the console on every single navigation.
+ * Module-wide, because the shape of the backend does not change while the tab is open -- but it is
+ * cleared again after a while: a single 404 during a rolling deploy used to silence the PM's badge
+ * for the rest of the session, with the log suppressed by design, and there is no way back from
+ * that short of a reload. The endpoint now exists on the matching backend and `canAccessProject`
+ * answers 403 rather than 404, so this is only a guard for running against an older backend.
  */
 let countEndpointMissing = false;
+let countEndpointMissingAt = 0;
+/** How long a 404 is taken as "this backend does not have it" before asking again. */
+const COUNT_ENDPOINT_RETRY_MS = 5 * 60 * 1000;
 
 export const knowledgeRequestService = {
   /** Hire: flag a question the buddy could not answer to the project's PM. */
@@ -76,7 +80,10 @@ export const knowledgeRequestService = {
     // asks on every navigation — so a 404 is remembered and the badge quietly reports nothing
     // instead of writing a failed request to the console for every view. Any other failure is
     // thrown as usual: a 500 or a dropped connection may well be gone by the next check.
-    if (countEndpointMissing) return 0;
+    if (countEndpointMissing && Date.now() - countEndpointMissingAt < COUNT_ENDPOINT_RETRY_MS) {
+      return 0;
+    }
+    countEndpointMissing = false;
 
     try {
       const { open } = await apiClient.fetch<{ open: number }>(
@@ -86,6 +93,7 @@ export const knowledgeRequestService = {
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 404) {
         countEndpointMissing = true;
+        countEndpointMissingAt = Date.now();
         return 0;
       }
       throw reason;

@@ -76,10 +76,6 @@ vi.mock("../../../src/features/team-management/components/detail/StepDetailsPane
   StepDetailsPanel: () => <aside aria-label="Step details">Step Details</aside>,
 }));
 
-vi.mock("../../../src/features/team-management/components/detail/AddCustomStepModal", () => ({
-  AddCustomStepModal: () => null,
-}));
-
 vi.mock("../../../src/features/team-management/components/detail/MemberDetailDialogs", () => ({
   MemberDetailDialogs: () => null,
 }));

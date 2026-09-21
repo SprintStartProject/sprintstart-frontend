@@ -35,6 +35,7 @@ import { Select } from "../components/ui/Select.tsx";
 import { Textarea } from "../components/ui/Textarea.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { PhasePrerequisites } from "../features/blueprints/components/PhasePrerequisites.tsx";
+import { versionWord } from "../features/blueprints/pathLifecycle.ts";
 import { useToast } from "../context/useToast.ts";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation.ts";
 import type {
@@ -309,6 +310,9 @@ export function BlueprintPathDetailPage() {
     label: string;
   } | null>(null);
   const [pendingDeleteError, setPendingDeleteError] = useState<string | null>(null);
+  // Kept out of the page-wide `error`, which renders in the page body underneath an open overlay.
+  const [itemFormError, setItemFormError] = useState<string | null>(null);
+  const [requirementError, setRequirementError] = useState<string | null>(null);
   const [requirementType, setRequirementType] = useState<"SKILL" | "PROJECT_ROLE">("SKILL");
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<string[]>([]);
   const [requirementCatalog, setRequirementCatalog] = useState<RequirementCatalog | null>(null);
@@ -492,6 +496,7 @@ export function BlueprintPathDetailPage() {
     setExplanation("");
     setCorrectAnswer("");
     setIsCorrect(false);
+    setItemFormError(null);
     setTarget({ kind, parentId, position, graphPosition });
   }
 
@@ -556,6 +561,7 @@ export function BlueprintPathDetailPage() {
   /** Opens the overlay on an existing item, seeded with whatever that kind of item actually has. */
   function openEdit(nextTarget: NonNullable<EditTarget>) {
     setError(null);
+    setItemFormError(null);
     setUrl(nextTarget.kind === "resource" ? nextTarget.item.url : "");
     setIsCorrect(nextTarget.kind === "option" && nextTarget.item.correct);
 
@@ -597,11 +603,11 @@ export function BlueprintPathDetailPage() {
     setRequirementType("SKILL");
     setSelectedRequirementIds([]);
     setIsRequirementCatalogLoading(true);
-    setError(null);
+    setRequirementError(null);
     try {
       setRequirementCatalog(await blueprintService.getRequirementCatalog());
     } catch (reason) {
-      setError(
+      setRequirementError(
         reason instanceof Error ? reason.message : "Requirement choices could not be loaded.",
       );
     } finally {
@@ -638,7 +644,7 @@ export function BlueprintPathDetailPage() {
     if (!phase) return;
 
     setIsRequirementSaving(true);
-    setError(null);
+    setRequirementError(null);
     try {
       const response = await blueprintService.addPhaseRequirements(
         blueprintScope,
@@ -872,7 +878,7 @@ export function BlueprintPathDetailPage() {
       setTarget(null);
       await refreshActiveEditorData();
     } catch (reason) {
-      setError(
+      setItemFormError(
         reason instanceof Error
           ? reason.message
           : `The ${editTarget?.kind ?? target?.kind ?? "item"} could not be saved.`,
@@ -942,21 +948,28 @@ export function BlueprintPathDetailPage() {
     ]);
     // The nested DTO has no phase coordinates or prerequisites; keep the ones already loaded
     // rather than dropping them while the sub-graph editor is open.
-    setPath((current) =>
-      current
-        ? withGraphNodes(
-            nextPath,
-            current.blueprintPhases.map((phase): BlueprintGraphNode => ({
-              id: phase.id,
-              revision: phase.revision,
-              title: phase.title,
-              graphX: phase.graphX ?? null,
-              graphY: phase.graphY ?? null,
-              blockerIds: phase.blockerIds ?? [],
-            })),
-          )
-        : nextPath,
-    );
+    setPath((current) => {
+      if (!current) return nextPath;
+      const heldById = new Map(current.blueprintPhases.map((phase) => [phase.id, phase]));
+      return withGraphNodes(
+        nextPath,
+        nextPath.blueprintPhases.map((phase): BlueprintGraphNode => {
+          const held = heldById.get(phase.id);
+          return {
+            id: phase.id,
+            // The revision the server just sent, not the one held here: `withGraphNodes` writes
+            // this back onto the phase, so carrying the stale one over meant the next phase
+            // mutation sent a revision the server had already moved past -- a 409 the page then
+            // reported as a success.
+            revision: phase.revision,
+            title: phase.title,
+            graphX: held?.graphX ?? null,
+            graphY: held?.graphY ?? null,
+            blockerIds: held?.blockerIds ?? [],
+          };
+        }),
+      );
+    });
     setSubGraphNodes(graph.nodes);
   }
 
@@ -1738,7 +1751,11 @@ export function BlueprintPathDetailPage() {
 
   // Keep the existing shell visible during a graph → list refresh. This avoids replacing the
   // whole page with a loading state while the nested DTO catches up with graph revisions.
-  if (isLoading && !path)
+  //
+  // A path from a *different* address is a different matter: during a walk between versions, the
+  // one being left stayed fully interactive under the new URL, so Publish published it and the
+  // header described it. The `reopen` effect guards this the same way.
+  if (isLoading && (!path || path.id !== pathId))
     return (
       <main className="flex min-h-80 items-center justify-center gap-3 text-app-text-muted">
         <Loader2 className="h-5 w-5 animate-spin" /> Loading blueprint…
@@ -1901,8 +1918,16 @@ export function BlueprintPathDetailPage() {
         subtitle={path.description || "No path description yet."}
         actions={
           <>
-            <Badge variant={path.status === "ACTIVE" ? "success" : "warning"}>
-              {path.status} · v{path.version}
+            <Badge
+              variant={
+                path.status === "ACTIVE"
+                  ? "success"
+                  : path.status === "ARCHIVED"
+                    ? "neutral"
+                    : "warning"
+              }
+            >
+              {versionWord(path.status)} · v{path.version}
             </Badge>
             <Button
               variant="secondary"
@@ -2036,9 +2061,7 @@ export function BlueprintPathDetailPage() {
             onAddResource={(step) =>
               openCreate("resource", step.id, step.blueprintResources.length)
             }
-            onRemoveResource={(resource) =>
-              requestDelete("resource", resource.id, resource.title)
-            }
+            onRemoveResource={(resource) => requestDelete("resource", resource.id, resource.title)}
             onEditTask={(task) => openEdit({ kind: "task", item: task })}
             onEditResource={(resource) => openEdit({ kind: "resource", item: resource })}
             onEditOption={(option) => openEdit({ kind: "option", item: option })}
@@ -2668,7 +2691,11 @@ export function BlueprintPathDetailPage() {
         isOpen={addRequirementTarget !== null}
         title="Add phase requirements"
         description="Select skills or project roles that must be met before this phase unlocks."
-        onClose={() => setAddRequirementTarget(null)}
+        errorMessage={requirementError ?? undefined}
+        onClose={() => {
+          setAddRequirementTarget(null);
+          setRequirementError(null);
+        }}
         footer={
           <>
             <Button variant="secondary" onClick={() => setAddRequirementTarget(null)}>
@@ -2756,7 +2783,7 @@ export function BlueprintPathDetailPage() {
                         : "warning"
                   }
                 >
-                  {version.status}
+                  {versionWord(version.status)}
                 </Badge>
               );
 
@@ -2808,9 +2835,11 @@ export function BlueprintPathDetailPage() {
             : `Add ${target ? kindLabels[target.kind] : "item"}`
         }
         description="This is reusable blueprint content, not a change to an active onboarding path."
+        errorMessage={itemFormError ?? undefined}
         onClose={() => {
           setTarget(null);
           setEditTarget(null);
+          setItemFormError(null);
         }}
         footer={
           <>

@@ -1,12 +1,4 @@
-import {
-  MessageSquareText,
-  Pencil,
-  Plus,
-  ThumbsDown,
-  ThumbsUp,
-  Users,
-  X,
-} from "lucide-react";
+import { MessageSquareText, Pencil, Plus, ThumbsDown, ThumbsUp, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
@@ -37,6 +29,8 @@ import {
   type OnboardingFeedback,
   type UserSkillLevel,
 } from "../services/teamManagementService";
+import { isSkipPending } from "../features/onboarding/journey";
+import { isFeedbackUnread } from "../features/team-management/feedbackState";
 
 type DetailOnboardingStep = OnboardingStepEndpoint & {
   startedAt?: string | null;
@@ -153,6 +147,11 @@ export function TeamMemberDetailPage() {
   // from the step it belongs to. The ref is the guard (a second click in the same tick still sees
   // it), the state is what disables both controls.
   const skipsInReview = useRef(new Set<string>());
+  // Which member the page is about right now, for the refreshes below to check themselves against.
+  const shownUserId = useRef(userId);
+  useEffect(() => {
+    shownUserId.current = userId;
+  }, [userId]);
   const [reviewingSkipIds, setReviewingSkipIds] = useState<readonly string[]>([]);
   // `feedbackError` stays for the feedback *load* failure (shown inline where the
   // list would be); every action outcome on this page is a toast instead.
@@ -244,16 +243,31 @@ export function TeamMemberDetailPage() {
 
       if (steps.length === 0) {
         setStepTaskCounts({});
+        // Cleared together: leaving the lists behind meant the previous member's tasks survived a
+        // switch to a member with no steps at all.
+        setStepTasksById({});
         return;
       }
 
-      const taskEntries = await Promise.all(
+      // Settled, not all-or-nothing: one step's request failing used to blank every count on the
+      // page, including the ones that had just been read successfully.
+      const results = await Promise.allSettled(
         steps.map(async (step) => {
           const tasks = await getOnboardingTasksByStep(step.id);
 
           return [step.id, tasks] as const;
         }),
       );
+      const failures = results.filter((result) => result.status === "rejected");
+      if (failures.length > 0) {
+        console.error(
+          `Failed to load the tasks of ${failures.length} of ${steps.length} steps:`,
+          failures[0].reason,
+        );
+      }
+      const taskEntries = results
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => result.value);
       const tasksByStepId = Object.fromEntries(taskEntries);
       const counts = Object.fromEntries(
         taskEntries.map(([stepId, tasks]) => [
@@ -278,33 +292,47 @@ export function TeamMemberDetailPage() {
     };
   }, [onboardingPath]);
 
+  /**
+   * The three post-action refreshes, each dropped when the page has moved on to another member.
+   *
+   * The initial load has the same guard and names the risk: member A's journey, with A's step and
+   * skip ids, rendered under B's URL -- after which the next action sends A's ids. These run from
+   * every action handler, so they need it just as much.
+   */
   async function refreshMember() {
     if (!userId) return;
+    const forUser = userId;
 
-    const memberData = await getTeamMember(userId);
+    const memberData = await getTeamMember(forUser);
+    if (shownUserId.current !== forUser) return;
     setUser(memberData);
   }
 
   async function refreshFeedback() {
     if (!userId) return;
+    const forUser = userId;
 
     setLoadingFeedback(true);
     setFeedbackError("");
 
     try {
-      const feedback = await getUserOnboardingFeedback(userId);
+      const feedback = await getUserOnboardingFeedback(forUser);
+      if (shownUserId.current !== forUser) return;
       setFeedbackItems(feedback);
     } catch (error) {
+      if (shownUserId.current !== forUser) return;
       setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
     } finally {
-      setLoadingFeedback(false);
+      if (shownUserId.current === forUser) setLoadingFeedback(false);
     }
   }
 
   async function refreshOnboardingPath() {
     if (!userId) return;
+    const forUser = userId;
 
-    const path = await getUserOnboardingPath(userId);
+    const path = await getUserOnboardingPath(forUser);
+    if (shownUserId.current !== forUser) return;
     setOnboardingPath(path);
   }
 
@@ -432,6 +460,9 @@ export function TeamMemberDetailPage() {
 
   async function handleReorderTasks(stepId: string, activeTaskId: string, overTaskId: string) {
     if (activeTaskId === overTaskId) return;
+    // A second drag while the first is still being written would compute its move from the
+    // optimistic list and send positions against the same stale state.
+    if (stepActionId === stepId) return;
 
     const currentTasks = [...(stepTasksById[stepId] ?? [])].sort((a, b) => a.position - b.position);
     const activeIndex = currentTasks.findIndex((task) => task.id === activeTaskId);
@@ -459,6 +490,9 @@ export function TeamMemberDetailPage() {
     }));
 
     try {
+      // One request per moved task: there is no batch endpoint, so a failure halfway through
+      // leaves the ones before it written. The refresh in both branches is what the list then
+      // shows -- the server's order, not this optimistic one.
       for (const task of changedTasks) {
         await updateOnboardingTask(task.id, {
           position: task.position,
@@ -470,7 +504,12 @@ export function TeamMemberDetailPage() {
 
       await refreshStepTasks(stepId);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't reorder the tasks.");
+      toast.error("The new order could not be saved in full", {
+        description:
+          error instanceof Error
+            ? `${error.message} The list now shows what the server has.`
+            : "The list now shows what the server has.",
+      });
       await refreshStepTasks(stepId);
     } finally {
       setStepActionId(null);
@@ -588,8 +627,11 @@ export function TeamMemberDetailPage() {
 
   const elapsedDays = user.currentStep?.startedAt ? getElapsedDays(user.currentStep.startedAt) : 0;
   const progressPercentage = Math.round(user.progressPercentage * 100);
+  // The team overview's skip is a different DTO from the path's: it carries `status`, not
+  // `accepted`, so `isSkipPending` does not apply to it. Every reading below that *does* see an
+  // `accepted` goes through the predicate.
   const pendingSkip = user.currentStep?.skip?.status === "PENDING" ? user.currentStep.skip : null;
-  const unreadFeedback = feedbackItems.filter((item) => item.read !== true && !item.readAt);
+  const unreadFeedback = feedbackItems.filter(isFeedbackUnread);
   const phases = [...(onboardingPath?.phases ?? [])].sort((a, b) => a.position - b.position);
   const allSteps = phases.flatMap((phase) =>
     [...(phase.steps ?? [])]
@@ -599,10 +641,7 @@ export function TeamMemberDetailPage() {
   // Every step's, like the journey section counts them: phases run side by side, so the step
   // waiting on a skip answer is not always the current one.
   const pendingSkipCount = allSteps.filter(
-    (step) =>
-      !!step.skip?.id &&
-      (step.skip.accepted === null || step.skip.accepted === undefined) &&
-      step.status !== "SKIPPED",
+    (step) => !!step.skip?.id && isSkipPending(step.skip) && step.status !== "SKIPPED",
   ).length;
   const checkModalPhase = checkModal
     ? (phases.find((phase) => phase.id === checkModal.phaseId) ?? null)
@@ -784,7 +823,7 @@ export function TeamMemberDetailPage() {
                 </p>
               ) : unreadFeedback.length > 0 ? (
                 unreadFeedback.map((feedback) => {
-                  const isUnread = feedback.read !== true && !feedback.readAt;
+                  const isUnread = isFeedbackUnread(feedback);
                   // Coloured by what it says, not by whether it has been read: a thumbs-down and a
                   // thumbs-up are different news. Unread is a badge of its own.
                   const tone =
