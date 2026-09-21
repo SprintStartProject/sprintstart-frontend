@@ -103,6 +103,13 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
       : (member.currentStep?.title ??
         (stage === "not-started" ? "Not started yet" : "No current step"));
 
+  // The short list has one line under the name, so it carries the phase too: "Setup · Clone the
+  // repo" says where someone is in the path, not only which step they are looking at.
+  const compactLine =
+    stage === "underway" && member.currentPhase?.title && member.currentStep?.title
+      ? `${member.currentPhase.title} · ${member.currentStep.title}`
+      : stepLine;
+
   return (
     <button
       type="button"
@@ -130,7 +137,7 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
               ? member.roles.length > 0
                 ? member.roles.map((role) => role.name).join(", ")
                 : "No role yet"
-              : stepLine}
+              : compactLine}
           </span>
         </span>
       </span>
@@ -155,7 +162,12 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
       <span className="col-start-2 row-start-1 flex items-center gap-2 md:col-start-auto md:row-start-auto">
         {!isFull && <MemberFlags member={member} />}
         {!isFull && (
-          <span className="text-xs font-medium text-app-text tabular-nums">{percent}%</span>
+          <>
+            <MemberProgressBar percent={percent} className="hidden w-28 sm:flex" />
+            <span className="text-xs font-medium text-app-text tabular-nums sm:hidden">
+              {percent}%
+            </span>
+          </>
         )}
         <ChevronRight
           aria-hidden="true"

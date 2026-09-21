@@ -11,27 +11,101 @@ import { Link } from "react-router-dom";
  * whole sections in `SpotlightCard`s with their own `text-lg` headings inside, which made it the
  * one area of the app that looked like a different product.
  */
+/**
+ * The colour a PM block is recognised by. Each section has one — Team is brand, Onboarding cyan,
+ * Questions indigo, Knowledge gaps pink, Escalations purple — and its cards, figures and chips use
+ * it wherever that section shows up, so a glance at a colour says which part of the area a block
+ * belongs to. `warning` is not a section: it is what "somebody is waiting on you" looks like.
+ */
+export type PmTone =
+  "brand" | "cyan" | "indigo" | "pink" | "purple" | "warning" | "success" | "neutral";
+
+/** Icon chip in a card header. Brand keeps the gradient every widget in the app uses. */
+const TONE_CHIP: Record<PmTone, string> = {
+  brand: "bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm",
+  cyan: "bg-app-cyan-bg text-app-cyan-text",
+  indigo: "bg-app-indigo-bg text-app-indigo-text",
+  pink: "bg-app-pink-bg text-app-pink-text",
+  purple: "bg-app-purple-bg text-app-purple-text",
+  warning: "bg-app-warning-bg text-app-warning-text",
+  success: "bg-app-success-bg text-app-success-text",
+  neutral: "bg-app-neutral-bg text-app-neutral-text",
+};
+
+/** The same tones, soft, for the small chips inside figures and rows. */
+const PM_TONE_SOFT: Record<PmTone, string> = {
+  brand: "bg-app-brand-soft text-app-brand-text",
+  cyan: "bg-app-cyan-bg text-app-cyan-text",
+  indigo: "bg-app-indigo-bg text-app-indigo-text",
+  pink: "bg-app-pink-bg text-app-pink-text",
+  purple: "bg-app-purple-bg text-app-purple-text",
+  warning: "bg-app-warning-bg text-app-warning-text",
+  success: "bg-app-success-bg text-app-success-text",
+  neutral: "bg-app-neutral-bg text-app-neutral-text",
+};
+
+/** The corner glow, in the card's own colour. */
+const TONE_GLOW: Record<PmTone, string> = {
+  brand: "bg-app-brand/10",
+  cyan: "bg-app-cyan-text/10",
+  indigo: "bg-app-indigo-text/10",
+  pink: "bg-app-pink-text/10",
+  purple: "bg-app-purple-text/10",
+  warning: "bg-app-warning-solid/10",
+  success: "bg-app-success-solid/10",
+  neutral: "bg-app-brand/5",
+};
+
 export function PmCard({
   children,
   className = "",
   as: Element = "section",
   "aria-label": ariaLabel,
+  tone = "brand",
+  to,
+  linkLabel,
 }: {
   children: ReactNode;
   className?: string;
   as?: "section" | "div" | "article";
   "aria-label"?: string;
+  tone?: PmTone;
+  /**
+   * Makes the whole card a way into its section, not only the small link in the header.
+   *
+   * Drawn as a link stretched under the content rather than a link around it: the rows inside
+   * are links and buttons of their own, and interactive elements cannot nest. The content lets
+   * clicks fall through to the stretched link everywhere except on those rows and controls.
+   */
+  to?: string;
+  /** Accessible name of the stretched link, e.g. "Open recurring questions". */
+  linkLabel?: string;
 }) {
   return (
     <Element
       aria-label={ariaLabel}
-      className={`relative overflow-hidden rounded-2xl border border-app-border bg-app-surface p-5 sm:p-6 ${className}`}
+      className={`relative overflow-hidden rounded-2xl border border-app-border bg-app-surface p-5 sm:p-6 ${
+        to ? "transition-colors hover:border-app-brand-border-strong" : ""
+      } ${className}`}
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"
+        className={`pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full blur-2xl ${TONE_GLOW[tone]}`}
       />
-      <div className="relative flex h-full flex-col">{children}</div>
+      {to && (
+        <Link
+          to={to}
+          aria-label={linkLabel ?? ariaLabel}
+          className="absolute inset-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset"
+        />
+      )}
+      <div
+        className={`relative flex h-full flex-col ${
+          to ? "pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto" : ""
+        }`}
+      >
+        {children}
+      </div>
     </Element>
   );
 }
@@ -41,9 +115,11 @@ export function PmCardHeader({
   title,
   meta,
   action,
+  tone = "brand",
 }: {
   icon: LucideIcon;
   title: string;
+  tone?: PmTone;
   /** A count or a timestamp beside the title — quiet, never a control. */
   meta?: ReactNode;
   /** One control on the right edge: usually a {@link PmCardLink}. */
@@ -52,7 +128,9 @@ export function PmCardHeader({
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${TONE_CHIP[tone]}`}
+        >
           <Icon aria-hidden="true" className="h-3.5 w-3.5" />
         </span>
         <h2 className="truncate text-sm font-semibold text-app-text">{title}</h2>
@@ -102,8 +180,10 @@ type PmStatProps = {
   label: string;
   value: ReactNode;
   hint: string;
-  /** A number somebody has to act on. Tints the icon chip only, never the figure. */
+  /** A number somebody has to act on. Marks the tile with a dot and a warm chip, never the figure. */
   attention?: boolean;
+  /** The section the figure belongs to — colours the icon chip while nothing is waiting. */
+  tone?: PmTone;
   /** Makes the tile a link to where the number can be acted on. */
   to?: string;
   onClick?: () => void;
@@ -119,19 +199,26 @@ export function PmStat({
   value,
   hint,
   attention = false,
+  tone = "brand",
   to,
   onClick,
 }: PmStatProps) {
   const body = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 text-[12.5px] font-medium text-app-text-muted">{label}</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-app-text-muted">
+          {attention && (
+            <span aria-hidden="true" className="relative flex h-2 w-2 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-app-warning-solid opacity-60 motion-reduce:animate-none" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-app-warning-solid" />
+            </span>
+          )}
+          <span className="truncate">{label}</span>
+        </span>
         <span
           aria-hidden="true"
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-            attention
-              ? "bg-app-warning-bg text-app-warning-text"
-              : "bg-app-brand-soft text-app-brand-text"
+            attention ? PM_TONE_SOFT.warning : PM_TONE_SOFT[tone]
           }`}
         >
           <Icon className="h-3.5 w-3.5" />

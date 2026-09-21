@@ -26,6 +26,7 @@ import { useOpenEscalationCount } from "../knowledge-request/useOpenEscalationCo
 import { OnboardingMetricsPage } from "../onboarding-metrics/components/OnboardingMetricsPage";
 import { useProjectContext } from "../projects/useProjectContext";
 import { MemberPeekPanel } from "./components/MemberPeekPanel";
+import { PmHeaderStatus } from "./components/PmHeaderStatus";
 import { INBOX_VIEW_PARAM, TEAM_TAB_PARAM } from "./pmWorkspacePaths";
 import { MEMBER_PEEK_PARAM } from "./useMemberPeek";
 
@@ -292,6 +293,7 @@ export function PmWorkspace() {
             icon={BriefcaseBusiness}
             title="PM Dashboard"
             subtitle="Track team onboarding, spot recurring questions and keep knowledge gaps visible."
+            actions={<PmHeaderStatus />}
           />
         </div>
       </header>

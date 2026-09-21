@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Inbox, MessageCircleQuestion, Rocket, Users } from "lucide-react";
+import { Hand, Inbox, Rocket, Users } from "lucide-react";
 import { IngestionStatusWidget } from "../features/data-ingestion/components/IngestionStatusWidget";
 import { useAttention } from "../features/onboarding-metrics/hooks/useAttention";
 import { formatDuration } from "../features/onboarding-metrics/format";
@@ -55,6 +55,14 @@ export function PmDashboardPage() {
 
   const doneCount = members.filter((member) => memberStage(member) === "done").length;
   const waitingCount = members.filter((member) => waitingOn(member).length > 0).length;
+  const skipCount = members.filter((member) => waitingOn(member).includes("skip")).length;
+  const feedbackCount = members.filter((member) => waitingOn(member).includes("feedback")).length;
+  const waitingHint = [
+    skipCount > 0 && (skipCount === 1 ? "1 skip request" : `${skipCount} skip requests`),
+    feedbackCount > 0 && `${feedbackCount} feedback`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const figuresReady = !rosterLoading && !rosterError;
 
   return (
@@ -67,16 +75,19 @@ export function PmDashboardPage() {
           hint={figuresReady ? `${doneCount} through onboarding` : "Loading the team"}
           to="/team-management"
         />
+        {/* A raised hand, not the inbox: the inbox is Escalations everywhere else in the area
+            (its tab, its figure), and this tile leads to people on the team, not to that inbox. */}
         <PmStat
-          icon={Inbox}
+          icon={Hand}
           label="Waiting on you"
           value={figuresReady ? waitingCount : "—"}
-          hint={waitingCount > 0 ? "Skip requests or feedback" : "Nothing to answer"}
+          hint={waitingCount > 0 ? waitingHint : "Nothing to answer"}
           attention={waitingCount > 0}
           to="/team-management?filter=waiting"
         />
         <PmStat
-          icon={MessageCircleQuestion}
+          icon={Inbox}
+          tone="purple"
           label="Open escalations"
           value={openEscalations}
           hint={openEscalations > 0 ? "Questions the buddy couldn't answer" : "Inbox clear"}
@@ -85,6 +96,7 @@ export function PmDashboardPage() {
         />
         <PmStat
           icon={Rocket}
+          tone="cyan"
           label="To first accepted work"
           value={metrics ? formatDuration(metrics.medianHoursToFirstAcceptedContribution) : "—"}
           hint="Median, joined → accepted"
@@ -92,7 +104,9 @@ export function PmDashboardPage() {
         />
       </section>
 
-      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      {/* The team gets the width: it is the one card with a whole roster to show, while "Needs
+          you" is a short pointer list that reads fine narrow. */}
+      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
         <NeedsYouCard
           entries={queue}
           loading={rosterLoading || attentionLoading}

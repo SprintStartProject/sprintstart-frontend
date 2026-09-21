@@ -59,9 +59,16 @@ export function QuestionsCard() {
   const asked = groups.reduce((sum, group) => sum + group.count, 0);
 
   return (
-    <PmCard aria-label="Recurring questions" className="h-full">
+    <PmCard
+      aria-label="Recurring questions"
+      tone="indigo"
+      className="h-full"
+      to="/insights/faq"
+      linkLabel="Open all recurring questions"
+    >
       <PmCardHeader
         icon={MessageSquareMore}
+        tone="indigo"
         title="Recurring questions"
         meta={
           revalidating ? (
@@ -137,9 +144,16 @@ export function KnowledgeGapsCard() {
     .slice(0, ROWS - 1);
 
   return (
-    <PmCard aria-label="Knowledge gaps" className="h-full">
+    <PmCard
+      aria-label="Knowledge gaps"
+      tone="pink"
+      className="h-full"
+      to="/insights/knowledge-gaps"
+      linkLabel="Open all knowledge gaps"
+    >
       <PmCardHeader
         icon={ShieldAlert}
+        tone="pink"
         title="Knowledge gaps"
         meta={overview ? `${summary.componentCount} components` : undefined}
         action={<PmCardLink to="/insights/knowledge-gaps">All</PmCardLink>}
@@ -207,7 +221,7 @@ function HealthRow({
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
           attention
             ? "bg-app-warning-bg text-app-warning-text"
-            : "bg-app-brand-soft text-app-brand-text"
+            : "bg-app-cyan-bg text-app-cyan-text"
         }`}
       >
         <Icon className="h-4 w-4" />
@@ -232,9 +246,16 @@ export function OnboardingHealthCard() {
   );
 
   return (
-    <PmCard aria-label="Onboarding health" className="h-full">
+    <PmCard
+      aria-label="Onboarding health"
+      tone="cyan"
+      className="h-full"
+      to="/insights/onboarding"
+      linkLabel="Open onboarding details"
+    >
       <PmCardHeader
         icon={Gauge}
+        tone="cyan"
         title="Onboarding health"
         meta={metrics ? `${metrics.memberCount} hires` : undefined}
         action={<PmCardLink to="/insights/onboarding">Details</PmCardLink>}

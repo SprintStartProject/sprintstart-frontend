@@ -99,3 +99,15 @@ export function buildAttentionQueue(
     }))
     .sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name));
 }
+
+/**
+ * Whether the person is waiting on an answer only the manager can give — a skip to decide,
+ * feedback to read. The same set the "Waiting on you" figure and filter count.
+ *
+ * Everybody else in the queue is worth a check-in (a review nobody picked up, a hire drifting,
+ * a step that has run long) but is not blocked on the manager. That split is the whole
+ * difference between "Needs you" and "Waiting on you": the second is the first half of the first.
+ */
+export function isWaitingOnAnswer(entry: AttentionEntry): boolean {
+  return entry.reasons.some((reason) => reason.kind === "skip" || reason.kind === "feedback");
+}
