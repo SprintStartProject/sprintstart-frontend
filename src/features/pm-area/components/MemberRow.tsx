@@ -87,6 +87,36 @@ function WaitingIcons({ member }: { member: TeamOverviewUser }) {
   );
 }
 
+/**
+ * Every reason the member needs the manager, as bare icons — the compact row's version of the
+ * roster's "Open with you" column. Same icons and colours as there; the label is the tooltip
+ * and the accessible name.
+ */
+function ReasonIcons({ reasons }: { reasons: AttentionReason[] }) {
+  if (reasons.length === 0) return null;
+
+  return (
+    <span className="flex items-center gap-1">
+      {reasons.map((reason) => {
+        const meta = REASON_META[reason.kind];
+        const Icon = meta.icon;
+
+        return (
+          <span
+            key={reason.kind}
+            role="img"
+            aria-label={meta.label}
+            title={`${meta.label}: ${reason.text}`}
+            className={`flex h-6 w-6 items-center justify-center rounded-full ${meta.tone}`}
+          >
+            <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 /** The skip / feedback / stuck markers, as small labelled chips. */
 export function MemberFlags({ member }: { member: TeamOverviewUser }) {
   const waiting = waitingOn(member);
@@ -315,7 +345,8 @@ export function MemberRow({
       )}
 
       <span className="col-start-2 row-start-1 flex items-center justify-end gap-2 md:col-start-auto md:row-start-auto">
-        {!isFull && <WaitingIcons member={member} />}
+        {!isFull &&
+          (reasons ? <ReasonIcons reasons={reasons} /> : <WaitingIcons member={member} />)}
         {!isFull && (
           <>
             <MemberProgressBar percent={percent} className="hidden w-28 sm:flex" />

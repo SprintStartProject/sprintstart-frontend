@@ -11,7 +11,6 @@ import {
   OnboardingHealthCard,
   QuestionsCard,
 } from "../features/pm-area/components/overview/InsightCards";
-import { NeedsYouCard } from "../features/pm-area/components/overview/NeedsYouCard";
 import { TeamPulseCard } from "../features/pm-area/components/overview/TeamPulseCard";
 import { useOpenEscalationCount } from "../features/knowledge-request/useOpenEscalationCount";
 import { memberStage, waitingOn } from "../features/pm-area/memberStatus";
@@ -29,10 +28,10 @@ import { queryKeys } from "../services/queryKeys";
  * The overview section of the PM workspace (see `PmWorkspace`): what needs the manager today, how the team is doing, and the
  * three insight readouts — each a click from the section it summarizes.
  *
- * Built around one queue ("Needs you") rather than a column of equal widgets. The old page gave
- * ingestion health the top row and made a manager scroll past it to find a skip request; the
- * first question a manager brings to this page is "does anybody need me", so that answer leads,
- * and every person in it opens in the side panel where it can be acted on.
+ * Built around "does anybody need me" rather than a column of equal widgets. The old page gave
+ * ingestion health the top row and made a manager scroll past it to find a skip request. Now the
+ * "Waiting on you" figure says how many answers are owed, and the team card below lists the
+ * people who need the manager first, each opening in the side panel where it can be acted on.
  */
 export function PmDashboardPage() {
   const { selectedProjectId } = useProjectContext();
@@ -140,21 +139,13 @@ export function PmDashboardPage() {
         />
       </section>
 
-      {/* The team gets the width: it is the one card with a whole roster to show, while "Needs
-          you" is a short pointer list that reads fine narrow. */}
-      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
-        <NeedsYouCard
-          entries={queue}
-          loading={rosterLoading || attentionLoading}
-          onOpenMember={openMember}
-        />
-        <TeamPulseCard
-          roster={members}
-          loading={rosterLoading}
-          error={rosterError}
-          onOpenMember={openMember}
-        />
-      </div>
+      <TeamPulseCard
+        roster={members}
+        queue={queue}
+        loading={rosterLoading || attentionLoading}
+        error={rosterError}
+        onOpenMember={openMember}
+      />
 
       <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
         <OnboardingHealthCard />

@@ -163,28 +163,27 @@ describe("PmDashboardPage", () => {
     );
   });
 
-  it("lists everybody who needs the manager in one queue, most blocking first", async () => {
+  it("lists the people who need the manager first, most blocking first", async () => {
     renderPage();
 
-    const queue = within(await screen.findByRole("region", { name: "Needs you" }));
-    const rows = await queue.findAllByRole("button");
+    const team = within(await screen.findByRole("region", { name: "Team" }));
+    const rows = await team.findAllByRole("button");
 
+    // Dan is flagged by the metrics but not on the roster, so the team card leaves him out.
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining("Bob Builder"),
       expect.stringContaining("Cleo Park"),
-      expect.stringContaining("Dan Brown"),
     ]);
-    expect(rows[0]).toHaveTextContent("Skip request");
-    expect(rows[1]).toHaveTextContent("Feedback");
-    expect(rows[2]).toHaveTextContent("Waiting on review");
+    expect(within(rows[0]).getByLabelText("Skip request")).toBeInTheDocument();
+    expect(within(rows[1]).getByLabelText("Feedback")).toBeInTheDocument();
   });
 
   it("opens a person in the member panel rather than on another page", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const queue = within(await screen.findByRole("region", { name: "Needs you" }));
-    await user.click(await queue.findByRole("button", { name: /Bob Builder/ }));
+    const team = within(await screen.findByRole("region", { name: "Team" }));
+    await user.click(await team.findByRole("button", { name: /Bob Builder/ }));
 
     expect(screen.getByTestId("location")).toHaveTextContent("?member=bob");
   });
@@ -194,6 +193,6 @@ describe("PmDashboardPage", () => {
     mocks.attentionItems = [];
     renderPage();
 
-    expect(await screen.findByText("All clear")).toBeInTheDocument();
+    expect(await screen.findByText(/All clear/)).toBeInTheDocument();
   });
 });
