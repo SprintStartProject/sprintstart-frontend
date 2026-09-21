@@ -155,9 +155,9 @@ export function PmDashboardPage() {
         <KnowledgeGapsCard />
       </div>
 
-      {/* The project's plumbing: onboarding figures and ingestion full, industry at half — it is
-          one label, not a readout. */}
-      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)]">
+      {/* The project's plumbing: ingestion widest, since it lists sources; onboarding health (four
+          short figures) and industry (one label and its evidence) share the rest evenly. */}
+      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,1.3fr)]">
         <OnboardingHealthCard />
         <IngestionStatusWidget />
         <ProjectIndustryWidget />
