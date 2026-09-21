@@ -212,6 +212,65 @@ describe("useBuddy", () => {
     expect(result.current.messages).toHaveLength(0);
   });
 
+  /**
+   * The draft outlives the dock: close it mid-sentence and the words are still there. A seed that
+   * arrives afterwards — a selection, a card's question — must not be the thing that erases them.
+   */
+  describe("a seed on top of words the hire already typed", () => {
+    const QUOTE = "> The migration runs on deploy.\n\n";
+
+    it("keeps a closed dock's saved draft and puts the seed under it", async () => {
+      server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      act(() => {
+        result.current.setDraft("why does the deploy");
+      });
+      expect(result.current.isOpen).toBe(false);
+
+      act(() => {
+        openAiBuddy({ draft: QUOTE });
+      });
+
+      await waitFor(() => expect(result.current.isOpen).toBe(true));
+      expect(result.current.draft).toBe(`why does the deploy\n\n${QUOTE}`);
+    });
+
+    it("keeps an open dock's draft the same way", async () => {
+      server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      act(() => {
+        result.current.toggleOpen();
+        result.current.setDraft("why does the deploy");
+      });
+
+      act(() => {
+        openAiBuddy({ draft: QUOTE });
+      });
+
+      await waitFor(() => expect(result.current.draft).toBe(`why does the deploy\n\n${QUOTE}`));
+      expect(result.current.isOpen).toBe(true);
+    });
+
+    /** Pressing the same button twice is not asking twice. */
+    it("does not stack the same seed twice", async () => {
+      server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+
+      act(() => {
+        openAiBuddy({ draft: QUOTE });
+      });
+      act(() => {
+        openAiBuddy({ draft: QUOTE });
+      });
+
+      await waitFor(() => expect(result.current.isOpen).toBe(true));
+      expect(result.current.draft).toBe(QUOTE);
+    });
+  });
+
   it("toggles open state", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 

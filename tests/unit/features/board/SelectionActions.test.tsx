@@ -6,6 +6,7 @@ import { SelectionActions } from "../../../../src/features/board/selection/Selec
 import { boardService } from "../../../../src/services/boardService";
 import { ChatContext, type ChatContextValue } from "../../../../src/context/ChatContext";
 import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
+import { FocusModeContext } from "../../../../src/context/FocusModeContext";
 
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -57,12 +58,16 @@ describe("SelectionActions", () => {
     document.dispatchEvent(new Event("selectionchange"));
   }
 
-  function renderToolbar() {
+  function renderToolbar({ focused = false }: { focused?: boolean } = {}) {
     return render(
       <MemoryRouter>
-        <ChatContext.Provider value={mockChatContext}>
-          <SelectionActions />
-        </ChatContext.Provider>
+        <FocusModeContext.Provider
+          value={{ isFocused: focused, setFocused: () => {}, toggleFocused: () => {} }}
+        >
+          <ChatContext.Provider value={mockChatContext}>
+            <SelectionActions />
+          </ChatContext.Provider>
+        </FocusModeContext.Provider>
       </MemoryRouter>,
     );
   }
@@ -241,6 +246,18 @@ describe("SelectionActions", () => {
       expect(vi.mocked(openAiBuddy).mock.calls[0][0]).toEqual({
         draft: "> The migration runs on deploy.\n\nFrom Deploying a change\n\n",
       });
+    });
+
+    /**
+     * Focus mode takes the dock away and leaves this toolbar up, so the bus would have nobody
+     * listening: the press would do nothing but make the toolbar vanish. Not offered there.
+     */
+    it("is not offered in focus mode, where there is no dock to hand it to", async () => {
+      renderToolbar({ focused: true });
+      highlight("The migration runs on deploy.");
+
+      expect(await screen.findByRole("button", { name: /add to board/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /ask the buddy/i })).not.toBeInTheDocument();
     });
 
     /** Asking is not filing. A hire who wanted the card would have pressed the other button. */

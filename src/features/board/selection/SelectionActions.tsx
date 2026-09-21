@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { BookmarkPlus, Eraser, Highlighter, MessageCircle, Reply } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
+import { useFocusMode } from "../../../context/useFocusMode";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { ChatContext } from "../../../context/ChatContext";
 import { boardService } from "../../../services/boardService";
@@ -41,6 +42,7 @@ const TOOLBAR_HEIGHT = 44;
 export function SelectionActions() {
   const { selection, clear } = useTextSelection();
   const { selectedProjectId } = useProjectContext();
+  const { isFocused } = useFocusMode();
   const { canMark, colorAt, enclosingColorAt, mark, unmark } = useCardMarks();
   const chatContext = useContext(ChatContext);
   const quoteSelection = chatContext?.quoteSelection;
@@ -81,12 +83,15 @@ export function SelectionActions() {
   /**
    * Hands the selection to the buddy as a quote, unsent.
    *
-   * Nothing is awaited and nothing can fail: the bus is a `CustomEvent`, the dock is already
-   * mounted, and the draft is state. So the selection is cleared straight away — the words are in
-   * the composer now, and a toolbar still floating over them invites sending them twice.
+   * Delivery is a `CustomEvent` the dock listens for, so it reaches the dock only while the dock is
+   * mounted — which is why the offer is withheld in focus mode (see {@link canAsk}), the one place
+   * this toolbar is on screen and the dock is not. With the dock there, nothing is awaited: the
+   * seed lands in the composer in the same tick, so the selection is cleared straight away rather
+   * than left floating over words that are already on their way.
    *
-   * See `buddy/quoteFromSelection.ts` for why a quote the hire has not sent yet is the hire
-   * speaking rather than the frontend speaking for them.
+   * What lands is added to the composer, never swapped in for it — see `withSeed` in
+   * `buddy/hooks/useBuddy.ts`. See `buddy/quoteFromSelection.ts` for why a quote the hire has not
+   * sent yet is the hire speaking rather than the frontend speaking for them.
    */
   const ask = useCallback(() => {
     if (!selection) return;
@@ -150,6 +155,15 @@ export function SelectionActions() {
   // with nothing true to say: the pen is not on offer here, and neither half of the other branch
   // applies to text the board is already holding.
   if (marking && !offersPen && !erasable) return null;
+
+  /**
+   * Whether "Ask the buddy" has anything to hand the selection to.
+   *
+   * Needs a project, like keeping does, and needs the dock to be mounted: in focus mode the app
+   * takes the dock away (`showBuddyDock` in `App.tsx`) while this toolbar stays, and a button
+   * whose only visible effect is making the toolbar vanish is worse than no button.
+   */
+  const canAsk = Boolean(selectedProjectId) && !isFocused;
 
   const { rect } = selection;
   const fitsAbove = rect.top > TOOLBAR_HEIGHT + OFFSET;
@@ -249,7 +263,7 @@ export function SelectionActions() {
             </Button>
           )}
 
-          {selectedProjectId && (
+          {canAsk && (
             <>
               <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
               {/* Second, not first. Keeping is the offer that was always here and the one a hire

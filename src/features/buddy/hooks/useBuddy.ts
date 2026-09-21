@@ -62,7 +62,7 @@ export function useBuddy() {
      */
     return onOpenAiBuddy(({ draft: seed }) => {
       setIsOpen(true);
-      if (seed) setDraft(seed);
+      if (seed) setDraft((current) => withSeed(current, seed));
     });
   }, [setDraft]);
 
@@ -73,4 +73,23 @@ export function useBuddy() {
     closeDock,
     suggestions,
   };
+}
+
+/**
+ * What the composer holds once `seed` has been handed to it.
+ *
+ * Never at the cost of what the hire already typed. The draft outlives the dock — close it
+ * mid-sentence and the words are still there next time — and the page behind an open dock stays
+ * interactive, so a seed can arrive on top of a half-written question from either direction.
+ * Replacing it would throw away the one thing on screen nobody else can bring back.
+ *
+ * So an empty composer takes the seed as it is, and a composer with words in it keeps them and
+ * gets the seed underneath, after a blank line. Pressing the same button twice does not stack the
+ * same text twice: a draft that already ends with the seed is left alone.
+ */
+export function withSeed(current: string, seed: string): string {
+  if (current.trim().length === 0) return seed;
+  if (current.trimEnd().endsWith(seed.trimEnd())) return current;
+
+  return `${current.trimEnd()}\n\n${seed}`;
 }
