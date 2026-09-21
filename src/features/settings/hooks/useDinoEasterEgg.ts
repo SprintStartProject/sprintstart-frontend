@@ -66,7 +66,9 @@ export function useDinoEasterEgg(): DinoEasterEgg {
     // a different component").
     queueMicrotask(() => window.dispatchEvent(new Event("dinoUnlockChanged")));
 
-    showToast(currentlyUnlocked ? "you saw nothing... 🫣" : "shh... 🤫 (press Space)");
+    showToast(
+      currentlyUnlocked ? "you saw nothing... 🫣" : "shh... 🤫 press Space while AI is thinking",
+    );
   }, [showToast]);
 
   const handleIconClick = useRepeatClicks(UNLOCK_THRESHOLD, toggleUnlock);

@@ -55,6 +55,7 @@ describe("useDinoEasterEgg", () => {
     act(() => result.current.handleIconClick());
 
     expect(window.localStorage.getItem("dinoUnlocked")).toBe("false");
+    expect(result.current.toast).toContain("you saw nothing");
   });
 
   it("debounces rapid toggles (second triple-click within 2s is ignored)", () => {

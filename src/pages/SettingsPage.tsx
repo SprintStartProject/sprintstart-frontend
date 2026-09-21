@@ -9,6 +9,7 @@ import { SettingsSection } from "../features/settings/components/SettingsSection
 import { ProfileSection } from "../features/settings/components/ProfileSection";
 import { AppearanceSection } from "../features/settings/components/AppearanceSection";
 import { AccessTokensSection } from "../features/settings/components/AccessTokensSection";
+import { DinoUnlockPopover } from "../features/settings/components/DinoUnlockPopover";
 import { useDinoEasterEgg } from "../features/settings/hooks/useDinoEasterEgg";
 
 type SectionId = "profile" | "appearance" | "tokens";
@@ -122,6 +123,7 @@ export function SettingsPage() {
               subtitle="Manage your profile, appearance and access tokens in one place."
               onIconClick={dino.handleIconClick}
               eggHint
+              iconPopover={<DinoUnlockPopover toast={dino.toast} />}
             />
           </div>
         </div>
@@ -158,16 +160,6 @@ export function SettingsPage() {
           </div>
         </div>
       </main>
-
-      {dino.toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="animate-in fade-in slide-in-from-bottom-4 pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full bg-app-brand px-4 py-2 text-sm font-medium text-white shadow-lg"
-        >
-          {dino.toast}
-        </div>
-      )}
     </div>
   );
 }

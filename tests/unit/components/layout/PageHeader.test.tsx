@@ -40,4 +40,17 @@ describe("PageHeader", () => {
     const buttons = screen.getAllByRole("button", { name: "Settings icon" });
     expect(buttons).toHaveLength(2);
   });
+
+  it("renders iconPopover inside the icon container", () => {
+    render(
+      <PageHeader
+        icon={Home}
+        title="Settings"
+        onIconClick={() => {}}
+        iconPopover={<div data-testid="test-popover">Popover Content</div>}
+      />,
+    );
+    expect(screen.getByTestId("test-popover")).toBeInTheDocument();
+    expect(screen.getByText("Popover Content")).toBeInTheDocument();
+  });
 });
