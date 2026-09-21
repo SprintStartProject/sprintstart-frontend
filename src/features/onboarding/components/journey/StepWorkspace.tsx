@@ -116,7 +116,13 @@ export function StepWorkspace({
       .then(([detail, fetchedTasks, fetchedResources]) => {
         if (cancelled) return;
         setStep(detail);
-        if (detail.skip && detail.skip.accepted !== null && !detail.skip.answerSeenAt) {
+        // A read that worked clears a failure from an earlier one: this effect re-runs when the
+        // path's status for the step changes, and the old message used to survive the retry.
+        setError(null);
+        // The shared predicate, not `accepted !== null`: an `accepted` the backend omits is a
+        // request nobody has answered, and marking its non-existent answer seen is a lie the
+        // server then records.
+        if (detail.skip && !isSkipPending(detail.skip) && !detail.skip.answerSeenAt) {
           onSkipAnswerSeenRef.current?.(detail.skip.id);
         }
         setTasks([...fetchedTasks].sort((left, right) => left.position - right.position));

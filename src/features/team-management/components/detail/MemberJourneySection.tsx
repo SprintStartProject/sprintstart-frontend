@@ -15,6 +15,7 @@ import { SlidingTabPanel } from "../../../../components/ui/SlidingTabPanel";
 import { useSwipeableTabs } from "../../../../hooks/useHorizontalWheelNavigation";
 import { useToast } from "../../../../context/useToast";
 import { onboardingGraphService } from "../../../../services/onboardingGraphService";
+import { useAuth } from "../../../../context/useAuth";
 import { isSkipPending } from "../../../onboarding/journey";
 import { computeRanks } from "../../../onboarding/graph/layout";
 import {
@@ -113,6 +114,9 @@ export function MemberJourneySection({
   onPathChanged,
 }: Props) {
   const toast = useToast();
+  // Who is looking. The remembered view is per manager as well as per member: browser storage is
+  // per browser, so a key without this hands one manager's view to whoever signs in next.
+  const viewerId = useAuth().profile?.id ?? "";
   const firstName = memberName.split(" ")[0] || "this member";
   const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
   const nextAction = useMemo(() => (path ? resolveNextAction(path) : null), [path]);
@@ -127,10 +131,10 @@ export function MemberJourneySection({
 
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(
-    () => readJourneyView(memberJourneyViewKey(userId)).mode,
+    () => readJourneyView(memberJourneyViewKey(viewerId, userId)).mode,
   );
   const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
-    () => readJourneyView(memberJourneyViewKey(userId)).graphPhaseId,
+    () => readJourneyView(memberJourneyViewKey(viewerId, userId)).graphPhaseId,
   );
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [freshStepId, setFreshStepId] = useState<string | null>(null);
@@ -140,12 +144,12 @@ export function MemberJourneySection({
     ? graphPhaseId
     : null;
   useEffect(() => {
-    if (phases.length === 0) return;
-    writeJourneyView(memberJourneyViewKey(userId), {
+    if (phases.length === 0 || !viewerId) return;
+    writeJourneyView(memberJourneyViewKey(viewerId, userId), {
       mode: viewMode,
       graphPhaseId: openGraphPhaseId,
     });
-  }, [openGraphPhaseId, phases.length, userId, viewMode]);
+  }, [openGraphPhaseId, phases.length, userId, viewerId, viewMode]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLElement>({
     order: VIEW_ORDER,

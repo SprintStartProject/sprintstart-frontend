@@ -399,6 +399,11 @@ export function TeamMemberDetailPage() {
     if (skipsInReview.current.has(skipId)) return;
     skipsInReview.current.add(skipId);
     setReviewingSkipIds([...skipsInReview.current]);
+    const release = () => {
+      skipsInReview.current.delete(skipId);
+      setReviewingSkipIds([...skipsInReview.current]);
+    };
+
     try {
       if (action === "accept") {
         await acceptOnboardingSkipRequest(skipId, comment);
@@ -407,17 +412,23 @@ export function TeamMemberDetailPage() {
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
+      // Only a decision that never landed can be made again.
+      release();
       return;
-    } finally {
-      skipsInReview.current.delete(skipId);
-      setReviewingSkipIds([...skipsInReview.current]);
     }
+
     toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
     // Told apart from a failed decision: the answer is in, and retrying it would be refused.
     try {
       await Promise.all([refreshMember(), refreshOnboardingPath()]);
+      // Held until here, not released when the request came back: until the refresh lands, both
+      // surfaces still draw the request as pending, and a second decision would be sent against
+      // one the server has already answered.
+      release();
     } catch {
       toast.error("The answer was saved, but the page could not refresh. Reload to see it.");
+      // The guard stays on for good in this case, for the same reason: what is on screen is a
+      // request that has in fact been answered.
     }
   }
 

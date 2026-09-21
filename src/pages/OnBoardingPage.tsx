@@ -30,6 +30,7 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { SegmentedTabs } from "../components/ui/SegmentedTabs";
 import { SLIDING_PANEL_EXIT_MS, SlidingTabPanel } from "../components/ui/SlidingTabPanel";
+import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { GenerationScreen } from "../features/onboarding/components/journey/GenerationScreen";
@@ -80,7 +81,7 @@ import {
   withSkipAnswerUnseen,
 } from "../features/onboarding/skipAnswers";
 import {
-  HIRE_JOURNEY_VIEW_KEY,
+  hireJourneyViewKey,
   readJourneyView,
   writeJourneyView,
 } from "../features/onboarding/journeyViewMemory";
@@ -141,6 +142,12 @@ export function OnBoardingPage() {
   // unfolded, so links from the dashboard and the buddy keep landing on the step.
   const { stepId: routeStepId } = useParams<{ stepId?: string }>();
   const navigate = useNavigate();
+  // Whose remembered view this is. Browser storage is per browser, so without this two accounts
+  // on one machine share the List/Graph mode and the phase the graph was left on. Empty only
+  // before the profile is there, which `AuthGuard` does not render this page without -- the
+  // fallbacks below keep that case from writing under the wrong key anyway.
+  const viewerId = useAuth().profile?.id ?? "";
+  const viewKey = viewerId ? hireJourneyViewKey(viewerId) : null;
   const toast = useToast();
   const { celebrate: celebrateMoment, completeMission, flyby } = useMoments();
   const {
@@ -173,12 +180,14 @@ export function OnBoardingPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     routeStepId || navigationState?.focusQuestionId || navigationState?.choosePhase
       ? "list"
-      : readJourneyView(HIRE_JOURNEY_VIEW_KEY).mode,
+      : viewKey
+        ? readJourneyView(viewKey).mode
+        : "list",
   );
   const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
     // A phase arrived at by name opens *inside* itself on the graph, the same way it opens selected
     // in the list — the two views' idea of "here" has to be the one place the member was sent.
-    () => openPhaseId ?? readJourneyView(HIRE_JOURNEY_VIEW_KEY).graphPhaseId,
+    () => openPhaseId ?? (viewKey ? readJourneyView(viewKey).graphPhaseId : null),
   );
   // The item unfolded in the list, and the one zoomed into on the graph.
   const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
@@ -200,6 +209,17 @@ export function OnBoardingPage() {
   }, []);
   const chooserScrollTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(chooserScrollTimer.current), []);
+  /** Brings the phase chooser into view, once the panel holding it has slid in. */
+  const scrollToChooser = useCallback(() => {
+    window.clearTimeout(chooserScrollTimer.current);
+    chooserScrollTimer.current = window.setTimeout(
+      () =>
+        document
+          .querySelector("#phase-chooser")
+          ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
+      SLIDING_PANEL_EXIT_MS,
+    );
+  }, []);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   // Set when the page itself moves the member on, so the item they land on is scrolled to.
   const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
@@ -232,20 +252,9 @@ export function OnBoardingPage() {
     hasLoadedRef.current = true;
     void (async () => {
       try {
-        let loaded = await onboardingService.fetchPath();
-        // A step opened by its address starts like one opened by a click.
-        const linked = routeStepId
-          ? loaded.phases.flatMap((phase) => phase.steps).find((step) => step.id === routeStepId)
-          : undefined;
-        if (linked && linked.status === "WAITING" && !linked.locked) {
-          try {
-            await onboardingService.startStep(linked.id);
-            loaded = await onboardingService.fetchPath();
-          } catch (error) {
-            console.error("Failed to start the linked onboarding step:", error);
-          }
-        }
-        applyPath(loaded, { keepSelection: false });
+        // The step a link points at is started by the arrival effect below, which sees every
+        // link rather than only the one this visit started with.
+        applyPath(await onboardingService.fetchPath(), { keepSelection: false });
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) {
           // Absence is a normal state; a path is only built when the user asks for one.
@@ -256,8 +265,6 @@ export function OnBoardingPage() {
         setErrorMessage(error instanceof Error ? error.message : "Unknown error");
       }
     })();
-    // Once, on arrival: the route's step is read from the first render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyPath]);
 
   const refreshPath = useCallback(async () => {
@@ -304,48 +311,83 @@ export function OnBoardingPage() {
   }, [clearGeneration, generation, loadingState, path, toast]);
 
   /**
-   * The step in the address, whenever it changes and whenever the path does.
+   * Everything this visit was sent here for, in one place: a step in the address, a question or
+   * the phase chooser in the router's state.
    *
-   * Two things were wrong with seeding this once from the first render. A step id the path does
-   * not hold -- a stale link, a step from a rebuilt path, somebody else's -- rendered an arbitrary
-   * phase with nothing unfolded, no message and the dead id still in the address. And a *second*
-   * link arriving while the page was already mounted was ignored, because `/onboarding` and
-   * `/onboarding/:stepId` are the same component in the same position.
+   * One effect rather than one per instruction, and keyed on the instruction rather than run once
+   * on mount. `/onboarding` and `/onboarding/:stepId` are the same component in the same position,
+   * so a second link arriving while the page is open remounts nothing -- which is how the first
+   * version came to follow a changed step id but not a changed question, and to bring the chooser
+   * into view exactly once per visit however often somebody was sent to it.
+   *
+   * Each arrival does the same four things: check the target is still on the path, put the view
+   * where the target unfolds, start a step that was opened for the first time, and scroll to it.
    */
+  const focusQuestionId = navigationState?.focusQuestionId;
+  const wantsChooser = Boolean(navigationState?.choosePhase);
+  const arrival = useMemo(
+    () =>
+      routeStepId
+        ? { kind: "step" as const, id: routeStepId }
+        : focusQuestionId
+          ? { kind: "question" as const, id: focusQuestionId }
+          : wantsChooser
+            ? { kind: "choose" as const, id: "" }
+            : null,
+    [focusQuestionId, routeStepId, wantsChooser],
+  );
+  const arrivalKey = arrival ? `${arrival.kind}:${arrival.id}` : "";
+  const handledArrivalRef = useRef("");
+
+  // Read by the arrival effect, which must not re-run every time one of these is recreated.
+  const startStepRef = useRef<(item: PhaseItem) => void>(() => undefined);
+  const scrollToChooserRef = useRef<() => void>(() => undefined);
+
   useEffect(() => {
-    if (loadingState !== "success" || !routeStepId || !path) return;
-    const owningPhase = path.phases.find((phase) =>
-      phase.steps.some((step) => step.id === routeStepId),
-    );
+    if (loadingState !== "success" || !path || !arrival) return;
+    if (handledArrivalRef.current === arrivalKey) return;
+    handledArrivalRef.current = arrivalKey;
+
     // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
     // and this is the pattern the repo already passes with.
     queueMicrotask(() => {
-      if (!owningPhase) {
-        toast.error("That step is not on your path", {
-          description: "It may have been replaced when your path was rebuilt.",
-        });
-        void navigate("/onboarding", { replace: true });
+      // The list, whichever view was last used: a step, a question and the chooser all unfold
+      // there. Marked as forced, so it is not written back as a preference the member chose.
+      arrivedInForcedList.current = true;
+      setViewMode("list");
+
+      if (arrival.kind === "choose") {
+        setExpandedItemId(null);
+        scrollToChooserRef.current();
         return;
       }
-      if (expandedItemId === routeStepId) return;
-      setSelectedPhaseId(owningPhase.id);
-      setViewMode("list");
-      scrollToItemRef.current = routeStepId;
-      setExpandedItemId(routeStepId);
-    });
-  }, [expandedItemId, loadingState, navigate, path, routeStepId, toast]);
 
-  // Brings the chooser into view when the member was sent to pick a phase, once per visit.
-  const hasShownChooserRef = useRef(false);
-  useEffect(() => {
-    if (loadingState !== "success" || hasShownChooserRef.current || !navigationState?.choosePhase) {
-      return;
-    }
-    hasShownChooserRef.current = true;
-    document
-      .querySelector("#phase-chooser")
-      ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-  }, [loadingState, navigationState]);
+      const owningPhase = path.phases.find((phase) =>
+        phaseItems(phase).some((item) => item.id === arrival.id),
+      );
+      if (!owningPhase) {
+        toast.error(
+          arrival.kind === "step"
+            ? "That step is not on your path"
+            : "That question is not on your path",
+          { description: "It may have been replaced when your path was rebuilt." },
+        );
+        // Only the step has an address of its own to go back from; a question arrives in router
+        // state, which is dropped by navigating to the same place without it.
+        void navigate("/onboarding", { replace: true, state: null });
+        return;
+      }
+
+      setSelectedPhaseId(owningPhase.id);
+      scrollToItemRef.current = arrival.id;
+      setExpandedItemId(arrival.id);
+
+      // A step opened by its address is started like one opened by a click -- including the
+      // second link of a visit, which the load-time version could not see.
+      const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
+      if (item) startStepRef.current(item);
+    });
+  }, [arrival, arrivalKey, loadingState, navigate, path, toast]);
 
   // Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue".
   useEffect(() => {
@@ -360,9 +402,9 @@ export function OnBoardingPage() {
   // A remembered phase that is not in this path (a rebuilt path, another project) opens the map.
   const openGraphPhaseId = phases.some((phase) => phase.id === graphPhaseId) ? graphPhaseId : null;
   useEffect(() => {
-    if (loadingState !== "success" || arrivedInForcedList.current) return;
-    writeJourneyView(HIRE_JOURNEY_VIEW_KEY, { mode: viewMode, graphPhaseId: openGraphPhaseId });
-  }, [loadingState, openGraphPhaseId, viewMode]);
+    if (loadingState !== "success" || arrivedInForcedList.current || !viewKey) return;
+    writeJourneyView(viewKey, { mode: viewMode, graphPhaseId: openGraphPhaseId });
+  }, [loadingState, openGraphPhaseId, viewKey, viewMode]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLDivElement>({
     order: VIEW_ORDER,
@@ -418,6 +460,13 @@ export function OnBoardingPage() {
       });
     }
   };
+
+  // Refreshed every render, so the arrival effect can call the latest of each without taking a
+  // dependency on a function that is recreated on every render.
+  useEffect(() => {
+    startStepRef.current = (item) => void beginStepIfWaiting(item);
+    scrollToChooserRef.current = scrollToChooser;
+  });
 
   /**
    * The answer to a skip request has been drawn for the member, so its "new" marker goes -- here
@@ -506,16 +555,7 @@ export function OnBoardingPage() {
           setGraphPhaseId(null);
           // The chooser lives in the list; from inside the graph there is nothing to scroll to.
           chooseViewMode("list");
-          // After the panel that holds it has slid in. Tracked so leaving the page cancels it --
-          // it was the one timer in this file that outlived the component that set it.
-          window.clearTimeout(chooserScrollTimer.current);
-          chooserScrollTimer.current = window.setTimeout(
-            () =>
-              document
-                .querySelector("#phase-chooser")
-                ?.scrollIntoView?.({ behavior: "smooth", block: "center" }),
-            SLIDING_PANEL_EXIT_MS,
-          );
+          scrollToChooser();
         },
       };
     }

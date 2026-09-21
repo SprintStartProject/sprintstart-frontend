@@ -301,6 +301,37 @@ describe("TeamMemberDetailPage", () => {
     expect(mockDenyOnboardingSkipRequest).not.toHaveBeenCalled();
   });
 
+  /**
+   * The decision is in, but both surfaces still draw the request as pending until the refresh
+   * lands -- and if the refresh never lands, they draw it for good. Enabling them again in the
+   * meantime invites a second decision against a request the server has already answered.
+   */
+  it("keeps the answered request locked when the refresh that should clear it fails", async () => {
+    const user = userEvent.setup();
+    mockAcceptOnboardingSkipRequest.mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <TeamMemberDetailPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Skip requested")).toBeInTheDocument();
+    });
+
+    // Only the refresh that follows the decision fails; the page itself loaded.
+    mockGetTeamMember.mockRejectedValueOnce(new Error("gateway"));
+
+    await user.click(screen.getByRole("button", { name: "Approve skip" }));
+
+    await waitFor(() => expect(mockAcceptOnboardingSkipRequest).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Approve skip" })).toBeDisabled();
+    });
+    expect(screen.getByRole("button", { name: "Decline" })).toBeDisabled();
+  });
+
   // The knowledge-gaps overview is the project's full component roster now, but
   // this panel is headed "Knowledge gaps" -- listing repositories that are
   // missing nothing would overstate what the member has to answer for.

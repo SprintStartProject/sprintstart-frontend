@@ -155,6 +155,31 @@ describe("StepWorkspace", () => {
     await waitFor(() => expect(onSkipAnswerSeen).toHaveBeenCalledWith("skip-1"));
   });
 
+  /**
+   * `accepted` is an explicit `null` on a pending request, but an omitted one means the same
+   * thing -- and `accepted !== null` is true for `undefined`, which had the page reporting that
+   * the member had seen an answer nobody has given yet.
+   */
+  it("does not mark a request whose answer is still missing as seen", async () => {
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue({
+      ...step,
+      skip: {
+        id: "skip-1",
+        stepId: "step1",
+        reason: "I have done this before",
+        reviewComment: null,
+        reviewedAt: null,
+        answerSeenAt: null,
+      } as unknown as NonNullable<(typeof step)["skip"]>,
+    });
+    const onSkipAnswerSeen = vi.fn();
+
+    renderWorkspace({ onSkipAnswerSeen });
+
+    await screen.findByRole("button", { name: /Install Node/ });
+    expect(onSkipAnswerSeen).not.toHaveBeenCalled();
+  });
+
   it("leaves an answer that has already been seen alone", async () => {
     vi.mocked(onboardingService.fetchStep).mockResolvedValue({
       ...step,

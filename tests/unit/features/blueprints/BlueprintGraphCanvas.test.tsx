@@ -296,9 +296,7 @@ describe("BlueprintGraphCanvas", () => {
     fireEvent.keyDown(pane, { key: "ArrowRight" });
     fireEvent.keyDown(pane, { key: "ArrowRight" });
 
-    await waitFor(() =>
-      expect(document.activeElement).toHaveAttribute("data-journey-node", "b"),
-    );
+    await waitFor(() => expect(document.activeElement).toHaveAttribute("data-journey-node", "b"));
 
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Enter" });
 
