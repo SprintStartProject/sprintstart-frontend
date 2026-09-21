@@ -423,7 +423,10 @@ export function SourceDetailsPanel({
           <div className="mb-3">
             <DinoGame
               onExit={closeDino}
-              replyReady={!isSyncing && dinoActive}
+              // "Sync complete" may only claim the state the source actually
+              // reached: leaving syncing also happens on a failure (attention)
+              // or a disabled source, and neither is a completed sync.
+              replyReady={dinoActive && source.statusView.state === "connected"}
               completionLabel="Sync complete"
             />
           </div>

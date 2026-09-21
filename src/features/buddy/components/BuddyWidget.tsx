@@ -320,7 +320,8 @@ export function BuddyWidget() {
             suggestionsHidden={suggestionsHidden}
             onHideSuggestions={() => setSuggestionsHidden(true)}
             // Hire conversation ↔ team conversations, in the header beside the title. The
-            // switcher carries the restore audit with it (see `BuddyModeSwitcher`).
+            // switcher only *offers* the switch; the restore audit lives in the session
+            // (`useBuddyConversation` / `BuddyProvider`).
             headerControl={
               <BuddyModeSwitcher
                 teamProjectId={teamProjectId}

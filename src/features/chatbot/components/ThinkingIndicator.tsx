@@ -34,9 +34,12 @@ export function ThinkingIndicator({
   // If neither thinking nor game active, nothing to render.
   if (!isThinking && !gameActive) return null;
 
-  // When thoughts/reasoning are streaming and the user has not opened the dino game,
-  // the ReasoningPanel already visibly displays the thinking state, so suppress the
-  // redundant bouncing dots indicator.
+  // When the dino game is closed, streamed reasoning leaves the ReasoningPanel as the
+  // visible carrier of the thinking state, so the bouncing dots are suppressed as
+  // redundant. Residual gap, accepted: a tool label set *after* the reasoning (e.g.
+  // "Searching knowledge base…") has no surface while the panel is open — the panel
+  // does not render thinkingState, and these dots stay hidden. With the game open the
+  // label shows here next to the game.
   if (hasReasoning && !gameActive) return null;
 
   // Resolve the status label; unknown tool names fall back to no label.

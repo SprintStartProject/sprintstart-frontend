@@ -132,8 +132,15 @@ export function useBuddyConversation(
   const { profile } = useAuth();
   const userId = profile?.id ?? null;
   const userIdRef = useRef<string | null>(null);
+  // Declared before the effect that resets it: the target binding must not outlive the user whose
+  // thread created it.
+  const teamTargetRef = useRef<string | null>(null);
   useEffect(() => {
     userIdRef.current = userId;
+    // A signed-in-user change drops the old user's project binding here, not just the visible
+    // mode: a stale target would make the adopt effect compare the next user's selection against
+    // it and overwrite their restored preference with a bogus exit.
+    teamTargetRef.current = null;
     // Re-read on every subject change: a logout or an account switch must not inherit the
     // previous user's preference. Nothing persisted while there is no user to own it.
     // Deferred to a microtask so the setState never runs synchronously in the effect body.
@@ -148,7 +155,6 @@ export function useBuddyConversation(
    * target while a switch is pending. `null` means team mode is on but has not adopted a
    * project yet (a restored preference waiting for the list to vouch).
    */
-  const teamTargetRef = useRef<string | null>(null);
 
   const setTeamMode = useCallback((value: boolean) => {
     setIsTeamMode(value);
@@ -437,8 +443,17 @@ export function useBuddyConversation(
     // second open. The backend replays the greeting it has just written rather than composing
     // another, so the hire would read the identical words twice.
     // `pendingDecisionsRef` is read alongside the state: a decision and this click can land
-    // in one frame, before the "deciding" state has re-rendered.
-    if (greetingRef.current || isDeciding || pendingDecisionsRef.current > 0) return;
+    // in one frame, before the "deciding" state has re-rendered. A live reply is also a
+    // reason to refuse: clearing mid-stream would silently drop the tokens, citations and
+    // proposed actions still on their way.
+    if (
+      greetingRef.current ||
+      isDeciding ||
+      isThinking ||
+      isStreaming ||
+      pendingDecisionsRef.current > 0
+    )
+      return;
     greetingRef.current = true;
 
     setMessages([]);
@@ -454,7 +469,7 @@ export function useBuddyConversation(
       greetingRef.current = false;
       setIsOpening(false);
     }
-  }, [greet, isDeciding]);
+  }, [greet, isDeciding, isThinking, isStreaming]);
 
   /**
    * Marks the turn a reply was streaming into as failed, so the thread says so.
@@ -662,9 +677,11 @@ export function useBuddyConversation(
 
   const confirmAction = useCallback(
     (messageId: string, action: ProposedAction) => {
-      // Retryable after a transport error; anything already on its way, answered or declined is
-      // not confirmable again.
-      if (action.status !== "idle" && action.status !== "error") return;
+      // Retryable after a transport error. A hire offer that came back refused is offered again
+      // under its reason ("Try again: …") when the refusal is not permanent, so it must pass the
+      // guard too; anything else already on its way, answered or declined is spent.
+      const retryableRefusal = action.status === "resolved" && "action" in action && !action.ok;
+      if (action.status !== "idle" && action.status !== "error" && !retryableRefusal) return;
 
       // One lock per proposal card, shared by both decisions: confirm and dismiss are the two
       // halves of one question, and letting both run would let the slower response overwrite

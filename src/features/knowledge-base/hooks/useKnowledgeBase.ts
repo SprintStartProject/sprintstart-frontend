@@ -264,13 +264,18 @@ export function useKnowledgeBase(projectId: string | null) {
     const offered = new Set([...repos, ...selectedRepositories]);
     return [...offered]
       .sort((a, b) => a.localeCompare(b))
-      .map((repository) => ({
-        value: repository,
-        label: repository,
-        count: githubCandidates.filter((artifact) =>
-          matchesRepository(artifact, new Set([repository])),
-        ).length,
-      }));
+      .map((repository) => {
+        // One set per offered repository (not per candidate): the count filter
+        // runs per artifact, so allocating inside the filter was O(repos ×
+        // candidates) throwaway Set allocations per facet evaluation.
+        const selection = new Set([repository]);
+        return {
+          value: repository,
+          label: repository,
+          count: githubCandidates.filter((artifact) => matchesRepository(artifact, selection))
+            .length,
+        };
+      });
   }, [
     artifacts,
     deferredSearchQuery,

@@ -466,7 +466,7 @@ export function ChatPage() {
               gameActive={gameActive}
               thinkingState={thinkingState}
               hasReasoning={hasReasoning}
-              replyReady={!isThinking && gameActive}
+              replyReady={gameActive && !isThinking && !isStreaming}
               onGameExit={closeGame}
             />
 

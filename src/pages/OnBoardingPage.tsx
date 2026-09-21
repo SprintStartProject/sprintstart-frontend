@@ -586,7 +586,11 @@ export function OnBoardingPage() {
       <GenerationScreen
         phases={activePhases}
         startedAt={startedAt}
-        isCompleted={!isRunning}
+        // Only a finished generation may claim "Path ready": a failed one also
+        // leaves the running state (and holds the game open until the user
+        // exits), and its screen says so — promising a path that failed to
+        // assemble would lie exactly where the user is looking.
+        isCompleted={generation.status === "done"}
         onGameActiveChange={setIsDinoActiveInGeneration}
       />
     );

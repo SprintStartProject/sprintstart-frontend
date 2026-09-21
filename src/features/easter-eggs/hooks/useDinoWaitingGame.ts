@@ -24,7 +24,8 @@ export function useDinoUnlocked(): boolean {
   return isUnlocked;
 }
 
-const isTypingTarget = (el: Element | null) =>
+/** Shared guard: true while the event landed in a text field that owns the keys. */
+export const isTypingTarget = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable);
 

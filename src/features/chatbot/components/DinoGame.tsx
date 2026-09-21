@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isTypingTarget } from "../../easter-eggs/hooks/useDinoWaitingGame";
 
 type DinoGameProps = {
   /**
@@ -269,6 +270,12 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
   // Keyboard + pointer controls.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // The game listens on the window, and it now outlives the turn it was armed
+      // for — exactly the window in which the user starts typing the next message
+      // (the composer regains focus the moment the turn ends). While the event
+      // target is a text field, every key below is a character or caret move:
+      // leave it unprevented and unhandled.
+      if (isTypingTarget(e.target)) return;
       if (e.key === "Escape") {
         e.preventDefault();
         onExit();
@@ -288,6 +295,7 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       if (e.code === "Space" || e.key === "ArrowUp" || e.key === "w") {
         releaseJump();
         return;
