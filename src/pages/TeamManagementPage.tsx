@@ -399,14 +399,10 @@ export function TeamManagementPage() {
                 className={`hidden gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid ${ROSTER_COLUMNS}`}
               >
                 <span>Member</span>
-                {/* The column shows where someone is; what it sorts by is how long they have
-                    been there — said on the control, with the clock every row's day count
-                    carries, so it does not read as a second "progress" sort. */}
-                <span className="flex items-center gap-2">
-                  <span>Where they are</span>
-                  <span aria-hidden="true" className="text-app-border">
-                    ·
-                  </span>
+                {/* Named for what it sorts by, not for what the rows show: "Where they are"
+                    over a sort arrow read like a second progress sort. The step itself is
+                    obvious from every row; the clock matches each row's day count. */}
+                <span>
                   <SortHeader
                     column="step"
                     label="Time on step"
