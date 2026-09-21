@@ -138,19 +138,6 @@ export function BuddyActionProposals({
               </div>
             )}
 
-            {/* The address as well as the label, because the label is the mentor's wording and the
-                address is the part that has to be right. A link card is a promise that it works. */}
-            {action.linkUrl && (
-              <div className="min-w-0">
-                {action.linkLabel && (
-                  <p className="text-sm font-medium break-words text-app-text">
-                    {action.linkLabel}
-                  </p>
-                )}
-                <p className="text-xs break-all text-app-text-muted">{action.linkUrl}</p>
-              </div>
-            )}
-
             {/* The one offer that *replaces* something already on a card, so it shows both: the
                 line as it reads now and as it would read. Only the new wording would be asking
                 them to agree to a change they would have to go and diff for themselves.

@@ -369,30 +369,6 @@ describe("BuddyActionProposals", () => {
     });
   });
 
-  /** The label is the mentor's wording; the address is the part that has to be right. */
-  describe("a proposed link", () => {
-    it("shows the address as well as the label", () => {
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[
-            action({
-              action: "place_link",
-              label: "Keep this link",
-              linkUrl: "https://example.test/runbook",
-              linkLabel: "The deploy runbook",
-            }),
-          ]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
-      );
-
-      expect(screen.getByText("The deploy runbook")).toBeInTheDocument();
-      expect(screen.getByText("https://example.test/runbook")).toBeInTheDocument();
-    });
-  });
-
   describe("a proposed note", () => {
     it("shows the words that would be kept", () => {
       render(
