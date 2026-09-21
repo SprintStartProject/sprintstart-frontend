@@ -164,11 +164,13 @@ describe("TeamManagementPage", () => {
       ),
     );
 
+    // "waiting" is what the overview linked to before it was merged into "needs you"; old links
+    // still land on the merged filter.
     renderPage("/team-management?filter=waiting");
 
     expect(await screen.findByText("Alice Smith")).toBeInTheDocument();
     expect(screen.queryByText("Bob Jones")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Waiting on you/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /Needs you/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

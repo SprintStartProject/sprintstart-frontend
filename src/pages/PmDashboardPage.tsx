@@ -99,7 +99,7 @@ export function PmDashboardPage() {
           value={figuresReady ? waitingCount : "—"}
           hint={waitingCount > 0 ? waitingHint : "No skip requests, no unread feedback"}
           attention={waitingCount > 0}
-          to="/team-management?filter=waiting"
+          to="/team-management?filter=attention"
         />
         <PmStat
           icon={Inbox}
