@@ -317,11 +317,14 @@ export function PmWorkspace() {
               ariaLabel="PM dashboard sections"
             />
 
-            {/* `overflow-x-clip` keeps the slide inside the column: the incoming section starts
+            {/* `-mx-2 px-2` moves the clip edge 8px outside the column without moving the
+                content, so focus rings and borders at the column's edge (the team search box,
+                say) paint the few pixels they reach past it instead of being cut.
+                `overflow-x-clip` keeps the slide inside the column: the incoming section starts
                 24px to the side, and without the clip that briefly widened the page and flashed
                 a horizontal scrollbar under the header. `clip` rather than `hidden`, which would
                 make this a scroll container and break the sticky and fixed elements inside. */}
-            <div ref={sectionFrameRef} className="mt-6 overflow-x-clip">
+            <div ref={sectionFrameRef} className="-mx-2 mt-6 overflow-x-clip px-2">
               <SlidingTabPanel activeKey={viewKey} index={PM_SECTION_ORDER.indexOf(section)}>
                 {content}
               </SlidingTabPanel>

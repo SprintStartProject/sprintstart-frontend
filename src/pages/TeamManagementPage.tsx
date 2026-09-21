@@ -290,15 +290,19 @@ export function TeamManagementPage() {
           <div className="space-y-4">
             {/* One row: search, the status chips, then role and sort on the right. */}
             <div className="flex flex-wrap items-center gap-2">
-              <Input
-                size="sm"
-                icon={<Search className="h-4 w-4" />}
-                aria-label="Search members"
-                placeholder="Search by name or step…"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="min-w-0 flex-1 sm:max-w-xs"
-              />
+              {/* Sized on a wrapper: with an icon, `Input` puts its `className` on the <input>
+                  inside its own full-width box, so flex sizing given to it never reached the
+                  box that actually sits in this row. */}
+              <div className="min-w-0 flex-1 sm:max-w-xs">
+                <Input
+                  size="sm"
+                  icon={<Search className="h-4 w-4" />}
+                  aria-label="Search members"
+                  placeholder="Search by name or step…"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </div>
 
               <div
                 role="group"
