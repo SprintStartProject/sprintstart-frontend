@@ -1,4 +1,4 @@
-import { render as rtlRender, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GitBranch } from "lucide-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,6 +89,7 @@ const confluenceSource: DataSource = {
 
 describe("SourceDetailsPanel", () => {
   beforeEach(() => {
+    window.localStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -500,5 +501,70 @@ describe("SourceDetailsPanel", () => {
     expect(screen.getByText("Commits")).toBeInTheDocument();
     expect(screen.getByText("Issues")).toBeInTheDocument();
     expect(screen.getByText("Pull requests")).toBeInTheDocument();
+  });
+
+  it("does not show space hint or open DinoGame when dino is locked", () => {
+    const syncingSource: DataSource = {
+      ...mockSource,
+      statusView: {
+        state: "syncing",
+        label: "Syncing",
+        icon: mockSource.icon,
+        tone: "brand",
+        spinning: true,
+      },
+    };
+
+    render(<SourceDetailsPanel source={syncingSource} onClose={vi.fn()} />);
+
+    expect(screen.queryByText(/to pass the time/i)).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { code: "Space" });
+    expect(screen.queryByRole("application", { name: /mini dino game/i })).not.toBeInTheDocument();
+  });
+
+  it("shows space hint when syncing and dino is unlocked, and starts DinoGame on Space", () => {
+    window.localStorage.setItem("dinoUnlocked", "true");
+    const syncingSource: DataSource = {
+      ...mockSource,
+      statusView: {
+        state: "syncing",
+        label: "Syncing",
+        icon: mockSource.icon,
+        tone: "brand",
+        spinning: true,
+      },
+    };
+
+    render(<SourceDetailsPanel source={syncingSource} onClose={vi.fn()} />);
+
+    expect(screen.getByText(/to pass the time/i)).toBeInTheDocument();
+    fireEvent.keyDown(window, { code: "Space" });
+
+    expect(screen.getByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
+  });
+
+  it("shows 'Sync complete' badge when syncing finishes while game is active", () => {
+    window.localStorage.setItem("dinoUnlocked", "true");
+    const syncingSource: DataSource = {
+      ...mockSource,
+      statusView: {
+        state: "syncing",
+        label: "Syncing",
+        icon: mockSource.icon,
+        tone: "brand",
+        spinning: true,
+      },
+    };
+
+    const { rerender } = render(<SourceDetailsPanel source={syncingSource} onClose={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "Space" });
+    expect(screen.getByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
+    expect(screen.queryByText(/sync complete/i)).not.toBeInTheDocument();
+
+    // Source finishes syncing
+    rerender(<SourceDetailsPanel source={mockSource} onClose={vi.fn()} />);
+
+    expect(screen.getByText(/sync complete/i)).toBeInTheDocument();
   });
 });

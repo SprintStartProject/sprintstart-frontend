@@ -43,6 +43,7 @@ import { StepWorkspace } from "../features/onboarding/components/journey/StepWor
 import {
   useOnboardingJourney,
   type GenerationFailureReason,
+  type GenerationPhaseProgress,
   type UnavailableReason,
 } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
@@ -183,6 +184,23 @@ export function OnBoardingPage() {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(focusItemId ?? null);
   const [graphItemId, setGraphItemId] = useState<string | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [isDinoActiveInGeneration, setIsDinoActiveInGeneration] = useState(false);
+  const [lastGeneration, setLastGeneration] = useState<{
+    phases: GenerationPhaseProgress[];
+    startedAt: number;
+  }>({ phases: [], startedAt: 0 });
+
+  useEffect(() => {
+    if (generation.status === "running") {
+      const { phases: currentPhases, startedAt } = generation;
+      queueMicrotask(() => {
+        setLastGeneration({
+          phases: currentPhases,
+          startedAt,
+        });
+      });
+    }
+  }, [generation]);
   // Set when the page itself moves the member on, so the item they land on is scrolled to.
   const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
 
@@ -559,8 +577,19 @@ export function OnBoardingPage() {
 
   // ── Render: generating ──────────────────────────────────────
 
-  if (generation.status === "running") {
-    return <GenerationScreen phases={generation.phases} startedAt={generation.startedAt} />;
+  if (generation.status === "running" || isDinoActiveInGeneration) {
+    const isRunning = generation.status === "running";
+    const activePhases = isRunning ? generation.phases : lastGeneration.phases;
+    const startedAt = isRunning ? generation.startedAt : lastGeneration.startedAt;
+
+    return (
+      <GenerationScreen
+        phases={activePhases}
+        startedAt={startedAt}
+        isCompleted={!isRunning}
+        onGameActiveChange={setIsDinoActiveInGeneration}
+      />
+    );
   }
 
   // ── Render: loading ─────────────────────────────────────────

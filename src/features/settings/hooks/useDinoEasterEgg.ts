@@ -67,7 +67,7 @@ export function useDinoEasterEgg(): DinoEasterEgg {
     queueMicrotask(() => window.dispatchEvent(new Event("dinoUnlockChanged")));
 
     showToast(
-      currentlyUnlocked ? "you saw nothing... 🫣" : "shh... 🤫 press Space while AI is thinking",
+      currentlyUnlocked ? "you saw nothing... 🫣" : "shh... 🤫 press Space whenever you're waiting",
     );
   }, [showToast]);
 

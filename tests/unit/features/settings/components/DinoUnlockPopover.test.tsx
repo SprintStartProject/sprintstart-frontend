@@ -9,13 +9,13 @@ describe("DinoUnlockPopover", () => {
   });
 
   it("renders playful whisper with kbd badge when unlocking", () => {
-    render(<DinoUnlockPopover toast="shh... 🤫 press Space while AI is thinking" />);
+    render(<DinoUnlockPopover toast="shh... 🤫 press Space whenever you're waiting" />);
 
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.getByText(/shh\.\.\. press/i)).toBeInTheDocument();
     expect(screen.getByText("Space")).toBeInTheDocument();
     expect(screen.getByText("Space").tagName.toLowerCase()).toBe("kbd");
-    expect(screen.getByText(/while AI is thinking/i)).toBeInTheDocument();
+    expect(screen.getByText(/whenever you're waiting/i)).toBeInTheDocument();
   });
 
   it("renders you saw nothing whisper when locking", () => {

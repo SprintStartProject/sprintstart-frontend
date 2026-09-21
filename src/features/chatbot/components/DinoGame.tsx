@@ -9,6 +9,10 @@ type DinoGameProps = {
    * True when the assistant reply has arrived while the game is open.
    */
   replyReady?: boolean;
+  /**
+   * Optional custom completion label shown when `replyReady` is true (defaults to "Reply ready").
+   */
+  completionLabel?: string;
 };
 
 type Phase = "intro" | "play" | "over";
@@ -164,7 +168,7 @@ function roundedRect(
  * The whole game runs on a canvas driven by requestAnimationFrame; React state
  * is only used for the surrounding chrome (game-over overlay, score badge).
  */
-export function DinoGame({ onExit, replyReady = false }: DinoGameProps) {
+export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -249,7 +253,7 @@ export function DinoGame({ onExit, replyReady = false }: DinoGameProps) {
         w.jumpBuffer = JUMP_BUFFER_TIME;
       }
     }
-  }, [resetWorld]);
+  }, [onExit, replyReady, resetWorld]);
 
   const releaseJump = useCallback(() => {
     const w = worldRef.current;
@@ -825,7 +829,7 @@ export function DinoGame({ onExit, replyReady = false }: DinoGameProps) {
               aria-hidden="true"
             />
           )}
-          <span>{replyReady ? "Reply ready · Esc ✕" : "Esc ✕"}</span>
+          <span>{replyReady ? `${completionLabel ?? "Reply ready"} · Esc ✕` : "Esc ✕"}</span>
         </button>
       </div>
 
@@ -860,7 +864,7 @@ export function DinoGame({ onExit, replyReady = false }: DinoGameProps) {
                 onClick={onExit}
                 className="rounded-lg bg-app-brand px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-brand-hover"
               >
-                View Reply (Space)
+                {completionLabel ? `${completionLabel} (Space)` : "View Reply (Space)"}
               </button>
             ) : (
               <button

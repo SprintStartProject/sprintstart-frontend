@@ -55,7 +55,7 @@ export function DinoUnlockPopover({ toast, className = "" }: DinoUnlockPopoverPr
                   <kbd className="inline-flex items-center rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-app-text shadow-2xs">
                     Space
                   </kbd>
-                  <span className="text-app-text-muted">while AI is thinking</span>
+                  <span className="text-app-text-muted">{"whenever you're waiting"}</span>
                 </span>
               </div>
             ) : isLock ? (
