@@ -4,6 +4,7 @@ import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AddTaskToBoard } from "./AddTaskToBoard";
 import type { BoardCard, CurrentTaskContent } from "../types";
 
 type CurrentTaskCardProps = {
@@ -11,6 +12,8 @@ type CurrentTaskCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
+  /** Told when the hire makes a checklist out of this task, so the board can re-read itself. */
+  onCardAdded?: () => void;
 };
 
 /**
@@ -29,7 +32,13 @@ type CurrentTaskCardProps = {
  * and where to go next, and the buddy question is repointed at picking a new one. Silently
  * dropping the card would leave the hire still thinking this is their goal.
  */
-export function CurrentTaskCard({ content, card, onDismiss, dismissing }: CurrentTaskCardProps) {
+export function CurrentTaskCard({
+  content,
+  card,
+  onDismiss,
+  dismissing,
+  onCardAdded,
+}: CurrentTaskCardProps) {
   const hasTask = content.taskId !== null;
   const closed = hasTask && content.closedAtSource;
   // A live card, so its highlights are matched by their words rather than written into the text —
@@ -94,14 +103,36 @@ export function CurrentTaskCard({ content, card, onDismiss, dismissing }: Curren
         </EmptyState>
       )}
 
+      {/* A working copy of the task, on the hire's own board, that they may break down and tick
+          off. This card is a live read they cannot edit, and the steps somebody thinks up while
+          reading a task have to go somewhere. It changes nothing about the task — see
+          `generation/taskChecklist.ts`. */}
+      {hasTask && content.title && (
+        <div className="mt-3">
+          <AddTaskToBoard
+            title={content.title}
+            summary={content.summary}
+            url={content.url}
+            onAdded={onCardAdded}
+            // This card asks the mentor for first steps in its own words below. A second button
+            // opening the same conversation with the same question is one button too many.
+            offerToAsk={false}
+          />
+        </div>
+      )}
+
       {/* "How do I start this" is what makes the mentor offer to assemble the orientation
-                packet, so the card needs no orientation action of its own. */}
+                packet, so the card needs no orientation action of its own.
+
+                It asks for a checklist, which is not decoration: a task that states no steps of
+                its own gets them here or nowhere, and the offer to keep a reply as a card only
+                appears under a reply that holds a list. See `AddTaskToBoard`. */}
       <AskTheBuddy
         question={
           closed
             ? `My task "${content.title ?? "my task"}" was closed. Which one should I take instead?`
             : hasTask
-              ? `How do I get started on "${content.title ?? "my task"}"?`
+              ? `How do I get started on "${content.title ?? "my task"}"? A short checklist of first steps would help.`
               : "What would be a good task for me to pick up?"
         }
         label={closed ? "Help me pick another one" : undefined}

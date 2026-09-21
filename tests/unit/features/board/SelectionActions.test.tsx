@@ -5,6 +5,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SelectionActions } from "../../../../src/features/board/selection/SelectionActions";
 import { boardService } from "../../../../src/services/boardService";
 import { ChatContext, type ChatContextValue } from "../../../../src/context/ChatContext";
+import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
+import { FocusModeContext } from "../../../../src/context/FocusModeContext";
 
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -24,6 +26,8 @@ const mockQuoteSelection = vi.fn();
 const mockChatContext = {
   quoteSelection: mockQuoteSelection,
 } as unknown as ChatContextValue;
+
+vi.mock("../../../../src/features/buddy/aiBuddyBus", () => ({ openAiBuddy: vi.fn() }));
 
 /**
  * The toolbar, at the level a hire meets it: highlight something, press the button, and find out
@@ -54,12 +58,16 @@ describe("SelectionActions", () => {
     document.dispatchEvent(new Event("selectionchange"));
   }
 
-  function renderToolbar() {
+  function renderToolbar({ focused = false }: { focused?: boolean } = {}) {
     return render(
       <MemoryRouter>
-        <ChatContext.Provider value={mockChatContext}>
-          <SelectionActions />
-        </ChatContext.Provider>
+        <FocusModeContext.Provider
+          value={{ isFocused: focused, setFocused: () => {}, toggleFocused: () => {} }}
+        >
+          <ChatContext.Provider value={mockChatContext}>
+            <SelectionActions />
+          </ChatContext.Provider>
+        </FocusModeContext.Provider>
       </MemoryRouter>,
     );
   }
@@ -187,5 +195,91 @@ describe("SelectionActions", () => {
 
     expect(await screen.findByRole("button", { name: /reply/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /add to board/i })).not.toBeInTheDocument();
+  });
+
+  /**
+   * The second half of the toolbar: text that does not make sense now, as opposed to text that
+   * will matter later. What the quote itself looks like is covered in
+   * `buddy/quoteFromSelection.test.ts`.
+   */
+  describe("asking the buddy", () => {
+    it("offers to ask about a selection alongside keeping it", async () => {
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      expect(await screen.findByRole("button", { name: /ask the buddy/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /add to board/i })).toBeInTheDocument();
+    });
+
+    /**
+     * The dock is opened through the bus rather than by navigating, and it does not matter
+     * whether it was open: the bus opens a closed dock and seeds an open one the same way, which
+     * is what lets this work from any page. `buddy/useBuddy.test.tsx` covers that end.
+     */
+    it("hands the selection to the buddy as an unsent quote", async () => {
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      await userEvent.click(await screen.findByRole("button", { name: /ask the buddy/i }));
+
+      expect(openAiBuddy).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(openAiBuddy).mock.calls[0][0]).toEqual({
+        draft: "> The migration runs on deploy.\n\n",
+      });
+    });
+
+    /**
+     * The same attribution the board writes onto a note made from the same words. Without it the
+     * buddy answers "what does this mean" about nothing in particular, which is the answer a hire
+     * could have got without highlighting anything.
+     */
+    it("tells the buddy where the hire was reading", async () => {
+      const heading = document.createElement("h2");
+      heading.textContent = "Deploying a change";
+      document.body.appendChild(heading);
+
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      await userEvent.click(await screen.findByRole("button", { name: /ask the buddy/i }));
+
+      expect(vi.mocked(openAiBuddy).mock.calls[0][0]).toEqual({
+        draft: "> The migration runs on deploy.\n\nFrom Deploying a change\n\n",
+      });
+    });
+
+    /**
+     * Focus mode takes the dock away and leaves this toolbar up, so the bus would have nobody
+     * listening: the press would do nothing but make the toolbar vanish. Not offered there.
+     */
+    it("is not offered in focus mode, where there is no dock to hand it to", async () => {
+      renderToolbar({ focused: true });
+      highlight("The migration runs on deploy.");
+
+      expect(await screen.findByRole("button", { name: /add to board/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /ask the buddy/i })).not.toBeInTheDocument();
+    });
+
+    /** Asking is not filing. A hire who wanted the card would have pressed the other button. */
+    it("does not put the selection on the board", async () => {
+      const addCard = vi.spyOn(boardService, "addCard").mockResolvedValue({} as never);
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      await userEvent.click(await screen.findByRole("button", { name: /ask the buddy/i }));
+
+      expect(addCard).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    /** The words are in the composer now; a toolbar still over them invites sending them twice. */
+    it("takes the toolbar down once the quote is handed over", async () => {
+      renderToolbar();
+      highlight("The migration runs on deploy.");
+
+      await userEvent.click(await screen.findByRole("button", { name: /ask the buddy/i }));
+
+      await waitFor(() => expect(screen.queryByRole("toolbar")).not.toBeInTheDocument());
+    });
   });
 });
