@@ -27,6 +27,7 @@ import { MemoryRecapCard } from "./MemoryRecapCard";
 import { NoteCard } from "./NoteCard";
 import { ArrivalStepsCard } from "./ArrivalStepsCard";
 import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
+import { PathStepCard } from "./PathStepCard";
 import { PathToFirstContributionCard } from "./PathToFirstContributionCard";
 import { SuggestedTasksCard } from "./SuggestedTasksCard";
 import { BoardCardContext } from "./boardCardControls";
@@ -476,6 +477,8 @@ function BoardCardView({
       return <MemoryRecapCard content={card.content} {...props} />;
     case "DIAGRAM":
       return <DiagramCard content={card.content} {...props} />;
+    case "PATH_STEP":
+      return <PathStepCard content={card.content} {...props} />;
     case "NOTE":
       return <NoteCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
     case "LINK":
@@ -1462,7 +1465,8 @@ function BoardCardCell({
 }: BoardCardCellProps) {
   const dragControls = useDragControls();
 
-  const label = card.content.kind === "NOTE" ? "note" : card.content.kind.toLowerCase();
+  const label =
+    card.content.kind === "NOTE" ? "note" : card.content.kind.toLowerCase().replace(/_/g, " ");
 
   /**
    * The card this one waits on, for the picker to show.
