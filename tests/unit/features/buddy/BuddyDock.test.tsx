@@ -54,6 +54,9 @@ function renderDock(
       dismissAction={vi.fn()}
       suggestions={suggestions}
       startFreshVisit={startFreshVisit}
+      isGreeting={false}
+      isDeciding={false}
+      teamProjectId={null}
       onClose={vi.fn()}
     />,
   );
