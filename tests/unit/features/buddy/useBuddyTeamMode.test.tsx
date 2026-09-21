@@ -242,9 +242,12 @@ describe("useBuddyConversation — team mode", () => {
       { initialProps: { selection: sel("", false) }, wrapper: authWrapper },
     );
 
-    await waitFor(() => expect(result.current.isTeamMode).toBe(false));
+    // Waits on the actual event, not on `isTeamMode`, which already reads `false` at the very
+    // first render — the restore only overwrites it after a microtask, so a check on that value
+    // alone can resolve before the audit ever ran.
+    await waitFor(() => expect(onLeft).toHaveBeenCalledTimes(1));
+    expect(result.current.isTeamMode).toBe(false);
     expect(result.current.teamProjectId).toBeNull();
-    expect(onLeft).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem("buddyTeamMode:user-1")).toBe("false");
   });
 
