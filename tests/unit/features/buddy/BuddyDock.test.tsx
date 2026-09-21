@@ -106,9 +106,7 @@ describe("a reply the mentor already offered to keep", () => {
     ]);
 
     expect(screen.getByRole("button", { name: /keep this as a checklist/i })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /keep as checklist/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /keep as checklist/i })).not.toBeInTheDocument();
   });
 
   /** Declining the mentor's list is not declining every way to keep one. */
