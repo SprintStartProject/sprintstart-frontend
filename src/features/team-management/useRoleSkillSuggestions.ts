@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ApiError } from "../../services/apiClient";
 import { parseApiError } from "../../services/apiError";
 import { suggestSkillsForRole } from "../../services/teamManagementService";
@@ -11,9 +11,16 @@ export type RoleSkillSuggestionResult =
 /** Requests non-persisted role-skill suggestions and normalizes service failures for the panel. */
 export function useRoleSkillSuggestions() {
   const [isSuggesting, setIsSuggesting] = useState<string | null>(null);
+  // Identifies the most recently started request, so a slower, older request
+  // resolving after a newer one cannot clear `isSuggesting` out from under it
+  // -- e.g. suggesting for role A, switching to role B and suggesting there
+  // too before A answers must leave B's spinner alone once A's late response
+  // arrives.
+  const latestRequestIdRef = useRef(0);
 
   const suggest = useCallback(
     async (roleId: string, context?: SuggestSkillsContext): Promise<RoleSkillSuggestionResult> => {
+      const requestId = ++latestRequestIdRef.current;
       setIsSuggesting(roleId);
 
       try {
@@ -34,7 +41,9 @@ export function useRoleSkillSuggestions() {
             : parseApiError(error, "Could not suggest skills for this role."),
         };
       } finally {
-        setIsSuggesting(null);
+        if (latestRequestIdRef.current === requestId) {
+          setIsSuggesting(null);
+        }
       }
     },
     [],

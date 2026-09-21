@@ -162,6 +162,63 @@ describe("RoleManagementTab", () => {
     expect(mocks.acceptSkillSuggestion).not.toHaveBeenCalled();
   });
 
+  it("ignores a stale suggestion response for a role that is no longer open", async () => {
+    const roleB = { id: "role-2", name: "Backend", description: "Builds the API" };
+    const suggestionForB = {
+      skillId: null,
+      name: "Kubernetes",
+      category: "TOOLING",
+      reason: "Runs the backend infrastructure",
+      confidence: "medium",
+      isNew: true,
+      chunkIds: [],
+    };
+
+    // Role A's request never resolves on its own -- it is settled by hand
+    // once role B is already open and has its own suggestions back, to
+    // reproduce a slow first response arriving after the user moved on.
+    let resolveRoleASuggestions: ((value: (typeof suggestion)[]) => void) | undefined;
+    mocks.suggestSkillsForRole.mockImplementation((roleId: string) => {
+      if (roleId === role.id) {
+        return new Promise((resolve) => {
+          resolveRoleASuggestions = resolve;
+        });
+      }
+
+      return Promise.resolve([suggestionForB]);
+    });
+
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role, roleB]} users={[]} onDataChanged={vi.fn()} />);
+
+    await waitFor(() => expect(mocks.getSkills).toHaveBeenCalled());
+
+    await openRole(user);
+    await user.click(screen.getByTestId("suggest-skills-button"));
+    await waitFor(() =>
+      expect(mocks.suggestSkillsForRole).toHaveBeenCalledWith(role.id, expect.anything()),
+    );
+
+    // Switch to role B before role A's suggestions ever come back.
+    await user.click(screen.getByRole("button", { name: "Close role details" }));
+    await user.click(
+      screen.getByRole("button", { name: `Manage skills and members of ${roleB.name}` }),
+    );
+    await screen.findByText("Manage role");
+    await user.click(screen.getByTestId("suggest-skills-button"));
+
+    expect(await screen.findByRole("checkbox", { name: "Accept Kubernetes" })).toBeInTheDocument();
+
+    // Role A's late response must not replace what role B is showing, or
+    // clear a spinner that belongs to a request role B might still have
+    // pending.
+    resolveRoleASuggestions?.([suggestion]);
+    await waitFor(() => expect(mocks.suggestSkillsForRole).toHaveBeenCalledTimes(2));
+
+    expect(screen.queryByRole("checkbox", { name: "Accept React" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Accept Kubernetes" })).toBeInTheDocument();
+  });
+
   it("creates a role first and then requests project-scoped suggestions", async () => {
     const user = userEvent.setup();
     const onDataChanged = vi.fn().mockResolvedValue(undefined);

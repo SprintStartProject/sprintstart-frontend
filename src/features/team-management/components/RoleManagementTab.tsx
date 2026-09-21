@@ -122,6 +122,14 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   const rolesControls = useAnimationControls();
   const [isRolesResizing, setIsRolesResizing] = useState(false);
 
+  // Mirrors `selectedRoleId`, but as a ref rather than state: a suggestion
+  // request or an apply that is still in flight when the user switches (or
+  // closes) roles reads this *after* awaiting, to tell whether its result is
+  // still meant for the role that is open by the time it arrives. State read
+  // through the async function's closure would only ever see the value from
+  // when the request started, not the live selection.
+  const selectedRoleIdRef = useRef<string | null>(null);
+
   function captureRolesHeight() {
     rolesHeightBeforeRef.current = rolesRef.current?.offsetHeight ?? null;
   }
@@ -180,6 +188,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     setSkillSuggestions([]);
     setSelectedSuggestionKeys(new Set());
     setSuggestionError(null);
+    selectedRoleIdRef.current = roleId;
     setSelectedRoleId(roleId);
     setSelectedUserIds(assignedUserIds);
     setOriginalUserIds(assignedUserIds);
@@ -188,6 +197,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
   function closeRole() {
     captureRolesHeight();
+    selectedRoleIdRef.current = null;
     setSelectedRoleId(null);
     setShowSuggestionPanel(false);
     setSkillSuggestions([]);
@@ -385,6 +395,12 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       : undefined;
     const result = await suggest(roleId, context);
 
+    // The user may have closed this role or opened another one while the
+    // request was in flight; a late answer must not overwrite whatever that
+    // other role's panel is showing (or apply itself to the wrong role once
+    // "Apply" is pressed).
+    if (selectedRoleIdRef.current !== roleId) return;
+
     if (!result.ok) {
       setSuggestionError(result.message);
       return;
@@ -410,6 +426,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   async function handleApplySuggestions() {
     if (!selectedRole || applyingSuggestions) return;
 
+    const roleId = selectedRole.id;
     const currentIds = new Set(selectedRoleSkills.map(({ id }) => id));
     const currentNames = new Set(
       selectedRoleSkills.map(({ name }) => name.trim().toLocaleLowerCase()),
@@ -431,17 +448,25 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
       for (const suggestion of accepted) {
         roleSkills = await acceptSkillSuggestion(
-          selectedRole.id,
+          roleId,
           suggestion.skillId
             ? { skillId: suggestion.skillId }
             : { name: suggestion.name, category: suggestion.category },
         );
       }
 
-      replaceRoleSkills(selectedRole.id, roleSkills);
-      setShowSuggestionPanel(false);
-      setSkillSuggestions([]);
-      setSelectedSuggestionKeys(new Set());
+      replaceRoleSkills(roleId, roleSkills);
+
+      // Closing/reopening onto another role while this ran must not
+      // suddenly hide *that* role's panel or wipe its own suggestions;
+      // only touch the shared panel state if this role is still the one
+      // open.
+      if (selectedRoleIdRef.current === roleId) {
+        setShowSuggestionPanel(false);
+        setSkillSuggestions([]);
+        setSelectedSuggestionKeys(new Set());
+      }
+
       toast.success(
         accepted.length === 1
           ? "1 suggested skill added"
@@ -449,16 +474,19 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       );
     } catch (error) {
       try {
-        replaceRoleSkills(selectedRole.id, await getSkillsByRoleId(selectedRole.id));
+        replaceRoleSkills(roleId, await getSkillsByRoleId(roleId));
       } catch {
         // The original apply error is the actionable one; a refresh failure must not hide it.
       }
-      setSuggestionError(
-        parseApiError(
-          error,
-          "Some suggestions may have been added. Review the role skills and try again.",
-        ),
-      );
+
+      if (selectedRoleIdRef.current === roleId) {
+        setSuggestionError(
+          parseApiError(
+            error,
+            "Some suggestions may have been added. Review the role skills and try again.",
+          ),
+        );
+      }
     } finally {
       setApplyingSuggestions(false);
     }
