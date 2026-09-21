@@ -30,6 +30,30 @@ export type ActionPatch = {
 export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
 
 /**
+ * The backend's `place_checklist` action: the mentor offering to keep a list it just wrote.
+ *
+ * Named here because two surfaces have to recognise it — the proposal draws the lines it would
+ * keep, and the reply's own "keep this list" button stands down beside it rather than offering a
+ * second, flatter version of the same thing.
+ */
+export const BUDDY_ACTION_PLACE_CHECKLIST = "place_checklist";
+
+/** The backend's `amend_checklist` action: lines the mentor would add to a list they already have. */
+export const BUDDY_ACTION_AMEND_CHECKLIST = "amend_checklist";
+
+/**
+ * The backend's `tick_checklist_items` action: lines the hire has said they finished.
+ *
+ * Carried in the same payload field as an amendment's, and drawn differently for it — one adds
+ * lines the mentor wrote, the other ticks lines the hire already has, and confirming the wrong one
+ * changes a card in a way they did not mean.
+ */
+export const BUDDY_ACTION_TICK_CHECKLIST = "tick_checklist_items";
+
+/** The backend's `reword_checklist_item` action: one line replaced, shown before and after. */
+export const BUDDY_ACTION_REWORD_CHECKLIST = "reword_checklist_item";
+
+/**
  * An action proposed in hire mode: the buddy offers to do something *for this hire*, and the
  * confirm echoes the offer's own payload back verbatim. What gets written is what was shown on
  * the button — never something the client derived.
@@ -75,6 +99,34 @@ export type HireActionProposal = {
    */
   competencyKey?: string;
   level?: string;
+  /**
+   * The `place_checklist` confirm payload: the list the buddy wrote and offered to keep.
+   *
+   * Echoed back like every payload above, and here the rule has its sharpest form: these lines are
+   * *content the model wrote*, not a pointer at something that already exists. A client that
+   * re-derived them — from the reply's markdown, say — could keep a card whose words the hire
+   * never read, which is the one thing the confirm button is there to prevent.
+   */
+  checklistTitle?: string;
+  checklistItems?: string[];
+  /**
+   * `amend_checklist`: the card of theirs the lines go on.
+   *
+   * The lines here are the *new* ones only — the card keeps what it already has, and the offer
+   * shows just the addition, because a change nobody can see is one nobody agreed to.
+   */
+  cardId?: string;
+  /** `place_note` confirm payload: the note's text, shown on the offer before it is kept. */
+  noteText?: string;
+  /**
+   * `reword_checklist_item`: the line as it reads now, and as it would read.
+   *
+   * Both, because this is the one action that *replaces* something the hire can already see. An
+   * offer showing only the new wording would be asking them to agree to a change they would have
+   * to go and diff.
+   */
+  lineBefore?: string;
+  lineAfter?: string;
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -210,6 +262,12 @@ export type BuddyStreamHandlers = {
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    checklistTitle?: string;
+    checklistItems?: string[];
+    cardId?: string;
+    noteText?: string;
+    lineBefore?: string;
+    lineAfter?: string;
   }) => void;
   /**
    * The buddy has proposed a *team-mode* change, stored server-side. Confirm goes by
