@@ -444,6 +444,8 @@ export const handlers = [
         name: "TypeScript",
         roleIds: ["role1"],
         status: "ACTIVE",
+        category: null,
+        universal: false,
       },
     ]),
   ),
@@ -458,6 +460,8 @@ export const handlers = [
       name: body.name,
       roleIds: body.roleIds,
       status: "ACTIVE",
+      category: null,
+      universal: false,
     });
   }),
 
@@ -467,6 +471,8 @@ export const handlers = [
       name: "TypeScript",
       roleIds: ["role1"],
       status: "ACTIVE",
+      category: null,
+      universal: false,
     }),
   ),
 
@@ -480,6 +486,8 @@ export const handlers = [
       name: body.name ?? "TypeScript",
       roleIds: body.roleIds ?? ["role1"],
       status: "ACTIVE",
+      category: null,
+      universal: false,
     });
   }),
 
@@ -490,10 +498,32 @@ export const handlers = [
         name: "TypeScript",
         roleIds: [params.roleId],
         status: "ACTIVE",
+        category: null,
+        universal: false,
       },
     ]),
   ),
 
+  http.post("/api/v1/projectRoles/:roleId/skills/suggest", ({ params }) =>
+    HttpResponse.json([
+      {
+        id: "skill1",
+        name: "TypeScript",
+        roleIds: [params.roleId],
+        status: "ACTIVE",
+        category: "TECHNICAL",
+        universal: false,
+      },
+      {
+        id: "skill-ai-1",
+        name: "AI Suggested Skill",
+        roleIds: [params.roleId],
+        status: "ACTIVE",
+        category: "TECHNICAL",
+        universal: false,
+      },
+    ]),
+  ),
   http.put("/api/v1/projectRoles/:roleId/skills", async ({ request, params }) => {
     const body = (await request.json()) as { skillIds: string[] };
     return HttpResponse.json(
@@ -502,6 +532,8 @@ export const handlers = [
         name: "Skill " + skillId,
         roleIds: [params.roleId],
         status: "ACTIVE" as const,
+        category: null,
+        universal: false,
       })),
     );
   }),

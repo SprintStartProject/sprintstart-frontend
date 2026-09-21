@@ -1,4 +1,4 @@
-import { Check, Minus, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, Minus, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
@@ -7,20 +7,27 @@ import { SaveButton } from "../../../components/ui/SaveButton";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { UserAvatar } from "../../../components/common/UserAvatar";
+import { useAuth } from "../../../context/useAuth";
 import { useToast } from "../../../context/useToast";
 import { RoleCard } from "./RoleCard";
+import { SkillSuggestionPanel } from "./SkillSuggestionPanel";
+import { skillSuggestionKey } from "../skillSuggestion";
 import {
+  acceptSkillSuggestion,
   assignProjectRoleToUser,
   createProjectRole,
-  createSkill,
   deleteProjectRole,
   deleteSkill,
   getSkills,
+  getSkillsByRoleId,
   reactivateSkill,
   unassignProjectRoleFromUser,
 } from "../../../services/teamManagementService";
+import { parseApiError } from "../../../services/apiError";
+import { useProjectContext } from "../../projects/useProjectContext";
+import { useRoleSkillSuggestions } from "../useRoleSkillSuggestions";
 import { isSkillLinkedToRole } from "../types";
-import type { ProjectRole, Skill, TeamOverviewUser } from "../types";
+import type { ProjectRole, Skill, SkillSuggestion, TeamOverviewUser } from "../types";
 
 type RoleManagementTabProps = {
   /** Roles of the current project, owned by the page so both tabs agree. */
@@ -58,6 +65,9 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   const [skills, setSkills] = useState<Skill[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const toast = useToast();
+  const { profile } = useAuth();
+  const { selectedProjectId, selectedProject, hasSelectedProject } = useProjectContext();
+  const { isSuggesting, suggest } = useRoleSkillSuggestions();
 
   const [roleName, setRoleName] = useState("");
   const [roleDescription, setRoleDescription] = useState("");
@@ -68,7 +78,11 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
   const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null);
   const [retireSkillId, setRetireSkillId] = useState<string | null>(null);
-
+  const [showSuggestionPanel, setShowSuggestionPanel] = useState(false);
+  const [skillSuggestions, setSkillSuggestions] = useState<SkillSuggestion[]>([]);
+  const [selectedSuggestionKeys, setSelectedSuggestionKeys] = useState<Set<string>>(new Set());
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [applyingSuggestions, setApplyingSuggestions] = useState(false);
   // Ids ticked in the member list, and the snapshot taken when the role was
   // opened so confirming can send only the difference.
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -107,6 +121,14 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   const rolesHeightBeforeRef = useRef<number | null>(null);
   const rolesControls = useAnimationControls();
   const [isRolesResizing, setIsRolesResizing] = useState(false);
+
+  // Mirrors `selectedRoleId`, but as a ref rather than state: a suggestion
+  // request or an apply that is still in flight when the user switches (or
+  // closes) roles reads this *after* awaiting, to tell whether its result is
+  // still meant for the role that is open by the time it arrives. State read
+  // through the async function's closure would only ever see the value from
+  // when the request started, not the live selection.
+  const selectedRoleIdRef = useRef<string | null>(null);
 
   function captureRolesHeight() {
     rolesHeightBeforeRef.current = rolesRef.current?.offsetHeight ?? null;
@@ -162,6 +184,11 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       .filter((user) => user.roles.some((role) => role.id === roleId))
       .map((user) => user.userId);
 
+    setShowSuggestionPanel(false);
+    setSkillSuggestions([]);
+    setSelectedSuggestionKeys(new Set());
+    setSuggestionError(null);
+    selectedRoleIdRef.current = roleId;
     setSelectedRoleId(roleId);
     setSelectedUserIds(assignedUserIds);
     setOriginalUserIds(assignedUserIds);
@@ -170,7 +197,12 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
   function closeRole() {
     captureRolesHeight();
+    selectedRoleIdRef.current = null;
     setSelectedRoleId(null);
+    setShowSuggestionPanel(false);
+    setSkillSuggestions([]);
+    setSelectedSuggestionKeys(new Set());
+    setSuggestionError(null);
     setSelectedUserIds([]);
     setOriginalUserIds([]);
     setSkillName("");
@@ -200,17 +232,23 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       setRoleName("");
       setRoleDescription("");
       await onDataChanged();
-      // Land on the new role: it is empty, so the next thing to do is
-      // always to give it skills or members.
       openRole(newRole.id);
       toast.success("Role created");
+
+      // HR can create roles but the suggest endpoint is ADMIN/PM-only; firing
+      // it for HR would 403 and show an unrecoverable error in the panel with
+      // no button to dismiss it. Not awaited: the AI round-trip should not
+      // keep the create button (and its "Creating role…" label) busy once the
+      // role already exists and is open -- the panel has its own spinner.
+      if (canSuggestSkills) {
+        void requestSkillSuggestions(newRole.id);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't create the role.");
     } finally {
       setCreatingRole(false);
     }
   }
-
   async function confirmDeleteRole() {
     if (!deleteRoleId) return;
 
@@ -244,23 +282,19 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     setAddingSkill(true);
 
     try {
-      const newSkill = await createSkill(skillName.trim(), [selectedRole.id]);
+      const roleSkills = await acceptSkillSuggestion(selectedRole.id, {
+        name: skillName.trim(),
+      });
 
-      setSkills((current) =>
-        current.some((skill) => skill.id === newSkill.id)
-          ? current.map((skill) => (skill.id === newSkill.id ? newSkill : skill))
-          : [...current, newSkill],
-      );
-
+      replaceRoleSkills(selectedRole.id, roleSkills);
       setSkillName("");
       toast.success("Skill added");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't add the skill.");
+      toast.error(parseApiError(error, "Couldn't add the skill."));
     } finally {
       setAddingSkill(false);
     }
   }
-
   async function confirmRetireSkill() {
     if (!retireSkillId) return;
 
@@ -334,7 +368,137 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   );
 
   const selectedRoleSkills = selectedRole ? getRoleSkills(selectedRole.id) : [];
+  const canSuggestSkills =
+    profile?.permissionGroup === "ADMIN" || profile?.permissionGroup === "PM";
 
+  function replaceRoleSkills(roleId: string, roleSkills: Skill[]) {
+    const responseById = new Map(roleSkills.map((skill) => [skill.id, skill]));
+
+    setSkills((current) => {
+      const merged = current.map((skill) => {
+        const updated = responseById.get(skill.id);
+        if (updated) return updated;
+
+        return isSkillLinkedToRole(skill, roleId)
+          ? { ...skill, roleIds: skill.roleIds.filter((id) => id !== roleId) }
+          : skill;
+      });
+      const knownIds = new Set(current.map(({ id }) => id));
+
+      return [...merged, ...roleSkills.filter((skill) => !knownIds.has(skill.id))];
+    });
+  }
+
+  async function requestSkillSuggestions(roleId: string) {
+    setShowSuggestionPanel(true);
+    setSuggestionError(null);
+    setSkillSuggestions([]);
+    setSelectedSuggestionKeys(new Set());
+
+    const context = hasSelectedProject
+      ? {
+          projectId: selectedProjectId,
+          ...(selectedProject?.industry ? { industry: selectedProject.industry } : {}),
+        }
+      : undefined;
+    const result = await suggest(roleId, context);
+
+    // The user may have closed this role or opened another one while the
+    // request was in flight; a late answer must not overwrite whatever that
+    // other role's panel is showing (or apply itself to the wrong role once
+    // "Apply" is pressed).
+    if (selectedRoleIdRef.current !== roleId) return;
+
+    if (!result.ok) {
+      setSuggestionError(result.message);
+      return;
+    }
+
+    const uniqueSuggestions = Array.from(
+      new Map(result.suggestions.map((item) => [skillSuggestionKey(item), item])).values(),
+    );
+
+    setSkillSuggestions(uniqueSuggestions);
+    setSelectedSuggestionKeys(new Set(uniqueSuggestions.map(skillSuggestionKey)));
+  }
+
+  function toggleSuggestion(key: string) {
+    setSelectedSuggestionKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function handleApplySuggestions() {
+    if (!selectedRole || applyingSuggestions) return;
+
+    const roleId = selectedRole.id;
+    const currentIds = new Set(selectedRoleSkills.map(({ id }) => id));
+    const currentNames = new Set(
+      selectedRoleSkills.map(({ name }) => name.trim().toLocaleLowerCase()),
+    );
+    const accepted = skillSuggestions.filter(
+      (suggestion) =>
+        selectedSuggestionKeys.has(skillSuggestionKey(suggestion)) &&
+        !(suggestion.skillId && currentIds.has(suggestion.skillId)) &&
+        !currentNames.has(suggestion.name.trim().toLocaleLowerCase()),
+    );
+
+    if (accepted.length === 0) return;
+
+    setApplyingSuggestions(true);
+    setSuggestionError(null);
+
+    try {
+      let roleSkills = selectedRoleSkills;
+
+      for (const suggestion of accepted) {
+        roleSkills = await acceptSkillSuggestion(
+          roleId,
+          suggestion.skillId
+            ? { skillId: suggestion.skillId }
+            : { name: suggestion.name, category: suggestion.category },
+        );
+      }
+
+      replaceRoleSkills(roleId, roleSkills);
+
+      // Closing/reopening onto another role while this ran must not
+      // suddenly hide *that* role's panel or wipe its own suggestions;
+      // only touch the shared panel state if this role is still the one
+      // open.
+      if (selectedRoleIdRef.current === roleId) {
+        setShowSuggestionPanel(false);
+        setSkillSuggestions([]);
+        setSelectedSuggestionKeys(new Set());
+      }
+
+      toast.success(
+        accepted.length === 1
+          ? "1 suggested skill added"
+          : `${accepted.length} suggested skills added`,
+      );
+    } catch (error) {
+      try {
+        replaceRoleSkills(roleId, await getSkillsByRoleId(roleId));
+      } catch {
+        // The original apply error is the actionable one; a refresh failure must not hide it.
+      }
+
+      if (selectedRoleIdRef.current === roleId) {
+        setSuggestionError(
+          parseApiError(
+            error,
+            "Some suggestions may have been added. Review the role skills and try again.",
+          ),
+        );
+      }
+    } finally {
+      setApplyingSuggestions(false);
+    }
+  }
   const getRoleMembers = useCallback(
     (roleId: string) =>
       users.filter((user) => user.roles.some((userRole) => userRole.id === roleId)),
@@ -485,7 +649,8 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
             >
               <h3 className="text-sm font-semibold text-app-text">Create role</h3>
               <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
-                A new role starts empty; open it to add skills and assign members.
+                A new role can start with AI-suggested skills; open it to review skills and assign
+                members.
               </p>
 
               <div className="space-y-3">
@@ -529,7 +694,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                     loading={creatingRole}
                     icon={<Plus className="h-4 w-4" />}
                   >
-                    {creatingRole ? "Creating..." : "Create role"}
+                    {creatingRole ? "Creating role…" : "Create role"}
                   </Button>
                 </div>
               </div>
@@ -585,7 +750,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                 {/* Members take the room, skills sit in a narrow column
                             beside them: the member grid is the part that grows
                             with the team, the skill list stays short. */}
-                <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_28rem]">
                   <div className="min-w-0">
                     <h4 className="text-sm font-semibold text-app-text">Members</h4>
                     <p className="mt-1 text-xs leading-relaxed text-app-text-muted">
@@ -711,7 +876,22 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                   </div>
 
                   <div className="min-w-0 border-t border-app-border pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
-                    <h4 className="text-sm font-semibold text-app-text">Skills</h4>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold text-app-text">Skills</h4>
+                      {canSuggestSkills && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          data-testid="suggest-skills-button"
+                          loading={isSuggesting === selectedRole.id}
+                          disabled={applyingSuggestions}
+                          icon={<Sparkles className="h-3.5 w-3.5" />}
+                          onClick={() => void requestSkillSuggestions(selectedRole.id)}
+                        >
+                          {showSuggestionPanel ? "Refresh suggestions" : "Suggest skills"}
+                        </Button>
+                      )}
+                    </div>
                     <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
                       Skills of this role, shown in the skill assessment flow for assigned members.
                     </p>
@@ -720,6 +900,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                       {selectedRoleSkills.map((skill) => (
                         <span
                           key={skill.id}
+                          aria-label={skill.name}
                           className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${
                             skill.status === "RETIRED"
                               ? "border-app-warning-border bg-app-warning-bg text-app-warning-text"
@@ -727,7 +908,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                           }`}
                         >
                           {skill.name}
-
                           {skill.status === "RETIRED" ? (
                             <>
                               <span className="font-medium">Retired</span>
@@ -757,7 +937,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                         <p className="text-xs text-app-text-muted">No skills added yet.</p>
                       )}
                     </div>
-
                     <div className="mt-4 space-y-2">
                       <label htmlFor="new-skill-name" className="sr-only">
                         Add skill to {selectedRole.name}
@@ -780,6 +959,22 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                         </Button>
                       </div>
                     </div>
+                    <AnimatePresence initial={false}>
+                      {showSuggestionPanel && (
+                        <SkillSuggestionPanel
+                          currentSkills={selectedRoleSkills}
+                          suggestions={skillSuggestions}
+                          selectedKeys={selectedSuggestionKeys}
+                          isLoading={isSuggesting === selectedRole.id}
+                          isApplying={applyingSuggestions}
+                          errorMessage={suggestionError}
+                          onToggle={toggleSuggestion}
+                          onApply={() => void handleApplySuggestions()}
+                          onRetry={() => void requestSkillSuggestions(selectedRole.id)}
+                          onClose={() => setShowSuggestionPanel(false)}
+                        />
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
               </section>
