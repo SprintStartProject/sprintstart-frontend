@@ -238,4 +238,31 @@ describe("RoleManagementTab", () => {
       }),
     );
   });
+
+  it("does not request suggestions when HR creates a role", async () => {
+    // The suggest endpoint is ADMIN/PM-only; HR can still create roles
+    // (POST /projectRoles allows HR too), so firing the request
+    // unconditionally would 403 and leave HR staring at an unrecoverable
+    // "Suggestions could not be loaded" panel with no button to close it.
+    mocks.permissionGroup = "HR";
+    const user = userEvent.setup();
+    const onDataChanged = vi.fn().mockResolvedValue(undefined);
+    render(<RoleManagementTab roles={[]} users={[]} onDataChanged={onDataChanged} />);
+
+    await user.type(screen.getByLabelText("Name"), "Frontend");
+    await user.type(screen.getByLabelText("Description"), "Builds the UI");
+    await user.click(screen.getByRole("button", { name: "Create role" }));
+
+    await waitFor(() =>
+      expect(mocks.createProjectRole).toHaveBeenCalledWith("Frontend", "Builds the UI"),
+    );
+    // Confirms handleCreateRole's try block ran past the suggestion check
+    // (its last observable step before `finally`), so a passing assertion
+    // below is not just "too early to tell".
+    await screen.findByText("Role created");
+
+    expect(mocks.suggestSkillsForRole).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("skill-suggestion-panel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suggestions could not be loaded")).not.toBeInTheDocument();
+  });
 });

@@ -234,7 +234,15 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       await onDataChanged();
       openRole(newRole.id);
       toast.success("Role created");
-      await requestSkillSuggestions(newRole.id);
+
+      // HR can create roles but the suggest endpoint is ADMIN/PM-only; firing
+      // it for HR would 403 and show an unrecoverable error in the panel with
+      // no button to dismiss it. Not awaited: the AI round-trip should not
+      // keep the create button (and its "Creating role…" label) busy once the
+      // role already exists and is open -- the panel has its own spinner.
+      if (canSuggestSkills) {
+        void requestSkillSuggestions(newRole.id);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't create the role.");
     } finally {
