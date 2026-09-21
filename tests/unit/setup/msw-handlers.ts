@@ -521,6 +521,9 @@ export const handlers = [
   }),
 
   http.post("/api/v1/users/:userId/project-roles", () => new HttpResponse(null, { status: 200 })),
+  // A member's onboarding path, read by the PM member side panel. No path by default; tests that
+  // care about the "phase 2 of 4" line override it.
+  http.get("/api/v1/onboarding/users/:userId/path", () => new HttpResponse(null, { status: 404 })),
 
   http.get("/api/v1/confluence/projects/:projectId/connections", () => HttpResponse.json([])),
   http.post("/api/v1/confluence/projects/:projectId/connections", () =>

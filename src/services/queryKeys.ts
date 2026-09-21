@@ -103,4 +103,9 @@ export const queryKeys = {
   memberSkills: {
     byUser: (userId: string) => ["member-skills", userId] as const,
   },
+  memberPath: {
+    // A member's full onboarding path as a PM reads it (phases with their steps) — what the
+    // member side panel counts "phase 2 of 4" from.
+    byUser: (userId: string) => ["member-path", userId] as const,
+  },
 } as const;

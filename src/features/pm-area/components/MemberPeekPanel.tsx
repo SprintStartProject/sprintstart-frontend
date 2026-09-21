@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, Clock, Flag, GraduationCap, Inbox, Route } from "lucide-react";
+import { ArrowUpRight, Check, Clock, Flag, GraduationCap, Hand, Route } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
@@ -10,7 +10,9 @@ import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../services/queryKeys";
-import { getUserSkillLevels } from "../../../services/teamManagementService";
+import { getUserOnboardingPath, getUserSkillLevels } from "../../../services/teamManagementService";
+import { findActivePhaseIndex } from "../../onboarding/activePhase";
+import type { OnboardingPathEndpoint } from "../../onboarding/types";
 import { formatDuration, formatMoment } from "../../onboarding-metrics/format";
 import { isAwaitingFirstResponse } from "../../onboarding-metrics/hireStatus";
 import { hireMoments } from "../../onboarding-metrics/moments";
@@ -57,6 +59,64 @@ function PanelSection({
   );
 }
 
+/**
+ * Where the member is in their path, counted: "Phase 2 of 4", one segment per phase, and how far
+ * into the current phase they are. A progress percentage says how much is done; this says how
+ * much is left, and in what shape — which is what a manager asks when deciding whether to step in.
+ */
+function PhaseProgress({ path, done }: { path: OnboardingPathEndpoint; done: boolean }) {
+  const phases = [...path.phases].sort((a, b) => a.position - b.position);
+  if (phases.length === 0) return null;
+
+  const activeIndex = done ? phases.length - 1 : findActivePhaseIndex({ ...path, phases });
+  const active = phases[activeIndex];
+  const steps = active.steps ?? [];
+  const closedSteps = steps.filter(
+    (step) => step.status === "FINISHED" || step.status === "SKIPPED",
+  ).length;
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="min-w-0 truncate text-sm text-app-text">
+          <span className="font-semibold">
+            Phase {activeIndex + 1} of {phases.length}
+          </span>
+          <span className="text-app-text-muted"> · {active.title}</span>
+        </p>
+        {!done && steps.length > 0 && (
+          <span className="shrink-0 text-xs text-app-text-muted tabular-nums">
+            {closedSteps} of {steps.length} steps
+          </span>
+        )}
+      </div>
+      <ol aria-label="Phases" className="mt-2 flex gap-1">
+        {phases.map((phase, index) => {
+          const state =
+            done || index < activeIndex ? "done" : index === activeIndex ? "current" : "next";
+
+          return (
+            <li
+              key={phase.id}
+              title={`${index + 1}. ${phase.title}`}
+              aria-label={`Phase ${index + 1}: ${phase.title}${
+                state === "done" ? ", done" : state === "current" ? ", current" : ""
+              }`}
+              className={`h-1.5 flex-1 rounded-full ${
+                state === "done"
+                  ? "bg-app-success-solid"
+                  : state === "current"
+                    ? "bg-app-brand"
+                    : "bg-app-progress-track"
+              }`}
+            />
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 const LEVEL_RANK: Record<string, number> = {
   BEGINNER: 1,
   INTERMEDIATE: 2,
@@ -79,6 +139,10 @@ function MemberPeekContent({ userId }: { userId: string }) {
         : Promise.resolve(null),
   );
   const hire = metrics?.hires.find((candidate) => candidate.userId === userId) ?? null;
+
+  const { data: path } = useQueryFetch(queryKeys.memberPath.byUser(userId), () =>
+    getUserOnboardingPath(userId),
+  );
 
   const { data: skills, loading: skillsLoading } = useQueryFetch(
     queryKeys.memberSkills.byUser(userId),
@@ -116,6 +180,7 @@ function MemberPeekContent({ userId }: { userId: string }) {
     <div className="space-y-4">
       <PanelSection icon={Route} title="Onboarding" meta={STAGE_LABEL[stage]}>
         <MemberProgressBar percent={percent} />
+        {path && <PhaseProgress path={path} done={stage === "done"} />}
 
         {stage === "done" ? (
           <p className="mt-3 flex items-center gap-2 text-sm text-app-text">
@@ -123,15 +188,18 @@ function MemberPeekContent({ userId }: { userId: string }) {
             Through the whole path.
           </p>
         ) : (
-          <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="min-w-0">
-              <dt>
-                <PmEyebrow>Phase</PmEyebrow>
-              </dt>
-              <dd className="mt-1 truncate text-sm text-app-text">
-                {member.currentPhase?.title ?? "—"}
-              </dd>
-            </div>
+          <dl className={`mt-4 grid grid-cols-1 gap-3 ${path ? "" : "sm:grid-cols-2"}`}>
+            {/* The phase is named in the "Phase 2 of 4" line above once the path is in. */}
+            {!path && (
+              <div className="min-w-0">
+                <dt>
+                  <PmEyebrow>Phase</PmEyebrow>
+                </dt>
+                <dd className="mt-1 truncate text-sm text-app-text">
+                  {member.currentPhase?.title ?? "—"}
+                </dd>
+              </div>
+            )}
             <div className="min-w-0">
               <dt>
                 <PmEyebrow>Current step</PmEyebrow>
@@ -155,7 +223,7 @@ function MemberPeekContent({ userId }: { userId: string }) {
       </PanelSection>
 
       <PanelSection
-        icon={Inbox}
+        icon={Hand}
         title="Waiting on you"
         meta={waitingCount > 0 ? `${waitingCount} open` : undefined}
       >
@@ -313,7 +381,7 @@ function MemberPeekSidePanel({ userId, onClose }: { userId: string; onClose: () 
       actions={
         <Link
           to={`/team/${userId}`}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-app-border px-3 py-2 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
         >
           Full profile
           <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
