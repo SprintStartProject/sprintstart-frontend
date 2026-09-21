@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
-import { Search, Shield, Users, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, Shield, Users, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../components/ui/FilterSelect";
 import { Input } from "../components/ui/Input";
-import { SegmentedTabs } from "../components/ui/SegmentedTabs";
 import { SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
@@ -14,7 +13,9 @@ import { useAttention } from "../features/onboarding-metrics/hooks/useAttention"
 import { buildAttentionQueue } from "../features/pm-area/attentionQueue";
 import { MemberRow } from "../features/pm-area/components/MemberRow";
 import { PmSectionHeader } from "../features/pm-area/components/PmCard";
+import { PmSubTabs } from "../features/pm-area/components/PmSubTabs";
 import {
+  STAGE_COLOR,
   daysOnStep,
   isAtRisk,
   memberName,
@@ -63,6 +64,76 @@ const SORT_OPTIONS: FilterSelectOption<TeamOverviewFilters["sortBy"]>[] = [
   { value: "HIGHEST_PROGRESS", label: "Highest progress" },
   { value: "LOWEST_PROGRESS", label: "Lowest progress" },
 ];
+
+/**
+ * The chips in three groups, split by a thin rule: everyone, the ones that ask something of the
+ * manager, and where people are in the path. Seven equal chips in a row read as seven unrelated
+ * choices; grouped, they read as two questions.
+ */
+const STATUS_GROUPS: readonly (readonly StatusFilter[])[] = [
+  ["all"],
+  ["attention", "waiting", "stuck"],
+  ["not-started", "underway", "done"],
+];
+
+/** The dot each chip carries — the same colours the overview uses for these states. */
+const STATUS_DOT: Partial<Record<StatusFilter, string>> = {
+  attention: "bg-app-warning-solid",
+  waiting: "bg-app-warning-solid",
+  stuck: "bg-app-orange-text",
+  "not-started": STAGE_COLOR["not-started"],
+  underway: STAGE_COLOR.underway,
+  done: STAGE_COLOR.done,
+};
+
+type SortColumn = "step" | "progress";
+
+/** Which column a sort belongs to, and which way it runs. */
+const SORT_COLUMN: Record<TeamOverviewFilters["sortBy"], { column: SortColumn; desc: boolean }> = {
+  LONGEST_STEP: { column: "step", desc: true },
+  SHORTEST_STEP: { column: "step", desc: false },
+  HIGHEST_PROGRESS: { column: "progress", desc: true },
+  LOWEST_PROGRESS: { column: "progress", desc: false },
+};
+
+function SortHeader({
+  column,
+  label,
+  sortBy,
+  onSort,
+}: {
+  column: SortColumn;
+  label: string;
+  sortBy: TeamOverviewFilters["sortBy"];
+  onSort: (next: TeamOverviewFilters["sortBy"]) => void;
+}) {
+  const current = SORT_COLUMN[sortBy];
+  const active = current.column === column;
+  const Icon = !active ? ArrowUpDown : current.desc ? ArrowDown : ArrowUp;
+
+  const toggle = () => {
+    // First press on a column sorts it the way a manager usually wants it (longest, highest
+    // first); pressing the active column again flips it.
+    const desc = active ? !current.desc : true;
+    if (column === "step") onSort(desc ? "LONGEST_STEP" : "SHORTEST_STEP");
+    else onSort(desc ? "HIGHEST_PROGRESS" : "LOWEST_PROGRESS");
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={`Sort by ${label.toLowerCase()}`}
+      aria-pressed={active}
+      className={`-mx-1 inline-flex items-center gap-1 rounded px-1 tracking-wider uppercase transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+        active ? "text-app-text" : "hover:text-app-text"
+      }`}
+    >
+      {label}
+      <Icon aria-hidden="true" className={`h-3 w-3 ${active ? "" : "opacity-50"}`} />
+    </button>
+  );
+}
 
 function isStatusFilter(value: string | null): value is StatusFilter {
   return value !== null && (STATUS_FILTERS as readonly string[]).includes(value);
@@ -213,13 +284,66 @@ export function TeamManagementPage() {
 
   const hasNarrowing = normalizedQuery !== "" || roleId !== "all" || statusFilter !== "all";
 
+  const statusChip = (filter: StatusFilter) => {
+    const active = statusFilter === filter;
+    const flagged =
+      (filter === "attention" || filter === "waiting" || filter === "stuck") &&
+      statusCounts[filter] > 0;
+    const dot = STATUS_DOT[filter];
+
+    return (
+      <button
+        key={filter}
+        type="button"
+        aria-pressed={active}
+        onClick={() => setStatusFilter(filter)}
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+          active
+            ? "border-app-brand bg-app-brand text-white"
+            : "border-app-border bg-app-surface text-app-text-muted hover:border-app-brand-border-strong hover:text-app-text"
+        }`}
+      >
+        {dot && (
+          <span
+            aria-hidden="true"
+            className={`h-1.5 w-1.5 rounded-full ${active ? "bg-white" : dot}`}
+          />
+        )}
+        {STATUS_LABEL[filter]}
+        {roster && (
+          <span
+            className={`rounded-full px-1.5 text-[11px] font-semibold tabular-nums ${
+              active
+                ? "bg-white/20 text-white"
+                : flagged
+                  ? "bg-app-warning-bg text-app-warning-text"
+                  : "bg-app-surface-muted text-app-text-subtle"
+            }`}
+          >
+            {statusCounts[filter]}
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  // A chip for a state nobody is in only says "0" — it stays while it is the active filter
+  // (so a link from the overview never lands on a filter that is not shown) and otherwise waits
+  // until somebody is in it.
+  const chipGroups = STATUS_GROUPS.map((group) =>
+    group.filter(
+      (filter) =>
+        filter === "all" || filter === statusFilter || !roster || statusCounts[filter] > 0,
+    ),
+  ).filter((group) => group.length > 0);
+
   return (
     <section aria-label="Team">
       <PmSectionHeader
         title="Team"
         description="Everybody on this project, where they are in their onboarding, and the roles they hold."
-        actions={
-          <SegmentedTabs
+        tabs={
+          <PmSubTabs
             value={activeTab}
             onChange={changeTab}
             layoutId="team-management-tab-pill"
@@ -242,154 +366,145 @@ export function TeamManagementPage() {
           />
         }
       />
-      <div className="space-y-5">
-        <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
-          {activeTab === "members" ? (
-            <div className="space-y-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <Input
-                  size="sm"
-                  icon={<Search className="h-4 w-4" />}
-                  aria-label="Search members"
-                  placeholder="Search by name or step…"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  className="min-w-0 lg:max-w-xs lg:flex-1"
-                />
-                <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+      <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
+        {activeTab === "members" ? (
+          <div className="space-y-4">
+            {/* One toolbar instead of two rows: search, the status chips, and the role filter
+                only where there is more than one role to tell apart. Sorting moved onto the
+                column headers, where it is on every table a manager already knows. */}
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+              <Input
+                size="sm"
+                icon={<Search className="h-4 w-4" />}
+                aria-label="Search members"
+                placeholder="Search by name or step…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="min-w-0 xl:w-64 xl:shrink-0"
+              />
+
+              <div
+                role="group"
+                aria-label="Filter members by status"
+                className="flex min-w-0 flex-1 [scrollbar-width:none]! items-center gap-2 overflow-x-auto pb-1 xl:pb-0 [&::-webkit-scrollbar]:hidden"
+              >
+                {chipGroups.map((group, index) => (
+                  <div key={group[0]} className="flex shrink-0 items-center gap-2">
+                    {index > 0 && (
+                      <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
+                    )}
+                    {group.map(statusChip)}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {(roles?.length ?? 0) > 1 && (
                   <FilterSelect
                     label="Filter team members by role"
                     value={roleId}
                     options={roleOptions}
                     onChange={setRoleId}
-                    className="w-44"
+                    className="w-40"
                   />
-                  <FilterSelect
-                    label="Sort team members"
-                    value={sortBy}
-                    options={SORT_OPTIONS}
-                    onChange={setSortBy}
-                    className="w-48"
-                  />
-                </div>
-              </div>
-
-              <div
-                role="group"
-                aria-label="Filter members by status"
-                className="flex [scrollbar-width:none]! gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden"
-              >
-                {STATUS_FILTERS.map((filter) => {
-                  const active = statusFilter === filter;
-                  const flagged =
-                    (filter === "attention" || filter === "waiting" || filter === "stuck") &&
-                    statusCounts[filter] > 0;
-
-                  return (
-                    <button
-                      key={filter}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setStatusFilter(filter)}
-                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-                        active
-                          ? "border-app-brand bg-app-brand text-white"
-                          : "border-app-border bg-app-surface text-app-text-muted hover:border-app-brand-border-strong hover:text-app-text"
-                      }`}
-                    >
-                      {STATUS_LABEL[filter]}
-                      {roster && (
-                        <span
-                          className={`rounded-full px-1.5 text-[11px] font-semibold tabular-nums ${
-                            active
-                              ? "bg-white/20 text-white"
-                              : flagged
-                                ? "bg-app-warning-bg text-app-warning-text"
-                                : "bg-app-surface-muted text-app-text-subtle"
-                          }`}
-                        >
-                          {statusCounts[filter]}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
-                <div
-                  aria-hidden="true"
-                  className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_9rem_auto] gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid"
-                >
-                  <span>Member</span>
-                  <span>Where they are</span>
-                  <span>Progress</span>
-                  <span className="w-4" />
-                </div>
-
-                {showLoadingSkeleton ? (
-                  <RosterSkeleton />
-                ) : loading ? null : error ? (
-                  <div className="p-6">
-                    <EmptyState size="sm">The team isn&apos;t available right now.</EmptyState>
-                  </div>
-                ) : visibleMembers.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 p-8 text-center">
-                    <p className="text-sm text-app-text-muted">
-                      {members.length === 0
-                        ? "Nobody is on this project yet."
-                        : "No team members match these filters."}
-                    </p>
-                    {hasNarrowing && members.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setQuery("");
-                          setRoleId("all");
-                          setStatusFilter("all");
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
-                      >
-                        <X aria-hidden="true" className="h-3.5 w-3.5" />
-                        Clear filters
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-app-border-muted px-3 py-1.5">
-                    {visibleMembers.map((member) => (
-                      <li key={member.userId} className="py-0.5">
-                        <MemberRow
-                          member={member}
-                          onOpen={openMember}
-                          selected={memberId === member.userId}
-                        />
-                      </li>
-                    ))}
-                  </ul>
                 )}
+                {/* Below `md` the column headers are hidden, so the sort needs a control of
+                    its own there. */}
+                <FilterSelect
+                  label="Sort team members"
+                  value={sortBy}
+                  options={SORT_OPTIONS}
+                  onChange={setSortBy}
+                  className="w-44 md:hidden"
+                />
               </div>
             </div>
-          ) : (
-            <RoleManagementTab
-              roles={roles ?? []}
-              users={members}
-              // Awaited by the tab (it opens a freshly created role right after), so this waits
-              // for both reads to land rather than only asking for them.
-              onDataChanged={async () => {
-                await Promise.all([
-                  queryClient.refetchQueries({
-                    queryKey: queryKeys.teamOverview.filtered(selectedProjectId || null),
-                  }),
-                  queryClient.refetchQueries({
-                    queryKey: queryKeys.projectRoles.byProject(selectedProjectId),
-                  }),
-                ]);
-              }}
-            />
-          )}
-        </SlidingTabPanel>
-      </div>
+
+            <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+              <div className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_9rem_4.5rem] gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid">
+                <span>Member</span>
+                <span>
+                  <SortHeader
+                    column="step"
+                    label="Time on step"
+                    sortBy={sortBy}
+                    onSort={setSortBy}
+                  />
+                </span>
+                <span>
+                  <SortHeader
+                    column="progress"
+                    label="Progress"
+                    sortBy={sortBy}
+                    onSort={setSortBy}
+                  />
+                </span>
+                <span />
+              </div>
+
+              {showLoadingSkeleton ? (
+                <RosterSkeleton />
+              ) : loading ? null : error ? (
+                <div className="p-6">
+                  <EmptyState size="sm">The team isn&apos;t available right now.</EmptyState>
+                </div>
+              ) : visibleMembers.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 p-8 text-center">
+                  <p className="text-sm text-app-text-muted">
+                    {members.length === 0
+                      ? "Nobody is on this project yet."
+                      : "No team members match these filters."}
+                  </p>
+                  {hasNarrowing && members.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuery("");
+                        setRoleId("all");
+                        setStatusFilter("all");
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
+                    >
+                      <X aria-hidden="true" className="h-3.5 w-3.5" />
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <ul className="divide-y divide-app-border-muted px-3 py-1.5">
+                  {visibleMembers.map((member) => (
+                    <li key={member.userId} className="py-0.5">
+                      <MemberRow
+                        member={member}
+                        onOpen={openMember}
+                        selected={memberId === member.userId}
+                        profileLink
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : (
+          <RoleManagementTab
+            roles={roles ?? []}
+            users={members}
+            // Awaited by the tab (it opens a freshly created role right after), so this waits
+            // for both reads to land rather than only asking for them.
+            onDataChanged={async () => {
+              await Promise.all([
+                queryClient.refetchQueries({
+                  queryKey: queryKeys.teamOverview.filtered(selectedProjectId || null),
+                }),
+                queryClient.refetchQueries({
+                  queryKey: queryKeys.projectRoles.byProject(selectedProjectId),
+                }),
+              ]);
+            }}
+          />
+        )}
+      </SlidingTabPanel>
     </section>
   );
 }

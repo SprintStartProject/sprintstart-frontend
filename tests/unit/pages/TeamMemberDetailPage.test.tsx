@@ -178,10 +178,10 @@ describe("TeamMemberDetailPage", () => {
     });
 
     expect(mockGetTeamMember).toHaveBeenCalledWith("user1");
-    expect(screen.getByRole("button", { name: "Backend" })).toBeInTheDocument();
+    expect(screen.getByText("Backend")).toBeInTheDocument();
   });
 
-  it("opens the roles modal and adds a new role", async () => {
+  it("adds a role straight from the profile, without a dialog", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -193,16 +193,8 @@ describe("TeamMemberDetailPage", () => {
       expect(screen.getByRole("heading", { name: "Alice Smith" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Backend" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Manage roles")).toBeInTheDocument();
-    });
-
     await user.click(screen.getByRole("combobox", { name: "Choose a role to add" }));
     await user.click(await screen.findByRole("option", { name: "Frontend" }));
-
-    await user.click(screen.getByRole("button", { name: /^Add$/ }));
 
     await waitFor(() => {
       expect(mockAssignProjectRoleToUser).toHaveBeenCalledWith("user1", "role2");
@@ -221,13 +213,7 @@ describe("TeamMemberDetailPage", () => {
       expect(screen.getByRole("heading", { name: "Alice Smith" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Backend" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Manage roles")).toBeInTheDocument();
-    });
-
-    const removeButton = screen.getByLabelText("Remove Backend");
+    const removeButton = screen.getByRole("button", { name: "Remove Backend" });
     await user.click(removeButton);
 
     await waitFor(() => {

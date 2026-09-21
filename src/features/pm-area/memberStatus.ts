@@ -38,6 +38,16 @@ export const STAGE_LABEL: Record<MemberStage, string> = {
   done: "Done",
 };
 
+/**
+ * The colour each stage is drawn in on every PM surface: grey for not started, brand while
+ * underway, green once through. Dots and bar segments alike.
+ */
+export const STAGE_COLOR: Record<MemberStage, string> = {
+  "not-started": "bg-app-border-strong",
+  underway: "bg-app-brand",
+  done: "bg-app-success-solid",
+};
+
 /** Whole days on the current step, or null when there is no current step. */
 export function daysOnStep(member: Pick<TeamOverviewUser, "currentStep">): number | null {
   const startedAt = member.currentStep?.startedAt;

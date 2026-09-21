@@ -1,4 +1,5 @@
-import { ChevronRight, Clock, MessageSquareText, SkipForward } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Clock, MessageSquareText, SkipForward } from "lucide-react";
+import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import type { TeamOverviewUser } from "../../team-management/types";
 import {
@@ -80,6 +81,12 @@ type MemberRowProps = {
   selected?: boolean;
   /** `compact` for the overview's short list, `full` for the team roster. */
   density?: "compact" | "full";
+  /**
+   * Adds a button straight to the full profile beside the row, for when the manager already
+   * knows they want the path and not the side panel — without it the profile always cost a
+   * press on the row and a second one inside the panel.
+   */
+  profileLink?: boolean;
 };
 
 /**
@@ -90,7 +97,13 @@ type MemberRowProps = {
  * Pressing it opens the side panel — the full profile is one more press from there, not the
  * first thing every look costs.
  */
-export function MemberRow({ member, onOpen, selected = false, density = "full" }: MemberRowProps) {
+export function MemberRow({
+  member,
+  onOpen,
+  selected = false,
+  density = "full",
+  profileLink = false,
+}: MemberRowProps) {
   const name = memberName(member);
   const percent = progressPercent(member);
   const stage = memberStage(member);
@@ -110,7 +123,7 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
       ? `${member.currentPhase.title} · ${member.currentStep.title}`
       : stepLine;
 
-  return (
+  const row = (
     <button
       type="button"
       onClick={() => onOpen(member.userId)}
@@ -119,7 +132,7 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
         selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
       } ${
         isFull
-          ? "grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_9rem_auto]"
+          ? "grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_9rem_4.5rem]"
           : "grid-cols-[minmax(0,1fr)_auto]"
       }`}
     >
@@ -159,7 +172,7 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
 
       {isFull && <MemberProgressBar percent={percent} className="col-span-2 md:col-span-1" />}
 
-      <span className="col-start-2 row-start-1 flex items-center gap-2 md:col-start-auto md:row-start-auto">
+      <span className="col-start-2 row-start-1 flex items-center justify-end gap-2 md:col-start-auto md:row-start-auto">
         {!isFull && <MemberFlags member={member} />}
         {!isFull && (
           <>
@@ -175,5 +188,22 @@ export function MemberRow({ member, onOpen, selected = false, density = "full" }
         />
       </span>
     </button>
+  );
+
+  if (!profileLink) return row;
+
+  // A sibling of the row, not inside it: a link cannot sit inside a button.
+  return (
+    <div className="relative">
+      {row}
+      <Link
+        to={`/team/${member.userId}`}
+        aria-label={`Open full profile of ${name}`}
+        title="Full profile"
+        className="absolute top-3 right-9 flex h-8 w-8 items-center justify-center rounded-lg text-app-text-subtle transition-colors hover:bg-app-brand-soft hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none md:top-1/2 md:-translate-y-1/2"
+      >
+        <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+      </Link>
+    </div>
   );
 }

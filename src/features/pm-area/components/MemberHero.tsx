@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight, Clock, Inbox, Pencil, Plus, Route } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Hand, Route, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
-import type { TeamOverviewUser } from "../../team-management/types";
+import { FilterSelect } from "../../../components/ui/FilterSelect";
+import type { ProjectRole, TeamOverviewUser } from "../../team-management/types";
 import {
   STAGE_LABEL,
   daysOnStep,
@@ -39,14 +40,31 @@ type MemberHeroProps = {
   member: TeamOverviewUser;
   /** The team in roster order, for stepping to the previous and next member. */
   roster: TeamOverviewUser[];
-  onEditRoles: () => void;
+  /** Project roles this member does not hold yet — what "Add role" offers. */
+  assignableRoles: ProjectRole[];
+  /** The role being assigned or removed right now, if any. */
+  savingRoleId: string | null;
+  onAddRole: (roleId: string) => void;
+  /** Asks to remove a role; the page confirms before it does. */
+  onRemoveRole: (role: ProjectRole) => void;
 };
 
 /**
- * The band under a member's name on their full profile: who they are, where they stand, and a
- * way to step through the team without going back to the list.
+ * The top of a member's full profile: who they are, the roles they hold, where they stand, and
+ * a way to step through the team without going back to the list.
+ *
+ * Roles are edited right here. They used to open a modal — press a role chip, find the select
+ * inside, pick, press Add — four steps and a dialog for what is one decision. Now the chip has
+ * its own remove button and "Add role" assigns the moment a role is picked.
  */
-export function MemberHero({ member, roster, onEditRoles }: MemberHeroProps) {
+export function MemberHero({
+  member,
+  roster,
+  assignableRoles,
+  savingRoleId,
+  onAddRole,
+  onRemoveRole,
+}: MemberHeroProps) {
   const percent = progressPercent(member);
   const stage = memberStage(member);
   const days = daysOnStep(member);
@@ -70,27 +88,48 @@ export function MemberHero({ member, roster, onEditRoles }: MemberHeroProps) {
           size={48}
         />
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          {member.roles.map((role) => (
-            <button
-              key={role.id}
-              type="button"
-              onClick={onEditRoles}
-              title="Edit roles"
-              className="group inline-flex items-center gap-1.5 rounded-full border border-app-brand-border bg-app-brand-soft px-3 py-1 text-xs font-semibold text-app-brand-text transition-colors hover:border-app-brand"
-            >
-              {role.name}
-              <Pencil aria-hidden="true" className="h-3 w-3 opacity-60 group-hover:opacity-100" />
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={onEditRoles}
-            className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-app-border px-3 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand hover:text-app-brand-text"
-          >
-            <Plus aria-hidden="true" className="h-3 w-3" />
-            {member.roles.length === 0 ? "Choose role" : "Role"}
-          </button>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-lg leading-tight font-semibold text-app-text">
+            {memberName(member)}
+          </h2>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {member.roles.map((role) => (
+              <span
+                key={role.id}
+                className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft py-0.5 pr-1 pl-2.5 text-xs font-semibold text-app-brand-text"
+              >
+                {role.name}
+                <button
+                  type="button"
+                  onClick={() => onRemoveRole(role)}
+                  disabled={savingRoleId === role.id}
+                  aria-label={`Remove ${role.name}`}
+                  title={`Remove ${role.name}`}
+                  className="flex h-4.5 w-4.5 items-center justify-center rounded-full opacity-60 transition hover:bg-app-brand/15 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:opacity-30"
+                >
+                  <X aria-hidden="true" className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+            {member.roles.length === 0 && (
+              <span className="text-xs text-app-text-muted">No role yet</span>
+            )}
+            {assignableRoles.length > 0 && (
+              <FilterSelect
+                label="Choose a role to add"
+                value=""
+                options={[
+                  { value: "", label: member.roles.length === 0 ? "Choose role" : "Add role" },
+                  ...assignableRoles.map((role) => ({ value: role.id, label: role.name })),
+                ]}
+                onChange={(roleId) => {
+                  if (roleId) onAddRole(roleId);
+                }}
+                disabled={savingRoleId !== null}
+                className="w-36 [&>button]:h-7 [&>button]:rounded-full [&>button]:border-dashed [&>button]:text-xs"
+              />
+            )}
+          </div>
         </div>
 
         {ordered.length > 1 && index >= 0 && (
@@ -157,7 +196,7 @@ export function MemberHero({ member, roster, onEditRoles }: MemberHeroProps) {
             </p>
           )}
         </HeroFact>
-        <HeroFact icon={Inbox} label="Waiting on you">
+        <HeroFact icon={Hand} label="Waiting on you">
           <p className={waiting.length > 0 ? "font-semibold text-app-warning-text" : undefined}>
             {waiting.length === 0
               ? "Nothing"

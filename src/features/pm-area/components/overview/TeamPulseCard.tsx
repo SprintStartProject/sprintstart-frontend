@@ -3,18 +3,20 @@ import { Link } from "react-router-dom";
 import { EmptyState } from "../../../../components/ui/EmptyState";
 import { SkeletonGroup, SkeletonLine } from "../../../../components/ui/Skeleton";
 import type { TeamOverviewUser } from "../../../team-management/types";
-import { daysOnStep, memberStage, type MemberStage } from "../../memberStatus";
+import {
+  STAGE_COLOR,
+  STAGE_LABEL,
+  daysOnStep,
+  memberStage,
+  type MemberStage,
+} from "../../memberStatus";
 import { MemberRow } from "../MemberRow";
 import { PmCard, PmCardHeader, PmCardLink, PmEyebrow } from "../PmCard";
 
 const VISIBLE_MEMBERS = 6;
 
-/** The three stages, in the order a hire moves through them, with the colour each is drawn in. */
-const STAGES: { stage: MemberStage; label: string; dot: string; bar: string }[] = [
-  { stage: "not-started", label: "Not started", dot: "bg-app-border-strong", bar: "bg-app-border" },
-  { stage: "underway", label: "Underway", dot: "bg-app-brand", bar: "bg-app-brand" },
-  { stage: "done", label: "Done", dot: "bg-app-success-solid", bar: "bg-app-success-solid" },
-];
+/** The three stages, in the order a hire moves through them. */
+const STAGES: MemberStage[] = ["not-started", "underway", "done"];
 
 type TeamPulseCardProps = {
   roster: TeamOverviewUser[];
@@ -68,15 +70,18 @@ export function TeamPulseCard({ roster, loading, error, onOpenMember }: TeamPuls
         <>
           <div>
             <ul aria-label="Onboarding stages" className="grid grid-cols-3 gap-2">
-              {STAGES.map(({ stage, label, dot }) => (
+              {STAGES.map((stage) => (
                 <li key={stage}>
                   <Link
                     to={`/team-management?filter=${stage}`}
                     className="block rounded-xl border border-app-border-muted bg-app-bg-soft px-3 py-2 transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                   >
                     <span className="flex items-center gap-1.5 text-[11px] font-medium text-app-text-muted">
-                      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${dot}`} />
-                      {label}
+                      <span
+                        aria-hidden="true"
+                        className={`h-2 w-2 rounded-full ${STAGE_COLOR[stage]}`}
+                      />
+                      {STAGE_LABEL[stage]}
                     </span>
                     <span className="mt-0.5 block text-xl font-bold text-app-text tabular-nums">
                       {counts[stage]}
@@ -90,10 +95,10 @@ export function TeamPulseCard({ roster, loading, error, onOpenMember }: TeamPuls
               aria-hidden="true"
               className="mt-3 flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-app-surface-muted"
             >
-              {STAGES.filter(({ stage }) => counts[stage] > 0).map(({ stage, bar }) => (
+              {STAGES.filter((stage) => counts[stage] > 0).map((stage) => (
                 <div
                   key={stage}
-                  className={`rounded-full ${bar}`}
+                  className={`rounded-full ${STAGE_COLOR[stage]}`}
                   style={{ width: `${(counts[stage] / roster.length) * 100}%` }}
                 />
               ))}

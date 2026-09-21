@@ -255,8 +255,12 @@ export function PmStat({
 }
 
 /**
- * The first row of a PM section: its name, one line on what it shows, and the section's own
- * controls on the right.
+ * The first row of a PM section: one line on what it shows, the section's own controls on the
+ * right, and — for the two sections that have them — its inner tabs on the left.
+ *
+ * The section's name is a heading for assistive technology only. The workspace's tab bar right
+ * above already says "Team" in the active pill, and repeating it as a visible title under that
+ * — with the page's "PM Dashboard" above both — stacked three headings before any content.
  *
  * The controls used to sit in the page header, and each section put different things there —
  * a rebuild button, a rescan button with two timestamps under it — so the header changed
@@ -267,18 +271,29 @@ export function PmSectionHeader({
   title,
   description,
   actions,
+  tabs,
 }: {
   title: string;
   description: ReactNode;
   actions?: ReactNode;
+  /** The section's inner views (a {@link PmSubTabs}); takes the description's place. */
+  tabs?: ReactNode;
 }) {
   return (
-    <div className="mb-5 flex flex-col gap-3 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      className={`mb-5 flex flex-col gap-3 sm:min-h-10 sm:flex-row sm:justify-between ${
+        tabs ? "border-b border-app-border-muted sm:items-end" : "sm:items-center"
+      }`}
+    >
       <div className="min-w-0">
-        <h2 className="text-lg leading-tight font-semibold text-app-text">{title}</h2>
-        <p className="mt-0.5 text-sm text-app-text-muted">{description}</p>
+        <h2 className="sr-only">{title}</h2>
+        {tabs ?? <p className="text-sm text-app-text-muted">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}
+      {actions && (
+        <div className={`flex shrink-0 flex-wrap items-center gap-3 ${tabs ? "pb-2" : ""}`}>
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

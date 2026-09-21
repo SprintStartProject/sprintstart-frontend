@@ -1,4 +1,4 @@
-import { ArrowLeft, Inbox, Plus, X } from "lucide-react";
+import { ArrowLeft, Hand } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
@@ -39,8 +39,6 @@ type DetailOnboardingStep = OnboardingStepEndpoint & {
 };
 
 import { Button } from "../components/ui/Button";
-import { FilterSelect } from "../components/ui/FilterSelect";
-import { Modal } from "../components/ui/Modal";
 import { MemberHero } from "../features/pm-area/components/MemberHero";
 import { MemberOpenItems } from "../features/pm-area/components/MemberOpenItems";
 import { PmCard, PmCardHeader } from "../features/pm-area/components/PmCard";
@@ -123,9 +121,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
 
   const [user, setUser] = useState<TeamOverviewUser | undefined>(undefined);
   const [availableRoles, setAvailableRoles] = useState<ProjectRole[]>([]);
-  const [selectedRoleId, setSelectedRoleId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [rolesModalOpen, setRolesModalOpen] = useState(false);
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   const [roleToRemove, setRoleToRemove] = useState<ProjectRole | null>(null);
   const [skillLevels, setSkillLevels] = useState<UserSkillLevel[]>([]);
@@ -273,22 +269,21 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
     );
   }, [availableRoles, user]);
 
-  async function handleAddRole() {
-    if (!user || !selectedRoleId) return;
+  async function handleAddRole(roleId: string) {
+    if (!user) return;
 
-    const roleToAdd = availableRoles.find((role) => role.id === selectedRoleId);
+    const roleToAdd = availableRoles.find((role) => role.id === roleId);
 
     if (!roleToAdd) return;
 
-    setSavingRoleId(selectedRoleId);
+    setSavingRoleId(roleId);
 
     try {
-      await assignProjectRoleToUser(user.userId, selectedRoleId);
+      await assignProjectRoleToUser(user.userId, roleId);
       setUser({
         ...user,
         roles: [...user.roles, roleToAdd],
       });
-      setSelectedRoleId("");
       toast.success("Role assigned");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't assign the role.");
@@ -661,14 +656,14 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
     <>
       <section aria-label={`${user.firstname} ${user.lastname}`}>
         <BackToTeam onBack={goBack} />
-        <div className="mb-5 space-y-4">
-          <h2 className="text-lg leading-tight font-semibold text-app-text">
-            {user.firstname} {user.lastname}
-          </h2>
+        <div className="mb-5">
           <MemberHero
             member={user}
             roster={roster ?? []}
-            onEditRoles={() => setRolesModalOpen(true)}
+            assignableRoles={unassignedRoles}
+            savingRoleId={savingRoleId}
+            onAddRole={(roleId) => void handleAddRole(roleId)}
+            onRemoveRole={setRoleToRemove}
           />
         </div>
         <div className="space-y-5">
@@ -676,7 +671,12 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
               profile would push the path down to say nothing. */}
           {openItemCount > 0 && (
             <PmCard aria-label="Waiting on you">
-              <PmCardHeader icon={Inbox} title="Waiting on you" meta={`${openItemCount} open`} />
+              <PmCardHeader
+                icon={Hand}
+                tone="warning"
+                title="Waiting on you"
+                meta={`${openItemCount} open`}
+              />
               <MemberOpenItems
                 member={user}
                 feedback={openItems.feedback}
@@ -735,65 +735,6 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           </aside>
         </div>
       </section>
-      <Modal
-        isOpen={rolesModalOpen}
-        title="Manage roles"
-        description={`Add or remove roles for ${user.firstname}.`}
-        closeLabel="Close roles modal"
-        onClose={() => setRolesModalOpen(false)}
-      >
-        <ul className="divide-y divide-app-border-muted rounded-2xl border border-app-border">
-          {user.roles.length > 0 ? (
-            user.roles.map((role) => (
-              <li key={role.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <span className="text-sm font-medium text-app-text">{role.name}</span>
-                <Button
-                  variant="dangerGhost"
-                  size="sm"
-                  iconOnly
-                  onClick={() => setRoleToRemove(role)}
-                  disabled={savingRoleId === role.id}
-                  aria-label={`Remove ${role.name}`}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </li>
-            ))
-          ) : (
-            <li className="px-4 py-3 text-sm text-app-text-muted">
-              No role assigned yet. Choose a role below.
-            </li>
-          )}
-        </ul>
-
-        <div className="mt-5 flex gap-2">
-          <FilterSelect
-            label="Choose a role to add"
-            value={selectedRoleId}
-            options={[
-              { value: "", label: "Choose role" },
-              ...unassignedRoles.map((role) => ({ value: role.id, label: role.name })),
-            ]}
-            onChange={setSelectedRoleId}
-            disabled={unassignedRoles.length === 0}
-            className="min-w-0 flex-1"
-          />
-          <Button
-            variant="primary"
-            onClick={() => void handleAddRole()}
-            disabled={!selectedRoleId || savingRoleId !== null}
-            icon={<Plus className="h-4 w-4" />}
-          >
-            Add
-          </Button>
-        </div>
-
-        {unassignedRoles.length === 0 && (
-          <p className="mt-3 text-xs text-app-text-muted">
-            All available roles are already assigned.
-          </p>
-        )}
-      </Modal>
       <MemberDetailDialogs
         firstName={user.firstname}
         roleToRemove={roleToRemove}

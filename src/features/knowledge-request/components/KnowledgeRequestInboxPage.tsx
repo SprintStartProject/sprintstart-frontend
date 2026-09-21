@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AlertCircle, BookCheck, FolderKanban, Inbox } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
+import type { SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuth } from "../../../context/useAuth";
@@ -11,6 +11,7 @@ import { PermissionGroup } from "../../../services/types";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { queryKeys } from "../../../services/queryKeys";
 import { PmSectionHeader } from "../../pm-area/components/PmCard";
+import { PmSubTabs } from "../../pm-area/components/PmSubTabs";
 import { INBOX_VIEW_PARAM } from "../../pm-area/pmWorkspacePaths";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { RequestCard } from "./RequestCard";
@@ -137,14 +138,14 @@ export function KnowledgeRequestInboxPage() {
 
   return (
     // A section of the PM workspace, which owns the page header and the section-level swipe.
-    // The open/answered switch sits in this section's own header row rather than as a second
-    // pill bar under the workspace's.
+    // The open/answered switch sits in this section's own header row, as underlined sub-tabs
+    // rather than a second pill bar under the workspace's (see `PmSubTabs`).
     <section aria-label="Escalations">
       <PmSectionHeader
         title="Escalations"
         description="Questions the buddy could not answer. Answer one and it becomes durable knowledge."
-        actions={
-          <SegmentedTabs
+        tabs={
+          <PmSubTabs
             value={tab}
             options={tabOptions}
             onChange={setTab}
