@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
 import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
+import { AuthContext, type AuthContextType } from "../../../src/context/AuthContext";
 
 vi.mock("../../../src/services/buddyService", () => ({
   getMessages: vi.fn().mockResolvedValue([]),
@@ -55,15 +57,29 @@ describe("BuddyPage Accessibility", () => {
     projectState.selectedProjectId = "p1";
   });
 
+  const authValue: AuthContextType = {
+    status: "authenticated",
+    profile: { id: "user-1" } as unknown as import("../../../src/services/types").UserProfile,
+    login: async () => {},
+    logout: async () => {},
+    refetchProfile: async () => {},
+  };
+
+  const AuthWrapper = ({ children }: { children: ReactNode }) => (
+    <AuthContext.Provider value={authValue}>{children}</AuthContext.Provider>
+  );
+
   it("has no violations in the no-project state", async () => {
     projectState.selectedProjectId = "";
 
     const { baseElement } = render(
       <MemoryRouter>
         <main>
-          <BuddyProvider>
-            <BuddyPage />
-          </BuddyProvider>
+          <AuthWrapper>
+            <BuddyProvider>
+              <BuddyPage />
+            </BuddyProvider>
+          </AuthWrapper>
         </main>
       </MemoryRouter>,
     );
@@ -79,9 +95,11 @@ describe("BuddyPage Accessibility", () => {
     const { baseElement } = render(
       <MemoryRouter>
         <main>
-          <BuddyProvider>
-            <BuddyPage />
-          </BuddyProvider>
+          <AuthWrapper>
+            <BuddyProvider>
+              <BuddyPage />
+            </BuddyProvider>
+          </AuthWrapper>
         </main>
       </MemoryRouter>,
     );

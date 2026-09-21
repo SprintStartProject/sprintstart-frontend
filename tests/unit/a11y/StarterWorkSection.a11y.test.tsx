@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { axe } from "vitest-axe";
-import { StarterWorkPage } from "../../../src/pages/StarterWorkPage";
+import { StarterWorkSection } from "../../../src/features/starter-work/components/StarterWorkSection";
 import { ToastProvider } from "../../../src/context/ToastProvider";
 import { starterWorkService } from "../../../src/services/starterWorkService";
 import { userService } from "../../../src/services/userService";
@@ -38,6 +38,9 @@ const task: StarterWorkTask = {
   competencyKeys: ["kotlin", "auth"],
   status: "LIVE",
   reviewed: false,
+  taskZeroEligible: false,
+  sourceHasAssignee: null,
+  sourceCheckedAt: null,
 };
 
 const candidate: StarterWorkCandidate = {
@@ -58,7 +61,7 @@ const candidate: StarterWorkCandidate = {
  * an empty page passes trivially, and the violations worth catching here live in the review
  * cards, the pool and the issue browser rather than in the shell around them.
  */
-describe("StarterWorkPage Accessibility", () => {
+describe("StarterWorkSection Accessibility", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(starterWorkService, "fetchUnreviewed").mockResolvedValue({ tasks: [task] });
@@ -71,18 +74,18 @@ describe("StarterWorkPage Accessibility", () => {
   });
 
   it("should not have any a11y violations", async () => {
-    // The page brings its own `main`, so it is not wrapped in one here. Scanned by `container`
+    // The section brings its own `main`, so it is not wrapped in one here. Scanned by `container`
     // rather than `baseElement` for the same reason: `ToastProvider` mounts the app's
     // notification list beside the route, and an empty `ol` that every page shares is chrome
     // this test has no say over.
     const { container } = render(
       <ToastProvider>
-        <StarterWorkPage />
+        <StarterWorkSection />
       </ToastProvider>,
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Available to new hires")).toBeInTheDocument();
+      expect(screen.getByTestId("starter-work-pool")).toHaveTextContent("Fix the login redirect");
     });
 
     expect(await axe(container)).toHaveNoViolations();

@@ -61,11 +61,47 @@ export type ChatMessage = {
   isStreaming?: boolean;
 
   /**
-   * Error message shown to the user when the stream failed mid-response.
-   * Set by the `onError` handler in `ChatProvider`. The partial content
-   * streamed so far stays visible alongside this error banner.
+   * Why this turn ended without an answer, when the user is the one who ended it.
+   *
+   * Failures are deliberately *not* represented here: they surface as a toast
+   * (see `ChatProvider`) so a long thread cannot bury them below the fold. This
+   * covers the two endings the user caused themselves, where a toast would be
+   * noise — they know what they did, the thread just has to say so.
    */
-  error?: string;
+  notice?: ChatNotice;
+};
+
+/**
+ * The two ways a turn can end without an answer and without a failure.
+ *
+ * - `stopped` — the user pressed Stop.
+ * - `interrupted` — a message was sent into another chat while this answer was
+ *   still being written, which is the one case left where a running turn is cut
+ *   short (a follow-up in the *same* chat is queued instead — see the chat
+ *   queue in `ChatContext`).
+ */
+export type ChatNotice = "stopped" | "interrupted";
+
+/**
+ * A message the user submitted while an answer was still being written.
+ *
+ * Queued rather than sent: cutting the running answer off mid-sentence to
+ * answer a follow-up was the behaviour that made people lose an answer they
+ * were reading. Each item keeps the chat it was typed in — the queue drains
+ * per chat, so a message queued here can never be sent into a conversation the
+ * user has since moved away from.
+ *
+ * Not persisted: the queue only lives as long as the answer it is waiting
+ * behind, and a reload mid-stream abandons that answer anyway. The composer's
+ * own draft (localStorage) is the durable half.
+ */
+export type ChatQueueItem = {
+  /** Stable key for React and for removal by id. */
+  id: string;
+  /** The chat the message was typed in and will be sent to. */
+  chatId: string;
+  /** The text as the user submitted it — never trimmed, so nothing is silently lost. */
+  text: string;
 };
 
 export type Citation = {

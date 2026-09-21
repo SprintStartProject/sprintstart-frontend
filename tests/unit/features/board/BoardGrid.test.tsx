@@ -45,6 +45,7 @@ const currentTaskContent = (over: Partial<CurrentTaskContent> = {}): CurrentTask
   summary: "It fails about one run in five.",
   url: null,
   chosen: true,
+  closedAtSource: false,
   ...over,
 });
 
@@ -240,7 +241,7 @@ describe("BoardGrid", () => {
     );
 
     expect(screen.getByText(/you have worked in this repository before/i)).toBeInTheDocument();
-    expect(screen.getByText("Best fit first")).toBeInTheDocument();
+    expect(screen.getByText("From your starter work, best fit first")).toBeInTheDocument();
   });
 
   it("explains an empty suggestions card as a PM step, not a dead end", () => {

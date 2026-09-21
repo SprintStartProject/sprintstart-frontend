@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   captureSelection,
   cardFor,
+  selectionQuoteText,
   type CapturedSelection,
 } from "../../../../src/features/board/selection/selectionCapture";
+import { insertQuoteIntoDraft } from "../../../../src/features/chatbot/utils/quoteFormat";
 
 /**
  * The decisions behind "add this to my board", tested on strings and a real DOM rather than
@@ -50,6 +52,133 @@ describe("selectionCapture", () => {
     it("collapses the whitespace a drag across elements picks up", () => {
       document.body.innerHTML = "<p id='t'>one\n   two</p>";
       expect(capture("#t").text).toBe("one two");
+    });
+
+    it("identifies when selection is inside an AI assistant message", () => {
+      document.body.innerHTML =
+        "<div data-chat-message-role='ASSISTANT'><p id='t'>AI response content</p></div>";
+      expect(capture("#t").isAiMessage).toBe(true);
+    });
+
+    it("identifies when selection is inside a user message", () => {
+      document.body.innerHTML =
+        "<div data-chat-message-role='USER'><p id='t'>User prompt question</p></div>";
+      expect(capture("#t").isAiMessage).toBe(false);
+    });
+
+    it("marks isAiMessage false for generic text outside chat", () => {
+      document.body.innerHTML = "<div class='docs'><p id='t'>Documentation guide</p></div>";
+      expect(capture("#t").isAiMessage).toBe(false);
+    });
+
+    /**
+     * A drag across two bubbles, reported the way a browser hands a selection over — the range
+     * as dragged, the anchor on whichever end the drag began. jsdom has no layout, so the
+     * toString a real browser would carry has to be stated rather than derived.
+     */
+    function dragAcross(
+      startSelector: string,
+      endSelector: string,
+      endOffset: number,
+      anchorAtStart: boolean,
+    ): Selection {
+      const startNode = document.querySelector(startSelector)!.firstChild!;
+      const endNode = document.querySelector(endSelector)!.firstChild!;
+      const range = document.createRange();
+      range.setStart(startNode, 0);
+      range.setEnd(endNode, endOffset);
+      return {
+        isCollapsed: false,
+        rangeCount: 1,
+        anchorNode: anchorAtStart ? range.startContainer : range.endContainer,
+        getRangeAt: () => range,
+        toString: () => "The answer. A follow-up question?",
+      } as unknown as Selection;
+    }
+
+    const twoBubbles =
+      "<div data-chat-message-role='ASSISTANT'><p id='a1'>The answer.</p></div>" +
+      "<div data-chat-message-role='USER'><p id='u1'>A follow-up question?</p></div>" +
+      "<div data-chat-message-role='ASSISTANT'><p id='a2'>Another answer.</p></div>";
+
+    it("says no when the drag runs from an answer into the next message", () => {
+      document.body.innerHTML = twoBubbles;
+
+      expect(captureSelection(dragAcross("#a1", "#u1", 6, true))!.isAiMessage).toBe(false);
+    });
+
+    /**
+     * The same visual selection, dragged the other way. The old check read the drag's anchor as
+     * a fallback and answered differently for it; both ends have to sit in one bubble, which
+     * does not care about direction.
+     */
+    it("says the same for the same selection dragged the other way", () => {
+      document.body.innerHTML = twoBubbles;
+
+      expect(captureSelection(dragAcross("#a1", "#u1", 6, false))!.isAiMessage).toBe(false);
+    });
+
+    it("says no when the selection spans two answers", () => {
+      document.body.innerHTML = twoBubbles;
+
+      expect(captureSelection(dragAcross("#a1", "#a2", 4, true))!.isAiMessage).toBe(false);
+    });
+
+    it("still says yes when the selection spans paragraphs inside one answer", () => {
+      document.body.innerHTML =
+        "<div data-chat-message-role='ASSISTANT'><p id='a1'>First part.</p><p id='a2'>Second part.</p></div>";
+
+      expect(captureSelection(dragAcross("#a1", "#a2", 6, true))!.isAiMessage).toBe(true);
+    });
+  });
+
+  describe("the quote the Reply offer sends", () => {
+    /**
+     * A selection the way a browser reports it, with the toString a real drag carries. jsdom's
+     * own toString never inserts the newlines a browser puts between block elements, so stubbing
+     * it in is the one honest way to exercise a multi-paragraph capture here.
+     */
+    function selectionReporting(selector: string, rawText: string): Selection {
+      const range = selectTextIn(selector).getRangeAt(0);
+      return {
+        isCollapsed: false,
+        rangeCount: 1,
+        anchorNode: range.startContainer,
+        getRangeAt: () => range,
+        toString: () => rawText,
+      } as unknown as Selection;
+    }
+
+    it("keeps the paragraph breaks that `text` collapses away", () => {
+      document.body.innerHTML = "<div id='t'><p>First paragraph.</p><p>Second paragraph.</p></div>";
+      const captured = captureSelection(
+        selectionReporting("#t", "First paragraph.\n\nSecond paragraph."),
+      )!;
+
+      expect(captured.text).toBe("First paragraph. Second paragraph.");
+      expect(captured.quoteText).toBe("First paragraph.\nSecond paragraph.");
+    });
+
+    /**
+     * The path the review flagged, end to end: a real multi-paragraph answer, captured the way
+     * the toolbar captures it, through to what lands in the composer. The paragraph breaks have
+     * to survive as separate quoted paragraphs, not one collapsed line.
+     */
+    it("lands a two-paragraph answer as two quoted paragraphs in the draft", () => {
+      document.body.innerHTML = "<div id='t'><p>First paragraph.</p><p>Second paragraph.</p></div>";
+      const captured = captureSelection(
+        selectionReporting("#t", "First paragraph.\n\nSecond paragraph."),
+      )!;
+
+      expect(insertQuoteIntoDraft("", captured.quoteText)).toBe(
+        "> First paragraph.\n>\n> Second paragraph.\n\n",
+      );
+    });
+
+    it("drops empty lines and stray spacing from the raw selection text", () => {
+      expect(selectionQuoteText("  First   word \n\n\nsecond\n\t\n  last  ")).toBe(
+        "First word\nsecond\nlast",
+      );
     });
   });
 

@@ -47,6 +47,65 @@ function makeFacetFixture(): Artifact[] {
   ];
 }
 
+/** Two repos' GitHub artifacts plus out-of-scope kinds, for the repository facet. */
+function makeRepoFixture(): Artifact[] {
+  const repoMetadata = (repository: string) =>
+    JSON.stringify({ repositoryId: "r1", repositoryFullName: repository });
+
+  return [
+    {
+      ...makeArtifact(
+        "gh-fe-1",
+        "Frontend fix",
+        "PULL_REQUEST",
+        repoMetadata("sprintstart/sprintstart-frontend"),
+      ),
+      sourceSystem: "GITHUB",
+    },
+    {
+      ...makeArtifact(
+        "gh-fe-2",
+        "Frontend chore",
+        "FILE",
+        repoMetadata("sprintstart/sprintstart-frontend"),
+      ),
+      sourceSystem: "GITHUB",
+    },
+    {
+      ...makeArtifact(
+        "gh-be-1",
+        "Backend fix",
+        "COMMIT",
+        repoMetadata("sprintstart/sprintstart-backend"),
+      ),
+      sourceSystem: "GITHUB",
+    },
+    {
+      ...makeArtifact(
+        "gh-org",
+        "SprintStart",
+        "ORG_METADATA",
+        JSON.stringify({ login: "sprintstart", members: [] }),
+      ),
+      sourceSystem: "GITHUB",
+    },
+    {
+      ...makeArtifact(
+        "gh-org-other",
+        "Unrelated Org",
+        "ORG_METADATA",
+        JSON.stringify({ login: "unrelated-org", members: [] }),
+      ),
+      sourceSystem: "GITHUB",
+    },
+    {
+      ...makeArtifact("up-pdf", "manual.pdf", "FILE"),
+      sourceSystem: "UPLOAD",
+      mime: "application/pdf",
+    },
+  ];
+}
+
 /** Renders the hook against a fixed artifact list and waits for the fetch to land. */
 async function renderWith(artifacts: Artifact[]) {
   const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
@@ -275,6 +334,132 @@ describe("useKnowledgeBase", () => {
     expect(result.current.filteredArtifacts).toHaveLength(5);
   });
 
+  it("offers the repository facet only while GitHub is selected", async () => {
+    const result = await renderWith(makeRepoFixture());
+
+    expect(result.current.repositoryOptions).toHaveLength(0);
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+    });
+
+    // Alphabetical; counts come from the repo-scoped artifacts only, so the
+    // org artifact (not repo-scoped) contributes to neither option.
+    expect(result.current.repositoryOptions.map((option) => option.value)).toEqual([
+      "sprintstart/sprintstart-backend",
+      "sprintstart/sprintstart-frontend",
+    ]);
+    expect(
+      result.current.repositoryOptions.find(
+        (option) => option.value === "sprintstart/sprintstart-frontend",
+      )?.count,
+    ).toBe(3);
+  });
+
+  it("promises with its count exactly what choosing the repository delivers", async () => {
+    const result = await renderWith(makeRepoFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+    });
+
+    // The owning org's profile counts toward the repo it owns — the number is
+    // a promise about what clicking does, so the list the reader gets must
+    // have exactly that many rows.
+    const frontend = result.current.repositoryOptions.find(
+      (option) => option.value === "sprintstart/sprintstart-frontend",
+    );
+    expect(frontend?.count).toBe(3);
+
+    act(() => {
+      result.current.toggleRepository("sprintstart/sprintstart-frontend");
+    });
+
+    expect(result.current.filteredArtifacts).toHaveLength(frontend?.count ?? -1);
+  });
+
+  it("narrows only the github artifacts when a repository is chosen", async () => {
+    const result = await renderWith(makeRepoFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+      result.current.toggleSource("UPLOAD");
+    });
+    act(() => {
+      result.current.toggleRepository("sprintstart/sprintstart-frontend");
+    });
+
+    // The repository facet narrows repo-scoped GitHub artifacts; it must not
+    // hide the upload (outside the facet's reach), it hides the unrelated org's
+    // profile, and it keeps the profile of the org that owns the chosen repo.
+    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      "gh-fe-1",
+      "gh-fe-2",
+      "gh-org",
+      "up-pdf",
+    ]);
+  });
+
+  it("shows the owning org profile under a checked repository, never an unrelated one", async () => {
+    const result = await renderWith(makeRepoFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+    });
+    act(() => {
+      result.current.toggleRepository("sprintstart/sprintstart-backend");
+    });
+
+    // The org profile belongs to the checked repo's owner org; the unrelated
+    // org's profile does not.
+    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      "gh-be-1",
+      "gh-org",
+    ]);
+  });
+
+  it("unions several repositories instead of replacing the choice", async () => {
+    const result = await renderWith(makeRepoFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+    });
+    act(() => {
+      result.current.toggleRepository("sprintstart/sprintstart-frontend");
+      result.current.toggleRepository("sprintstart/sprintstart-backend");
+    });
+
+    expect(result.current.selectedRepositories.size).toBe(2);
+    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      "gh-be-1",
+      "gh-fe-1",
+      "gh-fe-2",
+      "gh-org",
+    ]);
+  });
+
+  it("clears the repository selection when GitHub is deselected", async () => {
+    const result = await renderWith(makeRepoFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+    });
+    act(() => {
+      result.current.toggleRepository("sprintstart/sprintstart-frontend");
+    });
+    expect(result.current.selectedRepositories.size).toBe(1);
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+    });
+
+    // Same rule as the format facet: a hidden facet may not keep filtering and
+    // the trigger badge may not count what the reader can no longer see.
+    expect(result.current.selectedRepositories.size).toBe(0);
+    expect(result.current.repositoryOptions).toHaveLength(0);
+    expect(result.current.filteredArtifacts).toHaveLength(6);
+  });
+
   it("counts each option against the other facets, not just the search", async () => {
     const result = await renderWith(makeFacetFixture());
 
@@ -321,6 +506,7 @@ describe("useKnowledgeBase", () => {
       result.current.handleTabChange("PULL_REQUEST");
       result.current.toggleSource("UPLOAD");
       result.current.toggleFormat("PDF");
+      result.current.toggleRepository("sprintstart/sprintstart-frontend");
     });
     expect(result.current.hasActiveFilters).toBe(true);
 
@@ -332,6 +518,7 @@ describe("useKnowledgeBase", () => {
     expect(result.current.selectedSources.size).toBe(0);
     expect(result.current.activeTab).toBe("ALL");
     expect(result.current.selectedFormat).toBeNull();
+    expect(result.current.selectedRepositories.size).toBe(0);
     expect(result.current.searchQuery).toBe("");
     expect(result.current.filteredArtifacts).toHaveLength(5);
   });
@@ -609,6 +796,28 @@ describe("useKnowledgeBase", () => {
 
     expect(image).toBeDefined();
     expect(image?.count).toBe(0);
+    expect(result.current.filteredArtifacts).toHaveLength(0);
+  });
+  it("keeps a chosen repository visible after its artifacts are gone", async () => {
+    const result = await renderWith(makeRepoFixture());
+
+    act(() => {
+      result.current.toggleSource("GITHUB");
+    });
+    act(() => {
+      result.current.toggleRepository("sprintstart/sprintstart-backend");
+      result.current.handleTabChange("ISSUE");
+    });
+
+    // None of the repo-scoped GitHub artifacts is an ISSUE, so the backend repo
+    // can no longer be produced in scope — but the reader chose it, so the
+    // option stays offered with count 0 and can still be unchosen.
+    const backend = result.current.repositoryOptions.find(
+      (option) => option.value === "sprintstart/sprintstart-backend",
+    );
+
+    expect(backend).toBeDefined();
+    expect(backend?.count).toBe(0);
     expect(result.current.filteredArtifacts).toHaveLength(0);
   });
 });

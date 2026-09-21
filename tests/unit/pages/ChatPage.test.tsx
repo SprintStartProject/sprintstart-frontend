@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ChatPage } from "../../../src/pages/ChatPage";
-import type { ChatMessage } from "../../../src/features/chatbot/types";
+import type { ChatMessage, ChatQueueItem } from "../../../src/features/chatbot/types";
 
 vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({
@@ -65,6 +65,11 @@ const mockChatState = {
   toggleSourceSystem: vi.fn(),
   activeFilterCount: 0,
   clearFilters: vi.fn(),
+  queuedMessages: [] as ChatQueueItem[],
+  queuePaused: false,
+  removeQueuedMessage: vi.fn(),
+  editQueuedMessage: vi.fn(),
+  sendQueuedNow: vi.fn(),
 };
 
 vi.mock("../../../src/features/chatbot/hooks/useChat", () => ({
@@ -90,13 +95,15 @@ describe("ChatPage", () => {
   });
 
   it("renders the message list with user and assistant messages", () => {
-    render(
+    const { container } = render(
       <MemoryRouter>
         <ChatPage />
       </MemoryRouter>,
     );
     expect(screen.getByText("Hello bot")).toBeInTheDocument();
     expect(screen.getByText("Hi there")).toBeInTheDocument();
+    expect(container.querySelector('[data-chat-message-role="ASSISTANT"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-chat-message-role="USER"]')).toBeInTheDocument();
   });
 
   /*

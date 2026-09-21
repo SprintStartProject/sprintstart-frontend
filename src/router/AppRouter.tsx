@@ -98,11 +98,8 @@ const BuddyPage = lazy(() =>
 const BoardPage = lazy(() =>
   import("../pages/BoardPage.tsx").then((module) => ({ default: module.BoardPage })),
 );
-const ArrivalStepsPage = lazy(() =>
-  import("../pages/ArrivalStepsPage").then((module) => ({ default: module.ArrivalStepsPage })),
-);
-const StarterWorkPage = lazy(() =>
-  import("../pages/StarterWorkPage").then((module) => ({ default: module.StarterWorkPage })),
+const HireSetupPage = lazy(() =>
+  import("../pages/HireSetupPage").then((module) => ({ default: module.HireSetupPage })),
 );
 const NotFoundPage = lazy(() =>
   import("../pages/NotFoundPage.tsx").then((module) => ({ default: module.NotFoundPage })),
@@ -194,25 +191,27 @@ export function AppRouter() {
               in place of it: both ways in stay open. The buddy itself now sits with the chat,
               under `AssistantShell`. */}
             <Route path="/board" element={<BoardPage />} />
-            {/* Guarded, because the access policy says they are PM/HR/ADMIN-only and the sidebar
-              merely hides them -- which leaves the URL. Both pages already gate their *actions*
-              by role, but a hire who typed the path still got the page and a column of failed
+            {/* Guarded, because the access policy says it is PM/HR/ADMIN-only and the sidebar
+              merely hides it -- which leaves the URL. The page already gates its *actions* by
+              role, but a hire who typed the path still got the page and a column of failed
               requests, and the policy claimed otherwise. */}
             <Route
-              path="/arrival-steps"
+              path="/hire-setup"
               element={
-                <ManagerAreaGuard route="/arrival-steps">
-                  <ArrivalStepsPage />
+                <ManagerAreaGuard route="/hire-setup">
+                  <HireSetupPage />
                 </ManagerAreaGuard>
               }
             />
+            {/* The former standalone pages, now tabs of `/hire-setup`. Kept as redirects so old
+              links and bookmarks still land somewhere useful. */}
+            <Route
+              path="/arrival-steps"
+              element={<Navigate to="/hire-setup?tab=arrival" replace />}
+            />
             <Route
               path="/starter-work"
-              element={
-                <ManagerAreaGuard route="/starter-work">
-                  <StarterWorkPage />
-                </ManagerAreaGuard>
-              }
+              element={<Navigate to="/hire-setup?tab=starter" replace />}
             />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<Navigate to="/settings" replace />} />

@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookmarkPlus, Eraser, Highlighter } from "lucide-react";
+import { BookmarkPlus, Eraser, Highlighter, Reply } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { ChatContext } from "../../../context/ChatContext";
 import { boardService } from "../../../services/boardService";
 import { rememberOrigin } from "../layout/cardOrigins";
 import { useCardMarks } from "../marks/useCardMarks";
@@ -32,6 +33,8 @@ export function SelectionActions() {
   const { selection, clear } = useTextSelection();
   const { selectedProjectId } = useProjectContext();
   const { canMark, colorAt, enclosingColorAt, mark, unmark } = useCardMarks();
+  const chatContext = useContext(ChatContext);
+  const quoteSelection = chatContext?.quoteSelection;
   const [saving, setSaving] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
@@ -66,9 +69,10 @@ export function SelectionActions() {
     }
   }, [selection, selectedProjectId, toast, navigate, clear]);
 
-  // Nothing to keep, or nowhere to keep it. A hire on no project has no board, and an offer that
-  // can only fail is worse than no offer.
-  if (!selection || !selectedProjectId) return null;
+  if (!selection) return null;
+
+  // Nothing to offer: text on no card with no project to keep it on, and not an AI message to reply to.
+  if (!selection.cardId && !selectedProjectId && !selection.isAiMessage) return null;
 
   /**
    * Whether this selection is text on a card the board is already holding.
@@ -191,15 +195,33 @@ export function SelectionActions() {
         </div>
       ) : (
         <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => void add()}
-            loading={saving}
-            icon={<BookmarkPlus className="h-4 w-4" />}
-          >
-            Add to board
-          </Button>
+          {selection.isAiMessage && quoteSelection && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                // quoteText rather than text: it keeps the answer's paragraph breaks, which
+                // `text` has collapsed away for the card paths.
+                quoteSelection(selection.quoteText);
+                clear();
+              }}
+              icon={<Reply className="h-4 w-4" />}
+            >
+              Reply
+            </Button>
+          )}
+
+          {selectedProjectId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void add()}
+              loading={saving}
+              icon={<BookmarkPlus className="h-4 w-4" />}
+            >
+              Add to board
+            </Button>
+          )}
         </div>
       )}
     </div>

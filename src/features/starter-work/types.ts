@@ -3,9 +3,10 @@
  *
  * `PROPOSED` is gone: a mined task is live the moment it is mined, and `reviewed` says whether
  * anybody has looked at it. `REJECTED` is terminal *and sticky* — mining never brings back a task
- * somebody turned down.
+ * somebody turned down. `STALE` means reconciliation found the task's source issue closed; unlike
+ * `REJECTED` it is not sticky — the task returns to `LIVE` on its own if the issue reopens.
  */
-export type ProposalStatus = "LIVE" | "REJECTED";
+export type ProposalStatus = "LIVE" | "REJECTED" | "STALE";
 
 /**
  * An AI-mined starter task (a GitHub issue) a hire can be pointed at.
@@ -27,6 +28,18 @@ export type StarterWorkTask = {
   status: ProposalStatus;
   /** Whether a person has looked at this task. Unreviewed is claimable, just ranked lower. */
   reviewed: boolean;
+  /** Whether a PM has flagged this task as suitable for a hire's automatic first task (Task 0). */
+  taskZeroEligible: boolean;
+  /**
+   * Whether the issue had somebody on it when reconciliation last looked. Three-valued: null
+   * means nobody has checked yet, or the tracker never said — only `true` means somebody has this.
+   */
+  sourceHasAssignee: boolean | null;
+  /**
+   * ISO timestamp of when reconciliation last compared this task against its source, or null
+   * before that has ever happened.
+   */
+  sourceCheckedAt: string | null;
 };
 
 /** The live tasks nobody has vouched for yet. */
@@ -106,6 +119,20 @@ export type GenerateStarterWorkResult = {
   status: string;
   tasksProposed: number;
   notes: string[];
+};
+
+/**
+ * What one reconciliation pass changed, comparing the pool against its trackers.
+ *
+ * `skipped` is the one number here that is a problem rather than a result: it counts rows whose
+ * source issue the corpus no longer holds, so nothing could be compared for them.
+ */
+export type StarterWorkReconcileOutcome = {
+  examined: number;
+  markedStale: number;
+  revived: number;
+  assigneeChanged: number;
+  skipped: number;
 };
 
 /** What kind of work a task is, read off the issue's own labels. `OTHER` means unknown. */

@@ -82,6 +82,7 @@ describe("highlights on a card the board re-reads", () => {
           summary: "Roll it out behind a feature flag first.",
           url: null,
           chosen: true,
+          closedAtSource: false,
         }}
         card={card}
       />,

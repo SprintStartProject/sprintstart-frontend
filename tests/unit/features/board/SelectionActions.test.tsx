@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SelectionActions } from "../../../../src/features/board/selection/SelectionActions";
 import { boardService } from "../../../../src/services/boardService";
+import { ChatContext, type ChatContextValue } from "../../../../src/context/ChatContext";
 
 const navigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -18,6 +19,11 @@ vi.mock("../../../../src/features/projects/useProjectContext", () => ({
 
 const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("../../../../src/context/useToast", () => ({ useToast: () => toast }));
+
+const mockQuoteSelection = vi.fn();
+const mockChatContext = {
+  quoteSelection: mockQuoteSelection,
+} as unknown as ChatContextValue;
 
 /**
  * The toolbar, at the level a hire meets it: highlight something, press the button, and find out
@@ -51,7 +57,9 @@ describe("SelectionActions", () => {
   function renderToolbar() {
     return render(
       <MemoryRouter>
-        <SelectionActions />
+        <ChatContext.Provider value={mockChatContext}>
+          <SelectionActions />
+        </ChatContext.Provider>
       </MemoryRouter>,
     );
   }
@@ -109,11 +117,75 @@ describe("SelectionActions", () => {
   });
 
   /** A hire on no project has no board, and an offer that can only fail is worse than none. */
-  it("offers nothing when no project is selected", () => {
+  it("offers nothing when no project is selected and not an AI message", () => {
     selectedProjectId = "";
     renderToolbar();
     highlight("Run the migration first.");
 
     expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+  });
+
+  it("offers Reply button when selecting text in an AI assistant message", async () => {
+    renderToolbar();
+    const container = document.createElement("div");
+    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    const p = document.createElement("p");
+    p.textContent = "AI generated response.";
+    container.appendChild(p);
+    document.body.appendChild(container);
+
+    const range = document.createRange();
+    range.selectNodeContents(p.firstChild!);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+
+    expect(await screen.findByRole("button", { name: /reply/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add to board/i })).toBeInTheDocument();
+  });
+
+  it("calls quoteSelection and clears selection when Reply is clicked", async () => {
+    renderToolbar();
+    const container = document.createElement("div");
+    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    const p = document.createElement("p");
+    p.textContent = "AI generated response.";
+    container.appendChild(p);
+    document.body.appendChild(container);
+
+    const range = document.createRange();
+    range.selectNodeContents(p.firstChild!);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+
+    const replyButton = await screen.findByRole("button", { name: /reply/i });
+    await userEvent.click(replyButton);
+
+    expect(mockQuoteSelection).toHaveBeenCalledWith("AI generated response.");
+    expect(window.getSelection()?.rangeCount).toBe(0);
+  });
+
+  it("offers Reply button when no project is selected if text is in an AI message", async () => {
+    selectedProjectId = "";
+    renderToolbar();
+    const container = document.createElement("div");
+    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    const p = document.createElement("p");
+    p.textContent = "AI generated response.";
+    container.appendChild(p);
+    document.body.appendChild(container);
+
+    const range = document.createRange();
+    range.selectNodeContents(p.firstChild!);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+
+    expect(await screen.findByRole("button", { name: /reply/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add to board/i })).not.toBeInTheDocument();
   });
 });

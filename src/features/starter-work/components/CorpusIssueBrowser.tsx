@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useMemo, useState, useEffect } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Ban, Check, ChevronRight, Inbox, Loader2, Plus, Search, UserCheck } from "lucide-react";
 import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
 import { Badge } from "../../../components/ui/Badge";
@@ -9,11 +8,10 @@ import { FilterSelect, type FilterSelectOption } from "../../../components/ui/Fi
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Input } from "../../../components/ui/Input";
 import { Pagination } from "../../../components/ui/Pagination";
-import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { useToast } from "../../../context/useToast";
 import { useIsSmUp } from "../../../hooks/useIsSmUp";
 import { getQuickActionRevealVariants, quickActionSpringToken } from "../../../styles/tokens";
-import { CorpusIssueDetails } from "./CorpusIssueDetails";
+import { BuddyMarkdown } from "../../buddy/components/BuddyMarkdown";
 import { useCorpusIssueBrowser } from "../hooks/useCorpusIssueBrowser";
 import { parseCandidateSource, trackerLabel } from "../sourceId";
 import type { CandidatePoolState, StarterWorkCandidate, StarterWorkTask } from "../types";
@@ -59,13 +57,12 @@ const POOL_FILTER_STATE: Record<Exclude<PoolFilter, "all">, CandidatePoolState> 
  * Nothing is ranked and no issue carries a score. The judgement is the reader's, and a number would
  * be the mining filter wearing a different hat.
  *
- * Each row is compact — a name and a number — and opens a drawer with the whole issue body and the
- * add action, so the list scans quickly and the reading happens where there is room for it.
+ * Each row is compact — a name and a number — and expands in place to show the whole issue body and
+ * the add action, so the list scans quickly and reading happens without leaving it.
  */
 export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssueBrowserProps) {
   const {
     candidates,
-    resolveCandidate,
     totalCount,
     assignedCount,
     isLoading,
@@ -88,16 +85,26 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
   // Defaults to the new, not-yet-pooled issues — the ones a PM is here to act on. Pooled and
   // removed issues stay one filter step away rather than padding the default list.
   const [poolFilter, setPoolFilter] = useState<PoolFilter>("available");
-  const [openSourceId, setOpenSourceId] = useState<string | null>(null);
+  const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
 
-  // The pool-state filter sits on top of the hook's own search/assigned filtering.
-  const shown = useMemo(
-    () =>
+  // The pool-state filter sits on top of the hook's own search/assigned filtering. The row a PM
+  // just expanded stays visible even if adding it just moved it out of the filter (the default
+  // filter is "New", so promoting one is exactly this case) — otherwise the confirmation it is
+  // reading would be yanked out from under it the instant the add lands.
+  const shown = useMemo(() => {
+    const filtered =
       poolFilter === "all"
         ? candidates
-        : candidates.filter((candidate) => candidate.poolState === POOL_FILTER_STATE[poolFilter]),
-    [candidates, poolFilter],
-  );
+        : candidates.filter((candidate) => candidate.poolState === POOL_FILTER_STATE[poolFilter]);
+    if (
+      expandedSourceId &&
+      !filtered.some((candidate) => candidate.sourceId === expandedSourceId)
+    ) {
+      const expanded = candidates.find((candidate) => candidate.sourceId === expandedSourceId);
+      if (expanded) return [expanded, ...filtered];
+    }
+    return filtered;
+  }, [candidates, poolFilter, expandedSourceId]);
 
   // A new search, a flipped filter or a changed project makes the old page number meaningless, so
   // the list snaps back to the first page rather than stranding the reader on a page that no longer
@@ -117,11 +124,8 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
     [shown, safePage],
   );
 
-  // The open issue, resolved from the whole loaded list rather than the filtered view, so searching
-  // or flipping a filter while it is open does not yank the drawer shut. Its pool state still comes
-  // from the live list, so an add reflects the moment the drawer sees it. It only drops to null once
-  // the issue leaves the project's corpus entirely (a project switch), which does close the drawer.
-  const openCandidate = openSourceId ? resolveCandidate(openSourceId) : null;
+  const toggleExpanded = (sourceId: string) =>
+    setExpandedSourceId((current) => (current === sourceId ? null : sourceId));
 
   return (
     <section data-testid="corpus-issue-browser" aria-label="Issues in this project">
@@ -131,7 +135,7 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
             Issues in this project
           </h2>
           {projectId && totalCount > 0 && (
-            <Badge variant="neutral" size="sm" className="tabular-nums">
+            <Badge variant="neutral" size="md" className="tabular-nums">
               {totalCount}
             </Badge>
           )}
@@ -216,9 +220,10 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
                     key={candidate.sourceId}
                     candidate={candidate}
                     canAct={canAct}
+                    isExpanded={expandedSourceId === candidate.sourceId}
                     isPromoting={promotingSourceId === candidate.sourceId}
                     isBusy={promotingSourceId !== null}
-                    onOpen={setOpenSourceId}
+                    onToggle={toggleExpanded}
                     onPromote={promote}
                   />
                 ))}
@@ -233,28 +238,6 @@ export function CorpusIssueBrowser({ projectId, canAct, onPromoted }: CorpusIssu
           )}
         </>
       )}
-
-      {/* Portaled to <body> so the drawer clears the sliding tab panel's transform. The extra
-          AnimatePresence resets the `initial={false}` that SlidingTabPanel's own AnimatePresence
-          pushes down the React tree (context crosses the portal) — without it the drawer inherits
-          "no enter animation" and pops in instead of sliding. Its child, PanelPresence, is always
-          present, so this AnimatePresence only resets the context; it never manages the exit. */}
-      {createPortal(
-        <AnimatePresence>
-          <PanelPresence value={openCandidate}>
-            {(candidate) => (
-              <CorpusIssueDetails
-                candidate={candidate}
-                canAct={canAct}
-                isPromoting={promotingSourceId === candidate.sourceId}
-                onPromote={promote}
-                onClose={() => setOpenSourceId(null)}
-              />
-            )}
-          </PanelPresence>
-        </AnimatePresence>,
-        document.body,
-      )}
     </section>
   );
 }
@@ -263,11 +246,13 @@ type CandidateRowProps = {
   candidate: StarterWorkCandidate;
   /** HR reads the list; only PM/ADMIN get the quick-add action. */
   canAct: boolean;
+  /** Whether this row's body is expanded open. */
+  isExpanded: boolean;
   /** This row's own add is in flight. */
   isPromoting: boolean;
   /** Any row's add is in flight, so every add is held until it settles. */
   isBusy: boolean;
-  onOpen: (sourceId: string) => void;
+  onToggle: (sourceId: string) => void;
   onPromote: (sourceId: string, origin?: PoolFlightRect) => Promise<boolean>;
 };
 
@@ -300,20 +285,22 @@ function poolStateBadge(poolState: CandidatePoolState) {
 }
 
 /**
- * One browsable issue, kept to a name and a number.
+ * One browsable issue, kept to a name and a number until opened.
  *
- * A stretched button behind the content opens the detail drawer, so a click anywhere on the row
- * falls through to it — nothing interactive is nested inside anything interactive. On a pointer the
- * quick "Add to the pool" surfaces on hover (and on keyboard focus) so a PM can pool an obvious one
- * without opening it; on touch, where there is no hover, it stays out of the way and the drawer is
+ * The title button expands the row in place to show the whole issue body (rendered as the Markdown
+ * it is written in) and the add action, rather than opening a separate drawer — one less layer while
+ * the list is already sitting inside its own sheet. On a pointer the quick "Add to the pool" sits
+ * beside the title, revealed on hover (and on keyboard focus), so a PM can pool an obvious one
+ * without expanding it; on touch, where there is no hover, it stays out of the way and expanding is
  * the way in. Only an available issue offers it: a pooled or removed one is shown marked instead.
  */
 function CandidateRow({
   candidate,
   canAct,
+  isExpanded,
   isPromoting,
   isBusy,
-  onOpen,
+  onToggle,
   onPromote,
 }: CandidateRowProps) {
   const parsed = parseCandidateSource(candidate.sourceId);
@@ -337,7 +324,7 @@ function CandidateRow({
 
   return (
     <li
-      className="group relative"
+      className="rounded-2xl border border-app-border bg-app-surface transition-colors hover:border-app-border-strong"
       data-testid={`corpus-issue-${candidate.sourceId}`}
       data-corpus-row
       onPointerEnter={() => setIsHovered(true)}
@@ -345,29 +332,14 @@ function CandidateRow({
       onFocusCapture={() => setIsFocusWithin(true)}
       onBlurCapture={() => setIsFocusWithin(false)}
     >
-      {/* A stretched button rather than an interactive wrapper: it sits behind the content, so a
-          click anywhere but the add action falls through to it and opens the drawer. */}
-      <button
-        type="button"
-        onClick={(event) => {
-          onOpen(candidate.sourceId);
-          // A mouse open leaves this trigger focused; blur so it does not linger a focus ring or
-          // keep the quick-add revealed. Keyboard activation (detail 0) keeps the ring.
-          if (event.detail !== 0) {
-            event.currentTarget.blur();
-          }
-        }}
-        aria-label={`Open ${candidate.title}`}
-        className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-      />
-
-      <div
-        className={`pointer-events-none relative z-10 flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong ${
-          isRemoved ? "opacity-70" : ""
-        }`}
-      >
-        <div className="min-w-0 flex-1">
-          {/* Title row carries the one thing that is a state, not a tag: the pool badge. */}
+      <div className="flex items-start gap-3 p-4">
+        <button
+          type="button"
+          onClick={() => onToggle(candidate.sourceId)}
+          aria-expanded={isExpanded}
+          aria-label={`${isExpanded ? "Close" : "Open"} ${candidate.title}`}
+          className="min-w-0 flex-1 text-left focus-visible:outline-none"
+        >
           <div className="flex items-start gap-2">
             <h3
               className={`min-w-0 flex-1 truncate text-sm font-semibold text-app-text ${
@@ -415,7 +387,7 @@ function CandidateRow({
               )}
             </div>
           )}
-        </div>
+        </button>
 
         <div className="flex shrink-0 items-center gap-2 self-center">
           {canAdd && (
@@ -436,7 +408,7 @@ function CandidateRow({
                 const origin = capturePoolFlightRect(event.currentTarget);
                 void onPromote(candidate.sourceId, origin);
               }}
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
             >
               {isPromoting ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -446,9 +418,72 @@ function CandidateRow({
               Add to the pool
             </motion.button>
           )}
-          <ChevronRight className="h-4 w-4 shrink-0 text-app-text-disabled" aria-hidden="true" />
+          <ChevronRight
+            className={`h-4 w-4 shrink-0 text-app-text-disabled transition-transform ${
+              isExpanded ? "rotate-90" : ""
+            }`}
+            aria-hidden="true"
+          />
         </div>
       </div>
+
+      {isExpanded && (
+        <div className="border-t border-app-border px-4 pt-3 pb-4">
+          {candidate.excerpt ? (
+            <div className="text-sm leading-relaxed text-app-text-muted">
+              <BuddyMarkdown content={candidate.excerpt} />
+            </div>
+          ) : (
+            <p className="text-sm leading-relaxed text-app-text-muted">
+              This issue has no description in the corpus.
+            </p>
+          )}
+          {candidate.excerptTruncated && (
+            <p className="mt-2 text-xs text-app-text-subtle">
+              This text is shortened. Open the issue to read all of it.
+            </p>
+          )}
+          {candidate.hasAssignee === true && (
+            <p className="mt-3 text-xs text-app-text-subtle">
+              Someone is already on this issue. It is still yours to add — the pool is a suggestion,
+              not a claim.
+            </p>
+          )}
+
+          {candidate.poolState === "IN_POOL" && (
+            <p className="mt-3 text-sm font-medium text-app-success-text">Already in the pool.</p>
+          )}
+          {candidate.poolState === "REMOVED" && (
+            <p className="mt-3 text-sm text-app-text-muted">
+              Taken out of the pool. Reopen the issue at the source and it can be added again.
+            </p>
+          )}
+          {candidate.poolState === "AVAILABLE" &&
+            (canAct ? (
+              <button
+                type="button"
+                data-testid={`promote-issue-${candidate.sourceId}`}
+                disabled={isPromoting}
+                onClick={(event) => {
+                  const origin = capturePoolFlightRect(event.currentTarget);
+                  void onPromote(candidate.sourceId, origin);
+                }}
+                className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPromoting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                )}
+                Add to the pool
+              </button>
+            ) : (
+              <p className="mt-3 text-sm text-app-text-muted">
+                Only a project manager can add work to the pool.
+              </p>
+            ))}
+        </div>
+      )}
     </li>
   );
 }
