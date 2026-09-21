@@ -173,6 +173,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // first token of the post-tool answer glues onto pre-tool preamble text
   // ("Let me search…Searching knowledge base…") inside the same bubble.
   const sawToolUseRef = useRef(false);
+  // Set to true on the first content token from onToken. Keeps isThinking true
+  // during any reasoning/thoughts streaming phase so that the waiting game stays active.
+  const replyStartedRef = useRef(false);
 
   // Monotonic id per `sendMessage` call. Each handler captures the streamId
   // it was created for and no-ops if it doesn't match the current value —
@@ -317,6 +320,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       clearStreamTimeout();
       streamingStartedRef.current = false;
       sawToolUseRef.current = false;
+      replyStartedRef.current = false;
       streamIdRef.current += 1;
       latestLoadRef.current = null;
       if (draftRef.current && draftRef.current.rafId !== null) {
@@ -534,6 +538,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       commitStreamingChat(currentChatId);
       streamingStartedRef.current = false;
       sawToolUseRef.current = false;
+      replyStartedRef.current = false;
 
       // Initialize the rAF-batched draft so token/reasoning/citation events
       // append to a mutable buffer instead of triggering a state update each.
@@ -592,6 +597,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         if (!isCurrentStream()) return;
         streamingStartedRef.current = false;
         sawToolUseRef.current = false;
+        replyStartedRef.current = false;
         abortControllerRef.current = null;
         setIsStreaming(false);
         setIsThinking(false);
@@ -648,7 +654,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               if (!streamingStartedRef.current) {
                 streamingStartedRef.current = true;
                 setIsStreaming(true);
-                setIsThinking(false);
+                // Keep isThinking true while thoughts/reasoning stream,
+                // so the Dino waiting game remains armed until the actual reply arrives.
                 setStreamingMessageId(assistantId);
               }
 
@@ -666,8 +673,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               if (!streamingStartedRef.current) {
                 streamingStartedRef.current = true;
                 setIsStreaming(true);
-                setIsThinking(false);
                 setStreamingMessageId(assistantId);
+              }
+              if (!replyStartedRef.current) {
+                replyStartedRef.current = true;
+                setIsThinking(false);
               }
 
               const draft = draftRef.current;
@@ -818,6 +828,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     abortControllerRef.current = null;
     streamingStartedRef.current = false;
     sawToolUseRef.current = false;
+    replyStartedRef.current = false;
     setIsStreaming(false);
     setIsThinking(false);
     setStreamingMessageId(null);

@@ -5,6 +5,10 @@ type DinoGameProps = {
    * Called when the player leaves the game (Escape or the exit button).
    */
   onExit: () => void;
+  /**
+   * True when the assistant reply has arrived while the game is open.
+   */
+  replyReady?: boolean;
 };
 
 type Phase = "intro" | "play" | "over";
@@ -160,7 +164,7 @@ function roundedRect(
  * The whole game runs on a canvas driven by requestAnimationFrame; React state
  * is only used for the surrounding chrome (game-over overlay, score badge).
  */
-export function DinoGame({ onExit }: DinoGameProps) {
+export function DinoGame({ onExit, replyReady = false }: DinoGameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -181,7 +185,7 @@ export function DinoGame({ onExit }: DinoGameProps) {
     scoreF: 0,
     lastMilestone: 0,
     distanceSinceSpawn: 0,
-    nextGap: 320,
+    nextGap: 380,
     groundOffset: 0,
     dustTimer: 0,
     landTimer: 0,
@@ -199,20 +203,26 @@ export function DinoGame({ onExit }: DinoGameProps) {
 
   const resetWorld = useCallback(() => {
     const w = worldRef.current;
-
     w.phase = "intro";
-    w.player = { x: 56, y: -40, vy: 0, size: 34, onGround: false }; // start above, drop in
+    w.player = { x: 56, y: -40, vy: 0, size: 34, onGround: false };
     w.obstacles = [];
+    w.clouds = [];
     w.particles = [];
     w.toasts = [];
     w.speed = START_SPEED;
     w.scoreF = 0;
     w.lastMilestone = 0;
     w.distanceSinceSpawn = 0;
-    w.nextGap = 320;
+    w.nextGap = 380;
+    w.groundOffset = 0;
+    w.dustTimer = 0;
     w.landTimer = 0;
     w.shakeTimer = 0;
+    w.time = 0;
+    w.jumpHeld = false;
     w.jumpBuffer = 0;
+    w.duckHeld = false;
+
     setScore(0);
     setNewHighScore(false);
     setStatus("intro");
@@ -223,6 +233,10 @@ export function DinoGame({ onExit }: DinoGameProps) {
     w.jumpHeld = true;
 
     if (w.phase === "over") {
+      if (replyReady) {
+        onExit();
+        return;
+      }
       resetWorld();
       return;
     }
@@ -803,9 +817,15 @@ export function DinoGame({ onExit }: DinoGameProps) {
         <button
           type="button"
           onClick={onExit}
-          className="pointer-events-auto rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-medium text-app-text-muted backdrop-blur-sm transition-colors hover:text-app-text"
+          className="pointer-events-auto flex items-center gap-1.5 rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-medium text-app-text-muted backdrop-blur-sm transition-colors hover:text-app-text"
         >
-          Esc ✕
+          {replyReady && (
+            <span
+              className="inline-block size-1.5 animate-pulse rounded-full bg-emerald-500"
+              aria-hidden="true"
+            />
+          )}
+          <span>{replyReady ? "Reply ready · Esc ✕" : "Esc ✕"}</span>
         </button>
       </div>
 
@@ -834,13 +854,23 @@ export function DinoGame({ onExit }: DinoGameProps) {
             </p>
           )}
           <div className="mt-1 flex gap-2">
-            <button
-              type="button"
-              onClick={pressJump}
-              className="rounded-lg bg-app-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-brand-hover"
-            >
-              Play Again (Space)
-            </button>
+            {replyReady ? (
+              <button
+                type="button"
+                onClick={onExit}
+                className="rounded-lg bg-app-brand px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-brand-hover"
+              >
+                View Reply (Space)
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={pressJump}
+                className="rounded-lg bg-app-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-brand-hover"
+              >
+                Play Again (Space)
+              </button>
+            )}
             <button
               type="button"
               onClick={onExit}

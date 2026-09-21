@@ -151,11 +151,18 @@ export function ChatPage() {
   // Easter eggs play through the app-wide bus + EggEffectsLayer, so the
   // buddy chat can trigger the same effects without this page owning them.
   const dinoUnlocked = useDinoUnlocked();
-  const [gameActive, closeGame] = useSpaceOpensDino(isThinking, dinoUnlocked);
+  const [gameActive, closeGame] = useSpaceOpensDino(isThinking, dinoUnlocked, {
+    keepActiveUntilExit: true,
+  });
 
-  // The game closes itself and hands the shared slot back the moment
-  // `isThinking` flips off — see `useSpaceOpensDino`. `closeGame` is only
-  // for an exit from inside the game.
+  // When switching between chats while a waiting game is open, exit cleanly.
+  const [prevChatId, setPrevChatId] = useState(chatId);
+  if (prevChatId !== chatId) {
+    setPrevChatId(chatId);
+    if (gameActive) {
+      closeGame();
+    }
+  }
 
   const handleToggleFilters = useCallback(() => {
     setShowFilters((v) => !v);
@@ -310,6 +317,11 @@ export function ChatPage() {
 
   useNewConversationShortcut(startNewChat, surfaceFromPathname(pathname) === "chat");
 
+  const activeStreamingMessage = streamingMessageId
+    ? messages.find((m) => m.id === streamingMessageId)
+    : null;
+  const hasReasoning = Boolean(activeStreamingMessage?.reasoning);
+
   return (
     // No height of its own any more: the page is a panel inside `AssistantShell`, which owns
     // the viewport and the header above it.
@@ -453,6 +465,8 @@ export function ChatPage() {
               isThinking={isThinking}
               gameActive={gameActive}
               thinkingState={thinkingState}
+              hasReasoning={hasReasoning}
+              replyReady={!isThinking && gameActive}
               onGameExit={closeGame}
             />
 

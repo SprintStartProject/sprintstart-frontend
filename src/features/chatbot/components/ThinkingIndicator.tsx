@@ -3,12 +3,16 @@ import { DinoGame } from "./DinoGame";
 import { THINKING_LABELS, type ThinkingState } from "../constants";
 
 type ThinkingIndicatorProps = {
-  /** True while the assistant is working (before the first token arrives). */
+  /** True while the assistant is working (before the first reply token arrives). */
   isThinking: boolean;
   /** Whether the dino easter-egg game is active (shown instead of the dots). */
   gameActive: boolean;
   /** The tool the backend currently reports it's running, if any. */
   thinkingState: string | null;
+  /** Whether thoughts/reasoning are actively present (suppresses duplicate dots). */
+  hasReasoning?: boolean;
+  /** True if the reply is ready while the game is still active. */
+  replyReady?: boolean;
   /** Called when the user exits the dino game. */
   onGameExit: () => void;
 };
@@ -23,9 +27,17 @@ export function ThinkingIndicator({
   isThinking,
   gameActive,
   thinkingState,
+  hasReasoning = false,
+  replyReady = false,
   onGameExit,
 }: ThinkingIndicatorProps) {
-  if (!isThinking) return null;
+  // If neither thinking nor game active, nothing to render.
+  if (!isThinking && !gameActive) return null;
+
+  // When thoughts/reasoning are streaming and the user has not opened the dino game,
+  // the ReasoningPanel already visibly displays the thinking state, so suppress the
+  // redundant bouncing dots indicator.
+  if (hasReasoning && !gameActive) return null;
 
   // Resolve the status label; unknown tool names fall back to no label.
   const state = thinkingState as ThinkingState | null;
@@ -54,20 +66,25 @@ export function ThinkingIndicator({
         </div>
 
         <div className="min-w-0 flex-1">
-          <DinoGame onExit={onGameExit} />
+          <DinoGame onExit={onGameExit} replyReady={replyReady} />
 
-          <div className="mt-2 flex w-max items-center gap-1 rounded-2xl border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-app-text">
-            <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand" aria-hidden="true" />
-            <span
-              className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]"
-              aria-hidden="true"
-            />
-            <span
-              className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]"
-              aria-hidden="true"
-            />
-            {label && <span className="animate-pulse pl-2 text-sm italic">{label}</span>}
-          </div>
+          {isThinking && (
+            <div className="mt-2 flex w-max items-center gap-1 rounded-2xl border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-app-text">
+              <span
+                className="h-2 w-2 animate-bounce rounded-full bg-app-brand"
+                aria-hidden="true"
+              />
+              <span
+                className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]"
+                aria-hidden="true"
+              />
+              <span
+                className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]"
+                aria-hidden="true"
+              />
+              {label && <span className="animate-pulse pl-2 text-sm italic">{label}</span>}
+            </div>
+          )}
         </div>
       </div>
     );

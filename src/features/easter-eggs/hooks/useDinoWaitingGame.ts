@@ -46,6 +46,15 @@ function releaseGameSlot(host: symbol): void {
   if (gameHost === host) gameHost = null;
 }
 
+export type SpaceOpensDinoOptions = {
+  /**
+   * When true, if `armed` transitions from true to false while a game is actively
+   * being played, the game remains active until the player exits (via Esc, exit button,
+   * or game over). New games cannot be opened while `armed` is false.
+   */
+  keepActiveUntilExit?: boolean;
+};
+
 /**
  * The Space-to-play trigger shared by every dino waiting-game host
  * (AI chat, onboarding generation, buddy chat): while `armed` is true and
@@ -54,9 +63,15 @@ function releaseGameSlot(host: symbol): void {
  *
  * Returns whether the game should be shown, plus a way to close it early.
  * The game belongs to the wait it was opened under, so it closes by itself
- * the moment `armed` flips off — a host never has to watch that itself.
+ * the moment `armed` flips off — unless `keepActiveUntilExit` is set, in which
+ * case an ongoing run is allowed to finish.
  */
-export function useSpaceOpensDino(armed: boolean, isUnlocked: boolean): [boolean, () => void] {
+export function useSpaceOpensDino(
+  armed: boolean,
+  isUnlocked: boolean,
+  options?: SpaceOpensDinoOptions,
+): [boolean, () => void] {
+  const keepActiveUntilExit = options?.keepActiveUntilExit ?? false;
   const [gameActive, setGameActive] = useState(false);
 
   // Stable per-instance identity for the shared slot. Initial state rather
@@ -105,10 +120,12 @@ export function useSpaceOpensDino(armed: boolean, isUnlocked: boolean): [boolean
   // nobody can see (the onboarding generation step has no close of its own,
   // which is how a finished generation used to eat the trigger for the rest
   // of the visit). Same render-phase pattern as the lock above.
+  // When `keepActiveUntilExit` is true, an active run is preserved until the
+  // user exits or finishes their run.
   const [prevArmed, setPrevArmed] = useState(armed);
   if (prevArmed !== armed) {
     setPrevArmed(armed);
-    if (!armed) {
+    if (!armed && (!keepActiveUntilExit || !gameActive)) {
       releaseGameSlot(host);
       setGameActive(false);
     }

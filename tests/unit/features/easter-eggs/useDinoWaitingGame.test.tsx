@@ -121,5 +121,36 @@ describe("useDinoWaitingGame hooks", () => {
       second.unmount();
       first.unmount();
     });
+
+    it("keeps the current game active until manual close when keepActiveUntilExit is true", () => {
+      window.localStorage.setItem("dinoUnlocked", "true");
+      const { result, rerender } = renderHook(
+        ({ armed }) => useSpaceOpensDino(armed, true, { keepActiveUntilExit: true }),
+        {
+          initialProps: { armed: true },
+        },
+      );
+
+      act(() => {
+        fireEvent.keyDown(window, { code: "Space" });
+      });
+      expect(result.current[0]).toBe(true);
+
+      // When armed flips off (reply arrives), game stays active so user can finish their run.
+      rerender({ armed: false });
+      expect(result.current[0]).toBe(true);
+
+      // Exiting manually closes the game and frees the slot.
+      act(() => {
+        result.current[1]();
+      });
+      expect(result.current[0]).toBe(false);
+
+      // Cannot open a new game while armed is false.
+      act(() => {
+        fireEvent.keyDown(window, { code: "Space" });
+      });
+      expect(result.current[0]).toBe(false);
+    });
   });
 });
