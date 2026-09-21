@@ -1,6 +1,8 @@
 import {
+  CheckCircle2,
   Clock,
   Gauge,
+  Inbox,
   Hourglass,
   MessageSquareMore,
   Rocket,
@@ -9,6 +11,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
+import { UserAvatar } from "../../../../components/common/UserAvatar";
 import { EmptyState } from "../../../../components/ui/EmptyState";
 import { SkeletonGroup, SkeletonLine } from "../../../../components/ui/Skeleton";
 import { Spinner } from "../../../../components/ui/Spinner";
@@ -16,12 +19,14 @@ import { useLiveFetch } from "../../../../hooks/useLiveFetch";
 import { useQueryFetch } from "../../../../hooks/useQueryFetch";
 import { insightsService } from "../../../../services/faqService";
 import { knowledgeGapService } from "../../../../services/knowledgeGapService";
+import { knowledgeRequestService } from "../../../../services/knowledgeRequestService";
 import { onboardingMetricsService } from "../../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../../services/queryKeys";
 import { WidgetBar } from "../../../dashboard/components/WidgetBar";
 import { summarizeGaps, topQuestions } from "../../../dashboard/teamInsights";
 import { TrendBadge } from "../../../faq/components/TrendBadge";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../../../knowledge-gaps/severity";
+import { formatWaiting, hasWaitedADay } from "../../../knowledge-request/format";
 import { formatDuration } from "../../../onboarding-metrics/format";
 import { useProjectContext } from "../../../projects/useProjectContext";
 import { PmCard, PmCardHeader, PmCardLink } from "../PmCard";
@@ -291,6 +296,104 @@ export function OnboardingHealthCard() {
             value={metrics.stalledCount}
             attention={metrics.stalledCount > 0}
           />
+        </ul>
+      )}
+    </PmCard>
+  );
+}
+
+/**
+ * The escalation inbox, previewed: the questions the buddy could not answer, oldest first — who
+ * asked and how long they have been waiting. The figure above only said how many; a hire who has
+ * waited a week on an answer looks the same there as one who asked five minutes ago. Answering
+ * needs room, so every row leads to the Escalations section rather than answering in place.
+ */
+export function EscalationsCard() {
+  const { selectedProjectId } = useProjectContext();
+  const {
+    data: open,
+    loading,
+    error,
+  } = useQueryFetch(
+    queryKeys.knowledgeRequest.open(selectedProjectId),
+    () => knowledgeRequestService.listOpen(selectedProjectId),
+    { enabled: Boolean(selectedProjectId) },
+  );
+
+  const requests = [...(open ?? [])].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  const visible = requests.slice(0, ROWS);
+
+  return (
+    <PmCard
+      aria-label="Escalations"
+      tone="purple"
+      className="h-full"
+      to="/insights/knowledge-requests"
+      linkLabel="Open the escalation inbox"
+    >
+      <PmCardHeader
+        icon={Inbox}
+        tone="purple"
+        title="Escalations"
+        meta={open ? `${requests.length} open` : undefined}
+        action={<PmCardLink to="/insights/knowledge-requests">Inbox</PmCardLink>}
+      />
+
+      {loading ? (
+        <CardSkeleton label="Loading escalations" />
+      ) : error || !open ? (
+        <EmptyState size="sm">No escalations to show right now.</EmptyState>
+      ) : requests.length === 0 ? (
+        <p className="flex flex-1 items-center justify-center gap-2 py-6 text-sm text-app-text-muted">
+          <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-app-success-solid" />
+          Inbox clear — nothing escalated.
+        </p>
+      ) : (
+        <ul className="space-y-0.5">
+          {visible.map((request) => {
+            const stale = hasWaitedADay(request.createdAt);
+
+            return (
+              <li key={request.id}>
+                <Link to="/insights/knowledge-requests" className={rowClassName}>
+                  <span className="flex items-start gap-2.5">
+                    <UserAvatar
+                      profileIcon={request.hire?.profileIcon ?? undefined}
+                      fallbackName={request.hire?.displayName ?? "?"}
+                      seed={request.hire?.userId ?? request.hireId}
+                      size={24}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-2 text-sm leading-snug text-app-text">
+                        {request.question}
+                      </span>
+                      <span className="mt-0.5 flex items-center gap-1.5 text-xs text-app-text-muted">
+                        <span className="truncate">
+                          {request.hire?.displayName ?? "Former member"}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1 ${
+                            stale ? "font-medium text-app-warning-text" : ""
+                          }`}
+                        >
+                          <Clock aria-hidden="true" className="h-3 w-3" />
+                          waiting {formatWaiting(request.createdAt)}
+                        </span>
+                      </span>
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+          {requests.length > visible.length && (
+            <li className="px-2 pt-1 text-xs text-app-text-subtle">
+              +{requests.length - visible.length} more in the inbox
+            </li>
+          )}
         </ul>
       )}
     </PmCard>

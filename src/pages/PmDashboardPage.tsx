@@ -7,6 +7,7 @@ import { formatDuration } from "../features/onboarding-metrics/format";
 import { buildAttentionQueue } from "../features/pm-area/attentionQueue";
 import { PmStat } from "../features/pm-area/components/PmCard";
 import {
+  EscalationsCard,
   KnowledgeGapsCard,
   OnboardingHealthCard,
   QuestionsCard,
@@ -147,8 +148,9 @@ export function PmDashboardPage() {
         onOpenMember={openMember}
       />
 
-      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid items-stretch gap-5 md:grid-cols-2 2xl:grid-cols-4">
         <OnboardingHealthCard />
+        <EscalationsCard />
         <QuestionsCard />
         <KnowledgeGapsCard />
       </div>
