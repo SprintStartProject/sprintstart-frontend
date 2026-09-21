@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, Shield, Users, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Clock, Search, Shield, Users, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -75,12 +76,15 @@ const SORT_COLUMN: Record<TeamOverviewFilters["sortBy"], { column: SortColumn; d
 function SortHeader({
   column,
   label,
+  icon: LeadIcon,
   sortLabel,
   sortBy,
   onSort,
 }: {
   column: SortColumn;
   label: string;
+  /** Shown before the label — the clock that marks "time on step" in every row. */
+  icon?: LucideIcon;
   /** What the sort actually orders by, for the accessible name and tooltip. */
   sortLabel: string;
   sortBy: TeamOverviewFilters["sortBy"];
@@ -107,6 +111,7 @@ function SortHeader({
         active ? "text-app-text" : "hover:text-app-text"
       }`}
     >
+      {LeadIcon && <LeadIcon aria-hidden="true" className="h-3 w-3" />}
       {label}
       <Icon aria-hidden="true" className={`h-3 w-3 ${active ? "" : "opacity-50"}`} />
     </button>
@@ -394,10 +399,18 @@ export function TeamManagementPage() {
                 className={`hidden gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid ${ROSTER_COLUMNS}`}
               >
                 <span>Member</span>
-                <span>
+                {/* The column shows where someone is; what it sorts by is how long they have
+                    been there — said on the control, with the clock every row's day count
+                    carries, so it does not read as a second "progress" sort. */}
+                <span className="flex items-center gap-2">
+                  <span>Where they are</span>
+                  <span aria-hidden="true" className="text-app-border">
+                    ·
+                  </span>
                   <SortHeader
                     column="step"
-                    label="Where they are"
+                    label="Time on step"
+                    icon={Clock}
                     sortLabel="time on current step"
                     sortBy={sortBy}
                     onSort={setSortBy}
