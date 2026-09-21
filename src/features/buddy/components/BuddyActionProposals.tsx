@@ -3,6 +3,7 @@ import type { ProposedAction } from "../types";
 import {
   BUDDY_ACTION_AMEND_CHECKLIST,
   BUDDY_ACTION_OPEN_ORIENTATION,
+  BUDDY_ACTION_REWORD_CHECKLIST,
   BUDDY_ACTION_TICK_CHECKLIST,
 } from "../types";
 import { BuddyOrientationCard } from "./BuddyOrientationCard";
@@ -78,7 +79,7 @@ export function BuddyActionProposals({
                   className="mt-1.5 ml-5.5 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                  Try {action.label.toLowerCase()} again
+                  Try again: {action.label}
                 </button>
               )}
               {/* Opening orientation is the one action whose result is content, not
@@ -152,13 +153,29 @@ export function BuddyActionProposals({
 
             {/* The one offer that *replaces* something already on a card, so it shows both: the
                 line as it reads now and as it would read. Only the new wording would be asking
-                them to agree to a change they would have to go and diff for themselves. */}
-            {action.lineBefore && action.lineAfter && (
-              <div className="min-w-0 text-xs">
-                <p className="break-words text-app-text-muted line-through">{action.lineBefore}</p>
-                <p className="break-words text-app-text">{action.lineAfter}</p>
-              </div>
-            )}
+                them to agree to a change they would have to go and diff for themselves.
+
+                `<del>`/`<ins>` rather than a struck-through paragraph: `line-through` is paint
+                only, and to a screen reader two plain paragraphs are two near-identical sentences
+                with nothing saying which one is leaving. The spoken labels are there as well
+                because not every screen reader announces the elements themselves.
+
+                Keyed off the action, like the amend and tick branches above, so a future action
+                that happens to carry both fields does not render as a rewording. */}
+            {action.action === BUDDY_ACTION_REWORD_CHECKLIST &&
+              action.lineBefore &&
+              action.lineAfter && (
+                <div className="min-w-0 text-xs">
+                  <del className="block break-words text-app-text-muted line-through">
+                    <span className="sr-only">Currently: </span>
+                    {action.lineBefore}
+                  </del>
+                  <ins className="block break-words text-app-text no-underline">
+                    <span className="sr-only">Would become: </span>
+                    {action.lineAfter}
+                  </ins>
+                </div>
+              )}
 
             {/* Whitespace kept: the note's first line becomes the card's heading, so a preview that
                 reflowed it would not be showing what would be kept. */}
