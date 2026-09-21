@@ -179,7 +179,7 @@ type PmStatProps = {
   icon: LucideIcon;
   label: string;
   value: ReactNode;
-  hint: string;
+  hint: ReactNode;
   /** A number somebody has to act on. Marks the tile with a dot and a warm chip, never the figure. */
   attention?: boolean;
   /** The section the figure belongs to — colours the icon chip while nothing is waiting. */

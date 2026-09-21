@@ -94,8 +94,6 @@ export const queryKeys = {
     // Not project-scoped: feedback belongs to the member's path, and the admin endpoint answers
     // for the member across projects.
     byUser: (userId: string) => ["member-feedback", userId] as const,
-    // Everybody's feedback in one read, for the overview's "Waiting on you" count.
-    all: () => ["member-feedback", "__all__"] as const,
   },
   projectRoles: {
     // `getProjectRoles` takes no project argument, but the roles it returns are the selected

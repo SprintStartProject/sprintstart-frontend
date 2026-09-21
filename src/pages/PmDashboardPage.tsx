@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Hand, Inbox, Rocket, Users } from "lucide-react";
+import { Hand, Inbox, MessageSquareText, Rocket, SkipForward, Users } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
 import { IngestionStatusWidget } from "../features/data-ingestion/components/IngestionStatusWidget";
 import { useAttention } from "../features/onboarding-metrics/hooks/useAttention";
 import { formatDuration } from "../features/onboarding-metrics/format";
@@ -20,7 +21,7 @@ import { ProjectIndustryWidget } from "../features/projects/industry/ProjectIndu
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useQueryFetch } from "../hooks/useQueryFetch";
 import { isUnread } from "../features/pm-area/useMemberOpenItems";
-import { getAllOnboardingFeedback } from "../services/teamManagementService";
+import { getUserOnboardingFeedback } from "../services/teamManagementService";
 import { onboardingMetricsService } from "../services/onboardingMetricsService";
 import { queryKeys } from "../services/queryKeys";
 
@@ -56,28 +57,27 @@ export function PmDashboardPage() {
   const openEscalations = useOpenEscalationCount(selectedProjectId, true);
 
   const doneCount = members.filter((member) => memberStage(member) === "done").length;
-  const { data: allFeedback } = useQueryFetch(
-    queryKeys.memberFeedback.all(),
-    getAllOnboardingFeedback,
-  );
+  // Each flagged member's own feedback, under the same key the member panel reads — so marking
+  // one read in the panel refreshes this count too, and opening the panel after the overview
+  // costs no second request.
+  const feedbackQueries = useQueries({
+    queries: members
+      .filter((member) => member.hasFeedback)
+      .map((member) => ({
+        queryKey: queryKeys.memberFeedback.byUser(member.userId),
+        queryFn: () => getUserOnboardingFeedback(member.userId),
+      })),
+  });
 
   // What is open with the manager, counted as items rather than people: every pending skip
-  // request, and every unread piece of feedback from someone on this project. A member the
-  // roster flags as having feedback but whose items the feedback read does not show (or while
-  // it is loading or failed) still counts as one, so the figure never under-reports.
+  // request, and every unread piece of feedback. A flagged member whose feedback has not loaded
+  // (or failed to) still counts as one, so the figure never under-reports.
   const skipCount = members.filter((member) => waitingOn(member).includes("skip")).length;
-  const unreadByMember = new Map<string, number>();
-  for (const item of allFeedback ?? []) {
-    if (!item.userId || !isUnread(item)) continue;
-    unreadByMember.set(item.userId, (unreadByMember.get(item.userId) ?? 0) + 1);
-  }
-  const feedbackCount = members.reduce(
-    (sum, member) =>
-      sum + Math.max(unreadByMember.get(member.userId) ?? 0, member.hasFeedback ? 1 : 0),
+  const feedbackCount = feedbackQueries.reduce(
+    (sum, query) => sum + Math.max(1, (query.data ?? []).filter(isUnread).length),
     0,
   );
   const waitingCount = skipCount + feedbackCount;
-  const waitingHint = `${skipCount} skip ${skipCount === 1 ? "request" : "requests"} · ${feedbackCount} unread feedback`;
 
   const figuresReady = !rosterLoading && !rosterError;
 
@@ -97,7 +97,27 @@ export function PmDashboardPage() {
           icon={Hand}
           label="Waiting on you"
           value={figuresReady ? waitingCount : "—"}
-          hint={waitingCount > 0 ? waitingHint : "No skip requests, no unread feedback"}
+          hint={
+            waitingCount > 0 ? (
+              <span className="inline-flex items-center gap-3">
+                <span className="inline-flex items-center gap-1" title="Skip requests">
+                  <SkipForward aria-hidden="true" className="h-3.5 w-3.5 text-app-warning-text" />
+                  {skipCount}
+                  <span className="sr-only">skip requests</span>
+                </span>
+                <span className="inline-flex items-center gap-1" title="Unread feedback">
+                  <MessageSquareText
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 text-app-brand-text"
+                  />
+                  {feedbackCount}
+                  <span className="sr-only">unread feedback</span>
+                </span>
+              </span>
+            ) : (
+              "Nothing to answer"
+            )
+          }
           attention={waitingCount > 0}
           to="/team-management?filter=attention"
         />

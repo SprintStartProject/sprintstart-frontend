@@ -524,8 +524,6 @@ export const handlers = [
   // A member's onboarding path, read by the PM member side panel. No path by default; tests that
   // care about the "phase 2 of 4" line override it.
   http.get("/api/v1/onboarding/users/:userId/path", () => new HttpResponse(null, { status: 404 })),
-  // Everybody's onboarding feedback, which the PM overview counts unread items from.
-  http.get("/api/v1/admin/onboarding/feedback", () => HttpResponse.json([])),
 
   http.get("/api/v1/confluence/projects/:projectId/connections", () => HttpResponse.json([])),
   http.post("/api/v1/confluence/projects/:projectId/connections", () =>

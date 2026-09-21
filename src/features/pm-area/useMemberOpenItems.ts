@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../context/useToast";
 import { useQueryFetch } from "../../hooks/useQueryFetch";
 import { queryKeys } from "../../services/queryKeys";
@@ -33,7 +32,6 @@ export function useMemberOpenItems(
   onChanged?: () => Promise<unknown> | void,
 ) {
   const toast = useToast();
-  const queryClient = useQueryClient();
   const [reviewingSkip, setReviewingSkip] = useState<SkipDecision | null>(null);
   const [markingFeedbackId, setMarkingFeedbackId] = useState<string | null>(null);
 
@@ -73,8 +71,6 @@ export function useMemberOpenItems(
     try {
       await markOnboardingFeedbackRead(feedbackId);
       refetchFeedback();
-      // The overview counts unread feedback across the team from its own read.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.memberFeedback.all() });
       await onChanged?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't mark the feedback as read.");
