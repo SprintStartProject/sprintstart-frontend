@@ -151,7 +151,9 @@ export function ProjectIndustryPanel({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        {/* The value keeps a minimum width, so in a narrow card (the PM overview) the buttons
+            wrap onto their own line instead of squeezing the value into one word per line. */}
+        <div className="flex min-w-40 flex-1 flex-wrap items-center gap-2">
           {isEditing ? (
             <Input
               ref={editInputRef}
@@ -166,11 +168,31 @@ export function ProjectIndustryPanel({
             />
           ) : (
             <>
-              <p className="text-sm font-medium text-app-text" data-testid="project-industry-value">
+              <p
+                className={`text-sm font-medium ${industry ? "text-app-text" : "text-app-text-muted"}`}
+                data-testid="project-industry-value"
+              >
                 {industry || "Not determined yet"}
               </p>
               {industry && (
-                <IndustryConfidenceBadge confidence={industryConfidence} isCustom={industryCustom} />
+                <IndustryConfidenceBadge
+                  confidence={industryConfidence}
+                  isCustom={industryCustom}
+                />
+              )}
+              {/* Beside the value it edits, not among the actions on the right. */}
+              {showEditButton && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={startEditing}
+                  disabled={disabled || isEvaluating}
+                  aria-label="Edit industry"
+                  data-testid="edit-industry-button"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </Button>
               )}
             </>
           )}
@@ -199,21 +221,7 @@ export function ProjectIndustryPanel({
                 Cancel
               </Button>
             </>
-          ) : (
-            showEditButton && (
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={startEditing}
-                disabled={disabled || isEvaluating}
-                aria-label="Edit industry"
-                data-testid="edit-industry-button"
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            )
-          )}
+          ) : null}
 
           {canEvaluate && (
             <Button
