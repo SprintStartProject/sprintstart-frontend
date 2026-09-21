@@ -33,6 +33,8 @@ type LegacySkill = {
   roleId?: string;
   roleIds?: string[];
   status?: SkillStatus;
+  category?: string | null;
+  universal?: boolean;
 };
 
 function normalizeSkill(skill: LegacySkill): Skill {
@@ -43,6 +45,8 @@ function normalizeSkill(skill: LegacySkill): Skill {
     name: skill.name,
     roleIds,
     status: skill.status ?? "ACTIVE",
+    category: skill.category ?? null,
+    universal: skill.universal ?? false,
   };
 }
 
@@ -174,13 +178,18 @@ export async function getProjectRoles(): Promise<ProjectRole[]> {
   }
 }
 
-export async function createProjectRole(name: string, description: string): Promise<ProjectRole> {
+export async function createProjectRole(
+  name: string,
+  description: string,
+  options?: { projectId?: string },
+): Promise<ProjectRole> {
   try {
     return await apiClient.fetch<ProjectRole>("/api/v1/projectRoles", {
       method: "POST",
       body: JSON.stringify({
         name,
         description,
+        ...(options?.projectId ? { projectId: options.projectId } : {}),
       }),
     });
   } catch {
@@ -486,6 +495,8 @@ type SkillResponseDto = {
   id: string;
   name: string;
   status?: SkillStatus;
+  category?: string | null;
+  universal?: boolean;
   roleId?: string;
   roleIds?: string[];
   projectRole?: {
@@ -512,6 +523,8 @@ function toSkill(skill: SkillResponseDto): Skill {
     name: skill.name,
     roleIds: skill.roleIds ?? legacyRoleIds,
     status: skill.status ?? "ACTIVE",
+    category: skill.category ?? null,
+    universal: skill.universal ?? false,
   };
 }
 
@@ -541,6 +554,21 @@ export async function updateSkill(
   });
 
   return toSkill(response);
+}
+
+/**
+ * Asks the AI service for skills for a role.
+ *
+ * The endpoint immediately links its suggestions on the server and returns the
+ * role's complete skill list, not only the newly suggested entries.
+ */
+export async function suggestSkillsForRole(roleId: string): Promise<Skill[]> {
+  const response = await apiClient.fetch<SkillResponseDto[]>(
+    `/api/v1/projectRoles/${roleId}/skills/suggest`,
+    { method: "POST" },
+  );
+
+  return response.map(toSkill);
 }
 
 export async function getSkillsByRoleId(roleId: string): Promise<Skill[]> {
@@ -589,6 +617,7 @@ export async function reactivateSkill(
         name,
         roleIds,
         status: "ACTIVE",
+        universal: false,
       }
     );
   }
@@ -623,6 +652,7 @@ export async function createSkill(name: string, roleIds: string[]): Promise<Skil
       name,
       roleIds,
       status: "ACTIVE",
+      universal: false,
     };
 
     mockSkills = [...mockSkills, newSkill];

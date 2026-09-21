@@ -12,6 +12,7 @@ import {
   updateSkill,
   getSkillsByRoleId,
   updateRoleSkills,
+  suggestSkillsForRole,
   reactivateSkill,
   getMySkillLevels,
   getUserSkillLevels,
@@ -67,6 +68,70 @@ describe("teamManagementService", () => {
     expect(newRole.id).toBe("new-role-1");
   });
 
+  it("createProjectRole only includes projectId when provided", async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.post("/api/v1/projectRoles", async ({ request }) => {
+        const body = (await request.json()) as { name: string; description: string };
+        bodies.push(body);
+        return HttpResponse.json({ id: `role-${bodies.length}`, ...body });
+      }),
+    );
+
+    await createProjectRole("Tester", "QA");
+    await createProjectRole("Developer", "Builds features", { projectId: "project-1" });
+
+    expect(bodies).toEqual([
+      { name: "Tester", description: "QA" },
+      { name: "Developer", description: "Builds features", projectId: "project-1" },
+    ]);
+  });
+
+  it("suggestSkillsForRole posts to the role endpoint and maps the complete list", async () => {
+    let requestMethod = "";
+    server.use(
+      http.post("/api/v1/projectRoles/role1/skills/suggest", ({ request }) => {
+        requestMethod = request.method;
+        return HttpResponse.json([
+          {
+            id: "skill-ai-1",
+            name: "Prompt Engineering",
+            roleIds: ["role1"],
+            status: "ACTIVE",
+            category: "AI",
+            universal: true,
+          },
+        ]);
+      }),
+    );
+
+    const skills = await suggestSkillsForRole("role1");
+
+    expect(requestMethod).toBe("POST");
+    expect(skills).toEqual([
+      {
+        id: "skill-ai-1",
+        name: "Prompt Engineering",
+        roleIds: ["role1"],
+        status: "ACTIVE",
+        category: "AI",
+        universal: true,
+      },
+    ]);
+  });
+
+  it("suggestSkillsForRole propagates backend failures without a mock fallback", async () => {
+    server.use(
+      http.post("/api/v1/projectRoles/role1/skills/suggest", () =>
+        HttpResponse.json({ message: "AI unavailable" }, { status: 502 }),
+      ),
+    );
+
+    await expect(suggestSkillsForRole("role1")).rejects.toMatchObject({
+      status: 502,
+      message: "AI unavailable",
+    });
+  });
   it("assignProjectRoleToUser sends request to backend", async () => {
     let captured = false;
     server.use(
@@ -89,6 +154,8 @@ describe("teamManagementService", () => {
             name: "TypeScript",
             roleIds: ["role1", "role2"],
             status: "ACTIVE",
+            category: "ENGINEERING",
+            universal: true,
           },
           {
             id: "skill2",
@@ -108,12 +175,16 @@ describe("teamManagementService", () => {
         name: "TypeScript",
         roleIds: ["role1", "role2"],
         status: "ACTIVE",
+        category: "ENGINEERING",
+        universal: true,
       },
       {
         id: "skill2",
         name: "Legacy API",
         roleIds: [],
         status: "RETIRED",
+        category: null,
+        universal: false,
       },
     ]);
   });
@@ -222,6 +293,8 @@ describe("teamManagementService", () => {
             name: "TypeScript",
             roleIds: ["role1"],
             status: "ACTIVE",
+            category: "ENGINEERING",
+            universal: true,
           },
         ]),
       ),
@@ -245,6 +318,8 @@ describe("teamManagementService", () => {
             name: "TypeScript",
             roleIds: ["role1"],
             status: "ACTIVE",
+            category: "ENGINEERING",
+            universal: true,
           },
         ]);
       }),
@@ -310,6 +385,8 @@ describe("teamManagementService", () => {
             name: "TypeScript",
             roleIds: ["role1", "role2"],
             status: "ACTIVE",
+            category: "ENGINEERING",
+            universal: true,
           },
         ]),
       ),

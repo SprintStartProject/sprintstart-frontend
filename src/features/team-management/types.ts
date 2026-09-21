@@ -57,6 +57,8 @@ export type Skill = {
   name: string;
   roleIds: string[];
   status: SkillStatus;
+  category?: string | null;
+  universal: boolean;
   level?: SkillLevel;
 };
 
