@@ -19,6 +19,8 @@ import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { ProjectIndustryWidget } from "../features/projects/industry/ProjectIndustryWidget";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useQueryFetch } from "../hooks/useQueryFetch";
+import { isUnread } from "../features/pm-area/useMemberOpenItems";
+import { getAllOnboardingFeedback } from "../services/teamManagementService";
 import { onboardingMetricsService } from "../services/onboardingMetricsService";
 import { queryKeys } from "../services/queryKeys";
 
@@ -54,15 +56,29 @@ export function PmDashboardPage() {
   const openEscalations = useOpenEscalationCount(selectedProjectId, true);
 
   const doneCount = members.filter((member) => memberStage(member) === "done").length;
-  const waitingCount = members.filter((member) => waitingOn(member).length > 0).length;
+  const { data: allFeedback } = useQueryFetch(
+    queryKeys.memberFeedback.all(),
+    getAllOnboardingFeedback,
+  );
+
+  // What is open with the manager, counted as items rather than people: every pending skip
+  // request, and every unread piece of feedback from someone on this project. A member the
+  // roster flags as having feedback but whose items the feedback read does not show (or while
+  // it is loading or failed) still counts as one, so the figure never under-reports.
   const skipCount = members.filter((member) => waitingOn(member).includes("skip")).length;
-  const feedbackCount = members.filter((member) => waitingOn(member).includes("feedback")).length;
-  const waitingHint = [
-    skipCount > 0 && (skipCount === 1 ? "1 skip request" : `${skipCount} skip requests`),
-    feedbackCount > 0 && `${feedbackCount} feedback`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const unreadByMember = new Map<string, number>();
+  for (const item of allFeedback ?? []) {
+    if (!item.userId || !isUnread(item)) continue;
+    unreadByMember.set(item.userId, (unreadByMember.get(item.userId) ?? 0) + 1);
+  }
+  const feedbackCount = members.reduce(
+    (sum, member) =>
+      sum + Math.max(unreadByMember.get(member.userId) ?? 0, member.hasFeedback ? 1 : 0),
+    0,
+  );
+  const waitingCount = skipCount + feedbackCount;
+  const waitingHint = `${skipCount} skip ${skipCount === 1 ? "request" : "requests"} · ${feedbackCount} unread feedback`;
+
   const figuresReady = !rosterLoading && !rosterError;
 
   return (
@@ -81,7 +97,7 @@ export function PmDashboardPage() {
           icon={Hand}
           label="Waiting on you"
           value={figuresReady ? waitingCount : "—"}
-          hint={waitingCount > 0 ? waitingHint : "Nothing to answer"}
+          hint={waitingCount > 0 ? waitingHint : "No skip requests, no unread feedback"}
           attention={waitingCount > 0}
           to="/team-management?filter=waiting"
         />

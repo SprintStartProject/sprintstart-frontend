@@ -27,6 +27,7 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
 });
 
 vi.mock("../../../src/services/teamManagementService", () => ({
+  getAllOnboardingFeedback: vi.fn(() => Promise.resolve([])),
   getTeamOverview: vi.fn(() => Promise.resolve(mocks.roster)),
 }));
 

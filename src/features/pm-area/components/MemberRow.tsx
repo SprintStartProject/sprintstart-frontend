@@ -52,6 +52,41 @@ export function MemberProgressBar({
   );
 }
 
+/**
+ * Skip and feedback as bare icons in small round chips, for the overview's short list: the row
+ * is narrow, and "does this person want something from me" is a yes/no the icon answers alone.
+ * The label is the tooltip and the accessible name.
+ */
+function WaitingIcons({ member }: { member: TeamOverviewUser }) {
+  const waiting = waitingOn(member);
+  if (waiting.length === 0) return null;
+
+  return (
+    <span className="flex items-center gap-1">
+      {waiting.includes("skip") && (
+        <span
+          role="img"
+          aria-label="Skip request"
+          title="Skip request"
+          className="flex h-6 w-6 items-center justify-center rounded-full bg-app-warning-bg text-app-warning-text"
+        >
+          <SkipForward aria-hidden="true" className="h-3.5 w-3.5" />
+        </span>
+      )}
+      {waiting.includes("feedback") && (
+        <span
+          role="img"
+          aria-label="Unread feedback"
+          title="Unread feedback"
+          className="flex h-6 w-6 items-center justify-center rounded-full bg-app-brand-soft text-app-brand-text"
+        >
+          <MessageSquareText aria-hidden="true" className="h-3.5 w-3.5" />
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** The skip / feedback / stuck markers, as small labelled chips. */
 export function MemberFlags({ member }: { member: TeamOverviewUser }) {
   const waiting = waitingOn(member);
@@ -280,7 +315,7 @@ export function MemberRow({
       )}
 
       <span className="col-start-2 row-start-1 flex items-center justify-end gap-2 md:col-start-auto md:row-start-auto">
-        {!isFull && <MemberFlags member={member} />}
+        {!isFull && <WaitingIcons member={member} />}
         {!isFull && (
           <>
             <MemberProgressBar percent={percent} className="hidden w-28 sm:flex" />

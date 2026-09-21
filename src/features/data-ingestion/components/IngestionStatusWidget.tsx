@@ -35,9 +35,11 @@ const TONE_RANK: Record<DataSource["statusView"]["tone"], number> = {
 
 function Figure({ value, label }: { value: string; label: string }) {
   return (
-    <div className="min-w-0">
-      <p className="text-lg leading-tight font-bold text-app-text tabular-nums">{value}</p>
-      <p className="truncate text-[11px] text-app-text-muted">{label}</p>
+    <div className="min-w-0 rounded-xl border border-app-border-muted bg-app-bg-soft px-3 py-2">
+      <p className="text-base leading-tight font-bold text-app-text tabular-nums">{value}</p>
+      <p className="truncate text-[11px] text-app-text-muted" title={label}>
+        {label}
+      </p>
     </div>
   );
 }
@@ -153,9 +155,9 @@ export function IngestionStatusWidget() {
             {health.text}
           </p>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <Figure value={formatNumber(totalArtifacts)} label="artifacts known" />
-            <Figure value={`+${formatNumber(lastRunChanges)}`} label="new or updated, last runs" />
+            <Figure value={`+${formatNumber(lastRunChanges)}`} label="new or updated" />
             <Figure
               value={formatNumber(errors)}
               label={errors === 1 ? "failed item" : "failed items"}
