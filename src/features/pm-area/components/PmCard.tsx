@@ -255,8 +255,8 @@ export function PmStat({
 }
 
 /**
- * The first row of a PM section: one line on what it shows, the section's own controls on the
- * right, and — for the two sections that have them — its inner tabs on the left.
+ * The first row of a PM section: one line on what it shows, and the section's own controls on
+ * the right.
  *
  * The section's name is a heading for assistive technology only. The workspace's tab bar right
  * above already says "Team" in the active pill, and repeating it as a visible title under that
@@ -271,29 +271,18 @@ export function PmSectionHeader({
   title,
   description,
   actions,
-  tabs,
 }: {
   title: string;
   description: ReactNode;
   actions?: ReactNode;
-  /** The section's inner views (a {@link PmSubTabs}); takes the description's place. */
-  tabs?: ReactNode;
 }) {
   return (
-    <div
-      className={`mb-5 flex flex-col gap-3 sm:min-h-10 sm:flex-row sm:justify-between ${
-        tabs ? "border-b border-app-border-muted sm:items-end" : "sm:items-center"
-      }`}
-    >
+    <div className="mb-5 flex flex-col gap-3 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <h2 className="sr-only">{title}</h2>
-        {tabs ?? <p className="text-sm text-app-text-muted">{description}</p>}
+        <p className="text-sm text-app-text-muted">{description}</p>
       </div>
-      {actions && (
-        <div className={`flex shrink-0 flex-wrap items-center gap-3 ${tabs ? "pb-2" : ""}`}>
-          {actions}
-        </div>
-      )}
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div>}
     </div>
   );
 }

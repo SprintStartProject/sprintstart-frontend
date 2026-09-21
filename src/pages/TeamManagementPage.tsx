@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../components/ui/FilterSelect";
 import { Input } from "../components/ui/Input";
+import { SegmentedTabs } from "../components/ui/SegmentedTabs";
 import { SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
@@ -13,7 +14,6 @@ import { useAttention } from "../features/onboarding-metrics/hooks/useAttention"
 import { buildAttentionQueue } from "../features/pm-area/attentionQueue";
 import { MemberRow } from "../features/pm-area/components/MemberRow";
 import { PmSectionHeader } from "../features/pm-area/components/PmCard";
-import { PmSubTabs } from "../features/pm-area/components/PmSubTabs";
 import {
   STAGE_COLOR,
   daysOnStep,
@@ -342,8 +342,8 @@ export function TeamManagementPage() {
       <PmSectionHeader
         title="Team"
         description="Everybody on this project, where they are in their onboarding, and the roles they hold."
-        tabs={
-          <PmSubTabs
+        actions={
+          <SegmentedTabs
             value={activeTab}
             onChange={changeTab}
             layoutId="team-management-tab-pill"
