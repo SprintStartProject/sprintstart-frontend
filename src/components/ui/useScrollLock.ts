@@ -59,7 +59,88 @@ export function useScrollLock(locked: boolean) {
     if (lockCount === 0) {
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
 
-      const restores = [lockElement(document.body, scrollbarWidth)];
+      const restores = [
+        lockElement(document.documentElement, 0),
+        lockElement(document.body, scrollbarWidth),
+      ];
+
+      function handleWheel(event: WheelEvent) {
+        let node: HTMLElement | null = event.target instanceof HTMLElement ? event.target : null;
+        let canScroll = false;
+
+        while (node && node !== document.body && node !== document.documentElement) {
+          const style = window.getComputedStyle(node);
+          const isScrollable =
+            (style.overflowY === "auto" || style.overflowY === "scroll") &&
+            node.scrollHeight > node.clientHeight;
+
+          if (isScrollable) {
+            const isAtTop = node.scrollTop <= 0 && event.deltaY < 0;
+            const isAtBottom =
+              node.scrollTop + node.clientHeight >= node.scrollHeight - 1 && event.deltaY > 0;
+
+            if (!isAtTop && !isAtBottom) {
+              canScroll = true;
+              break;
+            }
+          }
+          node = node.parentElement;
+        }
+
+        if (!canScroll) {
+          event.preventDefault();
+        }
+      }
+
+      let touchStartY = 0;
+
+      function handleTouchStart(event: TouchEvent) {
+        if (event.touches.length > 0) {
+          touchStartY = event.touches[0].clientY;
+        }
+      }
+
+      function handleTouchMove(event: TouchEvent) {
+        if (event.touches.length === 0) return;
+        const currentY = event.touches[0].clientY;
+        const deltaY = touchStartY - currentY;
+
+        let node: HTMLElement | null = event.target instanceof HTMLElement ? event.target : null;
+        let canScroll = false;
+
+        while (node && node !== document.body && node !== document.documentElement) {
+          const style = window.getComputedStyle(node);
+          const isScrollable =
+            (style.overflowY === "auto" || style.overflowY === "scroll") &&
+            node.scrollHeight > node.clientHeight;
+
+          if (isScrollable) {
+            const isAtTop = node.scrollTop <= 0 && deltaY < 0;
+            const isAtBottom =
+              node.scrollTop + node.clientHeight >= node.scrollHeight - 1 && deltaY > 0;
+
+            if (!isAtTop && !isAtBottom) {
+              canScroll = true;
+              break;
+            }
+          }
+          node = node.parentElement;
+        }
+
+        if (!canScroll) {
+          event.preventDefault();
+        }
+      }
+
+      window.addEventListener("wheel", handleWheel, { passive: false });
+      window.addEventListener("touchstart", handleTouchStart, { passive: true });
+      window.addEventListener("touchmove", handleTouchMove, { passive: false });
+
+      restores.push(() => {
+        window.removeEventListener("wheel", handleWheel);
+        window.removeEventListener("touchstart", handleTouchStart);
+        window.removeEventListener("touchmove", handleTouchMove);
+      });
 
       document
         .querySelectorAll<HTMLElement>(`[${SCROLL_CONTAINER_ATTRIBUTE}]`)

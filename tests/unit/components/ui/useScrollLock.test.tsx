@@ -12,6 +12,7 @@ function Locker({ locked = true }: { locked?: boolean }) {
 
 afterEach(() => {
   cleanup();
+  document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
   document.body.style.paddingRight = "";
 });
@@ -19,9 +20,11 @@ afterEach(() => {
 describe("useScrollLock", () => {
   it("freezes the page while locked and restores it afterwards", () => {
     const view = render(<Locker />);
+    expect(document.documentElement.style.overflow).toBe("hidden");
     expect(document.body.style.overflow).toBe("hidden");
 
     view.unmount();
+    expect(document.documentElement.style.overflow).toBe("");
     expect(document.body.style.overflow).toBe("");
   });
 
@@ -67,5 +70,17 @@ describe("useScrollLock", () => {
 
     view.unmount();
     expect(document.body.style.overflow).toBe("auto");
+  });
+
+  it("prevents wheel events on non-scrollable background elements while locked", () => {
+    const view = render(<Locker />);
+    const event = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 100 });
+    document.body.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+
+    view.unmount();
+    const eventAfter = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 100 });
+    document.body.dispatchEvent(eventAfter);
+    expect(eventAfter.defaultPrevented).toBe(false);
   });
 });

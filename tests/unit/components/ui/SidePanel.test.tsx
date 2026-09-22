@@ -57,6 +57,7 @@ function SidePanelHarness({
 
 afterEach(() => {
   cleanup();
+  document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
   document.body.style.paddingRight = "";
 });
@@ -192,13 +193,18 @@ describe("SidePanel", () => {
     const user = userEvent.setup();
     render(<SidePanelHarness />);
 
+    expect(document.documentElement.style.overflow).toBe("");
     expect(document.body.style.overflow).toBe("");
 
     await user.click(screen.getByRole("button", { name: "Open" }));
+    expect(document.documentElement.style.overflow).toBe("hidden");
     expect(document.body.style.overflow).toBe("hidden");
 
     await user.keyboard("{Escape}");
-    await waitFor(() => expect(document.body.style.overflow).toBe(""));
+    await waitFor(() => {
+      expect(document.documentElement.style.overflow).toBe("");
+      expect(document.body.style.overflow).toBe("");
+    });
   });
 
   it("does not lock scrolling when lockScroll is false", async () => {
@@ -206,6 +212,7 @@ describe("SidePanel", () => {
     render(<SidePanelHarness lockScroll={false} />);
 
     await user.click(screen.getByRole("button", { name: "Open" }));
+    expect(document.documentElement.style.overflow).toBe("");
     expect(document.body.style.overflow).toBe("");
   });
 
