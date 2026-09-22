@@ -36,9 +36,15 @@ type EggModalShellProps = {
  *   never double-fire because keydowns in a focused iframe don't bubble out.
  *
  * Not the shared `Modal`: games own the keyboard, and Modal's focus trap
- * would fight them for the arrow keys. The one thing every overlay needs
- * regardless — the page behind it holding still — comes from
- * `useScrollLock`.
+ * would fight them for the arrow keys. The focus contract this shell does
+ * implement keeps hands off the keys the games use: focus lands on the
+ * dialog itself when it opens (so a screen reader announces it and the
+ * games' window-level keys work regardless of focus) and returns to
+ * whoever held it before when the dialog closes; Tab wraps inside the
+ * dialog — the canvas games never use it, and keydowns inside the 2048
+ * iframe don't reach this window, so the trap cannot fight either surface.
+ * The one thing every overlay needs regardless — the page behind it
+ * holding still — comes from `useScrollLock`.
  */
 export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
   const egg = EGG_REGISTRY[eggId];
@@ -46,6 +52,63 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
   useScrollLock(open);
   const prefersReducedMotion = useReducedMotion();
   const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
+
+  // Focus in on open, back to the opener on close. The dialog carries
+  // `tabIndex={-1}` so it is programmatically focusable without joining the
+  // page's Tab order. Restoring happens in the effect cleanup, i.e. the
+  // moment `open` flips false — before the exit animation finishes, but the
+  // return is what matters: focus never ends up on a removed node (the
+  // trigger button would be unreachable to keyboard users otherwise).
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    restoreFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.focus();
+    return () => {
+      restoreFocusRef.current?.focus();
+      restoreFocusRef.current = null;
+    };
+  }, [open]);
+
+  // Tab wraps inside the dialog. Deliberately Tab-only: canvas games bind
+  // arrows/w/s/space on the window, and a Tab press inside the 2048 iframe
+  // is confined to the frame's document, so neither surface ever fights
+  // this handler. The focusable list includes the iframe itself, so one Tab
+  // from the header close button walks into the frame and the next wrap
+  // brings focus back to the header.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog || !(e.target instanceof Node) || !dialog.contains(e.target)) return;
+
+      const focusables = [
+        ...dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])',
+        ),
+      ];
+      if (focusables.length === 0) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === dialog)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
 
   // Close on Escape while focus is outside the iframe (header bar, close
   // button, or before the frame has loaded). Canvas games handle Escape
@@ -92,6 +155,8 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
           aria-label={egg.label}
         >
           <motion.div
+            ref={dialogRef}
+            tabIndex={-1}
             className={`relative max-w-full overflow-hidden rounded-2xl border border-app-border bg-app-surface shadow-2xl ${
               egg.kind === "iframe" ? "flex max-h-[90vh] flex-col" : ""
             }`}

@@ -231,11 +231,11 @@ export function OnBoardingPage() {
   useEffect(() => {
     if (generation.status === "running") {
       const { phases: currentPhases, startedAt } = generation;
+      // Deferred out of the effect body on purpose: `react-hooks/set-state-in-effect`
+      // flags a synchronous setState here, and semantically this only needs to land
+      // before the next paint, not before the next effect runs.
       queueMicrotask(() => {
-        setLastGeneration({
-          phases: currentPhases,
-          startedAt,
-        });
+        setLastGeneration({ phases: currentPhases, startedAt });
       });
     }
   }, [generation]);

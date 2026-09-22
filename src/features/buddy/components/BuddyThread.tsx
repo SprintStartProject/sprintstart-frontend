@@ -11,6 +11,12 @@ import { BuddyMessage, BuddyTypingMessage } from "./BuddyMessage";
 type BuddyThreadProps = {
   messages: BuddyMessageView[];
   isThinking: boolean;
+  /**
+   * True while the reply is still receiving tokens. Together with `isThinking`
+   * this is what keeps the waiting game's "reply ready" badge honest: the game
+   * only claims the reply is there once the turn has actually finished.
+   */
+  isStreaming?: boolean;
   /** The tool the buddy is running right now, if any — becomes "Checking your progress…". */
   activeTool: string | null;
   /** Confirms a buddy-proposed action (the only path that mutates). */
@@ -98,6 +104,7 @@ type BuddyThreadProps = {
 export function BuddyThread({
   messages,
   isThinking,
+  isStreaming = false,
   activeTool,
   confirmAction,
   dismissAction,
@@ -227,11 +234,12 @@ export function BuddyThread({
         );
       })}
 
-      {isThinking && (
+      {(isThinking || dinoGameActive) && (
         <BuddyTypingMessage
           label={activeTool ? toolLabel(activeTool) : undefined}
           showName={showNames}
           gameActive={dinoGameActive}
+          replyReady={dinoGameActive && !isThinking && !isStreaming}
           onGameExit={onDinoGameExit}
         />
       )}

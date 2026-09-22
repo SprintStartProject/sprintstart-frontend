@@ -248,7 +248,7 @@ export function ConfettiBurst() {
       {prefersReducedMotion ? (
         <div
           role="status"
-          className="animate-fade-in shadow-card pointer-events-none fixed top-6 left-1/2 z-[9998] -translate-x-1/2 rounded-full border border-app-border bg-app-surface px-5 py-2.5 text-lg font-semibold"
+          className="pointer-events-none fixed top-6 left-1/2 z-[9998] -translate-x-1/2 rounded-full border border-app-border bg-app-surface px-5 py-2.5 text-lg font-semibold"
         >
           🎉 Party!
         </div>
@@ -280,7 +280,7 @@ function readPalette(): string[] {
     "--color-app-purple-text",
     "--color-app-pink-text",
     "--color-app-orange-text",
-    "--color-app-yellow-text",
+    "--color-app-highlight-yellow",
   ];
   const resolved = candidates.map((name) => styles.getPropertyValue(name).trim()).filter(Boolean);
   return resolved.length >= 3 ? resolved : FALLBACK_PALETTE;

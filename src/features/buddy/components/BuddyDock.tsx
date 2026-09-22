@@ -334,6 +334,7 @@ export function BuddyDock({
             compact
             messages={messages}
             isThinking={isThinking}
+            isStreaming={isStreaming}
             activeTool={activeTool}
             lastMessageFooter={lastMessageFooter}
             confirmAction={confirmAction}

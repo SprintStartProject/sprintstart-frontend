@@ -96,7 +96,12 @@ export function useBuddyConversation(
   // offers. Closing is handled inside the hook: on exit, when the turn ends,
   // or when the cogwheel unlock flag flips off.
   const dinoUnlocked = useDinoUnlocked();
-  const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(isThinking, dinoUnlocked);
+  const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(isThinking, dinoUnlocked, {
+    // Parity with the chat and the drawer: the game outlives the turn it was armed for
+    // and stays open until the player leaves it — the reply's arrival only flips its
+    // completion badge. Without this the first token unmounted the game mid-run.
+    keepActiveUntilExit: true,
+  });
 
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);

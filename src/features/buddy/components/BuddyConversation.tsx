@@ -166,6 +166,7 @@ export function BuddyConversation({
             )}
             messages={messages}
             isThinking={isThinking}
+            isStreaming={isStreaming}
             activeTool={activeTool}
             confirmAction={confirmAction}
             dismissAction={dismissAction}

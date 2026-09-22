@@ -221,12 +221,19 @@ export function BuddyTypingMessage({
   label,
   showName = false,
   gameActive = false,
+  replyReady = false,
   onGameExit,
 }: {
   label?: string;
   showName?: boolean;
   /** True when the dino waiting-game is open instead of the dots. */
   gameActive?: boolean;
+  /**
+   * True when the turn has finished while the game is open: forwarded to the
+   * game as its completion badge and used to stop showing the dots — a reply
+   * that has arrived is not being typed anymore.
+   */
+  replyReady?: boolean;
   /** Called when the player leaves the dino game (Escape / exit button). */
   onGameExit?: () => void;
 }) {
@@ -234,8 +241,10 @@ export function BuddyTypingMessage({
 
   // The unlocked dino waiting-game replaces the dots while the buddy works —
   // the same deal the AI chat's ThinkingIndicator offers. The dots stay
-  // underneath as the status row, exactly like ThinkingIndicator does, and
-  // the label keeps explaining what the buddy is doing behind the game.
+  // underneath as the status row while the buddy is still working, and the
+  // label keeps explaining what the buddy is doing behind the game. Once the
+  // turn has finished (replyReady) the dots stop: nobody is typing anymore,
+  // and the game's own completion badge takes over as the status line.
   if (gameActive && onGameExit) {
     return (
       <motion.div
@@ -254,16 +263,18 @@ export function BuddyTypingMessage({
         </div>
 
         <div className="min-w-0 flex-1">
-          <DinoGame onExit={onGameExit} />
+          <DinoGame onExit={onGameExit} replyReady={replyReady} />
 
-          <div className="mt-2 flex w-max max-w-full items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-2.5 shadow-sm">
-            <span className="flex gap-1" aria-hidden="true">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
-            </span>
-            {label && <span className="text-sm text-app-text-muted italic">{label}</span>}
-          </div>
+          {!replyReady && (
+            <div className="mt-2 flex w-max max-w-full items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-2.5 shadow-sm">
+              <span className="flex gap-1" aria-hidden="true">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
+              </span>
+              {label && <span className="text-sm text-app-text-muted italic">{label}</span>}
+            </div>
+          )}
         </div>
       </motion.div>
     );

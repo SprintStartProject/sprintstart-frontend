@@ -37,11 +37,14 @@ export function EggEffectsLayer() {
       clearEggEffect();
       return;
     }
-    document.body.classList.add("barrel-roll-active");
     // `seq` is a dependency, not just the id: firing the roll again while it
     // is running must give it its full time again instead of letting the
     // first trigger's timer cut the second roll short. The class itself is
-    // idempotent — cleanup drops it, the effect puts it straight back.
+    // idempotent — cleanup drops it, the effect forces a style recalc and
+    // puts it back, so the engine actually restarts the animation instead of
+    // leaving the already-finished roll on the element.
+    void document.body.offsetWidth;
+    document.body.classList.add("barrel-roll-active");
     const timeout = setTimeout(() => {
       if (document.body.classList.contains("barrel-roll-active")) {
         document.body.classList.remove("barrel-roll-active");
