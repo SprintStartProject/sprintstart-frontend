@@ -27,6 +27,17 @@ type BuddyMessageProps = {
    * column is narrow and the avatars are two apart rather than twenty.
    */
   showName?: boolean;
+  /**
+   * The dock's layout: no face beside the hire's own messages, and the buddy's bubble runs to the
+   * edge.
+   *
+   * With a face on both sides, a 400px window lost ~80px to avatars, and the two sides' columns
+   * were capped at 85% of what was left — so the hire's bubbles ended short of the right edge and
+   * the buddy's started indented from the left, staggered against each other. Everybody knows
+   * which messages in a small chat window are their own; the side and the colour carry it there,
+   * and the name is still on the page.
+   */
+  compact?: boolean;
   /** A quiet line under the bubble — a timestamp, or who answered and when. */
   meta?: ReactNode;
   /**
@@ -68,6 +79,7 @@ export function BuddyMessage({
   speaker,
   children,
   showName = false,
+  compact = false,
   meta,
   error,
   footer,
@@ -89,9 +101,11 @@ export function BuddyMessage({
       {...entrance}
       className={`flex w-full min-w-0 gap-2.5 ${isYou ? "flex-row-reverse" : "flex-row"}`}
     >
-      <div className="flex size-8 shrink-0 items-center justify-center">
-        <SpeakerAvatar speaker={speaker} isStreaming={isStreaming} />
-      </div>
+      {!(compact && isYou) && (
+        <div className="flex size-8 shrink-0 items-center justify-center">
+          <SpeakerAvatar speaker={speaker} isStreaming={isStreaming} />
+        </div>
+      )}
 
       <div
         // The reading measure lives here, not on the thread's column. The page runs the full
@@ -104,8 +118,8 @@ export function BuddyMessage({
         // widens word by word and snaps back whenever a re-parse changes the rendered markdown,
         // which is unreadable while it is being written. Everyone else's turns arrive whole and
         // still hug. Same rule, and the same reason, as `MessageRow` in the chat.
-        className={`flex max-w-[min(85%,46rem)] min-w-0 flex-col gap-1 ${
-          isYou ? "items-end" : "items-start"
+        className={`flex min-w-0 flex-col gap-1 ${isYou ? "items-end" : "items-start"} ${
+          compact && !isYou ? "flex-1" : "max-w-[min(85%,46rem)]"
         } ${speaker === "BUDDY" ? "w-full" : ""}`}
       >
         {showName && (

@@ -26,7 +26,23 @@ export type ProjectContextValue = {
   /** All projects the user may switch between, managed ones first. */
   projects: SelectableProject[];
   selectedProject: SelectableProject | null;
+  /**
+   * The selected project's id — or `""` while nothing is selected.
+   *
+   * This value is only ever published once the loaded project list has confirmed it: a
+   * stored id and a `?projectId=` deep link are both held back until a list vouches for
+   * them. Consumers may therefore treat a non-empty id as one this user actually
+   * reaches, and gate requests on it without re-checking the list themselves.
+   */
   selectedProjectId: string;
+  /**
+   * Whether a confirmed project is selected — the safe gate for anything scoped to one.
+   *
+   * False while the project list is loading and for a user with no projects at all;
+   * every project-scoped request should wait for it rather than re-deriving the same
+   * check from {@link selectedProjectId} or {@link selectedProject}.
+   */
+  hasSelectedProject: boolean;
   /**
    * Whether the user manages the currently selected project.
    *

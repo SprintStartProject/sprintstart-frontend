@@ -1,8 +1,11 @@
 import { motion, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
 import { useLayoutEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import type { SidebarIcon } from "./SidebarNavIcons";
 import { slidingIndicatorSpringToken } from "../../styles/tokens";
+import { prefetchRoute } from "../../services/routePrefetch";
+import { useProjectContext } from "../../features/projects/useProjectContext";
 
 /**
  * Scale applied to the item directly under the pointer.
@@ -169,6 +172,12 @@ type SidebarNavLinkProps = {
    * own tells a screen reader nothing about what three of them there are.
    */
   countLabel?: (count: number) => string;
+  /**
+   * Something is being prepared behind this entry right now -- the onboarding path while it is
+   * built in the background. A small spinner in the trailing slot, announced with `busyLabel`.
+   */
+  busy?: boolean;
+  busyLabel?: string;
   onNavigate?: () => void;
 };
 
@@ -203,10 +212,15 @@ export function SidebarNavLink({
   attentionLabel,
   count = 0,
   countLabel,
+  busy = false,
+  busyLabel,
   onNavigate,
 }: SidebarNavLinkProps) {
   const prefersReducedMotion = useReducedMotion();
   const indicatorTransition = prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken;
+
+  const queryClient = useQueryClient();
+  const { selectedProjectId } = useProjectContext();
 
   /**
    * One marker language for the whole sidebar: an entry with work waiting
@@ -331,6 +345,11 @@ export function SidebarNavLink({
         to={to}
         end={end}
         onClick={onNavigate}
+        // Pointerdown rather than hover: a sweep across the sidebar passes over several
+        // entries in one motion, and prefetching all of them would spend requests on
+        // entries nobody meant to visit. A press is committed — by the time the browser
+        // paints the new route, the request is already a beat ahead of it.
+        onPointerDown={() => prefetchRoute(queryClient, to, selectedProjectId || null)}
         className={({ isActive }) =>
           `${BASE_LINK_CLASS} ${getLinkStateClass(isActive || forceActive)}`
         }
@@ -513,7 +532,17 @@ export function SidebarNavLink({
                                     two separate signals about the same row, and the row
                                     you are already on has less to tell you than the one
                                     with work waiting behind it. */}
-                {count > 0 ? (
+                {busy ? (
+                  <span className="ml-auto flex items-center" role="status">
+                    <span
+                      aria-hidden="true"
+                      className={`h-[14px] w-[14px] rounded-full border-2 border-t-transparent motion-safe:animate-spin ${
+                        isHighlighted ? "border-white" : "border-app-brand"
+                      }`}
+                    />
+                    <span className="sr-only">{busyLabel ?? "In progress"}</span>
+                  </span>
+                ) : count > 0 ? (
                   <span className="ml-auto flex items-center">
                     {/* The same amber as the icon beside it, and the same
                                             amber on the active row as off it. This is the

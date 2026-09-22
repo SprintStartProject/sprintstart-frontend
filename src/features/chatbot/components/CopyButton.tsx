@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Check, Copy } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 
 type CopyButtonProps = {
   /** Text to copy to the clipboard when the button is clicked. */
@@ -8,8 +9,11 @@ type CopyButtonProps = {
 
 /**
  * A compact icon button that copies the given text to the clipboard and shows a
- * transient "Copied" check state. Used on assistant chat messages so users can
- * grab the raw markdown response without selecting it manually.
+ * transient "Copied" check state. Used on assistant chat messages and buddy replies so users
+ * can grab the raw markdown response without selecting it manually.
+ *
+ * An `xs` ghost `Button`, like "Keep on my board" beside it. It was a hand-styled 11px link, so
+ * the two actions under one answer were a speck and a toolbar button of different heights.
  */
 export function CopyButton({ text }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
@@ -27,14 +31,19 @@ export function CopyButton({ text }: CopyButtonProps) {
   }, [text]);
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="xs"
+      iconOnly
       onClick={handleCopy}
       aria-label={copied ? "Copied" : "Copy response"}
-      className="flex items-center gap-1 rounded-md px-1 py-0.5 text-[11px] text-app-text-subtle transition-colors hover:text-app-text-muted focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      title={copied ? "Copied" : "Copy"}
     >
-      {copied ? <Check size={12} /> : <Copy size={12} />}
-      {copied && <span>Copied</span>}
-    </button>
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-app-success-solid" aria-hidden="true" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+      )}
+    </Button>
   );
 }

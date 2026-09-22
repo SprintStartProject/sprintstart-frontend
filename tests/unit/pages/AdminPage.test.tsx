@@ -147,6 +147,9 @@ function createMockProject(overrides: Partial<AdminProject> = {}): AdminProject 
     manager: null,
     sources: [] as ProjectSource[],
     users: [] as ProjectUserSummary[],
+    industry: "",
+    industryConfidence: null,
+    industryCustom: false,
     ...overrides,
   };
 }

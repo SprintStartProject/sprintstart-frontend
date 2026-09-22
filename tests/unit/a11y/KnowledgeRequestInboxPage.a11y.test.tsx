@@ -78,7 +78,7 @@ describe("KnowledgeRequestInboxPage Accessibility", () => {
   });
 
   it("should not have any a11y violations", async () => {
-    // The page brings its own landmarks; see `StarterWorkPage.a11y` for why the scan is scoped
+    // The page brings its own landmarks; see `StarterWorkSection.a11y` for why the scan is scoped
     // to the rendered container.
     // A router, because each request card now links to the asker's member page.
     const { container } = render(

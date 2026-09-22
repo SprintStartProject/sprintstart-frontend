@@ -1,22 +1,50 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import {
   ArtifactFilters,
   ArtifactList,
   ArtifactViewerDrawer,
 } from "../features/knowledge-base/components";
-import { KNOWLEDGE_TAB_ORDER, TABS, type KnowledgeTab } from "../features/knowledge-base/tabs";
-import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
-import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { Pagination } from "../components/ui/Pagination";
 import { Button } from "../components/ui/Button";
+import { centralSpringToken } from "../styles/tokens";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeBase";
 import { useProjectContext } from "../features/projects/useProjectContext";
+import { useDelayedFlag } from "../hooks/useDelayedFlag";
+import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
+
+/** Placeholder for one `ArtifactCard`, matching its icon box, title/badge row and meta row. */
+function ArtifactCardSkeleton() {
+  return (
+    <div className="rounded-xl border border-app-border bg-app-surface p-4">
+      <div className="flex items-start gap-4">
+        <SkeletonBlock className="h-9 w-9 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <SkeletonLine className="w-1/3" />
+            <SkeletonLine className="h-4 w-12" />
+          </div>
+          <SkeletonLine className="mt-2 w-1/2" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactListSkeleton() {
+  return (
+    <SkeletonGroup label="Loading artifacts" className="space-y-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <ArtifactCardSkeleton key={index} />
+      ))}
+    </SkeletonGroup>
+  );
+}
 
 /** Roles allowed to delete uploaded artifacts. Pattern A gate mirroring
  *  the backend `@PreAuthorize("hasRole('PM') or hasRole('ADMIN')")` — keeps
@@ -52,18 +80,29 @@ export function KnowledgeBasePage() {
     fetchArtifacts,
     searchQuery,
     activeTab,
+    tabOptions,
+    sourceOptions,
+    formatOptions,
+    repositoryOptions,
+    selectedSources,
+    selectedFormat,
+    selectedRepositories,
     currentPage,
     totalPages,
     filteredArtifacts,
     paginatedArtifacts,
     handleSearchChange,
     handleTabChange,
+    toggleSource,
+    toggleFormat,
+    toggleRepository,
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,
   } = useKnowledgeBase(projectId);
 
   const isLoading = isProjectLoading || isArtifactsLoading;
+  const showLoadingSkeleton = useDelayedFlag(isLoading);
 
   /*
     `?artifact=<id>` says which document is open, and it is in the URL the whole time one is.
@@ -112,33 +151,38 @@ export function KnowledgeBasePage() {
     [artifacts, selectedArtifactId],
   );
 
-  // Two-finger swipe between the artifact-type tabs, for people who would
-  // rather not aim at the bar.
-  const swipeRef = useSwipeableTabs<KnowledgeTab, HTMLElement>({
-    order: KNOWLEDGE_TAB_ORDER,
-    value: activeTab,
-    onChange: handleTabChange,
-  });
+  const prefersReducedMotion = useReducedMotion();
+
+  /*
+    The list re-enters when the *facets* change, so switching GitHub -> Jira reads as a different
+    answer arriving rather than the same rows mutating in place. Search is deliberately not part of
+    the key: every keystroke would remount the list and replay the fade under the reader's cursor.
+
+    This replaced a `SlidingTabPanel` that slid the content sideways by the index of the active
+    connector. There is no index any more -- a multi-select selection has no direction, and a slide
+    chosen from a set's iteration order would move left on a change the reader reads as forward.
+  */
+  const facetKey = `${activeTab}|${[...selectedSources].sort().join(",")}|${selectedFormat ?? ""}|${[...selectedRepositories].sort().join(",")}`;
 
   return (
     <div className="flex min-h-screen flex-col text-app-text">
       <header className="border-b border-app-border bg-app-bg">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="app-page-frame py-6"
-        >
+        <div className="app-page-frame py-6">
           <PageHeader
             icon={BookOpen}
             title="Knowledge Base"
             subtitle="Explore unified project documentation, code runbooks, and artifacts."
           />
-        </motion.div>
+        </div>
       </header>
 
       <main
-        ref={swipeRef}
-        className="app-page-frame flex flex-1 flex-col overflow-y-auto py-6 sm:space-y-10 lg:py-8"
+        // Unlike Access Management, nothing above this page caps its height (the wrapper
+        // and App's own <main> are both `min-h-screen`), so `overflow-y-auto` never actually
+        // engages -- the document scrolls. No `SCROLL_CONTAINER_ATTRIBUTE` here for that
+        // reason: marking this element would point scroll restoration and the dialog scroll
+        // lock at something whose `scrollTop` never moves, both silently doing nothing.
+        className="app-page-frame flex flex-1 flex-col py-6 sm:space-y-10 lg:py-8"
       >
         <div className="mx-auto w-full max-w-7xl">
           {!projectId && !isLoading ? (
@@ -159,26 +203,23 @@ export function KnowledgeBasePage() {
                   onSearchChange={handleSearchChange}
                   activeTab={activeTab}
                   onTabChange={handleTabChange}
+                  tabOptions={tabOptions}
+                  sourceOptions={sourceOptions}
+                  formatOptions={formatOptions}
+                  selectedSources={selectedSources}
+                  selectedFormat={selectedFormat}
+                  onToggleSource={toggleSource}
+                  onToggleFormat={toggleFormat}
+                  repositoryOptions={repositoryOptions}
+                  selectedRepositories={selectedRepositories}
+                  onToggleRepository={toggleRepository}
+                  resultCount={filteredArtifacts.length}
+                  hasActiveFilters={hasActiveFilters}
+                  onClearFilters={handleClearFilters}
                   onRefresh={() => void fetchArtifacts()}
                   isRefreshing={isLoading}
                 />
               </motion.div>
-
-              <div className="mt-8 mb-4 flex items-center justify-between">
-                <p className="text-sm font-medium text-app-text-muted">
-                  {filteredArtifacts.length} {filteredArtifacts.length === 1 ? "result" : "results"}
-                </p>
-                {hasActiveFilters && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearFilters}
-                    data-testid="kb-clear-filters"
-                  >
-                    Clear filters
-                  </Button>
-                )}
-              </div>
 
               {fetchError && !isLoading && (
                 <div
@@ -203,17 +244,16 @@ export function KnowledgeBasePage() {
                 </div>
               )}
 
-              {isLoading ? (
-                <div className="flex justify-center p-12" aria-busy="true" aria-live="polite">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-app-brand border-t-transparent"></div>
-                </div>
-              ) : fetchError ? null : (
-                // Only the list slides; the loading and error
-                // states above are not tabs and would otherwise
-                // animate on their way in too.
-                <SlidingTabPanel
-                  activeKey={activeTab}
-                  index={TABS.findIndex((tab) => tab.id === activeTab)}
+              {showLoadingSkeleton ? (
+                <ArtifactListSkeleton />
+              ) : isLoading ? null : fetchError ? null : (
+                // Only the list fades; the loading and error states above are not facets and would
+                // otherwise animate on their way in too.
+                <motion.div
+                  key={facetKey}
+                  initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={prefersReducedMotion ? { duration: 0 } : centralSpringToken}
                 >
                   <ArtifactList artifacts={paginatedArtifacts} onSelect={setSelectedArtifactId} />
                   {totalPages > 1 && (
@@ -227,7 +267,7 @@ export function KnowledgeBasePage() {
                       className="mt-8 mb-12"
                     />
                   )}
-                </SlidingTabPanel>
+                </motion.div>
               )}
             </>
           )}

@@ -2,7 +2,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
-import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
+import { BuddyProviderWithStubs } from "./buddyTestHarness";
 import { server } from "../../setup/vitest.setup";
 
 const MESSAGES = "/api/v1/onboarding/me/buddy/messages";
@@ -45,7 +45,7 @@ describe("buddy failures", () => {
       http.post(MESSAGES, () => HttpResponse.error()),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
     await waitFor(() => expect(result.current.messages).toHaveLength(1));
 
     await act(async () => {
@@ -64,7 +64,7 @@ describe("buddy failures", () => {
   it("says so when the conversation cannot be loaded at all", async () => {
     server.use(http.get(MESSAGES, () => HttpResponse.error()));
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     await waitFor(() => expect(result.current.openError).toBeTruthy());
     expect(result.current.messages).toHaveLength(0);
@@ -86,7 +86,7 @@ describe("buddy failures", () => {
       http.post(OPEN, () => greetingStream("Welcome back!")),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
     await waitFor(() => expect(result.current.openError).toBeTruthy());
 
     await act(async () => {
@@ -118,7 +118,7 @@ describe("buddy failures", () => {
       http.post(OPEN, () => HttpResponse.error()),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
     expect(result.current.messages.some((message) => message.error)).toBe(false);
@@ -136,7 +136,7 @@ describe("buddy failures", () => {
       http.post(OPEN, () => HttpResponse.error()),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProvider });
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
 
     await waitFor(() => expect(result.current.messages).toHaveLength(1));
     expect(result.current.messages[0].error).toBeTruthy();

@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MyKnowledgeGapsProvider } from "../../../../src/features/knowledge-gaps/MyKnowledgeGapsProvider";
@@ -9,6 +10,8 @@ const { mocks } = vi.hoisted(() => ({
   mocks: {
     status: "authenticated",
     projectId: "p1",
+    /** Whether the loaded project list contains `projectId` (see `ProjectProvider`). */
+    selected: true,
     fetchMyKnowledgeGaps: vi.fn(),
   },
 }));
@@ -18,7 +21,11 @@ vi.mock("../../../../src/context/useAuth", () => ({
 }));
 
 vi.mock("../../../../src/features/projects/useProjectContext", () => ({
-  useProjectContext: () => ({ selectedProjectId: mocks.projectId }),
+  useProjectContext: () => ({
+    selectedProjectId: mocks.projectId,
+    selectedProject: mocks.selected && mocks.projectId ? { id: mocks.projectId } : null,
+    hasSelectedProject: mocks.selected && !!mocks.projectId,
+  }),
 }));
 
 vi.mock("../../../../src/services/knowledgeGapService", () => ({
@@ -63,6 +70,7 @@ describe("MyKnowledgeGapsProvider", () => {
     window.localStorage.clear();
     mocks.status = "authenticated";
     mocks.projectId = "p1";
+    mocks.selected = true;
     mocks.fetchMyKnowledgeGaps.mockResolvedValue({ gaps: [] });
   });
 
@@ -125,6 +133,17 @@ describe("MyKnowledgeGapsProvider", () => {
     expect(mocks.fetchMyKnowledgeGaps).not.toHaveBeenCalled();
   });
 
+  // The ID comes back from storage before the project list has resolved, so a non-empty
+  // selection is not yet evidence that this user can reach that project.
+  it("asks nothing at all for a selection the project list has not confirmed", async () => {
+    mocks.selected = false;
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId("gaps")).toBeEmptyDOMElement());
+    expect(mocks.fetchMyKnowledgeGaps).not.toHaveBeenCalled();
+  });
+
   it("asks nothing at all while nobody is signed in", async () => {
     mocks.status = "loading";
 
@@ -132,5 +151,31 @@ describe("MyKnowledgeGapsProvider", () => {
 
     await waitFor(() => expect(screen.getByTestId("gaps")).toBeEmptyDOMElement());
     expect(mocks.fetchMyKnowledgeGaps).not.toHaveBeenCalled();
+  });
+  it("loads the selected project's gaps once authentication settles", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
+    });
+    mocks.status = "loading";
+    mocks.fetchMyKnowledgeGaps.mockResolvedValue({
+      gaps: [gap("acme/service")],
+    });
+
+    const tree = () => (
+      <QueryClientProvider client={client}>
+        <MyKnowledgeGapsProvider>
+          <Probe />
+        </MyKnowledgeGapsProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree());
+
+    expect(mocks.fetchMyKnowledgeGaps).not.toHaveBeenCalled();
+
+    mocks.status = "authenticated";
+    rerender(tree());
+
+    await waitFor(() => expect(screen.getByTestId("gaps")).toHaveTextContent("acme/service"));
+    expect(mocks.fetchMyKnowledgeGaps).toHaveBeenCalledWith("p1");
   });
 });

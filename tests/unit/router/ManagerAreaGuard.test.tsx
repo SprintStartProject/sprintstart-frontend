@@ -39,17 +39,20 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
 vi.mock("../../../src/router/AuthGuard", () => ({
   AuthGuard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock("../../../src/pages/StarterWorkPage", () => ({
-  StarterWorkPage: () => <div>starter work page</div>,
-}));
-vi.mock("../../../src/pages/ArrivalStepsPage", () => ({
-  ArrivalStepsPage: () => <div>arrival steps page</div>,
+vi.mock("../../../src/pages/HireSetupPage", () => ({
+  HireSetupPage: () => <div>hire setup page</div>,
 }));
 vi.mock("../../../src/features/onboarding-metrics/components/OnboardingMetricsPage", () => ({
   OnboardingMetricsPage: () => <div>onboarding metrics page</div>,
 }));
 vi.mock("../../../src/pages/DashboardPage.tsx", () => ({
   DashboardPage: () => <div>dashboard page</div>,
+}));
+vi.mock("../../../src/pages/BlueprintPathsPage.tsx", () => ({
+  BlueprintPathsPage: () => <div>blueprint list page</div>,
+}));
+vi.mock("../../../src/pages/BlueprintPathDetailPage.tsx", () => ({
+  BlueprintPathDetailPage: () => <div>blueprint editor page</div>,
 }));
 
 function renderAt(path: string) {
@@ -67,9 +70,10 @@ function renderAt(path: string) {
  */
 describe("manager-area routes", () => {
   const managerRoutes = [
-    ["/starter-work", "starter work page"],
-    ["/arrival-steps", "arrival steps page"],
+    ["/hire-setup", "hire setup page"],
     ["/insights/onboarding", "onboarding metrics page"],
+    ["/blueprints", "blueprint list page"],
+    ["/blueprints/bp-1", "blueprint editor page"],
   ] as const;
 
   it.each(managerRoutes)("sends a hire away from %s", async (path, marker) => {
@@ -97,7 +101,7 @@ describe("manager-area routes", () => {
 
   /**
    * Only the routes in `MANAGER_ASSIGNMENT_ROUTES` additionally require managing the selected
-   * project — the onboarding metrics are one of them, the two authoring pages are not.
+   * project — the onboarding metrics are one of them, Hire Setup is not.
    */
   it("keeps a PM who only takes part in the project off the onboarding metrics", async () => {
     auth.permissionGroup = "PM";
@@ -109,5 +113,43 @@ describe("manager-area routes", () => {
       expect(screen.getByText("dashboard page")).toBeInTheDocument();
     });
     expect(screen.queryByText("onboarding metrics page")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Blueprints are project-scoped in both pages, so a PM who merely belongs to the selected
+   * project is kept out of the editor too, not just the list.
+   */
+  it.each([
+    ["/blueprints", "blueprint list page"],
+    ["/blueprints/bp-1", "blueprint editor page"],
+  ] as const)("keeps a PM who only takes part in the project off %s", async (path, marker) => {
+    auth.permissionGroup = "PM";
+    auth.canManageSelected = false;
+
+    renderAt(path);
+
+    await waitFor(() => {
+      expect(screen.getByText("dashboard page")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(marker)).not.toBeInTheDocument();
+  });
+
+  /**
+   * `/arrival-steps` and `/starter-work` used to be their own guarded pages; they are now plain
+   * redirects onto the corresponding `/hire-setup` tab, so old links and bookmarks still land
+   * somewhere useful rather than a 404.
+   */
+  it.each([
+    ["/arrival-steps", "/hire-setup?tab=arrival"],
+    ["/starter-work", "/hire-setup?tab=starter"],
+  ] as const)("redirects %s onto %s", async (oldPath, _target) => {
+    auth.permissionGroup = "PM";
+    auth.canManageSelected = true;
+
+    renderAt(oldPath);
+
+    await waitFor(() => {
+      expect(screen.getByText("hire setup page")).toBeInTheDocument();
+    });
   });
 });

@@ -1,5 +1,5 @@
-import { ArrowLeft, Check, MessageSquareText, Pencil, Plus, SkipForward, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { MessageSquareText, Pencil, Plus, ThumbsDown, ThumbsUp, Users, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
 import type {
@@ -7,7 +7,6 @@ import type {
   OnboardingStepEndpoint,
   OnboardingTaskEndpoint,
 } from "../features/onboarding/types";
-import { findActivePhaseIndex } from "../features/onboarding/activePhase";
 import type { ProjectRole, TeamOverviewUser } from "../features/team-management/types";
 import type { KnowledgeGap } from "../features/knowledge-gaps/types";
 import { knowledgeGapService } from "../services/knowledgeGapService";
@@ -22,16 +21,16 @@ import {
   getUserOnboardingFeedback,
   markOnboardingFeedbackRead,
   getUserOnboardingPath,
-  createOnboardingStepForPhase,
   createOnboardingTaskForStep,
   deleteOnboardingStep,
   deleteOnboardingTask,
   getOnboardingTasksByStep,
-  updateOnboardingStep,
   updateOnboardingTask,
   type OnboardingFeedback,
   type UserSkillLevel,
 } from "../services/teamManagementService";
+import { isSkipPending } from "../features/onboarding/journey";
+import { isFeedbackUnread } from "../features/team-management/feedbackState";
 
 type DetailOnboardingStep = OnboardingStepEndpoint & {
   startedAt?: string | null;
@@ -51,16 +50,17 @@ function getElapsedDays(startedAt: string): number {
 
 import { UserAvatar } from "../components/common/UserAvatar";
 import { Modal } from "../components/ui/Modal";
+import { PageShell } from "../components/layout/PageShell";
 import { PanelPresence } from "../components/ui/PanelPresence";
-import { AddCustomStepModal } from "../features/team-management/components/detail/AddCustomStepModal";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
-import { MemberOnboardingSection } from "../features/team-management/components/detail/MemberOnboardingSection";
-import { MemberReviewPoolPanel } from "../features/team-management/components/detail/MemberReviewPoolPanel";
+import { MemberJourneySection } from "../features/team-management/components/detail/MemberJourneySection";
+import { AlertDialog } from "../components/ui/AlertDialog";
 import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
 } from "../features/team-management/components/detail/PhaseCheckAdminModal";
+import { SkipReview } from "../features/team-management/components/detail/SkipReview";
 import { StepDetailsPanel } from "../features/team-management/components/detail/StepDetailsPanel";
 import { useProjectContext } from "../features/projects/useProjectContext";
 
@@ -120,25 +120,15 @@ export function TeamMemberDetailPage() {
   const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
   const [feedbackItems, setFeedbackItems] = useState<OnboardingFeedback[]>([]);
   const [onboardingPath, setOnboardingPath] = useState<OnboardingPathEndpoint | null>(null);
-  const [selectedPhaseId, setSelectedPhaseId] = useState("");
-  const [selectedStepId, setSelectedStepId] = useState("");
   const [detailStepId, setDetailStepId] = useState("");
+  // A step asked to be deleted from the graph, where there is no details panel to confirm in.
+  const [graphStepToDelete, setGraphStepToDelete] = useState<string | null>(null);
   const [stepToDelete, setStepToDelete] = useState<DetailOnboardingStep | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<OnboardingTaskEndpoint | null>(null);
-  const [stepInsertTarget, setStepInsertTarget] = useState<{
-    phaseId: string;
-    position: number;
-  } | null>(null);
-  // Which tab of the knowledge-check modal is open for the selected phase (null = closed).
-  const [checkModalTab, setCheckModalTab] = useState<PhaseCheckAdminTab | null>(null);
-  const [customStepTitle, setCustomStepTitle] = useState("");
-  const [customStepDescription, setCustomStepDescription] = useState("");
-  const [customStepExpectedOutcome, setCustomStepExpectedOutcome] = useState("");
-  const [customStepMinutes, setCustomStepMinutes] = useState("30");
-  const [customStepTasks, setCustomStepTasks] = useState<
-    Array<{ title: string; description: string }>
-  >([{ title: "", description: "" }]);
-  const [addingStep, setAddingStep] = useState(false);
+  // The phase whose knowledge-check modal is open, and on which tab (null = closed).
+  const [checkModal, setCheckModal] = useState<{ phaseId: string; tab: PhaseCheckAdminTab } | null>(
+    null,
+  );
   const [taskInsertTarget, setTaskInsertTarget] = useState<{
     stepId: string;
     position: number;
@@ -153,35 +143,77 @@ export function TeamMemberDetailPage() {
   const [stepTasksById, setStepTasksById] = useState<Record<string, OnboardingTaskEndpoint[]>>({});
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [markingFeedbackId, setMarkingFeedbackId] = useState<string | null>(null);
-  const [reviewingSkipAction, setReviewingSkipAction] = useState<"accept" | "deny" | null>(null);
+  // Keyed on the skip, not on the page: the same request is answerable from the card below and
+  // from the step it belongs to. The ref is the guard (a second click in the same tick still sees
+  // it), the state is what disables both controls.
+  const skipsInReview = useRef(new Set<string>());
+  // Which member the page is about right now, for the refreshes below to check themselves against.
+  const shownUserId = useRef(userId);
+  useEffect(() => {
+    shownUserId.current = userId;
+  }, [userId]);
+  const [reviewingSkipIds, setReviewingSkipIds] = useState<readonly string[]>([]);
   // `feedbackError` stays for the feedback *load* failure (shown inline where the
   // list would be); every action outcome on this page is a toast instead.
   const [feedbackError, setFeedbackError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const toast = useToast();
 
   useEffect(() => {
+    // A response for the member (or project) this page has since moved away from is dropped: it
+    // would otherwise render member A's journey, with A's step and skip ids, under B's URL.
+    let cancelled = false;
+
     async function loadMember() {
       if (!userId) {
         setLoading(false);
         return;
       }
 
+      setLoading(true);
+      setLoadError("");
       setLoadingFeedback(true);
 
-      const [memberData, rolesData, skills, path, knowledgeGapOverview] = await Promise.all([
-        getTeamMember(userId),
-        getProjectRoles(),
-        getUserSkillLevels(userId),
-        getUserOnboardingPath(userId),
-        knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-      ]);
-      let feedback: OnboardingFeedback[] = [];
       try {
-        feedback = await getUserOnboardingFeedback(userId);
+        const [memberData, rolesData, skills, path, knowledgeGapOverview] = await Promise.all([
+          getTeamMember(userId),
+          getProjectRoles(),
+          getUserSkillLevels(userId),
+          getUserOnboardingPath(userId),
+          knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
+        ]);
+        let feedback: OnboardingFeedback[] = [];
+        try {
+          feedback = await getUserOnboardingFeedback(userId);
+        } catch (error) {
+          if (!cancelled) {
+            setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
+          }
+        }
+        if (cancelled) return;
+        applyMember(memberData, rolesData, skills, path, knowledgeGapOverview, feedback);
       } catch (error) {
-        setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
+        if (cancelled) return;
+        setUser(undefined);
+        setLoadError(
+          error instanceof Error ? error.message : "The team member could not be loaded.",
+        );
+      } finally {
+        if (!cancelled) {
+          setLoadingFeedback(false);
+          setLoading(false);
+        }
       }
+    }
 
+    function applyMember(
+      memberData: Awaited<ReturnType<typeof getTeamMember>>,
+      rolesData: Awaited<ReturnType<typeof getProjectRoles>>,
+      skills: Awaited<ReturnType<typeof getUserSkillLevels>>,
+      path: Awaited<ReturnType<typeof getUserOnboardingPath>>,
+      knowledgeGapOverview: Awaited<ReturnType<typeof knowledgeGapService.fetchKnowledgeGaps>>,
+      feedback: OnboardingFeedback[],
+    ) {
       setUser(memberData);
       setAvailableRoles(rolesData);
       setSkillLevels(skills);
@@ -192,36 +224,50 @@ export function TeamMemberDetailPage() {
       setKnowledgeGaps(knowledgeGapOverview.gaps.filter((gap) => gap.severity !== "covered"));
       setFeedbackItems(feedback);
       setOnboardingPath(path);
-      // Open on the phase the member is actually working on. Phase 1 is almost never
-      // the interesting one for a reviewer, and it hides how far along they really are.
-      const activePhase = path?.phases?.[findActivePhaseIndex(path)];
-      setSelectedPhaseId(activePhase?.id ?? "");
-      setSelectedStepId(memberData?.currentStep?.id ?? activePhase?.steps?.[0]?.id ?? "");
-      setLoadingFeedback(false);
-      setLoading(false);
     }
 
     void loadMember();
+    return () => {
+      cancelled = true;
+    };
     // Knowledge gaps are project-scoped, so switching projects has to reload them —
     // otherwise this page keeps showing the previous project's gaps for the member.
   }, [userId, selectedProjectId]);
 
   useEffect(() => {
+    // Re-run on every path change (each PM edit); an older run finishing last must not win.
+    let cancelled = false;
+
     async function loadPathTaskCounts() {
       const steps = onboardingPath?.phases.flatMap((phase) => phase.steps ?? []) ?? [];
 
       if (steps.length === 0) {
         setStepTaskCounts({});
+        // Cleared together: leaving the lists behind meant the previous member's tasks survived a
+        // switch to a member with no steps at all.
+        setStepTasksById({});
         return;
       }
 
-      const taskEntries = await Promise.all(
+      // Settled, not all-or-nothing: one step's request failing used to blank every count on the
+      // page, including the ones that had just been read successfully.
+      const results = await Promise.allSettled(
         steps.map(async (step) => {
           const tasks = await getOnboardingTasksByStep(step.id);
 
           return [step.id, tasks] as const;
         }),
       );
+      const failures = results.filter((result) => result.status === "rejected");
+      if (failures.length > 0) {
+        console.error(
+          `Failed to load the tasks of ${failures.length} of ${steps.length} steps:`,
+          failures[0].reason,
+        );
+      }
+      const taskEntries = results
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => result.value);
       const tasksByStepId = Object.fromEntries(taskEntries);
       const counts = Object.fromEntries(
         taskEntries.map(([stepId, tasks]) => [
@@ -233,52 +279,61 @@ export function TeamMemberDetailPage() {
         ]),
       );
 
+      if (cancelled) return;
       setStepTasksById(tasksByStepId);
       setStepTaskCounts(counts);
     }
 
-    void loadPathTaskCounts();
+    void loadPathTaskCounts().catch((error: unknown) => {
+      console.error("Failed to load the member's task counts:", error);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [onboardingPath]);
 
+  /**
+   * The three post-action refreshes, each dropped when the page has moved on to another member.
+   *
+   * The initial load has the same guard and names the risk: member A's journey, with A's step and
+   * skip ids, rendered under B's URL -- after which the next action sends A's ids. These run from
+   * every action handler, so they need it just as much.
+   */
   async function refreshMember() {
     if (!userId) return;
+    const forUser = userId;
 
-    const memberData = await getTeamMember(userId);
+    const memberData = await getTeamMember(forUser);
+    if (shownUserId.current !== forUser) return;
     setUser(memberData);
   }
 
   async function refreshFeedback() {
     if (!userId) return;
+    const forUser = userId;
 
     setLoadingFeedback(true);
     setFeedbackError("");
 
     try {
-      const feedback = await getUserOnboardingFeedback(userId);
+      const feedback = await getUserOnboardingFeedback(forUser);
+      if (shownUserId.current !== forUser) return;
       setFeedbackItems(feedback);
     } catch (error) {
+      if (shownUserId.current !== forUser) return;
       setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
     } finally {
-      setLoadingFeedback(false);
+      if (shownUserId.current === forUser) setLoadingFeedback(false);
     }
   }
 
   async function refreshOnboardingPath() {
     if (!userId) return;
+    const forUser = userId;
 
-    const path = await getUserOnboardingPath(userId);
+    const path = await getUserOnboardingPath(forUser);
+    if (shownUserId.current !== forUser) return;
     setOnboardingPath(path);
-
-    // Only when the selected phase disappeared; fall back to the active one rather than
-    // to phase 1, for the same reason as on load.
-    if (path?.phases?.length && !path.phases.some((phase) => phase.id === selectedPhaseId)) {
-      setSelectedPhaseId(path.phases[findActivePhaseIndex(path)].id);
-    }
-
-    const refreshedSteps = path?.phases.flatMap((phase) => phase.steps ?? []) ?? [];
-    if (refreshedSteps.length && !refreshedSteps.some((step) => step.id === selectedStepId)) {
-      setSelectedStepId(refreshedSteps[0].id);
-    }
   }
 
   const unassignedRoles = useMemo(() => {
@@ -332,25 +387,48 @@ export function TeamMemberDetailPage() {
     }
   }
 
-  async function handleSkipReview(action: "accept" | "deny") {
-    const skipId = user?.currentStep?.skip?.id;
-    if (!skipId) return;
-
-    setReviewingSkipAction(action);
+  /**
+   * Answers a skip request -- the current step's from the card below, or any step's from where the
+   * step is shown. Phases run side by side, so the one waiting is not always the current step.
+   *
+   * One decision per request, and only one in flight: both surfaces can be on screen at once, the
+   * answer cannot be retried once it is in, and a skip accepted and declined within the same
+   * second would be settled by whichever call the server happened to finish last.
+   */
+  async function reviewSkip(skipId: string, action: "accept" | "deny", comment = "") {
+    if (skipsInReview.current.has(skipId)) return;
+    skipsInReview.current.add(skipId);
+    setReviewingSkipIds([...skipsInReview.current]);
+    const release = () => {
+      skipsInReview.current.delete(skipId);
+      setReviewingSkipIds([...skipsInReview.current]);
+    };
 
     try {
       if (action === "accept") {
-        await acceptOnboardingSkipRequest(skipId);
+        await acceptOnboardingSkipRequest(skipId, comment);
       } else {
-        await denyOnboardingSkipRequest(skipId);
+        await denyOnboardingSkipRequest(skipId, comment);
       }
-
-      await Promise.all([refreshMember(), refreshOnboardingPath()]);
-      toast.success(action === "accept" ? "Skip request approved" : "Skip request denied");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
-    } finally {
-      setReviewingSkipAction(null);
+      // Only a decision that never landed can be made again.
+      release();
+      return;
+    }
+
+    toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
+    // Told apart from a failed decision: the answer is in, and retrying it would be refused.
+    try {
+      await Promise.all([refreshMember(), refreshOnboardingPath()]);
+      // Held until here, not released when the request came back: until the refresh lands, both
+      // surfaces still draw the request as pending, and a second decision would be sent against
+      // one the server has already answered.
+      release();
+    } catch {
+      toast.error("The answer was saved, but the page could not refresh. Reload to see it.");
+      // The guard stays on for good in this case, for the same reason: what is on screen is a
+      // request that has in fact been answered.
     }
   }
 
@@ -363,73 +441,11 @@ export function TeamMemberDetailPage() {
       if (detailStepId === step.id) {
         setDetailStepId("");
       }
-      await refreshOnboardingPath();
+      // The member too: the deleted step may have been their current one.
+      await Promise.all([refreshOnboardingPath(), refreshMember()]);
       toast.success("Step deleted");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't delete the step.");
-    } finally {
-      setStepActionId(null);
-    }
-  }
-
-  async function handleReorderSteps(phaseId: string, activeStepId: string, overStepId: string) {
-    if (activeStepId === overStepId) return;
-
-    const phase = onboardingPath?.phases.find((item) => item.id === phaseId);
-    const currentSteps = [...(phase?.steps ?? [])].sort((a, b) => a.position - b.position);
-    const activeIndex = currentSteps.findIndex((step) => step.id === activeStepId);
-    const overIndex = currentSteps.findIndex((step) => step.id === overStepId);
-
-    if (!phase || activeIndex < 0 || overIndex < 0) return;
-
-    const reorderedSteps = [...currentSteps];
-    const [movedStep] = reorderedSteps.splice(activeIndex, 1);
-    reorderedSteps.splice(overIndex, 0, movedStep);
-
-    const nextSteps = reorderedSteps.map((step, index) => ({
-      ...step,
-      position: index,
-    }));
-    const changedSteps = nextSteps.filter(
-      (step) =>
-        currentSteps.find((currentStep) => currentStep.id === step.id)?.position !== step.position,
-    );
-
-    setStepActionId(activeStepId);
-    setOnboardingPath((currentPath) =>
-      currentPath
-        ? {
-            ...currentPath,
-            phases: currentPath.phases.map((currentPhase) =>
-              currentPhase.id === phaseId
-                ? {
-                    ...currentPhase,
-                    steps: nextSteps,
-                  }
-                : currentPhase,
-            ),
-          }
-        : currentPath,
-    );
-
-    try {
-      for (const step of changedSteps) {
-        await updateOnboardingStep(step.id, {
-          position: step.position,
-          title: step.title,
-          description: step.description,
-          type: step.type,
-          estimatedMinutes: step.estimatedMinutes,
-          expectedOutcome: step.expectedOutcomes?.[0] ?? "",
-          status: step.status,
-          skip: step.skip ?? null,
-        });
-      }
-
-      await refreshOnboardingPath();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't reorder the steps.");
-      await refreshOnboardingPath();
     } finally {
       setStepActionId(null);
     }
@@ -455,6 +471,9 @@ export function TeamMemberDetailPage() {
 
   async function handleReorderTasks(stepId: string, activeTaskId: string, overTaskId: string) {
     if (activeTaskId === overTaskId) return;
+    // A second drag while the first is still being written would compute its move from the
+    // optimistic list and send positions against the same stale state.
+    if (stepActionId === stepId) return;
 
     const currentTasks = [...(stepTasksById[stepId] ?? [])].sort((a, b) => a.position - b.position);
     const activeIndex = currentTasks.findIndex((task) => task.id === activeTaskId);
@@ -482,6 +501,9 @@ export function TeamMemberDetailPage() {
     }));
 
     try {
+      // One request per moved task: there is no batch endpoint, so a failure halfway through
+      // leaves the ones before it written. The refresh in both branches is what the list then
+      // shows -- the server's order, not this optimistic one.
       for (const task of changedTasks) {
         await updateOnboardingTask(task.id, {
           position: task.position,
@@ -493,7 +515,12 @@ export function TeamMemberDetailPage() {
 
       await refreshStepTasks(stepId);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't reorder the tasks.");
+      toast.error("The new order could not be saved in full", {
+        description:
+          error instanceof Error
+            ? `${error.message} The list now shows what the server has.`
+            : "The list now shows what the server has.",
+      });
       await refreshStepTasks(stepId);
     } finally {
       setStepActionId(null);
@@ -565,76 +592,6 @@ export function TeamMemberDetailPage() {
     }
   }
 
-  async function handleCreateCustomStep() {
-    const targetPhaseId = stepInsertTarget?.phaseId ?? selectedPhaseId;
-
-    if (!targetPhaseId || !customStepTitle.trim()) return;
-
-    const selectedPhase = onboardingPath?.phases.find((phase) => phase.id === targetPhaseId);
-
-    if (!selectedPhase) return;
-
-    setAddingStep(true);
-
-    try {
-      const createdStep = await createOnboardingStepForPhase(targetPhaseId, {
-        position: stepInsertTarget?.position ?? selectedPhase.steps?.length ?? 0,
-        isAiAssisted: false,
-        title: customStepTitle.trim(),
-        description: customStepDescription.trim(),
-        type: "TASK",
-        estimatedMinutes: Number(customStepMinutes) || 30,
-        expectedOutcome: customStepExpectedOutcome.trim(),
-      });
-      const tasksToCreate = customStepTasks
-        .map((task) => ({
-          title: task.title.trim(),
-          description: task.description.trim(),
-        }))
-        .filter((task) => task.title.length > 0);
-
-      // Create tasks sequentially: the backend validates each task's position
-      // against the current task count, so creating them in parallel makes every
-      // task after the first fail ("Position must be between 0 and 0").
-      for (const [index, task] of tasksToCreate.entries()) {
-        await createOnboardingTaskForStep(createdStep.id, {
-          position: index,
-          title: task.title,
-          description: task.description,
-          finished: false,
-        });
-      }
-
-      setCustomStepTitle("");
-      setCustomStepDescription("");
-      setCustomStepExpectedOutcome("");
-      setCustomStepMinutes("30");
-      setCustomStepTasks([{ title: "", description: "" }]);
-      setStepInsertTarget(null);
-      setSelectedStepId(createdStep.id);
-      setDetailStepId(createdStep.id);
-      await refreshOnboardingPath();
-      if (tasksToCreate.length > 0) {
-        await refreshStepTasks(createdStep.id);
-      }
-      toast.success("Step added");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Couldn't create the custom onboarding step.",
-      );
-    } finally {
-      setAddingStep(false);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-app-text-muted">Loading team member...</p>
-      </div>
-    );
-  }
-
   function goBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
       void navigate(-1);
@@ -643,46 +600,63 @@ export function TeamMemberDetailPage() {
     }
   }
 
+  // Loading and not-found share PageShell with the success render below, so the band
+  // (and the back button in it) never disappears and reappears while the member loads.
+  if (loading) {
+    return (
+      <PageShell
+        icon={Users}
+        title="Team member"
+        subtitle=""
+        back={{ label: "Back", onClick: goBack }}
+      >
+        <div className="flex min-h-96 items-center justify-center">
+          <p className="text-sm text-app-text-muted">Loading team member...</p>
+        </div>
+      </PageShell>
+    );
+  }
+
   if (!user) {
     return (
-      <div className="min-h-screen bg-app-bg">
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <button
-            onClick={goBack}
-            className="inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-
-          <div className="mt-6 rounded-3xl border border-app-border bg-app-surface p-8">
-            <p className="text-sm text-app-text">Team member not found.</p>
-          </div>
-        </main>
-      </div>
+      <PageShell
+        icon={Users}
+        title="Team member"
+        subtitle=""
+        back={{ label: "Back", onClick: goBack }}
+      >
+        <div className="rounded-3xl border border-app-border bg-app-surface p-8">
+          <p className="text-sm text-app-text">
+            {loadError
+              ? `The team member could not be loaded: ${loadError}`
+              : "Team member not found."}
+          </p>
+        </div>
+      </PageShell>
     );
   }
 
   const elapsedDays = user.currentStep?.startedAt ? getElapsedDays(user.currentStep.startedAt) : 0;
   const progressPercentage = Math.round(user.progressPercentage * 100);
+  // The team overview's skip is a different DTO from the path's: it carries `status`, not
+  // `accepted`, so `isSkipPending` does not apply to it. Every reading below that *does* see an
+  // `accepted` goes through the predicate.
   const pendingSkip = user.currentStep?.skip?.status === "PENDING" ? user.currentStep.skip : null;
-  const unreadFeedback = feedbackItems.filter((item) => item.read !== true && !item.readAt);
+  const unreadFeedback = feedbackItems.filter(isFeedbackUnread);
   const phases = [...(onboardingPath?.phases ?? [])].sort((a, b) => a.position - b.position);
   const allSteps = phases.flatMap((phase) =>
     [...(phase.steps ?? [])]
       .sort((a, b) => a.position - b.position)
       .map((step) => step as DetailOnboardingStep),
   );
-  const finishedSteps = allSteps.filter((step) => step.status === "FINISHED").length;
-  const skippedSteps = allSteps.filter((step) => step.status === "SKIPPED").length;
-  const pathPendingSkips = allSteps.filter((step) => step.skip?.status === "PENDING").length;
-  const estimatedMinutes = allSteps.reduce((sum, step) => sum + (step.estimatedMinutes || 0), 0);
-  const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0];
-  const selectedPhaseSteps = [...(selectedPhase?.steps ?? [])]
-    .sort((a, b) => a.position - b.position)
-    .map((step) => step as DetailOnboardingStep);
-  const selectedStep =
-    allSteps.find((step) => step.id === selectedStepId) ?? selectedPhaseSteps[0] ?? null;
+  // Every step's, like the journey section counts them: phases run side by side, so the step
+  // waiting on a skip answer is not always the current one.
+  const pendingSkipCount = allSteps.filter(
+    (step) => !!step.skip?.id && isSkipPending(step.skip) && step.status !== "SKIPPED",
+  ).length;
+  const checkModalPhase = checkModal
+    ? (phases.find((phase) => phase.id === checkModal.phaseId) ?? null)
+    : null;
   const detailStep = allSteps.find((step) => step.id === detailStepId) ?? null;
   const detailStepTasks = detailStep ? (stepTasksById[detailStep.id] ?? []) : [];
   const sortedDetailStepTasks = [...detailStepTasks].sort((a, b) => a.position - b.position);
@@ -724,38 +698,29 @@ export function TeamMemberDetailPage() {
   const topKnowledgeGaps = [...knowledgeGaps]
     .sort((a, b) => (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3))
     .slice(0, 3);
-  const nextStep =
-    allSteps.find((step) => step.status !== "FINISHED" && step.status !== "SKIPPED") ?? null;
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <button
-            onClick={goBack}
-            className="mb-4 inline-flex items-center gap-1.5 text-sm text-app-text-muted hover:text-app-text"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
+    <>
+      <PageShell
+        icon={Users}
+        title={`${user.firstname} ${user.lastname}`}
+        subtitle={user.currentStep?.title || "Onboarding completed"}
+        back={{ label: "Back", onClick: goBack }}
+        mainClassName="pt-6 pb-24 lg:pt-8"
+        bandExtra={
+          <div>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center justify-center">
+                  <UserAvatar
+                    profileIcon={user.profileIcon}
+                    fallbackName={`${user.firstname} ${user.lastname}`.trim()}
+                    seed={user.userId}
+                    size={56}
+                  />
+                </div>
 
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex shrink-0 items-center justify-center">
-                <UserAvatar
-                  profileIcon={user.profileIcon}
-                  fallbackName={`${user.firstname} ${user.lastname}`.trim()}
-                  seed={user.userId}
-                  size={56}
-                />
-              </div>
-
-              <div>
-                <h1 className="text-2xl font-bold text-app-text">
-                  {user.firstname} {user.lastname}
-                </h1>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {user.roles.length > 0 ? (
                     user.roles.map((role) => (
                       <button
@@ -782,262 +747,221 @@ export function TeamMemberDetailPage() {
                   )}
                 </div>
               </div>
-            </div>
 
-            <div className="lg:text-right">
-              <p className="text-xs font-medium tracking-wide text-app-text-muted uppercase">
-                Current Step
-                {user.currentStep?.startedAt && (
-                  <span className="ml-2 font-normal normal-case">
-                    · {elapsedDays} {elapsedDays === 1 ? "day" : "days"} ago
-                  </span>
-                )}
-              </p>
-
-              <p className="mt-2 text-sm font-medium text-app-text">
-                {user.currentStep?.title || "Onboarding Completed"}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 flex items-center gap-3">
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-app-border-muted">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
-                style={{
-                  width: `${progressPercentage}%`,
-                }}
-              />
-            </div>
-
-            <span className="text-sm font-medium text-app-text tabular-nums">
-              {progressPercentage}%
-            </span>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-6 pt-8 pb-24 sm:px-6 lg:px-8">
-        {/* items-start keeps both columns at their own height: without it the grid
-                    stretches the onboarding card to match the insights column, which grows
-                    when the review questions are expanded. */}
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
-          <MemberOnboardingSection
-            phases={phases}
-            selectedPhase={selectedPhase}
-            selectedPhaseSteps={selectedPhaseSteps}
-            selectedStep={selectedStep}
-            nextStep={nextStep}
-            finishedSteps={finishedSteps}
-            totalSteps={allSteps.length}
-            estimatedMinutes={estimatedMinutes}
-            skippedSteps={skippedSteps}
-            pendingSkipCount={pathPendingSkips}
-            stepTaskCounts={stepTaskCounts}
-            onSelectPhase={(phaseId, firstStepId) => {
-              setSelectedPhaseId(phaseId);
-              setSelectedStepId(firstStepId);
-            }}
-            onSelectStep={(stepId) => {
-              setSelectedStepId(stepId);
-              setDetailStepId(stepId);
-            }}
-            onAddStep={setStepInsertTarget}
-            onReorderSteps={(phaseId, activeStepId, overStepId) =>
-              void handleReorderSteps(phaseId, activeStepId, overStepId)
-            }
-            onOpenCheck={setCheckModalTab}
-            formatMinutes={formatMinutes}
-            getActualMinutes={getActualMinutes}
-            getStepStatusStyles={getStepStatusStyles}
-          />
-          <aside aria-label="Member insights" className="space-y-4">
-            {userId && <MemberReviewPoolPanel userId={userId} />}
-            <div className="rounded-3xl border border-app-border bg-app-surface p-6">
-              <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
-
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquareText className="h-4 w-4 text-app-text-muted" />
-                    <p className="text-sm font-semibold text-app-text">Open items</p>
-                  </div>
-
-                  {(unreadFeedback.length > 0 || pendingSkip) && (
-                    <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
-                      {unreadFeedback.length + (pendingSkip ? 1 : 0)} open
+              <div className="lg:text-right">
+                <p className="text-xs font-medium tracking-wide text-app-text-muted uppercase">
+                  Current Step
+                  {user.currentStep?.startedAt && (
+                    <span className="ml-2 font-normal normal-case">
+                      · {elapsedDays} {elapsedDays === 1 ? "day" : "days"} ago
                     </span>
                   )}
-                </div>
+                </p>
 
-                {pendingSkip && (
-                  <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 gap-3">
-                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                          <SkipForward className="h-4 w-4" />
-                        </span>
-
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-app-text">Skip request</p>
-                            <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                              Pending
-                            </span>
-                          </div>
-
-                          {user.currentStep?.title && (
-                            <p className="mt-1 text-xs text-app-text-muted">
-                              {user.currentStep.title}
-                            </p>
-                          )}
-
-                          <p className="mt-2 text-sm text-app-text">{pendingSkip.reason}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void handleSkipReview("accept")}
-                          disabled={reviewingSkipAction !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-app-success-solid px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-app-success-solid/90 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          {reviewingSkipAction === "accept" ? "Accepting..." : "Accept"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void handleSkipReview("deny")}
-                          disabled={reviewingSkipAction !== null}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          {reviewingSkipAction === "deny" ? "Denying..." : "Deny"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {loadingFeedback ? (
-                  <p className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                    Loading feedback...
-                  </p>
-                ) : unreadFeedback.length > 0 ? (
-                  unreadFeedback.map((feedback) => {
-                    const isUnread = feedback.read !== true && !feedback.readAt;
-
-                    return (
-                      <div
-                        key={feedback.id}
-                        className={`rounded-2xl border p-4 ${
-                          isUnread
-                            ? "border-app-warning-border bg-app-warning-bg"
-                            : "border-app-border bg-app-surface-muted"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex min-w-0 gap-3">
-                            <span
-                              className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                isUnread
-                                  ? "bg-app-surface text-app-warning-text"
-                                  : "bg-app-surface text-app-text-muted"
-                              }`}
-                            >
-                              <MessageSquareText className="h-4 w-4" />
-                            </span>
-
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-app-text">Feedback</p>
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                                    isUnread
-                                      ? "bg-app-surface text-app-warning-text"
-                                      : "bg-app-border-muted text-app-text-muted"
-                                  }`}
-                                >
-                                  {isUnread ? "Unread" : "Read"}
-                                </span>
-                              </div>
-
-                              <p className="mt-2 text-sm text-app-text">{feedback.message}</p>
-
-                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-app-text-muted">
-                                {feedback.stepTitle && (
-                                  <span className="rounded-full bg-app-surface px-2 py-0.5">
-                                    {feedback.stepTitle}
-                                  </span>
-                                )}
-                                {feedback.createdAt && (
-                                  <span>
-                                    {new Date(feedback.createdAt).toLocaleDateString("en-US", {
-                                      year: "numeric",
-                                      month: "short",
-                                      day: "numeric",
-                                    })}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {isUnread && (
-                            <button
-                              type="button"
-                              onClick={() => void handleMarkFeedbackRead(feedback.id)}
-                              disabled={markingFeedbackId === feedback.id}
-                              className="shrink-0 rounded-lg border border-app-warning-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-warning-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {markingFeedbackId === feedback.id ? "Marking..." : "Mark read"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : user.hasFeedback && feedbackItems.length === 0 ? (
-                  <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                        <MessageSquareText className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-app-text">Feedback</p>
-                          <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                            Unread
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-app-text">
-                          {user.firstname} has left feedback on their onboarding path.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : !pendingSkip ? (
-                  <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                    No open feedback or skip requests.
-                  </p>
-                ) : null}
-
-                {feedbackError && <p className="text-xs text-app-danger-text">{feedbackError}</p>}
+                <p className="mt-2 text-sm font-medium text-app-text">
+                  {user.currentStep?.title || "Onboarding Completed"}
+                </p>
               </div>
             </div>
-            <MemberGapsPanel
-              skillLevels={skillLevels}
-              skillGaps={skillGaps}
-              knowledgeGaps={topKnowledgeGaps}
-              onOpenKnowledgeGap={(gapId) => {
-                void navigate(`/insights/knowledge-gaps/${gapId}`);
-              }}
-            />
-          </aside>
-        </div>
-      </main>
+
+            <div className="mt-6 flex items-center gap-3">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-app-border-muted">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
+                  style={{
+                    width: `${progressPercentage}%`,
+                  }}
+                />
+              </div>
+
+              <span className="text-sm font-medium text-app-text tabular-nums">
+                {progressPercentage}%
+              </span>
+            </div>
+          </div>
+        }
+      >
+        <MemberJourneySection
+          userId={user.userId}
+          memberName={`${user.firstname} ${user.lastname}`.trim()}
+          path={onboardingPath}
+          stepTaskCounts={stepTaskCounts}
+          onOpenStep={setDetailStepId}
+          onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
+          onDeleteStep={setGraphStepToDelete}
+          onReviewSkip={reviewSkip}
+          feedbackItems={feedbackItems}
+          onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+          markingFeedbackId={markingFeedbackId}
+          onPathChanged={refreshOnboardingPath}
+        />
+
+        {/* Below the journey rather than beside it: the graph needs the width, and these read fine
+            as two cards side by side. items-start keeps each card at its own height. */}
+        <aside aria-label="Member insights" className="mt-6 grid items-start gap-4 lg:grid-cols-2">
+          <div className="rounded-3xl border border-app-border bg-app-surface p-6">
+            <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
+
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <MessageSquareText className="h-4 w-4 text-app-text-muted" />
+                  <p className="text-sm font-semibold text-app-text">Open items</p>
+                </div>
+
+                {unreadFeedback.length + pendingSkipCount > 0 && (
+                  <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
+                    {unreadFeedback.length + pendingSkipCount} open
+                  </span>
+                )}
+              </div>
+
+              {/* The same control the step panel and the graph aside use, rather than a second
+                  pair of buttons with their own wording, their own busy state and no comment
+                  field. The card supplies which step it is about. */}
+              {pendingSkip && (
+                <SkipReview
+                  reason={pendingSkip.reason}
+                  meta={user.currentStep?.title}
+                  disabled={reviewingSkipIds.includes(pendingSkip.id)}
+                  onReview={(action, comment) => reviewSkip(pendingSkip.id, action, comment)}
+                />
+              )}
+
+              {loadingFeedback ? (
+                <p className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
+                  Loading feedback...
+                </p>
+              ) : unreadFeedback.length > 0 ? (
+                unreadFeedback.map((feedback) => {
+                  const isUnread = isFeedbackUnread(feedback);
+                  // Coloured by what it says, not by whether it has been read: a thumbs-down and a
+                  // thumbs-up are different news. Unread is a badge of its own.
+                  const tone =
+                    feedback.helpful === true
+                      ? {
+                          card: "border-app-success-border bg-app-success-bg",
+                          icon: "text-app-success-text",
+                          label: "Found it helpful",
+                        }
+                      : feedback.helpful === false
+                        ? {
+                            card: "border-app-danger-border bg-app-danger-bg",
+                            icon: "text-app-danger-text",
+                            label: "Found it not helpful",
+                          }
+                        : {
+                            card: "border-app-brand-border bg-app-brand-soft",
+                            icon: "text-app-brand-text",
+                            label: "Feedback",
+                          };
+
+                  return (
+                    <div
+                      key={feedback.id}
+                      className={`rounded-2xl border p-4 ${tone.card} ${isUnread ? "" : "opacity-75"}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 gap-3">
+                          <span
+                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface ${tone.icon}`}
+                          >
+                            {feedback.helpful === true ? (
+                              <ThumbsUp className="h-4 w-4" />
+                            ) : feedback.helpful === false ? (
+                              <ThumbsDown className="h-4 w-4" />
+                            ) : (
+                              <MessageSquareText className="h-4 w-4" />
+                            )}
+                          </span>
+
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-app-text">{tone.label}</p>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  isUnread
+                                    ? "bg-app-brand text-white"
+                                    : "bg-app-surface text-app-text-muted"
+                                }`}
+                              >
+                                {isUnread ? "New" : "Read"}
+                              </span>
+                            </div>
+
+                            <p className="mt-2 text-sm text-app-text">{feedback.message}</p>
+
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-app-text-muted">
+                              {feedback.stepTitle && (
+                                <span className="rounded-full bg-app-surface px-2 py-0.5">
+                                  {feedback.stepTitle}
+                                </span>
+                              )}
+                              {feedback.createdAt && (
+                                <span>
+                                  {new Date(feedback.createdAt).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {isUnread && (
+                          <button
+                            type="button"
+                            onClick={() => void handleMarkFeedbackRead(feedback.id)}
+                            disabled={markingFeedbackId === feedback.id}
+                            className="shrink-0 rounded-lg border border-app-warning-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-warning-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {markingFeedbackId === feedback.id ? "Marking..." : "Mark read"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : user.hasFeedback && feedbackItems.length === 0 ? (
+                <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
+                      <MessageSquareText className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-app-text">Feedback</p>
+                        <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
+                          Unread
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-app-text">
+                        {user.firstname} has left feedback on their onboarding path.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : !pendingSkip ? (
+                <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
+                  No open feedback or skip requests.
+                </p>
+              ) : null}
+
+              {feedbackError && <p className="text-xs text-app-danger-text">{feedbackError}</p>}
+            </div>
+          </div>
+          <MemberGapsPanel
+            skillLevels={skillLevels}
+            skillGaps={skillGaps}
+            knowledgeGaps={topKnowledgeGaps}
+            onOpenKnowledgeGap={(gapId) => {
+              void navigate(`/insights/knowledge-gaps/${gapId}`);
+            }}
+          />
+        </aside>
+      </PageShell>
 
       <Modal
         isOpen={rolesModalOpen}
@@ -1115,33 +1039,32 @@ export function TeamMemberDetailPage() {
           setRoleToRemove(null);
         }}
       />
-      <AddCustomStepModal
-        open={Boolean(stepInsertTarget)}
-        title={customStepTitle}
-        description={customStepDescription}
-        expectedOutcome={customStepExpectedOutcome}
-        estimatedMinutes={customStepMinutes}
-        tasks={customStepTasks}
-        addingStep={addingStep}
-        onTitleChange={setCustomStepTitle}
-        onDescriptionChange={setCustomStepDescription}
-        onExpectedOutcomeChange={setCustomStepExpectedOutcome}
-        onEstimatedMinutesChange={setCustomStepMinutes}
-        onTasksChange={(updater) => setCustomStepTasks(updater)}
-        onClose={() => setStepInsertTarget(null)}
-        onSubmit={() => void handleCreateCustomStep()}
-      />
-      {checkModalTab && selectedPhase && userId && (
+      {checkModal && checkModalPhase && userId && (
         <PhaseCheckAdminModal
           userId={userId}
-          phaseId={selectedPhase.id}
-          phaseTitle={selectedPhase.title}
+          phaseId={checkModalPhase.id}
+          phaseTitle={checkModalPhase.title}
           memberName={`${user.firstname} ${user.lastname}`.trim()}
-          initialTab={checkModalTab}
+          initialTab={checkModal.tab}
           onSaved={() => void refreshOnboardingPath()}
-          onClose={() => setCheckModalTab(null)}
+          onClose={() => setCheckModal(null)}
         />
       )}
+      <AlertDialog
+        isOpen={graphStepToDelete !== null}
+        title="Delete this step?"
+        description={`"${allSteps.find((step) => step.id === graphStepToDelete)?.title ?? "The step"}" is removed from ${user.firstname}'s path. Whatever waited on it waits on what it waited on instead.`}
+        confirmLabel="Delete step"
+        variant="danger"
+        isLoading={stepActionId === graphStepToDelete}
+        onClose={() => setGraphStepToDelete(null)}
+        onConfirm={() => {
+          const step = allSteps.find((candidate) => candidate.id === graphStepToDelete);
+          // Gone since the dialog opened (a refetch): nothing left to delete, so just close.
+          if (!step) setGraphStepToDelete(null);
+          else void handleDeleteStep(step).finally(() => setGraphStepToDelete(null));
+        }}
+      />
       <PanelPresence value={detailStep}>
         {(step) => (
           <StepDetailsPanel
@@ -1171,12 +1094,15 @@ export function TeamMemberDetailPage() {
             onCreateTask={() => void handleCreateTask()}
             formatMinutes={formatMinutes}
             getStepStatusStyles={getStepStatusStyles}
+            onReviewSkip={reviewSkip}
+            onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+            markingFeedbackId={markingFeedbackId}
             onReorderTasks={(activeTaskId, overTaskId) =>
               void handleReorderTasks(step.id, activeTaskId, overTaskId)
             }
           />
         )}
       </PanelPresence>
-    </div>
+    </>
   );
 }

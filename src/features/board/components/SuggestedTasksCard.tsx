@@ -4,6 +4,7 @@ import { BoardCardFrame } from "./BoardCardFrame";
 import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
+import { AddTaskToBoard } from "./AddTaskToBoard";
 import type { BoardCard, SuggestedTasksContent } from "../types";
 
 type SuggestedTasksCardProps = {
@@ -11,6 +12,8 @@ type SuggestedTasksCardProps = {
   card: Pick<BoardCard, "id" | "owner" | "placedAt">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
+  /** Told when the hire makes a checklist out of one of these, so the board can re-read itself. */
+  onCardAdded?: () => void;
 };
 
 /**
@@ -29,6 +32,7 @@ export function SuggestedTasksCard({
   card,
   onDismiss,
   dismissing,
+  onCardAdded,
 }: SuggestedTasksCardProps) {
   // Matched by their words: this list is re-ranked on every board read, so a highlight cannot be
   // pinned to a position. A reason the hire marked stays marked while it is still being given.
@@ -39,7 +43,7 @@ export function SuggestedTasksCard({
       icon={Sparkles}
       title="Good next tasks"
       card={card}
-      subtitle={content.tasks.length > 0 ? "Best fit first" : undefined}
+      subtitle={content.tasks.length > 0 ? "From your starter work, best fit first" : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
     >
@@ -68,13 +72,20 @@ export function SuggestedTasksCard({
                   </a>
                 )}
               </div>
-              {/* Seeds the conversation rather than claiming here: claiming changes
-                                what the hire's whole plan aims at, so it stays behind the mentor's
-                                confirm button. */}
-              <AskTheBuddy
-                question={`I'd like to work on "${task.title}". Can you set that as my goal?`}
-                label="I want to work on this"
-              />
+              {/* Two different things, and only one of them is a commitment. Saying "I want to
+                  work on this" aims the hire's whole plan at the task and goes through the
+                  mentor's confirm button; keeping it is a working copy on their own board that
+                  claims nothing. A hire who is not ready to claim anything should still be able to
+                  put a task somewhere they will find it again. */}
+              <div className="flex flex-wrap items-center gap-x-3">
+                <AskTheBuddy
+                  question={`I'd like to work on "${task.title}". Can you set that as my goal?`}
+                  label="I want to work on this"
+                />
+                <div className="mt-3">
+                  <AddTaskToBoard title={task.title} url={task.url} onAdded={onCardAdded} />
+                </div>
+              </div>
               {task.reasons.length > 0 && (
                 <ul className="mt-1.5 space-y-0.5">
                   {task.reasons.map((reason) => (

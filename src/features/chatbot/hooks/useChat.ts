@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChatContext } from "../../../context/ChatContext";
+import { useProjectContext } from "../../projects/useProjectContext";
 import { RAIL_DESKTOP_QUERY } from "../../../components/layout/ConversationRail";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
 import { useRailOverlayGuard } from "../../../hooks/useRailOverlayGuard";
@@ -52,6 +53,10 @@ export function useChat() {
   if (ctx === undefined) {
     throw new Error("useChat must be used within a ChatProvider");
   }
+
+  // The composer's gate reads the same confirmed-project flag every other project-scoped
+  // request reads, rather than re-deriving "is the id non-empty" from the chat context.
+  const { hasSelectedProject } = useProjectContext();
 
   const { id: chatId } = useParams();
   const navigate = useNavigate();
@@ -124,6 +129,8 @@ export function useChat() {
     setSelectedCitation,
     newRequest,
     setNewRequest,
+    registerFocusComposer,
+    quoteSelection,
     showFilters,
     setShowFilters,
     from,
@@ -134,10 +141,26 @@ export function useChat() {
     toggleSourceSystem,
     activeFilterCount,
     clearFilters,
-    sendMessage,
+    submitMessage,
+    queue,
+    queuePaused,
+    removeQueuedMessage,
+    pullQueuedMessage,
+    resumeQueue,
     stopStreaming,
     deleteChat: ctxDeleteChat,
   } = ctx;
+
+  useEffect(() => {
+    return registerFocusComposer(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    });
+  }, [registerFocusComposer]);
 
   /**
    * When the user navigates to `/chat` (no chatId) from the main sidebar
@@ -348,11 +371,19 @@ export function useChat() {
     return () => clearTimeout(id);
   }, [newRequest, chatId]);
 
+  /**
+   * The composer's send — routed through the provider's `submitMessage`, so a
+   * message typed while this chat is still answering is queued instead of
+   * aborting the answer being read.
+   *
+   * Returns void rather than the stream's promise: a queued message has no
+   * stream to await yet, and callers only ever fire this and forget.
+   */
   const addMessage = useCallback(
     (text: string) => {
-      return sendMessage(chatId, text, navigate);
+      submitMessage(chatId, text, navigate);
     },
-    [sendMessage, chatId, navigate],
+    [submitMessage, chatId, navigate],
   );
 
   const handleSubmit = useCallback(
@@ -373,6 +404,33 @@ export function useChat() {
     },
     [newRequest, addMessage, setNewRequest, chatId],
   );
+
+  /**
+   * The queue as this chat sees it.
+   *
+   * The provider holds one list for the whole app, but a message queued in
+   * another conversation is not this page's business — it drains into its own
+   * chat, whenever that chat is next answered.
+   */
+  const queuedMessages = useMemo(
+    () => (chatId ? queue.filter((item) => item.chatId === chatId) : []),
+    [queue, chatId],
+  );
+
+  /**
+   * Hands a queued message back to the composer for editing, dropping it from the
+   * queue — leaving it in place would send both the edit and the original.
+   */
+  const editQueuedMessage = useCallback(
+    (id: string) => {
+      const text = pullQueuedMessage(id);
+      if (text !== null) setNewRequest(text);
+    },
+    [pullQueuedMessage, setNewRequest],
+  );
+
+  /** Releases a queue that Stop held back, starting with the oldest message. */
+  const sendQueuedNow = useCallback(() => resumeQueue(navigate), [resumeQueue, navigate]);
 
   const deleteChat = useCallback(
     async (targetChatId: string) => {
@@ -409,15 +467,21 @@ export function useChat() {
     stopStreaming: stopActiveStream,
     deleteChat,
 
+    queuedMessages,
+    queuePaused,
+    removeQueuedMessage,
+    editQueuedMessage,
+    sendQueuedNow,
+
     newRequest,
     setNewRequest,
 
     // Gated on `isActiveChatStreaming` — see the note above. Consumers get
     // "is *this* chat working", never "is any chat working".
-    // Nothing can be asked without a project: retrieval is scoped to one, and the backend
-    // rejects a chat that has none. Surfaced so the composer can say so instead of letting
-    // the prompt vanish.
-    hasProject: selectedProjectId !== "",
+    // Nothing can be asked without a confirmed project: retrieval is scoped to one, and the
+    // backend rejects a chat that has none. Surfaced so the composer can say so instead of
+    // letting the prompt vanish.
+    hasProject: hasSelectedProject,
 
     promptHistory,
 
@@ -434,6 +498,8 @@ export function useChat() {
     textareaRef,
     bottomRef,
     scrollContainerRef,
+
+    quoteSelection,
 
     isAtBottom,
     scrollToBottom,

@@ -12,6 +12,14 @@ import type {
   SuggestedTasksContent,
 } from "../../../../src/features/board/types";
 
+// The task cards offer to keep a task on the hire's own board, and that offer reads the selected
+// project the way every other write to the board does. A harness rendering cards on their own
+// stands one in rather than wrapping the whole board in a provider — see `useProjectContext`
+// for why that hook throws instead of falling back.
+vi.mock("../../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "p1" }),
+}));
+
 const pathContent = (
   over: Partial<PathToFirstContributionContent> = {},
 ): PathToFirstContributionContent => ({
@@ -45,6 +53,7 @@ const currentTaskContent = (over: Partial<CurrentTaskContent> = {}): CurrentTask
   summary: "It fails about one run in five.",
   url: null,
   chosen: true,
+  closedAtSource: false,
   ...over,
 });
 
@@ -240,7 +249,7 @@ describe("BoardGrid", () => {
     );
 
     expect(screen.getByText(/you have worked in this repository before/i)).toBeInTheDocument();
-    expect(screen.getByText("Best fit first")).toBeInTheDocument();
+    expect(screen.getByText("From your starter work, best fit first")).toBeInTheDocument();
   });
 
   it("explains an empty suggestions card as a PM step, not a dead end", () => {

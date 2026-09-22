@@ -18,7 +18,7 @@ import { useBuddySuggestions } from "./useBuddySuggestions";
  */
 export function useBuddy() {
   const conversation = useBuddySession();
-  const { ensureOpened, setDraft } = conversation;
+  const { ensureOpened, setDraft, teamProjectId } = conversation;
 
   const [isOpen, setIsOpen] = useState(false);
 
@@ -26,7 +26,10 @@ export function useBuddy() {
   // makes no request. Chips are the answer to an empty composer, so they have to be ready by
   // the time one is on screen — hence the read is its own cheap endpoint, not something riding
   // on a greeting a model has to write first.
-  const suggestions = useBuddySuggestions(isOpen);
+  // Hire-only, too: the suggestions describe the *hire's* next useful question, and the backend
+  // has no team-scoped list, so a team-mode conversation simply asks for none.
+  const isTeamMode = teamProjectId !== null;
+  const suggestions = useBuddySuggestions(isOpen && !isTeamMode);
 
   const toggleOpen = useCallback(() => {
     setIsOpen((prev) => !prev);
@@ -59,7 +62,7 @@ export function useBuddy() {
      */
     return onOpenAiBuddy(({ draft: seed }) => {
       setIsOpen(true);
-      if (seed) setDraft(seed);
+      if (seed) setDraft((current) => withSeed(current, seed));
     });
   }, [setDraft]);
 
@@ -70,4 +73,23 @@ export function useBuddy() {
     closeDock,
     suggestions,
   };
+}
+
+/**
+ * What the composer holds once `seed` has been handed to it.
+ *
+ * Never at the cost of what the hire already typed. The draft outlives the dock — close it
+ * mid-sentence and the words are still there next time — and the page behind an open dock stays
+ * interactive, so a seed can arrive on top of a half-written question from either direction.
+ * Replacing it would throw away the one thing on screen nobody else can bring back.
+ *
+ * So an empty composer takes the seed as it is, and a composer with words in it keeps them and
+ * gets the seed underneath, after a blank line. Pressing the same button twice does not stack the
+ * same text twice: a draft that already ends with the seed is left alone.
+ */
+export function withSeed(current: string, seed: string): string {
+  if (current.trim().length === 0) return seed;
+  if (current.trimEnd().endsWith(seed.trimEnd())) return current;
+
+  return `${current.trimEnd()}\n\n${seed}`;
 }

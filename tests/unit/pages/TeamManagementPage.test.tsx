@@ -11,7 +11,7 @@ describe("TeamManagementPage", () => {
     vi.clearAllMocks();
   });
 
-  it("renders loading state initially", () => {
+  it("renders loading state initially", async () => {
     server.use(
       http.get("/api/v1/onboarding/team-overview", () => {
         return new Promise<never>(() => {});
@@ -24,7 +24,8 @@ describe("TeamManagementPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("Loading team overview...")).toBeInTheDocument();
+    // The skeleton only appears after a short delay, so it never flashes on a fast load.
+    expect(await screen.findByText("Loading team overview")).toBeInTheDocument();
   });
 
   it("offers user and role management, and nothing else", async () => {

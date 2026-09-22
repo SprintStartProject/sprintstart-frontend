@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 
-import { Button } from "../../../components/ui/Button";
+import { Button, type ButtonSize } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -20,12 +20,28 @@ type SaveToBoardProps = {
   /** Where this came from, recorded beside the card. See `layout/cardOrigins.ts`. */
   origin?: () => CardOrigin | null;
   label: string;
-  /** What the button says afterwards. It stays pressable — see below. */
-  savedLabel: string;
+  /**
+   * What the button says afterwards. It stays pressable — see below.
+   *
+   * Optional, because acknowledging on the button is only worth anything where the result is out
+   * of sight. In a chat the card lands on a surface the hire is not looking at, so the label is
+   * the only thing that says it worked. *On the board*, the card appears in front of them — and a
+   * button still reading "on your board" next to the card it made is a hint about something they
+   * can see, which reads as the button being stuck rather than as confirmation. Left out, the
+   * label never changes.
+   */
+  savedLabel?: string;
+  /**
+   * Told after a card is really on the board, so a surface that is *showing* the board can re-read
+   * it. Everywhere else there is nothing to tell: the board is not on screen.
+   */
+  onSaved?: () => void;
   icon: ReactNode;
   /** The second line of the toast: what exactly landed on the board. */
   description?: string;
   iconOnly?: boolean;
+  /** `xs` under a chat message, where it sits beside the other quiet message actions. */
+  size?: ButtonSize;
   className?: string;
 };
 
@@ -51,9 +67,11 @@ export function SaveToBoard({
   origin,
   label,
   savedLabel,
+  onSaved,
   icon,
   description,
   iconOnly = false,
+  size = "sm",
   className = "",
 }: SaveToBoardProps) {
   const { selectedProjectId } = useProjectContext();
@@ -78,6 +96,7 @@ export function SaveToBoard({
 
       setSaved(true);
       toast.success("Kept on your board", { description });
+      onSaved?.();
     } catch {
       toast.error("That couldn't be kept", { description: "Nothing changed — try again." });
     } finally {
@@ -85,12 +104,12 @@ export function SaveToBoard({
     }
   }
 
-  const text = saved ? savedLabel : label;
+  const text = saved && savedLabel ? savedLabel : label;
 
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size={size}
       iconOnly={iconOnly}
       className={className}
       loading={saving}

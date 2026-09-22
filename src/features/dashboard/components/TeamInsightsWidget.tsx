@@ -2,9 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, ShieldAlert } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Spinner } from "../../../components/ui/Spinner";
-import { useFetch } from "../../../hooks/useFetch";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { insightsService } from "../../../services/faqService";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
+import { queryKeys } from "../../../services/queryKeys";
 import type { FAQGroup } from "../../faq/types";
 import type { KnowledgeGap, KnowledgeGapSeverity } from "../../knowledge-gaps/types";
 import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../../knowledge-gaps/severity";
@@ -254,19 +255,27 @@ function ColumnHeading({ label, total }: { label: string; total: string }) {
  */
 export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
   const navigate = useNavigate();
-  const { selectedProjectId } = useProjectContext();
+  const { hasSelectedProject, selectedProjectId } = useProjectContext();
 
-  const { data: faq, loading: faqLoading } = useFetch(
+  // Gated on a confirmed project like every widget scoped to one: before the project list
+  // confirms a selection there is nothing to ask about, and firing then would send an empty
+  // `projectId` (a cross-project overview this user never chose to look at) or — with a
+  // `?projectId=` deep link — ask about a project before any list has said it is reachable.
+  const { data: faq, loading: faqLoading } = useQueryFetch(
+    queryKeys.faq.groups(selectedProjectId),
     () => insightsService.fetchFAQGroups(selectedProjectId),
-    [selectedProjectId],
+    { enabled: hasSelectedProject },
   );
 
-  const { data: knowledgeGaps, loading: gapsLoading } = useFetch(
+  const { data: knowledgeGaps, loading: gapsLoading } = useQueryFetch(
+    queryKeys.knowledgeGaps.overview(selectedProjectId),
     () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    [selectedProjectId],
+    { enabled: hasSelectedProject },
   );
 
-  if (faqLoading || gapsLoading) {
+  // Waiting for the project context is loading, not an empty answer — an unanswered request
+  // must not flash its zeros as the card's figures.
+  if (!hasSelectedProject || faqLoading || gapsLoading) {
     return (
       <div className="flex h-full items-center justify-center rounded-2xl p-6">
         <Spinner size="lg" label="Loading" />

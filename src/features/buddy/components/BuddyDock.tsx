@@ -1,18 +1,25 @@
 import { useEffect, useRef } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import type { ReactNode } from "react";
+import { motion, useReducedMotion, type MotionValue } from "framer-motion";
 import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { Button } from "../../../components/ui/Button";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyQuestionActions } from "./BuddyQuestionActions";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
 import { BuddyThread } from "./BuddyThread";
-import { SaveReplyToBoard } from "./SaveReplyToBoard";
-import { BookmarkPlus } from "lucide-react";
-import { SaveToBoard } from "../../board/save/SaveToBoard";
-import { buddyReplyNote } from "../../board/generation/chatToCard";
+import { BuddyReplyActions } from "./BuddyReplyActions";
 import { useStickToBottom } from "../hooks/useStickToBottom";
+import {
+  DEFAULT_CORNER,
+  cornerTransformOrigin,
+  dockBox,
+  isTopCorner,
+  useViewportSize,
+  type BuddyCorner,
+} from "../buddyCorner";
 
 /**
  * The hand-off to `/buddy`, in seconds, in two parts.
@@ -28,14 +35,6 @@ import { useStickToBottom } from "../hooks/useStickToBottom";
 export const DOCK_EXPAND_S = 0.42;
 export const DOCK_REVEAL_S = 0.2;
 
-/** The window's resting size. Big enough to hold a conversation, small enough to leave the page. */
-const DOCK_WIDTH = 400;
-const DOCK_HEIGHT = 560;
-
-/** Distance from the viewport's right edge, and from the launcher sitting below it. */
-const DOCK_RIGHT = 24;
-const DOCK_BOTTOM = 104;
-
 type BuddyDockProps = Pick<
   ReturnType<typeof useBuddy>,
   | "messages"
@@ -49,8 +48,21 @@ type BuddyDockProps = Pick<
   | "dismissAction"
   | "suggestions"
   | "startFreshVisit"
+  | "isGreeting"
+  | "isDeciding"
+  | "teamProjectId"
 > & {
   onClose: () => void;
+  /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
+  lastMessageFooter?: ReactNode;
+  /** The corner the launcher sits in; the window opens beside it. */
+  corner?: BuddyCorner;
+  /**
+   * The launcher's drag offset. The window rides along on it while the launcher is dragged, and
+   * settles with it once it is dropped.
+   */
+  dragX?: MotionValue<number>;
+  dragY?: MotionValue<number>;
   /**
    * Opens the full page, carrying the draft. Omitted when there is nowhere to go — on
    * `/buddy` itself, where the control would offer the page the hire is already reading.
@@ -78,10 +90,17 @@ type BuddyDockProps = Pick<
    * that has been standing in for it fades away and reveals it.
    */
   isRevealing?: boolean;
+  /**
+   * A control rendered in the header beside the title — the conversation switcher. Handed in
+   * like every other prop so the dock stays presentational (and testable without a project
+   * context to read).
+   */
+  headerControl?: ReactNode;
 };
 
 /**
- * The buddy's own little window, in the bottom-right corner over whatever page you are on.
+ * The buddy's own little window, in the corner of whatever page you are on — beside the launcher,
+ * in whichever of the four corners the hire has dragged it to.
  *
  * **Small on purpose.** It is the size of a conversation, not the size of the app: the buddy is
  * consulted *about* what you are looking at, so a full-height drawer that covered the page hid
@@ -113,14 +132,22 @@ export function BuddyDock({
   dismissAction,
   suggestions,
   startFreshVisit,
+  isGreeting,
+  isDeciding,
+  teamProjectId,
   openError,
   onClose,
+  lastMessageFooter,
+  corner = DEFAULT_CORNER,
+  dragX,
+  dragY,
   onOpenFull,
   onRetryOpen,
   suggestionsHidden = false,
   onHideSuggestions,
   isExpanding = false,
   isRevealing = false,
+  headerControl,
 }: BuddyDockProps) {
   const prefersReducedMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -140,30 +167,16 @@ export function BuddyDock({
   // Mid-turn: the buddy is deciding, running a tool, or writing. Not a spinner's worth of
   // state -- it gates the one control that would pull the thread out from under a reply
   // that is still arriving.
-  const isBusy = isThinking || isStreaming;
+  const isBusy = isThinking || isStreaming || isGreeting || isDeciding;
 
-  const resting = {
-    width: DOCK_WIDTH,
-    height: DOCK_HEIGHT,
-    right: DOCK_RIGHT,
-    bottom: DOCK_BOTTOM,
-    borderRadius: 20,
-  };
+  const viewport = useViewportSize();
+  const resting = { ...dockBox(corner, viewport), borderRadius: 20 };
 
-  // Read here rather than kept in state: the viewport size matters for exactly one animation
-  // target, on the render where `isExpanding` flips. A resize listener would be a subscription
-  // held for the life of the widget to serve a value used once — and Framer Motion cannot
-  // interpolate `400px` to `100vw`, so the target has to be in pixels either way.
-  const box =
-    isExpanding && typeof window !== "undefined"
-      ? {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          right: 0,
-          bottom: 0,
-          borderRadius: 0,
-        }
-      : resting;
+  // The viewport in pixels rather than `100vw`: Framer Motion cannot interpolate `400px` to
+  // `100vw`, so the growth target has to be the same unit as the resting box.
+  const box = isExpanding
+    ? { left: 0, top: 0, width: viewport.width, height: viewport.height, borderRadius: 0 }
+    : resting;
 
   return (
     <motion.div
@@ -173,15 +186,21 @@ export function BuddyDock({
       initial={
         prefersReducedMotion
           ? { opacity: 0, ...resting }
-          : { opacity: 0, scale: 0.86, y: 24, ...resting }
+          : {
+              opacity: 0,
+              scale: 0.86,
+              ...resting,
+              // Rises out of a launcher below it, drops out of one above it. `top` rather than
+              // `y`, because `y` is the drag offset it shares with the launcher.
+              top: resting.top + (isTopCorner(corner) ? -24 : 24),
+            }
       }
       animate={{
         opacity: isRevealing ? 0 : 1,
         scale: 1,
-        y: 0,
         ...box,
       }}
-      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 16 }}
+      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
       transition={
         prefersReducedMotion
           ? { duration: 0 }
@@ -193,21 +212,16 @@ export function BuddyDock({
               ? { duration: DOCK_EXPAND_S, ease: [0.32, 0.72, 0, 1] }
               : centralSpringToken
       }
-      // The corner it grows out of, so opening reads as the buddy standing up rather than as a
-      // box fading in over the page.
-      style={{ transformOrigin: "bottom right" }}
-      // The caps keep the window inside a small viewport at rest; while it is growing into the
-      // page they would stop it a rem short of the edges, which is exactly where the illusion
-      // that it *became* the page would break.
-      //
-      // They have to subtract the offsets the window is anchored by, not just a margin. The
-      // window hangs `DOCK_BOTTOM` above the bottom edge, so a cap of `100vh - 2rem` still let
-      // it grow past the *top* of a short viewport -- which put the header, and with it the
-      // close and expand controls, off screen and out of reach. `8rem` is `DOCK_BOTTOM` plus a
-      // `DOCK_RIGHT`-sized gap at the top; `3rem` is `DOCK_RIGHT` on both sides.
-      className={`fixed z-50 flex flex-col overflow-hidden border border-app-border bg-app-bg shadow-2xl ${
-        isExpanding ? "" : "max-h-[calc(100vh-8rem)] max-w-[calc(100vw-3rem)]"
-      }`}
+      style={{
+        // The corner it grows out of, so opening reads as the buddy standing up rather than as
+        // a box fading in over the page.
+        transformOrigin: cornerTransformOrigin(corner),
+        x: dragX,
+        y: dragY,
+      }}
+      // No `max-h`/`max-w` caps any more: `dockBox` already fits the window inside the viewport,
+      // with its header on screen, and caps would stop the growth into the page short of the edges.
+      className="fixed z-50 flex flex-col overflow-hidden border border-app-border bg-app-bg shadow-2xl"
     >
       {/* Everything inside fades as the window grows, so by the time the route changes the
                 screen holds nothing but a full-bleed `bg-app-bg` surface — which is exactly what
@@ -229,6 +243,12 @@ export function BuddyDock({
             <p className="truncate text-xs text-app-text-muted">Your onboarding mentor</p>
           </div>
 
+          {/* Hire conversation ↔ team conversations. Rendered by the caller (the widget), like
+                    every other session-driven piece here, so the dock needs no project context
+                    of its own. `max-w-full min-w-0` keeps a long project name from pushing the
+                    fresh-visit button out of a 384 px window. */}
+          {headerControl && <div className="max-w-[11rem] min-w-0 shrink-0">{headerControl}</div>}
+
           {/* Same control, same words and the same promise as the one on `/buddy`: the window is
                     a view of that conversation, so anything it can do to the conversation it has to
                     be able to do here — a hire who had to open the full page to start over would
@@ -245,8 +265,10 @@ export function BuddyDock({
                     aborting the stream is the other half and belongs in the session, alongside
                     the same gap on `BuddyPage`. */}
           {hasUserMessage && !isBusy && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
+              iconOnly
               onClick={() => void startFreshVisit()}
               aria-label="Start a new conversation"
               // No chord named here, deliberately. The window floats over every page, and
@@ -254,10 +276,9 @@ export function BuddyDock({
               // *chat*, and on most pages nothing binds it at all. Advertising it from the dock
               // would be promising a key that does somebody else's job.
               title="Start a new conversation — your buddy keeps what it has learned about you"
-              className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
             >
               <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </Button>
           )}
 
           {/* The answer to "this is too small" is the page that already exists, rather than a
@@ -265,26 +286,28 @@ export function BuddyDock({
                     components with room to spare. The draft goes with it — a control that
                     discarded what somebody was typing would be worse than not offering one. */}
           {onOpenFull && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
+              iconOnly
               onClick={onOpenFull}
               aria-label="Open the full buddy page"
               title="Open the full page"
-              className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
             >
               <Maximize2 className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </Button>
           )}
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="xs"
+            iconOnly
             onClick={onClose}
             aria-label="Minimise your buddy"
             title="Minimise"
-            className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
           >
             <Minus className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </Button>
         </header>
 
         <div
@@ -294,28 +317,21 @@ export function BuddyDock({
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
         >
           <BuddyThread
-            renderReplyAction={(reply) => (
-              <div className="flex flex-wrap items-center gap-1">
-                <SaveReplyToBoard content={reply} />
-                {/* Icon-only here and worded on the page. The dock is a narrow column beside
-                    whatever the hire was actually doing, and a second worded button in it wraps to
-                    its own line — the same control, sized for where it is. */}
-                <SaveToBoard
-                  request={() => buddyReplyNote(reply)}
-                  label="Keep this answer on my board"
-                  savedLabel="On your board"
-                  description="The reply, frozen as a note."
-                  icon={<BookmarkPlus className="h-4 w-4" aria-hidden="true" />}
-                  iconOnly
-                />
-              </div>
+            renderReplyAction={(reply, message) => (
+              <BuddyReplyActions reply={reply} message={message} />
             )}
+            compact
             messages={messages}
             isThinking={isThinking}
             activeTool={activeTool}
+            lastMessageFooter={lastMessageFooter}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
-            renderQuestionAction={(question) => <BuddyQuestionActions question={question} />}
+            // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+            // team-mode conversation is not one — the offer must not even render there.
+            renderQuestionAction={(question) =>
+              teamProjectId === null ? <BuddyQuestionActions question={question} /> : undefined
+            }
             openError={openError}
             onRetryOpen={onRetryOpen}
             onStartFreshVisit={() => void startFreshVisit()}
@@ -338,15 +354,17 @@ export function BuddyDock({
                 compact
                 headingAction={
                   onHideSuggestions && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      iconOnly
                       onClick={onHideSuggestions}
                       aria-label="Hide suggestions"
                       title="Hide suggestions"
-                      className="-mr-1 rounded p-1 text-app-text-disabled transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="-my-1.5 -mr-1.5"
                     >
                       <X className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
+                    </Button>
                   )
                 }
               />

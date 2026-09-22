@@ -19,6 +19,8 @@ type BuddyThreadProps = {
   dismissAction: (messageId: string, actionId: string) => void;
   /** Names above the bubbles — on for the page, off in the dock. */
   showNames?: boolean;
+  /** The dock's narrow layout — see `BuddyMessage`'s `compact`. */
+  compact?: boolean;
   /** Rendered above the first message: what came back from the hire's PM. */
   before?: ReactNode;
   /**
@@ -41,7 +43,7 @@ type BuddyThreadProps = {
    * keeping or how — it hands over the text and lets the caller decide, which is what stops this
    * component from growing a dependency on the board.
    */
-  renderReplyAction?: (reply: string) => ReactNode;
+  renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
   /**
    * Why the conversation could not be brought on screen at all, if it could not.
    *
@@ -92,6 +94,7 @@ export function BuddyThread({
   confirmAction,
   dismissAction,
   showNames = false,
+  compact = false,
   before,
   lastMessageFooter,
   renderQuestionAction,
@@ -183,12 +186,13 @@ export function BuddyThread({
             <BuddyMessage
               speaker={isUser ? "YOU" : "BUDDY"}
               showName={showNames}
+              compact={compact}
               isStreaming={message.id === streamingId}
               error={message.error}
               footer={
                 <>
                   {isUser && renderQuestionAction?.(message.content)}
-                  {!isUser && hasText && renderReplyAction?.(message.content)}
+                  {!isUser && hasText && renderReplyAction?.(message.content, message)}
                   {!isUser && hasActions && (
                     <BuddyActionProposals
                       messageId={message.id}

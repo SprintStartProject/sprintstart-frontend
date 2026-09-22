@@ -13,6 +13,7 @@ import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { TrendBadge } from "./TrendBadge";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 import { TrendingUp, FileText, ArrowRight, AlertCircle } from "lucide-react";
@@ -33,7 +34,9 @@ export function FaqWidget() {
     loading,
     revalidating,
     error,
-  } = useLiveFetch(() => insightsService.fetchFAQGroups(selectedProjectId), [selectedProjectId]);
+  } = useLiveFetch(queryKeys.faq.groups(selectedProjectId), () =>
+    insightsService.fetchFAQGroups(selectedProjectId),
+  );
 
   // ── LOADING ──────────────────────────────────────────────
 

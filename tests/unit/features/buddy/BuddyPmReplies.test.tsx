@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BuddyPmReplies } from "../../../../src/features/buddy/components/BuddyPmReplies";
 import type {
@@ -6,21 +6,17 @@ import type {
   KnowledgeRequest,
 } from "../../../../src/features/knowledge-request/types";
 
-vi.mock("../../../../src/hooks/useFetch", () => ({
-  useFetch: vi.fn(),
-}));
-
 vi.mock("../../../../src/services/knowledgeRequestService", () => ({
   knowledgeRequestService: { listMine: vi.fn() },
 }));
 
-import { useFetch } from "../../../../src/hooks/useFetch";
+import { knowledgeRequestService } from "../../../../src/services/knowledgeRequestService";
 import { usePmReplies } from "../../../../src/features/buddy/hooks/usePmReplies";
 
 /**
  * The grouping moved into `usePmReplies` so the page can ask "is there anything?" without a
  * second request, leaving the rail presentational. The tests still drive it end to end through
- * the mocked `useFetch`, which is what they were always really exercising.
+ * the mocked `knowledgeRequestService.listMine`, which is what they were always really exercising.
  */
 function Harness() {
   const replies = usePmReplies();
@@ -60,11 +56,14 @@ function mockRequests(
   data: KnowledgeRequest[] | null,
   state: { loading?: boolean; error?: boolean } = {},
 ) {
-  vi.mocked(useFetch).mockReturnValue({
-    data,
-    loading: state.loading ?? false,
-    error: state.error ?? false,
-  });
+  if (state.loading) {
+    // Never settles, so the query stays pending for the life of the test.
+    vi.mocked(knowledgeRequestService.listMine).mockReturnValue(new Promise(() => {}));
+  } else if (state.error) {
+    vi.mocked(knowledgeRequestService.listMine).mockRejectedValue(new Error("network"));
+  } else {
+    vi.mocked(knowledgeRequestService.listMine).mockResolvedValue(data ?? []);
+  }
 }
 
 describe("BuddyPmReplies", () => {
@@ -72,9 +71,10 @@ describe("BuddyPmReplies", () => {
     vi.clearAllMocks();
   });
 
-  it("renders nothing when the hire has never escalated anything", () => {
+  it("renders nothing when the hire has never escalated anything", async () => {
     mockRequests([]);
     const { container } = render(<Harness />);
+    await waitFor(() => expect(knowledgeRequestService.listMine).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -84,13 +84,14 @@ describe("BuddyPmReplies", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("stays silent on a failed load rather than showing an error the hire cannot act on", () => {
+  it("stays silent on a failed load rather than showing an error the hire cannot act on", async () => {
     mockRequests(null, { error: true });
     const { container } = render(<Harness />);
+    await waitFor(() => expect(knowledgeRequestService.listMine).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows the answer itself, not just that one arrived — the promise the button makes", () => {
+  it("shows the answer itself, not just that one arrived — the promise the button makes", async () => {
     mockRequests([
       request({
         status: "ANSWERED",
@@ -100,46 +101,55 @@ describe("BuddyPmReplies", () => {
     ]);
     render(<Harness />);
 
-    expect(screen.getByText("How do I get staging credentials?")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("How do I get staging credentials?")).toBeInTheDocument();
+    });
     expect(screen.getByText("Ask in #platform and Dana will provision them.")).toBeInTheDocument();
   });
 
-  it("attributes the answer to the PM, not to the buddy", () => {
+  it("attributes the answer to the PM, not to the buddy", async () => {
     mockRequests([
       request({ status: "ANSWERED", answeredAt: "2026-07-27T10:00:00Z", answer: answer() }),
     ]);
     render(<Harness />);
 
-    expect(screen.getByText(/Answered by your PM/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Answered by your PM/)).toBeInTheDocument();
+    });
   });
 
-  it("does not treat an ANSWERED request with no answer body as answered", () => {
+  it("does not treat an ANSWERED request with no answer body as answered", async () => {
     // Defensive: the status and the payload disagreeing would otherwise render an empty answer
     // under a heading claiming the PM replied.
     mockRequests([
       request({ status: "ANSWERED", answeredAt: "2026-07-27T10:00:00Z", answer: null }),
     ]);
     const { container } = render(<Harness />);
+    await waitFor(() => expect(knowledgeRequestService.listMine).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows a still-open question as waiting, so the hire does not re-flag it", () => {
+  it("shows a still-open question as waiting, so the hire does not re-flag it", async () => {
     mockRequests([request()]);
     render(<Harness />);
 
-    expect(screen.getByText("Still with your PM")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Still with your PM")).toBeInTheDocument();
+    });
     expect(screen.queryByText(/Your PM answered/)).not.toBeInTheDocument();
   });
 
-  it("surfaces a dismissed question instead of leaving it waiting forever", () => {
+  it("surfaces a dismissed question instead of leaving it waiting forever", async () => {
     mockRequests([request({ status: "DISMISSED" })]);
     render(<Harness />);
 
-    expect(screen.getByText("Closed without an answer")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Closed without an answer")).toBeInTheDocument();
+    });
     expect(screen.queryByText("Still with your PM")).not.toBeInTheDocument();
   });
 
-  it("separates the three outcomes when the hire has all of them", () => {
+  it("separates the three outcomes when the hire has all of them", async () => {
     mockRequests([
       request({
         id: "r1",
@@ -152,7 +162,9 @@ describe("BuddyPmReplies", () => {
     ]);
     render(<Harness />);
 
-    expect(screen.getByText("Your PM answered")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Your PM answered")).toBeInTheDocument();
+    });
     expect(screen.getByText("Still with your PM")).toBeInTheDocument();
     expect(screen.getByText("Closed without an answer")).toBeInTheDocument();
     expect(screen.getByText("Who reviews infra PRs?")).toBeInTheDocument();

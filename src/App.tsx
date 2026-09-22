@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./services/queryClient";
 import { AppRouter } from "./router/AppRouter";
 import { SideBar } from "./components/layout/SideBar";
 import { AuthProvider } from "./context/AuthProvider";
@@ -9,6 +11,7 @@ import { FocusModeProvider } from "./context/FocusModeProvider";
 import { useFocusMode } from "./context/useFocusMode";
 import { ProjectProvider } from "./features/projects/ProjectProvider";
 import { MomentsProvider, RocketPet, useMoments } from "./features/moments";
+import { OnboardingJourneyProvider } from "./features/onboarding/generation/OnboardingJourneyProvider";
 import { BuddyWidget } from "./features/buddy/components/BuddyWidget";
 import { BuddyProvider } from "./features/buddy/BuddyProvider";
 import { SelectionActions } from "./features/board/selection/SelectionActions";
@@ -17,14 +20,19 @@ import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
+import { useScrollRestoration } from "./hooks/useScrollRestoration";
 
 function AppContent() {
   const { status } = useAuth();
   const { showRocketPet } = useMoments();
   const { isFocused } = useFocusMode();
+  useScrollRestoration();
 
   // Signed in at all — the shell is drawn for anyone past the login screen, onboarding included.
-  const signedIn = status !== "unauthenticated" && status !== "loading";
+  // `signingOut` stays out on purpose: it is the boot script's "this load is a logout return"
+  // flag settling back toward unauthenticated (see `AuthContext`'s `AuthStatus`), and the shell
+  // must not flash back in while that resolves.
+  const signedIn = status === "authenticated";
 
   // A page in focus mode has asked for the whole screen, and the dock is the one piece of the shell
   // that cannot step aside politely: it floats *over* the content, and a surface somebody asked to
@@ -129,7 +137,7 @@ function AppContent() {
 
         {/* Decorative easter egg; only for signed-in users, so it never
           sits on top of the login screen, and off unless turned on in
-          Settings (see MomentsSection). */}
+          Settings (see AppearanceSection). */}
         {signedIn && showRocketPet && <RocketPet />}
       </div>
     </BuddyProvider>
@@ -141,35 +149,42 @@ function App() {
   // depends on the authenticated user's permission group.
   return (
     <ThemeProvider>
-      {/* Outermost app-level provider (just inside theme, so cards pick up
-          light/dark): toasts must be reachable from every page, signed in or
-          not, and must outlive route changes. */}
-      <ToastProvider>
-        <AuthProvider>
-          <ProjectProvider>
-            <ChatProvider>
-              {/* Inside ProjectProvider: what a user owns is asked per selected project, and
-                  above the router so the owner announcement can appear on any page. */}
-              <MyKnowledgeGapsProvider>
-                {/* Inside AuthProvider: the launch sequence is triggered
-                              by the user becoming authenticated. */}
-                <MomentsProvider>
-                  {/* Inside the router's providers and outside the router itself: the shell has to
-                      read the flag a page sets, and both live under this. */}
-                  <FocusModeProvider>
-                    {/* Inside ProjectProvider, which it reads the project id from, and outside the
-                        router, because the toolbar that makes a highlight is mounted out here too —
-                        the board page under it lends its cards in. */}
-                    <CardMarksProvider>
-                      <AppContent />
-                    </CardMarksProvider>
-                  </FocusModeProvider>
-                </MomentsProvider>
-              </MyKnowledgeGapsProvider>
-            </ChatProvider>
-          </ProjectProvider>
-        </AuthProvider>
-      </ToastProvider>
+      {/* Outermost data provider, just inside theme: every provider below reads or
+          writes through the query cache, including AuthProvider on logout. */}
+      <QueryClientProvider client={queryClient}>
+        {/* Toasts must be reachable from every page, signed in or not, and must
+            outlive route changes. */}
+        <ToastProvider>
+          <AuthProvider>
+            <ProjectProvider>
+              <ChatProvider>
+                {/* Inside ProjectProvider: what a user owns is asked per selected project, and
+                    above the router so the owner announcement can appear on any page. */}
+                <MyKnowledgeGapsProvider>
+                  {/* Inside AuthProvider: the launch sequence is triggered
+                                by the user becoming authenticated. */}
+                  <MomentsProvider>
+                    {/* Inside the router's providers and outside the router itself: the shell has to
+                        read the flag a page sets, and both live under this. */}
+                    <FocusModeProvider>
+                      {/* Inside ProjectProvider, which it reads the project id from, and outside the
+                          router, because the toolbar that makes a highlight is mounted out here too —
+                          the board page under it lends its cards in. */}
+                      <CardMarksProvider>
+                        {/* Inside the project and toast providers it reads from; above the routes,
+                            so a path being built keeps building while the user changes routes. */}
+                        <OnboardingJourneyProvider>
+                          <AppContent />
+                        </OnboardingJourneyProvider>
+                      </CardMarksProvider>
+                    </FocusModeProvider>
+                  </MomentsProvider>
+                </MyKnowledgeGapsProvider>
+              </ChatProvider>
+            </ProjectProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

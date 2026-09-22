@@ -35,17 +35,40 @@ type UseHorizontalWheelNavigationOptions = {
   onPrevious: () => void;
   /** Set false to leave the gesture alone, e.g. while a dialog is open. */
   enabled?: boolean;
+  /**
+   * How far out the gesture counts, and how far up the ignore markers are read.
+   *
+   * `"page"` is the default and what a page's tab bar wants: a swipe anywhere counts, including
+   * the empty room below short content, and anything marked {@link SWIPE_IGNORE_ATTRIBUTE}
+   * anywhere above the pointer opts out.
+   *
+   * `"self"` is for a layer that sits *inside* something that already opted out — a page opened
+   * over a graph canvas, say. The gesture then has to start inside the element, and the walk for
+   * ignore markers stops there, so the canvas's own opt-out no longer covers what is drawn on top
+   * of it. Markers inside the element still count.
+   */
+  boundary?: "page" | "self";
 };
+
+/**
+ * Marks a subtree the gesture must keep its hands off.
+ *
+ * Put on anything that reads a horizontal two-finger swipe as its own — a graph canvas pans with
+ * it — where switching the surrounding view instead would be the opposite of what was asked for.
+ */
+export const SWIPE_IGNORE_ATTRIBUTE = "data-swipe-ignore";
 
 /**
  * Reports whether the gesture started inside something that scrolls sideways
  * on its own -- a tab bar that overflows, a wide table. Those keep their own
- * gesture; stealing it would make them unreachable on a trackpad.
+ * gesture; stealing it would make them unreachable on a trackpad. Anything
+ * marked {@link SWIPE_IGNORE_ATTRIBUTE} counts the same way.
  */
 function startedInHorizontalScroller(target: EventTarget | null, boundary: HTMLElement): boolean {
   let node = target instanceof HTMLElement ? target : null;
 
   while (node && node !== boundary) {
+    if (node.hasAttribute(SWIPE_IGNORE_ATTRIBUTE)) return true;
     // A few pixels of overflow is rounding, not a scroller. Treating it as
     // one would silently swallow gestures over ordinary content.
     if (node.scrollWidth - node.clientWidth > 4) {
@@ -77,6 +100,7 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
   onNext,
   onPrevious,
   enabled = true,
+  boundary: scope = "page",
 }: UseHorizontalWheelNavigationOptions): RefCallback<T> {
   const [element, setElement] = useState<T | null>(null);
 
@@ -93,6 +117,20 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
   useEffect(() => {
     if (!element || !enabled) return;
 
+    /**
+     * Listened for on the window rather than on the element that opted in.
+     *
+     * The element is a page's content, and a page's content is as tall as it happens to be — on a
+     * short page most of what somebody sees, and most of where their pointer is, is the empty room
+     * below it. A gesture there never reached the element at all, which is why the swipe worked on
+     * a page filled by a canvas and did nothing on a page holding four cards.
+     *
+     * The element is still what decides *whether* the gesture counts: the walk below stops at the
+     * body, so a swipe that starts inside a horizontal scroller or anything marked
+     * `data-swipe-ignore` is left to whatever owns it.
+     */
+    const boundary = scope === "self" ? element : element.ownerDocument.body;
+
     let travelled = 0;
     /** -1 previous, 1 next, 0 nothing yet -- for this gesture. */
     let lastFired = 0;
@@ -102,6 +140,10 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
 
     function handleWheel(event: WheelEvent) {
       if (!element) return;
+      // A layer that owns the gesture only within itself never sees one that began outside it.
+      if (scope === "self" && !(event.target instanceof Node && element.contains(event.target))) {
+        return;
+      }
 
       // The axis is decided once, on the first event of the gesture, and
       // then held: a real swipe drifts vertically halfway through, and
@@ -109,12 +151,17 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
       // gesture and losing the travel accumulated so far.
       if (!horizontalGesture) {
         if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
-        if (startedInHorizontalScroller(event.target, element)) return;
+        if (startedInHorizontalScroller(event.target, boundary)) return;
 
         horizontalGesture = true;
       }
 
       event.preventDefault();
+      // Claims the gesture: a page that nests one swipeable region inside another (Hire Setup's
+      // Arrival/Starter work tabs around Arrival's own scope tabs, say) would otherwise have both
+      // levels react to the same flick, since the event still bubbles to the outer listener after
+      // the inner one has already turned it into a navigation.
+      event.stopPropagation();
 
       window.clearTimeout(endTimer);
       endTimer = window.setTimeout(() => {
@@ -158,13 +205,13 @@ export function useHorizontalWheelNavigation<T extends HTMLElement>({
       }
     }
 
-    element.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("wheel", handleWheel, { passive: false });
 
     return () => {
-      element.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("wheel", handleWheel);
       window.clearTimeout(endTimer);
     };
-  }, [element, enabled]);
+  }, [element, enabled, scope]);
 
   return useCallback((node: T | null) => setElement(node), []);
 }
@@ -175,6 +222,8 @@ type UseSwipeableTabsOptions<TTab extends string> = {
   value: TTab;
   onChange: (tab: TTab) => void;
   enabled?: boolean;
+  /** Passed through to {@link useHorizontalWheelNavigation}; see its `boundary`. */
+  boundary?: "page" | "self";
 };
 
 /**
@@ -190,6 +239,7 @@ export function useSwipeableTabs<TTab extends string, T extends HTMLElement>({
   value,
   onChange,
   enabled,
+  boundary,
 }: UseSwipeableTabsOptions<TTab>): RefCallback<T> {
   function step(offset: number) {
     const next = order[order.indexOf(value) + offset];
@@ -201,5 +251,8 @@ export function useSwipeableTabs<TTab extends string, T extends HTMLElement>({
     onNext: () => step(1),
     onPrevious: () => step(-1),
     enabled,
+    // Forwarded, not dropped: without this every consumer of this helper was page-scoped, and
+    // `boundary` existed on the hook underneath with nothing able to ask for it.
+    boundary,
   });
 }
