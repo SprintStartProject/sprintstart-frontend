@@ -4,6 +4,7 @@ import { useContext, useEffect, useId, useRef, type ReactNode } from "react";
 import { SWIPE_IGNORE_ATTRIBUTE } from "../../hooks/useHorizontalWheelNavigation";
 import { PanelPresenceContext } from "./panelPresenceContext";
 import { sidePanelSlideToken } from "../../styles/tokens";
+import { useScrollLock } from "./useScrollLock";
 
 type SidePanelProps = {
   isOpen: boolean;
@@ -27,6 +28,7 @@ type SidePanelProps = {
   footerClassName?: string;
   closeAriaLabel?: string;
   closeOnEscape?: boolean;
+  lockScroll?: boolean;
 };
 
 const focusableSelector = [
@@ -72,6 +74,7 @@ export function SidePanel({
   footerClassName = "border-t border-app-border bg-app-bg px-6 py-5",
   closeAriaLabel = "Close details",
   closeOnEscape = true,
+  lockScroll = true,
 }: SidePanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
@@ -82,6 +85,10 @@ export function SidePanel({
   // caller has torn its props down, so it wins over the local prop.
   const presence = useContext(PanelPresenceContext);
   const isOpen = presence ? presence.isOpen : isOpenProp;
+
+  // Freezes the background page (body and any scroll containers) while the
+  // panel is open so only the panel insides scroll under the pointer.
+  useScrollLock(isOpen && lockScroll);
 
   const prefersReducedMotion = useReducedMotion();
   const panelTransition = prefersReducedMotion ? { duration: 0 } : sidePanelSlideToken;
@@ -244,7 +251,7 @@ export function SidePanel({
           </div>
         )}
 
-        <div className="flex-1 [scrollbar-gutter:auto] overflow-y-auto">
+        <div className="flex-1 [scrollbar-gutter:auto] overflow-y-auto overscroll-contain">
           <div className={contentClassName}>{children}</div>
         </div>
 

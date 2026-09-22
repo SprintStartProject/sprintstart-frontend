@@ -50,15 +50,17 @@ vi.mock("../../../../../src/components/ui/SidePanel", () => ({
     actions,
     badge,
     children,
+    lockScroll,
   }: {
     isOpen: boolean;
     title: React.ReactNode;
     actions: React.ReactNode;
     badge?: React.ReactNode;
     children: React.ReactNode;
+    lockScroll?: boolean;
   }) =>
     isOpen ? (
-      <div data-testid="side-panel">
+      <div data-testid="side-panel" data-lock-scroll={lockScroll !== false}>
         <div data-testid="panel-header">{title}</div>
         {badge && <div data-testid="panel-badge">{badge}</div>}
         <div data-testid="panel-actions">{actions}</div>
@@ -998,5 +1000,11 @@ describe("ArtifactViewerDrawer", () => {
     expect(selected.removeAllRanges).toHaveBeenCalledTimes(1);
 
     vi.restoreAllMocks();
+  });
+
+  it("enables background scroll locking by default on the rendered SidePanel", () => {
+    renderDrawer();
+    const panel = screen.getByTestId("side-panel");
+    expect(panel).toHaveAttribute("data-lock-scroll", "true");
   });
 });

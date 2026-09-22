@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { SidePanel } from "../../../../src/components/ui/SidePanel";
 
 function SidePanelHarness({
@@ -15,6 +15,7 @@ function SidePanelHarness({
   actions,
   footer,
   children,
+  lockScroll = true,
 }: {
   showOverlay?: boolean;
   closeOnEscape?: boolean;
@@ -26,6 +27,7 @@ function SidePanelHarness({
   actions?: React.ReactNode;
   footer?: React.ReactNode;
   children?: React.ReactNode;
+  lockScroll?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   return (
@@ -45,12 +47,19 @@ function SidePanelHarness({
         showOverlay={showOverlay}
         closeOnEscape={closeOnEscape}
         closeAriaLabel={closeAriaLabel}
+        lockScroll={lockScroll}
       >
         {children ?? <p>Panel content</p>}
       </SidePanel>
     </main>
   );
 }
+
+afterEach(() => {
+  cleanup();
+  document.body.style.overflow = "";
+  document.body.style.paddingRight = "";
+});
 
 describe("SidePanel", () => {
   it("renders the dialog with aria-hidden and inert when closed", () => {
@@ -177,5 +186,37 @@ describe("SidePanel", () => {
     await user.click(closeBtn);
 
     await waitFor(() => expect(dialog).toHaveAttribute("aria-hidden", "true"));
+  });
+
+  it("locks document body scrolling when opened and restores it when closed", async () => {
+    const user = userEvent.setup();
+    render(<SidePanelHarness />);
+
+    expect(document.body.style.overflow).toBe("");
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    expect(document.body.style.overflow).toBe("hidden");
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(document.body.style.overflow).toBe(""));
+  });
+
+  it("does not lock scrolling when lockScroll is false", async () => {
+    const user = userEvent.setup();
+    render(<SidePanelHarness lockScroll={false} />);
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("applies overscroll-contain to the internal scroll container", async () => {
+    const user = userEvent.setup();
+    render(<SidePanelHarness />);
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    const dialog = screen.getByRole("dialog");
+    const scrollContainer = dialog.querySelector(".overflow-y-auto");
+    expect(scrollContainer).toBeInTheDocument();
+    expect(scrollContainer).toHaveClass("overscroll-contain");
   });
 });

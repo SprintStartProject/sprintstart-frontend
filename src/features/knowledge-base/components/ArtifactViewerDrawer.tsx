@@ -64,6 +64,8 @@ interface ArtifactViewerDrawerProps {
   /** Called after a successful deletion so the parent can clear the selection
    *  and re-fetch the artifact list. */
   onDelete: (artifactId: string) => void;
+  /** Whether to lock background scrolling while the drawer is open. Defaults to true. */
+  lockScroll?: boolean;
 }
 
 type ViewMode = "raw" | "summary";
@@ -848,6 +850,7 @@ export function ArtifactViewerDrawer({
   highlightLines,
   canDelete,
   onDelete,
+  lockScroll = true,
 }: ArtifactViewerDrawerProps) {
   const { profile } = useAuth();
   const [state, dispatch] = useReducer(drawerReducer, initialState);
@@ -1277,6 +1280,7 @@ export function ArtifactViewerDrawer({
       panelBackgroundClassName="bg-app-surface"
       headerClassName="p-4 bg-app-bg"
       contentClassName="p-6"
+      lockScroll={lockScroll}
     >
       {error && viewMode === "raw" ? (
         <div className="rounded-2xl border border-app-danger-border bg-app-danger-bg p-4 text-app-danger-text">
