@@ -6,6 +6,7 @@ import {
   getMyChats,
   getMessages,
   streamMessage,
+  cancelMessage,
 } from "../services/chatService";
 import { useAuth } from "./useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
@@ -729,6 +730,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [streamingChatId, stopStreaming, refreshChats],
   );
 
+  /**
+   * Marks a specified user message as canceled, indicating that an AI response was never expected.
+   */
+  const markAsCanceled = useCallback(
+      async (messageId: string) => {
+        await cancelMessage(messageId);
+      },
+      [],
+  );
+
+  /**
+   * Stops the active chat stream, marking the user prompt as canceled.
+   */
+  const cancelActiveMessage = useCallback(async () => {
+
+    const stopped = draftRef.current;
+
+    if (!stopped) return;
+
+    const chatId = stopped.chatId;
+
+    stopStreaming();
+
+    await markAsCanceled(chatId);
+  }, [
+    stopStreaming,
+    markAsCanceled,
+  ]);
+
   const value: ChatContextValue = {
     chats,
     sortedChats,
@@ -759,6 +789,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     stopStreaming,
     refreshChats,
     deleteChat,
+    cancelActiveMessage,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

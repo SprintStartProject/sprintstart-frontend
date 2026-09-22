@@ -96,6 +96,7 @@ export function ChatPage() {
     handleSubmit,
     stopStreaming,
     deleteChat,
+    cancelActiveMessage,
     isThinking,
     isStreaming,
     thinkingState,
@@ -536,7 +537,7 @@ export function ChatPage() {
           value={newRequest}
           onChange={setNewRequest}
           onSubmit={handleChatSubmit}
-          onStop={stopStreaming}
+          onStop={cancelActiveMessage}
           isBusy={isThinking || isStreaming}
           hasProject={hasProject}
           promptHistory={promptHistory}

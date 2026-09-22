@@ -12,7 +12,7 @@ type ChatComposerProps = {
   /** Submit handler (form onSubmit). */
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   /** Stop the in-flight stream. */
-  onStop: () => void;
+  onStop: () => Promise<void>;
   /** True while the assistant is thinking or streaming. */
   isBusy: boolean;
   /**
@@ -350,7 +350,9 @@ export function ChatComposer({
             type="button"
             aria-label="Stop generation"
             data-testid="chat-stop-button"
-            onClick={onStop}
+            onClick={() => {
+              void onStop();
+            }}
             className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-app-danger-border bg-app-danger-solid text-white transition-colors hover:opacity-90"
           >
             <Square size={16} className="fill-current" />

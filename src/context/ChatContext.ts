@@ -88,8 +88,7 @@ export type ChatContextValue = {
 
   /**
    * Aborts the in-flight chat stream (if any). The partial content already
-   * streamed stays visible — this is a clean stop, not an error. Called by
-   * the "Stop" button in the chat UI.
+   * streamed stays visible — this is a clean stop, not an error.
    */
   stopStreaming: () => void;
 
@@ -104,6 +103,11 @@ export type ChatContextValue = {
    * cleaning up associated state and drafts.
    */
   deleteChat: (chatId: string) => Promise<void>;
+
+  /**
+   * Stops the active chat stream, marking the user prompt as canceled. Called by the "Stop" button in the chat UI.
+   */
+  cancelActiveMessage: () => Promise<void>
 };
 
 export const ChatContext = createContext<ChatContextValue | undefined>(undefined);
