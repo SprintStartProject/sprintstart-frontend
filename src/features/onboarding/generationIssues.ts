@@ -46,21 +46,46 @@ export const ISSUE_EXPLANATIONS: Record<
 /** The order they are worth reading in: what is broken first, what is merely missing last. */
 const STATUS_ORDER: IssueStatus[] = ["FAILED", "TIMED_OUT", "EMPTY", "SKIPPED"];
 
+/**
+ * What to say about an outcome this build does not know.
+ *
+ * The status comes from the backend, which can grow a case while a frontend is deployed against
+ * it. Indexing straight into the table took the whole page down for that; this reads as "something
+ * happened, we cannot say what" instead, which is both true and survivable.
+ */
+const UNKNOWN_ISSUE = {
+  label: "Unknown outcome",
+  icon: TriangleAlert,
+  meaning: "This phase reported an outcome this version does not know about yet.",
+  retryHelps: false,
+} as const;
+
+function explain(status: IssueStatus) {
+  return ISSUE_EXPLANATIONS[status] ?? UNKNOWN_ISSUE;
+}
+
 /** The issues gathered by outcome, in reading order, with empty outcomes left out. */
 export function groupIssues(issues: readonly OnboardingGenerationIssueEndpoint[]) {
-  return STATUS_ORDER.map((status) => ({
-    status,
-    ...ISSUE_EXPLANATIONS[status],
-    titles: issues.filter((issue) => issue.status === status).map((issue) => issue.title),
-  })).filter((group) => group.titles.length > 0);
+  const known = new Set<string>(STATUS_ORDER);
+  const order: IssueStatus[] = [
+    ...STATUS_ORDER,
+    ...[...new Set(issues.map((issue) => issue.status))].filter((status) => !known.has(status)),
+  ];
+  return order
+    .map((status) => ({
+      status,
+      ...explain(status),
+      titles: issues.filter((issue) => issue.status === status).map((issue) => issue.title),
+    }))
+    .filter((group) => group.titles.length > 0);
 }
 
 /** Whether trying again could plausibly change any of these outcomes. */
 export function retryCouldHelp(issues: readonly OnboardingGenerationIssueEndpoint[]): boolean {
-  return issues.some((issue) => ISSUE_EXPLANATIONS[issue.status].retryHelps);
+  return issues.some((issue) => explain(issue.status).retryHelps);
 }
 
 /** The short name for one outcome, for places with room for a word and not a paragraph. */
 export function issueStatusLabel(status: IssueStatus): string {
-  return ISSUE_EXPLANATIONS[status].label;
+  return explain(status).label;
 }

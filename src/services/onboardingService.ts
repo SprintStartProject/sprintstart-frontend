@@ -10,7 +10,6 @@ import type {
   OnboardingPersonalizeEvent,
   OnboardingPersonalizeHandlers,
   OnboardingGenerationStatus,
-  StepStatus,
   QuestionAttemptSubmission,
   QuestionAttemptResult,
   AdminPhaseQuestionsEndpoint,
@@ -98,7 +97,10 @@ export const onboardingService = {
       }
     }
 
-    handlers.onDone();
+    // Falling out of the loop means the body ended without `done` or `error`, which the backend
+    // never does on purpose. Reporting a finished path here told members their path was ready
+    // while it was still being built.
+    handlers.onInterrupted?.();
   },
 
   /**
@@ -132,26 +134,18 @@ export const onboardingService = {
     });
   },
 
-  async updateStepStatus(step: OnboardingStepDetail, newStatus: StepStatus): Promise<void> {
-    if (newStatus === "FINISHED") {
-      await apiClient.fetch(`/api/v1/onboarding/me/steps/${step.id}/complete`, {
-        method: "PUT",
-      });
-      return;
-    }
-
-    await apiClient.fetch(`/api/v1/onboarding/me/steps/${step.id}`, {
+  /**
+   * Marks a step done.
+   *
+   * Narrowed from a general `updateStepStatus`: every other status went to `PUT /steps/{id}` with
+   * `status` and `skip` in the body, which `UpdateOnboardingStepRequest` does not have. Spring
+   * ignores unknown properties, so those calls returned 200 and changed nothing -- while also
+   * truncating `expectedOutcomes` to its first entry. A member has exactly one status to set, and
+   * this is it.
+   */
+  async completeStep(stepId: string): Promise<void> {
+    await apiClient.fetch(`/api/v1/onboarding/me/steps/${stepId}/complete`, {
       method: "PUT",
-      body: JSON.stringify({
-        position: step.position,
-        title: step.title,
-        description: step.description,
-        type: step.type ?? "TASK",
-        estimatedMinutes: step.estimatedMinutes,
-        expectedOutcome: step.expectedOutcomes?.[0] ?? "",
-        status: newStatus,
-        skip: step.skip ?? null,
-      }),
     });
   },
 

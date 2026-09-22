@@ -14,7 +14,7 @@ import {
   ThumbsUp,
   Video,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import type { ItemState, PhaseItem, PhaseState } from "../journey";
 import { unseenSkipAnswerOf } from "../skipAnswers";
 import {
@@ -416,8 +416,16 @@ const previewFill: Record<ItemState, string> = {
  * That sameness is the point: on the journey map a phase already shows the shape inside it, so
  * zooming into the card lands on the graph the picture promised.
  */
-function PhaseGraphPreview({ phase }: { phase: OnboardingPhaseEndpoint }) {
+const PhaseGraphPreview = memo(function PhaseGraphPreview({
+  phase,
+}: {
+  phase: OnboardingPhaseEndpoint;
+}) {
   const items = phaseItems(phase);
+  // Ranks plus four barycentre passes, and the card it is drawn on re-renders on every wheel
+  // event and every pointer move while the map is panned -- the zoom is threaded through the node
+  // renderer. Memoized on the phase, which only changes when the path does.
+  const positions = useMemo(() => itemGraphLayout(phase).positions, [phase]);
   if (items.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-[11px] text-app-text-subtle">
@@ -425,7 +433,6 @@ function PhaseGraphPreview({ phase }: { phase: OnboardingPhaseEndpoint }) {
       </div>
     );
   }
-  const { positions } = itemGraphLayout(phase);
   const points = [...positions.values()];
   const halfWidth = ITEM_NODE_SIZE.width / 2;
   const halfHeight = ITEM_NODE_SIZE.height / 2;
@@ -482,7 +489,7 @@ function PhaseGraphPreview({ phase }: { phase: OnboardingPhaseEndpoint }) {
       })}
     </svg>
   );
-}
+});
 
 /** One phase on the journey map: its progress, its state, and a picture of the graph inside it. */
 export function PhaseNodeCard({

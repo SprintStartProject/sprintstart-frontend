@@ -12,6 +12,7 @@ const { mocks } = vi.hoisted(() => ({
     permissionGroup: "PM",
     getPaths: vi.fn(),
     getPath: vi.fn(),
+    getGraph: vi.fn(),
   },
 }));
 
@@ -24,7 +25,12 @@ vi.mock("../../../src/features/projects/useProjectContext.ts", () => ({
 }));
 
 vi.mock("../../../src/services/blueprintService.ts", () => ({
-  blueprintService: { getPaths: mocks.getPaths, getPath: mocks.getPath },
+  blueprintService: {
+    getPaths: mocks.getPaths,
+    getPath: mocks.getPath,
+    // The shape comes from the graph: the path DTO carries no coordinates or prerequisites.
+    getGraph: mocks.getGraph,
+  },
 }));
 
 function overview(over: Partial<BlueprintPathOverview> = {}): BlueprintPathOverview {
@@ -115,6 +121,7 @@ describe("BlueprintPathsPage", () => {
     vi.clearAllMocks();
     mocks.permissionGroup = "PM";
     mocks.getPath.mockResolvedValue(pathWith([]));
+    mocks.getGraph.mockResolvedValue({ nodes: [] });
   });
 
   it("groups by what hires get, not by the status of the newest version", async () => {
@@ -180,6 +187,35 @@ describe("BlueprintPathsPage", () => {
     // Three phases with nothing sequencing them is a very different thing to be handed than three
     // in a row, and no count on the card can tell them apart.
     expect(await screen.findByText("No order between any of them")).toBeInTheDocument();
+  });
+
+  /**
+   * The order between phases is only on the graph endpoint -- `GET /paths/{id}` carries no
+   * `blockerIds`, and the client fills them in as `[]`. Reading the path alone therefore described
+   * every blueprint, however carefully sequenced, as having no order at all.
+   */
+  it("reads the shape from the graph, not from the path that does not carry it", async () => {
+    mocks.getPaths.mockResolvedValue([overview()]);
+    mocks.getPath.mockResolvedValue(pathWith([{}, {}, {}]));
+    mocks.getGraph.mockResolvedValue({
+      nodes: [
+        { id: "phase-0", revision: 0, title: "One", graphX: 0, graphY: 0, blockerIds: [] },
+        { id: "phase-1", revision: 0, title: "Two", graphX: 0, graphY: 1, blockerIds: ["phase-0"] },
+        {
+          id: "phase-2",
+          revision: 0,
+          title: "Three",
+          graphX: 0,
+          graphY: 2,
+          blockerIds: ["phase-1"],
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Backend onboarding" });
+    expect(screen.queryByText("No order between any of them")).not.toBeInTheDocument();
   });
 
   it("narrows the page to what somebody is looking for", async () => {

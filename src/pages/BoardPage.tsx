@@ -26,6 +26,7 @@ import { useGeneratedPathCards } from "../features/board/hooks/useGeneratedPathC
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
+import { BoardPathNotes } from "../features/board/components/BoardPathNotes";
 import { BoardPathWindow } from "../features/board/components/BoardPathWindow";
 import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
 import { BoardFilterTriggers } from "../features/board/components/BoardFilterTriggers";
@@ -457,9 +458,10 @@ export function BoardPage() {
     });
   }
 
-  // The path is drawn in the header; the grid gets everything else. Its index is kept so a reorder
-  // of the visible cards can put it back where it was — the board's order is the hire's, and this
-  // is a display decision, not an edit to it.
+  // The path is drawn above the board -- the window for where they stand, `BoardPathNotes` for
+  // the two things the card says that nothing else does -- and the grid gets everything else. Its
+  // index is kept so a reorder of the visible cards can put it back where it was: the board's
+  // order is the hire's, and this is a display decision, not an edit to it.
   const pathIndex =
     board?.cards.findIndex((card) => card.content.kind === "PATH_TO_FIRST_CONTRIBUTION") ?? -1;
   const pathCard = pathIndex === -1 ? null : (board?.cards[pathIndex] ?? null);
@@ -1008,6 +1010,9 @@ export function BoardPage() {
           page; this is about the work, and it belongs where the work is.
         */}
         {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
+        {pathCard?.content.kind === "PATH_TO_FIRST_CONTRIBUTION" && (
+          <BoardPathNotes content={pathCard.content} />
+        )}
         {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
             space: the board is a column of cards and the margin is where a hand rests. So the
             offers live there — always in reach, never in the way, and out of the row above the
@@ -1292,6 +1297,10 @@ export function BoardPage() {
                   onDismiss={handleDismiss}
                   dismissingId={dismissingId}
                   onEdit={(cardId, request) => void editCard(cardId, request)}
+                  // A checklist broken out of a task is a *new* card, which only a re-read can
+                  // show. Without this the write lands and the board keeps drawing what it read
+                  // before the press.
+                  onCardAdded={refresh}
                   onReorder={handleReorder}
                   boardOrder={allCards.map((card) => card.id)}
                   isArranging={isArranging}

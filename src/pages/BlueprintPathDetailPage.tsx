@@ -35,6 +35,7 @@ import { Select } from "../components/ui/Select.tsx";
 import { Textarea } from "../components/ui/Textarea.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
 import { PhasePrerequisites } from "../features/blueprints/components/PhasePrerequisites.tsx";
+import { versionWord } from "../features/blueprints/pathLifecycle.ts";
 import { useToast } from "../context/useToast.ts";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation.ts";
 import type {
@@ -91,6 +92,51 @@ type RequirementCatalog = {
 };
 
 /** What else goes when one of these is deleted — the part somebody has to weigh before saying yes. */
+type LifecycleAction = "publish" | "rollback" | "delete-draft";
+
+/**
+ * What each one-way lifecycle action is called and what it costs, said before it happens.
+ *
+ * Archiving already asked; publishing, reverting and deleting a draft did not, although publishing
+ * is the one action here that people outside the team see and a deleted draft cannot be brought
+ * back.
+ */
+const LIFECYCLE_COPY: Record<
+  LifecycleAction,
+  {
+    title: (version: number) => string;
+    description: string;
+    confirm: string;
+    busy: string;
+    failure: string;
+  }
+> = {
+  publish: {
+    title: (version) => `Publish version ${version}?`,
+    description:
+      "Every new hire on this project is given this version from now on, and the version published today stops being handed out. Anybody already on a path keeps their copy.",
+    confirm: "Publish",
+    busy: "Publishing…",
+    failure: "Blueprint could not be published.",
+  },
+  rollback: {
+    title: (version) => `Revert to version ${version}?`,
+    description:
+      "This version becomes the published blueprint again, and new hires are given it from now on. Anybody already on a path keeps their copy.",
+    confirm: "Revert",
+    busy: "Reverting…",
+    failure: "Blueprint version could not be restored.",
+  },
+  "delete-draft": {
+    title: (version) => `Delete draft version ${version}?`,
+    description:
+      "The draft and everything authored in it are gone for good — there is no undo. Published and archived versions are untouched.",
+    confirm: "Delete draft",
+    busy: "Deleting…",
+    failure: "Blueprint draft could not be deleted.",
+  },
+};
+
 const DELETE_CONSEQUENCE: Record<CreateKind, string> = {
   phase: "Its steps, knowledge checks and every prerequisite pointing at it go with it.",
   step: "Its tasks, resources and every prerequisite pointing at it go with it.",
@@ -247,6 +293,12 @@ export function BlueprintPathDetailPage() {
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
+  const [pendingLifecycle, setPendingLifecycle] = useState<{
+    action: LifecycleAction;
+    version: BlueprintPath;
+  } | null>(null);
+  const [isLifecycleBusy, setIsLifecycleBusy] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [isDraftPromptOpen, setIsDraftPromptOpen] = useState(false);
   const [isOpeningDraft, setIsOpeningDraft] = useState(false);
   const [draftPromptError, setDraftPromptError] = useState<string | null>(null);
@@ -257,6 +309,10 @@ export function BlueprintPathDetailPage() {
     id: string;
     label: string;
   } | null>(null);
+  const [pendingDeleteError, setPendingDeleteError] = useState<string | null>(null);
+  // Kept out of the page-wide `error`, which renders in the page body underneath an open overlay.
+  const [itemFormError, setItemFormError] = useState<string | null>(null);
+  const [requirementError, setRequirementError] = useState<string | null>(null);
   const [requirementType, setRequirementType] = useState<"SKILL" | "PROJECT_ROLE">("SKILL");
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<string[]>([]);
   const [requirementCatalog, setRequirementCatalog] = useState<RequirementCatalog | null>(null);
@@ -338,18 +394,55 @@ export function BlueprintPathDetailPage() {
 
   async function rollback() {
     if (!path) return;
+    const restored = await blueprintService.rollbackPath(
+      blueprintScope,
+      path.blueprintKey,
+      path.version,
+    );
+    if (restored.id === pathId) {
+      // Same address, so the load effect will not refire -- and the response cannot be set
+      // straight into state: `GET /paths/{id}` carries no `graphX`/`graphY`/`blockerIds`, so that
+      // emptied the canvas and the next drag saved a position against it. See `loadPath`.
+      await loadPath(false);
+      return;
+    }
+    void navigate(`/blueprints/${restored.id}${isGlobal ? "?scope=global" : ""}`);
+  }
+
+  async function publish() {
+    if (!path) return;
+    await blueprintService.publishPath(blueprintScope, path.id);
+    // Publishing answers with the same nested DTO, so the graph has to be put back.
+    await loadPath(false);
+    toast.success(`Version ${path.version} is now the published blueprint`, {
+      description: "New hires on this project are given it from now on.",
+    });
+  }
+
+  /**
+   * Runs whichever lifecycle action was confirmed, one at a time.
+   *
+   * All three are one-way -- publishing swaps what new hires are handed, reverting does the same,
+   * and a deleted draft has no undo endpoint -- so each is asked about first, and the dialog holds
+   * the answer while the request is in flight. A second click used to send a second request and
+   * land its failure on a page that had just succeeded.
+   */
+  async function runLifecycleAction() {
+    const pending = pendingLifecycle;
+    if (!pending || isLifecycleBusy) return;
+    setIsLifecycleBusy(true);
+    setLifecycleError(null);
     try {
-      const restored = await blueprintService.rollbackPath(
-        blueprintScope,
-        path.blueprintKey,
-        path.version,
-      );
-      void navigate(`/blueprints/${restored.id}${isGlobal ? "?scope=global" : ""}`);
-      setPath(restored);
+      if (pending.action === "publish") await publish();
+      else if (pending.action === "rollback") await rollback();
+      else await deleteDraft(pending.version);
+      setPendingLifecycle(null);
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Blueprint version could not be restored.",
+      setLifecycleError(
+        reason instanceof Error ? reason.message : LIFECYCLE_COPY[pending.action].failure,
       );
+    } finally {
+      setIsLifecycleBusy(false);
     }
   }
 
@@ -370,19 +463,11 @@ export function BlueprintPathDetailPage() {
   }
 
   async function deleteDraft(version: BlueprintPath) {
-    setDeletingId(version.id);
-    setError(null);
-    try {
-      await blueprintService.deleteDraft(blueprintScope, version.id);
-      setHistory((current) => current.filter((item) => item.id !== version.id));
-      if (version.id === pathId) {
-        setIsHistoryOpen(false);
-        void navigate(blueprintListPath);
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Blueprint draft could not be deleted.");
-    } finally {
-      setDeletingId(null);
+    await blueprintService.deleteDraft(blueprintScope, version.id);
+    setHistory((current) => current.filter((item) => item.id !== version.id));
+    if (version.id === pathId) {
+      setIsHistoryOpen(false);
+      void navigate(blueprintListPath);
     }
   }
 
@@ -411,6 +496,7 @@ export function BlueprintPathDetailPage() {
     setExplanation("");
     setCorrectAnswer("");
     setIsCorrect(false);
+    setItemFormError(null);
     setTarget({ kind, parentId, position, graphPosition });
   }
 
@@ -475,6 +561,7 @@ export function BlueprintPathDetailPage() {
   /** Opens the overlay on an existing item, seeded with whatever that kind of item actually has. */
   function openEdit(nextTarget: NonNullable<EditTarget>) {
     setError(null);
+    setItemFormError(null);
     setUrl(nextTarget.kind === "resource" ? nextTarget.item.url : "");
     setIsCorrect(nextTarget.kind === "option" && nextTarget.item.correct);
 
@@ -516,11 +603,11 @@ export function BlueprintPathDetailPage() {
     setRequirementType("SKILL");
     setSelectedRequirementIds([]);
     setIsRequirementCatalogLoading(true);
-    setError(null);
+    setRequirementError(null);
     try {
       setRequirementCatalog(await blueprintService.getRequirementCatalog());
     } catch (reason) {
-      setError(
+      setRequirementError(
         reason instanceof Error ? reason.message : "Requirement choices could not be loaded.",
       );
     } finally {
@@ -557,7 +644,7 @@ export function BlueprintPathDetailPage() {
     if (!phase) return;
 
     setIsRequirementSaving(true);
-    setError(null);
+    setRequirementError(null);
     try {
       const response = await blueprintService.addPhaseRequirements(
         blueprintScope,
@@ -791,7 +878,7 @@ export function BlueprintPathDetailPage() {
       setTarget(null);
       await refreshActiveEditorData();
     } catch (reason) {
-      setError(
+      setItemFormError(
         reason instanceof Error
           ? reason.message
           : `The ${editTarget?.kind ?? target?.kind ?? "item"} could not be saved.`,
@@ -861,21 +948,28 @@ export function BlueprintPathDetailPage() {
     ]);
     // The nested DTO has no phase coordinates or prerequisites; keep the ones already loaded
     // rather than dropping them while the sub-graph editor is open.
-    setPath((current) =>
-      current
-        ? withGraphNodes(
-            nextPath,
-            current.blueprintPhases.map((phase): BlueprintGraphNode => ({
-              id: phase.id,
-              revision: phase.revision,
-              title: phase.title,
-              graphX: phase.graphX ?? null,
-              graphY: phase.graphY ?? null,
-              blockerIds: phase.blockerIds ?? [],
-            })),
-          )
-        : nextPath,
-    );
+    setPath((current) => {
+      if (!current) return nextPath;
+      const heldById = new Map(current.blueprintPhases.map((phase) => [phase.id, phase]));
+      return withGraphNodes(
+        nextPath,
+        nextPath.blueprintPhases.map((phase): BlueprintGraphNode => {
+          const held = heldById.get(phase.id);
+          return {
+            id: phase.id,
+            // The revision the server just sent, not the one held here: `withGraphNodes` writes
+            // this back onto the phase, so carrying the stale one over meant the next phase
+            // mutation sent a revision the server had already moved past -- a 409 the page then
+            // reported as a success.
+            revision: phase.revision,
+            title: phase.title,
+            graphX: held?.graphX ?? null,
+            graphY: held?.graphY ?? null,
+            blockerIds: held?.blockerIds ?? [],
+          };
+        }),
+      );
+    });
     setSubGraphNodes(graph.nodes);
   }
 
@@ -1084,10 +1178,13 @@ export function BlueprintPathDetailPage() {
     await refreshSubGraph(question.blueprintPhaseId);
   }
 
-  async function removeSubGraphQuestionOption(option: BlueprintOption) {
-    await blueprintService.deleteOption(blueprintScope, option.id, option.revision);
-    if (subGraphPhaseId) await refreshSubGraph(subGraphPhaseId);
-    else await loadPath();
+  /**
+   * Asks first, like the identical control in the outline. The dialog then owns the request, its
+   * failure and the refresh, through `deleteItem`.
+   */
+  function removeSubGraphQuestionOption(option: BlueprintOption) {
+    requestDelete("option", option.id, option.label);
+    return Promise.resolve();
   }
 
   async function updateSubGraphStep(step: BlueprintStep, metadata: BlueprintStepMetadata) {
@@ -1430,6 +1527,10 @@ export function BlueprintPathDetailPage() {
         await refreshActiveEditorData();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `The ${kind} could not be deleted.`);
+      // Rethrown, not swallowed: the graph panels close themselves and toast "deleted" on a
+      // resolved promise, so a 409 on a stale revision used to read as a success with the node
+      // still on the canvas. Every caller below handles the rejection.
+      throw reason;
     } finally {
       setDeletingId(null);
     }
@@ -1650,7 +1751,11 @@ export function BlueprintPathDetailPage() {
 
   // Keep the existing shell visible during a graph → list refresh. This avoids replacing the
   // whole page with a loading state while the nested DTO catches up with graph revisions.
-  if (isLoading && !path)
+  //
+  // A path from a *different* address is a different matter: during a walk between versions, the
+  // one being left stayed fully interactive under the new URL, so Publish published it and the
+  // header described it. The `reopen` effect guards this the same way.
+  if (isLoading && (!path || path.id !== pathId))
     return (
       <main className="flex min-h-80 items-center justify-center gap-3 text-app-text-muted">
         <Loader2 className="h-5 w-5 animate-spin" /> Loading blueprint…
@@ -1706,11 +1811,22 @@ export function BlueprintPathDetailPage() {
         variant="danger"
         isLoading={pendingDelete !== null && deletingId === pendingDelete.id}
         loadingLabel="Deleting…"
-        onClose={() => setPendingDelete(null)}
+        errorMessage={pendingDeleteError ?? undefined}
+        onClose={() => {
+          setPendingDelete(null);
+          setPendingDeleteError(null);
+        }}
         onConfirm={() => {
           if (!pendingDelete) return;
           const { kind, id } = pendingDelete;
-          void deleteItem(kind, id).then(() => setPendingDelete(null));
+          setPendingDeleteError(null);
+          void deleteItem(kind, id).then(
+            () => setPendingDelete(null),
+            (reason: unknown) =>
+              setPendingDeleteError(
+                reason instanceof Error ? reason.message : `The ${kind} could not be deleted.`,
+              ),
+          );
         }}
       />
       <AlertDialog
@@ -1776,14 +1892,42 @@ export function BlueprintPathDetailPage() {
         onClose={() => setIsArchiveConfirmOpen(false)}
         onConfirm={() => void archivePath()}
       />
+      <AlertDialog
+        isOpen={pendingLifecycle !== null}
+        title={
+          pendingLifecycle
+            ? LIFECYCLE_COPY[pendingLifecycle.action].title(pendingLifecycle.version.version)
+            : ""
+        }
+        description={pendingLifecycle ? LIFECYCLE_COPY[pendingLifecycle.action].description : ""}
+        confirmLabel={pendingLifecycle ? LIFECYCLE_COPY[pendingLifecycle.action].confirm : ""}
+        variant={pendingLifecycle?.action === "delete-draft" ? "danger" : "default"}
+        isLoading={isLifecycleBusy}
+        loadingLabel={pendingLifecycle ? LIFECYCLE_COPY[pendingLifecycle.action].busy : ""}
+        errorMessage={lifecycleError ?? undefined}
+        onClose={() => {
+          if (isLifecycleBusy) return;
+          setPendingLifecycle(null);
+          setLifecycleError(null);
+        }}
+        onConfirm={() => void runLifecycleAction()}
+      />
       <PageHeader
         icon={Layers3}
         title={path.title}
         subtitle={path.description || "No path description yet."}
         actions={
           <>
-            <Badge variant={path.status === "ACTIVE" ? "success" : "warning"}>
-              {path.status} · v{path.version}
+            <Badge
+              variant={
+                path.status === "ACTIVE"
+                  ? "success"
+                  : path.status === "ARCHIVED"
+                    ? "neutral"
+                    : "warning"
+              }
+            >
+              {versionWord(path.status)} · v{path.version}
             </Badge>
             <Button
               variant="secondary"
@@ -1837,7 +1981,8 @@ export function BlueprintPathDetailPage() {
               <Button
                 variant="primary"
                 icon={<RotateCcw className="h-4 w-4" />}
-                onClick={() => void rollback()}
+                disabled={isLifecycleBusy}
+                onClick={() => setPendingLifecycle({ action: "rollback", version: path })}
               >
                 Revert to this version
               </Button>
@@ -1845,24 +1990,8 @@ export function BlueprintPathDetailPage() {
               <Button
                 variant="primary"
                 icon={<Rocket className="h-4 w-4" />}
-                onClick={() =>
-                  void blueprintService
-                    .publishPath(blueprintScope, path.id)
-                    // Publishing answers with the same nested DTO, so the graph has to be put back.
-                    .then(async () => {
-                      await loadPath(false);
-                      toast.success(`Version ${path.version} is now the published blueprint`, {
-                        description: "New hires on this project are given it from now on.",
-                      });
-                    })
-                    .catch((reason: unknown) =>
-                      setError(
-                        reason instanceof Error
-                          ? reason.message
-                          : "Blueprint could not be published.",
-                      ),
-                    )
-                }
+                disabled={isLifecycleBusy}
+                onClick={() => setPendingLifecycle({ action: "publish", version: path })}
               >
                 Publish
               </Button>
@@ -1928,11 +2057,11 @@ export function BlueprintPathDetailPage() {
             onRemoveOption={removeSubGraphQuestionOption}
             onUpdateStep={updateSubGraphStep}
             onAddTask={(step) => openCreate("task", step.id, step.blueprintTasks.length)}
-            onRemoveTask={(task) => void deleteItem("task", task.id)}
+            onRemoveTask={(task) => requestDelete("task", task.id, task.title)}
             onAddResource={(step) =>
               openCreate("resource", step.id, step.blueprintResources.length)
             }
-            onRemoveResource={(resource) => void deleteItem("resource", resource.id)}
+            onRemoveResource={(resource) => requestDelete("resource", resource.id, resource.title)}
             onEditTask={(task) => openEdit({ kind: "task", item: task })}
             onEditResource={(resource) => openEdit({ kind: "resource", item: resource })}
             onEditOption={(option) => openEdit({ kind: "option", item: option })}
@@ -2562,7 +2691,11 @@ export function BlueprintPathDetailPage() {
         isOpen={addRequirementTarget !== null}
         title="Add phase requirements"
         description="Select skills or project roles that must be met before this phase unlocks."
-        onClose={() => setAddRequirementTarget(null)}
+        errorMessage={requirementError ?? undefined}
+        onClose={() => {
+          setAddRequirementTarget(null);
+          setRequirementError(null);
+        }}
         footer={
           <>
             <Button variant="secondary" onClick={() => setAddRequirementTarget(null)}>
@@ -2650,7 +2783,7 @@ export function BlueprintPathDetailPage() {
                         : "warning"
                   }
                 >
-                  {version.status}
+                  {versionWord(version.status)}
                 </Badge>
               );
 
@@ -2681,8 +2814,8 @@ export function BlueprintPathDetailPage() {
                       aria-label={`Delete draft version ${version.version}`}
                       iconOnly
                       variant="dangerGhost"
-                      loading={deletingId === version.id}
-                      onClick={() => void deleteDraft(version)}
+                      loading={isLifecycleBusy && pendingLifecycle?.version.id === version.id}
+                      onClick={() => setPendingLifecycle({ action: "delete-draft", version })}
                     >
                       <Minus className="h-4 w-4" strokeWidth={2.5} />
                     </Button>
@@ -2702,9 +2835,11 @@ export function BlueprintPathDetailPage() {
             : `Add ${target ? kindLabels[target.kind] : "item"}`
         }
         description="This is reusable blueprint content, not a change to an active onboarding path."
+        errorMessage={itemFormError ?? undefined}
         onClose={() => {
           setTarget(null);
           setEditTarget(null);
+          setItemFormError(null);
         }}
         footer={
           <>

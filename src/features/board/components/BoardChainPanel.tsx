@@ -103,7 +103,6 @@ export function BoardChainPanel({
             height="fill"
             ariaLabel={subject ? `What ${subject.title} is waiting on` : "Card chain"}
             emptyTitle="Nothing waits on this one"
-            onNodeClick={() => {}}
             onPositionChange={() => Promise.resolve()}
             onAddBlocker={() => Promise.resolve()}
             onRemoveBlocker={() => Promise.resolve()}

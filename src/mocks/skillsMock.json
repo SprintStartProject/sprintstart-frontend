@@ -4,31 +4,41 @@
       "id": "skill-1",
       "name": "React",
       "roleIds": ["r1"],
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "category": null,
+      "universal": false
     },
     {
       "id": "skill-2",
       "name": "TypeScript",
       "roleIds": ["r1"],
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "category": null,
+      "universal": false
     },
     {
       "id": "skill-3",
       "name": "Tailwind CSS",
       "roleIds": ["r1"],
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "category": null,
+      "universal": false
     },
     {
       "id": "skill-4",
       "name": "Java",
       "roleIds": ["r2"],
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "category": null,
+      "universal": false
     },
     {
       "id": "skill-5",
       "name": "Spring Boot",
       "roleIds": ["r2"],
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "category": null,
+      "universal": false
     }
   ]
 }

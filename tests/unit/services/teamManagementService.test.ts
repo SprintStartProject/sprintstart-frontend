@@ -4,6 +4,7 @@ import {
   getTeamMember,
   getProjectRoles,
   createProjectRole,
+  acceptSkillSuggestion,
   assignProjectRoleToUser,
   createSkill,
   deleteSkill,
@@ -12,6 +13,7 @@ import {
   updateSkill,
   getSkillsByRoleId,
   updateRoleSkills,
+  suggestSkillsForRole,
   reactivateSkill,
   getMySkillLevels,
   getUserSkillLevels,
@@ -67,6 +69,112 @@ describe("teamManagementService", () => {
     expect(newRole.id).toBe("new-role-1");
   });
 
+  it("createProjectRole sends only the role fields supported by the backend", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post("/api/v1/projectRoles", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({
+          id: "role-1",
+          name: "Developer",
+          description: "Builds features",
+        });
+      }),
+    );
+
+    await createProjectRole("Developer", "Builds features");
+
+    expect(capturedBody).toEqual({
+      name: "Developer",
+      description: "Builds features",
+    });
+  });
+
+  it("suggestSkillsForRole posts project context and reads the response wrapper", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post("/api/v1/projectRoles/role1/skills/suggest", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json({
+          suggestions: [
+            {
+              skillId: "skill-ai-1",
+              name: "Prompt Engineering",
+              category: "AI",
+              reason: "Useful for the role",
+              confidence: "high",
+              isNew: false,
+              chunkIds: ["chunk-1"],
+            },
+          ],
+        });
+      }),
+    );
+
+    const suggestions = await suggestSkillsForRole("role1", {
+      projectId: "project-1",
+      industry: "Fintech",
+    });
+
+    expect(capturedBody).toEqual({ projectId: "project-1", industry: "Fintech" });
+    expect(suggestions).toEqual([
+      {
+        skillId: "skill-ai-1",
+        name: "Prompt Engineering",
+        category: "AI",
+        reason: "Useful for the role",
+        confidence: "high",
+        isNew: false,
+        chunkIds: ["chunk-1"],
+      },
+    ]);
+  });
+
+  it("acceptSkillSuggestion posts the reviewed item and maps the updated role skills", async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post("/api/v1/projectRoles/role1/skills/suggestions/accept", async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json([
+          {
+            id: "skill-ai-1",
+            name: "Prompt Engineering",
+            roleIds: ["role1"],
+            status: "ACTIVE",
+            category: "AI",
+            universal: false,
+          },
+        ]);
+      }),
+    );
+
+    const skills = await acceptSkillSuggestion("role1", {
+      name: "Prompt Engineering",
+      category: "AI",
+    });
+
+    expect(capturedBody).toEqual({ name: "Prompt Engineering", category: "AI" });
+    expect(skills[0]).toEqual({
+      id: "skill-ai-1",
+      name: "Prompt Engineering",
+      roleIds: ["role1"],
+      status: "ACTIVE",
+      category: "AI",
+      universal: false,
+    });
+  });
+  it("suggestSkillsForRole propagates backend failures without a mock fallback", async () => {
+    server.use(
+      http.post("/api/v1/projectRoles/role1/skills/suggest", () =>
+        HttpResponse.json({ message: "AI unavailable" }, { status: 502 }),
+      ),
+    );
+
+    await expect(suggestSkillsForRole("role1")).rejects.toMatchObject({
+      status: 502,
+      message: "AI unavailable",
+    });
+  });
   it("assignProjectRoleToUser sends request to backend", async () => {
     let captured = false;
     server.use(
@@ -89,6 +197,8 @@ describe("teamManagementService", () => {
             name: "TypeScript",
             roleIds: ["role1", "role2"],
             status: "ACTIVE",
+            category: "ENGINEERING",
+            universal: true,
           },
           {
             id: "skill2",
@@ -108,12 +218,16 @@ describe("teamManagementService", () => {
         name: "TypeScript",
         roleIds: ["role1", "role2"],
         status: "ACTIVE",
+        category: "ENGINEERING",
+        universal: true,
       },
       {
         id: "skill2",
         name: "Legacy API",
         roleIds: [],
         status: "RETIRED",
+        category: null,
+        universal: false,
       },
     ]);
   });
@@ -222,6 +336,8 @@ describe("teamManagementService", () => {
             name: "TypeScript",
             roleIds: ["role1"],
             status: "ACTIVE",
+            category: "ENGINEERING",
+            universal: true,
           },
         ]),
       ),
@@ -245,6 +361,8 @@ describe("teamManagementService", () => {
             name: "TypeScript",
             roleIds: ["role1"],
             status: "ACTIVE",
+            category: "ENGINEERING",
+            universal: true,
           },
         ]);
       }),
@@ -310,6 +428,8 @@ describe("teamManagementService", () => {
             name: "TypeScript",
             roleIds: ["role1", "role2"],
             status: "ACTIVE",
+            category: "ENGINEERING",
+            universal: true,
           },
         ]),
       ),

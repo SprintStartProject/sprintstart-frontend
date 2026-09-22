@@ -15,9 +15,11 @@ import { SlidingTabPanel } from "../../../../components/ui/SlidingTabPanel";
 import { useSwipeableTabs } from "../../../../hooks/useHorizontalWheelNavigation";
 import { useToast } from "../../../../context/useToast";
 import { onboardingGraphService } from "../../../../services/onboardingGraphService";
+import { useAuth } from "../../../../context/useAuth";
+import { isSkipPending } from "../../../onboarding/journey";
 import { computeRanks } from "../../../onboarding/graph/layout";
 import {
-  MEMBER_JOURNEY_VIEW_KEY,
+  memberJourneyViewKey,
   readJourneyView,
   writeJourneyView,
 } from "../../../onboarding/journeyViewMemory";
@@ -112,6 +114,9 @@ export function MemberJourneySection({
   onPathChanged,
 }: Props) {
   const toast = useToast();
+  // Who is looking. The remembered view is per manager as well as per member: browser storage is
+  // per browser, so a key without this hands one manager's view to whoever signs in next.
+  const viewerId = useAuth().profile?.id ?? "";
   const firstName = memberName.split(" ")[0] || "this member";
   const phases = useMemo(() => (path ? sortedPhases(path) : []), [path]);
   const nextAction = useMemo(() => (path ? resolveNextAction(path) : null), [path]);
@@ -126,10 +131,10 @@ export function MemberJourneySection({
 
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(
-    () => readJourneyView(MEMBER_JOURNEY_VIEW_KEY).mode,
+    () => readJourneyView(memberJourneyViewKey(viewerId, userId)).mode,
   );
   const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
-    () => readJourneyView(MEMBER_JOURNEY_VIEW_KEY).graphPhaseId,
+    () => readJourneyView(memberJourneyViewKey(viewerId, userId)).graphPhaseId,
   );
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [freshStepId, setFreshStepId] = useState<string | null>(null);
@@ -139,9 +144,12 @@ export function MemberJourneySection({
     ? graphPhaseId
     : null;
   useEffect(() => {
-    if (phases.length === 0) return;
-    writeJourneyView(MEMBER_JOURNEY_VIEW_KEY, { mode: viewMode, graphPhaseId: openGraphPhaseId });
-  }, [openGraphPhaseId, phases.length, viewMode]);
+    if (phases.length === 0 || !viewerId) return;
+    writeJourneyView(memberJourneyViewKey(viewerId, userId), {
+      mode: viewMode,
+      graphPhaseId: openGraphPhaseId,
+    });
+  }, [openGraphPhaseId, phases.length, userId, viewerId, viewMode]);
 
   const swipeRef = useSwipeableTabs<ViewMode, HTMLElement>({
     order: VIEW_ORDER,
@@ -156,6 +164,13 @@ export function MemberJourneySection({
     phases.find((candidate) => phaseState(candidate) !== "done") ??
     phases[0];
 
+  // One step per gesture, across all five ways of asking for one. A double click created two,
+  // wired into the member's live path with the same prerequisites -- both computed from the same
+  // pre-refresh snapshot -- and only the second opened for naming, leaving the first as an unnamed
+  // orphan to hunt down. The ref is the guard, the state is what the buttons read.
+  const addingStep = useRef(false);
+  const [isAddingStep, setIsAddingStep] = useState(false);
+
   /** A blank step the PM names next -- dropped on the graph, or put in between two list rows. */
   const createBlankStep = useCallback(
     async (
@@ -168,23 +183,31 @@ export function MemberJourneySection({
         graphY?: number;
       },
     ) => {
-      const created = await onboardingGraphService.createConnectedStep(target.id, {
-        step: {
-          position: Math.min(placement.position, target.steps.length),
-          title: NEW_STEP_TITLE,
-          description: "",
-          type: "TASK",
-          estimatedMinutes: 30,
-          expectedOutcome: "",
-        },
-        waitsOn: placement.waitsOn,
-        unlocks: placement.unlocks,
-        graphX: placement.graphX,
-        graphY: placement.graphY,
-      });
-      await onPathChanged();
-      setFreshStepId(created.id);
-      return created;
+      if (addingStep.current) return null;
+      addingStep.current = true;
+      setIsAddingStep(true);
+      try {
+        const created = await onboardingGraphService.createConnectedStep(target.id, {
+          step: {
+            position: Math.min(placement.position, target.steps.length),
+            title: NEW_STEP_TITLE,
+            description: "",
+            type: "TASK",
+            estimatedMinutes: 30,
+            expectedOutcome: "",
+          },
+          waitsOn: placement.waitsOn,
+          unlocks: placement.unlocks,
+          graphX: placement.graphX,
+          graphY: placement.graphY,
+        });
+        await onPathChanged();
+        setFreshStepId(created.id);
+        return created;
+      } finally {
+        addingStep.current = false;
+        setIsAddingStep(false);
+      }
     },
     [onPathChanged],
   );
@@ -293,7 +316,7 @@ export function MemberJourneySection({
           graphX: point.x,
           graphY: point.y,
         });
-        setSelectedItemId(created.id);
+        if (created) setSelectedItemId(created.id);
       },
     }),
     [createBlankStep, phases, rewire],
@@ -318,7 +341,7 @@ export function MemberJourneySection({
   const skipped = allSteps.filter((step) => step.status === "SKIPPED").length;
   // `accepted` is null while the PM has not answered yet.
   const pendingSkips = allSteps.filter(
-    (step) => !!step.skip && step.skip.accepted === null && step.status !== "SKIPPED",
+    (step) => isSkipPending(step.skip) && step.status !== "SKIPPED",
   ).length;
 
   const questionTools = (target: OnboardingPhaseEndpoint) => (
@@ -410,6 +433,8 @@ export function MemberJourneySection({
                           size="sm"
                           variant="primary"
                           icon={<ListPlus className="h-4 w-4" />}
+                          loading={isAddingStep}
+                          disabled={isAddingStep}
                           onClick={() => void addStepInList(phase, null)}
                         >
                           Add step

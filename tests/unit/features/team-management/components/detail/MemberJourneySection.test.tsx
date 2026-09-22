@@ -8,6 +8,12 @@ import type {
   OnboardingStepEndpoint,
 } from "../../../../../../src/features/onboarding/types";
 
+// The remembered List/Graph view is keyed on the manager looking as well as on the member, so
+// the section asks who is signed in.
+vi.mock("../../../../../../src/context/useAuth", () => ({
+  useAuth: () => ({ profile: { id: "pm-1" } }),
+}));
+
 vi.mock("../../../../../../src/services/onboardingGraphService", () => ({
   onboardingGraphService: {
     createConnectedStep: vi.fn().mockResolvedValue({ id: "new-step" }),

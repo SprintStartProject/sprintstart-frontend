@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { OnBoardingPage } from "../../../src/pages/OnBoardingPage";
 import { http, HttpResponse } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
@@ -11,12 +11,20 @@ import {
   type OnboardingJourneyValue,
 } from "../../../src/features/onboarding/generation/OnboardingJourneyContext";
 
+const { signedInUserId } = vi.hoisted(() => ({ signedInUserId: { value: "user1" } }));
+
 const { projectContextState } = vi.hoisted(() => ({
   projectContextState: {
     selectedProjectId: "proj1",
     isLoading: false,
     isSwitcherEnabled: true,
   },
+}));
+
+// The page reads the signed-in id to key the remembered view on the account rather than on the
+// browser, which is the one thing it asks the auth context for.
+vi.mock("../../../src/context/useAuth", () => ({
+  useAuth: () => ({ profile: { id: signedInUserId.value } }),
 }));
 
 // The celebratory layer is decorative and lives behind its own provider; the
@@ -71,8 +79,8 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
 
 type JourneyOverrides = Partial<OnboardingJourneyValue>;
 
-function renderPage(overrides: JourneyOverrides = {}) {
-  const value: OnboardingJourneyValue = {
+function journeyValue(overrides: JourneyOverrides = {}): OnboardingJourneyValue {
+  return {
     generation: { status: "idle" },
     startGeneration: vi.fn(),
     clearGeneration: vi.fn(),
@@ -81,6 +89,30 @@ function renderPage(overrides: JourneyOverrides = {}) {
     refreshAvailability: vi.fn(),
     ...overrides,
   };
+}
+
+/** Where the router currently is, for the cases that assert the page navigated away. */
+function LocationDisplay() {
+  const location = useLocation();
+  return <span data-testid="location">{location.pathname}</span>;
+}
+
+/** A second arrival, clicked while the page is already mounted. */
+function LinkTo({ to }: { to: string }) {
+  return <Link to={to}>second link</Link>;
+}
+
+/** Whether the list row for an item is the one unfolded. */
+async function expectUnfolded(itemId: string) {
+  await waitFor(() =>
+    expect(
+      document.querySelector(`[data-item-id="${itemId}"] button[aria-expanded]`),
+    ).toHaveAttribute("aria-expanded", "true"),
+  );
+}
+
+function renderPage(overrides: JourneyOverrides = {}) {
+  const value = journeyValue(overrides);
   return render(
     <MemoryRouter>
       <OnboardingJourneyContext.Provider value={value}>
@@ -724,7 +756,7 @@ describe("OnBoardingPage", () => {
       ),
     );
     localStorage.setItem(
-      "sprintstart.onboarding.view",
+      "sprintstart.onboarding.view.user1",
       JSON.stringify({ mode: "graph", graphPhaseId: "phase2" }),
     );
 
@@ -735,5 +767,98 @@ describe("OnBoardingPage", () => {
         name: "Graph of the steps and questions in Phase 2",
       }),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * Browser storage is per browser, not per account. A shared key handed one account's remembered
+   * view to whoever signed in next on the same machine.
+   */
+  it("keeps one account's remembered view out of another's", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user2",
+          createdAt: new Date().toISOString(),
+          phases: [phaseFixture("phase1", 1, "Phase 1"), phaseFixture("phase2", 2, "Phase 2")],
+        }),
+      ),
+    );
+    localStorage.setItem(
+      "sprintstart.onboarding.view.user1",
+      JSON.stringify({ mode: "graph", graphPhaseId: "phase2" }),
+    );
+    signedInUserId.value = "user2";
+
+    renderPage();
+
+    // The list, which is what an account with nothing remembered gets -- not the graph the other
+    // account left behind.
+    expect(await screen.findByRole("button", { name: /Phase 1 step/ })).toBeInTheDocument();
+    expect(screen.queryByRole("application")).not.toBeInTheDocument();
+
+    // And what this account does is written under its own key, leaving the other one alone.
+    await waitFor(() =>
+      expect(localStorage.getItem("sprintstart.onboarding.view.user2")).not.toBeNull(),
+    );
+    expect(
+      JSON.parse(localStorage.getItem("sprintstart.onboarding.view.user1") ?? "{}"),
+    ).toMatchObject({ mode: "graph", graphPhaseId: "phase2" });
+  });
+
+  /**
+   * `/onboarding` and `/onboarding/:stepId` are the same component in the same position, so a
+   * second link arriving while the page is open remounts nothing. It used to be ignored.
+   */
+  it("follows a second deep link without being remounted", async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [phaseFixture("phase1", 1, "Phase 1"), phaseFixture("phase2", 2, "Phase 2")],
+        }),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding/step-phase1"]}>
+        <OnboardingJourneyContext.Provider value={journeyValue()}>
+          <Routes>
+            <Route path="/onboarding" element={<OnBoardingPage />} />
+            <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
+          </Routes>
+          <LinkTo to="/onboarding/step-phase2" />
+        </OnboardingJourneyContext.Provider>
+      </MemoryRouter>,
+    );
+
+    await expectUnfolded("step-phase1");
+
+    await user.click(screen.getByRole("link", { name: "second link" }));
+
+    await expectUnfolded("step-phase2");
+  });
+
+  /**
+   * A stale link, a step from a rebuilt path, somebody else's: the page used to render an
+   * arbitrary phase with nothing unfolded and the dead id still in the address.
+   */
+  it("says so when a deep link points at a step that is not on the path", async () => {
+    render(
+      <MemoryRouter initialEntries={["/onboarding/step-that-went-away"]}>
+        <OnboardingJourneyContext.Provider value={journeyValue()}>
+          <Routes>
+            <Route path="/onboarding" element={<OnBoardingPage />} />
+            <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
+          </Routes>
+          <LocationDisplay />
+        </OnboardingJourneyContext.Provider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/onboarding$/));
   });
 });

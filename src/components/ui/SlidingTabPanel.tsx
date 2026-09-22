@@ -31,6 +31,15 @@ type SlidingTabPanelProps = {
  * Uses `mode="wait"` so the outgoing panel is gone before the incoming one
  * arrives -- overlapping two panels of different heights makes the page jump.
  */
+/**
+ * How long one panel takes to slide out, in seconds and in milliseconds.
+ *
+ * Exported because a caller that scrolls to something inside the panel it just switched to has to
+ * wait for the switch -- the number used to be repeated there as a guess.
+ */
+export const SLIDING_PANEL_SECONDS = 0.18;
+export const SLIDING_PANEL_EXIT_MS = SLIDING_PANEL_SECONDS * 1000;
+
 export function SlidingTabPanel({ activeKey, index, children, className }: SlidingTabPanelProps) {
   const prefersReducedMotion = useReducedMotion();
   const [previousIndex, setPreviousIndex] = useState(index);
@@ -52,7 +61,7 @@ export function SlidingTabPanel({ activeKey, index, children, className }: Slidi
         initial="enter"
         animate="center"
         exit="exit"
-        transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+        transition={{ duration: SLIDING_PANEL_SECONDS, ease: [0.32, 0.72, 0, 1] }}
         className={className}
       >
         {children}

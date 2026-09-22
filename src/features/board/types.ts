@@ -1,4 +1,5 @@
 import type { ArrivalStep } from "../arrival/types";
+import type { StepStatus } from "../onboarding/types";
 
 /**
  * The board: a hire's persistent working surface on one project.
@@ -17,6 +18,7 @@ export type BoardCardKind =
   | "COMPETENCY_PROGRESS"
   | "MEMORY_RECAP"
   | "DIAGRAM"
+  | "PATH_STEP"
   | AuthoredCardKind;
 
 /**
@@ -239,6 +241,57 @@ export type DiagramContent = {
   reason: string | null;
 };
 
+/** One task of a path step, as the path itself holds it. */
+export type PathStepTask = {
+  id: string;
+  stepId: string;
+  position: number;
+  title: string;
+  description: string;
+  finished: boolean;
+};
+
+/** One resource of a path step, as the path itself holds it. */
+export type PathStepResource = {
+  id: string;
+  stepId: string;
+  title: string;
+  description: string;
+  url: string;
+};
+
+/**
+ * The hire's current step of their onboarding path, live.
+ *
+ * The one card in the catalog that is `AI`-owned and still partly the hire's to change: everything
+ * here is a read straight from the path, except the tick on a task, which writes back to the path
+ * itself and never to the board. That is also why almost every field is nullable — the path can be
+ * regenerated out from under a card that is still sitting on the board, and a step that no longer
+ * exists is not an error, it is `reason` explaining why the rest went quiet.
+ */
+export type PathStepContent = {
+  kind: "PATH_STEP";
+  stepId: string | null;
+  phaseTitle: string | null;
+  title: string | null;
+  description: string | null;
+  status: StepStatus | null;
+  isAiAssisted: boolean;
+  expectedOutcomes: string[];
+  tasks: PathStepTask[];
+  resources: PathStepResource[];
+  /** Why the step behind this card is gone, e.g. no longer on the hire's path. Null while it holds. */
+  reason: string | null;
+};
+
+/**
+ * What to call a `PATH_STEP` card when the step behind it did not come with a `title`.
+ *
+ * Shared between the card's own frame title (`PathStepCard`) and `cardName` so the two cannot
+ * drift into saying two different things for the same untitled step.
+ */
+export const PATH_STEP_FALLBACK_TITLE = "A step of your path";
+
 /** Something the hire wrote down, in markdown. Theirs — never quoted back as fact. */
 export type NoteContent = {
   kind: "NOTE";
@@ -276,6 +329,7 @@ export type BoardCardContent =
   | CompetencyProgressContent
   | MemoryRecapContent
   | DiagramContent
+  | PathStepContent
   | NoteContent
   | LinkContent
   | ChecklistContent;

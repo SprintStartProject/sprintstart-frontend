@@ -677,11 +677,14 @@ export function useBuddyConversation(
 
   const confirmAction = useCallback(
     (messageId: string, action: ProposedAction) => {
-      // Retryable after a transport error. A hire offer that came back refused is offered again
-      // under its reason ("Try again: …") when the refusal is not permanent, so it must pass the
-      // guard too; anything else already on its way, answered or declined is spent.
-      const retryableRefusal = action.status === "resolved" && "action" in action && !action.ok;
-      if (action.status !== "idle" && action.status !== "error" && !retryableRefusal) return;
+      // Retryable after a transport error, and after a hire offer came back a legible "couldn't" —
+      // that refusal is not always permanent, and the card offers it again. A stored team proposal
+      // is never re-confirmable: resolved means the backend has already spoken for it. Anything on
+      // its way, succeeded or declined is spent — confirming a success twice is how somebody
+      // claims the same task twice.
+      const isRetryableRefusal =
+        action.status === "resolved" && action.ok === false && !("proposalId" in action);
+      if (action.status !== "idle" && action.status !== "error" && !isRetryableRefusal) return;
 
       // One lock per proposal card, shared by both decisions: confirm and dismiss are the two
       // halves of one question, and letting both run would let the slower response overwrite

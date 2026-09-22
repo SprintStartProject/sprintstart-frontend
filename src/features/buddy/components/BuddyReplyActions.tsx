@@ -6,7 +6,10 @@ import { BUDDY_ACTION_PLACE_CHECKLIST } from "../types";
 import type { BuddyMessageView } from "../types";
 import { SaveReplyToBoard } from "./SaveReplyToBoard";
 
-/** Whether the mentor has already offered to keep a list out of this reply. */
+/**
+ * Whether the mentor has already offered to keep a list out of this reply. Team-mode proposals
+ * carry no `action` name, and never keep a list on the hire's board.
+ */
 function offersChecklist(message: BuddyMessageView): boolean {
   return (message.actions ?? []).some(
     (action) =>

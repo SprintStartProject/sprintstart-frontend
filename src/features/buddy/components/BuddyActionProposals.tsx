@@ -71,7 +71,9 @@ export function BuddyActionProposals({
               {/* Under the refusal, not instead of it. The outcome is why it did not work and is
                   the thing worth reading; this is only the way to try it once the reason has been
                   dealt with. Never offered on success — running a confirmed action twice is how
-                  somebody claims the same task twice. Stored proposals have no retry. */}
+                  somebody claims the same task twice. Hire actions only: a stored team
+                  proposal is settled server-side once decided, so confirming it again
+                  could only be refused. */}
               {!action.ok && "action" in action && (
                 <button
                   type="button"
@@ -83,9 +85,9 @@ export function BuddyActionProposals({
                 </button>
               )}
               {/* Opening orientation is the one hire action whose result is content, not
-                  just an outcome line: the packet renders right here in the thread
-                  instead of navigating to a page. Stored proposals have no `action`
-                  name to match — their payoff is always the outcome line. */}
+                                just an outcome line: the packet renders right here in the thread
+                                instead of navigating to a page. Stored proposals have no `action`
+                                name to match — their payoff is always the outcome line. */}
               {"action" in action &&
                 action.action === BUDDY_ACTION_OPEN_ORIENTATION &&
                 action.ok && <BuddyOrientationCard />}
@@ -106,60 +108,44 @@ export function BuddyActionProposals({
             key={action.id}
             className="flex max-w-full min-w-0 flex-col gap-1.5 rounded-xl border border-app-border bg-app-bg p-2.5"
           >
-            {/* What the manager is agreeing to comes FIRST, in the buddy's own words, and the
-                confirm button describes it (aria-describedby): the target is the stored id, so
-                this text is the offer's full description — never a summary the client
-                recomposed, and never read after the button that acts on it. */}
-            {isStored && action.preview && (
-              <p id={previewId} className="text-xs leading-relaxed break-words text-app-text-muted">
-                {action.preview}
-              </p>
-            )}
-
-            {/* A stored proposal warns about itself before it is even clicked: how much it would
-                change decides how loudly the card speaks, before any confirm happens. */}
-            {isStored && action.risk !== null && <ProposalRiskBadge risk={action.risk} />}
-
             {/* Shown before the press, not after it, and only where the payload is *content*.
                 `place_checklist` is the one action whose confirm writes the mentor's own sentences
                 onto a surface the hire owns — the same reason the assessment proposal names the
                 skill and the level rather than saying "Save this". The lines are in the reply
                 above as well; having them here is what makes the two comparable, so a list that
                 does not match what was written is visible before it is kept, not after. */}
-            {!("proposalId" in action) &&
-              action.checklistItems &&
-              action.checklistItems.length > 0 && (
-                <div className="min-w-0">
-                  {action.checklistTitle && (
-                    <p className="text-sm font-medium break-words text-app-text">
-                      {action.checklistTitle}
-                    </p>
-                  )}
-                  {/* Named as an addition when it is one. The card keeps everything it already has,
+            {!isStored && action.checklistItems && action.checklistItems.length > 0 && (
+              <div className="min-w-0">
+                {action.checklistTitle && (
+                  <p className="text-sm font-medium break-words text-app-text">
+                    {action.checklistTitle}
+                  </p>
+                )}
+                {/* Named as an addition when it is one. The card keeps everything it already has,
                     and these lines go after it — saying so is the difference between agreeing to
                     three new steps and agreeing to whatever the list becomes. */}
-                  {action.action === BUDDY_ACTION_AMEND_CHECKLIST && (
-                    <p className="text-xs text-app-text-muted">
-                      Added to the end of that list — nothing on it changes:
-                    </p>
-                  )}
-                  {action.action === BUDDY_ACTION_TICK_CHECKLIST && (
-                    <p className="text-xs text-app-text-muted">
-                      Ticked off on that list — nothing else on it changes:
-                    </p>
-                  )}
-                  <ul className="mt-1 space-y-0.5">
-                    {action.checklistItems.map((item, index) => (
-                      <li
-                        key={`${action.id}-${index}`}
-                        className="text-xs break-words text-app-text-muted"
-                      >
-                        · {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                {action.action === BUDDY_ACTION_AMEND_CHECKLIST && (
+                  <p className="text-xs text-app-text-muted">
+                    Added to the end of that list — nothing on it changes:
+                  </p>
+                )}
+                {action.action === BUDDY_ACTION_TICK_CHECKLIST && (
+                  <p className="text-xs text-app-text-muted">
+                    Ticked off on that list — nothing else on it changes:
+                  </p>
+                )}
+                <ul className="mt-1 space-y-0.5">
+                  {action.checklistItems.map((item, index) => (
+                    <li
+                      key={`${action.id}-${index}`}
+                      className="text-xs break-words text-app-text-muted"
+                    >
+                      · {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* The one offer that *replaces* something already on a card, so it shows both: the
                 line as it reads now and as it would read. Only the new wording would be asking
@@ -172,7 +158,7 @@ export function BuddyActionProposals({
 
                 Keyed off the action, like the amend and tick branches above, so a future action
                 that happens to carry both fields does not render as a rewording. */}
-            {!("proposalId" in action) &&
+            {!isStored &&
               action.action === BUDDY_ACTION_REWORD_CHECKLIST &&
               action.lineBefore &&
               action.lineAfter && (
@@ -190,11 +176,24 @@ export function BuddyActionProposals({
 
             {/* Whitespace kept: the note's first line becomes the card's heading, so a preview that
                 reflowed it would not be showing what would be kept. */}
-            {!("proposalId" in action) && action.noteText && (
+            {!isStored && action.noteText && (
               <p className="min-w-0 text-xs break-words whitespace-pre-wrap text-app-text-muted">
                 {action.noteText}
               </p>
             )}
+            {/* What the manager is agreeing to comes FIRST, in the buddy's own words, and the
+                confirm button describes it (aria-describedby): the target is the stored id, so
+                this text is the offer's full description — never a summary the client
+                recomposed, and never read after the button that acts on it. */}
+            {isStored && action.preview && (
+              <p id={previewId} className="text-xs leading-relaxed break-words text-app-text-muted">
+                {action.preview}
+              </p>
+            )}
+
+            {/* A stored proposal warns about itself before it is even clicked: how much it would
+                change decides how loudly the card speaks, before any confirm happens. */}
+            {isStored && action.risk !== null && <ProposalRiskBadge risk={action.risk} />}
 
             {isUnsupported && (
               <>
@@ -221,9 +220,9 @@ export function BuddyActionProposals({
             {!isUnsupported && (
               <div className="flex flex-wrap items-center gap-2">
                 {/* `action.label` is written by the model, so its length is not ours to
-                    assume. In a 384 px panel an unbreakable one would push the button
-                    past the edge -- hence the wrap and the left alignment that follows
-                    from a label running to two lines. */}
+                                assume. In a 384 px panel an unbreakable one would push the button
+                                past the edge -- hence the wrap and the left alignment that follows
+                                from a label running to two lines. */}
                 <button
                   type="button"
                   onClick={() => onConfirm(messageId, action)}

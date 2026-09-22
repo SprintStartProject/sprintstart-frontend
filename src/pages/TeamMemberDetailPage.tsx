@@ -1,15 +1,5 @@
-import {
-  Check,
-  MessageSquareText,
-  Pencil,
-  Plus,
-  SkipForward,
-  ThumbsDown,
-  ThumbsUp,
-  Users,
-  X,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { MessageSquareText, Pencil, Plus, ThumbsDown, ThumbsUp, Users, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
 import type {
@@ -39,6 +29,8 @@ import {
   type OnboardingFeedback,
   type UserSkillLevel,
 } from "../services/teamManagementService";
+import { isSkipPending } from "../features/onboarding/journey";
+import { isFeedbackUnread } from "../features/team-management/feedbackState";
 
 type DetailOnboardingStep = OnboardingStepEndpoint & {
   startedAt?: string | null;
@@ -68,6 +60,7 @@ import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
 } from "../features/team-management/components/detail/PhaseCheckAdminModal";
+import { SkipReview } from "../features/team-management/components/detail/SkipReview";
 import { StepDetailsPanel } from "../features/team-management/components/detail/StepDetailsPanel";
 import { useProjectContext } from "../features/projects/useProjectContext";
 
@@ -150,7 +143,16 @@ export function TeamMemberDetailPage() {
   const [stepTasksById, setStepTasksById] = useState<Record<string, OnboardingTaskEndpoint[]>>({});
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [markingFeedbackId, setMarkingFeedbackId] = useState<string | null>(null);
-  const [reviewingSkipAction, setReviewingSkipAction] = useState<"accept" | "deny" | null>(null);
+  // Keyed on the skip, not on the page: the same request is answerable from the card below and
+  // from the step it belongs to. The ref is the guard (a second click in the same tick still sees
+  // it), the state is what disables both controls.
+  const skipsInReview = useRef(new Set<string>());
+  // Which member the page is about right now, for the refreshes below to check themselves against.
+  const shownUserId = useRef(userId);
+  useEffect(() => {
+    shownUserId.current = userId;
+  }, [userId]);
+  const [reviewingSkipIds, setReviewingSkipIds] = useState<readonly string[]>([]);
   // `feedbackError` stays for the feedback *load* failure (shown inline where the
   // list would be); every action outcome on this page is a toast instead.
   const [feedbackError, setFeedbackError] = useState("");
@@ -241,16 +243,31 @@ export function TeamMemberDetailPage() {
 
       if (steps.length === 0) {
         setStepTaskCounts({});
+        // Cleared together: leaving the lists behind meant the previous member's tasks survived a
+        // switch to a member with no steps at all.
+        setStepTasksById({});
         return;
       }
 
-      const taskEntries = await Promise.all(
+      // Settled, not all-or-nothing: one step's request failing used to blank every count on the
+      // page, including the ones that had just been read successfully.
+      const results = await Promise.allSettled(
         steps.map(async (step) => {
           const tasks = await getOnboardingTasksByStep(step.id);
 
           return [step.id, tasks] as const;
         }),
       );
+      const failures = results.filter((result) => result.status === "rejected");
+      if (failures.length > 0) {
+        console.error(
+          `Failed to load the tasks of ${failures.length} of ${steps.length} steps:`,
+          failures[0].reason,
+        );
+      }
+      const taskEntries = results
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => result.value);
       const tasksByStepId = Object.fromEntries(taskEntries);
       const counts = Object.fromEntries(
         taskEntries.map(([stepId, tasks]) => [
@@ -275,33 +292,47 @@ export function TeamMemberDetailPage() {
     };
   }, [onboardingPath]);
 
+  /**
+   * The three post-action refreshes, each dropped when the page has moved on to another member.
+   *
+   * The initial load has the same guard and names the risk: member A's journey, with A's step and
+   * skip ids, rendered under B's URL -- after which the next action sends A's ids. These run from
+   * every action handler, so they need it just as much.
+   */
   async function refreshMember() {
     if (!userId) return;
+    const forUser = userId;
 
-    const memberData = await getTeamMember(userId);
+    const memberData = await getTeamMember(forUser);
+    if (shownUserId.current !== forUser) return;
     setUser(memberData);
   }
 
   async function refreshFeedback() {
     if (!userId) return;
+    const forUser = userId;
 
     setLoadingFeedback(true);
     setFeedbackError("");
 
     try {
-      const feedback = await getUserOnboardingFeedback(userId);
+      const feedback = await getUserOnboardingFeedback(forUser);
+      if (shownUserId.current !== forUser) return;
       setFeedbackItems(feedback);
     } catch (error) {
+      if (shownUserId.current !== forUser) return;
       setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
     } finally {
-      setLoadingFeedback(false);
+      if (shownUserId.current === forUser) setLoadingFeedback(false);
     }
   }
 
   async function refreshOnboardingPath() {
     if (!userId) return;
+    const forUser = userId;
 
-    const path = await getUserOnboardingPath(userId);
+    const path = await getUserOnboardingPath(forUser);
+    if (shownUserId.current !== forUser) return;
     setOnboardingPath(path);
   }
 
@@ -359,8 +390,20 @@ export function TeamMemberDetailPage() {
   /**
    * Answers a skip request -- the current step's from the card below, or any step's from where the
    * step is shown. Phases run side by side, so the one waiting is not always the current step.
+   *
+   * One decision per request, and only one in flight: both surfaces can be on screen at once, the
+   * answer cannot be retried once it is in, and a skip accepted and declined within the same
+   * second would be settled by whichever call the server happened to finish last.
    */
   async function reviewSkip(skipId: string, action: "accept" | "deny", comment = "") {
+    if (skipsInReview.current.has(skipId)) return;
+    skipsInReview.current.add(skipId);
+    setReviewingSkipIds([...skipsInReview.current]);
+    const release = () => {
+      skipsInReview.current.delete(skipId);
+      setReviewingSkipIds([...skipsInReview.current]);
+    };
+
     try {
       if (action === "accept") {
         await acceptOnboardingSkipRequest(skipId, comment);
@@ -369,36 +412,23 @@ export function TeamMemberDetailPage() {
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
+      // Only a decision that never landed can be made again.
+      release();
       return;
     }
+
     toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
     // Told apart from a failed decision: the answer is in, and retrying it would be refused.
     try {
       await Promise.all([refreshMember(), refreshOnboardingPath()]);
+      // Held until here, not released when the request came back: until the refresh lands, both
+      // surfaces still draw the request as pending, and a second decision would be sent against
+      // one the server has already answered.
+      release();
     } catch {
       toast.error("The answer was saved, but the page could not refresh. Reload to see it.");
-    }
-  }
-
-  async function handleSkipReview(action: "accept" | "deny") {
-    const skipId = user?.currentStep?.skip?.id;
-    if (!skipId) return;
-
-    setReviewingSkipAction(action);
-
-    try {
-      if (action === "accept") {
-        await acceptOnboardingSkipRequest(skipId);
-      } else {
-        await denyOnboardingSkipRequest(skipId);
-      }
-
-      await Promise.all([refreshMember(), refreshOnboardingPath()]);
-      toast.success(action === "accept" ? "Skip request approved" : "Skip request denied");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
-    } finally {
-      setReviewingSkipAction(null);
+      // The guard stays on for good in this case, for the same reason: what is on screen is a
+      // request that has in fact been answered.
     }
   }
 
@@ -441,6 +471,9 @@ export function TeamMemberDetailPage() {
 
   async function handleReorderTasks(stepId: string, activeTaskId: string, overTaskId: string) {
     if (activeTaskId === overTaskId) return;
+    // A second drag while the first is still being written would compute its move from the
+    // optimistic list and send positions against the same stale state.
+    if (stepActionId === stepId) return;
 
     const currentTasks = [...(stepTasksById[stepId] ?? [])].sort((a, b) => a.position - b.position);
     const activeIndex = currentTasks.findIndex((task) => task.id === activeTaskId);
@@ -468,6 +501,9 @@ export function TeamMemberDetailPage() {
     }));
 
     try {
+      // One request per moved task: there is no batch endpoint, so a failure halfway through
+      // leaves the ones before it written. The refresh in both branches is what the list then
+      // shows -- the server's order, not this optimistic one.
       for (const task of changedTasks) {
         await updateOnboardingTask(task.id, {
           position: task.position,
@@ -479,7 +515,12 @@ export function TeamMemberDetailPage() {
 
       await refreshStepTasks(stepId);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't reorder the tasks.");
+      toast.error("The new order could not be saved in full", {
+        description:
+          error instanceof Error
+            ? `${error.message} The list now shows what the server has.`
+            : "The list now shows what the server has.",
+      });
       await refreshStepTasks(stepId);
     } finally {
       setStepActionId(null);
@@ -597,8 +638,11 @@ export function TeamMemberDetailPage() {
 
   const elapsedDays = user.currentStep?.startedAt ? getElapsedDays(user.currentStep.startedAt) : 0;
   const progressPercentage = Math.round(user.progressPercentage * 100);
+  // The team overview's skip is a different DTO from the path's: it carries `status`, not
+  // `accepted`, so `isSkipPending` does not apply to it. Every reading below that *does* see an
+  // `accepted` goes through the predicate.
   const pendingSkip = user.currentStep?.skip?.status === "PENDING" ? user.currentStep.skip : null;
-  const unreadFeedback = feedbackItems.filter((item) => item.read !== true && !item.readAt);
+  const unreadFeedback = feedbackItems.filter(isFeedbackUnread);
   const phases = [...(onboardingPath?.phases ?? [])].sort((a, b) => a.position - b.position);
   const allSteps = phases.flatMap((phase) =>
     [...(phase.steps ?? [])]
@@ -608,10 +652,7 @@ export function TeamMemberDetailPage() {
   // Every step's, like the journey section counts them: phases run side by side, so the step
   // waiting on a skip answer is not always the current one.
   const pendingSkipCount = allSteps.filter(
-    (step) =>
-      !!step.skip?.id &&
-      (step.skip.accepted === null || step.skip.accepted === undefined) &&
-      step.status !== "SKIPPED",
+    (step) => !!step.skip?.id && isSkipPending(step.skip) && step.status !== "SKIPPED",
   ).length;
   const checkModalPhase = checkModal
     ? (phases.find((phase) => phase.id === checkModal.phaseId) ?? null)
@@ -775,55 +816,16 @@ export function TeamMemberDetailPage() {
                 )}
               </div>
 
+              {/* The same control the step panel and the graph aside use, rather than a second
+                  pair of buttons with their own wording, their own busy state and no comment
+                  field. The card supplies which step it is about. */}
               {pendingSkip && (
-                <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 gap-3">
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                        <SkipForward className="h-4 w-4" />
-                      </span>
-
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-app-text">Skip request</p>
-                          <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                            Pending
-                          </span>
-                        </div>
-
-                        {user.currentStep?.title && (
-                          <p className="mt-1 text-xs text-app-text-muted">
-                            {user.currentStep.title}
-                          </p>
-                        )}
-
-                        <p className="mt-2 text-sm text-app-text">{pendingSkip.reason}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleSkipReview("accept")}
-                        disabled={reviewingSkipAction !== null}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-app-success-solid px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-app-success-solid/90 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        {reviewingSkipAction === "accept" ? "Accepting..." : "Accept"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => void handleSkipReview("deny")}
-                        disabled={reviewingSkipAction !== null}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        {reviewingSkipAction === "deny" ? "Denying..." : "Deny"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <SkipReview
+                  reason={pendingSkip.reason}
+                  meta={user.currentStep?.title}
+                  disabled={reviewingSkipIds.includes(pendingSkip.id)}
+                  onReview={(action, comment) => reviewSkip(pendingSkip.id, action, comment)}
+                />
               )}
 
               {loadingFeedback ? (
@@ -832,7 +834,7 @@ export function TeamMemberDetailPage() {
                 </p>
               ) : unreadFeedback.length > 0 ? (
                 unreadFeedback.map((feedback) => {
-                  const isUnread = feedback.read !== true && !feedback.readAt;
+                  const isUnread = isFeedbackUnread(feedback);
                   // Coloured by what it says, not by whether it has been read: a thumbs-down and a
                   // thumbs-up are different news. Unread is a badge of its own.
                   const tone =

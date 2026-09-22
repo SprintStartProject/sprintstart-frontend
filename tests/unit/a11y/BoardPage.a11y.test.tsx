@@ -6,7 +6,7 @@ import { BoardPage } from "../../../src/pages/BoardPage";
 import type { Board } from "../../../src/features/board/types";
 
 vi.mock("../../../src/services/boardService", () => ({
-  boardService: { fetchBoard: vi.fn() },
+  boardService: { fetchBoard: vi.fn(), tickPathStepTask: vi.fn() },
 }));
 
 vi.mock("../../../src/context/useAuth", () => ({
@@ -42,8 +42,9 @@ const board: Board = {
         kind: "PATH_TO_FIRST_CONTRIBUTION",
         moments: [{ key: "JOINED", reachedAt: "2026-07-20T09:00:00Z" }],
         acceptedCount: 0,
-        autonomyReachedAt: null,
-        stalledReason: null,
+        autonomyReachedAt: "2026-08-04T09:00:00Z",
+        // Both lines of `BoardPathNotes` are on screen for this pass, so axe sees them.
+        stalledReason: "a review has been waiting three days",
       },
     },
     {
@@ -66,6 +67,43 @@ const board: Board = {
         attributionMissing: false,
       },
     },
+    {
+      id: "c3",
+      kind: "PATH_STEP",
+      owner: "AI",
+      position: 2,
+      placedAt: "2026-07-27T09:00:00Z",
+      content: {
+        kind: "PATH_STEP",
+        stepId: "step-1",
+        phaseTitle: "Getting oriented",
+        title: "Set up your local environment",
+        description: "Install the tools you need and get the project running.",
+        status: "IN_PROGRESS",
+        isAiAssisted: true,
+        expectedOutcomes: ["You can run the project locally"],
+        tasks: [
+          {
+            id: "task-1",
+            stepId: "step-1",
+            position: 1,
+            title: "Clone the repo",
+            description: "git clone the project and open it in your editor",
+            finished: false,
+          },
+        ],
+        resources: [
+          {
+            id: "resource-1",
+            stepId: "step-1",
+            title: "Setup guide",
+            description: "The onboarding doc",
+            url: "https://example.test/setup",
+          },
+        ],
+        reason: null,
+      },
+    },
   ],
 };
 
@@ -79,10 +117,12 @@ describe("BoardPage Accessibility", () => {
       </MemoryRouter>,
     );
 
-    // Waits for a card rather than for the header strip of moments, which the board no longer
-    // carries: that strip answered "how far through onboarding am I", which is a question the
-    // board was already answering four other ways.
-    await waitFor(() => expect(screen.getByRole("main")).toBeInTheDocument());
+    // Waits for real board content. `main` is there from first paint, so waiting for it would
+    // let this pass with the grid entirely broken. The header strip of moments it used to wait
+    // for is gone: that answered "how far through onboarding am I", which the board answers four
+    // other ways -- only the two lines with no second home stayed, in `BoardPathNotes`.
+    await waitFor(() => expect(screen.getByText(/Add a health endpoint/)).toBeInTheDocument());
+    expect(screen.getByText(/a review has been waiting three days/)).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 

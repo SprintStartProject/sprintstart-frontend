@@ -66,8 +66,14 @@ export function QuestionWorkspace({ question, onAnswered, continueLabel, onConti
   return (
     <div className="space-y-4">
       {result?.correct ? <ConfettiBurst /> : null}
+      {/* `status`, so that submitting an answer is announced rather than only drawn: grading
+          moved from a modal into the page, and a banner that replaces the button somebody just
+          pressed is a change nothing else would tell them about. */}
       {result?.correct ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-app-success-solid/30 bg-app-success-bg p-3">
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-2xl border border-app-success-solid/30 bg-app-success-bg p-3"
+        >
           <Trophy className="h-5 w-5 shrink-0 text-app-success-solid" aria-hidden="true" />
           <p className="text-sm font-semibold text-app-text">
             Correct — nice work!
@@ -79,7 +85,10 @@ export function QuestionWorkspace({ question, onAnswered, continueLabel, onConti
           </p>
         </div>
       ) : result ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-app-danger-solid/30 bg-app-surface-muted p-3">
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-2xl border border-app-danger-solid/30 bg-app-surface-muted p-3"
+        >
           <XCircle className="h-5 w-5 shrink-0 text-app-danger-solid" aria-hidden="true" />
           <p className="text-sm font-semibold text-app-text">
             Not correct yet

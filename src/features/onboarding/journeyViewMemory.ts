@@ -17,6 +17,23 @@ export type JourneyView = {
 export const HIRE_JOURNEY_VIEW_KEY = "sprintstart.onboarding.view";
 export const MEMBER_JOURNEY_VIEW_KEY = "sprintstart.memberJourney.view";
 
+/**
+ * The key for one member's journey as one manager looks at it.
+ *
+ * Both halves matter. The remembered *phase* is about the member's own path, so a key shared
+ * between members applied the phase last opened for member A to member B. And browser storage is
+ * per browser, not per account, so a key shared between managers hands one manager's view to
+ * whoever signs in next on the same machine.
+ */
+export function memberJourneyViewKey(viewerId: string, memberId: string): string {
+  return `${MEMBER_JOURNEY_VIEW_KEY}.${viewerId}.${memberId}`;
+}
+
+/** The same, for the hire's own path: one remembered view per account, not per browser. */
+export function hireJourneyViewKey(userId: string): string {
+  return `${HIRE_JOURNEY_VIEW_KEY}.${userId}`;
+}
+
 const DEFAULT_VIEW: JourneyView = { mode: "list", graphPhaseId: null };
 
 /**

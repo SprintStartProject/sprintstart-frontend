@@ -37,6 +37,12 @@ export type JourneyCameraHandle = {
   viewCenter: () => GraphPoint;
   /** Flies back out to the whole graph. */
   flyToFit: (durationMs?: number) => Promise<void>;
+  /**
+   * Pans, at the zoom it is on, until the node is comfortably inside the view. Does nothing when
+   * it already is -- moving the picture under somebody who can see what they picked is worse than
+   * not moving it. Used to follow an arrow-key selection, which could otherwise walk off screen.
+   */
+  revealNode: (id: string, durationMs?: number) => Promise<void>;
 };
 
 /**
@@ -118,6 +124,8 @@ const MAX_ZOOM = 1.75;
 const DRAG_THRESHOLD_PX = 4;
 const FIT_PADDING_PX = 72;
 const SNAP = 10;
+/** How much room a node revealed by {@link JourneyCameraHandle.revealNode} keeps to the edge. */
+const REVEAL_MARGIN_PX = 24;
 
 const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
 
@@ -507,8 +515,40 @@ export function JourneyCanvas<TNode extends LayoutNode>({
           y: (size.height / 2 - current.y) / current.zoom,
         };
       },
+      revealNode: async (id, durationMs = 220) => {
+        const point = positions.get(id);
+        if (!point || !size.width || !size.height) return;
+        const current = viewportRef.current;
+        const screenX = point.x * current.zoom + current.x;
+        const screenY = point.y * current.zoom + current.y;
+        const marginX = (nodeSize.width * current.zoom) / 2 + REVEAL_MARGIN_PX;
+        const marginY = (nodeSize.height * current.zoom) / 2 + REVEAL_MARGIN_PX;
+        const dx =
+          screenX < marginX
+            ? marginX - screenX
+            : screenX > size.width - marginX
+              ? size.width - marginX - screenX
+              : 0;
+        const dy =
+          screenY < marginY
+            ? marginY - screenY
+            : screenY > size.height - marginY
+              ? size.height - marginY - screenY
+              : 0;
+        if (dx === 0 && dy === 0) return;
+        await flyTo({ ...current, x: current.x + dx, y: current.y + dy }, durationMs);
+      },
     }),
-    [fitTarget, flyTo, size.height, size.width, viewportIntoNode],
+    [
+      fitTarget,
+      flyTo,
+      nodeSize.height,
+      nodeSize.width,
+      positions,
+      size.height,
+      size.width,
+      viewportIntoNode,
+    ],
   );
 
   // Refit when the graph itself changes or the canvas first gets a size -- not on every position
@@ -881,6 +921,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   }, [bounds, nodes.length]);
 
   const gridSize = 24 * viewport.zoom;
+  const isInteractive = Boolean(onSelect || onOpen || canMove || canConnect);
 
   const canvas = (
     <div
@@ -899,6 +940,10 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         aria-roledescription="graph"
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
+        // While a node is open as a page over the graph, the graph is not there to be used: its
+        // nodes, the minimap and the zoom toolbar would otherwise all still be tab stops behind
+        // what was opened, which is the long way round to the thing in front.
+        inert={cover ? true : undefined}
         className="absolute inset-0 cursor-grab touch-none select-none focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset active:cursor-grabbing"
         style={{
           backgroundImage: "radial-gradient(var(--color-app-border) 1.2px, transparent 1.2px)",
@@ -1014,10 +1059,13 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               <div
                 key={node.id}
                 data-journey-node={node.id}
-                role="button"
-                tabIndex={0}
-                aria-label={nodeLabel(node)}
-                aria-pressed={selected}
+                // A node is a control where there is something to select or open, and a picture
+                // where there is not: a read-only canvas used to hand a keyboard a tab stop per
+                // node, each of which did nothing.
+                role={isInteractive ? "button" : undefined}
+                tabIndex={isInteractive ? 0 : undefined}
+                aria-label={isInteractive ? nodeLabel(node) : undefined}
+                aria-pressed={isInteractive ? selected : undefined}
                 className={`group/node absolute rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-app-focus ${
                   canMove ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                 } ${dragging ? "z-30" : selected ? "z-20" : "z-10"}`}
@@ -1089,6 +1137,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
       {overlay ? (
         <div
           data-canvas-control
+          inert={cover ? true : undefined}
           className="pointer-events-none absolute top-3 left-3 z-40 max-w-[calc(100%-1.5rem)]"
         >
           <div className="pointer-events-auto">{overlay}</div>
@@ -1104,6 +1153,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
       {aside ? (
         <div
           data-canvas-control
+          inert={cover ? true : undefined}
           className="absolute top-3 right-3 bottom-16 z-40 w-[min(22rem,calc(100%-1.5rem))]"
         >
           {aside}

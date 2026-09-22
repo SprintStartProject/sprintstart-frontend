@@ -44,6 +44,22 @@ export function withSkipAnswerSeen(
   };
 }
 
+/** The reverse, for putting the marker back when the server refused to record it. */
+export function withSkipAnswerUnseen(
+  path: OnboardingPathEndpoint,
+  skipId: string,
+): OnboardingPathEndpoint {
+  return {
+    ...path,
+    phases: path.phases.map((phase) => ({
+      ...phase,
+      steps: phase.steps.map((step) =>
+        step.skip?.id === skipId ? { ...step, skip: { ...step.skip, answerSeenAt: null } } : step,
+      ),
+    })),
+  };
+}
+
 const SEEN_CHANGED_EVENT = "sprintstart:onboarding-skip-answers-seen";
 
 /** Tells anything counting unseen answers (the sidebar marker) that one was just seen. */

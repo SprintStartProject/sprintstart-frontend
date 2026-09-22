@@ -49,9 +49,9 @@ export type BoardCardControls = {
   /**
    * Opens the picture of the run this card belongs to.
    *
-   * Absent where there is nothing to draw — a card with no arrow either way is not a chain, and a
-   * control that opens a box teaches people not to press it. Absent on a read-only board too,
-   * where the structure it would draw is not there to be read.
+   * The panel it opens is what decides there is nothing to draw: it says so in words ("Nothing
+   * waits on this one") rather than being withheld, because a control that appears on some cards
+   * and not others is a fact about the board somebody has to work out by pressing things.
    */
   onShowChain?: () => void;
   /**

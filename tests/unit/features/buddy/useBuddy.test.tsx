@@ -2,6 +2,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
 import { BuddyProviderWithStubs } from "./buddyTestHarness";
+import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
@@ -170,6 +171,106 @@ describe("useBuddy", () => {
     expect(result.current.messages.at(-1)?.actions ?? []).toHaveLength(0);
   });
 
+  /**
+   * The case every surface that seeds a draft depends on: the hire was not in the dock when they
+   * pressed the button. A seed that only landed in an already-open dock would make "Ask the
+   * buddy" on a selection do nothing visible from most of the app.
+   */
+  it("opens a closed dock and seeds the composer", async () => {
+    server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    expect(result.current.isOpen).toBe(false);
+
+    act(() => {
+      openAiBuddy({ draft: "> The migration runs on deploy.\n\n" });
+    });
+
+    await waitFor(() => expect(result.current.isOpen).toBe(true));
+    expect(result.current.draft).toBe("> The migration runs on deploy.\n\n");
+  });
+
+  /** Seeded, never sent: the question the hire is about to type is the point of the message. */
+  it("does not send what it was handed", async () => {
+    let sent = false;
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/messages", () => {
+        sent = true;
+        return silentGreeting();
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+
+    act(() => {
+      openAiBuddy({ draft: "> The migration runs on deploy.\n\n" });
+    });
+
+    await waitFor(() => expect(result.current.isOpen).toBe(true));
+    expect(sent).toBe(false);
+    expect(result.current.messages).toHaveLength(0);
+  });
+
+  /**
+   * The draft outlives the dock: close it mid-sentence and the words are still there. A seed that
+   * arrives afterwards — a selection, a card's question — must not be the thing that erases them.
+   */
+  describe("a seed on top of words the hire already typed", () => {
+    const QUOTE = "> The migration runs on deploy.\n\n";
+
+    it("keeps a closed dock's saved draft and puts the seed under it", async () => {
+      server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      act(() => {
+        result.current.setDraft("why does the deploy");
+      });
+      expect(result.current.isOpen).toBe(false);
+
+      act(() => {
+        openAiBuddy({ draft: QUOTE });
+      });
+
+      await waitFor(() => expect(result.current.isOpen).toBe(true));
+      expect(result.current.draft).toBe(`why does the deploy\n\n${QUOTE}`);
+    });
+
+    it("keeps an open dock's draft the same way", async () => {
+      server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      act(() => {
+        result.current.toggleOpen();
+        result.current.setDraft("why does the deploy");
+      });
+
+      act(() => {
+        openAiBuddy({ draft: QUOTE });
+      });
+
+      await waitFor(() => expect(result.current.draft).toBe(`why does the deploy\n\n${QUOTE}`));
+      expect(result.current.isOpen).toBe(true);
+    });
+
+    /** Pressing the same button twice is not asking twice. */
+    it("does not stack the same seed twice", async () => {
+      server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+
+      act(() => {
+        openAiBuddy({ draft: QUOTE });
+      });
+      act(() => {
+        openAiBuddy({ draft: QUOTE });
+      });
+
+      await waitFor(() => expect(result.current.isOpen).toBe(true));
+      expect(result.current.draft).toBe(QUOTE);
+    });
+  });
+
   it("toggles open state", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
@@ -251,6 +352,106 @@ describe("useBuddy", () => {
       });
     });
     await waitFor(() => {
+      expect(result.current.messages[1].actions?.[0].status).toBe("resolved");
+    });
+  });
+  /**
+   * The seam between the card and the hook. The card offers "Try again" on a hire action that
+   * came back "couldn't"; the hook has to let that second confirm through. Rendered-component
+   * tests mock `onConfirm`, so only a test at this level sees the two meet.
+   */
+  describe("confirming a resolved hire offer again", () => {
+    function offerChecklist() {
+      const encoder = new TextEncoder();
+      return new HttpResponse(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                'data: {"type":"action_proposal","action":"place_checklist","label":"Keep this as a checklist","checklist_title":"Getting started","checklist_items":["Run it locally","Open a PR"]}\n\n',
+              ),
+            );
+            controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+            controller.close();
+          },
+        }),
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    }
+
+    async function confirmOnce(ok: boolean) {
+      let calls = 0;
+      server.use(
+        http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+        http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
+        http.post("/api/v1/onboarding/me/buddy/messages", () => offerChecklist()),
+        http.post("/api/v1/onboarding/me/buddy/actions", () => {
+          calls += 1;
+          return HttpResponse.json({
+            ok,
+            message: ok ? "Kept." : "I couldn't keep that just now.",
+          });
+        }),
+      );
+
+      const hook = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      act(() => {
+        hook.result.current.toggleOpen();
+      });
+      await waitFor(() => expect(hook.result.current.messages).toHaveLength(0));
+      act(() => {
+        hook.result.current.setDraft("how do I start?");
+      });
+      act(() => {
+        hook.result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+      await waitFor(() => expect(hook.result.current.messages[1]?.actions?.[0]).toBeDefined());
+
+      act(() => {
+        hook.result.current.confirmAction(
+          hook.result.current.messages[1].id,
+          hook.result.current.messages[1].actions![0],
+        );
+      });
+      await waitFor(() => {
+        const action = hook.result.current.messages[1].actions?.[0];
+        expect(action?.status).toBe("resolved");
+        expect(action?.ok).toBe(ok);
+      });
+
+      return { result: hook.result, calls: () => calls };
+    }
+
+    it("sends a refused hire offer again when the hire retries it", async () => {
+      const { result, calls } = await confirmOnce(false);
+      expect(calls()).toBe(1);
+
+      // What the "Try again" button does: confirm the resolved action as it stands.
+      act(() => {
+        result.current.confirmAction(
+          result.current.messages[1].id,
+          result.current.messages[1].actions![0],
+        );
+      });
+
+      await waitFor(() => expect(calls()).toBe(2));
+    });
+
+    /** Confirming a success twice is how somebody claims the same task twice. */
+    it("never sends a hire offer again once it worked", async () => {
+      const { result, calls } = await confirmOnce(true);
+
+      act(() => {
+        result.current.confirmAction(
+          result.current.messages[1].id,
+          result.current.messages[1].actions![0],
+        );
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(calls()).toBe(1);
       expect(result.current.messages[1].actions?.[0].status).toBe("resolved");
     });
   });

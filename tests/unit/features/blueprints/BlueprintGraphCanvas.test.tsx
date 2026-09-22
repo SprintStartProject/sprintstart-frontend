@@ -280,6 +280,30 @@ describe("BlueprintGraphCanvas", () => {
     await waitFor(() => expect(screen.getByText("1 must happen first")).toBeInTheDocument());
   });
 
+  /**
+   * The ring and the keyboard's idea of "this node" used to be two different things: arrow keys
+   * moved a selection held by the canvas wrapper, while Enter was handled on whatever node had DOM
+   * focus. So the ring sat on one node and Enter opened another.
+   */
+  it("opens the node the ring is on, not the one that happened to have focus", async () => {
+    render(<OpenableCanvas />);
+
+    const pane = screen.getByTestId("blueprint-graph-canvas");
+    // Focus starts on the first node, the way tabbing into the graph leaves it.
+    const first = screen.getByTestId("graph-node-a").closest("[data-journey-node]");
+    (first as HTMLElement).focus();
+
+    fireEvent.keyDown(pane, { key: "ArrowRight" });
+    fireEvent.keyDown(pane, { key: "ArrowRight" });
+
+    await waitFor(() => expect(document.activeElement).toHaveAttribute("data-journey-node", "b"));
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Enter" });
+
+    await waitFor(() => expect(screen.getByText("Fields for Node b")).toBeInTheDocument());
+    expect(screen.queryByText("Fields for Node a")).not.toBeInTheDocument();
+  });
+
   it("leaves an arrow key alone inside a field, where it is a cursor", async () => {
     renderCanvas([node("a"), node("b", ["a"]), node("c"), node("d"), node("e")], {
       onCreateNode: noop,
@@ -348,11 +372,15 @@ describe("BlueprintGraphCanvas", () => {
     // The camera flies in first, so the page appears once it has landed rather than over a graph
     // still on its way there.
     await waitFor(() => expect(screen.getByText("Fields for Node a")).toBeInTheDocument());
-    expect(screen.getByRole("region", { name: "Node a" })).toBeInTheDocument();
+    // A dialog, not a region: it covers the graph, so focus belongs inside it and the graph
+    // underneath is `inert` while it is up.
+    const page = screen.getByRole("dialog", { name: "Node a" });
+    expect(page).toBeInTheDocument();
+    await waitFor(() => expect(page.contains(document.activeElement)).toBe(true));
 
     // Pressing beside the page closes it — the gesture nobody has to be taught, and the reason
     // there is no shrink-back glyph in the corner any more.
-    const backdrop = screen.getByRole("region", { name: "Node a" }).parentElement as HTMLElement;
+    const backdrop = page.parentElement as HTMLElement;
     fireEvent.pointerDown(backdrop);
     await waitFor(() => expect(screen.queryByText("Fields for Node a")).not.toBeInTheDocument());
 
@@ -384,7 +412,7 @@ describe("BlueprintGraphCanvas", () => {
     clickNode("b");
     await waitFor(() => expect(screen.getByText("Fields for Node b")).toBeInTheDocument());
 
-    const surface = screen.getByRole("region", { name: "Node b" }).parentElement as HTMLElement;
+    const surface = screen.getByRole("dialog", { name: "Node b" }).parentElement as HTMLElement;
     fireEvent.wheel(surface, { deltaX: 60, deltaY: 0 });
 
     await waitFor(() => expect(screen.getByText("Fields for Node c")).toBeInTheDocument());

@@ -12,6 +12,7 @@ import {
   ListPlus,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useDialogFocus } from "../../../../components/ui/useDialogFocus";
 import { useToast } from "../../../../context/useToast";
 import {
   blockingPhases,
@@ -587,14 +588,23 @@ function ItemFocus({
 }) {
   const state = itemState(item, phase.locked);
   const isQuestion = item.kind === "question";
+  // A step opened until it fills the canvas is a dialog: focus moves in, Tab stays inside, and it
+  // goes back to the node on the way out. Enter on a node used to leave focus on the node behind
+  // this page, so reaching what had just been opened meant tabbing past the rest of the graph.
+  const pageRef = useDialogFocus<HTMLElement>(true);
+
   return (
     <div className="absolute inset-0 flex items-stretch justify-center bg-app-bg-soft/70 p-3 backdrop-blur-sm sm:p-6">
       <motion.section
+        ref={pageRef}
+        role="dialog"
+        aria-modal="true"
         aria-label={`${isQuestion ? "Question" : "Step"}: ${item.title}`}
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        className={`flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border bg-app-surface shadow-2xl ${
+        className={`flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border bg-app-surface shadow-2xl outline-none ${
           isQuestion ? "border-app-question-border" : "border-app-brand-border"
         }`}
       >

@@ -7,7 +7,13 @@
 // place.
 // ============================================================
 
-import { isPhaseStarted, itemState, lastActivityAt, orderedPhaseItems } from "./journey";
+import {
+  isPhaseStarted,
+  isSkipPending,
+  itemState,
+  lastActivityAt,
+  orderedPhaseItems,
+} from "./journey";
 import type {
   OnboardingPathEndpoint,
   OnboardingPhaseEndpoint,
@@ -86,8 +92,7 @@ export function nextItemInPhase(
   for (const item of orderedPhaseItems(phase)) {
     const state = itemState(item, false);
     // A step waiting on the PM's answer to a skip request is not what to do next.
-    const skipPending =
-      item.kind === "step" && !!item.step.skip && item.step.skip.accepted === null;
+    const skipPending = item.kind === "step" && isSkipPending(item.step.skip);
     if (item.kind === "step" && state === "open" && !skipPending) {
       return { kind: "step", step: item.step };
     }

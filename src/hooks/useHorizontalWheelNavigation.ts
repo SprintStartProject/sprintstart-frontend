@@ -222,6 +222,8 @@ type UseSwipeableTabsOptions<TTab extends string> = {
   value: TTab;
   onChange: (tab: TTab) => void;
   enabled?: boolean;
+  /** Passed through to {@link useHorizontalWheelNavigation}; see its `boundary`. */
+  boundary?: "page" | "self";
 };
 
 /**
@@ -237,6 +239,7 @@ export function useSwipeableTabs<TTab extends string, T extends HTMLElement>({
   value,
   onChange,
   enabled,
+  boundary,
 }: UseSwipeableTabsOptions<TTab>): RefCallback<T> {
   function step(offset: number) {
     const next = order[order.indexOf(value) + offset];
@@ -248,5 +251,8 @@ export function useSwipeableTabs<TTab extends string, T extends HTMLElement>({
     onNext: () => step(1),
     onPrevious: () => step(-1),
     enabled,
+    // Forwarded, not dropped: without this every consumer of this helper was page-scoped, and
+    // `boundary` existed on the hook underneath with nothing able to ask for it.
+    boundary,
   });
 }

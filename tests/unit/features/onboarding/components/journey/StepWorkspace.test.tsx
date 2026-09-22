@@ -16,7 +16,7 @@ vi.mock("../../../../../../src/services/onboardingService", () => ({
     fetchResources: vi.fn(),
     startStep: vi.fn(),
     updateTask: vi.fn(),
-    updateStepStatus: vi.fn(),
+    completeStep: vi.fn(),
     skipStep: vi.fn(),
     submitFeedback: vi.fn(),
   },
@@ -66,6 +66,19 @@ function renderWorkspace(overrides: Partial<Parameters<typeof StepWorkspace>[0]>
   return props;
 }
 
+/** The same, but handing back `rerender` so the path's status can change under the workspace. */
+function renderWaitingWorkspace(waiting: { status: "WAITING" }) {
+  const props = {
+    stepId: "step1",
+    stepStatus: waiting.status,
+    onPathChanged: vi.fn().mockResolvedValue(undefined),
+    continueLabel: "Next step",
+    onContinue: vi.fn(),
+  };
+  const { rerender } = render(<StepWorkspace {...props} />);
+  return { rerender, props };
+}
+
 describe("StepWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -95,6 +108,99 @@ describe("StepWorkspace", () => {
     expect(screen.getByRole("button", { name: "1 task to go" })).toBeDisabled();
   });
 
+  /**
+   * Opening a WAITING step fires `PUT /start` and this component's `GET` in the same tick, so the
+   * read frequently came back WAITING and left "Start step" on a step that had already begun --
+   * and nothing re-read it, because the load only depended on the id.
+   */
+  it("re-reads the step when the path says its status has moved on", async () => {
+    const waiting = { ...step, status: "WAITING" as const, startedAt: null };
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue(waiting);
+
+    const { rerender, props } = renderWaitingWorkspace(waiting);
+
+    expect(await screen.findByRole("button", { name: "Start step" })).toBeInTheDocument();
+
+    // The page started it and its refreshed path now says so.
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue(step);
+    rerender(<StepWorkspace {...props} stepStatus="IN_PROGRESS" />);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Start step" })).not.toBeInTheDocument(),
+    );
+    expect(onboardingService.startStep).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The answer is marked seen by whoever draws it. Opening a step used to do it -- which includes
+   * "Continue" and "Up next", so answers were marked seen on the way past.
+   */
+  it("marks an answered skip request seen once it is on screen", async () => {
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue({
+      ...step,
+      skip: {
+        id: "skip-1",
+        stepId: "step1",
+        reason: "I have done this before",
+        accepted: false,
+        reviewComment: "Have a look anyway",
+        reviewedAt: "2026-07-02T00:00:00Z",
+        answerSeenAt: null,
+      },
+    });
+    const onSkipAnswerSeen = vi.fn();
+
+    renderWorkspace({ onSkipAnswerSeen });
+
+    await waitFor(() => expect(onSkipAnswerSeen).toHaveBeenCalledWith("skip-1"));
+  });
+
+  /**
+   * `accepted` is an explicit `null` on a pending request, but an omitted one means the same
+   * thing -- and `accepted !== null` is true for `undefined`, which had the page reporting that
+   * the member had seen an answer nobody has given yet.
+   */
+  it("does not mark a request whose answer is still missing as seen", async () => {
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue({
+      ...step,
+      skip: {
+        id: "skip-1",
+        stepId: "step1",
+        reason: "I have done this before",
+        reviewComment: null,
+        reviewedAt: null,
+        answerSeenAt: null,
+      } as unknown as NonNullable<(typeof step)["skip"]>,
+    });
+    const onSkipAnswerSeen = vi.fn();
+
+    renderWorkspace({ onSkipAnswerSeen });
+
+    await screen.findByRole("button", { name: /Install Node/ });
+    expect(onSkipAnswerSeen).not.toHaveBeenCalled();
+  });
+
+  it("leaves an answer that has already been seen alone", async () => {
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue({
+      ...step,
+      skip: {
+        id: "skip-1",
+        stepId: "step1",
+        reason: "I have done this before",
+        accepted: true,
+        reviewComment: null,
+        reviewedAt: "2026-07-02T00:00:00Z",
+        answerSeenAt: "2026-07-03T00:00:00Z",
+      },
+    });
+    const onSkipAnswerSeen = vi.fn();
+
+    renderWorkspace({ onSkipAnswerSeen });
+
+    await screen.findByRole("button", { name: /Install Node/ });
+    expect(onSkipAnswerSeen).not.toHaveBeenCalled();
+  });
+
   it("completes the step once every task is ticked, then offers to continue", async () => {
     const user = userEvent.setup();
     const { onPathChanged, onContinue } = renderWorkspace();
@@ -103,7 +209,7 @@ describe("StepWorkspace", () => {
     expect(onboardingService.updateTask).toHaveBeenCalledWith(tasks[0], true);
 
     await user.click(screen.getByRole("button", { name: "Mark as complete" }));
-    expect(onboardingService.updateStepStatus).toHaveBeenCalledWith(step, "FINISHED");
+    expect(onboardingService.completeStep).toHaveBeenCalledWith(step.id);
     await waitFor(() => expect(onPathChanged).toHaveBeenCalled());
 
     await user.click(await screen.findByRole("button", { name: "Next step" }));

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  hireJourneyViewKey,
+  memberJourneyViewKey,
   readJourneyView,
   writeJourneyView,
 } from "../../../../src/features/onboarding/journeyViewMemory.ts";
@@ -10,6 +12,27 @@ describe("journey view memory", () => {
   afterEach(() => {
     window.localStorage.clear();
     vi.restoreAllMocks();
+  });
+
+  /**
+   * Browser storage is per browser, not per account or per member, so the key has to carry both.
+   * These are the shapes the pages ask for; the page-level tests check that they ask.
+   */
+  it("keys a remembered view on who is looking, and at whom", () => {
+    expect(hireJourneyViewKey("user-1")).not.toEqual(hireJourneyViewKey("user-2"));
+    expect(memberJourneyViewKey("pm-1", "member-1")).not.toEqual(
+      memberJourneyViewKey("pm-2", "member-1"),
+    );
+    expect(memberJourneyViewKey("pm-1", "member-1")).not.toEqual(
+      memberJourneyViewKey("pm-1", "member-2"),
+    );
+
+    writeJourneyView(hireJourneyViewKey("user-1"), { mode: "graph", graphPhaseId: "phase-2" });
+
+    expect(readJourneyView(hireJourneyViewKey("user-2"))).toEqual({
+      mode: "list",
+      graphPhaseId: null,
+    });
   });
 
   it("opens on the list when nothing is remembered", () => {

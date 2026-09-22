@@ -204,13 +204,24 @@ export function unlockedBy(item: PhaseItem, items: readonly PhaseItem[]): PhaseI
 }
 
 /**
+ * A skip request nobody has answered yet.
+ *
+ * `accepted` is an explicit `null` while a request is open, but treating an *absent* one as
+ * answered is how the same skip came to be counted in one place, left out of a second and
+ * unanswerable in a third. One predicate, used everywhere a pending skip is counted or acted on.
+ */
+export function isSkipPending(skip: { accepted?: boolean | null } | null | undefined): boolean {
+  return !!skip && (skip.accepted === null || skip.accepted === undefined);
+}
+
+/**
  * Where a step's skip request stands, if it has one: waiting on the PM, or turned down. A granted
  * request needs no flag -- the step is simply skipped.
  */
 export function skipRequestOf(item: PhaseItem): "pending" | "declined" | null {
   if (item.kind !== "step" || !item.step.skip) return null;
   if (item.step.status === "SKIPPED") return null;
-  if (item.step.skip.accepted === null) return "pending";
+  if (isSkipPending(item.step.skip)) return "pending";
   return item.step.skip.accepted === false ? "declined" : null;
 }
 
