@@ -66,7 +66,6 @@ const { mockArtifacts } = vi.hoisted(() => ({
 
 vi.mock("../../../src/services/knowledgeService", () => ({
   knowledgeService: {
-    getUnifiedArtifacts: vi.fn().mockResolvedValue(mockArtifacts),
     getArtifactPage: vi.fn().mockResolvedValue({
       items: mockArtifacts,
       page: {

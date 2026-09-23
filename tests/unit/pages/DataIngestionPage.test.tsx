@@ -57,7 +57,6 @@ const {
   mockUpdateGithubRepository,
   mockGetAccessibleProject,
   mockGetIngestionSourceStatuses,
-  mockGetUnifiedArtifacts,
   mockListConnectors,
   mockConfigureAllGithubRepositories,
 } = vi.hoisted(() => ({
@@ -70,7 +69,6 @@ const {
   mockUpdateGithubRepository: vi.fn(),
   mockGetAccessibleProject: vi.fn(),
   mockGetIngestionSourceStatuses: vi.fn(),
-  mockGetUnifiedArtifacts: vi.fn(),
   mockListConnectors: vi.fn(),
   mockConfigureAllGithubRepositories: vi.fn(),
 }));
@@ -124,7 +122,7 @@ vi.mock("../../../src/services/knowledgeService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/services/knowledgeService")>();
   return {
     ...actual,
-    knowledgeService: { ...actual.knowledgeService, getUnifiedArtifacts: mockGetUnifiedArtifacts },
+    knowledgeService: { ...actual.knowledgeService },
   };
 });
 
@@ -155,7 +153,6 @@ describe("DataIngestionPage", () => {
     mockUpdateJiraInstance.mockResolvedValue({ transactionId: "jira-tx" });
     mockConfigureAllGithubRepositories.mockResolvedValue(undefined);
     mockConfigureAllJiraInstances.mockResolvedValue(undefined);
-    mockGetUnifiedArtifacts.mockResolvedValue([]);
     mockListConnectors.mockResolvedValue([]);
     selectProject();
   });

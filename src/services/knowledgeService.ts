@@ -55,9 +55,9 @@ export const knowledgeService = {
    * Fetches a single short page of project artifacts for at-a-glance views
    * such as the dashboard widget.
    *
-   * Deliberately separate from {@link knowledgeService.getUnifiedArtifacts},
-   * which pages through the entire project and additionally merges personal
-   * uploads — far more work than a preview card needs.
+   * Deliberately separate from {@link knowledgeService.getArtifactPage}: a
+   * preview card wants the newest handful of rows and nothing else, so it must
+   * not drag facet counts or a full page size along with it.
    *
    * @param projectId UUID of the project to scope the listing.
    * @param limit Maximum number of artifacts to return.
@@ -149,18 +149,6 @@ export const knowledgeService = {
    */
   async getArtifactById(projectId: string, artifactId: string): Promise<Artifact> {
     return apiClient.fetch<Artifact>(`/api/v1/projects/${projectId}/artifacts/${artifactId}`);
-  },
-
-  /**
-   * Fetches the first page of unified artifacts for a specific project.
-   * Retained for backward compatibility.
-   *
-   * @param projectId UUID of the project to scope the artifact listing.
-   * @returns List of project-scoped artifacts.
-   */
-  async getUnifiedArtifacts(projectId: string): Promise<Artifact[]> {
-    const page = await this.getArtifactPage(projectId, { page: 1, size: 100 });
-    return page.items ?? [];
   },
 
   /**

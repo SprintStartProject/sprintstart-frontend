@@ -36,25 +36,21 @@ vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: mockProfileRef.current }),
 }));
 
-const { mockGetArtifactPage, mockGetArtifactFacets, mockGetArtifactById, mockGetUnifiedArtifacts } =
-  vi.hoisted(() => ({
-    mockGetArtifactPage: vi.fn(),
-    mockGetArtifactFacets: vi.fn(),
-    mockGetArtifactById: vi.fn(),
-    mockGetUnifiedArtifacts: vi.fn(),
-  }));
+const { mockGetArtifactPage, mockGetArtifactFacets, mockGetArtifactById } = vi.hoisted(() => ({
+  mockGetArtifactPage: vi.fn(),
+  mockGetArtifactFacets: vi.fn(),
+  mockGetArtifactById: vi.fn(),
+}));
 
 vi.mock("../../../src/services/knowledgeService", () => ({
   knowledgeService: {
     getArtifactPage: mockGetArtifactPage,
     getArtifactFacets: mockGetArtifactFacets,
     getArtifactById: mockGetArtifactById,
-    getUnifiedArtifacts: mockGetUnifiedArtifacts,
   },
 }));
 
 function setupMockArtifacts(artifacts: Artifact[]) {
-  mockGetUnifiedArtifacts.mockResolvedValue(artifacts);
   mockGetArtifactPage.mockImplementation(
     (_pid: string, params: { search?: string; sources?: string[] } = {}) => {
       let filtered = artifacts;

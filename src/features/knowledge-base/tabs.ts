@@ -1,6 +1,13 @@
 import type { Artifact, ArtifactType, SourceSystem, UploadFormat } from "./types";
 
 /**
+ * Upload file formats the knowledge base classifies an upload into. Declared
+ * beside the artifact types they filter on, and re-exported from `./types` so
+ * the facet's labels and its values stay next to each other.
+ */
+export type { UploadFormat } from "./types";
+
+/**
  * Human-readable display names for the artifact sources (connectors).
  */
 export const SOURCE_LABELS: Record<SourceSystem, string> = {
@@ -80,8 +87,6 @@ export const KNOWLEDGE_TAB_ORDER: readonly KnowledgeTab[] = KNOWLEDGE_TABS.map((
  * for uploads, so this facet is offered only while `UPLOAD` is part of the
  * source selection (see `useKnowledgeBase`).
  */
-export type { UploadFormat } from "./types";
-
 /** Human-readable display names for the file-format facet. */
 export const FORMAT_LABELS: Record<UploadFormat, string> = {
   PDF: "PDFs",

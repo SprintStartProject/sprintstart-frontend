@@ -272,16 +272,6 @@ describe("knowledgeService", () => {
               hasNext: false,
               hasPrevious: true,
             },
-            metadata: {
-              pageNumber: 2,
-              pageSize: 20,
-              totalElements: 25,
-              totalPages: 2,
-              isFirst: false,
-              isLast: true,
-              hasNext: false,
-              hasPrevious: true,
-            },
           });
         }),
       );
@@ -298,7 +288,7 @@ describe("knowledgeService", () => {
 
       expect(page.items).toHaveLength(1);
       expect(page.items[0].title).toBe("guide.pdf");
-      expect(page.page?.totalElements ?? page.metadata?.totalElements).toBe(25);
+      expect(page.page.totalElements).toBe(25);
     });
   });
 
@@ -355,65 +345,6 @@ describe("knowledgeService", () => {
       const artifact = await knowledgeService.getArtifactById(projectId, artifactId);
       expect(artifact.id).toBe(artifactId);
       expect(artifact.title).toBe("detail.md");
-    });
-  });
-
-  describe("getUnifiedArtifacts", () => {
-    const projectId = "proj-uuid";
-
-    it("fetches a single page of artifacts and returns items", async () => {
-      server.use(
-        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
-          const url = new URL(request.url);
-          expect(url.searchParams.get("page")).toBe("1");
-          expect(url.searchParams.get("size")).toBe("100");
-          return HttpResponse.json({
-            items: [
-              {
-                id: "art-1",
-                title: "doc1.md",
-                artifactType: "FILE",
-                sourceSystem: "GITHUB",
-                sourceId: "src-1",
-                sourceUrl: null,
-                mime: "text/markdown",
-                language: null,
-                ingestedAt: "2026-01-01T00:00:00Z",
-                lastChangedAt: null,
-                contentHash: null,
-                ingestionRunId: null,
-              },
-            ],
-            metadata: {
-              pageNumber: 1,
-              pageSize: 100,
-              totalElements: 1,
-              totalPages: 1,
-              isFirst: true,
-              isLast: true,
-              hasNext: false,
-              hasPrevious: false,
-            },
-          });
-        }),
-      );
-
-      const artifacts = await knowledgeService.getUnifiedArtifacts(projectId);
-      expect(artifacts).toHaveLength(1);
-      expect(artifacts[0].title).toBe("doc1.md");
-    });
-
-    it("propagates ApiError when the request fails with 500", async () => {
-      server.use(
-        http.get(`/api/v1/projects/${projectId}/artifacts`, () =>
-          HttpResponse.json({ message: "Internal server error" }, { status: 500 }),
-        ),
-      );
-
-      await expect(knowledgeService.getUnifiedArtifacts(projectId)).rejects.toMatchObject({
-        name: "ApiError",
-        status: 500,
-      });
     });
   });
 });

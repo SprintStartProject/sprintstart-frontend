@@ -460,7 +460,7 @@ export function SideBar() {
     <>
       <aside
         aria-label="Desktop Sidebar"
-        className="fixed top-0 bottom-0 left-0 hidden w-[286px] flex-col border-r border-app-border bg-app-bg lg:flex"
+        className="fixed top-0 bottom-0 left-0 hidden w-[var(--app-sidebar-width)] flex-col border-r border-app-border bg-app-bg lg:flex"
       >
         <SidebarContent
           aria-label="Desktop Navigation"
@@ -510,7 +510,7 @@ export function SideBar() {
         className={[
           // The cubic-bezier is the iOS sheet curve: fast out of the
           // gate, long soft settle — reads as gliding, not snapping.
-          "fixed top-0 bottom-0 left-0 z-[60] flex w-[286px] flex-col border-r border-app-border bg-app-bg transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden",
+          "fixed top-0 bottom-0 left-0 z-[60] flex w-[var(--app-sidebar-width)] flex-col border-r border-app-border bg-app-bg transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden",
           isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >

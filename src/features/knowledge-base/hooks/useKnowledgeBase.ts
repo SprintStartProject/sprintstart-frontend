@@ -55,11 +55,6 @@ export function loadKnowledgeBaseFacets(
   return knowledgeService.getArtifactFacets(projectId, params);
 }
 
-/** Legacy loader returning first page of artifacts for backward compatibility. */
-export function loadKnowledgeBaseArtifacts(projectId: string): Promise<Artifact[]> {
-  return knowledgeService.getUnifiedArtifacts(projectId);
-}
-
 /**
  * State + data layer for the Knowledge Base page.
  *
@@ -165,16 +160,13 @@ export function useKnowledgeBase(projectId: string | null) {
   const fetchError =
     isListError || isFacetsError ? "Failed to load artifacts. Please try again." : null;
 
-  const pageMeta = pageData?.page ?? pageData?.metadata;
+  const pageMeta = pageData?.page;
   const totalPages = Math.max(1, pageMeta?.totalPages ?? 1);
   const totalElements = pageMeta?.totalElements ?? artifacts.length;
 
   if (currentPage > totalPages && totalPages > 0) {
     setCurrentPage(totalPages);
   }
-
-  const paginatedArtifacts = artifacts;
-  const filteredArtifacts = artifacts;
 
   const fetchArtifacts = useCallback(async () => {
     if (projectId === null) return;
@@ -347,8 +339,6 @@ export function useKnowledgeBase(projectId: string | null) {
     currentPage,
     totalPages,
     totalElements,
-    filteredArtifacts,
-    paginatedArtifacts,
     handleSearchChange,
     handleTabChange,
     toggleSource,

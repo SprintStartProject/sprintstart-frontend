@@ -96,16 +96,12 @@ export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
  * Pagination metadata returned by Spring Boot Page response.
  */
 export interface PageMetadata {
-  number?: number;
-  size?: number;
+  number: number;
+  size: number;
   totalElements: number;
   totalPages: number;
-  hasNext?: boolean;
-  hasPrevious?: boolean;
-  pageNumber?: number;
-  pageSize?: number;
-  isFirst?: boolean;
-  isLast?: boolean;
+  hasNext: boolean;
+  hasPrevious: boolean;
 }
 
 /**
@@ -113,8 +109,8 @@ export interface PageMetadata {
  */
 export interface ArtifactPage {
   items: Artifact[];
-  page?: PageMetadata;
-  metadata?: PageMetadata;
+  /** Spring's `Page` envelope — the only shape the endpoint sends. */
+  page: PageMetadata;
 }
 
 /**

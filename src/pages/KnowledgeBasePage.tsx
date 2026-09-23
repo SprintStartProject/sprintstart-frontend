@@ -60,9 +60,10 @@ const DELETE_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
  *
  * Bound to the `/knowledge-base` route (accessible to all permission groups).
  * Displays all artifacts (uploads, github, etc.) in a filtered grid, with a side
- * drawer for viewing raw content and AI summaries. Artifacts are fetched via
- * `knowledgeService.getUnifiedArtifacts`, scoped to the globally selected
- * project.
+ * drawer for viewing raw content and AI summaries. Artifacts arrive one page at
+ * a time from `knowledgeService.getArtifactPage`, with the facet counts beside
+ * them from `knowledgeService.getArtifactFacets`, scoped to the globally
+ * selected project.
  *
  * Users without a project switcher fall back to their first assigned project,
  * which is what the global selection resolves to for them anyway.
@@ -91,7 +92,6 @@ export function KnowledgeBasePage() {
     currentPage,
     totalPages,
     totalElements,
-    paginatedArtifacts,
     handleSearchChange,
     handleTabChange,
     toggleSource,
@@ -268,7 +268,7 @@ export function KnowledgeBasePage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={prefersReducedMotion ? { duration: 0 } : centralSpringToken}
                 >
-                  <ArtifactList artifacts={paginatedArtifacts} onSelect={setSelectedArtifactId} />
+                  <ArtifactList artifacts={artifacts} onSelect={setSelectedArtifactId} />
                   {totalPages > 1 && (
                     <Pagination
                       currentPage={currentPage}

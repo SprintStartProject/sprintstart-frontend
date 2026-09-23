@@ -109,7 +109,12 @@ function AppContent() {
           screen — see momentStage.ts in the moments feature. */}
         <main
           data-moment-stage
-          className={`relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0 ${signedIn && !isFocused ? "lg:ml-[286px]" : ""}`}
+          className={`relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0 ${
+            // The sidebar is `fixed` from `lg` up (see SideBar), so it is out of
+            // flow and the page has to leave its width free itself. In focus mode
+            // it slides away over the content, so the margin goes with it.
+            signedIn && !isFocused ? "lg:ml-[var(--app-sidebar-width)]" : ""
+          }`}
         >
           <AppRouter />
         </main>

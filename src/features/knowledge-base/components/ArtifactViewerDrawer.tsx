@@ -1089,10 +1089,10 @@ export function ArtifactViewerDrawer({
    * @remarks The delete endpoint expects the `UploadedArtifact`'s UUID, not
    * the ingestion `Artifact`'s UUID. The displayed artifact is usually the
    * ingestion mirror (its `id` is the ingestion UUID); the corresponding
-   * `UploadedArtifact` id is carried in `artifact.sourceId`, which
-   * `getUnifiedArtifacts` enriches via title-matching against the uploads
-   * list. When `sourceId` is missing (e.g. ingestion mirror without a
-   * matching upload), deletion is refused with a user-facing error.
+   * `UploadedArtifact` id is carried in `artifact.sourceId`, which the backend
+   * fills in from the upload row. When `sourceId` is missing (e.g. ingestion
+   * mirror without a matching upload), deletion is refused with a user-facing
+   * error.
    */
   const handleDelete = async () => {
     if (!artifact) return;
@@ -1288,7 +1288,7 @@ export function ArtifactViewerDrawer({
       title={titleContent}
       badge={headerBadge}
       actions={actionsContent}
-      widthClassName="w-full max-w-[1000px] md:w-[100%] lg:w-[100%]"
+      widthClassName="w-full max-w-5xl"
       zIndexClassName="z-50 md:z-30"
       panelClassName="border-l border-app-border shadow-2xl"
       panelBackgroundClassName="bg-app-surface"

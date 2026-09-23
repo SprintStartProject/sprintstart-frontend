@@ -16,7 +16,6 @@ vi.mock("../../../../../src/services/knowledgeService", () => ({
   knowledgeService: {
     getArtifactPage: vi.fn(),
     getArtifactFacets: vi.fn(),
-    getUnifiedArtifacts: vi.fn(),
   },
 }));
 
@@ -306,13 +305,11 @@ describe("useKnowledgeBase", () => {
 
     const makePage = (title: string): ArtifactPage => ({
       items: [makeArtifact("a", title)],
-      metadata: {
-        pageNumber: 1,
-        pageSize: 20,
+      page: {
+        number: 1,
+        size: 20,
         totalElements: 1,
         totalPages: 1,
-        isFirst: true,
-        isLast: true,
         hasNext: false,
         hasPrevious: false,
       },
@@ -373,8 +370,8 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts).toHaveLength(1);
-      expect(result.current.filteredArtifacts[0].title).toBe("readme.md");
+      expect(result.current.artifacts).toHaveLength(1);
+      expect(result.current.artifacts[0].title).toBe("readme.md");
       expect(result.current.currentPage).toBe(1);
     });
   });
@@ -410,8 +407,8 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts).toHaveLength(1);
-      expect(result.current.filteredArtifacts[0].sourceSystem).toBe("UPLOAD");
+      expect(result.current.artifacts).toHaveLength(1);
+      expect(result.current.artifacts[0].sourceSystem).toBe("UPLOAD");
       expect(result.current.hasActiveFilters).toBe(true);
     });
   });
@@ -426,7 +423,7 @@ describe("useKnowledgeBase", () => {
 
     await waitFor(() => {
       expect(result.current.selectedSources.size).toBe(2);
-      expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
         "gh-issue",
         "gh-pr",
         "jira-issue",
@@ -443,8 +440,8 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts).toHaveLength(1);
-      expect(result.current.filteredArtifacts[0].id).toBe("gh-pr");
+      expect(result.current.artifacts).toHaveLength(1);
+      expect(result.current.artifacts[0].id).toBe("gh-pr");
     });
   });
 
@@ -456,7 +453,7 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
         "gh-issue",
         "jira-issue",
       ]);
@@ -494,7 +491,7 @@ describe("useKnowledgeBase", () => {
 
     await waitFor(() => {
       // The format facet describes uploads; it must not hide the GitHub artifacts.
-      expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
         "gh-issue",
         "gh-pr",
         "up-pdf",
@@ -522,7 +519,7 @@ describe("useKnowledgeBase", () => {
     await waitFor(() => {
       expect(result.current.selectedFormat).toBeNull();
       expect(result.current.formatOptions).toHaveLength(0);
-      expect(result.current.filteredArtifacts).toHaveLength(5);
+      expect(result.current.artifacts).toHaveLength(5);
     });
   });
 
@@ -569,7 +566,7 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts).toHaveLength(frontendCount);
+      expect(result.current.artifacts).toHaveLength(frontendCount);
     });
   });
 
@@ -585,7 +582,7 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
         "gh-fe-1",
         "gh-fe-2",
         "gh-org",
@@ -605,7 +602,7 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
         "gh-be-1",
         "gh-org",
       ]);
@@ -625,7 +622,7 @@ describe("useKnowledgeBase", () => {
 
     await waitFor(() => {
       expect(result.current.selectedRepositories.size).toBe(2);
-      expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
         "gh-be-1",
         "gh-fe-1",
         "gh-fe-2",
@@ -654,7 +651,7 @@ describe("useKnowledgeBase", () => {
     await waitFor(() => {
       expect(result.current.selectedRepositories.size).toBe(0);
       expect(result.current.repositoryOptions).toHaveLength(0);
-      expect(result.current.filteredArtifacts).toHaveLength(6);
+      expect(result.current.artifacts).toHaveLength(6);
     });
   });
 
@@ -723,7 +720,7 @@ describe("useKnowledgeBase", () => {
     expect(result.current.selectedFormat).toBeNull();
     expect(result.current.selectedRepositories.size).toBe(0);
     expect(result.current.searchQuery).toBe("");
-    expect(result.current.filteredArtifacts).toHaveLength(5);
+    expect(result.current.artifacts).toHaveLength(5);
   });
 
   it("does not fetch when projectId is null", () => {
@@ -794,7 +791,7 @@ describe("useKnowledgeBase", () => {
     });
   });
 
-  it("safely indexes paginatedArtifacts when totalPages decreases", async () => {
+  it("safely indexes the page items when totalPages decreases", async () => {
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
@@ -805,7 +802,7 @@ describe("useKnowledgeBase", () => {
     });
     await waitFor(() => {
       expect(result.current.currentPage).toBe(2);
-      expect(result.current.paginatedArtifacts).toHaveLength(5);
+      expect(result.current.artifacts).toHaveLength(5);
     });
 
     // Narrow to a source with 0 items.
@@ -815,7 +812,7 @@ describe("useKnowledgeBase", () => {
 
     await waitFor(() => {
       expect(result.current.currentPage).toBe(1);
-      expect(result.current.paginatedArtifacts).toHaveLength(0);
+      expect(result.current.artifacts).toHaveLength(0);
     });
   });
 
@@ -870,7 +867,7 @@ describe("useKnowledgeBase", () => {
 
     await waitFor(() => {
       expect(result.current.currentPage).toBe(2);
-      expect(result.current.paginatedArtifacts).toHaveLength(5);
+      expect(result.current.artifacts).toHaveLength(5);
     });
   });
 
@@ -889,7 +886,7 @@ describe("useKnowledgeBase", () => {
       // Without the clamp the control would report page 5 while the slice runs off
       // the end of the list and renders nothing.
       expect(result.current.currentPage).toBe(2);
-      expect(result.current.paginatedArtifacts).toHaveLength(5);
+      expect(result.current.artifacts).toHaveLength(5);
     });
   });
 
@@ -903,7 +900,7 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
         "gh-issue",
         "jira-issue",
       ]);
@@ -914,8 +911,8 @@ describe("useKnowledgeBase", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.filteredArtifacts).toHaveLength(1);
-      expect(result.current.filteredArtifacts[0].id).toBe("jira-issue");
+      expect(result.current.artifacts).toHaveLength(1);
+      expect(result.current.artifacts[0].id).toBe("jira-issue");
     });
   });
 
@@ -967,7 +964,7 @@ describe("useKnowledgeBase", () => {
       result.current.toggleFormat("IMAGE");
     });
     await waitFor(() => {
-      expect(result.current.filteredArtifacts[0].title).toBe("wireframe.png");
+      expect(result.current.artifacts[0].title).toBe("wireframe.png");
     });
 
     act(() => {
@@ -975,7 +972,7 @@ describe("useKnowledgeBase", () => {
     });
     await waitFor(() => {
       // "Other" no longer swallows images — that is what the Images option is for.
-      expect(result.current.filteredArtifacts[0].title).toBe("archive.tar.gz");
+      expect(result.current.artifacts[0].title).toBe("archive.tar.gz");
     });
   });
 
@@ -1014,7 +1011,7 @@ describe("useKnowledgeBase", () => {
 
       expect(page).toBeDefined();
       expect(page?.count).toBe(0);
-      expect(result.current.filteredArtifacts).toHaveLength(0);
+      expect(result.current.artifacts).toHaveLength(0);
     });
   });
 
@@ -1033,7 +1030,7 @@ describe("useKnowledgeBase", () => {
 
       expect(image).toBeDefined();
       expect(image?.count).toBe(0);
-      expect(result.current.filteredArtifacts).toHaveLength(0);
+      expect(result.current.artifacts).toHaveLength(0);
     });
   });
 
@@ -1058,7 +1055,7 @@ describe("useKnowledgeBase", () => {
 
       expect(backend).toBeDefined();
       expect(backend?.count).toBe(0);
-      expect(result.current.filteredArtifacts).toHaveLength(0);
+      expect(result.current.artifacts).toHaveLength(0);
     });
   });
 });

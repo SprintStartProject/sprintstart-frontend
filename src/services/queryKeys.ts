@@ -77,8 +77,10 @@ export const queryKeys = {
     pending: () => ["attestations", "pending"] as const,
   },
   knowledgeBase: {
+    // Scope prefix for everything the Knowledge Base page holds: invalidating it
+    // clears the current page, the facet counts, and any open artifact's detail
+    // at once — React Query matches keys by prefix.
     project: (projectId: string) => ["knowledge-base", projectId] as const,
-    byProject: (projectId: string) => ["knowledge-base", projectId] as const,
     list: (projectId: string, params: KnowledgeListParams = {}) =>
       ["knowledge-base", projectId, "list", params] as const,
     facets: (projectId: string, params: KnowledgeListParams = {}) =>
