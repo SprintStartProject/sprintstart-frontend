@@ -69,6 +69,14 @@ vi.mock("../../../src/services/knowledgeService", () => ({
     getUnifiedArtifacts: vi.fn().mockResolvedValue(mockArtifacts),
     getArtifactPage: vi.fn().mockResolvedValue({
       items: mockArtifacts,
+      page: {
+        number: 1,
+        size: 20,
+        totalElements: mockArtifacts.length,
+        totalPages: 1,
+        hasNext: false,
+        hasPrevious: false,
+      },
       metadata: {
         pageNumber: 1,
         pageSize: 20,

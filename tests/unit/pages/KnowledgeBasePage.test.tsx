@@ -68,6 +68,14 @@ function setupMockArtifacts(artifacts: Artifact[]) {
       }
       return Promise.resolve({
         items: filtered,
+        page: {
+          number: 1,
+          size: 20,
+          totalElements: filtered.length,
+          totalPages: 1,
+          hasNext: false,
+          hasPrevious: false,
+        },
         metadata: {
           pageNumber: 1,
           pageSize: 20,

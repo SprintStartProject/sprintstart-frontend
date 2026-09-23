@@ -90,7 +90,7 @@ export function KnowledgeBasePage() {
     selectedRepositories,
     currentPage,
     totalPages,
-    filteredArtifacts,
+    totalElements,
     paginatedArtifacts,
     handleSearchChange,
     handleTabChange,
@@ -226,7 +226,7 @@ export function KnowledgeBasePage() {
                   repositoryOptions={repositoryOptions}
                   selectedRepositories={selectedRepositories}
                   onToggleRepository={toggleRepository}
-                  resultCount={filteredArtifacts.length}
+                  resultCount={totalElements}
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={handleClearFilters}
                   onRefresh={() => void fetchArtifacts()}

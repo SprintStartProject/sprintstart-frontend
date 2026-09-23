@@ -264,6 +264,14 @@ describe("knowledgeService", () => {
                 ingestionRunId: null,
               },
             ],
+            page: {
+              number: 2,
+              size: 20,
+              totalElements: 25,
+              totalPages: 2,
+              hasNext: false,
+              hasPrevious: true,
+            },
             metadata: {
               pageNumber: 2,
               pageSize: 20,
@@ -290,7 +298,7 @@ describe("knowledgeService", () => {
 
       expect(page.items).toHaveLength(1);
       expect(page.items[0].title).toBe("guide.pdf");
-      expect(page.metadata.totalElements).toBe(25);
+      expect(page.page?.totalElements ?? page.metadata?.totalElements).toBe(25);
     });
   });
 

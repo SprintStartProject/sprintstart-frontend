@@ -151,6 +151,14 @@ function mockArtifactQuery(artifacts: Artifact[]) {
 
       return Promise.resolve({
         items,
+        page: {
+          number: page,
+          size,
+          totalElements,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrevious: page > 1,
+        },
         metadata: {
           pageNumber: page,
           pageSize: size,

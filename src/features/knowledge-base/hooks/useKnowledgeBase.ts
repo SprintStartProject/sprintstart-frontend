@@ -165,7 +165,9 @@ export function useKnowledgeBase(projectId: string | null) {
   const fetchError =
     isListError || isFacetsError ? "Failed to load artifacts. Please try again." : null;
 
-  const totalPages = Math.max(1, pageData?.metadata?.totalPages ?? 1);
+  const pageMeta = pageData?.page ?? pageData?.metadata;
+  const totalPages = Math.max(1, pageMeta?.totalPages ?? 1);
+  const totalElements = pageMeta?.totalElements ?? artifacts.length;
 
   if (currentPage > totalPages && totalPages > 0) {
     setCurrentPage(totalPages);
@@ -344,6 +346,7 @@ export function useKnowledgeBase(projectId: string | null) {
     selectedRepositories,
     currentPage,
     totalPages,
+    totalElements,
     filteredArtifacts,
     paginatedArtifacts,
     handleSearchChange,
