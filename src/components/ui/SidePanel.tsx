@@ -95,7 +95,7 @@ export function SidePanel({
 
   useEffect(() => {
     if (!isOpen) {
-      previouslyFocusedElement.current?.focus();
+      previouslyFocusedElement.current?.focus({ preventScroll: true });
       return;
     }
 
@@ -107,7 +107,7 @@ export function SidePanel({
       if (!panel) return;
 
       const [firstFocusable] = getFocusableElements(panel);
-      (firstFocusable ?? panel).focus();
+      (firstFocusable ?? panel).focus({ preventScroll: true });
     });
 
     return () => {
