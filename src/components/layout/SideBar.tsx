@@ -460,7 +460,7 @@ export function SideBar() {
     <>
       <aside
         aria-label="Desktop Sidebar"
-        className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-app-border bg-app-bg lg:flex"
+        className="fixed top-0 bottom-0 left-0 hidden w-[286px] flex-col border-r border-app-border bg-app-bg lg:flex"
       >
         <SidebarContent
           aria-label="Desktop Navigation"

@@ -19,6 +19,7 @@ let restoreStyles: (() => void) | null = null;
 function lockElement(element: HTMLElement, scrollbarWidth: number): () => void {
   const previousOverflow = element.style.overflow;
   const previousPaddingRight = element.style.paddingRight;
+  const initialScrollTop = element.scrollTop;
 
   element.style.overflow = "hidden";
 
@@ -30,6 +31,9 @@ function lockElement(element: HTMLElement, scrollbarWidth: number): () => void {
   return () => {
     element.style.overflow = previousOverflow;
     element.style.paddingRight = previousPaddingRight;
+    if (element.scrollTop !== initialScrollTop) {
+      element.scrollTop = initialScrollTop;
+    }
   };
 }
 
@@ -51,6 +55,12 @@ function lockElement(element: HTMLElement, scrollbarWidth: number): () => void {
  * Deliberately not `position: fixed` on the body: that technique loses the
  * scroll position and has to restore it by hand, which reads as a jump on every
  * close.
+ *
+ * Note: the desktop sidebar uses `position: fixed` (not `sticky`) precisely
+ * because locking `<html>` with `overflow: hidden` collapses its scroll
+ * container, which would cause a `sticky` element to snap to document y=0
+ * and disappear above the viewport. Fixed elements are immune to this because
+ * they are positioned relative to the viewport, not any scroll container.
  */
 export function useScrollLock(locked: boolean) {
   useLayoutEffect(() => {
@@ -58,11 +68,18 @@ export function useScrollLock(locked: boolean) {
 
     if (lockCount === 0) {
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      const initialScrollY = window.scrollY;
 
       const restores = [
         lockElement(document.documentElement, 0),
         lockElement(document.body, scrollbarWidth),
       ];
+
+      restores.push(() => {
+        if (window.scrollY !== initialScrollY) {
+          window.scrollTo(0, initialScrollY);
+        }
+      });
 
       function handleWheel(event: WheelEvent) {
         let node: HTMLElement | null = event.target instanceof HTMLElement ? event.target : null;
