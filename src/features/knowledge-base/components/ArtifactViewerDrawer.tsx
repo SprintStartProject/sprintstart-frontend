@@ -1288,7 +1288,7 @@ export function ArtifactViewerDrawer({
       title={titleContent}
       badge={headerBadge}
       actions={actionsContent}
-      widthClassName="w-full max-w-[720px] md:w-[60%] lg:w-[70%]"
+      widthClassName="w-full max-w-[1000px] md:w-[100%] lg:w-[100%]"
       zIndexClassName="z-50 md:z-30"
       panelClassName="border-l border-app-border shadow-2xl"
       panelBackgroundClassName="bg-app-surface"
