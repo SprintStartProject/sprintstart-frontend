@@ -137,7 +137,7 @@ export function KnowledgeBasePage() {
     if (selectedArtifactId) next.set("artifact", selectedArtifactId);
     else next.delete("artifact");
 
-    setSearchParams(next, { replace: true });
+    setSearchParams(next, { replace: true, preventScrollReset: true });
   }, [selectedArtifactId, searchParams, setSearchParams]);
 
   // Reset active drawer selection whenever the project scope changes.

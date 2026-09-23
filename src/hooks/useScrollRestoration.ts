@@ -64,17 +64,29 @@ export function useScrollRestoration(): void {
   const location = useLocation();
   const navigationType = useNavigationType();
   const pendingRestorationRef = useRef<PendingRestoration | null>(null);
+  const prevPathnameRef = useRef(location.pathname);
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     history.scrollRestoration = "manual";
   }, []);
 
   useLayoutEffect(() => {
+    const isFirstRender = isFirstRenderRef.current;
+    isFirstRenderRef.current = false;
     const initialHost = getScrollHost();
+    const pathnameChanged = prevPathnameRef.current !== location.pathname;
+    prevPathnameRef.current = location.pathname;
+
+    const preventScrollReset = Boolean(
+      (location.state as { preventScrollReset?: boolean } | null)?.preventScrollReset,
+    );
 
     if (navigationType !== NavigationType.Pop) {
-      pendingRestorationRef.current = null;
-      scrollHostTo(initialHost, 0);
+      if ((pathnameChanged || isFirstRender) && !preventScrollReset) {
+        pendingRestorationRef.current = null;
+        scrollHostTo(initialHost, 0);
+      }
       return;
     }
 
@@ -151,7 +163,7 @@ export function useScrollRestoration(): void {
         pendingRestorationRef.current = null;
       }
     };
-  }, [location.key, navigationType]);
+  }, [location.key, location.pathname, location.state, navigationType]);
 
   // Keeps the current page's position current for whenever the reader comes back to it.
   useEffect(() => {
