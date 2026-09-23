@@ -1,3 +1,5 @@
+import type { KnowledgeListParams } from "../features/knowledge-base/types";
+
 /**
  * Central query-key factory, shared by every migrated hook, invalidation call and
  * prefetch (sidebar hover/press). Keeping one factory is what makes those three
@@ -75,7 +77,14 @@ export const queryKeys = {
     pending: () => ["attestations", "pending"] as const,
   },
   knowledgeBase: {
+    project: (projectId: string) => ["knowledge-base", projectId] as const,
     byProject: (projectId: string) => ["knowledge-base", projectId] as const,
+    list: (projectId: string, params: KnowledgeListParams = {}) =>
+      ["knowledge-base", projectId, "list", params] as const,
+    facets: (projectId: string, params: KnowledgeListParams = {}) =>
+      ["knowledge-base", projectId, "facets", params] as const,
+    detail: (projectId: string, artifactId: string) =>
+      ["knowledge-base", projectId, "detail", artifactId] as const,
   },
   faq: {
     groups: (projectId: string) => ["faq", "groups", projectId] as const,

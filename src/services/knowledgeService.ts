@@ -5,6 +5,9 @@ import keycloak from "../config/keycloak";
 import type {
   Artifact,
   ArtifactContent,
+  ArtifactFacets,
+  ArtifactPage,
+  KnowledgeListParams,
   SummaryStreamHandlers,
 } from "../features/knowledge-base/types";
 
@@ -73,36 +76,91 @@ export const knowledgeService = {
   },
 
   /**
-   * Fetches all unified artifacts for a specific project.
+   * Fetches a paginated, server-side filtered page of artifacts for a project.
+   *
+   * @param projectId UUID of the project.
+   * @param params Query parameters including page, size, search, types, sources, repositories, format.
+   */
+  async getArtifactPage(
+    projectId: string,
+    params: KnowledgeListParams = {},
+  ): Promise<ArtifactPage> {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.set("page", String(params.page));
+    if (params.size !== undefined) query.set("size", String(params.size));
+    if (params.search && params.search.trim().length > 0) {
+      query.set("search", params.search.trim());
+    }
+    if (params.types && params.types.length > 0) {
+      for (const t of params.types) query.append("types", t);
+    }
+    if (params.sources && params.sources.length > 0) {
+      for (const s of params.sources) query.append("sources", s);
+    }
+    if (params.repositories && params.repositories.length > 0) {
+      for (const r of params.repositories) query.append("repositories", r);
+    }
+    if (params.format) {
+      query.set("format", params.format);
+    }
+
+    const queryString = query.toString();
+    const endpoint = `/api/v1/projects/${projectId}/artifacts${queryString ? `?${queryString}` : ""}`;
+    return apiClient.fetch<ArtifactPage>(endpoint);
+  },
+
+  /**
+   * Fetches faceted counts for artifact types, source systems, upload formats, and repositories.
+   *
+   * @param projectId UUID of the project.
+   * @param params Active filter criteria to calculate dynamic facet counts.
+   */
+  async getArtifactFacets(
+    projectId: string,
+    params: KnowledgeListParams = {},
+  ): Promise<ArtifactFacets> {
+    const query = new URLSearchParams();
+    if (params.search && params.search.trim().length > 0) {
+      query.set("search", params.search.trim());
+    }
+    if (params.types && params.types.length > 0) {
+      for (const t of params.types) query.append("types", t);
+    }
+    if (params.sources && params.sources.length > 0) {
+      for (const s of params.sources) query.append("sources", s);
+    }
+    if (params.repositories && params.repositories.length > 0) {
+      for (const r of params.repositories) query.append("repositories", r);
+    }
+    if (params.format) {
+      query.set("format", params.format);
+    }
+
+    const queryString = query.toString();
+    const endpoint = `/api/v1/projects/${projectId}/artifacts/facets${queryString ? `?${queryString}` : ""}`;
+    return apiClient.fetch<ArtifactFacets>(endpoint);
+  },
+
+  /**
+   * Fetches metadata for a single artifact by ID within a project.
+   *
+   * @param projectId UUID of the project.
+   * @param artifactId UUID of the artifact.
+   */
+  async getArtifactById(projectId: string, artifactId: string): Promise<Artifact> {
+    return apiClient.fetch<Artifact>(`/api/v1/projects/${projectId}/artifacts/${artifactId}`);
+  },
+
+  /**
+   * Fetches the first page of unified artifacts for a specific project.
+   * Retained for backward compatibility.
    *
    * @param projectId UUID of the project to scope the artifact listing.
    * @returns List of project-scoped artifacts.
-   * @throws ApiError when the backend request fails so callers can distinguish
-   *   between an empty project and a failed fetch.
    */
   async getUnifiedArtifacts(projectId: string): Promise<Artifact[]> {
-    let artifacts: Artifact[] = [];
-
-    interface PageResponse {
-      items: Artifact[];
-      page: {
-        totalPages: number;
-      };
-    }
-
-    let currentPage = 1;
-    let totalPages = 1;
-
-    while (currentPage <= totalPages) {
-      const response = await apiClient.fetch<PageResponse>(
-        `/api/v1/projects/${projectId}/artifacts?page=${currentPage}&size=100`,
-      );
-      artifacts = [...artifacts, ...(response.items || [])];
-      totalPages = response.page?.totalPages ?? 1;
-      currentPage++;
-    }
-
-    return artifacts;
+    const page = await this.getArtifactPage(projectId, { page: 1, size: 100 });
+    return page.items ?? [];
   },
 
   /**

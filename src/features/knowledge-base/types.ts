@@ -86,3 +86,61 @@ export interface SummaryStreamHandlers {
   /** Called when an in-stream error event is received (non-HTTP failure). */
   onError?: (error: string) => void;
 }
+
+/**
+ * Filter classification for direct uploaded artifact formats.
+ */
+export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
+
+/**
+ * Pagination metadata returned by Spring Boot Page response.
+ */
+export interface PageMetadata {
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  isFirst: boolean;
+  isLast: boolean;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+/**
+ * Paginated list response for artifacts from GET /api/v1/projects/{projectId}/artifacts.
+ */
+export interface ArtifactPage {
+  items: Artifact[];
+  metadata: PageMetadata;
+}
+
+/**
+ * Single facet entry value and matched artifact count.
+ */
+export interface FacetCount {
+  value: string;
+  count: number;
+}
+
+/**
+ * Aggregated facet breakdown for knowledge base artifacts in a project.
+ */
+export interface ArtifactFacets {
+  types: FacetCount[];
+  sources: FacetCount[];
+  formats: FacetCount[];
+  repositories: FacetCount[];
+}
+
+/**
+ * Query parameters for filtering and paginating knowledge base artifacts.
+ */
+export interface KnowledgeListParams {
+  page?: number;
+  size?: number;
+  search?: string;
+  types?: ArtifactType[];
+  sources?: SourceSystem[];
+  repositories?: string[];
+  format?: UploadFormat;
+}

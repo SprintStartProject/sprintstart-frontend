@@ -36,15 +36,63 @@ vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: mockProfileRef.current }),
 }));
 
-const { mockGetUnifiedArtifacts } = vi.hoisted(() => ({
-  mockGetUnifiedArtifacts: vi.fn(),
-}));
+const { mockGetArtifactPage, mockGetArtifactFacets, mockGetArtifactById, mockGetUnifiedArtifacts } =
+  vi.hoisted(() => ({
+    mockGetArtifactPage: vi.fn(),
+    mockGetArtifactFacets: vi.fn(),
+    mockGetArtifactById: vi.fn(),
+    mockGetUnifiedArtifacts: vi.fn(),
+  }));
 
 vi.mock("../../../src/services/knowledgeService", () => ({
   knowledgeService: {
+    getArtifactPage: mockGetArtifactPage,
+    getArtifactFacets: mockGetArtifactFacets,
+    getArtifactById: mockGetArtifactById,
     getUnifiedArtifacts: mockGetUnifiedArtifacts,
   },
 }));
+
+function setupMockArtifacts(artifacts: Artifact[]) {
+  mockGetUnifiedArtifacts.mockResolvedValue(artifacts);
+  mockGetArtifactPage.mockImplementation(
+    (_pid: string, params: { search?: string; sources?: string[] } = {}) => {
+      let filtered = artifacts;
+      if (params.search) {
+        filtered = filtered.filter((a) =>
+          (a.title ?? "").toLowerCase().includes(params.search!.toLowerCase()),
+        );
+      }
+      if (params.sources && params.sources.length > 0) {
+        filtered = filtered.filter((a) => params.sources!.includes(a.sourceSystem));
+      }
+      return Promise.resolve({
+        items: filtered,
+        metadata: {
+          pageNumber: 1,
+          pageSize: 20,
+          totalElements: filtered.length,
+          totalPages: 1,
+          isFirst: true,
+          isLast: true,
+          hasNext: false,
+          hasPrevious: false,
+        },
+      });
+    },
+  );
+
+  mockGetArtifactFacets.mockResolvedValue({
+    types: [],
+    sources: [],
+    formats: [],
+    repositories: [],
+  });
+
+  mockGetArtifactById.mockImplementation((_pid: string, id: string) => {
+    return Promise.resolve(artifacts.find((a) => a.id === id) ?? null);
+  });
+}
 
 vi.mock("../../../src/features/knowledge-base/components", () => ({
   ArtifactFilters: ({
@@ -114,7 +162,7 @@ function makeArtifact(overrides: Partial<Artifact> = {}): Artifact {
 describe("KnowledgeBasePage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockGetUnifiedArtifacts.mockResolvedValue([]);
+    setupMockArtifacts([]);
 
     const { createProjectContextValue, createSelectableProject } =
       await import("../setup/projectContext");
@@ -132,7 +180,7 @@ describe("KnowledgeBasePage", () => {
 
   it("renders the artifact list after loading artifacts", async () => {
     const artifacts: Artifact[] = [makeArtifact({ id: "a1", title: "readme.md" })];
-    mockGetUnifiedArtifacts.mockResolvedValue(artifacts);
+    setupMockArtifacts(artifacts);
 
     render(
       <MemoryRouter>
@@ -150,7 +198,7 @@ describe("KnowledgeBasePage", () => {
     there used to land on the bare page and the reader had to find the document again.
   */
   it("opens the artifact named in the URL", async () => {
-    mockGetUnifiedArtifacts.mockResolvedValue([
+    setupMockArtifacts([
       makeArtifact({ id: "a1", title: "readme.md" }),
       makeArtifact({ id: "a2", title: "runbook.md" }),
     ]);
@@ -167,7 +215,7 @@ describe("KnowledgeBasePage", () => {
   });
 
   it("opens no artifact without the parameter", async () => {
-    mockGetUnifiedArtifacts.mockResolvedValue([makeArtifact({ id: "a1", title: "readme.md" })]);
+    setupMockArtifacts([makeArtifact({ id: "a1", title: "readme.md" })]);
 
     render(
       <MemoryRouter>
@@ -205,7 +253,7 @@ describe("KnowledgeBasePage", () => {
   });
 
   it("no longer offers uploading here — that moved into the Add source wizard", async () => {
-    mockGetUnifiedArtifacts.mockResolvedValue([makeArtifact({ id: "a1", title: "readme.md" })]);
+    setupMockArtifacts([makeArtifact({ id: "a1", title: "readme.md" })]);
 
     render(
       <MemoryRouter>
@@ -226,7 +274,7 @@ describe("KnowledgeBasePage", () => {
       makeArtifact({ id: "a1", title: "readme.md" }),
       makeArtifact({ id: "a2", title: "contributing.md", sourceId: "src2" }),
     ];
-    mockGetUnifiedArtifacts.mockResolvedValue(artifacts);
+    setupMockArtifacts(artifacts);
 
     render(
       <MemoryRouter>
@@ -251,7 +299,7 @@ describe("KnowledgeBasePage", () => {
       makeArtifact({ id: "a1", title: "github-file.md", sourceSystem: "GITHUB" }),
       makeArtifact({ id: "a2", title: "uploaded-file.pdf", sourceSystem: "UPLOAD" }),
     ];
-    mockGetUnifiedArtifacts.mockResolvedValue(artifacts);
+    setupMockArtifacts(artifacts);
 
     render(
       <MemoryRouter>
@@ -271,8 +319,8 @@ describe("KnowledgeBasePage", () => {
     });
   });
 
-  it("shows the fetch error banner when getUnifiedArtifacts rejects", async () => {
-    mockGetUnifiedArtifacts.mockRejectedValue(new Error("Server down"));
+  it("shows the fetch error banner when getArtifactPage rejects", async () => {
+    mockGetArtifactPage.mockRejectedValue(new Error("Server down"));
 
     render(
       <MemoryRouter>
@@ -289,10 +337,8 @@ describe("KnowledgeBasePage", () => {
   });
 
   it("re-fetches when the retry button is clicked after an error", async () => {
-    mockGetUnifiedArtifacts.mockRejectedValueOnce(new Error("Server down"));
-    mockGetUnifiedArtifacts.mockResolvedValueOnce([
-      makeArtifact({ id: "a1", title: "recovered.md" }),
-    ]);
+    mockGetArtifactPage.mockRejectedValueOnce(new Error("Server down"));
+    setupMockArtifacts([makeArtifact({ id: "a1", title: "recovered.md" })]);
 
     render(
       <MemoryRouter>
@@ -312,10 +358,7 @@ describe("KnowledgeBasePage", () => {
   });
 
   it("re-fetches when the refresh button is clicked", async () => {
-    mockGetUnifiedArtifacts.mockResolvedValueOnce([]);
-    mockGetUnifiedArtifacts.mockResolvedValueOnce([
-      makeArtifact({ id: "a1", title: "after-refresh.md" }),
-    ]);
+    setupMockArtifacts([]);
 
     render(
       <MemoryRouter>
@@ -326,6 +369,8 @@ describe("KnowledgeBasePage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("kb-refresh")).toBeInTheDocument();
     });
+
+    setupMockArtifacts([makeArtifact({ id: "a1", title: "after-refresh.md" })]);
 
     await userEvent.click(screen.getByTestId("kb-refresh"));
 

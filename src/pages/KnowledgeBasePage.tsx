@@ -14,6 +14,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeBase";
+import { useArtifactById } from "../features/knowledge-base/hooks/useArtifactById";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
@@ -146,9 +147,21 @@ export function KnowledgeBasePage() {
     setSelectedArtifactId(null);
   }
 
-  const selectedArtifact = useMemo(
-    () => artifacts.find((a) => a.id === selectedArtifactId) ?? null,
+  const isSelectedInPage = useMemo(
+    () => artifacts.some((a) => a.id === selectedArtifactId),
     [artifacts, selectedArtifactId],
+  );
+
+  const { data: fetchedArtifact } = useArtifactById(
+    projectId,
+    selectedArtifactId && !isSelectedInPage ? selectedArtifactId : null,
+  );
+
+  const selectedArtifact = useMemo(
+    () =>
+      artifacts.find((a) => a.id === selectedArtifactId) ??
+      (fetchedArtifact?.id === selectedArtifactId ? fetchedArtifact : null),
+    [artifacts, selectedArtifactId, fetchedArtifact],
   );
 
   const prefersReducedMotion = useReducedMotion();

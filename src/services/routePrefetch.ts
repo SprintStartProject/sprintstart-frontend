@@ -2,7 +2,10 @@ import type { QueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./queryKeys";
 import { knowledgeRequestService } from "./knowledgeRequestService";
 import { loadBoard } from "../features/board/hooks/useBoard";
-import { loadKnowledgeBaseArtifacts } from "../features/knowledge-base/hooks/useKnowledgeBase";
+import {
+  loadKnowledgeBasePage,
+  loadKnowledgeBaseFacets,
+} from "../features/knowledge-base/hooks/useKnowledgeBase";
 import { loadStarterWorkReviewQueue } from "../features/starter-work/hooks/useStarterWorkReview";
 
 /**
@@ -68,8 +71,12 @@ export function prefetchRoute(
     case "/knowledge-base":
       if (!projectId) return;
       void queryClient.prefetchQuery({
-        queryKey: queryKeys.knowledgeBase.byProject(projectId),
-        queryFn: () => loadKnowledgeBaseArtifacts(projectId),
+        queryKey: queryKeys.knowledgeBase.list(projectId, { page: 1, size: 20 }),
+        queryFn: () => loadKnowledgeBasePage(projectId, { page: 1, size: 20 }),
+      });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.knowledgeBase.facets(projectId, {}),
+        queryFn: () => loadKnowledgeBaseFacets(projectId, {}),
       });
       return;
 

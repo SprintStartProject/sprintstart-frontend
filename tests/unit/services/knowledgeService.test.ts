@@ -232,10 +232,128 @@ describe("knowledgeService", () => {
     });
   });
 
+  describe("getArtifactPage", () => {
+    const projectId = "proj-uuid";
+
+    it("serializes filter criteria and pagination into query params and returns page response", async () => {
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("page")).toBe("2");
+          expect(url.searchParams.get("size")).toBe("20");
+          expect(url.searchParams.get("search")).toBe("guide");
+          expect(url.searchParams.getAll("types")).toEqual(["FILE", "ISSUE"]);
+          expect(url.searchParams.getAll("sources")).toEqual(["GITHUB"]);
+          expect(url.searchParams.getAll("repositories")).toEqual(["owner/repo"]);
+          expect(url.searchParams.get("format")).toBe("PDF");
+
+          return HttpResponse.json({
+            items: [
+              {
+                id: "art-1",
+                title: "guide.pdf",
+                artifactType: "FILE",
+                sourceSystem: "GITHUB",
+                sourceId: "src-1",
+                sourceUrl: null,
+                mime: "application/pdf",
+                language: null,
+                ingestedAt: "2026-01-01T00:00:00Z",
+                lastChangedAt: null,
+                contentHash: null,
+                ingestionRunId: null,
+              },
+            ],
+            metadata: {
+              pageNumber: 2,
+              pageSize: 20,
+              totalElements: 25,
+              totalPages: 2,
+              isFirst: false,
+              isLast: true,
+              hasNext: false,
+              hasPrevious: true,
+            },
+          });
+        }),
+      );
+
+      const page = await knowledgeService.getArtifactPage(projectId, {
+        page: 2,
+        size: 20,
+        search: "guide",
+        types: ["FILE", "ISSUE"],
+        sources: ["GITHUB"],
+        repositories: ["owner/repo"],
+        format: "PDF",
+      });
+
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0].title).toBe("guide.pdf");
+      expect(page.metadata.totalElements).toBe(25);
+    });
+  });
+
+  describe("getArtifactFacets", () => {
+    const projectId = "proj-uuid";
+
+    it("queries facets endpoint and returns aggregated facet breakdown", async () => {
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts/facets`, ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("search")).toBe("guide");
+          return HttpResponse.json({
+            types: [{ value: "FILE", count: 10 }],
+            sources: [{ value: "GITHUB", count: 10 }],
+            formats: [{ value: "PDF", count: 3 }],
+            repositories: [{ value: "owner/repo", count: 7 }],
+          });
+        }),
+      );
+
+      const facets = await knowledgeService.getArtifactFacets(projectId, {
+        search: "guide",
+      });
+
+      expect(facets.types).toEqual([{ value: "FILE", count: 10 }]);
+      expect(facets.formats).toEqual([{ value: "PDF", count: 3 }]);
+    });
+  });
+
+  describe("getArtifactById", () => {
+    const projectId = "proj-uuid";
+    const artifactId = "art-uuid";
+
+    it("fetches single artifact by id", async () => {
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts/${artifactId}`, () => {
+          return HttpResponse.json({
+            id: artifactId,
+            title: "detail.md",
+            artifactType: "FILE",
+            sourceSystem: "GITHUB",
+            sourceId: "src-detail",
+            sourceUrl: null,
+            mime: "text/markdown",
+            language: null,
+            ingestedAt: "2026-01-01T00:00:00Z",
+            lastChangedAt: null,
+            contentHash: null,
+            ingestionRunId: null,
+          });
+        }),
+      );
+
+      const artifact = await knowledgeService.getArtifactById(projectId, artifactId);
+      expect(artifact.id).toBe(artifactId);
+      expect(artifact.title).toBe("detail.md");
+    });
+  });
+
   describe("getUnifiedArtifacts", () => {
     const projectId = "proj-uuid";
 
-    it("fetches a single page of artifacts", async () => {
+    it("fetches a single page of artifacts and returns items", async () => {
       server.use(
         http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
           const url = new URL(request.url);
@@ -258,8 +376,15 @@ describe("knowledgeService", () => {
                 ingestionRunId: null,
               },
             ],
-            page: {
+            metadata: {
+              pageNumber: 1,
+              pageSize: 100,
+              totalElements: 1,
               totalPages: 1,
+              isFirst: true,
+              isLast: true,
+              hasNext: false,
+              hasPrevious: false,
             },
           });
         }),
@@ -268,64 +393,6 @@ describe("knowledgeService", () => {
       const artifacts = await knowledgeService.getUnifiedArtifacts(projectId);
       expect(artifacts).toHaveLength(1);
       expect(artifacts[0].title).toBe("doc1.md");
-    });
-
-    it("fetches across multiple pages until all pages are retrieved", async () => {
-      server.use(
-        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
-          const url = new URL(request.url);
-          const page = url.searchParams.get("page");
-          if (page === "1") {
-            return HttpResponse.json({
-              items: [
-                {
-                  id: "art-1",
-                  title: "page1.md",
-                  artifactType: "FILE",
-                  sourceSystem: "GITHUB",
-                  sourceId: "src-1",
-                  sourceUrl: null,
-                  mime: "text/markdown",
-                  language: null,
-                  ingestedAt: "2026-01-01T00:00:00Z",
-                  lastChangedAt: null,
-                  contentHash: null,
-                  ingestionRunId: null,
-                },
-              ],
-              page: {
-                totalPages: 2,
-              },
-            });
-          }
-          return HttpResponse.json({
-            items: [
-              {
-                id: "art-2",
-                title: "page2.md",
-                artifactType: "FILE",
-                sourceSystem: "GITHUB",
-                sourceId: "src-2",
-                sourceUrl: null,
-                mime: "text/markdown",
-                language: null,
-                ingestedAt: "2026-01-01T00:00:00Z",
-                lastChangedAt: null,
-                contentHash: null,
-                ingestionRunId: null,
-              },
-            ],
-            page: {
-              totalPages: 2,
-            },
-          });
-        }),
-      );
-
-      const artifacts = await knowledgeService.getUnifiedArtifacts(projectId);
-      expect(artifacts).toHaveLength(2);
-      expect(artifacts[0].title).toBe("page1.md");
-      expect(artifacts[1].title).toBe("page2.md");
     });
 
     it("propagates ApiError when the request fails with 500", async () => {

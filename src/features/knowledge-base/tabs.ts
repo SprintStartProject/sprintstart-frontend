@@ -1,4 +1,4 @@
-import type { Artifact, ArtifactType, SourceSystem } from "./types";
+import type { Artifact, ArtifactType, SourceSystem, UploadFormat } from "./types";
 
 /**
  * Human-readable display names for the artifact sources (connectors).
@@ -80,7 +80,7 @@ export const KNOWLEDGE_TAB_ORDER: readonly KnowledgeTab[] = KNOWLEDGE_TABS.map((
  * for uploads, so this facet is offered only while `UPLOAD` is part of the
  * source selection (see `useKnowledgeBase`).
  */
-export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
+export type { UploadFormat } from "./types";
 
 /** Human-readable display names for the file-format facet. */
 export const FORMAT_LABELS: Record<UploadFormat, string> = {
