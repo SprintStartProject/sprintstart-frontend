@@ -474,9 +474,13 @@ export function ProjectAnalysisDialog({
           >
             {/* Drawn at one size and scaled down on a phone, where the dialog is narrower than
                 the orb; the box shrinks with it so no empty band is left underneath. */}
-            <div className="flex h-[288px] justify-center sm:h-[360px]">
-              <div className="origin-top scale-[0.8] sm:scale-100">
-                <AnalysisOrb tasks={tasks} active={running} />
+            <div className="flex h-[288px] min-w-0 justify-center sm:h-[360px]">
+              {/* A transform does not change the space an element takes, so the box is given the
+                  scaled width itself — otherwise the full-size orb widens the dialog on a phone. */}
+              <div className="w-[288px] sm:w-[360px]">
+                <div className="origin-top-left scale-[0.8] sm:scale-100">
+                  <AnalysisOrb tasks={tasks} active={running} />
+                </div>
               </div>
             </div>
 
