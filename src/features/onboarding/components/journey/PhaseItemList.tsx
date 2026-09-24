@@ -11,6 +11,7 @@ import {
   type PhaseItem,
 } from "../../journey";
 import { ItemFlags, ItemGlyph } from "../../graph/JourneyNodeCards";
+import { itemNumbers } from "../../itemNumbers";
 import { itemKindLabel, itemStateLabel, primaryActionLabel } from "../../graph/nodeLabels";
 import type { OnboardingPhaseEndpoint } from "../../types";
 
@@ -49,6 +50,9 @@ export function PhaseItemList({
   renderExpanded,
 }: Props) {
   const items = orderedPhaseItems(phase);
+  // The numbers the buddy uses for the same items. Labels rather than a count down this list: the
+  // list reads in graph order, the numbers stay put so "#3" means one item on every surface.
+  const numbers = itemNumbers(phase);
 
   if (items.length === 0) {
     return (
@@ -77,7 +81,7 @@ export function PhaseItemList({
             key={isLinked ? `${item.id}:${linkHighlight.key}` : item.id}
             id={linkedCardId(item.id)}
             data-item-id={item.id}
-            className={`overflow-hidden rounded-2xl border transition-colors ${isLinked ? "app-link-highlight" : ""}${
+            className={`overflow-hidden rounded-2xl border transition-colors ${
               isExpanded
                 ? isQuestion
                   ? "border-app-question-border bg-app-surface shadow-lg"
@@ -89,7 +93,7 @@ export function PhaseItemList({
                   : isQuestion
                     ? "border-app-question-border/60 bg-app-question-bg/30 hover:bg-app-question-bg/60"
                     : "border-app-border/70 bg-app-surface/60 hover:bg-app-surface"
-            }`}
+            } ${isLinked ? "app-link-highlight" : ""}`}
           >
             <div className="flex items-center gap-3 p-3 pr-4">
               <button
@@ -120,6 +124,9 @@ export function PhaseItemList({
                             : "text-app-text"
                       }`}
                     >
+                      <span className="mr-1.5 font-mono font-normal text-app-text-subtle">
+                        #{numbers.get(item.id)}
+                      </span>
                       {isQuestion ? item.question.question : item.title}
                     </span>
                   </span>

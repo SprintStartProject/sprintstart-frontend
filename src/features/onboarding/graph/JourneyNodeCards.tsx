@@ -281,12 +281,18 @@ export function ItemNodeCard({
   render,
   isNext = false,
   showUpdates = false,
+  number,
 }: {
   item: PhaseItem;
   state: ItemState;
   render: JourneyNodeRenderState;
   isNext?: boolean;
   showUpdates?: boolean;
+  /**
+   * The number the item carries on the list and in the buddy's replies (see `itemNumbers`), so a
+   * node here can be talked about by the number the hire can see on it.
+   */
+  number?: number;
 }) {
   const minutes = item.kind === "step" ? item.step.estimatedMinutes : null;
   const isQuestion = item.kind === "question";
@@ -316,6 +322,9 @@ export function ItemNodeCard({
               : "text-app-text"
           }`}
         >
+          {number !== undefined ? (
+            <span className="mr-1 font-mono font-normal text-app-text-subtle">#{number}</span>
+          ) : null}
           {item.title}
         </p>
       </div>

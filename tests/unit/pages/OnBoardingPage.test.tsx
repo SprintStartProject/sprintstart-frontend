@@ -974,6 +974,23 @@ describe("OnBoardingPage: links from the buddy", () => {
     ).not.toBeInTheDocument();
   });
 
+  /** Steps first, then questions -- the numbering `BuddyPathTools` gives the mentor. */
+  it("numbers the rows the way the buddy numbers them", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/onboarding?phase=phase-2"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("heading", { name: "Meetings", level: 2 });
+    expect(container.querySelector("#onboarding-item-step-phase-2")).toHaveTextContent("#1");
+    expect(container.querySelector("#onboarding-item-q-linked")).toHaveTextContent("#2");
+  });
+
   it("lands on the phase a link names", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
