@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StepWorkspace } from "../../../../../../src/features/onboarding/components/journey/StepWorkspace";
@@ -24,12 +24,14 @@ vi.mock("../../../../../../src/services/onboardingService", () => ({
 
 const mockOpenAiBuddy = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../../../src/features/buddy/aiBuddyBus", () => ({
+// The real path-changed signal, so a test can announce one the way the dock does.
+vi.mock("../../../../../../src/features/buddy/aiBuddyBus", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../../../src/features/buddy/aiBuddyBus")>()),
   openAiBuddy: mockOpenAiBuddy,
-  onBuddyPathChanged: () => () => undefined,
 }));
 
 import { onboardingService } from "../../../../../../src/services/onboardingService";
+import { announceBuddyPathChanged } from "../../../../../../src/features/buddy/aiBuddyBus";
 
 const step = {
   id: "step1",
@@ -249,6 +251,18 @@ describe("StepWorkspace", () => {
     expect(mockOpenAiBuddy).toHaveBeenCalledWith({
       draft: expect.stringContaining("Setup Environment") as string,
     });
+  });
+
+  it("re-reads the step after the buddy changed the path", async () => {
+    renderWorkspace();
+    await screen.findByText("1/2 done");
+    vi.mocked(onboardingService.fetchTasks).mockResolvedValue(
+      tasks.map((task) => ({ ...task, finished: true })),
+    );
+
+    act(() => announceBuddyPathChanged());
+
+    await waitFor(() => expect(screen.getByText("2/2 done")).toBeInTheDocument());
   });
 
   it("does not offer the buddy on a step that is behind the hire", async () => {

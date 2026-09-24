@@ -28,6 +28,7 @@ import type {
   OnboardingTaskEndpoint,
 } from "../../types";
 import { AskTheBuddy } from "../../../buddy/components/AskTheBuddy";
+import { onBuddyPathChanged } from "../../../buddy/aiBuddyBus";
 import { askAboutStep } from "../../buddyDrafts";
 import { StepOriginBadge } from "../StepOriginBadge";
 import { TaskCheckItem } from "../TaskCheckItem";
@@ -96,6 +97,11 @@ export function StepWorkspace({
   const [comment, setComment] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // Bumped when the buddy changed the path, so the open step re-reads its tasks and status: ticking
+  // a line off in the conversation must show on the checklist behind the dock.
+  const [buddyChanges, setBuddyChanges] = useState(0);
+
+  useEffect(() => onBuddyPathChanged(() => setBuddyChanges((count) => count + 1)), []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -142,7 +148,7 @@ export function StepWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [stepId, stepStatus]);
+  }, [stepId, stepStatus, buddyChanges]);
 
   if (error) {
     return (

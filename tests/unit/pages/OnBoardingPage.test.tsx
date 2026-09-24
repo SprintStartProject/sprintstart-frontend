@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Link, MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -6,6 +6,7 @@ import { OnBoardingPage } from "../../../src/pages/OnBoardingPage";
 import { http, HttpResponse } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
 import { onboardingService } from "../../../src/services/onboardingService";
+import { announceBuddyPathChanged } from "../../../src/features/buddy/aiBuddyBus";
 import {
   OnboardingJourneyContext,
   type OnboardingJourneyValue,
@@ -871,6 +872,40 @@ describe("OnBoardingPage", () => {
  * opened in a second tab. A step or question link *lands* on the card — its phase opens, the page
  * scrolls to it, and it lights up — and starts nothing: that stays the hire's own click.
  */
+describe("OnBoardingPage: changes the buddy made", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    projectContextState.selectedProjectId = "proj1";
+  });
+
+  it("re-reads the path when the buddy announces a change", async () => {
+    const fetchPath = vi.spyOn(onboardingService, "fetchPath");
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          generationIssues: [],
+          phases: [phaseFixture("phase-1", 0, "Overview")],
+        }),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+    await screen.findByRole("heading", { name: "Overview", level: 2 });
+    const before = fetchPath.mock.calls.length;
+
+    act(() => announceBuddyPathChanged());
+
+    await waitFor(() => expect(fetchPath.mock.calls.length).toBeGreaterThan(before));
+  });
+});
+
 describe("OnBoardingPage: links from the buddy", () => {
   beforeEach(() => {
     vi.clearAllMocks();

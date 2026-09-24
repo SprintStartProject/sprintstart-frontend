@@ -21,12 +21,14 @@ import { AuroraBackground } from "./components/layout/AuroraBackground";
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
+import { useBuddyPathSync } from "./features/buddy/hooks/useBuddyPathSync";
 
 function AppContent() {
   const { status } = useAuth();
   const { showRocketPet } = useMoments();
   const { isFocused } = useFocusMode();
   useScrollRestoration();
+  useBuddyPathSync();
 
   // Signed in at all — the shell is drawn for anyone past the login screen, onboarding included.
   // `signingOut` stays out on purpose: it is the boot script's "this load is a logout return"

@@ -71,6 +71,7 @@ import type {
 import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
+import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
 import { askAboutEmptyPhase, askAboutPhase } from "../features/onboarding/buddyDrafts";
 import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
@@ -298,6 +299,16 @@ export function OnBoardingPage() {
       });
     }
   }, [applyPath, toast]);
+
+  /**
+   * Re-reads the path after the buddy changed it.
+   *
+   * The buddy lives in a dock over this page, which is where a hire most likely is while talking
+   * about their path. Without this, confirming "mark this step as done" in the conversation left the
+   * list behind the dock still showing the step open. Told rather than polled; see
+   * `announceBuddyPathChanged`.
+   */
+  useEffect(() => onBuddyPathChanged(() => void refreshPath()), [refreshPath]);
 
   // A generation that finished -- here or while the user was elsewhere -- means there is a new path.
   // Read fresh rather than taken from the generation: the hire may have started working on it before
