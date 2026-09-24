@@ -253,6 +253,23 @@ describe("useDinoWaitingGame hooks", () => {
       expect(isInteractiveTarget(div)).toBe(false);
       expect(isInteractiveTarget(null)).toBe(false);
     });
+
+    it("lets Space through on a disabled control, which has no Space action", () => {
+      // A busy ui/Button is disabled while it can still hold focus; it must not
+      // keep the game shut for the very wait the game exists for.
+      const busy = document.createElement("button");
+      busy.disabled = true;
+      const ariaBusy = document.createElement("div");
+      ariaBusy.setAttribute("role", "button");
+      ariaBusy.setAttribute("aria-disabled", "true");
+      const disabledInput = document.createElement("input");
+      disabledInput.disabled = true;
+
+      expect(isInteractiveTarget(busy)).toBe(false);
+      expect(isInteractiveTarget(ariaBusy)).toBe(false);
+      // Text fields stay protected either way: the typing guard is unchanged.
+      expect(isInteractiveTarget(disabledInput)).toBe(true);
+    });
   });
 
   describe("useDinoUnlocked storage guard", () => {

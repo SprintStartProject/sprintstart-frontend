@@ -583,17 +583,17 @@ describe("SourceDetailsPanel", () => {
     render(
       <SourceDetailsPanel source={mockSource} onUpdateSource={onUpdateSource} onClose={vi.fn()} />,
     );
-
+    // SidePanel moves focus into the drawer on the next animation frame; let it
+    // land before the click, or it could pull focus off the Update button after.
+    await waitFor(() =>
+      expect(screen.getByRole("dialog")).toContainElement(document.activeElement as HTMLElement),
+    );
     await user.click(screen.getByRole("button", { name: /Update repo/ }));
-    // Space on a focused button is that button's own activation, so the game
-    // only opens once focus has left it.
-    (document.activeElement as HTMLElement | null)?.blur();
-    // The trigger arms in an effect once the update is in flight; under a loaded
-    // runner that can land a tick after the click resolves, so retry the press.
-    await waitFor(() => {
-      fireEvent.keyDown(window, { code: "Space" });
-      expect(screen.getByTestId("dino-game")).toBeInTheDocument();
-    });
+    // Focus stays on the Update button, now disabled while the request runs.
+    // Space on a disabled control has no meaning of its own, so it opens the game.
+    expect(screen.getByRole("button", { name: /Update repo/ })).toHaveFocus();
+    fireEvent.keyDown(window, { code: "Space" });
+    expect(screen.getByTestId("dino-game")).toBeInTheDocument();
 
     // Status still reads "connected", but the update has not settled yet.
     expect(screen.queryByTestId("dino-game-reply-ready")).not.toBeInTheDocument();

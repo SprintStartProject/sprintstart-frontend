@@ -71,9 +71,17 @@ const SPACE_ACTIVATED_SELECTOR = [
  * one to decide whether a key is typing, and a focused button is not typing.
  * Only the Space-to-play trigger needs the wider set, because swallowing
  * Space on a focused "Send" button would open a game instead of pressing it.
+ *
+ * A disabled control is the exception: Space on it does nothing, and a
+ * busy button (`ui/Button` with `loading`) is disabled while it may still
+ * hold focus, so treating it as the owner of Space would keep the game
+ * shut for exactly the wait it exists for.
  */
 export const isInteractiveTarget = (el: EventTarget | null): boolean =>
-  isTypingTarget(el) || (el instanceof Element && el.matches(SPACE_ACTIVATED_SELECTOR));
+  isTypingTarget(el) ||
+  (el instanceof Element &&
+    el.matches(SPACE_ACTIVATED_SELECTOR) &&
+    !el.matches(':disabled, [aria-disabled="true"]'));
 
 /**
  * Which host currently has the one waiting-game open, if any.
