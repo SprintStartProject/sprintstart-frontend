@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useContext, useEffect, useId, useRef, type ReactNode } from "react";
+import { SWIPE_IGNORE_ATTRIBUTE } from "../../hooks/useHorizontalWheelNavigation";
 import { PanelPresenceContext } from "./panelPresenceContext";
 import { sidePanelSlideToken } from "../../styles/tokens";
 
@@ -177,6 +178,9 @@ export function SidePanel({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
+        // A sideways flick inside a panel is a flick inside a panel. Without this it reached the
+        // page underneath, where it switches tabs -- behind an overlay the person is reading.
+        {...{ [SWIPE_IGNORE_ATTRIBUTE]: "" }}
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={description ? descriptionId : undefined}
         initial={{ x: "100%", opacity: 0 }}

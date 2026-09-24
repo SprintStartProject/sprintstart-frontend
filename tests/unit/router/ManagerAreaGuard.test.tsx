@@ -48,6 +48,12 @@ vi.mock("../../../src/features/onboarding-metrics/components/OnboardingMetricsPa
 vi.mock("../../../src/pages/DashboardPage.tsx", () => ({
   DashboardPage: () => <div>dashboard page</div>,
 }));
+vi.mock("../../../src/pages/BlueprintPathsPage.tsx", () => ({
+  BlueprintPathsPage: () => <div>blueprint list page</div>,
+}));
+vi.mock("../../../src/pages/BlueprintPathDetailPage.tsx", () => ({
+  BlueprintPathDetailPage: () => <div>blueprint editor page</div>,
+}));
 
 function renderAt(path: string) {
   return render(
@@ -66,6 +72,8 @@ describe("manager-area routes", () => {
   const managerRoutes = [
     ["/hire-setup", "hire setup page"],
     ["/insights/onboarding", "onboarding metrics page"],
+    ["/blueprints", "blueprint list page"],
+    ["/blueprints/bp-1", "blueprint editor page"],
   ] as const;
 
   it.each(managerRoutes)("sends a hire away from %s", async (path, marker) => {
@@ -105,6 +113,25 @@ describe("manager-area routes", () => {
       expect(screen.getByText("dashboard page")).toBeInTheDocument();
     });
     expect(screen.queryByText("onboarding metrics page")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Blueprints are project-scoped in both pages, so a PM who merely belongs to the selected
+   * project is kept out of the editor too, not just the list.
+   */
+  it.each([
+    ["/blueprints", "blueprint list page"],
+    ["/blueprints/bp-1", "blueprint editor page"],
+  ] as const)("keeps a PM who only takes part in the project off %s", async (path, marker) => {
+    auth.permissionGroup = "PM";
+    auth.canManageSelected = false;
+
+    renderAt(path);
+
+    await waitFor(() => {
+      expect(screen.getByText("dashboard page")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(marker)).not.toBeInTheDocument();
   });
 
   /**

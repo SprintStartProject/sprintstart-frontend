@@ -1,4 +1,4 @@
-import type { BoardCard } from "../types";
+import { PATH_STEP_FALLBACK_TITLE, type BoardCard } from "../types";
 
 /**
  * The invisible marks the retired "Build my path" generator put at the front of a checklist title:
@@ -44,6 +44,8 @@ export function cardName(card: BoardCard): string {
       return "What you have shown";
     case "MEMORY_RECAP":
       return "What your buddy remembers";
+    case "PATH_STEP":
+      return content.title ?? PATH_STEP_FALLBACK_TITLE;
     default:
       return "Card";
   }

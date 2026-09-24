@@ -100,6 +100,9 @@ const ACCENTS: Record<BoardCardKind, CardAccent> = {
   SUGGESTED_TASKS: PURPLE,
   COMPETENCY_PROGRESS: PURPLE,
 
+  // The hire's current step, live from the path — the one AI-owned card the hire partly writes to.
+  PATH_STEP: PURPLE,
+
   // The hire's own three, each its own colour — these are the cards a board fills up with.
   NOTE: PINK,
   LINK: CYAN,

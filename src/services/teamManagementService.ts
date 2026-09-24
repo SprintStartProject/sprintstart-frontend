@@ -4,6 +4,7 @@ import skillsMock from "../mocks/skillsMock.json";
 import type {
   ProjectRole,
   Skill,
+  SkillSuggestion,
   TeamOverviewUser,
   SkillLevel,
   SkillStatus,
@@ -33,6 +34,8 @@ type LegacySkill = {
   roleId?: string;
   roleIds?: string[];
   status?: SkillStatus;
+  category?: string | null;
+  universal?: boolean;
 };
 
 function normalizeSkill(skill: LegacySkill): Skill {
@@ -43,6 +46,8 @@ function normalizeSkill(skill: LegacySkill): Skill {
     name: skill.name,
     roleIds,
     status: skill.status ?? "ACTIVE",
+    category: skill.category ?? null,
+    universal: skill.universal ?? false,
   };
 }
 
@@ -309,24 +314,34 @@ export type OnboardingFeedback = {
   readAt?: string | null;
 };
 
+/**
+ * Feedback as the rest of the app may assume it: a message that is there, and a `read` that is a
+ * definite boolean rather than absent.
+ *
+ * `read` being optional is what let three different readings of "unread" grow -- `read !== true`,
+ * `read === false` -- which disagreed exactly when the backend omitted the field: one surface
+ * offered "Mark read" on an item another surface was already calling read.
+ */
+function normaliseFeedback(item: OnboardingFeedback): OnboardingFeedback {
+  return {
+    ...item,
+    message: item.message ?? item.comment ?? "",
+    read: item.read ?? !!item.readAt,
+  };
+}
+
 export async function getUserOnboardingFeedback(userId: string): Promise<OnboardingFeedback[]> {
   const feedback = await apiClient.fetch<OnboardingFeedback[]>(
     `/api/v1/admin/onboarding/users/${userId}/feedback`,
   );
 
-  return feedback.map((item) => ({
-    ...item,
-    message: item.message ?? item.comment ?? "",
-  }));
+  return feedback.map(normaliseFeedback);
 }
 
 export async function getAllOnboardingFeedback(): Promise<OnboardingFeedback[]> {
   const feedback = await apiClient.fetch<OnboardingFeedback[]>("/api/v1/admin/onboarding/feedback");
 
-  return feedback.map((item) => ({
-    ...item,
-    message: item.message ?? item.comment ?? "",
-  }));
+  return feedback.map(normaliseFeedback);
 }
 
 export async function markOnboardingFeedbackRead(feedbackId: string): Promise<void> {
@@ -498,6 +513,8 @@ type SkillResponseDto = {
   id: string;
   name: string;
   status?: SkillStatus;
+  category?: string | null;
+  universal?: boolean;
   roleId?: string;
   roleIds?: string[];
   projectRole?: {
@@ -524,6 +541,8 @@ function toSkill(skill: SkillResponseDto): Skill {
     name: skill.name,
     roleIds: skill.roleIds ?? legacyRoleIds,
     status: skill.status ?? "ACTIVE",
+    category: skill.category ?? null,
+    universal: skill.universal ?? false,
   };
 }
 
@@ -553,6 +572,65 @@ export async function updateSkill(
   });
 
   return toSkill(response);
+}
+
+export type SuggestSkillsContext = {
+  projectId?: string;
+  industry?: string;
+};
+
+type SkillSuggestionsResponseDto = {
+  suggestions: SkillSuggestion[];
+};
+
+export type AcceptSkillSuggestionRequest = {
+  skillId?: string;
+  name?: string;
+  category?: string | null;
+};
+
+/**
+ * Requests reviewable AI suggestions without changing the role's persisted skills.
+ *
+ * Project context is optional. When supplied, the backend authorizes it before using
+ * its industry and artifact corpus. Failures propagate so the review panel can show
+ * an actionable error instead of pretending that the AI returned no suggestions.
+ */
+export async function suggestSkillsForRole(
+  roleId: string,
+  context?: SuggestSkillsContext,
+): Promise<SkillSuggestion[]> {
+  const hasContext = Boolean(context?.projectId || context?.industry);
+  const response = await apiClient.fetch<SkillSuggestionsResponseDto>(
+    `/api/v1/projectRoles/${roleId}/skills/suggest`,
+    {
+      method: "POST",
+      ...(hasContext ? { body: JSON.stringify(context) } : {}),
+    },
+  );
+
+  return response.suggestions;
+}
+
+/**
+ * Persists one reviewed suggestion and returns the role's complete updated skill list.
+ *
+ * Existing catalog entries are accepted by ID. New suggestions are accepted by name
+ * and optional category so the backend can create and link a non-universal skill.
+ */
+export async function acceptSkillSuggestion(
+  roleId: string,
+  request: AcceptSkillSuggestionRequest,
+): Promise<Skill[]> {
+  const response = await apiClient.fetch<SkillResponseDto[]>(
+    `/api/v1/projectRoles/${roleId}/skills/suggestions/accept`,
+    {
+      method: "POST",
+      body: JSON.stringify(request),
+    },
+  );
+
+  return response.map(toSkill);
 }
 
 export async function getSkillsByRoleId(roleId: string): Promise<Skill[]> {
@@ -601,6 +679,7 @@ export async function reactivateSkill(
         name,
         roleIds,
         status: "ACTIVE",
+        universal: false,
       }
     );
   }
@@ -635,6 +714,7 @@ export async function createSkill(name: string, roleIds: string[]): Promise<Skil
       name,
       roleIds,
       status: "ACTIVE",
+      universal: false,
     };
 
     mockSkills = [...mockSkills, newSkill];

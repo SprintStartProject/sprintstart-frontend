@@ -9,14 +9,13 @@ import type {
   OnboardingResourceEndpoint,
   OnboardingPersonalizeEvent,
   OnboardingPersonalizeHandlers,
-  StepStatus,
+  OnboardingGenerationStatus,
   QuestionAttemptSubmission,
   QuestionAttemptResult,
   AdminPhaseQuestionsEndpoint,
   UpsertQuestion,
   QuestionAttemptsReviewEndpoint,
 } from "../features/onboarding/types";
-import onboardingStepMock from "../mocks/onboardingStepMock.json";
 
 /**
  * Onboarding path, step, question and task CRUD.
@@ -37,12 +36,20 @@ export const onboardingService = {
    * Triggers AI generation of the current user's onboarding path and streams
    * progress over SSE. Replaces any existing path once the `path` event arrives.
    *
+   * The generation runs on the backend independently of this stream: aborting it
+   * (via `signal`) or losing the connection only stops watching. Calling this while
+   * a generation is already running attaches to that one instead of starting another.
+   *
    * `projectId` is interpolated into the URL because path generation is
    * project-scoped: the path is copied from the active blueprint of the project
    * the user has selected. Hook it to the selected project so the generated
    * path matches the project the user is looking at.
    */
-  async personalizePath(projectId: string, handlers: OnboardingPersonalizeHandlers): Promise<void> {
+  async personalizePath(
+    projectId: string,
+    handlers: OnboardingPersonalizeHandlers,
+    signal?: AbortSignal,
+  ): Promise<void> {
     try {
       if (keycloak.authenticated) {
         await keycloak.updateToken(30);
@@ -58,6 +65,7 @@ export const onboardingService = {
       headers: {
         Authorization: `Bearer ${keycloak.token}`,
       },
+      signal,
     });
 
     if (!res.ok) {
@@ -84,23 +92,35 @@ export const onboardingService = {
           handlers.onDone();
           return;
         case "error":
-          handlers.onError?.(event.message ?? "Unknown error");
+          handlers.onError?.(event.message ?? "Unknown error", event.reason ?? undefined);
           return;
       }
     }
 
-    handlers.onDone();
+    // Falling out of the loop means the body ended without `done` or `error`, which the backend
+    // never does on purpose. Reporting a finished path here told members their path was ready
+    // while it was still being built.
+    handlers.onInterrupted?.();
+  },
+
+  /**
+   * Whether a path generation is running for the current user -- started in another tab, or in
+   * this one before a reload -- and whether the project has the active blueprint a new one needs.
+   */
+  async fetchGenerationStatus(projectId: string): Promise<OnboardingGenerationStatus> {
+    return await apiClient.fetch<OnboardingGenerationStatus>(
+      `/api/v1/projects/${projectId}/onboarding/me/path/generation`,
+    );
   },
 
   // ── STEP ─────────────────────────────────────────────────
 
+  /**
+   * One step with its details. Failures propagate: the step view shows its own error state, and a
+   * stand-in step would offer to complete or skip something that does not exist.
+   */
   async fetchStep(stepId: string): Promise<OnboardingStepDetail> {
-    try {
-      return await apiClient.fetch<OnboardingStepDetail>(`/api/v1/onboarding/me/steps/${stepId}`);
-    } catch (error) {
-      console.error(`Error fetching onboarding step with ID ${stepId}:`, error);
-      return onboardingStepMock as OnboardingStepDetail;
-    }
+    return await apiClient.fetch<OnboardingStepDetail>(`/api/v1/onboarding/me/steps/${stepId}`);
   },
 
   /**
@@ -114,26 +134,18 @@ export const onboardingService = {
     });
   },
 
-  async updateStepStatus(step: OnboardingStepDetail, newStatus: StepStatus): Promise<void> {
-    if (newStatus === "FINISHED") {
-      await apiClient.fetch(`/api/v1/onboarding/me/steps/${step.id}/complete`, {
-        method: "PUT",
-      });
-      return;
-    }
-
-    await apiClient.fetch(`/api/v1/onboarding/me/steps/${step.id}`, {
+  /**
+   * Marks a step done.
+   *
+   * Narrowed from a general `updateStepStatus`: every other status went to `PUT /steps/{id}` with
+   * `status` and `skip` in the body, which `UpdateOnboardingStepRequest` does not have. Spring
+   * ignores unknown properties, so those calls returned 200 and changed nothing -- while also
+   * truncating `expectedOutcomes` to its first entry. A member has exactly one status to set, and
+   * this is it.
+   */
+  async completeStep(stepId: string): Promise<void> {
+    await apiClient.fetch(`/api/v1/onboarding/me/steps/${stepId}/complete`, {
       method: "PUT",
-      body: JSON.stringify({
-        position: step.position,
-        title: step.title,
-        description: step.description,
-        type: step.type ?? "TASK",
-        estimatedMinutes: step.estimatedMinutes,
-        expectedOutcome: step.expectedOutcomes?.[0] ?? "",
-        status: newStatus,
-        skip: step.skip ?? null,
-      }),
     });
   },
 
@@ -150,6 +162,11 @@ export const onboardingService = {
         }),
       },
     );
+  },
+
+  /** Records that the member has seen the PM's answer to a skip request. */
+  async markSkipAnswerSeen(skipId: string): Promise<void> {
+    await apiClient.fetch(`/api/v1/onboarding/me/skips/${skipId}/seen`, { method: "POST" });
   },
 
   // ── KNOWLEDGE-CHECK QUESTIONS ───────────────────────────

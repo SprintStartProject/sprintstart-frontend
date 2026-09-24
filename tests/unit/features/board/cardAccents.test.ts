@@ -13,6 +13,7 @@ const KINDS: BoardCardKind[] = [
   "SUGGESTED_TASKS",
   "COMPETENCY_PROGRESS",
   "MEMORY_RECAP",
+  "PATH_STEP",
   "NOTE",
   "LINK",
   "CHECKLIST",

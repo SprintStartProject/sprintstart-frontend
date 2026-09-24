@@ -72,8 +72,8 @@ vi.mock("../../../src/components/common/UserAvatar", () => ({
   UserAvatar: () => <svg role="img" aria-label="User Avatar" width="56" height="56" />,
 }));
 
-vi.mock("../../../src/features/team-management/components/detail/MemberOnboardingSection", () => ({
-  MemberOnboardingSection: () => <div data-testid="member-onboarding-section">Onboarding</div>,
+vi.mock("../../../src/features/team-management/components/detail/MemberJourneySection", () => ({
+  MemberJourneySection: () => <div data-testid="member-journey-section">Onboarding</div>,
 }));
 
 vi.mock("../../../src/features/team-management/components/detail/MemberGapsPanel", () => ({
@@ -88,10 +88,6 @@ vi.mock("../../../src/features/team-management/components/detail/MemberGapsPanel
 
 vi.mock("../../../src/features/team-management/components/detail/StepDetailsPanel", () => ({
   StepDetailsPanel: () => <div data-testid="step-details-panel">Step Details</div>,
-}));
-
-vi.mock("../../../src/features/team-management/components/detail/AddCustomStepModal", () => ({
-  AddCustomStepModal: () => <div data-testid="add-custom-step-modal">Add Step</div>,
 }));
 
 vi.mock("../../../src/features/team-management/components/detail/MemberDetailDialogs", () => ({
@@ -237,7 +233,7 @@ describe("TeamMemberDetailPage", () => {
     });
   });
 
-  it("accepts a pending skip request", async () => {
+  it("accepts a pending skip request, with the comment the PM wrote", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -246,17 +242,18 @@ describe("TeamMemberDetailPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Skip request")).toBeInTheDocument();
+      expect(screen.getByText("Skip requested")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Accept" }));
+    await user.type(screen.getByLabelText("Comment for the member"), "Fine by me");
+    await user.click(screen.getByRole("button", { name: "Approve skip" }));
 
     await waitFor(() => {
-      expect(mockAcceptOnboardingSkipRequest).toHaveBeenCalledWith("skip1");
+      expect(mockAcceptOnboardingSkipRequest).toHaveBeenCalledWith("skip1", "Fine by me");
     });
   });
 
-  it("denies a pending skip request", async () => {
+  it("declines a pending skip request", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -265,14 +262,74 @@ describe("TeamMemberDetailPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Skip request")).toBeInTheDocument();
+      expect(screen.getByText("Skip requested")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Deny" }));
+    await user.click(screen.getByRole("button", { name: "Decline" }));
 
     await waitFor(() => {
-      expect(mockDenyOnboardingSkipRequest).toHaveBeenCalledWith("skip1");
+      expect(mockDenyOnboardingSkipRequest).toHaveBeenCalledWith("skip1", "");
     });
+  });
+
+  /**
+   * The decision cannot be retried once it is in, and the same request is answerable from a
+   * second surface, so the page holds one in-flight answer per skip.
+   */
+  it("answers a skip request once, however fast the PM clicks", async () => {
+    const user = userEvent.setup();
+    // Never settles: the point is what the other controls do while one answer is in flight,
+    // and `beforeEach` puts the resolving mock back for the next test.
+    mockAcceptOnboardingSkipRequest.mockImplementation(() => new Promise<void>(() => {}));
+
+    render(
+      <MemoryRouter>
+        <TeamMemberDetailPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Skip requested")).toBeInTheDocument();
+    });
+
+    const approve = screen.getByRole("button", { name: "Approve skip" });
+    await user.click(approve);
+    await user.click(approve);
+    await user.click(screen.getByRole("button", { name: "Decline" }));
+
+    expect(mockAcceptOnboardingSkipRequest).toHaveBeenCalledTimes(1);
+    expect(mockDenyOnboardingSkipRequest).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The decision is in, but both surfaces still draw the request as pending until the refresh
+   * lands -- and if the refresh never lands, they draw it for good. Enabling them again in the
+   * meantime invites a second decision against a request the server has already answered.
+   */
+  it("keeps the answered request locked when the refresh that should clear it fails", async () => {
+    const user = userEvent.setup();
+    mockAcceptOnboardingSkipRequest.mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <TeamMemberDetailPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Skip requested")).toBeInTheDocument();
+    });
+
+    // Only the refresh that follows the decision fails; the page itself loaded.
+    mockGetTeamMember.mockRejectedValueOnce(new Error("gateway"));
+
+    await user.click(screen.getByRole("button", { name: "Approve skip" }));
+
+    await waitFor(() => expect(mockAcceptOnboardingSkipRequest).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Approve skip" })).toBeDisabled();
+    });
+    expect(screen.getByRole("button", { name: "Decline" })).toBeDisabled();
   });
 
   // The knowledge-gaps overview is the project's full component roster now, but

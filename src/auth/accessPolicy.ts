@@ -81,6 +81,7 @@ const routePermissions: Record<AppRoute, readonly PermissionGroup[]> = {
 const MANAGER_ASSIGNMENT_ROUTES: readonly AppRoute[] = [
   "/pm-dashboard",
   "/data-ingestion",
+  "/blueprints",
   "/team-management",
   "/insights/faq",
   "/insights/knowledge-gaps",

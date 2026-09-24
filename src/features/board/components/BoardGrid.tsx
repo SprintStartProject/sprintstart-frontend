@@ -27,6 +27,7 @@ import { MemoryRecapCard } from "./MemoryRecapCard";
 import { NoteCard } from "./NoteCard";
 import { ArrivalStepsCard } from "./ArrivalStepsCard";
 import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
+import { PathStepCard } from "./PathStepCard";
 import { SuggestedTasksCard } from "./SuggestedTasksCard";
 import { BoardCardContext } from "./boardCardControls";
 import { BoardStageBand } from "./BoardStageBand";
@@ -35,6 +36,8 @@ import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
 import { moveTo } from "../layout/boardOrder";
 import { cardIcon } from "../layout/cardIcons";
+import { buddyLockSaid, lockedAfter, teamLockSaid } from "../../graph-diagram/lockWords";
+import { unblockedByFinishing } from "../layout/nextUp";
 import { cardName } from "../layout/cardNames";
 import type { CardStack } from "../layout/cardStacks";
 import {
@@ -374,6 +377,8 @@ type BoardGridProps = {
   onToggleDone?: (cardId: string, done: boolean) => void;
   /** Makes a card wait on one other card, or on nothing. */
   onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
+  /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
+  onShowChain?: (cardId: string) => void;
   /**
    * The stacks on this board, keyed by every member's id.
    *
@@ -414,6 +419,15 @@ type BoardGridProps = {
    * `layout/cardOrigins.ts`, including the note about wanting this on the wire instead.
    */
   cardOrigins?: CardOrigins;
+  /**
+   * Told when a card made *from* a card on this board has landed — a checklist broken out of a
+   * task, today the only case.
+   *
+   * Separate from `onEdit` and `onDismiss` because it is not a change to a card the grid is
+   * holding: it is a new card appearing, which only a re-read can show. Without it the write goes
+   * through, the toast says so, and the board keeps drawing what it read before the press.
+   */
+  onCardAdded?: () => void;
 };
 
 type SharedProps = {
@@ -422,6 +436,8 @@ type SharedProps = {
   dismissing: boolean;
   /** Where this card came from, for the kinds that can have been found somewhere. */
   origin?: CardOrigin | null;
+  /** Told when this card made another one — see `BoardGridProps.onCardAdded`. */
+  onCardAdded?: () => void;
 };
 
 /**
@@ -435,11 +451,13 @@ function BoardCardView({
   card,
   onEdit,
   origin,
+  onCardAdded,
   ...shared
 }: SharedProps & { onEdit?: (cardId: string, request: AuthoredCardRequest) => void }) {
-  // Only the authored kinds take an origin, so it is unpacked here rather than spread with the
-  // rest: a live card was never found anywhere, and handing it a prop it ignores invites somebody
-  // to wire one up later and wonder why nothing shows.
+  // Only the authored kinds take an origin — all three of them now, since a checklist minted from
+  // a task is as found as a note taken from a paragraph. It is unpacked here rather than spread
+  // with the rest: a live card was never found anywhere, and handing it a prop it ignores invites
+  // somebody to wire one up later and wonder why nothing shows.
   const props = { card, ...shared };
   switch (card.content.kind) {
     case "ARRIVAL_STEPS":
@@ -447,21 +465,23 @@ function BoardCardView({
     case "OPEN_PULL_REQUESTS":
       return <OpenPullRequestsCard content={card.content} {...props} />;
     case "CURRENT_TASK":
-      return <CurrentTaskCard content={card.content} {...props} />;
+      return <CurrentTaskCard content={card.content} onCardAdded={onCardAdded} {...props} />;
     case "SUGGESTED_TASKS":
-      return <SuggestedTasksCard content={card.content} {...props} />;
+      return <SuggestedTasksCard content={card.content} onCardAdded={onCardAdded} {...props} />;
     case "COMPETENCY_PROGRESS":
       return <CompetencyProgressCard content={card.content} {...props} />;
     case "MEMORY_RECAP":
       return <MemoryRecapCard content={card.content} {...props} />;
     case "DIAGRAM":
       return <DiagramCard content={card.content} {...props} />;
+    case "PATH_STEP":
+      return <PathStepCard content={card.content} {...props} />;
     case "NOTE":
       return <NoteCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
     case "LINK":
       return <LinkCard content={card.content} origin={origin} {...props} />;
     case "CHECKLIST":
-      return <ChecklistCard content={card.content} onEdit={onEdit} {...props} />;
+      return <ChecklistCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
     default:
       return (
         <section className="rounded-2xl border border-dashed border-app-border p-4">
@@ -521,6 +541,7 @@ export function BoardGrid({
   onAssignGroupStage,
   onToggleDone,
   onSetPredecessor,
+  onShowChain,
   stacks,
   expandedStackIds,
   onToggleStack,
@@ -529,6 +550,7 @@ export function BoardGrid({
   cardSizes,
   cardOrigins,
   onResizeCard,
+  onCardAdded,
 }: BoardGridProps) {
   const wideEnough = useMediaQuery(TWO_COLUMN_QUERY);
 
@@ -561,6 +583,25 @@ export function BoardGrid({
 
   /** The cards on screen, in the order they are drawn. */
   const shownIds = useMemo(() => board.cards.map((card) => card.id), [board.cards]);
+
+  /**
+   * What finishing each card would free, counted once for the whole board.
+   *
+   * A question about *other* cards, like "blocked" is — so it is answered in one pass here rather
+   * than by every card asking the same question about the same forty.
+   */
+  const unblocksById = useMemo(
+    () =>
+      states
+        ? new Map(
+            board.cards.map((card) => [
+              card.id,
+              unblockedByFinishing(board.cards, states, card.id),
+            ]),
+          )
+        : null,
+    [board.cards, states],
+  );
 
   /**
    * The whole board's order, filtered cards included.
@@ -987,6 +1028,10 @@ export function BoardGrid({
         onAssignStage={isArranging ? onAssignStage : undefined}
         onToggleDone={onToggleDone}
         onSetPredecessor={isArranging ? onSetPredecessor : undefined}
+        // Unlike the pickers, this is not an arranging tool: the question it answers — why is this
+        // card closed — is asked hardest by somebody who is trying to work, not to rearrange.
+        onShowChain={onShowChain}
+        unblocks={unblocksById?.get(card.id)}
         onDrop={handleCardDrop}
         onMove={move}
         onDismiss={onDismiss}
@@ -1009,6 +1054,7 @@ export function BoardGrid({
         }
         size={sizeOf(cardSizes, card.id)}
         origin={originOf(cardOrigins, card.id)}
+        onCardAdded={onCardAdded}
         onResize={onResizeCard ? (next) => onResizeCard(card.id, next) : undefined}
       />
     );
@@ -1328,6 +1374,10 @@ type BoardCardCellProps = {
   onAssignStage?: (cardId: string, stage: BoardStage) => void;
   onToggleDone?: (cardId: string, done: boolean) => void;
   onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
+  /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
+  onShowChain?: (cardId: string) => void;
+  /** How many cards this one alone is holding up, already counted by the grid. */
+  unblocks?: number;
   /**
    * Set only on the top card of a *closed* pile — the one standing in for the others.
    *
@@ -1337,6 +1387,8 @@ type BoardCardCellProps = {
   stack?: CardStack;
   /** Where this card came from, passed through to the kinds that show it. */
   origin?: CardOrigin | null;
+  /** Passed through to the kinds that can make a card — see `BoardGridProps.onCardAdded`. */
+  onCardAdded?: () => void;
   onToggleStack?: (rootId: string) => void;
   /** Opens the pile and brings one member into view. Absent when the pile cannot be opened. */
   onRevealMember?: (cardId: string) => void;
@@ -1388,8 +1440,11 @@ function BoardCardCell({
   onAssignStage,
   onToggleDone,
   onSetPredecessor,
+  onShowChain,
+  unblocks,
   stack,
   origin,
+  onCardAdded,
   onToggleStack,
   onRevealMember,
   size,
@@ -1407,7 +1462,8 @@ function BoardCardCell({
 }: BoardCardCellProps) {
   const dragControls = useDragControls();
 
-  const label = card.content.kind === "NOTE" ? "note" : card.content.kind.toLowerCase();
+  const label =
+    card.content.kind === "NOTE" ? "note" : card.content.kind.toLowerCase().replace(/_/g, " ");
 
   /**
    * The card this one waits on, for the picker to show.
@@ -1547,11 +1603,11 @@ function BoardCardCell({
         // why this card is behind that one when the hire never put it there.
         <span
           className="flex max-w-40 items-center gap-1 text-xs text-app-text-muted"
-          title={`Your team put this after ${predecessorName ? cardName(predecessorName) : "another card"}.`}
+          title={teamLockSaid(predecessorName ? cardName(predecessorName) : null)}
         >
           <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
           <span className="min-w-0 truncate">
-            After: {predecessorName ? cardName(predecessorName) : "another card"}
+            {lockedAfter(predecessorName ? cardName(predecessorName) : "another card")}
           </span>
         </span>
       ) : (
@@ -1564,7 +1620,7 @@ function BoardCardCell({
           // not look like something they set themselves and forgot.
           title={
             state?.predecessorSource === "BUDDY" && predecessorName
-              ? `Your buddy put this after ${cardName(predecessorName)}. You can change it.`
+              ? buddyLockSaid(cardName(predecessorName))
               : undefined
           }
           onChange={(event) => onSetPredecessor(card.id, event.target.value || null)}
@@ -1574,11 +1630,13 @@ function BoardCardCell({
             .filter((other) => other.id !== card.id)
             .map((other) => (
               <option key={other.id} value={other.id}>
-                After: {cardName(other)}
+                {lockedAfter(cardName(other))}
               </option>
             ))}
         </Select>
       ),
+      onShowChain: onShowChain ? () => onShowChain(card.id) : undefined,
+      unblocks,
       stack:
         stack && onToggleStack
           ? {
@@ -1660,6 +1718,8 @@ function BoardCardCell({
       onAssignStage,
       onMove,
       onSetPredecessor,
+      onShowChain,
+      unblocks,
       onToggleStack,
       predecessorName,
       isArranging,
@@ -1787,6 +1847,7 @@ function BoardCardCell({
               dismissing={dismissing}
               onEdit={onEdit}
               origin={origin}
+              onCardAdded={onCardAdded}
             />
           </BoardCardContext.Provider>
         </motion.div>

@@ -94,10 +94,19 @@ function toBlueprintPath(path: BackendBlueprintPath): BlueprintPath {
   };
 }
 
-function blueprintBase(scope: BlueprintScope) {
+function onboardingBase(scope: BlueprintScope) {
   return scope.kind === "global"
-    ? "/api/v1/onboarding/blueprints"
-    : `/api/v1/projects/${encodeURIComponent(scope.projectId)}/onboarding/blueprints`;
+    ? "/api/v1/onboarding"
+    : `/api/v1/projects/${encodeURIComponent(scope.projectId)}/onboarding`;
+}
+
+function blueprintBase(scope: BlueprintScope) {
+  return `${onboardingBase(scope)}/blueprints`;
+}
+
+/** Phase graph nodes live under `/blueprint/graph-nodes`, beside rather than inside the paths. */
+function graphNodeBase(scope: BlueprintScope) {
+  return `${onboardingBase(scope)}/blueprint/graph-nodes`;
 }
 
 /** Communicates with the Blueprint authoring endpoints, which are separate from live onboarding paths. */
@@ -271,33 +280,18 @@ export const blueprintService = {
       method: "PUT",
       body: JSON.stringify(input),
     }),
-  /** Stores a step's graph-canvas coordinates. */
-  updateStepGraphPosition: (scope: BlueprintScope, stepId: string, input: GraphPositionUpdate) =>
-    apiClient.fetch<GraphPositionUpdate>(`${blueprintBase(scope)}/steps/${stepId}/graph-position`, {
+  /** Stores a phase's top-level graph-canvas coordinates. */
+  updateGraphNodePosition: (scope: BlueprintScope, nodeId: string, input: GraphPositionUpdate) =>
+    apiClient.fetch<GraphPositionUpdate>(`${graphNodeBase(scope)}/${nodeId}/position`, {
       method: "PUT",
       body: JSON.stringify(input),
     }),
-  /** Removes a step from the graph canvas while preserving the step in its phase. */
-  removeStepGraphPosition: (scope: BlueprintScope, stepId: string, revision: number) =>
-    apiClient.fetch<{ revision: number }>(
-      `${blueprintBase(scope)}/steps/${stepId}/graph-position`,
-      {
-        method: "DELETE",
-        body: JSON.stringify({ revision }),
-      },
-    ),
-  /** Stores a phase's top-level graph-canvas coordinates. */
-  updateGraphNodePosition: (scope: BlueprintScope, nodeId: string, input: GraphPositionUpdate) =>
-    apiClient.fetch<GraphPositionUpdate>(
-      `${blueprintBase(scope).replace("/blueprints", "")}/blueprint/graph-nodes/${nodeId}/position`,
-      { method: "PUT", body: JSON.stringify(input) },
-    ),
   /** Removes a phase from the path graph without deleting the phase itself. */
   removeGraphNodePosition: (scope: BlueprintScope, nodeId: string, revision: number) =>
-    apiClient.fetch<GraphNodePositionRemoval>(
-      `${blueprintBase(scope).replace("/blueprints", "")}/blueprint/graph-nodes/${nodeId}/position`,
-      { method: "DELETE", body: JSON.stringify({ revision }) },
-    ),
+    apiClient.fetch<GraphNodePositionRemoval>(`${graphNodeBase(scope)}/${nodeId}/position`, {
+      method: "DELETE",
+      body: JSON.stringify({ revision }),
+    }),
   /** Creates a prerequisite edge between two phases in the path graph. */
   addGraphNodeBlocker: (
     scope: BlueprintScope,
@@ -305,10 +299,10 @@ export const blueprintService = {
     blockerId: string,
     revision: number,
   ) =>
-    apiClient.fetch<BlockerUpdate>(
-      `${blueprintBase(scope).replace("/blueprints", "")}/blueprint/graph-nodes/${nodeId}/blockers/${blockerId}`,
-      { method: "POST", body: JSON.stringify({ revision }) },
-    ),
+    apiClient.fetch<BlockerUpdate>(`${graphNodeBase(scope)}/${nodeId}/blockers/${blockerId}`, {
+      method: "POST",
+      body: JSON.stringify({ revision }),
+    }),
   /** Removes a prerequisite edge between two phases in the path graph. */
   removeGraphNodeBlocker: (
     scope: BlueprintScope,
@@ -316,10 +310,10 @@ export const blueprintService = {
     blockerId: string,
     revision: number,
   ) =>
-    apiClient.fetch<BlockerUpdate>(
-      `${blueprintBase(scope).replace("/blueprints", "")}/blueprint/graph-nodes/${nodeId}/blockers/${blockerId}`,
-      { method: "DELETE", body: JSON.stringify({ revision }) },
-    ),
+    apiClient.fetch<BlockerUpdate>(`${graphNodeBase(scope)}/${nodeId}/blockers/${blockerId}`, {
+      method: "DELETE",
+      body: JSON.stringify({ revision }),
+    }),
   /** Stores a step or question node position in its phase subgraph. */
   updateSubGraphNodePosition: (scope: BlueprintScope, nodeId: string, input: GraphPositionUpdate) =>
     apiClient.fetch<GraphPositionUpdate>(
@@ -357,21 +351,6 @@ export const blueprintService = {
       `${blueprintBase(scope)}/sub-graph-nodes/${nodeId}/blockers/${blockerId}`,
       { method: "DELETE", body: JSON.stringify({ revision }) },
     ),
-  /** Adds a prerequisite edge: the step cannot start until blockerId is complete. */
-  addStepBlocker: (scope: BlueprintScope, stepId: string, blockerId: string, revision: number) =>
-    apiClient.fetch<BlockerUpdate>(
-      `${blueprintBase(scope)}/steps/${stepId}/blockers/${blockerId}`,
-      {
-        method: "POST",
-        body: JSON.stringify({ revision }),
-      },
-    ),
-  /** Removes a prerequisite edge from a step. */
-  removeStepBlocker: (scope: BlueprintScope, stepId: string, blockerId: string, revision: number) =>
-    apiClient.fetch<BlockerUpdate>(`${blueprintBase(scope)}/steps/${stepId}/blocker/${blockerId}`, {
-      method: "DELETE",
-      body: JSON.stringify({ revision }),
-    }),
   /** Adds a task to a Blueprint step. */
   createTask: (scope: BlueprintScope, stepId: string, input: TaskInput) =>
     apiClient.fetch(`${blueprintBase(scope)}/steps/${stepId}/task`, {

@@ -6,6 +6,7 @@ import {
   ChartColumn,
   Database,
   DoorOpen,
+  DraftingCompass,
   Inbox,
   LayoutDashboard,
   MessageSquare,
@@ -251,6 +252,66 @@ export function OnboardingIcon({ isActive }: SidebarIconProps) {
 }
 
 /** Data Ingestion: the platters drop onto the stack, top last. */
+/**
+ * Blueprints: the compass opens and draws its arc.
+ *
+ * It used to borrow the hire's rocket, which is the one icon in the sidebar that
+ * already means something else — the path somebody is *walking*. A blueprint is
+ * the thing somebody *draws* for them, and a drafting compass is the oldest
+ * picture there is of that: the legs part, the lead comes down, and the curve
+ * appears under it.
+ *
+ * The arc draws itself with `pathLength` rather than being revealed by a mask,
+ * so the line appears from one end the way a drawn line does. Both legs turn
+ * about the hinge, which is the only point on a compass that does not move.
+ */
+export function BlueprintsIcon({ isActive }: SidebarIconProps) {
+  const playKey = usePlayOnActivate(isActive);
+  const hasPlayed = playKey > 0;
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) return <DraftingCompass className={ICON_CLASS} />;
+
+  const hinge = { transformOrigin: "12px 5px", transformBox: "view-box" } as const;
+
+  return (
+    <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+      {/* The leg that holds the point. It swings out from closed, so the arc it
+          is about to draw has somewhere to start. */}
+      <motion.path
+        d="m3 21 8.02-14.26"
+        style={hinge}
+        initial={hasPlayed ? { rotate: 14 } : false}
+        animate={{ rotate: 0 }}
+        transition={bounce}
+      />
+
+      {/* The leg that holds the lead, in two pieces with the arc between them —
+          which is why they turn as one group rather than separately. */}
+      <motion.g
+        style={hinge}
+        initial={hasPlayed ? { rotate: -14 } : false}
+        animate={{ rotate: 0 }}
+        transition={bounce}
+      >
+        <path d="m12.99 6.74 1.93 3.44" />
+        <path d="m21 21-2.16-3.84" />
+      </motion.g>
+
+      {/* Drawn left to right once the legs have settled, which is the order a
+          hand does it in. */}
+      <motion.path
+        d="M19.136 12a10 10 0 0 1-14.271 0"
+        initial={hasPlayed ? { pathLength: 0 } : false}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.55, ease: "easeInOut", delay: 0.12 }}
+      />
+
+      <circle cx="12" cy="5" r="2" />
+    </IconFrame>
+  );
+}
+
 export function DataIngestionIcon({ isActive }: SidebarIconProps) {
   const playKey = usePlayOnActivate(isActive);
   const hasPlayed = playKey > 0;

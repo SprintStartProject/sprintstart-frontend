@@ -43,6 +43,8 @@ export interface OnboardingStepSkip {
   accepted: boolean | null;
   reviewComment: string | null;
   reviewedAt: string | null;
+  /** When the member saw the PM's answer; null while it is new to them. */
+  answerSeenAt?: string | null;
 }
 
 /** Who put a step on a path — see the backend's `StepOrigin`. */
@@ -271,11 +273,30 @@ export interface OnboardingPersonalizeEvent {
   detail?: string;
   path?: OnboardingPathEndpoint;
   message?: string;
+  /** On `error`: a code the client can explain, e.g. `not-enough-knowledge`. */
+  reason?: string;
+}
+
+/** GET /projects/{projectId}/onboarding/me/path/generation */
+export interface OnboardingGenerationStatus {
+  running: boolean;
+  runningProjectId?: string | null;
+  startedAt?: string | null;
+  hasActiveBlueprint: boolean;
+  /** Tells "none yet" from "several, which is ambiguous" when `hasActiveBlueprint` is false. */
+  activeBlueprintCount?: number;
 }
 
 export interface OnboardingPersonalizeHandlers {
   onStage?: (name: string, detail?: string) => void;
   onPath: (path: OnboardingPathEndpoint) => void;
   onDone: () => void;
-  onError?: (message: string) => void;
+  /** `reason` is a code for failures the client can explain, e.g. `not-enough-knowledge`. */
+  onError?: (message: string, reason?: string) => void;
+  /**
+   * The stream ended without `done` or `error`. The backend always terminates with one of the
+   * two, so this means the connection was cut -- an idle proxy, a restart, a dropped network --
+   * while the run itself carries on detached. Not a finished path.
+   */
+  onInterrupted?: () => void;
 }

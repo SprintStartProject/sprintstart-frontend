@@ -4,9 +4,10 @@ import { useAuth } from "../../../context/useAuth";
 /**
  * Whether the onboarding entry should be offered to this user.
  *
- * Path existence is deliberately not part of navigation availability. The
- * onboarding page owns that state and offers manual personalization when the
- * real path endpoint returns 404.
+ * Always, while onboarding is theirs to do -- whether or not a path can be built right now. The page
+ * says why not (no project, no published blueprint, nothing in the knowledge base yet) and only offers
+ * to start when a start can succeed; an entry that appears and disappears with the project's state
+ * was harder to find than one that explains itself.
  */
 export function useOnboardingAvailable(): boolean {
   const { profile } = useAuth();

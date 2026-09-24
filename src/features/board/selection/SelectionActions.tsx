@@ -1,14 +1,17 @@
 import { useCallback, useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookmarkPlus, Eraser, Highlighter, Reply } from "lucide-react";
+import { BookmarkPlus, Eraser, Highlighter, MessageCircle, Reply } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
+import { useFocusMode } from "../../../context/useFocusMode";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { ChatContext } from "../../../context/ChatContext";
 import { boardService } from "../../../services/boardService";
 import { rememberOrigin } from "../layout/cardOrigins";
 import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
+import { openAiBuddy } from "../../buddy/aiBuddyBus";
+import { quoteFromSelection } from "../../buddy/quoteFromSelection";
 import { cardFor } from "./selectionCapture";
 import { useTextSelection } from "./useTextSelection";
 
@@ -27,11 +30,19 @@ const TOOLBAR_HEIGHT = 44;
  * remembering to come back for it, or nobody does.
  *
  * Deliberately does not navigate. Being pulled to `/board` to confirm something landed is exactly
- * the interruption this exists to avoid; the toast carries the way there for whoever wants it.
+ * the interruption this exists to avoid; the toast carries the way there for whoever wants it. The
+ * same holds for the second offer: asking the buddy opens the dock over the page rather than going
+ * to `/buddy`, because what the question is about is what is on screen.
+ *
+ * **Two things to do with found text, and they are not the same thing.** Keeping it is for text
+ * that will matter later; asking about it is for text that does not make sense now. Offering only
+ * the first made the board the answer to both, and a hire who did not understand a sentence filed
+ * it instead of asking about it.
  */
 export function SelectionActions() {
   const { selection, clear } = useTextSelection();
   const { selectedProjectId } = useProjectContext();
+  const { isFocused } = useFocusMode();
   const { canMark, colorAt, enclosingColorAt, mark, unmark } = useCardMarks();
   const chatContext = useContext(ChatContext);
   const quoteSelection = chatContext?.quoteSelection;
@@ -68,6 +79,26 @@ export function SelectionActions() {
       setSaving(false);
     }
   }, [selection, selectedProjectId, toast, navigate, clear]);
+
+  /**
+   * Hands the selection to the buddy as a quote, unsent.
+   *
+   * Delivery is a `CustomEvent` the dock listens for, so it reaches the dock only while the dock is
+   * mounted — which is why the offer is withheld in focus mode (see {@link canAsk}), the one place
+   * this toolbar is on screen and the dock is not. With the dock there, nothing is awaited: the
+   * seed lands in the composer in the same tick, so the selection is cleared straight away rather
+   * than left floating over words that are already on their way.
+   *
+   * What lands is added to the composer, never swapped in for it — see `withSeed` in
+   * `buddy/hooks/useBuddy.ts`. See `buddy/quoteFromSelection.ts` for why a quote the hire has not
+   * sent yet is the hire speaking rather than the frontend speaking for them.
+   */
+  const ask = useCallback(() => {
+    if (!selection) return;
+
+    openAiBuddy({ draft: quoteFromSelection(selection) });
+    clear();
+  }, [selection, clear]);
 
   if (!selection) return null;
 
@@ -124,6 +155,15 @@ export function SelectionActions() {
   // with nothing true to say: the pen is not on offer here, and neither half of the other branch
   // applies to text the board is already holding.
   if (marking && !offersPen && !erasable) return null;
+
+  /**
+   * Whether "Ask the buddy" has anything to hand the selection to.
+   *
+   * Needs a project, like keeping does, and needs the dock to be mounted: in focus mode the app
+   * takes the dock away (`showBuddyDock` in `App.tsx`) while this toolbar stays, and a button
+   * whose only visible effect is making the toolbar vanish is worse than no button.
+   */
+  const canAsk = Boolean(selectedProjectId) && !isFocused;
 
   const { rect } = selection;
   const fitsAbove = rect.top > TOOLBAR_HEIGHT + OFFSET;
@@ -221,6 +261,24 @@ export function SelectionActions() {
             >
               Add to board
             </Button>
+          )}
+
+          {canAsk && (
+            <>
+              <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-app-border" />
+              {/* Second, not first. Keeping is the offer that was always here and the one a hire
+                  reaches for without thinking; asking is the one they reach for having read
+                  something twice. Putting it left of the familiar button would have moved the
+                  familiar button. */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={ask}
+                icon={<MessageCircle className="h-4 w-4" />}
+              >
+                Ask the buddy
+              </Button>
+            </>
           )}
         </div>
       )}

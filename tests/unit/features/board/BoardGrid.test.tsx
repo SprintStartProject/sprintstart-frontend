@@ -11,6 +11,14 @@ import type {
   SuggestedTasksContent,
 } from "../../../../src/features/board/types";
 
+// The task cards offer to keep a task on the hire's own board, and that offer reads the selected
+// project the way every other write to the board does. A harness rendering cards on their own
+// stands one in rather than wrapping the whole board in a provider — see `useProjectContext`
+// for why that hook throws instead of falling back.
+vi.mock("../../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "p1" }),
+}));
+
 const pullRequestContent = (
   over: Partial<OpenPullRequestsContent> = {},
 ): OpenPullRequestsContent => ({
@@ -26,6 +34,7 @@ const currentTaskContent = (over: Partial<CurrentTaskContent> = {}): CurrentTask
   title: "Fix the flaky login test",
   summary: "It fails about one run in five.",
   url: null,
+  closedAtSource: false,
   ...over,
 });
 

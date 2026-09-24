@@ -57,7 +57,20 @@ export type Skill = {
   name: string;
   roleIds: string[];
   status: SkillStatus;
+  category?: string | null;
+  universal: boolean;
   level?: SkillLevel;
+};
+
+/** A non-persisted AI recommendation returned for review before it is linked to a role. */
+export type SkillSuggestion = {
+  skillId: string | null;
+  name: string;
+  category: string | null;
+  reason: string;
+  confidence: string;
+  isNew: boolean;
+  chunkIds: string[];
 };
 
 export function isSkillLinkedToRole(skill: Skill, roleId: string): boolean {

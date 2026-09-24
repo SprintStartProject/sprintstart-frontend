@@ -14,21 +14,30 @@ import {
   Loader2,
   Milestone,
   Minus,
+  Network,
+  Pencil,
   Plus,
   Rocket,
   RotateCcw,
   Square,
+  X,
 } from "lucide-react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AlertDialog } from "../components/ui/AlertDialog.tsx";
 import { Badge } from "../components/ui/Badge.tsx";
 import { Button } from "../components/ui/Button.tsx";
 import { EmptyState } from "../components/ui/EmptyState.tsx";
 import { Field } from "../components/ui/Field.tsx";
 import { Input } from "../components/ui/Input.tsx";
 import { Modal } from "../components/ui/Modal.tsx";
+import { SegmentedTabs } from "../components/ui/SegmentedTabs.tsx";
 import { Select } from "../components/ui/Select.tsx";
 import { Textarea } from "../components/ui/Textarea.tsx";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
+import { PhasePrerequisites } from "../features/blueprints/components/PhasePrerequisites.tsx";
+import { versionWord } from "../features/blueprints/pathLifecycle.ts";
+import { useToast } from "../context/useToast.ts";
+import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation.ts";
 import type {
   BlueprintOption,
   BlueprintGraphNode,
@@ -59,7 +68,18 @@ type CreateTarget = {
   position: number;
   graphPosition?: { graphX: number; graphY: number };
 } | null;
+/**
+ * What the create/edit overlay is currently editing.
+ *
+ * Phase, step and question were missing: the list editor could add one and delete one, but not
+ * rename one — the only way to change a phase's own fields was the graph editor's side panel, three
+ * levels down and only on a draft. Deleting a phase from a surface that cannot edit it is the wrong
+ * half of the pair to offer.
+ */
 type EditTarget =
+  | { kind: "phase"; item: BlueprintPhase }
+  | { kind: "step"; item: BlueprintStep }
+  | { kind: "question"; item: BlueprintQuestion }
   | { kind: "task"; item: BlueprintTask }
   | { kind: "resource"; item: BlueprintResource }
   | { kind: "option"; item: BlueprintOption }
@@ -70,10 +90,61 @@ type RequirementCatalog = {
   skills: { id: string; name: string }[];
   projectRoles: { id: string; name: string }[];
 };
-type GraphDetail =
-  | { kind: "phase"; item: BlueprintPhase }
-  | { kind: "step"; item: BlueprintStep }
-  | { kind: "question"; item: BlueprintQuestion };
+
+/** What else goes when one of these is deleted — the part somebody has to weigh before saying yes. */
+type LifecycleAction = "publish" | "rollback" | "delete-draft";
+
+/**
+ * What each one-way lifecycle action is called and what it costs, said before it happens.
+ *
+ * Archiving already asked; publishing, reverting and deleting a draft did not, although publishing
+ * is the one action here that people outside the team see and a deleted draft cannot be brought
+ * back.
+ */
+const LIFECYCLE_COPY: Record<
+  LifecycleAction,
+  {
+    title: (version: number) => string;
+    description: string;
+    confirm: string;
+    busy: string;
+    failure: string;
+  }
+> = {
+  publish: {
+    title: (version) => `Publish version ${version}?`,
+    description:
+      "Every new hire on this project is given this version from now on, and the version published today stops being handed out. Anybody already on a path keeps their copy.",
+    confirm: "Publish",
+    busy: "Publishing…",
+    failure: "Blueprint could not be published.",
+  },
+  rollback: {
+    title: (version) => `Revert to version ${version}?`,
+    description:
+      "This version becomes the published blueprint again, and new hires are given it from now on. Anybody already on a path keeps their copy.",
+    confirm: "Revert",
+    busy: "Reverting…",
+    failure: "Blueprint version could not be restored.",
+  },
+  "delete-draft": {
+    title: (version) => `Delete draft version ${version}?`,
+    description:
+      "The draft and everything authored in it are gone for good — there is no undo. Published and archived versions are untouched.",
+    confirm: "Delete draft",
+    busy: "Deleting…",
+    failure: "Blueprint draft could not be deleted.",
+  },
+};
+
+const DELETE_CONSEQUENCE: Record<CreateKind, string> = {
+  phase: "Its steps, knowledge checks and every prerequisite pointing at it go with it.",
+  step: "Its tasks, resources and every prerequisite pointing at it go with it.",
+  question: "Its answer options and every prerequisite pointing at it go with it.",
+  task: "The line disappears from this step's checklist.",
+  resource: "The link disappears from this step.",
+  option: "The answer disappears from this question.",
+};
 
 const kindLabels: Record<CreateKind, string> = {
   phase: "phase",
@@ -84,20 +155,100 @@ const kindLabels: Record<CreateKind, string> = {
   option: "option",
 };
 
-/** Compact definition-list cell used by the graph node detail dialog. */
-function DetailStat({ label, value }: { label: string; value: string }) {
+/**
+ * What to put back in front of the author after landing somewhere new.
+ *
+ * Carried by title, not by id, because the one journey that needs it ends on a *copy*: opening a
+ * draft duplicates every phase, step and question, so the ids the author was looking at a moment
+ * ago exist nowhere on the page they arrive at. The titles are the ones they just read.
+ */
+type BlueprintReopen = { phaseTitle: string; nodeTitle?: string };
+
+/**
+ * A loaded path with its phases' graph coordinates and prerequisite edges filled in.
+ *
+ * Phases keep whatever the nested DTO said about everything else; only the three fields that
+ * response cannot carry come from the graph.
+ */
+function withGraphNodes(path: BlueprintPath, nodes: BlueprintGraphNode[]): BlueprintPath {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+
+  return {
+    ...path,
+    blueprintPhases: path.blueprintPhases.map((phase) => {
+      const node = nodesById.get(phase.id);
+      return node
+        ? {
+            ...phase,
+            revision: node.revision,
+            graphX: node.graphX,
+            graphY: node.graphY,
+            blockerIds: node.blockerIds,
+          }
+        : phase;
+    }),
+  };
+}
+
+/**
+ * What this version of the blueprint means for the people it is for.
+ *
+ * The status badge says `DRAFT · v4`, which answers a question nobody asked. The question authors
+ * actually have is whether editing this takes the thing out of service — and the answer is no: a
+ * draft is a copy of the active version, and the active version keeps being handed to new hires
+ * until the draft is published. Saying so is the difference between a surface people edit and one
+ * they are afraid to touch.
+ */
+function LifecycleNotice({
+  status,
+  version,
+}: {
+  status: BlueprintPath["status"];
+  version: number;
+}) {
+  if (status === "DRAFT") {
+    return (
+      <p className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+        <strong className="font-semibold">Draft v{version}.</strong> Nothing here reaches anybody
+        yet — the published version keeps being handed to new hires until you press Publish. Every
+        change is saved as you make it; Publish is what swaps the two over.
+      </p>
+    );
+  }
+
+  if (status === "ARCHIVED") {
+    return (
+      <p className="rounded-xl border border-app-neutral-border bg-app-neutral-bg px-4 py-3 text-sm text-app-neutral-text">
+        <strong className="font-semibold">Archived v{version}.</strong> Read-only. Hires who were
+        given this path keep their copy; nobody new is given it. &ldquo;Revert to this
+        version&rdquo; makes it the published one again.
+      </p>
+    );
+  }
+
   return (
-    <div className="rounded-xl bg-app-surface-muted p-3">
-      <dt className="text-xs font-medium tracking-wide text-app-text-muted uppercase">{label}</dt>
-      <dd className="mt-1 font-semibold text-app-text">{value}</dd>
-    </div>
+    <p className="rounded-xl border border-app-success-border bg-app-success-bg px-4 py-3 text-sm text-app-success-text">
+      <strong className="font-semibold">Published v{version}.</strong> This is what a new hire on
+      this project is given. To change it, open a draft — this version stays in service until the
+      draft is published.
+    </p>
   );
 }
+
+/**
+ * The two ways of looking at a blueprint, in the order the bar draws them.
+ *
+ * Both are editable, which is why neither is called "the editor": the outline is the whole thing
+ * written out in order, the graph is the same content arranged by what waits on what.
+ */
+const EDITOR_MODE_ORDER = ["list", "graph"] as const;
+type EditorMode = (typeof EDITOR_MODE_ORDER)[number];
 
 /** Authors one Blueprint path and its reusable phases, content, and knowledge checks. */
 export function BlueprintPathDetailPage() {
   const { pathId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { profile } = useAuth();
   const { selectedProjectId, isLoading: isProjectLoading } = useProjectContext();
@@ -110,6 +261,9 @@ export function BlueprintPathDetailPage() {
   const projectIdAtMount = useRef<string | null>(null);
   const [path, setPath] = useState<BlueprintPath | null>(null);
   const [subGraphPhaseId, setSubGraphPhaseId] = useState<string | null>(null);
+  /** A phase or node the graph should open by itself, once it has it. See {@link BlueprintReopen}. */
+  const [pendingOpenPhaseTitle, setPendingOpenPhaseTitle] = useState<string | null>(null);
+  const [pendingOpenNodeTitle, setPendingOpenNodeTitle] = useState<string | null>(null);
   const [subGraphNodes, setSubGraphNodes] = useState<BlueprintGraphNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,23 +292,66 @@ export function BlueprintPathDetailPage() {
   const [history, setHistory] = useState<BlueprintPath[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
+  const [pendingLifecycle, setPendingLifecycle] = useState<{
+    action: LifecycleAction;
+    version: BlueprintPath;
+  } | null>(null);
+  const [isLifecycleBusy, setIsLifecycleBusy] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [isDraftPromptOpen, setIsDraftPromptOpen] = useState(false);
+  const [isOpeningDraft, setIsOpeningDraft] = useState(false);
+  const [draftPromptError, setDraftPromptError] = useState<string | null>(null);
   const [addRequirementTarget, setAddRequirementTarget] = useState<RequirementTarget>(null);
-  const [removeRequirementTarget, setRemoveRequirementTarget] = useState<RequirementTarget>(null);
+  const [removingRequirementId, setRemovingRequirementId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    kind: CreateKind;
+    id: string;
+    label: string;
+  } | null>(null);
+  const [pendingDeleteError, setPendingDeleteError] = useState<string | null>(null);
+  // Kept out of the page-wide `error`, which renders in the page body underneath an open overlay.
+  const [itemFormError, setItemFormError] = useState<string | null>(null);
+  const [requirementError, setRequirementError] = useState<string | null>(null);
   const [requirementType, setRequirementType] = useState<"SKILL" | "PROJECT_ROLE">("SKILL");
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<string[]>([]);
   const [requirementCatalog, setRequirementCatalog] = useState<RequirementCatalog | null>(null);
   const [isRequirementCatalogLoading, setIsRequirementCatalogLoading] = useState(false);
   const [isRequirementSaving, setIsRequirementSaving] = useState(false);
-  const [editorMode, setEditorMode] = useState<"list" | "graph">("list");
-  const [graphDetail, setGraphDetail] = useState<GraphDetail | null>(null);
+  const toast = useToast();
+  const [editorMode, setEditorMode] = useState<EditorMode>("list");
+  // Two-finger swipe between the two editors, the same gesture the admin and inbox pages use.
+  const swipeRef = useSwipeableTabs<EditorMode, HTMLElement>({
+    order: EDITOR_MODE_ORDER,
+    value: editorMode,
+    onChange: (mode) => changeEditorMode(mode),
+  });
 
+  /**
+   * Loads the path together with its graph, and merges the two.
+   *
+   * The two requests are one fact. `GET /paths/{id}` returns phases without `graphX`, `graphY` or
+   * `blockerIds` — `GetBlueprintPhaseResponse` simply has no such fields, while the nested *step*
+   * response does — so a path loaded on its own describes every phase as never placed, and the
+   * canvas drawn from it is empty. That is what made the graph vanish after "Edit as draft" (which
+   * navigates to the new draft's id) and after Publish (which replaces the path with a fresh DTO),
+   * and why a reload appeared to fix it: a reload starts in list mode, and the graph was fetched
+   * again on the way back.
+   *
+   * Merging here rather than at each call site means no caller can forget. **Backend TODO:** the
+   * three fields on the nested phase response would remove the second request entirely.
+   */
   const loadPath = useCallback(
     async (showLoading = true) => {
       if (!pathId) return;
       if (showLoading) setIsLoading(true);
       setError(null);
       try {
-        setPath(await blueprintService.getPath(blueprintScope, pathId));
+        const [nextPath, graph] = await Promise.all([
+          blueprintService.getPath(blueprintScope, pathId),
+          blueprintService.getGraph(blueprintScope, pathId),
+        ]);
+        setPath(withGraphNodes(nextPath, graph.nodes));
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : "Blueprint path could not be loaded.");
       } finally {
@@ -197,18 +394,55 @@ export function BlueprintPathDetailPage() {
 
   async function rollback() {
     if (!path) return;
+    const restored = await blueprintService.rollbackPath(
+      blueprintScope,
+      path.blueprintKey,
+      path.version,
+    );
+    if (restored.id === pathId) {
+      // Same address, so the load effect will not refire -- and the response cannot be set
+      // straight into state: `GET /paths/{id}` carries no `graphX`/`graphY`/`blockerIds`, so that
+      // emptied the canvas and the next drag saved a position against it. See `loadPath`.
+      await loadPath(false);
+      return;
+    }
+    void navigate(`/blueprints/${restored.id}${isGlobal ? "?scope=global" : ""}`);
+  }
+
+  async function publish() {
+    if (!path) return;
+    await blueprintService.publishPath(blueprintScope, path.id);
+    // Publishing answers with the same nested DTO, so the graph has to be put back.
+    await loadPath(false);
+    toast.success(`Version ${path.version} is now the published blueprint`, {
+      description: "New hires on this project are given it from now on.",
+    });
+  }
+
+  /**
+   * Runs whichever lifecycle action was confirmed, one at a time.
+   *
+   * All three are one-way -- publishing swaps what new hires are handed, reverting does the same,
+   * and a deleted draft has no undo endpoint -- so each is asked about first, and the dialog holds
+   * the answer while the request is in flight. A second click used to send a second request and
+   * land its failure on a page that had just succeeded.
+   */
+  async function runLifecycleAction() {
+    const pending = pendingLifecycle;
+    if (!pending || isLifecycleBusy) return;
+    setIsLifecycleBusy(true);
+    setLifecycleError(null);
     try {
-      const restored = await blueprintService.rollbackPath(
-        blueprintScope,
-        path.blueprintKey,
-        path.version,
-      );
-      void navigate(`/blueprints/${restored.id}${isGlobal ? "?scope=global" : ""}`);
-      setPath(restored);
+      if (pending.action === "publish") await publish();
+      else if (pending.action === "rollback") await rollback();
+      else await deleteDraft(pending.version);
+      setPendingLifecycle(null);
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Blueprint version could not be restored.",
+      setLifecycleError(
+        reason instanceof Error ? reason.message : LIFECYCLE_COPY[pending.action].failure,
       );
+    } finally {
+      setIsLifecycleBusy(false);
     }
   }
 
@@ -218,6 +452,8 @@ export function BlueprintPathDetailPage() {
     setError(null);
     try {
       await blueprintService.archivePath(blueprintScope, path.blueprintKey);
+      setIsArchiveConfirmOpen(false);
+      toast.success(`"${path.title}" archived`);
       void navigate(blueprintListPath);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Blueprint path could not be archived.");
@@ -227,19 +463,11 @@ export function BlueprintPathDetailPage() {
   }
 
   async function deleteDraft(version: BlueprintPath) {
-    setDeletingId(version.id);
-    setError(null);
-    try {
-      await blueprintService.deleteDraft(blueprintScope, version.id);
-      setHistory((current) => current.filter((item) => item.id !== version.id));
-      if (version.id === pathId) {
-        setIsHistoryOpen(false);
-        void navigate(blueprintListPath);
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Blueprint draft could not be deleted.");
-    } finally {
-      setDeletingId(null);
+    await blueprintService.deleteDraft(blueprintScope, version.id);
+    setHistory((current) => current.filter((item) => item.id !== version.id));
+    if (version.id === pathId) {
+      setIsHistoryOpen(false);
+      void navigate(blueprintListPath);
     }
   }
 
@@ -249,6 +477,12 @@ export function BlueprintPathDetailPage() {
     position: number,
     graphPosition?: { graphX: number; graphY: number },
   ) {
+    // Every "Add …" lands here. On a published version, offer the draft rather than a form whose
+    // save can only come back refused.
+    if (!isDraft) {
+      whenEditable(() => undefined);
+      return;
+    }
     setTitle("");
     setDescription("");
     setPhaseType("FIXED");
@@ -262,14 +496,104 @@ export function BlueprintPathDetailPage() {
     setExplanation("");
     setCorrectAnswer("");
     setIsCorrect(false);
+    setItemFormError(null);
     setTarget({ kind, parentId, position, graphPosition });
   }
 
+  /**
+   * Whether authoring actions apply right now.
+   *
+   * Only a draft is editable — the backend refuses a mutation on a published or archived path — but
+   * hiding every control on a published one left a page that looks like an editor and silently is
+   * not. So the controls stay, and asking one of them explains why and offers the way forward.
+   */
+  const isDraft = path?.status === "DRAFT";
+
+  /** Runs an authoring action on a draft, or offers to make one first. */
+  function whenEditable(run: () => void) {
+    if (isDraft) {
+      run();
+      return;
+    }
+    setDraftPromptError(null);
+    setIsDraftPromptOpen(true);
+  }
+
+  /**
+   * Opens (or reuses) the draft for this blueprint and continues there.
+   *
+   * `reopen` is what the author was looking at when they asked. Given one, the draft is opened
+   * without stopping to explain first: the question was asked from inside that very phase, with a
+   * line above the button already saying the version is read-only, and the toast on arrival says
+   * what stays published. The dialog is for the buttons scattered across the outline, where
+   * "why can I not type here" has not been answered yet.
+   */
+  async function openDraftAndContinue(reopen: BlueprintReopen | null) {
+    if (!path) return;
+    setIsOpeningDraft(true);
+    setDraftPromptError(null);
+    try {
+      const draft = await blueprintService.openDraft(blueprintScope, path.blueprintKey);
+      setIsDraftPromptOpen(false);
+      toast.info(`Editing draft v${draft.version}`, {
+        description: `Version ${path.version} stays published until you publish this one.`,
+      });
+      void navigate(`/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`, {
+        state: reopen ? { reopen } : null,
+      });
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "The draft could not be opened.";
+      // With no dialog on screen there is nowhere for the dialog's error line to be read.
+      if (reopen) toast.error("The draft could not be opened", { description: message });
+      else setDraftPromptError(message);
+    } finally {
+      setIsOpeningDraft(false);
+    }
+  }
+
+  /** A graph edit asked for from the outline: made on a draft, and offered as one on anything else. */
+  function runGraphEdit(edit: () => Promise<void>): Promise<void> {
+    if (isDraft) return edit();
+    whenEditable(() => undefined);
+    return Promise.resolve();
+  }
+
+  /** Opens the overlay on an existing item, seeded with whatever that kind of item actually has. */
   function openEdit(nextTarget: NonNullable<EditTarget>) {
-    setTitle(nextTarget.kind === "option" ? nextTarget.item.label : nextTarget.item.title);
-    setDescription(nextTarget.kind === "option" ? "" : nextTarget.item.description);
+    setError(null);
+    setItemFormError(null);
     setUrl(nextTarget.kind === "resource" ? nextTarget.item.url : "");
     setIsCorrect(nextTarget.kind === "option" && nextTarget.item.correct);
+
+    if (nextTarget.kind === "option") {
+      setTitle(nextTarget.item.label);
+      setDescription("");
+    } else if (nextTarget.kind === "question") {
+      // The overlay keeps the node's own name and the question text in two different fields.
+      setQuestionTitle(nextTarget.item.title);
+      setTitle(nextTarget.item.question);
+      setQuestionType(nextTarget.item.type);
+      setExplanation(nextTarget.item.explanation ?? "");
+      setCorrectAnswer(nextTarget.item.correctAnswer ?? "");
+    } else {
+      setTitle(nextTarget.item.title);
+      setDescription(
+        nextTarget.kind === "phase"
+          ? (nextTarget.item.description ?? "")
+          : nextTarget.item.description,
+      );
+    }
+
+    if (nextTarget.kind === "phase") {
+      setPhaseType(nextTarget.item.type);
+      setAiPrompt(nextTarget.item.aiPrompt ?? "");
+    }
+    if (nextTarget.kind === "step") {
+      setStepType(nextTarget.item.type);
+      setMinutes(String(nextTarget.item.estimatedMinutes));
+      setOutcome(nextTarget.item.expectedOutcome);
+    }
+
     setEditTarget(nextTarget);
   }
 
@@ -279,21 +603,16 @@ export function BlueprintPathDetailPage() {
     setRequirementType("SKILL");
     setSelectedRequirementIds([]);
     setIsRequirementCatalogLoading(true);
-    setError(null);
+    setRequirementError(null);
     try {
       setRequirementCatalog(await blueprintService.getRequirementCatalog());
     } catch (reason) {
-      setError(
+      setRequirementError(
         reason instanceof Error ? reason.message : "Requirement choices could not be loaded.",
       );
     } finally {
       setIsRequirementCatalogLoading(false);
     }
-  }
-
-  function openRemoveRequirements(phaseId: string) {
-    setRemoveRequirementTarget({ phaseId });
-    setSelectedRequirementIds([]);
   }
 
   function toggleRequirementSelection(id: string) {
@@ -325,13 +644,16 @@ export function BlueprintPathDetailPage() {
     if (!phase) return;
 
     setIsRequirementSaving(true);
-    setError(null);
+    setRequirementError(null);
     try {
       const response = await blueprintService.addPhaseRequirements(
         blueprintScope,
         phase.id,
         phase.revision,
-        selectedRequirementIds.map((referenceId) => ({ referenceId, type: requirementType })),
+        selectedRequirementIds.map((referenceId) => ({
+          referenceId,
+          type: requirementType,
+        })),
       );
       setPath((current) =>
         current
@@ -339,7 +661,11 @@ export function BlueprintPathDetailPage() {
               ...current,
               blueprintPhases: current.blueprintPhases.map((item) =>
                 item.id === phase.id
-                  ? { ...item, revision: response.revision, requirements: response.requirements }
+                  ? {
+                      ...item,
+                      revision: response.revision,
+                      requirements: response.requirements,
+                    }
                   : item,
               ),
             }
@@ -355,23 +681,25 @@ export function BlueprintPathDetailPage() {
     }
   }
 
-  async function deleteRequirements(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!path || !removeRequirementTarget || selectedRequirementIds.length === 0) return;
-    const phase = path.blueprintPhases.find((item) => item.id === removeRequirementTarget.phaseId);
+  /**
+   * Takes one requirement off a phase.
+   *
+   * One at a time, from the chip itself. There used to be a second modal with a multi-select
+   * mirroring the add one, which is a lot of ceremony for "not that one" — and the thing being
+   * removed was already on screen with nothing to click.
+   */
+  async function removeRequirement(phaseId: string, requirementId: string) {
+    const phase = path?.blueprintPhases.find((item) => item.id === phaseId);
     if (!phase) return;
 
+    setRemovingRequirementId(requirementId);
     setError(null);
-    setIsRequirementSaving(true);
     try {
-      const selectedRequirements = (phase.requirements ?? []).filter((requirement) =>
-        selectedRequirementIds.includes(requirement.id),
-      );
       const response = await blueprintService.deletePhaseRequirements(
         blueprintScope,
         phase.id,
         phase.revision,
-        selectedRequirements.map(({ id }) => id),
+        [requirementId],
       );
       setPath((current) =>
         current
@@ -383,8 +711,7 @@ export function BlueprintPathDetailPage() {
                       ...item,
                       revision: response.revision,
                       requirements: (item.requirements ?? []).filter(
-                        (currentRequirement) =>
-                          !selectedRequirementIds.includes(currentRequirement.id),
+                        (currentRequirement) => currentRequirement.id !== requirementId,
                       ),
                     }
                   : item,
@@ -392,13 +719,13 @@ export function BlueprintPathDetailPage() {
             }
           : current,
       );
-      setRemoveRequirementTarget(null);
+      toast.success("Requirement removed");
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "The phase requirement could not be removed.",
       );
     } finally {
-      setIsRequirementSaving(false);
+      setRemovingRequirementId(null);
     }
   }
 
@@ -408,11 +735,42 @@ export function BlueprintPathDetailPage() {
     setIsSaving(true);
     setError(null);
     try {
+      if (editTarget?.kind === "phase")
+        await blueprintService.updatePhase(blueprintScope, editTarget.item.id, {
+          revision: editTarget.item.revision,
+          position: editTarget.item.position,
+          title,
+          description: description || null,
+          type: phaseType,
+          aiPrompt: phaseType === "AI_ENHANCED" ? aiPrompt || null : null,
+        });
+      if (editTarget?.kind === "step")
+        await blueprintService.updateStep(blueprintScope, editTarget.item.id, {
+          revision: editTarget.item.revision,
+          position: editTarget.item.position,
+          title,
+          description,
+          type: stepType as "VIDEO" | "DOCUMENT" | "TASK",
+          estimatedMinutes: Number(minutes),
+          expectedOutcome: outcome,
+          aiAssisted: editTarget.item.aiAssisted,
+        });
+      if (editTarget?.kind === "question")
+        await blueprintService.updateQuestion(blueprintScope, editTarget.item.id, {
+          revision: editTarget.item.revision,
+          position: editTarget.item.position,
+          title: questionTitle,
+          type: questionType as "MULTIPLE_CHOICE" | "SHORT_TEXT",
+          question: title,
+          explanation: explanation || null,
+          correctAnswer: correctAnswer || null,
+        });
       if (editTarget?.kind === "task")
         await blueprintService.updateTask(blueprintScope, editTarget.item.id, {
           revision: editTarget.item.revision,
           position: editTarget.item.position,
-          title: questionTitle,
+          // The task form edits `title`; `questionTitle` belongs to the question form.
+          title,
           description,
         });
       if (editTarget?.kind === "option")
@@ -430,8 +788,10 @@ export function BlueprintPathDetailPage() {
           url,
         });
       if (editTarget) {
+        const savedKind = editTarget.kind;
         setEditTarget(null);
         await refreshActiveEditorData();
+        toast.success(`${kindLabels[savedKind]} saved`);
         return;
       }
       if (!target) return;
@@ -447,7 +807,10 @@ export function BlueprintPathDetailPage() {
         if (target.graphPosition) {
           setPath((current) =>
             current
-              ? { ...current, blueprintPhases: [...current.blueprintPhases, phase] }
+              ? {
+                  ...current,
+                  blueprintPhases: [...current.blueprintPhases, phase],
+                }
               : current,
           );
           setTarget(null);
@@ -465,7 +828,10 @@ export function BlueprintPathDetailPage() {
           ...target.graphPosition,
         });
         if (target.graphPosition) {
-          appendCreatedSubGraphStep(step, { revision: step.revision, ...target.graphPosition });
+          appendCreatedSubGraphStep(step, {
+            revision: step.revision,
+            ...target.graphPosition,
+          });
           setTarget(null);
           return;
         }
@@ -485,7 +851,9 @@ export function BlueprintPathDetailPage() {
       if (target.kind === "question") {
         const question = await blueprintService.createQuestion(blueprintScope, target.parentId, {
           position: target.position,
-          title,
+          // The overlay asks for a node title separately; it used to send the question text as
+          // both, so every new question was named after its own wording.
+          title: questionTitle || title,
           type: questionType as "MULTIPLE_CHOICE" | "SHORT_TEXT",
           question: title,
           explanation: explanation || null,
@@ -510,7 +878,7 @@ export function BlueprintPathDetailPage() {
       setTarget(null);
       await refreshActiveEditorData();
     } catch (reason) {
-      setError(
+      setItemFormError(
         reason instanceof Error
           ? reason.message
           : `The ${editTarget?.kind ?? target?.kind ?? "item"} could not be saved.`,
@@ -540,35 +908,6 @@ export function BlueprintPathDetailPage() {
       graphY,
     });
     updateGraphPhase(phase.id, response);
-  }
-
-  async function removeGraphNode(phase: BlueprintPhase) {
-    const response = await blueprintService.removeGraphNodePosition(
-      blueprintScope,
-      phase.id,
-      phase.revision,
-    );
-    const revisionsById = new Map(
-      response.changedNodes.map((changedNode) => [changedNode.id, changedNode.revision]),
-    );
-    setPath((current) =>
-      current
-        ? {
-            ...current,
-            blueprintPhases: current.blueprintPhases.map((item) => {
-              const revision = revisionsById.get(item.id);
-              if (revision === undefined) return item;
-              return item.id === phase.id
-                ? { ...item, revision, graphX: null, graphY: null, blockerIds: [] }
-                : {
-                    ...item,
-                    revision,
-                    blockerIds: item.blockerIds.filter((blockerId) => blockerId !== phase.id),
-                  };
-            }),
-          }
-        : current,
-    );
   }
 
   async function addGraphBlocker(phase: BlueprintPhase, blockerId: string) {
@@ -607,7 +946,30 @@ export function BlueprintPathDetailPage() {
       blueprintService.getPath(blueprintScope, pathId),
       blueprintService.getSubGraph(blueprintScope, phaseId),
     ]);
-    setPath(nextPath);
+    // The nested DTO has no phase coordinates or prerequisites; keep the ones already loaded
+    // rather than dropping them while the sub-graph editor is open.
+    setPath((current) => {
+      if (!current) return nextPath;
+      const heldById = new Map(current.blueprintPhases.map((phase) => [phase.id, phase]));
+      return withGraphNodes(
+        nextPath,
+        nextPath.blueprintPhases.map((phase): BlueprintGraphNode => {
+          const held = heldById.get(phase.id);
+          return {
+            id: phase.id,
+            // The revision the server just sent, not the one held here: `withGraphNodes` writes
+            // this back onto the phase, so carrying the stale one over meant the next phase
+            // mutation sent a revision the server had already moved past -- a 409 the page then
+            // reported as a success.
+            revision: phase.revision,
+            title: phase.title,
+            graphX: held?.graphX ?? null,
+            graphY: held?.graphY ?? null,
+            blockerIds: held?.blockerIds ?? [],
+          };
+        }),
+      );
+    });
     setSubGraphNodes(graph.nodes);
   }
 
@@ -645,7 +1007,10 @@ export function BlueprintPathDetailPage() {
             ...current,
             blueprintPhases: current.blueprintPhases.map((phase) =>
               phase.id === step.blueprintPhaseId
-                ? { ...phase, blueprintSteps: [...phase.blueprintSteps, positionedStep] }
+                ? {
+                    ...phase,
+                    blueprintSteps: [...phase.blueprintSteps, positionedStep],
+                  }
                 : phase,
             ),
           }
@@ -658,7 +1023,10 @@ export function BlueprintPathDetailPage() {
     question: BlueprintQuestion,
     graphPosition: { revision: number; graphX: number; graphY: number },
   ) {
-    const positionedQuestion = { ...question, revision: graphPosition.revision };
+    const positionedQuestion = {
+      ...question,
+      revision: graphPosition.revision,
+    };
     setSubGraphNodes((current) => [
       ...current,
       {
@@ -727,61 +1095,6 @@ export function BlueprintPathDetailPage() {
                 blueprintCheckQuestions: phase.blueprintCheckQuestions.map((question) =>
                   question.id === node.id ? { ...question, revision: response.revision } : question,
                 ),
-              };
-            }),
-          }
-        : current,
-    );
-  }
-
-  async function removeSubGraphNode(node: BlueprintGraphNode) {
-    const response = await blueprintService.removeSubGraphNodePosition(
-      blueprintScope,
-      node.id,
-      node.revision,
-    );
-    const revisionsById = new Map(
-      response.updatedNodes.map((updatedNode) => [updatedNode.id, updatedNode.revision]),
-    );
-    const phaseId = node.blueprintPhaseId ?? subGraphPhaseId;
-
-    setSubGraphNodes((current) =>
-      current.map((item) => {
-        const revision = revisionsById.get(item.id);
-        if (revision === undefined) return item;
-        return item.id === node.id
-          ? { ...item, revision, graphX: null, graphY: null, blockerIds: [] }
-          : {
-              ...item,
-              revision,
-              blockerIds: item.blockerIds.filter((blockerId) => blockerId !== node.id),
-            };
-      }),
-    );
-    if (!phaseId) return;
-    setPath((current) =>
-      current
-        ? {
-            ...current,
-            blueprintPhases: current.blueprintPhases.map((phase) => {
-              if (phase.id !== phaseId) return phase;
-              return {
-                ...phase,
-                blueprintSteps: phase.blueprintSteps.map((step) => {
-                  const revision = revisionsById.get(step.id);
-                  if (revision === undefined) return step;
-                  return step.id === node.id
-                    ? { ...step, revision, graphX: null, graphY: null, blockerIds: [] }
-                    : {
-                        ...step,
-                        revision,
-                        blockerIds: step.blockerIds.filter((blockerId) => blockerId !== node.id),
-                      };
-                }),
-                blueprintCheckQuestions: phase.blueprintCheckQuestions.map((question) => {
-                  const revision = revisionsById.get(question.id);
-                  return revision === undefined ? question : { ...question, revision };
-                }),
               };
             }),
           }
@@ -865,10 +1178,13 @@ export function BlueprintPathDetailPage() {
     await refreshSubGraph(question.blueprintPhaseId);
   }
 
-  async function removeSubGraphQuestionOption(option: BlueprintOption) {
-    await blueprintService.deleteOption(blueprintScope, option.id, option.revision);
-    if (subGraphPhaseId) await refreshSubGraph(subGraphPhaseId);
-    else await loadPath();
+  /**
+   * Asks first, like the identical control in the outline. The dialog then owns the request, its
+   * failure and the refresh, through `deleteItem`.
+   */
+  function removeSubGraphQuestionOption(option: BlueprintOption) {
+    requestDelete("option", option.id, option.label);
+    return Promise.resolve();
   }
 
   async function updateSubGraphStep(step: BlueprintStep, metadata: BlueprintStepMetadata) {
@@ -891,6 +1207,45 @@ export function BlueprintPathDetailPage() {
       setError(reason instanceof Error ? reason.message : "Phase graph could not be loaded.");
     }
   }
+
+  /**
+   * Puts the author back in front of what they were looking at before they were sent here.
+   *
+   * **Not until the path on screen is the one the address names.** Navigating to the draft changes
+   * the URL immediately; the draft itself arrives a request later, and until it does `path` is
+   * still the *published* version this request came from. Its phases carry the same titles — a
+   * draft is a copy — so a title match against it succeeds and reopens a phase whose id exists
+   * only in the version that was just left. The page it opened then vanished the moment the draft
+   * landed, leaving the author looking at the graph and pressing the phase a second time.
+   *
+   * The state is cleared as soon as it is acted on: a reload or a step back through history must
+   * not open the same thing again, and a title that no longer matches anything is not a reason to
+   * keep asking.
+   */
+  const reopenRequest = (location.state as { reopen?: BlueprintReopen } | null)?.reopen ?? null;
+  useEffect(() => {
+    if (!reopenRequest || !path || path.id !== pathId) return;
+    const phase = path.blueprintPhases.find(
+      (candidate) => candidate.title === reopenRequest.phaseTitle,
+    );
+    void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    if (!phase) return;
+    // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
+    // and this is the pattern the repo already passes with.
+    queueMicrotask(() => {
+      if (reopenRequest.nodeTitle && phase.type === "FIXED") {
+        setPendingOpenNodeTitle(reopenRequest.nodeTitle);
+        setEditorMode("graph");
+        void openSubGraph(phase);
+        return;
+      }
+      setPendingOpenPhaseTitle(phase.title);
+      void openGraphEditor();
+    });
+    // `openSubGraph` and `openGraphEditor` are declared per render and would restart this on every
+    // one; what this effect actually depends on is the request and the path it has to find it in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search, navigate, path, pathId, reopenRequest]);
 
   /** Reloads top-level graph positions, which are not refreshed by subgraph mutations. */
   async function returnToTopLevelGraph() {
@@ -923,6 +1278,19 @@ export function BlueprintPathDetailPage() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Blueprint graph could not be loaded.");
     }
+  }
+
+  /** Switching views, from the bar or from a two-finger swipe — the two must not disagree. */
+  function changeEditorMode(mode: EditorMode) {
+    if (mode === editorMode) return;
+    if (mode === "graph") {
+      void openGraphEditor();
+      return;
+    }
+    setEditorMode("list");
+    // The graph endpoints update node revisions independently from the nested path DTO. Reload it
+    // before exposing list mutations so their optimistic-lock revisions are current.
+    void loadPath();
   }
 
   async function openGraphEditor() {
@@ -1097,6 +1465,18 @@ export function BlueprintPathDetailPage() {
     );
   }
 
+  /**
+   * Asks before deleting, for everything the list editor can delete.
+   *
+   * The graph editor already asked; the list editor did not, so the same phase was one guarded
+   * click away on one surface and one unguarded click away on the other. Nothing here is
+   * recoverable from the UI — there is no undo endpoint — so the question is the only safety net
+   * there is.
+   */
+  function requestDelete(kind: CreateKind, id: string, label: string) {
+    whenEditable(() => setPendingDelete({ kind, id, label }));
+  }
+
   async function deleteItem(
     kind: "phase" | "step" | "question" | "task" | "resource" | "option",
     id: string,
@@ -1147,6 +1527,10 @@ export function BlueprintPathDetailPage() {
         await refreshActiveEditorData();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `The ${kind} could not be deleted.`);
+      // Rethrown, not swallowed: the graph panels close themselves and toast "deleted" on a
+      // resolved promise, so a 409 on a stale revision used to read as a success with the node
+      // still on the canvas. Every caller below handles the rejection.
+      throw reason;
     } finally {
       setDeletingId(null);
     }
@@ -1244,12 +1628,19 @@ export function BlueprintPathDetailPage() {
           return items.map((item) => {
             const update = byId.get(item.id);
             return update
-              ? { ...item, revision: update.revision, position: update.position }
+              ? {
+                  ...item,
+                  revision: update.revision,
+                  position: update.position,
+                }
               : item;
           });
         };
         if (kind === "phase")
-          return { ...current, blueprintPhases: applyUpdates(current.blueprintPhases) };
+          return {
+            ...current,
+            blueprintPhases: applyUpdates(current.blueprintPhases),
+          };
         return {
           ...current,
           blueprintPhases: current.blueprintPhases.map((currentPhase) => ({
@@ -1280,9 +1671,29 @@ export function BlueprintPathDetailPage() {
         };
       });
     } catch (reason) {
-      setPath(path);
+      // Back to what the server has, not to the snapshot this call started from: anything saved
+      // meanwhile would be thrown away with the failed move.
+      void loadPath(false);
       setError(reason instanceof Error ? reason.message : "The item could not be reordered.");
     }
+  }
+
+  /** The ids of the list an item sits in -- a drag only reorders within one. */
+  function siblingIds(kind: SortKind, id: string): string[] {
+    const phases = path?.blueprintPhases ?? [];
+    const steps = phases.flatMap((phase) => phase.blueprintSteps);
+    const questions = phases.flatMap((phase) => phase.blueprintCheckQuestions);
+    const lists: { id: string }[][] =
+      kind === "phase"
+        ? [phases]
+        : kind === "step"
+          ? phases.map((phase) => phase.blueprintSteps)
+          : kind === "task"
+            ? steps.map((step) => step.blueprintTasks)
+            : kind === "question"
+              ? phases.map((phase) => phase.blueprintCheckQuestions)
+              : questions.map((question) => question.blueprintCheckOptions);
+    return (lists.find((list) => list.some((item) => item.id === id)) ?? []).map((item) => item.id);
   }
 
   function dragProps(kind: SortKind, id: string, position: number) {
@@ -1300,8 +1711,12 @@ export function BlueprintPathDetailPage() {
       onDrop: (event: DragEvent<HTMLElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        if (dragged?.kind === kind && dragged.id !== id) void reorder(kind, dragged.id, position);
+        const source = dragged;
         setDragged(null);
+        // Dropped on an item of another list, the target's position means nothing in the source's.
+        if (source?.kind !== kind || source.id === id) return;
+        if (!siblingIds(kind, id).includes(source.id)) return;
+        whenEditable(() => void reorder(kind, source.id, position));
       },
       onDragEnd: () => setDragged(null),
     };
@@ -1336,7 +1751,11 @@ export function BlueprintPathDetailPage() {
 
   // Keep the existing shell visible during a graph → list refresh. This avoids replacing the
   // whole page with a loading state while the nested DTO catches up with graph revisions.
-  if (isLoading && !path)
+  //
+  // A path from a *different* address is a different matter: during a walk between versions, the
+  // one being left stayed fully interactive under the new URL, so Publish published it and the
+  // header described it. The `reopen` effect guards this the same way.
+  if (isLoading && (!path || path.id !== pathId))
     return (
       <main className="flex min-h-80 items-center justify-center gap-3 text-app-text-muted">
         <Loader2 className="h-5 w-5 animate-spin" /> Loading blueprint…
@@ -1358,20 +1777,157 @@ export function BlueprintPathDetailPage() {
       </main>
     );
 
+  // What the overlay is about, whichever way it was opened. The field conditions below used to ask
+  // `target?.kind`, which is only set while *creating* — so editing anything but a task, resource or
+  // option showed a title box and nothing else.
+  const formKind = editTarget?.kind ?? target?.kind ?? null;
+
+  const orderedPhases = [...path.blueprintPhases].sort((a, b) => a.position - b.position);
   const subGraphPhase = subGraphPhaseId
     ? (path.blueprintPhases.find((phase) => phase.id === subGraphPhaseId) ?? null)
     : null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
+    // The swipe listens on the page, not on the bar: a gesture that only works while the pointer is
+    // over a 20rem control reads as broken everywhere else.
+    <main ref={swipeRef} className="mx-auto w-full max-w-6xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
+      <AlertDialog
+        isOpen={pendingDelete !== null}
+        title={
+          pendingDelete ? `Delete ${kindLabels[pendingDelete.kind]} "${pendingDelete.label}"?` : ""
+        }
+        description={
+          pendingDelete ? (
+            <>
+              <p>{DELETE_CONSEQUENCE[pendingDelete.kind]}</p>
+              <p className="mt-2">
+                Hires who already have a path built from this blueprint keep theirs — a personalized
+                path is a copy, not a live reference. This cannot be undone from here.
+              </p>
+            </>
+          ) : undefined
+        }
+        confirmLabel={pendingDelete ? `Delete ${kindLabels[pendingDelete.kind]}` : "Delete"}
+        variant="danger"
+        isLoading={pendingDelete !== null && deletingId === pendingDelete.id}
+        loadingLabel="Deleting…"
+        errorMessage={pendingDeleteError ?? undefined}
+        onClose={() => {
+          setPendingDelete(null);
+          setPendingDeleteError(null);
+        }}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          const { kind, id } = pendingDelete;
+          setPendingDeleteError(null);
+          void deleteItem(kind, id).then(
+            () => setPendingDelete(null),
+            (reason: unknown) =>
+              setPendingDeleteError(
+                reason instanceof Error ? reason.message : `The ${kind} could not be deleted.`,
+              ),
+          );
+        }}
+      />
+      <AlertDialog
+        isOpen={isDraftPromptOpen}
+        title={
+          path?.status === "ARCHIVED" ? "This version is archived" : "This version is published"
+        }
+        description={
+          path?.status === "ARCHIVED" ? (
+            <p>
+              Archived versions are kept as they were. To work from this one again, use
+              &ldquo;Revert to this version&rdquo; — it becomes the published blueprint, and you can
+              open a draft from there.
+            </p>
+          ) : (
+            <>
+              <p>
+                Changes are made in a draft, so the version new hires are being given never changes
+                under them mid-edit.
+              </p>
+              <p className="mt-2">
+                Opening draft v{(path?.version ?? 0) + 1} leaves v{path?.version} published until
+                you press Publish. Nothing you do in the draft reaches anybody before that.
+              </p>
+            </>
+          )
+        }
+        confirmLabel={
+          path?.status === "ARCHIVED" ? "Close" : `Open draft v${(path?.version ?? 0) + 1}`
+        }
+        cancelLabel={path?.status === "ARCHIVED" ? undefined : "Not now"}
+        isLoading={isOpeningDraft}
+        loadingLabel="Opening draft…"
+        errorMessage={draftPromptError ?? undefined}
+        onClose={() => setIsDraftPromptOpen(false)}
+        onConfirm={() => {
+          if (path?.status === "ARCHIVED") {
+            setIsDraftPromptOpen(false);
+            return;
+          }
+          void openDraftAndContinue(null);
+        }}
+      />
+      <AlertDialog
+        isOpen={isArchiveConfirmOpen}
+        title="Archive this blueprint?"
+        description={
+          <>
+            <p>
+              New hires stop being given this path. Anybody already on one keeps the copy they were
+              given — a personalized path is a copy, not a live reference.
+            </p>
+            <p className="mt-2">
+              Any unpublished draft of this blueprint is deleted with it. You can bring an archived
+              version back from the version history.
+            </p>
+          </>
+        }
+        confirmLabel="Archive"
+        variant="danger"
+        isLoading={isArchiving}
+        loadingLabel="Archiving…"
+        onClose={() => setIsArchiveConfirmOpen(false)}
+        onConfirm={() => void archivePath()}
+      />
+      <AlertDialog
+        isOpen={pendingLifecycle !== null}
+        title={
+          pendingLifecycle
+            ? LIFECYCLE_COPY[pendingLifecycle.action].title(pendingLifecycle.version.version)
+            : ""
+        }
+        description={pendingLifecycle ? LIFECYCLE_COPY[pendingLifecycle.action].description : ""}
+        confirmLabel={pendingLifecycle ? LIFECYCLE_COPY[pendingLifecycle.action].confirm : ""}
+        variant={pendingLifecycle?.action === "delete-draft" ? "danger" : "default"}
+        isLoading={isLifecycleBusy}
+        loadingLabel={pendingLifecycle ? LIFECYCLE_COPY[pendingLifecycle.action].busy : ""}
+        errorMessage={lifecycleError ?? undefined}
+        onClose={() => {
+          if (isLifecycleBusy) return;
+          setPendingLifecycle(null);
+          setLifecycleError(null);
+        }}
+        onConfirm={() => void runLifecycleAction()}
+      />
       <PageHeader
         icon={Layers3}
         title={path.title}
         subtitle={path.description || "No path description yet."}
         actions={
           <>
-            <Badge variant={path.status === "ACTIVE" ? "success" : "warning"}>
-              {path.status} · v{path.version}
+            <Badge
+              variant={
+                path.status === "ACTIVE"
+                  ? "success"
+                  : path.status === "ARCHIVED"
+                    ? "neutral"
+                    : "warning"
+              }
+            >
+              {versionWord(path.status)} · v{path.version}
             </Badge>
             <Button
               variant="secondary"
@@ -1393,7 +1949,7 @@ export function BlueprintPathDetailPage() {
                   variant="dangerSoft"
                   icon={<Archive className="h-4 w-4" />}
                   loading={isArchiving}
-                  onClick={() => void archivePath()}
+                  onClick={() => setIsArchiveConfirmOpen(true)}
                 >
                   Archive
                 </Button>
@@ -1403,9 +1959,14 @@ export function BlueprintPathDetailPage() {
                   onClick={() =>
                     void blueprintService
                       .openDraft(blueprintScope, path.blueprintKey)
-                      .then((draft) =>
-                        navigate(`/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`),
-                      )
+                      .then((draft) => {
+                        toast.info(`Editing draft v${draft.version}`, {
+                          description: `Version ${path.version} stays published until you publish this one.`,
+                        });
+                        return navigate(
+                          `/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`,
+                        );
+                      })
                       .catch((reason: unknown) =>
                         setError(
                           reason instanceof Error ? reason.message : "Draft could not be opened.",
@@ -1420,7 +1981,8 @@ export function BlueprintPathDetailPage() {
               <Button
                 variant="primary"
                 icon={<RotateCcw className="h-4 w-4" />}
-                onClick={() => void rollback()}
+                disabled={isLifecycleBusy}
+                onClick={() => setPendingLifecycle({ action: "rollback", version: path })}
               >
                 Revert to this version
               </Button>
@@ -1428,18 +1990,8 @@ export function BlueprintPathDetailPage() {
               <Button
                 variant="primary"
                 icon={<Rocket className="h-4 w-4" />}
-                onClick={() =>
-                  void blueprintService
-                    .publishPath(blueprintScope, path.id)
-                    .then(setPath)
-                    .catch((reason: unknown) =>
-                      setError(
-                        reason instanceof Error
-                          ? reason.message
-                          : "Blueprint could not be published.",
-                      ),
-                    )
-                }
+                disabled={isLifecycleBusy}
+                onClick={() => setPendingLifecycle({ action: "publish", version: path })}
               >
                 Publish
               </Button>
@@ -1452,43 +2004,44 @@ export function BlueprintPathDetailPage() {
           {error}
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2" aria-label="Blueprint editor mode">
-        <Button
-          size="sm"
-          variant={editorMode === "list" ? "primary" : "secondary"}
-          aria-pressed={editorMode === "list"}
-          icon={<ListChecks className="h-4 w-4" />}
-          onClick={() => {
-            setEditorMode("list");
-            // The graph endpoints update node revisions independently from the nested path DTO.
-            // Reload it before exposing list mutations so their optimistic-lock revisions are current.
-            void loadPath();
-          }}
-        >
-          List editor
-        </Button>
-        <Button
-          size="sm"
-          variant={editorMode === "graph" ? "primary" : "secondary"}
-          aria-pressed={editorMode === "graph"}
-          icon={<Link className="h-4 w-4" />}
-          onClick={() => void openGraphEditor()}
-        >
-          Graph editor
-        </Button>
-      </div>
+      <LifecycleNotice status={path.status} version={path.version} />
+      <SegmentedTabs
+        value={editorMode}
+        options={[
+          {
+            value: "list",
+            label: "Outline",
+            icon: <ListChecks className="h-4 w-4" />,
+          },
+          {
+            value: "graph",
+            label: "Graph",
+            icon: <Link className="h-4 w-4" />,
+          },
+        ]}
+        onChange={changeEditorMode}
+        layoutId="blueprint-editor-mode-pill"
+        ariaLabel="Blueprint view"
+      />
       {editorMode === "graph" ? (
         subGraphPhase ? (
           <BlueprintSubGraphEditor
             phase={subGraphPhase}
             nodes={subGraphNodes}
             editable={path.status === "DRAFT"}
+            onRequestDraft={(node) =>
+              void openDraftAndContinue({
+                phaseTitle: subGraphPhase.title,
+                nodeTitle: node.title,
+              })
+            }
+            openNodeTitle={pendingOpenNodeTitle}
+            onOpenedNode={() => setPendingOpenNodeTitle(null)}
             onBack={() => void returnToTopLevelGraph()}
             onPositionChange={saveSubGraphPosition}
-            onRemoveNode={removeSubGraphNode}
             onAddBlocker={addSubGraphBlocker}
             onRemoveBlocker={removeSubGraphBlocker}
-            onCreateFromLibrary={(kind, graphX, graphY) => {
+            onCreateNode={(kind, graphX, graphY) => {
               openCreate(
                 kind,
                 subGraphPhase.id,
@@ -1504,11 +2057,11 @@ export function BlueprintPathDetailPage() {
             onRemoveOption={removeSubGraphQuestionOption}
             onUpdateStep={updateSubGraphStep}
             onAddTask={(step) => openCreate("task", step.id, step.blueprintTasks.length)}
-            onRemoveTask={(task) => void deleteItem("task", task.id)}
+            onRemoveTask={(task) => requestDelete("task", task.id, task.title)}
             onAddResource={(step) =>
               openCreate("resource", step.id, step.blueprintResources.length)
             }
-            onRemoveResource={(resource) => void deleteItem("resource", resource.id)}
+            onRemoveResource={(resource) => requestDelete("resource", resource.id, resource.title)}
             onEditTask={(task) => openEdit({ kind: "task", item: task })}
             onEditResource={(resource) => openEdit({ kind: "resource", item: resource })}
             onEditOption={(option) => openEdit({ kind: "option", item: option })}
@@ -1517,15 +2070,22 @@ export function BlueprintPathDetailPage() {
           />
         ) : (
           <BlueprintGraphEditor
-            phases={path.blueprintPhases}
+            // In the author's own order, which is what the graph falls back to when it steps from
+            // an opened phase to the one either side of it and there is no arrow to follow.
+            phases={orderedPhases}
             pathTitle={path.title}
             editable={path.status === "DRAFT"}
+            onRequestDraft={(phase) => void openDraftAndContinue({ phaseTitle: phase.title })}
+            openPhaseTitle={pendingOpenPhaseTitle}
+            onOpenedPhase={() => setPendingOpenPhaseTitle(null)}
             onPositionChange={saveGraphPosition}
-            onRemoveNode={removeGraphNode}
             onAddBlocker={addGraphBlocker}
             onRemoveBlocker={removeGraphBlocker}
-            onCreateFromLibrary={(graphX, graphY) => {
-              openCreate("phase", path.id, path.blueprintPhases.length, { graphX, graphY });
+            onCreateNode={(graphX: number, graphY: number) => {
+              openCreate("phase", path.id, path.blueprintPhases.length, {
+                graphX,
+                graphY,
+              });
               return Promise.resolve();
             }}
             onDeletePhase={(phase) => deleteItem("phase", phase.id)}
@@ -1535,6 +2095,25 @@ export function BlueprintPathDetailPage() {
         )
       ) : (
         <section className="space-y-5">
+          {/*
+            At the top as well as the bottom. A sixteen-phase blueprint is several screens of
+            outline, and the only way to add a phase was to scroll past all of it — so adding one
+            cost a journey through everything already written. Kept at the bottom too, because
+            somebody who has just read to the end is also somebody about to add one.
+          */}
+          {path.blueprintPhases.length > 0 && path.status === "DRAFT" ? (
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Plus className="h-4 w-4" />}
+                onClick={() => openCreate("phase", path.id, path.blueprintPhases.length)}
+              >
+                Add phase
+              </Button>
+            </div>
+          ) : null}
+
           {path.blueprintPhases.length === 0 ? (
             <EmptyState
               icon={<Milestone className="h-8 w-8" />}
@@ -1552,7 +2131,7 @@ export function BlueprintPathDetailPage() {
               Build the path in phases, then add steps and a knowledge check to each phase.
             </EmptyState>
           ) : (
-            path.blueprintPhases
+            [...path.blueprintPhases]
               .sort((a, b) => a.position - b.position)
               .map((phase, phaseIndex) => (
                 <section
@@ -1604,20 +2183,73 @@ export function BlueprintPathDetailPage() {
                       </div>
                     </div>
                     {!collapsedPhaseIds.has(phase.id) ? (
-                      <Button
-                        aria-label={`Delete phase ${phase.title}`}
-                        iconOnly
-                        size="sm"
-                        variant="dangerGhost"
-                        loading={deletingId === phase.id}
-                        onClick={() => void deleteItem("phase", phase.id)}
-                      >
-                        <Minus className="h-4 w-4" strokeWidth={2.5} />
-                      </Button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {/*
+                          The same phase, in the other view. Somebody reading down the outline who
+                          wants to see where a phase actually sits had to switch views and then
+                          find it again — two steps to ask one question about the thing already
+                          under their cursor.
+                        */}
+                        <Button
+                          aria-label={`Open phase ${phase.title} in the graph`}
+                          title="Open in the graph"
+                          iconOnly
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setPendingOpenPhaseTitle(phase.title);
+                            changeEditorMode("graph");
+                          }}
+                        >
+                          <Network className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          aria-label={`Edit phase ${phase.title}`}
+                          iconOnly
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            whenEditable(() => openEdit({ kind: "phase", item: phase }))
+                          }
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          aria-label={`Delete phase ${phase.title}`}
+                          iconOnly
+                          size="sm"
+                          variant="dangerGhost"
+                          loading={deletingId === phase.id}
+                          onClick={() => requestDelete("phase", phase.id, phase.title)}
+                        >
+                          <Minus className="h-4 w-4" strokeWidth={2.5} />
+                        </Button>
+                      </div>
                     ) : null}
                   </div>
                   {!collapsedPhaseIds.has(phase.id) ? (
                     <>
+                      {/*
+                        The order the graph draws as arrows, written out. Without it the outline was
+                        a list of phases in `position` order and nothing else — and `position` is a
+                        suggestion, not a rule, so an author working from the list was reading an
+                        order the product does not actually enforce while the one it does enforce
+                        was only visible in the other view. Editable here too: the arrow is the same
+                        edge whichever end it is drawn from.
+                      */}
+                      <div className="mt-5 rounded-xl border border-app-border bg-app-surface-muted p-4">
+                        <PhasePrerequisites
+                          phase={phase}
+                          phases={path.blueprintPhases}
+                          editable
+                          onAdd={(blocked, blockerId) =>
+                            runGraphEdit(() => addGraphBlocker(blocked, blockerId))
+                          }
+                          onRemove={(blocked, blockerId) =>
+                            runGraphEdit(() => removeGraphBlocker(blocked, blockerId))
+                          }
+                        />
+                      </div>
                       <div className="mt-5 rounded-xl border border-app-border bg-app-surface-muted p-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
@@ -1626,25 +2258,14 @@ export function BlueprintPathDetailPage() {
                               Skills or project roles required before this phase unlocks.
                             </p>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              icon={<Plus className="h-3.5 w-3.5" />}
-                              onClick={() => void openAddRequirements(phase.id)}
-                            >
-                              Add requirements
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="dangerSoft"
-                              icon={<Minus className="h-3.5 w-3.5" />}
-                              disabled={(phase.requirements ?? []).length === 0}
-                              onClick={() => openRemoveRequirements(phase.id)}
-                            >
-                              Remove requirements
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<Plus className="h-3.5 w-3.5" />}
+                            onClick={() => whenEditable(() => void openAddRequirements(phase.id))}
+                          >
+                            Add requirement
+                          </Button>
                         </div>
                         {(phase.requirements ?? []).length === 0 ? (
                           <p className="mt-3 text-sm text-app-text-subtle">No requirements yet.</p>
@@ -1653,12 +2274,26 @@ export function BlueprintPathDetailPage() {
                             {(phase.requirements ?? []).map((requirement) => (
                               <li
                                 key={requirement.id}
-                                className="flex items-center gap-1 rounded-lg border border-app-border bg-app-surface px-2 py-1 text-sm text-app-text"
+                                className="flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface py-1 pr-1 pl-2 text-sm text-app-text"
                               >
                                 <span className="text-xs text-app-text-subtle">
                                   {requirement.type === "SKILL" ? "Skill:" : "Role:"}
                                 </span>
                                 <span>{requirement.displayName}</span>
+                                <Button
+                                  iconOnly
+                                  size="sm"
+                                  variant="dangerGhost"
+                                  aria-label={`Remove requirement ${requirement.displayName}`}
+                                  loading={removingRequirementId === requirement.id}
+                                  onClick={() =>
+                                    whenEditable(
+                                      () => void removeRequirement(phase.id, requirement.id),
+                                    )
+                                  }
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
                               </li>
                             ))}
                           </ul>
@@ -1685,7 +2320,7 @@ export function BlueprintPathDetailPage() {
                             {phase.blueprintSteps.length === 0 ? (
                               <EmptyState size="sm">No steps in this phase.</EmptyState>
                             ) : (
-                              phase.blueprintSteps
+                              [...phase.blueprintSteps]
                                 .sort((a, b) => a.position - b.position)
                                 .map((step, stepIndex) => (
                                   <article
@@ -1729,6 +2364,18 @@ export function BlueprintPathDetailPage() {
                                           <Button
                                             size="sm"
                                             variant="ghost"
+                                            icon={<Pencil className="h-3.5 w-3.5" />}
+                                            onClick={() =>
+                                              whenEditable(() =>
+                                                openEdit({ kind: "step", item: step }),
+                                              )
+                                            }
+                                          >
+                                            Edit step
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
                                             icon={<Plus className="h-3.5 w-3.5" />}
                                             onClick={() =>
                                               openCreate(
@@ -1766,7 +2413,10 @@ export function BlueprintPathDetailPage() {
                                                     tabIndex={0}
                                                     className="min-w-0 flex-1 cursor-pointer px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                                                     onClick={() =>
-                                                      openEdit({ kind: "task", item: task })
+                                                      openEdit({
+                                                        kind: "task",
+                                                        item: task,
+                                                      })
                                                     }
                                                     onKeyDown={(event) => {
                                                       if (
@@ -1774,7 +2424,10 @@ export function BlueprintPathDetailPage() {
                                                         event.key === " "
                                                       ) {
                                                         event.preventDefault();
-                                                        openEdit({ kind: "task", item: task });
+                                                        openEdit({
+                                                          kind: "task",
+                                                          item: task,
+                                                        });
                                                       }
                                                     }}
                                                   >
@@ -1786,7 +2439,9 @@ export function BlueprintPathDetailPage() {
                                                     size="sm"
                                                     variant="dangerGhost"
                                                     loading={deletingId === task.id}
-                                                    onClick={() => void deleteItem("task", task.id)}
+                                                    onClick={() =>
+                                                      requestDelete("task", task.id, task.title)
+                                                    }
                                                   >
                                                     <Minus className="h-4 w-4" strokeWidth={2.5} />
                                                   </Button>
@@ -1811,7 +2466,10 @@ export function BlueprintPathDetailPage() {
                                                     tabIndex={0}
                                                     className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                                                     onClick={() =>
-                                                      openEdit({ kind: "resource", item: resource })
+                                                      openEdit({
+                                                        kind: "resource",
+                                                        item: resource,
+                                                      })
                                                     }
                                                     onKeyDown={(event) => {
                                                       if (
@@ -1836,7 +2494,11 @@ export function BlueprintPathDetailPage() {
                                                     variant="dangerGhost"
                                                     loading={deletingId === resource.id}
                                                     onClick={() =>
-                                                      void deleteItem("resource", resource.id)
+                                                      requestDelete(
+                                                        "resource",
+                                                        resource.id,
+                                                        resource.title,
+                                                      )
                                                     }
                                                   >
                                                     <Minus className="h-4 w-4" strokeWidth={2.5} />
@@ -1876,7 +2538,7 @@ export function BlueprintPathDetailPage() {
                             {phase.blueprintCheckQuestions.length === 0 ? (
                               <EmptyState size="sm">No questions in this phase.</EmptyState>
                             ) : (
-                              phase.blueprintCheckQuestions
+                              [...phase.blueprintCheckQuestions]
                                 .sort((a, b) => a.position - b.position)
                                 .map((question, questionIndex) => (
                                   <article
@@ -1916,22 +2578,37 @@ export function BlueprintPathDetailPage() {
                                           ) : null}
                                         </div>
                                       </div>
-                                      {question.type === "MULTIPLE_CHOICE" &&
-                                      !collapsedQuestionIds.has(question.id) ? (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          icon={<Plus className="h-3.5 w-3.5" />}
-                                          onClick={() =>
-                                            openCreate(
-                                              "option",
-                                              question.id,
-                                              question.blueprintCheckOptions.length,
-                                            )
-                                          }
-                                        >
-                                          Add option
-                                        </Button>
+                                      {!collapsedQuestionIds.has(question.id) ? (
+                                        <div className="flex shrink-0 flex-wrap items-center gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            icon={<Pencil className="h-3.5 w-3.5" />}
+                                            onClick={() =>
+                                              whenEditable(() =>
+                                                openEdit({ kind: "question", item: question }),
+                                              )
+                                            }
+                                          >
+                                            Edit
+                                          </Button>
+                                          {question.type === "MULTIPLE_CHOICE" ? (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              icon={<Plus className="h-3.5 w-3.5" />}
+                                              onClick={() =>
+                                                openCreate(
+                                                  "option",
+                                                  question.id,
+                                                  question.blueprintCheckOptions.length,
+                                                )
+                                              }
+                                            >
+                                              Add option
+                                            </Button>
+                                          ) : null}
+                                        </div>
                                       ) : null}
                                     </div>
                                     {!collapsedQuestionIds.has(question.id) &&
@@ -1949,12 +2626,18 @@ export function BlueprintPathDetailPage() {
                                                 tabIndex={0}
                                                 className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                                                 onClick={() =>
-                                                  openEdit({ kind: "option", item: option })
+                                                  openEdit({
+                                                    kind: "option",
+                                                    item: option,
+                                                  })
                                                 }
                                                 onKeyDown={(event) => {
                                                   if (event.key === "Enter" || event.key === " ") {
                                                     event.preventDefault();
-                                                    openEdit({ kind: "option", item: option });
+                                                    openEdit({
+                                                      kind: "option",
+                                                      item: option,
+                                                    });
                                                   }
                                                 }}
                                               >
@@ -1971,7 +2654,9 @@ export function BlueprintPathDetailPage() {
                                                 size="sm"
                                                 variant="dangerGhost"
                                                 loading={deletingId === option.id}
-                                                onClick={() => void deleteItem("option", option.id)}
+                                                onClick={() =>
+                                                  requestDelete("option", option.id, option.label)
+                                                }
                                               >
                                                 <Minus className="h-4 w-4" strokeWidth={2.5} />
                                               </Button>
@@ -2003,101 +2688,14 @@ export function BlueprintPathDetailPage() {
         </section>
       )}
       <Modal
-        isOpen={graphDetail !== null}
-        title={graphDetail?.item.title ?? "Blueprint details"}
-        onClose={() => setGraphDetail(null)}
-        size="lg"
-      >
-        {graphDetail?.kind === "phase" ? (
-          <div className="space-y-6 text-sm">
-            <div>
-              <h3 className="font-semibold text-app-text">Description</h3>
-              <p className="mt-1 text-app-text-muted">
-                {graphDetail.item.description || "No description yet."}
-              </p>
-            </div>
-            <dl className="grid gap-4 sm:grid-cols-3">
-              <DetailStat label="Phase type" value={graphDetail.item.type} />
-              <DetailStat label="Steps" value={String(graphDetail.item.blueprintSteps.length)} />
-              <DetailStat
-                label="Knowledge-check questions"
-                value={String(graphDetail.item.blueprintCheckQuestions.length)}
-              />
-            </dl>
-            {graphDetail.item.aiPrompt ? (
-              <div>
-                <h3 className="font-semibold text-app-text">AI prompt</h3>
-                <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
-                  {graphDetail.item.aiPrompt}
-                </p>
-              </div>
-            ) : null}
-            <div>
-              <h3 className="font-semibold text-app-text">Requirements</h3>
-              {graphDetail.item.requirements?.length ? (
-                <ul className="mt-2 flex flex-wrap gap-2">
-                  {graphDetail.item.requirements.map((requirement) => (
-                    <li key={requirement.id}>
-                      <Badge variant="neutral">
-                        {requirement.type === "SKILL" ? "Skill" : "Project role"}:{" "}
-                        {requirement.displayName}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-1 text-app-text-muted">No requirements configured.</p>
-              )}
-            </div>
-          </div>
-        ) : graphDetail?.kind === "step" ? (
-          <div className="space-y-5 text-sm">
-            <p className="text-app-text-muted">{graphDetail.item.description}</p>
-            <dl className="grid gap-4 sm:grid-cols-3">
-              <DetailStat label="Step type" value={graphDetail.item.type} />
-              <DetailStat
-                label="Estimated time"
-                value={`${graphDetail.item.estimatedMinutes} min`}
-              />
-              <DetailStat label="AI assisted" value={graphDetail.item.aiAssisted ? "Yes" : "No"} />
-            </dl>
-            <div>
-              <h3 className="font-semibold text-app-text">Expected outcome</h3>
-              <p className="mt-1 text-app-text-muted">{graphDetail.item.expectedOutcome}</p>
-            </div>
-            <dl className="grid gap-4 sm:grid-cols-2">
-              <DetailStat label="Tasks" value={String(graphDetail.item.blueprintTasks.length)} />
-              <DetailStat
-                label="Resources"
-                value={String(graphDetail.item.blueprintResources.length)}
-              />
-            </dl>
-          </div>
-        ) : graphDetail?.kind === "question" ? (
-          <div className="space-y-5 text-sm">
-            <DetailStat label="Question type" value={graphDetail.item.type} />
-            <div>
-              <h3 className="font-semibold text-app-text">Question</h3>
-              <p className="mt-1 text-app-text-muted">{graphDetail.item.question}</p>
-            </div>
-            {graphDetail.item.explanation ? (
-              <div>
-                <h3 className="font-semibold text-app-text">Explanation</h3>
-                <p className="mt-1 text-app-text-muted">{graphDetail.item.explanation}</p>
-              </div>
-            ) : null}
-            <DetailStat
-              label="Answer options"
-              value={String(graphDetail.item.blueprintCheckOptions.length)}
-            />
-          </div>
-        ) : null}
-      </Modal>
-      <Modal
         isOpen={addRequirementTarget !== null}
         title="Add phase requirements"
         description="Select skills or project roles that must be met before this phase unlocks."
-        onClose={() => setAddRequirementTarget(null)}
+        errorMessage={requirementError ?? undefined}
+        onClose={() => {
+          setAddRequirementTarget(null);
+          setRequirementError(null);
+        }}
         footer={
           <>
             <Button variant="secondary" onClick={() => setAddRequirementTarget(null)}>
@@ -2162,55 +2760,6 @@ export function BlueprintPathDetailPage() {
         )}
       </Modal>
       <Modal
-        isOpen={removeRequirementTarget !== null}
-        title="Remove phase requirements"
-        description="Select every requirement to remove from this phase."
-        onClose={() => setRemoveRequirementTarget(null)}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setRemoveRequirementTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="dangerSoft"
-              type="submit"
-              form="remove-phase-requirements"
-              loading={isRequirementSaving}
-              disabled={selectedRequirementIds.length === 0}
-            >
-              Remove selected
-            </Button>
-          </>
-        }
-      >
-        <form
-          id="remove-phase-requirements"
-          className="space-y-2"
-          onSubmit={(event) => void deleteRequirements(event)}
-        >
-          {(
-            path.blueprintPhases.find((phase) => phase.id === removeRequirementTarget?.phaseId)
-              ?.requirements ?? []
-          ).map((requirement) => (
-            <label
-              key={requirement.id}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text hover:bg-app-surface-muted"
-            >
-              <input
-                type="checkbox"
-                checked={selectedRequirementIds.includes(requirement.id)}
-                onChange={() => toggleRequirementSelection(requirement.id)}
-                className="h-4 w-4 accent-[var(--color-app-danger)]"
-              />
-              <span className="text-app-text-subtle">
-                {requirement.type === "SKILL" ? "Skill" : "Project role"}
-              </span>
-              <span>{requirement.displayName}</span>
-            </label>
-          ))}
-        </form>
-      </Modal>
-      <Modal
         isOpen={isHistoryOpen}
         title="Version history"
         description="Select a version to inspect or restore it."
@@ -2234,7 +2783,7 @@ export function BlueprintPathDetailPage() {
                         : "warning"
                   }
                 >
-                  {version.status}
+                  {versionWord(version.status)}
                 </Badge>
               );
 
@@ -2265,8 +2814,8 @@ export function BlueprintPathDetailPage() {
                       aria-label={`Delete draft version ${version.version}`}
                       iconOnly
                       variant="dangerGhost"
-                      loading={deletingId === version.id}
-                      onClick={() => void deleteDraft(version)}
+                      loading={isLifecycleBusy && pendingLifecycle?.version.id === version.id}
+                      onClick={() => setPendingLifecycle({ action: "delete-draft", version })}
                     >
                       <Minus className="h-4 w-4" strokeWidth={2.5} />
                     </Button>
@@ -2282,13 +2831,15 @@ export function BlueprintPathDetailPage() {
         zIndexClassName="z-[60]"
         title={
           editTarget
-            ? `Edit ${editTarget.kind}`
+            ? `Edit ${kindLabels[editTarget.kind]}`
             : `Add ${target ? kindLabels[target.kind] : "item"}`
         }
         description="This is reusable blueprint content, not a change to an active onboarding path."
+        errorMessage={itemFormError ?? undefined}
         onClose={() => {
           setTarget(null);
           setEditTarget(null);
+          setItemFormError(null);
         }}
         footer={
           <>
@@ -2312,7 +2863,7 @@ export function BlueprintPathDetailPage() {
           className="space-y-4"
           onSubmit={(event) => void createItem(event)}
         >
-          {target?.kind === "question" ? (
+          {formKind === "question" ? (
             <>
               <Field label="Node title" required>
                 <Input
@@ -2330,22 +2881,21 @@ export function BlueprintPathDetailPage() {
               </Field>
             </>
           ) : (
-            <Field label="Title or label" required>
+            <Field label={formKind === "option" ? "Label" : "Title"} required>
               <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
             </Field>
           )}
-          {(target !== null && target.kind !== "option" && target.kind !== "question") ||
-          editTarget?.kind === "task" ||
-          editTarget?.kind === "resource" ? (
-            <Field label="Description" required={target?.kind !== "phase"}>
+          {formKind !== null && formKind !== "option" && formKind !== "question" ? (
+            // A phase may have no description; everything else that has one must have one.
+            <Field label="Description" required={formKind !== "phase"}>
               <Textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                required={target?.kind !== "phase"}
+                required={formKind !== "phase"}
               />
             </Field>
           ) : null}
-          {target?.kind === "phase" ? (
+          {formKind === "phase" ? (
             <>
               <div className="flex items-center justify-between gap-4 rounded-xl border border-app-border bg-app-surface-muted p-3">
                 <div>
@@ -2387,7 +2937,7 @@ export function BlueprintPathDetailPage() {
               ) : null}
             </>
           ) : null}
-          {target?.kind === "resource" || editTarget?.kind === "resource" ? (
+          {formKind === "resource" ? (
             <Field label="URL" required>
               <Input
                 type="url"
@@ -2397,7 +2947,7 @@ export function BlueprintPathDetailPage() {
               />
             </Field>
           ) : null}
-          {target?.kind === "step" ? (
+          {formKind === "step" ? (
             <>
               <Field label="Step type">
                 <Select value={stepType} onChange={(event) => setStepType(event.target.value)}>
@@ -2424,7 +2974,7 @@ export function BlueprintPathDetailPage() {
               </Field>
             </>
           ) : null}
-          {target?.kind === "question" ? (
+          {formKind === "question" ? (
             <>
               <Field label="Question type">
                 <Select
@@ -2449,7 +2999,7 @@ export function BlueprintPathDetailPage() {
               </Field>
             </>
           ) : null}
-          {target?.kind === "option" || editTarget?.kind === "option" ? (
+          {formKind === "option" ? (
             <label className="flex items-center gap-2 text-sm text-app-text">
               <input
                 type="checkbox"

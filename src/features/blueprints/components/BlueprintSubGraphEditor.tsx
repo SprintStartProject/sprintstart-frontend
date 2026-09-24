@@ -1,16 +1,27 @@
-import { ArrowLeft, CircleHelp, ListChecks, Minus, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  ArrowLeft,
+  Check,
+  CircleHelp,
+  FilePlus2,
+  ListChecks,
+  Minus,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Field } from "../../../components/ui/Field.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { Select } from "../../../components/ui/Select.tsx";
-import { SidePanel } from "../../../components/ui/SidePanel.tsx";
 import { Textarea } from "../../../components/ui/Textarea.tsx";
+import { useToast } from "../../../context/useToast.ts";
 import {
   BlueprintGraphCanvas,
   type BlueprintGraphCanvasNodeProps,
 } from "./BlueprintGraphCanvas.tsx";
+import { BlueprintNodeCard } from "./BlueprintNodeCard.tsx";
 import type {
   BlueprintGraphNode,
   BlueprintOption,
@@ -36,12 +47,27 @@ type Props = {
   phase: BlueprintPhase;
   nodes: BlueprintGraphNode[];
   editable: boolean;
+  /**
+   * Asks the page to open a draft, on a version that cannot be edited, carrying the node it was
+   * asked from — so the author lands back in front of it rather than on a graph with nothing open.
+   *
+   * Without it a published blueprint drew a details panel with no footer at all, which reads as
+   * "this has no actions" rather than "not on this version".
+   */
+  onRequestDraft?: (node: BlueprintGraphNode) => void;
+  /**
+   * A node to open as soon as it is there, found by title.
+   *
+   * By title rather than by id: the one caller is a landing on a freshly opened draft, and a draft
+   * is a copy, so every id in it is new while the titles are the ones the author just read.
+   */
+  openNodeTitle?: string | null;
+  onOpenedNode?: () => void;
   onBack: () => void;
   onPositionChange: (node: BlueprintGraphNode, x: number, y: number) => Promise<void>;
-  onRemoveNode: (node: BlueprintGraphNode) => Promise<void>;
   onAddBlocker: (node: BlueprintGraphNode, blockerId: string) => Promise<void>;
   onRemoveBlocker: (node: BlueprintGraphNode, blockerId: string) => Promise<void>;
-  onCreateFromLibrary: (kind: "step" | "question", graphX: number, graphY: number) => Promise<void>;
+  onCreateNode: (kind: "step" | "question", graphX: number, graphY: number) => Promise<void>;
   onDeleteStep: (step: BlueprintStep) => Promise<void>;
   onDeleteQuestion: (question: BlueprintQuestion) => Promise<void>;
   onUpdateQuestion: (
@@ -65,12 +91,14 @@ export function BlueprintSubGraphEditor({
   phase,
   nodes,
   editable,
+  onRequestDraft,
+  openNodeTitle = null,
+  onOpenedNode,
   onBack,
   onPositionChange,
-  onRemoveNode,
   onAddBlocker,
   onRemoveBlocker,
-  onCreateFromLibrary,
+  onCreateNode,
   onDeleteStep,
   onDeleteQuestion,
   onUpdateQuestion,
@@ -87,7 +115,6 @@ export function BlueprintSubGraphEditor({
 }: Props) {
   const [detailsNodeId, setDetailsNodeId] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [isQuestionEditing, setIsQuestionEditing] = useState(false);
   const [isQuestionSaving, setIsQuestionSaving] = useState(false);
   const [questionSaveError, setQuestionSaveError] = useState<string | null>(null);
   const [questionMetadata, setQuestionMetadata] = useState<BlueprintQuestionMetadata>({
@@ -97,7 +124,15 @@ export function BlueprintSubGraphEditor({
     explanation: null,
     correctAnswer: null,
   });
-  const [isStepEditing, setIsStepEditing] = useState(false);
+  const [isStepSaving, setIsStepSaving] = useState(false);
+  const [stepSaveError, setStepSaveError] = useState<string | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
+  /** Where the author was on their way to when the unsaved-changes question stopped them. */
+  const [nodeAfterDiscard, setNodeAfterDiscard] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const toast = useToast();
   const [stepMetadata, setStepMetadata] = useState<BlueprintStepMetadata>({
     title: "",
     description: "",
@@ -108,18 +143,77 @@ export function BlueprintSubGraphEditor({
   });
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
+  /** Each entity as it is stored, which is what "changed" is measured against. */
+  function stepMetadataOf(step: BlueprintStep): BlueprintStepMetadata {
+    return {
+      title: step.title,
+      description: step.description,
+      type: step.type,
+      aiAssisted: step.aiAssisted,
+      estimatedMinutes: step.estimatedMinutes,
+      expectedOutcome: step.expectedOutcome,
+    };
+  }
+
+  function questionMetadataOf(question: BlueprintQuestion): BlueprintQuestionMetadata {
+    return {
+      title: question.title,
+      type: question.type,
+      question: question.question,
+      explanation: question.explanation,
+      correctAnswer: question.correctAnswer,
+    };
+  }
+
   function openNodeDetails(node: BlueprintGraphNode) {
     setDetailsNodeId(node.id);
-    setIsQuestionEditing(false);
-    setIsStepEditing(false);
     setQuestionSaveError(null);
+    setStepSaveError(null);
+
+    const step = phase.blueprintSteps.find((item) => item.id === node.id);
+    if (step) setStepMetadata(stepMetadataOf(step));
+    const question = phase.blueprintCheckQuestions.find((item) => item.id === node.id);
+    if (question) setQuestionMetadata(questionMetadataOf(question));
+
     setIsDetailsOpen(true);
+  }
+
+  // Asked for from somewhere else — a draft opened from inside this very node. Cleared through the
+  // callback, so it opens once rather than every time the phase is reloaded.
+  useEffect(() => {
+    if (!openNodeTitle) return;
+    const match = nodes.find((node) => node.title === openNodeTitle);
+    if (!match) return;
+    // Deferred to a microtask: React 19's lint rejects a synchronous setState in an effect body,
+    // and this is the pattern the repo already passes with.
+    queueMicrotask(() => {
+      openNodeDetails(match);
+      onOpenedNode?.();
+    });
+    // `openNodeDetails` reads this render's phase, which is what its metadata has to come from.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, onOpenedNode, openNodeTitle]);
+
+  /**
+   * Steps from the open node to one of its neighbours.
+   *
+   * Through the same question closing asks, because it is the same risk: leaving a node with
+   * unsaved fields loses them, and it makes no difference whether it was left through the way out
+   * or through the way onward.
+   */
+  function goToNode(id: string) {
+    const node = nodeById.get(id);
+    if (!node) return;
+    if ((detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty)) {
+      setNodeAfterDiscard(id);
+      setIsDiscardConfirmOpen(true);
+      return;
+    }
+    openNodeDetails(node);
   }
 
   function closeNodeDetails() {
     setIsDetailsOpen(false);
-    setIsQuestionEditing(false);
-    setIsStepEditing(false);
     setDetailsNodeId(null);
   }
 
@@ -131,49 +225,60 @@ export function BlueprintSubGraphEditor({
     ? (phase.blueprintSteps.find((step) => step.id === detailsNode.id) ?? null)
     : null;
 
-  async function deleteStep() {
-    if (!detailsStep) return;
-    closeNodeDetails();
-    await onDeleteStep(detailsStep);
+  /**
+   * Deletes whichever of the two the details panel is showing, once it has been confirmed.
+   *
+   * The panel closes after the request, not before: closing first said "gone" before anybody knew,
+   * and left a failure with nowhere to appear.
+   */
+  async function deleteDetailsNode() {
+    const target = detailsStep ?? detailsQuestion;
+    if (!target) return;
+    const isStep = detailsStep !== null;
+    const { title } = target;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      if (detailsStep) await onDeleteStep(detailsStep);
+      else if (detailsQuestion) await onDeleteQuestion(detailsQuestion);
+      setIsDeleteConfirmOpen(false);
+      closeNodeDetails();
+      toast.success(`${isStep ? "Step" : "Knowledge check"} "${title}" deleted`);
+    } catch (reason) {
+      setDeleteError(
+        reason instanceof Error
+          ? reason.message
+          : `The ${isStep ? "step" : "knowledge check"} could not be deleted.`,
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
-  async function deleteQuestion() {
-    if (!detailsQuestion) return;
-    closeNodeDetails();
-    await onDeleteQuestion(detailsQuestion);
-  }
-
-  function beginStepEditing() {
-    if (!detailsStep) return;
-    setStepMetadata({
-      title: detailsStep.title,
-      description: detailsStep.description,
-      type: detailsStep.type,
-      aiAssisted: detailsStep.aiAssisted,
-      estimatedMinutes: detailsStep.estimatedMinutes,
-      expectedOutcome: detailsStep.expectedOutcome,
-    });
-    setIsStepEditing(true);
-  }
+  /** Whether what is on screen differs from what is stored, per entity. */
+  const isStepDirty =
+    detailsStep !== null &&
+    JSON.stringify(stepMetadata) !== JSON.stringify(stepMetadataOf(detailsStep));
+  const isQuestionDirty =
+    detailsQuestion !== null &&
+    JSON.stringify(questionMetadata) !== JSON.stringify(questionMetadataOf(detailsQuestion));
 
   async function saveStepMetadata(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!detailsStep) return;
-    await onUpdateStep(detailsStep, stepMetadata);
-    setIsStepEditing(false);
-  }
-
-  function beginQuestionEditing() {
-    if (!detailsQuestion) return;
-    setQuestionMetadata({
-      title: detailsQuestion.title,
-      type: detailsQuestion.type,
-      question: detailsQuestion.question,
-      explanation: detailsQuestion.explanation,
-      correctAnswer: detailsQuestion.correctAnswer,
-    });
-    setQuestionSaveError(null);
-    setIsQuestionEditing(true);
+    setIsStepSaving(true);
+    setStepSaveError(null);
+    try {
+      await onUpdateStep(detailsStep, stepMetadata);
+      toast.success("Step saved");
+    } catch (reason) {
+      setStepSaveError(
+        reason instanceof Error ? reason.message : "Step metadata could not be saved.",
+      );
+    } finally {
+      setIsStepSaving(false);
+    }
   }
 
   async function saveQuestionMetadata(event: React.FormEvent<HTMLFormElement>) {
@@ -183,7 +288,7 @@ export function BlueprintSubGraphEditor({
     setQuestionSaveError(null);
     try {
       await onUpdateQuestion(detailsQuestion, questionMetadata);
-      setIsQuestionEditing(false);
+      toast.success("Knowledge check saved");
     } catch (reason) {
       setQuestionSaveError(
         reason instanceof Error ? reason.message : "Question metadata could not be saved.",
@@ -209,183 +314,205 @@ export function BlueprintSubGraphEditor({
             Back to phases
           </Button>
         }
-        libraryTitle="Phase content"
-        libraryDescription="Drag steps and knowledge checks onto the canvas. Drop a canvas node here to return it to the library."
-        libraryEmptyMessage="All phase content is on the canvas."
-        libraryTemplates={[
-          { id: "step", title: "New step", description: "Drop onto the canvas to create a step." },
-          {
-            id: "question",
-            title: "New knowledge check",
-            description: "Drop onto the canvas to create a knowledge check.",
-          },
+        emptyTitle="No steps or knowledge checks on the canvas yet"
+        createKinds={[
+          { id: "step", label: "New step" },
+          { id: "question", label: "New check" },
         ]}
         editable={editable}
         onNodeClick={openNodeDetails}
         onPositionChange={onPositionChange}
-        onRemoveNode={onRemoveNode}
         onAddBlocker={onAddBlocker}
         onRemoveBlocker={onRemoveBlocker}
-        onCreateFromLibrary={(templateId, graphX, graphY) => {
-          if (templateId !== "step" && templateId !== "question")
-            return Promise.reject(new Error("Unknown Blueprint node template."));
-          return onCreateFromLibrary(templateId, graphX, graphY);
-        }}
-        renderNode={(node, graphNodeProps) => <SubGraphNodeCard node={node} {...graphNodeProps} />}
-      />
-      <SidePanel
-        isOpen={isDetailsOpen && detailsNode !== null}
-        onClose={() => {
-          setIsDetailsOpen(false);
-          setIsQuestionEditing(false);
-          setIsStepEditing(false);
-        }}
-        title={detailsNode?.title ?? "Node details"}
-        footer={
-          detailsStep && editable ? (
-            isStepEditing ? (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deleteStep()}
-                >
-                  Delete
-                </Button>
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setIsStepEditing(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary" type="submit" form="edit-blueprint-step">
-                    Save changes
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deleteStep()}
-                >
-                  Delete
-                </Button>
-                <Button variant="secondary" onClick={beginStepEditing}>
-                  Edit
-                </Button>
-              </div>
-            )
-          ) : detailsQuestion && editable ? (
-            isQuestionEditing ? (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deleteQuestion()}
-                >
-                  Delete
-                </Button>
-                <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => setIsQuestionEditing(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    form="edit-blueprint-question"
-                    loading={isQuestionSaving}
-                  >
-                    Save changes
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  variant="dangerSoft"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => void deleteQuestion()}
-                >
-                  Delete
-                </Button>
-                <Button variant="secondary" onClick={beginQuestionEditing}>
-                  Edit
-                </Button>
-              </div>
-            )
-          ) : undefined
+        onCreateNode={(kindId, graphX, graphY) =>
+          onCreateNode(kindId === "question" ? "question" : "step", graphX, graphY)
         }
-      >
-        {detailsNode ? (
-          <SubGraphNodeDetails
-            node={detailsNode}
-            phase={phase}
-            editable={editable}
-            isQuestionEditing={isQuestionEditing}
-            questionMetadata={questionMetadata}
-            questionSaveError={questionSaveError}
-            onQuestionMetadataChange={setQuestionMetadata}
-            onQuestionSubmit={saveQuestionMetadata}
-            onAddOption={onAddOption}
-            onRemoveOption={onRemoveOption}
-            isStepEditing={isStepEditing}
-            stepMetadata={stepMetadata}
-            onStepMetadataChange={setStepMetadata}
-            onStepSubmit={saveStepMetadata}
-            onAddTask={onAddTask}
-            onRemoveTask={onRemoveTask}
-            onAddResource={onAddResource}
-            onRemoveResource={onRemoveResource}
-            onEditTask={onEditTask}
-            onEditResource={onEditResource}
-            onEditOption={onEditOption}
-          />
-        ) : null}
-      </SidePanel>
+        renderNode={(node, graphNodeProps) => <SubGraphNodeCard node={node} {...graphNodeProps} />}
+        openNodeId={isDetailsOpen ? detailsNodeId : null}
+        onNavigateNodeDetail={goToNode}
+        onCloseNodeDetail={() => {
+          // Without the mode there is no Cancel, so stepping back out is the only way to walk away
+          // from an edit — and it has to say so rather than dropping the work on the floor.
+          if ((detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty)) {
+            setIsDiscardConfirmOpen(true);
+            return;
+          }
+          setIsDetailsOpen(false);
+        }}
+        renderNodeDetail={(node) => ({
+          title: node.title,
+          body: (
+            <SubGraphNodeDetails
+              node={node}
+              phase={phase}
+              editable={editable}
+              isQuestionEditing={editable}
+              questionMetadata={questionMetadata}
+              questionSaveError={questionSaveError}
+              onQuestionMetadataChange={setQuestionMetadata}
+              onQuestionSubmit={saveQuestionMetadata}
+              onAddOption={onAddOption}
+              onRemoveOption={onRemoveOption}
+              isStepEditing={editable}
+              stepSaveError={stepSaveError}
+              stepMetadata={stepMetadata}
+              onStepMetadataChange={setStepMetadata}
+              onStepSubmit={saveStepMetadata}
+              onAddTask={onAddTask}
+              onRemoveTask={onRemoveTask}
+              onAddResource={onAddResource}
+              onRemoveResource={onRemoveResource}
+              onEditTask={onEditTask}
+              onEditResource={onEditResource}
+              onEditOption={onEditOption}
+            />
+          ),
+          footer:
+            (detailsStep || detailsQuestion) && editable ? (
+              /*
+                No edit mode, and so nothing to cancel: the fields are live and the footer says
+                whether what is on screen has reached the server. Pressing Edit to change a field and
+                Cancel to stop was two decisions about a mode on top of the one real decision.
+              */
+              <div className="flex items-center justify-between gap-3">
+                <Button
+                  variant="dangerSoft"
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
+                >
+                  Delete
+                </Button>
+                {(detailsStep && isStepDirty) || (detailsQuestion && isQuestionDirty) ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => {
+                        if (detailsStep) setStepMetadata(stepMetadataOf(detailsStep));
+                        if (detailsQuestion)
+                          setQuestionMetadata(questionMetadataOf(detailsQuestion));
+                      }}
+                    >
+                      Discard
+                    </Button>
+                    <Button
+                      variant="primary"
+                      type="submit"
+                      form={detailsStep ? "edit-blueprint-step" : "edit-blueprint-question"}
+                      loading={detailsStep ? isStepSaving : isQuestionSaving}
+                    >
+                      Save changes
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="flex items-center gap-1.5 text-sm text-app-text-muted">
+                    <Check className="h-4 w-4 text-app-success-solid" aria-hidden="true" />
+                    Saved
+                  </p>
+                )}
+              </div>
+            ) : onRequestDraft ? (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-app-text-muted">
+                  This version is published, so it is read-only.
+                </p>
+                <Button
+                  variant="primary"
+                  icon={<FilePlus2 className="h-4 w-4" />}
+                  onClick={() => onRequestDraft(node)}
+                >
+                  Edit as draft
+                </Button>
+              </div>
+            ) : undefined,
+        })}
+      />
+      <AlertDialog
+        isOpen={isDeleteConfirmOpen}
+        title={
+          detailsStep
+            ? `Delete step "${detailsStep.title}"?`
+            : detailsQuestion
+              ? `Delete knowledge check "${detailsQuestion.title}"?`
+              : "Delete this node?"
+        }
+        description={
+          <>
+            <p>
+              {detailsStep
+                ? "Its tasks, resources and every prerequisite pointing at it go with it."
+                : "Its answer options and every prerequisite pointing at it go with it."}{" "}
+              Hires who already have a path built from this blueprint keep theirs.
+            </p>
+            <p className="mt-2">This cannot be undone from here.</p>
+          </>
+        }
+        confirmLabel={detailsStep ? "Delete step" : "Delete knowledge check"}
+        variant="danger"
+        isLoading={isDeleting}
+        loadingLabel="Deleting…"
+        errorMessage={deleteError ?? undefined}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={() => void deleteDetailsNode()}
+      />
+      <AlertDialog
+        isOpen={isDiscardConfirmOpen}
+        title="Discard your changes?"
+        description={
+          <p>
+            This {detailsStep ? "step" : "knowledge check"} has edits that have not been saved.
+            {nodeAfterDiscard ? " Discarding them moves on to the next one." : ""}
+          </p>
+        }
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        variant="danger"
+        onClose={() => {
+          setIsDiscardConfirmOpen(false);
+          setNodeAfterDiscard(null);
+        }}
+        onConfirm={() => {
+          if (detailsStep) setStepMetadata(stepMetadataOf(detailsStep));
+          if (detailsQuestion) setQuestionMetadata(questionMetadataOf(detailsQuestion));
+          setIsDiscardConfirmOpen(false);
+          const next = nodeAfterDiscard ? nodeById.get(nodeAfterDiscard) : null;
+          setNodeAfterDiscard(null);
+          if (next) {
+            openNodeDetails(next);
+            return;
+          }
+          setIsDetailsOpen(false);
+        }}
+      />
     </>
   );
 }
 
 function SubGraphNodeCard({
   node,
-  draggable,
-  disabled,
-  onDragStart,
-  onClick,
+  ...cardProps
 }: { node: BlueprintGraphNode } & BlueprintGraphCanvasNodeProps) {
   const isQuestion = node.type === "QUESTION";
+
   return (
-    <div
-      data-graph-node
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick();
-        }
+    <BlueprintNodeCard
+      {...cardProps}
+      title={node.title}
+      kind={{
+        label: isQuestion ? "Knowledge check" : "Step",
+        icon: isQuestion ? CircleHelp : ListChecks,
       }}
-      role="button"
-      tabIndex={0}
-      className={
-        (draggable ? "cursor-grab " : "cursor-default ") +
-        "min-h-20 rounded-xl border border-app-border bg-app-surface p-3 shadow-sm" +
-        (disabled ? " pointer-events-none" : "")
-      }
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-2 text-sm font-semibold text-app-text">{node.title}</p>
-        {isQuestion ? (
-          <CircleHelp className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
-        ) : (
-          <ListChecks className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />
-        )}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge variant="neutral">{isQuestion ? "Knowledge check" : "Step"}</Badge>
-      </div>
-    </div>
+      // Two kinds on one canvas, and the difference is what the hire is asked to *do*: work through
+      // something, or answer for it. That is the distinction the colour carries here.
+      accent={isQuestion ? "orange" : "brand"}
+      // A diamond for a check, a circle for a step. Two kinds on one canvas have to stay apart for
+      // a reader who cannot tell two small colours apart, and at the zoom where a whole phase fits
+      // the outline is all there is left of either.
+      glyph={isQuestion ? "diamond" : "round"}
+    />
   );
 }
 
@@ -401,6 +528,7 @@ function SubGraphNodeDetails({
   onAddOption,
   onRemoveOption,
   isStepEditing,
+  stepSaveError,
   stepMetadata,
   onStepMetadataChange,
   onStepSubmit,
@@ -423,6 +551,7 @@ function SubGraphNodeDetails({
   onAddOption: (question: BlueprintQuestion, label: string, correct: boolean) => Promise<void>;
   onRemoveOption: (option: BlueprintOption) => Promise<void>;
   isStepEditing: boolean;
+  stepSaveError: string | null;
   stepMetadata: BlueprintStepMetadata;
   onStepMetadataChange: React.Dispatch<React.SetStateAction<BlueprintStepMetadata>>;
   onStepSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
@@ -443,6 +572,7 @@ function SubGraphNodeDetails({
         step={step}
         editable={editable}
         isEditing={isStepEditing}
+        saveError={stepSaveError}
         metadata={stepMetadata}
         onMetadataChange={onStepMetadataChange}
         onSubmit={onStepSubmit}
@@ -476,6 +606,7 @@ function StepDetails({
   step,
   editable,
   isEditing,
+  saveError,
   metadata,
   onMetadataChange,
   onSubmit,
@@ -489,6 +620,7 @@ function StepDetails({
   step: BlueprintStep;
   editable: boolean;
   isEditing: boolean;
+  saveError: string | null;
   metadata: BlueprintStepMetadata;
   onMetadataChange: React.Dispatch<React.SetStateAction<BlueprintStepMetadata>>;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
@@ -499,76 +631,95 @@ function StepDetails({
   onEditTask: (task: BlueprintStep["blueprintTasks"][number]) => void;
   onEditResource: (resource: BlueprintStep["blueprintResources"][number]) => void;
 }) {
-  if (isEditing)
-    return (
-      <form
-        id="edit-blueprint-step"
-        className="space-y-5"
-        onSubmit={(event) => void onSubmit(event)}
-      >
-        <Field label="Title" required>
-          <Input
-            value={metadata.title}
-            onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, title: event.target.value }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Description" required>
-          <Textarea
-            value={metadata.description}
-            onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, description: event.target.value }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Step type">
-          <Select
-            value={metadata.type}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                type: event.target.value as BlueprintStep["type"],
-              }))
-            }
-          >
-            <option value="DOCUMENT">Document</option>
-            <option value="VIDEO">Video</option>
-            <option value="TASK">Task</option>
-          </Select>
-        </Field>
-        <Field label="Estimated minutes">
-          <Input
-            type="number"
-            min="0"
-            value={metadata.estimatedMinutes}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                estimatedMinutes: Number(event.target.value),
-              }))
-            }
-          />
-        </Field>
-        <Field label="Expected outcome">
-          <Textarea
-            value={metadata.expectedOutcome}
-            onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, expectedOutcome: event.target.value }))
-            }
-          />
-        </Field>
-      </form>
-    );
+  // Fields and lists both, always. They used to be two branches of an edit mode, so on a draft —
+  // where the form is what you get — there was no way to reach the tasks or the resources at all.
+  const form = (
+    <form id="edit-blueprint-step" className="space-y-5" onSubmit={(event) => void onSubmit(event)}>
+      <Field label="Title" required>
+        <Input
+          value={metadata.title}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              title: event.target.value,
+            }))
+          }
+          required
+        />
+      </Field>
+      <Field label="Description" required>
+        <Textarea
+          value={metadata.description}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              description: event.target.value,
+            }))
+          }
+          required
+        />
+      </Field>
+      <Field label="Step type">
+        <Select
+          value={metadata.type}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              type: event.target.value as BlueprintStep["type"],
+            }))
+          }
+        >
+          <option value="DOCUMENT">Document</option>
+          <option value="VIDEO">Video</option>
+          <option value="TASK">Task</option>
+        </Select>
+      </Field>
+      <Field label="Estimated minutes">
+        <Input
+          type="number"
+          min="1"
+          value={metadata.estimatedMinutes}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              estimatedMinutes: Number(event.target.value),
+            }))
+          }
+        />
+      </Field>
+      <Field label="Expected outcome">
+        <Textarea
+          value={metadata.expectedOutcome}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              expectedOutcome: event.target.value,
+            }))
+          }
+        />
+      </Field>
+      {saveError ? (
+        <p role="alert" className="text-sm text-app-danger-text">
+          {saveError}
+        </p>
+      ) : null}
+    </form>
+  );
+
   return (
-    <div className="space-y-5 text-sm">
-      <dl className="grid grid-cols-2 gap-3">
-        <Detail label="Type" value={step.type} />
-        <Detail label="Duration" value={`${step.estimatedMinutes} minutes`} />
-      </dl>
-      <Detail label="Expected outcome" value={step.expectedOutcome || "Not specified."} />
+    <div className="space-y-6 text-sm">
+      {isEditing ? (
+        form
+      ) : (
+        <div className="space-y-5">
+          <p className="text-app-text-muted">{step.description || "No description yet."}</p>
+          <dl className="grid grid-cols-2 gap-3">
+            <Detail label="Type" value={step.type} />
+            <Detail label="Duration" value={`${step.estimatedMinutes} minutes`} />
+          </dl>
+          <Detail label="Expected outcome" value={step.expectedOutcome || "Not specified."} />
+        </div>
+      )}
       <DetailList
         title="Tasks"
         action={
@@ -588,38 +739,43 @@ function StepDetails({
           step.blueprintTasks
             .toSorted((left, right) => left.position - right.position)
             .map((task) => (
-              <div
-                key={task.id}
-                className="flex cursor-pointer justify-between gap-2 rounded-lg bg-app-surface-muted p-3"
-                role="button"
-                tabIndex={0}
-                onClick={() => onEditTask(task)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onEditTask(task);
-                  }
-                }}
-              >
-                <div>
-                  <p className="font-medium text-app-text">{task.title}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-app-text-muted">{task.description}</p>
+              // The row inside the item, not instead of it: a `ul` whose children are
+              // `role="button"` is announced as an empty list.
+              <li key={task.id}>
+                <div
+                  className="flex cursor-pointer justify-between gap-2 rounded-lg bg-app-surface-muted p-3"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onEditTask(task)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onEditTask(task);
+                    }
+                  }}
+                >
+                  <div>
+                    <p className="font-medium text-app-text">{task.title}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
+                      {task.description}
+                    </p>
+                  </div>
+                  {editable ? (
+                    <Button
+                      aria-label={`Delete task ${task.title}`}
+                      iconOnly
+                      size="sm"
+                      variant="dangerGhost"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemoveTask(task);
+                      }}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                 </div>
-                {editable ? (
-                  <Button
-                    aria-label={`Delete task ${task.title}`}
-                    iconOnly
-                    size="sm"
-                    variant="dangerGhost"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRemoveTask(task);
-                    }}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                ) : null}
-              </div>
+              </li>
             ))
         ) : (
           <EmptyDetailListItem>No tasks have been added.</EmptyDetailListItem>
@@ -642,40 +798,41 @@ function StepDetails({
       >
         {step.blueprintResources.length ? (
           step.blueprintResources.map((resource) => (
-            <div
-              key={resource.id}
-              className="flex cursor-pointer items-start justify-between gap-3 rounded-lg bg-app-surface-muted p-3"
-              role="button"
-              tabIndex={0}
-              onClick={() => onEditResource(resource)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onEditResource(resource);
-                }
-              }}
-            >
-              <div>
-                <p className="font-medium text-app-text">{resource.title}</p>
-                <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
-                  {resource.description}
-                </p>
+            <li key={resource.id}>
+              <div
+                className="flex cursor-pointer items-start justify-between gap-3 rounded-lg bg-app-surface-muted p-3"
+                role="button"
+                tabIndex={0}
+                onClick={() => onEditResource(resource)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onEditResource(resource);
+                  }
+                }}
+              >
+                <div>
+                  <p className="font-medium text-app-text">{resource.title}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
+                    {resource.description}
+                  </p>
+                </div>
+                {editable ? (
+                  <Button
+                    aria-label={`Delete resource ${resource.title}`}
+                    iconOnly
+                    size="sm"
+                    variant="dangerGhost"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRemoveResource(resource);
+                    }}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                ) : null}
               </div>
-              {editable ? (
-                <Button
-                  aria-label={`Delete resource ${resource.title}`}
-                  iconOnly
-                  size="sm"
-                  variant="dangerGhost"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRemoveResource(resource);
-                  }}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-              ) : null}
-            </div>
+            </li>
           ))
         ) : (
           <EmptyDetailListItem>No resources have been added.</EmptyDetailListItem>
@@ -730,77 +887,94 @@ function QuestionDetails({
     }
   }
 
-  if (isEditing)
-    return (
-      <form
-        id="edit-blueprint-question"
-        className="space-y-5"
-        onSubmit={(event) => void onSubmit(event)}
-      >
-        <Field label="Title" required>
-          <Input
-            value={metadata.title}
-            onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, title: event.target.value }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Question type">
-          <Select
-            value={metadata.type}
-            onChange={(event) =>
-              onMetadataChange((current) => ({
-                ...current,
-                type: event.target.value as BlueprintQuestion["type"],
-              }))
-            }
-          >
-            <option value="MULTIPLE_CHOICE">Multiple choice</option>
-            <option value="SHORT_TEXT">Short text</option>
-          </Select>
-        </Field>
-        <Field label="Question" required>
-          <Textarea
-            value={metadata.question}
-            onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, question: event.target.value }))
-            }
-            required
-          />
-        </Field>
-        <Field label="Explanation">
-          <Textarea
-            value={metadata.explanation ?? ""}
-            onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, explanation: event.target.value }))
-            }
-          />
-        </Field>
-        <Field label="Correct answer">
-          <Input
-            value={metadata.correctAnswer ?? ""}
-            onChange={(event) =>
-              onMetadataChange((current) => ({ ...current, correctAnswer: event.target.value }))
-            }
-          />
-        </Field>
-        {saveError ? (
-          <p role="alert" className="text-sm text-app-danger-text">
-            {saveError}
-          </p>
-        ) : null}
-      </form>
-    );
+  const form = (
+    <form
+      id="edit-blueprint-question"
+      className="space-y-5"
+      onSubmit={(event) => void onSubmit(event)}
+    >
+      <Field label="Title" required>
+        <Input
+          value={metadata.title}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              title: event.target.value,
+            }))
+          }
+          required
+        />
+      </Field>
+      <Field label="Question type">
+        <Select
+          value={metadata.type}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              type: event.target.value as BlueprintQuestion["type"],
+            }))
+          }
+        >
+          <option value="MULTIPLE_CHOICE">Multiple choice</option>
+          <option value="SHORT_TEXT">Short text</option>
+        </Select>
+      </Field>
+      <Field label="Question" required>
+        <Textarea
+          value={metadata.question}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              question: event.target.value,
+            }))
+          }
+          required
+        />
+      </Field>
+      <Field label="Explanation">
+        <Textarea
+          value={metadata.explanation ?? ""}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              explanation: event.target.value,
+            }))
+          }
+        />
+      </Field>
+      <Field label="Correct answer">
+        <Input
+          value={metadata.correctAnswer ?? ""}
+          onChange={(event) =>
+            onMetadataChange((current) => ({
+              ...current,
+              correctAnswer: event.target.value,
+            }))
+          }
+        />
+      </Field>
+      {saveError ? (
+        <p role="alert" className="text-sm text-app-danger-text">
+          {saveError}
+        </p>
+      ) : null}
+    </form>
+  );
 
   return (
-    <div className="space-y-5 text-sm">
-      <dl className="grid grid-cols-2 gap-3">
-        <Detail label="Type" value={question.type} />
-        <Detail label="Options" value={String(question.blueprintCheckOptions.length)} />
-      </dl>
-      <Detail label="Question" value={question.question} />
-      <Detail label="Explanation" value={question.explanation || "Not specified."} />
+    <div className="space-y-6 text-sm">
+      {isEditing ? (
+        form
+      ) : (
+        <div className="space-y-5">
+          <dl className="grid grid-cols-2 gap-3">
+            <Detail label="Type" value={question.type.replace("_", " ")} />
+            <Detail label="Options" value={String(question.blueprintCheckOptions.length)} />
+          </dl>
+          <Detail label="Question" value={question.question} />
+          <Detail label="Explanation" value={question.explanation || "Not specified."} />
+        </div>
+      )}
       <section>
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-semibold text-app-text">Options</h3>

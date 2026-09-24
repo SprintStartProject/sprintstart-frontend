@@ -21,8 +21,8 @@ const user: TeamOverviewUser = {
 };
 
 const skills: Skill[] = [
-  { id: "sk1", name: "React", roleIds: ["r1"], status: "ACTIVE" },
-  { id: "sk2", name: "TypeScript", roleIds: ["r1"], status: "ACTIVE" },
+  { id: "sk1", name: "React", roleIds: ["r1"], status: "ACTIVE", universal: false },
+  { id: "sk2", name: "TypeScript", roleIds: ["r1"], status: "ACTIVE", universal: false },
 ];
 
 function SkillWizardHarness() {

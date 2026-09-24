@@ -163,6 +163,8 @@ export function PhaseCheckAdminModal({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Saving with every question removed deletes the phase's whole check; that takes a second click.
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -189,6 +191,14 @@ export function PhaseCheckAdminModal({
       setSaveError(problem);
       return;
     }
+    if (drafts.length === 0 && (questions?.length ?? 0) > 0 && !confirmingClear) {
+      setConfirmingClear(true);
+      setSaveError(
+        `This removes all ${questions?.length} questions from the phase. Save again to confirm.`,
+      );
+      return;
+    }
+    setConfirmingClear(false);
     setSaving(true);
     setSaveError(null);
     try {
@@ -257,7 +267,10 @@ export function PhaseCheckAdminModal({
           saveError={saveError}
           onUpdate={updateDraft}
           onRemove={(key) => setDrafts((current) => current.filter((draft) => draft.key !== key))}
-          onAdd={(type) => setDrafts((current) => [...current, emptyDraft(type)])}
+          onAdd={(type) => {
+            setConfirmingClear(false);
+            setDrafts((current) => [...current, emptyDraft(type)]);
+          }}
         />
       )}
     </Modal>
@@ -298,7 +311,10 @@ function ResultsTab({ userId, questions }: { userId: string; questions: AdminQue
   const [attemptsByQuestion, setAttemptsByQuestion] = useState<
     Record<string, QuestionAttemptsReviewEndpoint | null>
   >({});
-  const [loadingQuestionId, setLoadingQuestionId] = useState<string | null>(null);
+  // A set, not one id: two questions expanded in quick succession used to share a single spinner,
+  // so the second looked like it was doing nothing.
+  const [loadingQuestionIds, setLoadingQuestionIds] = useState<readonly string[]>([]);
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
 
   if (questions.length === 0) {
     return (
@@ -313,14 +329,21 @@ function ResultsTab({ userId, questions }: { userId: string; questions: AdminQue
   }
 
   const loadAttempts = async (questionId: string) => {
-    setLoadingQuestionId(questionId);
+    setLoadingQuestionIds((current) => [...current, questionId]);
     try {
       const attempts = await onboardingService.fetchQuestionAttempts(userId, questionId);
       setAttemptsByQuestion((current) => ({ ...current, [questionId]: attempts }));
-    } catch {
-      setAttemptsByQuestion((current) => ({ ...current, [questionId]: null }));
+    } catch (reason) {
+      console.error("Failed to load the attempts on a knowledge question:", reason);
+      // Nothing is stored for a failed load, so collapsing and expanding again tries once more.
+      // Storing `null` made the entry present, and "present" is what the retry condition asks
+      // about -- so a failure was permanent for as long as the modal stayed open.
+      setAttemptsByQuestion((current) => {
+        const { [questionId]: _removed, ...rest } = current;
+        return rest;
+      });
     } finally {
-      setLoadingQuestionId(null);
+      setLoadingQuestionIds((current) => current.filter((id) => id !== questionId));
     }
   };
 
@@ -331,14 +354,22 @@ function ResultsTab({ userId, questions }: { userId: string; questions: AdminQue
       </p>
       {questions.map((question) => {
         const attempts = attemptsByQuestion[question.id];
-        const loaded = question.id in attemptsByQuestion;
+        const isOpen = openIds.has(question.id);
+        const loaded = isOpen && question.id in attemptsByQuestion;
         return (
           <div key={question.id} className="rounded-2xl border border-app-border p-4">
             <button
               type="button"
+              aria-expanded={isOpen}
               className="flex w-full items-start justify-between gap-3 text-left"
               onClick={() => {
-                if (!loaded) void loadAttempts(question.id);
+                setOpenIds((current) => {
+                  const next = new Set(current);
+                  if (next.has(question.id)) next.delete(question.id);
+                  else next.add(question.id);
+                  return next;
+                });
+                if (!(question.id in attemptsByQuestion)) void loadAttempts(question.id);
               }}
             >
               <div className="min-w-0">
@@ -348,10 +379,12 @@ function ResultsTab({ userId, questions }: { userId: string; questions: AdminQue
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {loadingQuestionId === question.id ? (
+                {loadingQuestionIds.includes(question.id) ? (
                   <Loader2 className="h-4 w-4 animate-spin text-app-brand" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-app-text-muted" />
+                  <ChevronDown
+                    className={`h-4 w-4 text-app-text-muted transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  />
                 )}
               </div>
             </button>

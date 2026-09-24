@@ -36,7 +36,9 @@ import {
   type OrgMetadataArtifactMetadata,
   type OrgMetadataTeam,
 } from "../orgMetadata";
+import { getArtifactRepository } from "../githubMetadata";
 import { knowledgeService } from "../../../services/knowledgeService";
+import { RepositoryBadge } from "./RepositoryBadge";
 import { useToast } from "../../../context/useToast";
 import { Button } from "../../../components/ui/Button";
 import { ApiError } from "../../../services/apiClient";
@@ -1254,11 +1256,20 @@ export function ArtifactViewerDrawer({
     </div>
   );
 
+  // GitHub repo artifacts show their `owner/repository` in the header's badge
+  // row; other kinds have no repository to name, so the badge stays unset.
+  const repository = artifact ? getArtifactRepository(artifact) : null;
+
+  const repositoryBadge = repository ? (
+    <RepositoryBadge repository={repository} testId="artifact-drawer-repo-badge" />
+  ) : undefined;
+
   return (
     <SidePanel
       isOpen={!!artifact}
       onClose={onClose}
       title={titleContent}
+      badge={repositoryBadge}
       actions={actionsContent}
       widthClassName="w-full max-w-[720px] md:w-[60%] lg:w-[70%]"
       zIndexClassName="z-50 md:z-30"

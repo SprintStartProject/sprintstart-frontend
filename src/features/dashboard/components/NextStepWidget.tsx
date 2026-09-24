@@ -1,6 +1,6 @@
 import { Spinner } from "../../../components/ui/Spinner";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, ArrowRight, CircleHelp, Rocket } from "lucide-react";
+import { AlertCircle, ArrowRight, CircleHelp, Rocket, Signpost } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import type { MyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
@@ -93,7 +93,7 @@ type CardContent = {
    * Handed to the onboarding page through the router, which uses it to put the thing the
    * user came for in front of them instead of dropping them at the top of the page.
    */
-  navigationState?: { focusQuestionId?: string };
+  navigationState?: { focusQuestionId?: string; choosePhase?: boolean };
 };
 
 function describeNextAction(action: Exclude<OnboardingNextAction, { kind: "done" }>): CardContent {
@@ -124,6 +124,18 @@ function describeNextAction(action: Exclude<OnboardingNextAction, { kind: "done"
         ariaLabel: `Answer the knowledge question for ${action.phase.title}`,
         to: "/onboarding",
         navigationState: { focusQuestionId: action.question.id },
+      };
+
+    case "choose":
+      return {
+        icon: Signpost,
+        eyebrow: "Your pick",
+        title: `${action.phases.length} phases are open`,
+        subtitle: "Choose where your onboarding goes next",
+        cta: "Choose",
+        ariaLabel: "Choose the next phase of your onboarding",
+        to: "/onboarding",
+        navigationState: { choosePhase: true },
       };
   }
 }
