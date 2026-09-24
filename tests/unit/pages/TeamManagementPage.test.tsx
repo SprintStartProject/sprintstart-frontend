@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { http, HttpResponse } from "msw";
 import { TeamManagementPage } from "../../../src/pages/TeamManagementPage";
 import { server } from "../../unit/setup/vitest.setup";
@@ -49,8 +49,20 @@ function renderPage(url = "/team-management") {
             </>
           }
         />
+        <Route path="/team/:userId" element={<ProfileProbe />} />
       </Routes>
     </MemoryRouter>,
+  );
+}
+
+function ProfileProbe() {
+  const { userId } = useParams();
+  const location = useLocation();
+  return (
+    <>
+      <p>profile of {userId}</p>
+      <output>{location.search}</output>
+    </>
   );
 }
 
@@ -187,7 +199,22 @@ describe("TeamManagementPage", () => {
 
     await user.click(await screen.findByRole("button", { name: /Alice Smith/ }));
 
-    expect(screen.getByTestId("location")).toHaveTextContent("?member=user1");
+    // A single click waits a moment to be sure it is not the first half of a double click.
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("?member=user1");
+    });
+  });
+
+  it("opens a member's full profile on a double click, without the side panel", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.dblClick(await screen.findByRole("button", { name: /Alice Smith/ }));
+
+    expect(await screen.findByText("profile of user1")).toBeInTheDocument();
+    // Well past the single-click delay: the first click of the pair must not open the panel.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(screen.queryByText("?member=user1")).not.toBeInTheDocument();
   });
 
   it("shows the roles tab when the URL asks for it", async () => {

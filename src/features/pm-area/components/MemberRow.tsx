@@ -6,7 +6,8 @@ import {
   MessageSquareText,
   SkipForward,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import type { TeamOverviewUser } from "../../team-management/types";
 import type { AttentionReason } from "../attentionQueue";
@@ -149,6 +150,15 @@ export function MemberFlags({ member }: { member: TeamOverviewUser }) {
   );
 }
 
+/**
+ * How long a first click waits for a second one before it counts as a single click.
+ *
+ * A single click opens the side panel, a double click the full profile. Opening the panel at once
+ * would slide it in under the second click and then yank it away again as the page changes, so
+ * the single click holds back for about as long as a double click takes.
+ */
+export const DOUBLE_CLICK_WINDOW_MS = 220;
+
 /** How many open items a roster row spells out before it folds the rest into "+n". */
 const VISIBLE_REASONS = 2;
 
@@ -231,8 +241,9 @@ type MemberRowProps = {
  *
  * A row rather than the card grid the team page used: a manager scans a team top to bottom by
  * one thing at a time (who is stuck, who is waiting), and a grid of cards made that a zig-zag.
- * Pressing it opens the side panel — the full profile is one more press from there, not the
- * first thing every look costs.
+ * A click opens the side panel for a quick look; a double click goes straight to the full
+ * profile. Enter and Space open the panel at once — the delay is only there to tell a single
+ * click from a double one, and a key press is never half of a double click.
  */
 export function MemberRow({
   member,
@@ -243,6 +254,43 @@ export function MemberRow({
   reasons,
 }: MemberRowProps) {
   const name = memberName(member);
+  const navigate = useNavigate();
+  const pendingClick = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (pendingClick.current !== null) window.clearTimeout(pendingClick.current);
+    },
+    [],
+  );
+
+  const cancelPendingClick = () => {
+    if (pendingClick.current === null) return;
+    window.clearTimeout(pendingClick.current);
+    pendingClick.current = null;
+  };
+
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    // `detail` is 0 for a click synthesized from the keyboard: no second click is coming.
+    if (event.detail === 0) {
+      onOpen(member.userId);
+      return;
+    }
+    // The second click of a double click: the double-click handler takes it from here.
+    if (event.detail > 1) return;
+
+    cancelPendingClick();
+    pendingClick.current = window.setTimeout(() => {
+      pendingClick.current = null;
+      onOpen(member.userId);
+    }, DOUBLE_CLICK_WINDOW_MS);
+  };
+
+  const handleDoubleClick = () => {
+    cancelPendingClick();
+    void navigate(`/team/${member.userId}`);
+  };
+
   const percent = progressPercent(member);
   const stage = memberStage(member);
   const days = daysOnStep(member);
@@ -264,7 +312,9 @@ export function MemberRow({
   const row = (
     <button
       type="button"
-      onClick={() => onOpen(member.userId)}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      title="Click for a quick look · double-click for the full profile"
       aria-current={selected ? "true" : undefined}
       className={`group grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
         selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -186,7 +186,9 @@ describe("PmDashboardPage", () => {
     const team = within(await screen.findByRole("region", { name: "Team" }));
     await user.click(await team.findByRole("button", { name: /Bob Builder/ }));
 
-    expect(screen.getByTestId("location")).toHaveTextContent("?member=bob");
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("?member=bob");
+    });
   });
 
   it("says so when nobody needs anything", async () => {
