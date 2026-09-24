@@ -4,11 +4,6 @@ coverage
 node_modules
 package-lock.json
 
-# Local per-task worktrees (git worktree add .worktrees/<name>) carry full
-# copies of the tree, each formatted against its own branch state; checking
-# them here makes format:check walk and flag four extra repos.
-.worktrees
-
 # Vendored Keycloak theme. `keycloakify sync-extensions` runs on every
 # `npm install` and rewrites everything except the handful of "owned" files
 # listed in src/keycloak-theme/.gitignore — formatting the rest is churn that

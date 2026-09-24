@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 import { keycloakify } from "keycloakify/vite-plugin";
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
-import { defaultExclude } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -44,10 +43,6 @@ export default defineConfig({
     // parallel. The default 5s bounds machine load rather than the code under test, so a
     // busy runner fails whichever file happens to be scheduled last.
     testTimeout: 30000,
-    // Per-task worktrees under .worktrees/ carry full tests/ copies of their own
-    // branches; the default include would run all of them against this tree's
-    // modules and fail thousands of tests that are not this branch's concern.
-    exclude: [...defaultExclude, ".worktrees/**"],
     alias: [
       // Every test's `render`/`renderHook` gets a QueryClientProvider for free, without
       // touching the ~230 files that import them directly — see tests/unit/setup/rtl.tsx.

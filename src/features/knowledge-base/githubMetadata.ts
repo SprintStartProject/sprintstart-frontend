@@ -88,16 +88,14 @@ export function parseGithubMetadata(
  *
  * @param artifact The artifact whose metadata should be interpreted.
  * @returns The `owner/repository` string, or `null`.
- *
- * Cached per artifact object through `repositoryInfoOf`: the card list, the
- * drawer and the facet loop all call this on every render pass, and without
- * the cache each call re-ran `JSON.parse` (and re-warned on a malformed
- * payload) for the same metadata.
  */
 export function getArtifactRepository(
   artifact: Pick<Artifact, "sourceSystem" | "artifactType" | "metadata">,
 ): string | null {
-  return repositoryInfoOf(artifact).repository;
+  if (artifact.sourceSystem !== "GITHUB" || artifact.artifactType === "ORG_METADATA") {
+    return null;
+  }
+  return parseGithubMetadata(artifact.metadata)?.repositoryFullName ?? null;
 }
 
 /**
@@ -113,25 +111,6 @@ interface RepositoryInfo {
   orgLogin: string | null;
 }
 
-/** Uncached core both public readers share; see the WeakMap note below. */
-function computeRepositoryInfo(
-  artifact: Pick<Artifact, "sourceSystem" | "artifactType" | "metadata">,
-): RepositoryInfo {
-  const repository =
-    artifact.sourceSystem === "GITHUB" && artifact.artifactType !== "ORG_METADATA"
-      ? (parseGithubMetadata(artifact.metadata)?.repositoryFullName ?? null)
-      : null;
-  if (repository !== null) return { repository, orgLogin: null };
-
-  return {
-    repository: null,
-    orgLogin:
-      artifact.artifactType === "ORG_METADATA"
-        ? (parseOrgMetadata(artifact.metadata)?.login ?? null)
-        : null,
-  };
-}
-
 const repositoryInfoCache = new WeakMap<object, RepositoryInfo>();
 
 function repositoryInfoOf(
@@ -140,7 +119,17 @@ function repositoryInfoOf(
   const cached = repositoryInfoCache.get(artifact);
   if (cached !== undefined) return cached;
 
-  const info = computeRepositoryInfo(artifact);
+  const repository = getArtifactRepository(artifact);
+  const info: RepositoryInfo =
+    repository !== null
+      ? { repository, orgLogin: null }
+      : {
+          repository: null,
+          orgLogin:
+            artifact.artifactType === "ORG_METADATA"
+              ? (parseOrgMetadata(artifact.metadata)?.login ?? null)
+              : null,
+        };
   repositoryInfoCache.set(artifact, info);
   return info;
 }

@@ -13,10 +13,6 @@ export default defineConfig([
     "dist_keycloak",
     "node_modules",
     "coverage",
-    // Local per-task worktrees (git worktree add .worktrees/<name>) carry full
-    // copies of src/ and tests/; without this the type-checked lint run walks
-    // every copy and takes minutes instead of seconds.
-    ".worktrees/**",
     "src/keycloak-theme/**",
     "public/keycloak-theme/**",
     "public/keycloakify-dev-resources/**",

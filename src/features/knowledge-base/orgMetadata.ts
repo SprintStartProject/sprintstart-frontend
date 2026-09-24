@@ -80,8 +80,7 @@ export function parseOrgMetadata(
   }
 
   const p = parsed as Record<string, unknown>;
-  const login = p["login"];
-  if (typeof login !== "string" || login.trim() === "" || !Array.isArray(p["members"])) {
+  if (typeof p["login"] !== "string" || !Array.isArray(p["members"])) {
     return null;
   }
 
@@ -103,8 +102,5 @@ export function parseOrgMetadata(
     if (!everyTeamUsable) return null;
   }
 
-  // Same normalization as the repo parser applies to repositoryFullName: a
-  // padded login must not silently miss the owner-half match, which folds
-  // case but compares against a trimmed `owner/repo` string.
-  return { ...(parsed as OrgMetadataArtifactMetadata), login: login.trim() };
+  return parsed as OrgMetadataArtifactMetadata;
 }
