@@ -39,10 +39,12 @@ export function Game2048Frame({ onExit }: Game2048FrameProps) {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<unknown>) => {
-      // Same origin only: the game page is served by this app, so a message
-      // from anywhere else can only be somebody else's frame closing a modal
-      // that is not its business.
+      // Same origin *and* this very frame: the game page is served by this
+      // app, so a message from anywhere else — another origin, or another
+      // same-origin frame or window — is somebody else closing a modal that
+      // is not its business.
       if (event.origin !== window.location.origin) return;
+      if (event.source !== iframeRef.current?.contentWindow) return;
       if (isEggExitMessage(event.data)) {
         onExitRef.current();
       }
@@ -69,9 +71,12 @@ export function Game2048Frame({ onExit }: Game2048FrameProps) {
       }
     };
 
-    if (iframe.contentDocument?.readyState === "complete") {
-      focusFrame();
-    }
+    // Only the `load` event, never an early `readyState` check: a freshly
+    // inserted iframe still holds its initial about:blank document, whose
+    // readyState is already "complete". Focusing that would steal focus
+    // before the game exists — and before the shell has recorded who opened
+    // it, which is how the frame used to end up as the "opener" focus was
+    // restored to on close.
     iframe.addEventListener("load", focusFrame);
 
     return () => iframe.removeEventListener("load", focusFrame);

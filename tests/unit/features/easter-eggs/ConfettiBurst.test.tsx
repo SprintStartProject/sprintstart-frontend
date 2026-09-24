@@ -89,13 +89,19 @@ describe("ConfettiBurst (via EggEffectsLayer)", () => {
     unmount();
   });
 
-  it("shows a static status chip instead of particles under reduced motion", () => {
+  it("shows a static status chip instead of particles under reduced motion", async () => {
     mockReducedMotion.mockReturnValue(true);
     render(<EggEffectsLayer />);
 
     act(() => playEggEffect("party"));
 
     expect(document.querySelector("canvas")).toBeNull();
+    // The live region mounts empty and is filled a moment later, so screen
+    // readers see a change to announce instead of a region born with text.
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(150);
+    });
     expect(screen.getByRole("status")).toHaveTextContent(/party/i);
   });
 

@@ -1,10 +1,12 @@
-import { afterEach, describe, it, expect, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { fireEvent } from "@testing-library/react";
 import {
+  isInteractiveTarget,
+  isTypingTarget,
   useDinoUnlocked,
   useSpaceOpensDino,
-} from "../../../../src/features/easter-eggs/hooks/useDinoWaitingGame";
+} from "../../../../src/features/easter-eggs/hooks/useDinoWaitingGame.ts";
 
 describe("useDinoWaitingGame hooks", () => {
   beforeEach(() => {
@@ -13,6 +15,7 @@ describe("useDinoWaitingGame hooks", () => {
 
   afterEach(() => {
     window.localStorage.clear();
+    document.body.innerHTML = "";
   });
 
   describe("useDinoUnlocked", () => {
@@ -151,6 +154,122 @@ describe("useDinoWaitingGame hooks", () => {
         fireEvent.keyDown(window, { code: "Space" });
       });
       expect(result.current[0]).toBe(false);
+    });
+
+    it("opens exactly one game when two armed hosts see the same Space press", () => {
+      window.localStorage.setItem("dinoUnlocked", "true");
+      const first = renderHook(() => useSpaceOpensDino(true, true));
+      const second = renderHook(() => useSpaceOpensDino(true, true));
+
+      act(() => {
+        fireEvent.keyDown(window, { code: "Space" });
+      });
+
+      const openCount = [first.result.current[0], second.result.current[0]].filter(Boolean).length;
+      expect(openCount).toBe(1);
+    });
+
+    it.each([
+      ["button", () => document.createElement("button")],
+      ["select", () => document.createElement("select")],
+      [
+        "link",
+        () => {
+          const a = document.createElement("a");
+          a.href = "#x";
+          return a;
+        },
+      ],
+      [
+        "role=switch",
+        () => {
+          const el = document.createElement("div");
+          el.setAttribute("role", "switch");
+          el.tabIndex = 0;
+          return el;
+        },
+      ],
+    ])("leaves Space to a focused %s", (_name, make) => {
+      window.localStorage.setItem("dinoUnlocked", "true");
+      const { result } = renderHook(() => useSpaceOpensDino(true, true));
+      const control = make();
+      document.body.appendChild(control);
+      control.focus();
+
+      let event!: KeyboardEvent;
+      act(() => {
+        event = new KeyboardEvent("keydown", { code: "Space", bubbles: true, cancelable: true });
+        control.dispatchEvent(event);
+      });
+
+      expect(result.current[0]).toBe(false);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it.each([
+      ["ctrlKey", { ctrlKey: true }],
+      ["metaKey", { metaKey: true }],
+      ["altKey", { altKey: true }],
+      ["shiftKey", { shiftKey: true }],
+      ["repeat", { repeat: true }],
+    ])("ignores Space with %s", (_name, init) => {
+      window.localStorage.setItem("dinoUnlocked", "true");
+      const { result } = renderHook(() => useSpaceOpensDino(true, true));
+
+      act(() => {
+        fireEvent.keyDown(window, { code: "Space", ...init });
+      });
+
+      expect(result.current[0]).toBe(false);
+    });
+
+    it("ignores a Space press someone else already handled", () => {
+      window.localStorage.setItem("dinoUnlocked", "true");
+      const { result } = renderHook(() => useSpaceOpensDino(true, true));
+      const claim = (e: KeyboardEvent) => e.preventDefault();
+      window.addEventListener("keydown", claim, { capture: true });
+
+      try {
+        act(() => {
+          fireEvent.keyDown(window, { code: "Space" });
+        });
+        expect(result.current[0]).toBe(false);
+      } finally {
+        window.removeEventListener("keydown", claim, { capture: true });
+      }
+    });
+  });
+
+  describe("target helpers", () => {
+    it("keeps isTypingTarget to text fields while isInteractiveTarget adds controls", () => {
+      const input = document.createElement("input");
+      const button = document.createElement("button");
+      const div = document.createElement("div");
+
+      expect(isTypingTarget(input)).toBe(true);
+      expect(isTypingTarget(button)).toBe(false);
+      expect(isInteractiveTarget(input)).toBe(true);
+      expect(isInteractiveTarget(button)).toBe(true);
+      expect(isInteractiveTarget(div)).toBe(false);
+      expect(isInteractiveTarget(null)).toBe(false);
+    });
+  });
+
+  describe("useDinoUnlocked storage guard", () => {
+    it("treats unreadable storage as locked instead of throwing", () => {
+      const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+        throw new DOMException("denied", "SecurityError");
+      });
+      try {
+        const { result } = renderHook(() => useDinoUnlocked());
+        expect(result.current).toBe(false);
+        act(() => {
+          fireEvent(window, new Event("dinoUnlockChanged"));
+        });
+        expect(result.current).toBe(false);
+      } finally {
+        getItem.mockRestore();
+      }
     });
   });
 });

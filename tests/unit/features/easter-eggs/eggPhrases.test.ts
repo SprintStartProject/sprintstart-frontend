@@ -13,12 +13,17 @@ describe("matchEggPhrase", () => {
     expect(matchEggPhrase(text)).toBe("matrix");
   });
 
-  it.each(["party", "party time", "let's party", "🎉", "  PARTY  "])(
-    "recognizes %j as party",
-    (text) => {
-      expect(matchEggPhrase(text)).toBe("party");
-    },
-  );
+  it.each([
+    "party",
+    "party time",
+    "let's party",
+    "let\u2019s party",
+    "Let\u2018s Party",
+    "🎉",
+    "  PARTY  ",
+  ])("recognizes %j as party", (text) => {
+    expect(matchEggPhrase(text)).toBe("party");
+  });
 
   it.each([
     "how do I do a barrel roll?",

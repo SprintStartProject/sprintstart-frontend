@@ -74,13 +74,42 @@ describe("useRepeatClicks", () => {
       }
       expect(onReached).toHaveBeenCalledTimes(1);
 
-      // And the 3s budget still rules out accumulation: a click four seconds
-      // after the last one starts a fresh count.
+      // And the 3s budget still rules out accumulation: it is measured from
+      // the first click of the gesture, so 5600 → 9000 (3.4s) starts over
+      // at 9000, and 12000 is only the second click of that new count.
       clock = 5600;
       result.current();
       clock = 9000;
       result.current();
       clock = 12000;
+      result.current();
+      expect(onReached).toHaveBeenCalledTimes(1);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("measures the window from the first click of the gesture, not the last gap", () => {
+    const onReached = vi.fn();
+    const { result } = renderHook(() => useRepeatClicks(3, onReached));
+
+    const nowSpy = vi.spyOn(Date, "now");
+    let clock = 0;
+    nowSpy.mockImplementation(() => clock);
+
+    try {
+      // Every gap is under 3s, but the three clicks span 3.5s: not a triple
+      // click, just a slow drip.
+      for (const tick of [0, 2000, 3500]) {
+        clock = tick;
+        result.current();
+      }
+      expect(onReached).not.toHaveBeenCalled();
+
+      // 3500 started a new gesture; two more inside its window complete it.
+      clock = 4500;
+      result.current();
+      clock = 6500;
       result.current();
       expect(onReached).toHaveBeenCalledTimes(1);
     } finally {

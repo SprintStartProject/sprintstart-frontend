@@ -1,9 +1,20 @@
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useScrollLock } from "../../../components/ui/useScrollLock";
-import { getModalDialogVariants, modalBackdropVariants } from "../../../styles/tokens";
-import { EGG_REGISTRY, type EggId } from "../registry";
+import { Button } from "../../../components/ui/Button.tsx";
+import { useScrollLock } from "../../../components/ui/useScrollLock.ts";
+import { getModalDialogVariants, modalBackdropVariants } from "../../../styles/tokens.ts";
+import { EGG_REGISTRY } from "../registry.ts";
+import type { EggId } from "../registry.ts";
+import { EggErrorBoundary } from "./EggErrorBoundary.tsx";
+
+/** Everything Tab can land on inside the dialog, in document order. */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])';
+
+function getFocusables(container: HTMLElement): HTMLElement[] {
+  return [...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
+}
 
 type EggModalShellProps = {
   /** Which registered egg to show. Unknown ids render nothing. */
@@ -24,7 +35,7 @@ type EggModalShellProps = {
  *
  * Two shapes fall out of the registry:
  *
- * - Canvas games (dino, invaders) own their keyboard and already draw
+ * - Canvas games (Space Invaders) own their keyboard and already draw
  *   their score / "Esc ✕" chrome on top of the canvas and call their
  *   `onExit` prop on Escape — so this shell adds no header and no Escape
  *   listener of its own (a second handler would double-fire).
@@ -40,11 +51,18 @@ type EggModalShellProps = {
  * implement keeps hands off the keys the games use: focus lands on the
  * dialog itself when it opens (so a screen reader announces it and the
  * games' window-level keys work regardless of focus) and returns to
- * whoever held it before when the dialog closes; Tab wraps inside the
- * dialog — the canvas games never use it, and keydowns inside the 2048
- * iframe don't reach this window, so the trap cannot fight either surface.
+ * whoever held it before when the dialog closes (if that element is still
+ * in the document); focus cannot leave the dialog while it is open — Tab in
+ * the parent chrome wraps, and focus that escapes any other way (tabbing
+ * past the last control *inside* the 2048 iframe, whose keydowns this
+ * window never sees) is pulled straight back. The canvas games never use
+ * Tab, so neither mechanism fights them.
  * The one thing every overlay needs regardless — the page behind it
  * holding still — comes from `useScrollLock`.
+ *
+ * A game whose chunk fails to load (stale deploy, offline) is caught by
+ * {@link EggErrorBoundary}: the modal explains and stays closable instead of
+ * the error unmounting the whole app.
  */
 export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
   const egg = EGG_REGISTRY[eggId];
@@ -53,31 +71,60 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
   const prefersReducedMotion = useReducedMotion();
   const dialogVariants = getModalDialogVariants(Boolean(prefersReducedMotion));
 
-  // Focus in on open, back to the opener on close. The dialog carries
-  // `tabIndex={-1}` so it is programmatically focusable without joining the
-  // page's Tab order. Restoring happens in the effect cleanup, i.e. the
-  // moment `open` flips false — before the exit animation finishes, but the
-  // return is what matters: focus never ends up on a removed node (the
-  // trigger button would be unreachable to keyboard users otherwise).
+  // Focus in on open, back to the opener on close, and never anywhere else
+  // in between. The dialog carries `tabIndex={-1}` so it is programmatically
+  // focusable without joining the page's Tab order.
+  //
+  // A *layout* effect on purpose: it runs before any child's passive effect,
+  // so the opener is recorded before a game (e.g. the 2048 frame focusing
+  // itself) can move focus — a plain effect here would, on a cached-chunk
+  // reopen, record the game as the opener. Restoring happens in the cleanup,
+  // i.e. the moment `open` flips false, and only onto an opener that is
+  // still in the document: focusing a removed node is a silent no-op that
+  // would strand keyboard users on <body>, so better not to pretend.
+  //
+  // The focusin guard is the half of the trap the Tab handler below cannot
+  // provide: a Tab press inside the 2048 iframe is dispatched to the frame's
+  // own document, so tabbing past the frame's last control moves focus onto
+  // the page behind the overlay without this window ever seeing the key.
+  // Focus landing outside the dialog is pulled back; where it landed tells
+  // the direction — before the dialog in document order means the user went
+  // backwards (wrap to the last focusable), anything else forwards (wrap to
+  // the first). It lives in this same effect so the cleanup can remove it
+  // *before* restoring focus; otherwise the restore itself — the dialog is
+  // still in the DOM during its exit animation — would be pulled back in.
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
-    restoreFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const active = document.activeElement;
+    const opener = active instanceof HTMLElement && active !== document.body ? active : null;
+
+    const onFocusIn = (e: FocusEvent) => {
+      const dialog = dialogRef.current;
+      const target = e.target;
+      if (!dialog || !(target instanceof Node) || dialog.contains(target)) return;
+      const focusables = getFocusables(dialog);
+      const wentBackwards = Boolean(
+        target.compareDocumentPosition(dialog) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      const next = wentBackwards ? focusables[focusables.length - 1] : focusables[0];
+      (next ?? dialog).focus();
+    };
+
     dialogRef.current?.focus();
+    document.addEventListener("focusin", onFocusIn);
     return () => {
-      restoreFocusRef.current?.focus();
-      restoreFocusRef.current = null;
+      document.removeEventListener("focusin", onFocusIn);
+      if (opener?.isConnected) opener.focus();
     };
   }, [open]);
 
-  // Tab wraps inside the dialog. Deliberately Tab-only: canvas games bind
-  // arrows/w/s/space on the window, and a Tab press inside the 2048 iframe
-  // is confined to the frame's document, so neither surface ever fights
-  // this handler. The focusable list includes the iframe itself, so one Tab
-  // from the header close button walks into the frame and the next wrap
-  // brings focus back to the header.
+  // Tab wraps inside the dialog for presses the parent window sees (the
+  // header close button, the dialog itself). Deliberately Tab-only: canvas
+  // games bind arrows/w/s/space on the window. Presses inside the 2048
+  // iframe never reach this handler — the focusin guard above covers those.
+  // The focusable list includes the iframe itself, so one Tab from the
+  // header close button walks into the frame.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -85,11 +132,7 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
       const dialog = dialogRef.current;
       if (!dialog || !(e.target instanceof Node) || !dialog.contains(e.target)) return;
 
-      const focusables = [
-        ...dialog.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])',
-        ),
-      ];
+      const focusables = getFocusables(dialog);
       if (focusables.length === 0) {
         e.preventDefault();
         dialog.focus();
@@ -166,30 +209,33 @@ export function EggModalShell({ eggId, open, onClose }: EggModalShellProps) {
             exit="exit"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* One Suspense around every branch: all registry components are
-                lazy, and an unsuspended lazy child would tear down the tree. */}
-            <Suspense fallback={<EggLoadingFallback onLoadingChange={setGameLoading} />}>
-              {egg.kind === "iframe" ? (
-                <>
-                  {/* Header bar for the iframe game (canvas games draw their own chrome). */}
-                  <div className="flex items-center justify-between border-b border-app-border px-4 py-3">
-                    <h2 className="text-lg font-semibold text-app-text">{egg.label}</h2>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      aria-label={`Close ${egg.label}`}
-                      data-testid={`${eggId}-close`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                  <Game onExit={onClose} />
-                </>
-              ) : (
+            {/* Header bar for the iframe game (canvas games draw their own
+                chrome). Outside the boundary and Suspense so the close
+                button is there while the chunk loads and if it fails. */}
+            {egg.kind === "iframe" && (
+              <div className="flex items-center justify-between border-b border-app-border px-4 py-3">
+                <h2 className="text-lg font-semibold text-app-text">{egg.label}</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={onClose}
+                  aria-label={`Close ${egg.label}`}
+                  data-testid={`${eggId}-close`}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            )}
+            {/* All registry components are lazy: Suspense covers the fetch,
+                the boundary covers a fetch that fails. The boundary only
+                brings its own close controls where the header above does
+                not already provide them. */}
+            <EggErrorBoundary label={egg.label} onClose={onClose} ownsClose={egg.kind !== "iframe"}>
+              <Suspense fallback={<EggLoadingFallback onLoadingChange={setGameLoading} />}>
                 <Game onExit={onClose} />
-              )}
-            </Suspense>
+              </Suspense>
+            </EggErrorBoundary>
           </motion.div>
         </motion.div>
       )}

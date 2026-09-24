@@ -1,18 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
+ * Reads the unlock flag, treating unavailable storage as "locked". Storage
+ * access throws in some privacy modes and sandboxed frames; an easter egg
+ * must never be the reason a chat page fails to render.
+ */
+function readDinoUnlocked(): boolean {
+  try {
+    return localStorage.getItem("dinoUnlocked") === "true";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Reads the persisted dino unlock flag (`localStorage["dinoUnlocked"]`)
  * and keeps it live: reacts to the `dinoUnlockChanged` window event that
  * `useDinoEasterEgg` dispatches after a triple-click toggle, and to the
  * browser's cross-tab `storage` event.
  */
 export function useDinoUnlocked(): boolean {
-  const [isUnlocked, setIsUnlocked] = useState(
-    () => localStorage.getItem("dinoUnlocked") === "true",
-  );
+  const [isUnlocked, setIsUnlocked] = useState(readDinoUnlocked);
 
   useEffect(() => {
-    const sync = () => setIsUnlocked(localStorage.getItem("dinoUnlocked") === "true");
+    const sync = () => setIsUnlocked(readDinoUnlocked());
     window.addEventListener("dinoUnlockChanged", sync);
     window.addEventListener("storage", sync);
     return () => {
@@ -25,9 +36,44 @@ export function useDinoUnlocked(): boolean {
 }
 
 /** Shared guard: true while the event landed in a text field that owns the keys. */
-export const isTypingTarget = (el: EventTarget | null) =>
+export const isTypingTarget = (el: EventTarget | null): boolean =>
   el instanceof HTMLElement &&
-  (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable);
+  (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable === true);
+
+/**
+ * Controls on which Space already has a meaning of its own: activating a
+ * button, toggling a checkbox or switch, opening a select or a disclosure.
+ */
+const SPACE_ACTIVATED_SELECTOR = [
+  "button",
+  "select",
+  "summary",
+  "a[href]",
+  '[role="button"]',
+  '[role="checkbox"]',
+  '[role="switch"]',
+  '[role="combobox"]',
+  '[role="textbox"]',
+  '[role="menuitem"]',
+  '[role="menuitemcheckbox"]',
+  '[role="menuitemradio"]',
+  '[role="option"]',
+  '[role="radio"]',
+  '[role="tab"]',
+].join(", ");
+
+/**
+ * True when Space pressed on `el` belongs to the element rather than to a
+ * global shortcut: any text field (see {@link isTypingTarget}) plus every
+ * control Space activates.
+ *
+ * Separate from `isTypingTarget` on purpose — the games themselves use that
+ * one to decide whether a key is typing, and a focused button is not typing.
+ * Only the Space-to-play trigger needs the wider set, because swallowing
+ * Space on a focused "Send" button would open a game instead of pressing it.
+ */
+export const isInteractiveTarget = (el: EventTarget | null): boolean =>
+  isTypingTarget(el) || (el instanceof Element && el.matches(SPACE_ACTIVATED_SELECTOR));
 
 /**
  * Which host currently has the one waiting-game open, if any.
@@ -60,7 +106,9 @@ export type SpaceOpensDinoOptions = {
  * The Space-to-play trigger shared by every dino waiting-game host
  * (AI chat, onboarding generation, buddy chat): while `armed` is true and
  * the game is not already open, pressing Space opens it — unless the user
- * is typing in a field, in which case Space stays a space.
+ * is typing in a field or has a control focused that Space activates (see
+ * {@link isInteractiveTarget}), in which case Space keeps its meaning. A
+ * modified, auto-repeated or already-handled press is never the trigger.
  *
  * Returns whether the game should be shown, plus a way to close it early.
  * The game belongs to the wait it was opened under, so it closes by itself
@@ -86,7 +134,9 @@ export function useSpaceOpensDino(
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
-      if (isTypingTarget(document.activeElement)) return;
+      if (e.repeat || e.defaultPrevented) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if (isInteractiveTarget(document.activeElement) || isInteractiveTarget(e.target)) return;
       if (gameHost !== null) return;
       e.preventDefault();
       gameHost = host;

@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { useReducedMotion } from "framer-motion";
-import { clearEggEffect, useActiveEggEffect } from "../eggEffectBus";
-import { MatrixRain } from "./MatrixRain";
-import { ConfettiBurst } from "./ConfettiBurst";
+import { clearEggEffect, useActiveEggEffect } from "../eggEffectBus.ts";
+import { MatrixRain } from "./MatrixRain.tsx";
+import { ConfettiBurst } from "./ConfettiBurst.tsx";
+import { ReducedMotionEffectChip } from "./ReducedMotionEffectChip.tsx";
 
 /** How long the barrel roll spins before the page settles again (ms). */
 const BARREL_ROLL_MS = 2000;
@@ -18,9 +19,10 @@ const BARREL_ROLL_MS = 2000;
  * effects; two layers would double-apply the body class, so surfaces must
  * call the bus instead of rendering effects themselves.
  *
- * Effects that are pure motion are skipped for users who asked for less of
- * it: see the barrel-roll branch below, and the reduced-motion chip the
- * confetti falls back to.
+ * Effects that are pure motion never move for users who asked for less of
+ * it. The barrel roll plays nothing (see its branch below); confetti and the
+ * matrix rain fall back to a short static {@link ReducedMotionEffectChip},
+ * so the phrase the user typed is still acknowledged.
  */
 export function EggEffectsLayer() {
   const effect = useActiveEggEffect();
@@ -63,6 +65,12 @@ export function EggEffectsLayer() {
   if (effect.id === "party") return <ConfettiBurst key={effect.seq} />;
 
   if (effect.id === "matrix") {
+    // The falling glyphs are the whole effect, so under reduced motion the
+    // canvas never mounts — same still chip the confetti uses. Keyed by seq
+    // so a re-fire restarts its timer too.
+    if (prefersReducedMotion) {
+      return <ReducedMotionEffectChip key={effect.seq} text="Wake up, Neo…" />;
+    }
     // Same key contract: the rain ends itself on a timer from its own mount,
     // so without a remount a second "matrix" would just cut the first short.
     return <MatrixRain key={effect.seq} onClose={clearEggEffect} />;

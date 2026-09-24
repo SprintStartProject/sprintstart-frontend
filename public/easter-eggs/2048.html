@@ -1002,7 +1002,7 @@
             if (!modifiers) {
               if (event.key === "Escape") {
                 try {
-                  window.parent.postMessage({ type: "EGG_EXIT" }, "*");
+                  window.parent.postMessage({ type: "EGG_EXIT" }, window.location.origin);
                 } catch (_) {}
                 return;
               }

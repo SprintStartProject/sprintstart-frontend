@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useReducedMotion } from "framer-motion";
-import { clearEggEffect } from "../eggEffectBus";
+import { clearEggEffect } from "../eggEffectBus.ts";
+import { ReducedMotionEffectChip } from "./ReducedMotionEffectChip.tsx";
 
 /**
  * Confetti particle: position, velocity, spin and look. Plain mutable data —
@@ -29,8 +30,6 @@ type Particle = {
 
 /** How long a particle lives at most, in seconds. */
 const MAX_AGE_S = 3.5;
-/** How long the reduced-motion chip stays before the effect clears (ms). */
-const REDUCED_FADE_MS = 1500;
 /** Gravity, px/s² — tuned so the arc peaks around mid-screen. */
 const GRAVITY = 900;
 /** Per-frame velocity damping (applied once per second worth of time). */
@@ -64,7 +63,7 @@ const CANNON_ANGLES = {
  *   future palette change without this file ever hardcoding hex values.
  * - Re-fire while running (the bus's `seq`) simply remounts this
  *   component via EggEffectsLayer's key, respawning the world.
- * - Reduced motion renders no particles at all — see ReducedPartyChip.
+ * - Reduced motion renders no particles at all — see ReducedMotionEffectChip.
  * - The repo has two other components called `ConfettiBurst`
  *   (`moments/` and `onboarding/`): those radiate outward from a point and
  *   are drawn with framer-motion elements, which is fine for a burst that
@@ -82,18 +81,9 @@ export function ConfettiBurst() {
   // instance's timer clear the *new* effect a few hundred ms in.
   const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reduced motion: particle animation IS the effect, so there is no
-  // honest way to keep it — show a static celebratory chip instead
-  // (opacity-only fade), so typing "party" never disappears into a void.
-  useEffect(() => {
-    if (!prefersReducedMotion) return;
-    const timeout = setTimeout(() => clearEggEffect(), REDUCED_FADE_MS);
-    return () => clearTimeout(timeout);
-  }, [prefersReducedMotion]);
-
   useEffect(() => {
     if (prefersReducedMotion) return;
-    // The reduced-motion branch above owns the chip's timer; this effect
+    // The reduced-motion chip owns its own timer; this effect
     // only runs the canvas. `prefersReducedMotion` is listed so the
     // linter sees the guard — flipping it remounts nothing because the
     // layer keys ConfettiBurst by seq, and a flip mid-burst simply ends
@@ -243,32 +233,27 @@ export function ConfettiBurst() {
     };
   }, [prefersReducedMotion]);
 
+  // Reduced motion: particle animation IS the effect, so there is no
+  // honest way to keep it — show a static celebratory chip instead, so
+  // typing "party" never disappears into a void.
+  if (prefersReducedMotion) return <ReducedMotionEffectChip text="🎉 Party!" />;
+
   return (
-    <>
-      {prefersReducedMotion ? (
-        <div
-          role="status"
-          className="pointer-events-none fixed top-6 left-1/2 z-[9998] -translate-x-1/2 rounded-full border border-app-border bg-app-surface px-5 py-2.5 text-lg font-semibold"
-        >
-          🎉 Party!
-        </div>
-      ) : (
-        <canvas
-          ref={canvasRef}
-          aria-hidden="true"
-          className="pointer-events-none fixed top-0 left-0 z-[9998] h-full w-full"
-        />
-      )}
-    </>
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className="pointer-events-none fixed top-0 left-0 z-[9998] h-full w-full"
+    />
   );
 }
 
 /**
  * Reads the confetti colors from the app's CSS custom properties.
  *
- * Uses the extended badge hues (brand, purple, pink, orange, amber/yellow)
- * — festive but still the app's own palette. Falls back to sensible colors
- * when getComputedStyle cannot resolve a variable (e.g. jsdom).
+ * Uses the extended badge hues (brand, purple, pink, orange, amber) —
+ * festive but still the app's own palette. The amber is the solid warning
+ * token rather than the highlight yellow: that one is a pale text-marker
+ * wash (30% alpha in dark mode) and vanishes against the page.
  */
 function readPalette(): string[] {
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -280,10 +265,18 @@ function readPalette(): string[] {
     "--color-app-purple-text",
     "--color-app-pink-text",
     "--color-app-orange-text",
-    "--color-app-highlight-yellow",
+    "--color-app-warning-solid",
   ];
   const resolved = candidates.map((name) => styles.getPropertyValue(name).trim()).filter(Boolean);
   return resolved.length >= 3 ? resolved : FALLBACK_PALETTE;
 }
 
+/**
+ * Used only when the tokens above cannot be resolved — in practice jsdom,
+ * which does not load the app stylesheet, or a stylesheet that failed to
+ * load. The only raw hex values in this effect, and deliberately so: a
+ * canvas `fillStyle` needs a concrete color, and without one the burst would
+ * draw nothing at all. Roughly the light theme's brand/amber/green/blue/
+ * purple, so a fallback burst still looks like this app.
+ */
 const FALLBACK_PALETTE: string[] = ["#e11d48", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6"];

@@ -1,7 +1,11 @@
-import { act, render } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EggEffectsLayer } from "../../../../src/features/easter-eggs/components/EggEffectsLayer";
-import { clearEggEffect, playEggEffect } from "../../../../src/features/easter-eggs/eggEffectBus";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EggEffectsLayer } from "../../../../src/features/easter-eggs/components/EggEffectsLayer.tsx";
+import {
+  clearEggEffect,
+  playEggEffect,
+  useActiveEggEffect,
+} from "../../../../src/features/easter-eggs/eggEffectBus.ts";
 
 // jsdom only: no canvas implementation, and no rAF-driven pixel output to
 // assert. These tests are about the layer's timing contract — when an effect
@@ -14,6 +18,9 @@ vi.mock("framer-motion", async () => {
     useReducedMotion: vi.fn(() => false),
   };
 });
+
+const { useReducedMotion } = await import("framer-motion");
+const mockReducedMotion = vi.mocked(useReducedMotion);
 
 const ctxStub = {
   save: () => {},
@@ -81,5 +88,50 @@ describe("EggEffectsLayer re-fires", () => {
       await vi.advanceTimersByTimeAsync(1500);
     });
     expect(document.querySelector("canvas")).not.toBeNull();
+  });
+});
+
+describe("EggEffectsLayer under reduced motion", () => {
+  beforeEach(() => {
+    clearEggEffect();
+    vi.useFakeTimers();
+    mockReducedMotion.mockReturnValue(true);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      ctxStub as unknown as CanvasRenderingContext2D,
+    );
+  });
+
+  afterEach(() => {
+    mockReducedMotion.mockReturnValue(false);
+    vi.useRealTimers();
+  });
+
+  it("replaces the matrix rain with a static, announced chip that clears itself", async () => {
+    let active: ReturnType<typeof useActiveEggEffect> = null;
+    function Probe() {
+      active = useActiveEggEffect();
+      return null;
+    }
+    render(
+      <>
+        <EggEffectsLayer />
+        <Probe />
+      </>,
+    );
+
+    act(() => playEggEffect("matrix"));
+    // Nothing that falls: no canvas at all.
+    expect(document.querySelector("canvas")).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(150);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(/neo/i);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(active).toBeNull();
   });
 });

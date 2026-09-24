@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef } from "react";
 
-/** Longest gap between two clicks that still counts as the same gesture (ms). */
-const CLICK_GAP_MS = 1000;
+/** Time budget per required click when no explicit window is given (ms). */
+const MS_PER_CLICK = 1000;
 
 /**
  * Returns a click handler that fires `onReached` once every
  * `requiredClicks` consecutive calls, resetting the count in between.
  *
- * Clicks only count as consecutive while each follows the previous within
- * `windowMs`; a longer pause starts the count over. Without that, the
+ * The whole gesture has to fit in `windowMs`, measured from its *first*
+ * click: once that much time has passed since the click that started the
+ * count, the next click starts a new one. (Measuring the gap between two
+ * neighbouring clicks instead would let a slow drip of clicks, each within
+ * the window of the last, add up forever.) Without the window, the
  * counter is an accumulator that never resets, and stray clicks on the
  * dashboard's header icon spread over a working day would open the 2048
  * modal out of nowhere.
@@ -31,10 +34,10 @@ const CLICK_GAP_MS = 1000;
 export function useRepeatClicks(
   requiredClicks: number,
   onReached: () => void,
-  windowMs: number = requiredClicks * CLICK_GAP_MS,
+  windowMs: number = requiredClicks * MS_PER_CLICK,
 ): () => void {
   const countRef = useRef(0);
-  const lastClickRef = useRef(0);
+  const firstClickRef = useRef(0);
   const onReachedRef = useRef(onReached);
 
   useEffect(() => {
@@ -43,8 +46,10 @@ export function useRepeatClicks(
 
   return useCallback(() => {
     const now = Date.now();
-    if (now - lastClickRef.current > windowMs) countRef.current = 0;
-    lastClickRef.current = now;
+    if (countRef.current === 0 || now - firstClickRef.current > windowMs) {
+      countRef.current = 0;
+      firstClickRef.current = now;
+    }
 
     countRef.current += 1;
     if (countRef.current < requiredClicks) return;
