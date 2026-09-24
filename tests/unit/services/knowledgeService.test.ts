@@ -114,6 +114,66 @@ describe("knowledgeService", () => {
         knowledgeService.deleteUpload("proj-1", "up-1", "remover-1"),
       ).rejects.toMatchObject({ name: "ApiError", status: 403 });
     });
+
+    it("rejects with the backend's reason when the one id comes back failed", async () => {
+      server.use(
+        http.delete("/api/v1/uploads", () =>
+          HttpResponse.json({
+            deletedIds: [],
+            failed: [{ artifactId: "up-1", error: "Artifact could not be deleted." }],
+          }),
+        ),
+      );
+
+      await expect(knowledgeService.deleteUpload("proj-1", "up-1", "remover-1")).rejects.toThrow(
+        "Artifact could not be deleted.",
+      );
+    });
+  });
+
+  describe("deleteUploads", () => {
+    it("sends every id in one request and returns the per-item outcome", async () => {
+      const fetchSpy = vi.spyOn(apiClient, "fetch").mockResolvedValue({
+        deletedIds: ["up-1"],
+        failed: [{ artifactId: "up-2", error: "Artifact with id up-2 not found." }],
+      });
+
+      const result = await knowledgeService.deleteUploads("proj-1", ["up-1", "up-2"], "r-1");
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const part = (fetchSpy.mock.calls[0][1]?.body as FormData).get("request") as Blob;
+      const payload: unknown = JSON.parse(await part.text());
+      expect(payload).toEqual({
+        artifactIds: ["up-1", "up-2"],
+        removerId: "r-1",
+        projectId: "proj-1",
+      });
+      expect(result).toEqual({
+        deletedIds: ["up-1"],
+        failed: [{ artifactId: "up-2", error: "Artifact with id up-2 not found." }],
+      });
+    });
+
+    it("reads an old backend's empty 204 as every id deleted", async () => {
+      server.use(http.delete("/api/v1/uploads", () => new HttpResponse(null, { status: 204 })));
+
+      await expect(
+        knowledgeService.deleteUploads("proj-1", ["up-1", "up-2"], "r-1"),
+      ).resolves.toEqual({ deletedIds: ["up-1", "up-2"], failed: [] });
+    });
+
+    it("never counts an id the answer does not mention as deleted", async () => {
+      server.use(
+        http.delete("/api/v1/uploads", () =>
+          HttpResponse.json({ deletedIds: ["up-1"], failed: [] }),
+        ),
+      );
+
+      const result = await knowledgeService.deleteUploads("proj-1", ["up-1", "up-2"], "r-1");
+
+      expect(result.deletedIds).toEqual(["up-1"]);
+      expect(result.failed.map((item) => item.artifactId)).toEqual(["up-2"]);
+    });
   });
 
   describe("streamArtifactSummary", () => {

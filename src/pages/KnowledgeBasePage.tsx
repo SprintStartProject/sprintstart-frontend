@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import {
+  ArtifactBulkActions,
   ArtifactFilters,
   ArtifactList,
   ArtifactViewerDrawer,
@@ -14,6 +15,8 @@ import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeBase";
 import { useArtifactById } from "../features/knowledge-base/hooks/useArtifactById";
+import { useUploadSelection } from "../features/knowledge-base/hooks/useUploadSelection";
+import { isUpload } from "../features/knowledge-base/tabs";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
 import { useDebouncedValue } from "../hooks/useDebouncedValue.ts";
@@ -112,6 +115,7 @@ export function KnowledgeBasePage() {
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,
+    listScopeKey,
     selectedArtifactId,
     setSelectedArtifactId,
     sort,
@@ -122,6 +126,28 @@ export function KnowledgeBasePage() {
 
   const isLoading = isProjectLoading || isArtifactsLoading;
   const showLoadingSkeleton = useDelayedFlag(isLoading);
+
+  const uploadSelection = useUploadSelection(listScopeKey);
+  /* Only ticked rows that are uploads on the page in view can be deleted: the selection is
+     re-read against the list itself, so nothing off screen is ever sent. */
+  const selectedUploads = useMemo(
+    () => artifacts.filter((a) => isUpload(a) && uploadSelection.selectedIds.has(a.id)),
+    [artifacts, uploadSelection.selectedIds],
+  );
+
+  /** Refresh drops the selection: the rows it named may no longer be the rows shown. */
+  const handleRefresh = () => {
+    uploadSelection.clear();
+    void fetchArtifacts();
+  };
+
+  /** After a bulk delete: nothing stays ticked, and a drawer showing a deleted row closes. */
+  const handleBulkDeleted = (deletedIds: string[]) => {
+    uploadSelection.clear();
+    if (selectedArtifactId && deletedIds.includes(selectedArtifactId)) {
+      setSelectedArtifactId(null);
+    }
+  };
 
   /*
     What a screen reader hears after a filter, search or page change: the new total, said once
@@ -245,8 +271,14 @@ export function KnowledgeBasePage() {
                   onSortChange={setSort}
                   dateRange={dateRange}
                   onDateRangeChange={setDateRange}
-                  onRefresh={() => void fetchArtifacts()}
+                  onRefresh={handleRefresh}
                   isRefreshing={isLoading}
+                  {...(canDeleteUpload
+                    ? {
+                        isSelectMode: uploadSelection.isSelectMode,
+                        onSelectModeChange: uploadSelection.setSelectMode,
+                      }
+                    : {})}
                 />
                 <p
                   className="sr-only"
@@ -257,6 +289,18 @@ export function KnowledgeBasePage() {
                   {resultsAnnouncement}
                 </p>
               </motion.div>
+
+              {canDeleteUpload && projectId && uploadSelection.isSelectMode && (
+                <div className="mb-4">
+                  <ArtifactBulkActions
+                    projectId={projectId}
+                    removerId={profile?.id ?? null}
+                    selected={selectedUploads}
+                    onClearSelection={uploadSelection.clear}
+                    onDeleted={handleBulkDeleted}
+                  />
+                </div>
+              )}
 
               {fetchError && !isLoading && (
                 <div
@@ -292,7 +336,18 @@ export function KnowledgeBasePage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={prefersReducedMotion ? { duration: 0 } : centralSpringToken}
                 >
-                  <ArtifactList artifacts={artifacts} onSelect={setSelectedArtifactId} />
+                  <ArtifactList
+                    artifacts={artifacts}
+                    onSelect={setSelectedArtifactId}
+                    selection={
+                      uploadSelection.isSelectMode
+                        ? {
+                            selectedIds: uploadSelection.selectedIds,
+                            onToggle: uploadSelection.toggle,
+                          }
+                        : undefined
+                    }
+                  />
                   {(totalPages > 1 || totalElements > PAGE_SIZE_OPTIONS[0]) && (
                     // Both controls carry the same top margin (Pagination's own `mt-6`) so the row
                     // lines up without overriding a primitive's classes.

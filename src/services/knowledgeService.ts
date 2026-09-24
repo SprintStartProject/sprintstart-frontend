@@ -7,6 +7,7 @@ import type {
   ArtifactContent,
   ArtifactFacets,
   ArtifactPage,
+  DeleteUploadsResult,
   KnowledgeListParams,
   SummaryStreamHandlers,
 } from "../features/knowledge-base/types";
@@ -51,6 +52,32 @@ function buildFilterQuery(params: KnowledgeListParams): URLSearchParams {
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
   return query;
+}
+
+/** Reason recorded for an id the backend answered for in neither list. */
+const UNCONFIRMED_DELETE = "The server did not confirm this deletion.";
+
+/**
+ * Normalises a delete answer. No `deletedIds`/`failed` at all is the old
+ * backend's empty 204: every requested id is taken as deleted.
+ */
+function readDeleteOutcome(
+  requested: readonly string[],
+  body: Partial<DeleteUploadsResult> | undefined,
+): DeleteUploadsResult {
+  if (!body || (!Array.isArray(body.deletedIds) && !Array.isArray(body.failed))) {
+    return { deletedIds: [...requested], failed: [] };
+  }
+  const failed = body.failed ?? [];
+  const deleted = new Set(body.deletedIds ?? []);
+  const answered = new Set([...deleted, ...failed.map((item) => item.artifactId)]);
+  const unconfirmed = requested
+    .filter((id) => !answered.has(id))
+    .map((artifactId) => ({ artifactId, error: UNCONFIRMED_DELETE }));
+  return {
+    deletedIds: requested.filter((id) => deleted.has(id)),
+    failed: [...failed, ...unconfirmed],
+  };
 }
 
 export const knowledgeService = {
@@ -305,7 +332,45 @@ export const knowledgeService = {
   },
 
   /**
+   * Deletes a batch of uploaded artifacts and reports what happened to each.
+   *
+   * Sends one multipart DELETE to `/api/v1/uploads` (`request` JSON part with
+   * `artifactIds`, `removerId`, `projectId`). The backend answers 200 with
+   * `{ deletedIds, failed }`; an older backend answers an empty 204, which is
+   * read as "every requested id deleted" — that was its only success signal.
+   *
+   * An id the new shape reports in neither list is counted as failed: a
+   * deletion nobody confirmed must not be shown as a success.
+   *
+   * @param uploadIds Upload UUIDs (`Artifact.sourceId`), not ingestion ids.
+   * @throws ApiError on a non-2xx response; per-item failures do not throw.
+   */
+  async deleteUploads(
+    projectId: string,
+    uploadIds: readonly string[],
+    removerId: string,
+  ): Promise<DeleteUploadsResult> {
+    const formData = new FormData();
+    const requestPayload = { artifactIds: [...uploadIds], removerId, projectId };
+    formData.append(
+      "request",
+      new Blob([JSON.stringify(requestPayload)], { type: "application/json" }),
+    );
+
+    const body = await apiClient.fetch<Partial<DeleteUploadsResult> | undefined>(
+      `/api/v1/uploads`,
+      { method: "DELETE", body: formData },
+    );
+    return readDeleteOutcome(uploadIds, body);
+  },
+
+  /**
    * Deletes a single uploaded artifact by its id.
+   *
+   * Delegates to {@link knowledgeService.deleteUploads} so the single and bulk
+   * paths cannot drift, and throws when the backend reports this id as failed —
+   * the batch endpoint answers 200 for per-item failures, which used to make a
+   * failed single delete look like a success.
    *
    * Sends a multipart DELETE to `/api/v1/uploads` with a `request`
    * JSON part containing the artifactIds batch, the removerId (authenticated user)
@@ -325,23 +390,12 @@ export const knowledgeService = {
    *   which resolves the remover from the JWT subject.
    * @throws ApiError on a non-2xx response (e.g. 403 if the caller lacks access
    *   to the supplied projectId, 404 if the artifact does not exist).
+   * @throws Error carrying the backend's reason when the id is in `failed`.
    */
   async deleteUpload(projectId: string, artifactId: string, removerId: string): Promise<void> {
-    const formData = new FormData();
-    const requestPayload = {
-      artifactIds: [artifactId],
-      removerId,
-      projectId,
-    };
-    formData.append(
-      "request",
-      new Blob([JSON.stringify(requestPayload)], { type: "application/json" }),
-    );
-
-    await apiClient.fetch<void>(`/api/v1/uploads`, {
-      method: "DELETE",
-      body: formData,
-    });
+    const { failed } = await knowledgeService.deleteUploads(projectId, [artifactId], removerId);
+    const failure = failed.find((item) => item.artifactId === artifactId);
+    if (failure) throw new Error(failure.error);
   },
 
   /**

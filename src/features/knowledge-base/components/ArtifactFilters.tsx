@@ -9,6 +9,7 @@ import {
   GitBranch,
   Image as ImageIcon,
   Languages,
+  ListChecks,
   RefreshCw,
   Search,
   Ticket,
@@ -108,6 +109,13 @@ export interface ArtifactFiltersProps {
   onRefresh?: () => void;
   /** Whether a refresh is currently in progress. */
   isRefreshing?: boolean;
+  /** Whether upload checkboxes are showing (bulk delete). */
+  isSelectMode?: boolean;
+  /**
+   * Toggles select mode. The Select button is only shown when given, and the
+   * page gives it only to roles allowed to delete uploads — no dead control.
+   */
+  onSelectModeChange?: (on: boolean) => void;
 }
 
 const ICON_CLASS = "h-4 w-4 shrink-0 text-app-text-muted";
@@ -233,6 +241,8 @@ export function ArtifactFilters({
   onSortChange,
   dateRange = NO_DATE_RANGE,
   onDateRangeChange,
+  isSelectMode = false,
+  onSelectModeChange,
 }: ArtifactFiltersProps) {
   const searchHintId = useId();
   const sections: MultiSelectFilterSection<string>[] = [];
@@ -423,6 +433,21 @@ export function ArtifactFilters({
                 ))}
               </Select>
             </div>
+          )}
+
+          {onSelectModeChange && (
+            <Button
+              variant={isSelectMode ? "primary" : "secondary"}
+              size="sm"
+              icon={<ListChecks className="h-4 w-4" aria-hidden="true" />}
+              aria-pressed={isSelectMode}
+              onClick={() => onSelectModeChange(!isSelectMode)}
+              data-testid="kb-select-toggle"
+              className="shrink-0"
+            >
+              {/* Constant label: a toggle's state is aria-pressed, not a changing name. */}
+              Select
+            </Button>
           )}
 
           <div className="min-w-0 flex-1 sm:w-80 sm:flex-none">

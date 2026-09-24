@@ -1,6 +1,6 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { KnowledgeBasePage } from "../../../src/pages/KnowledgeBasePage";
 import type { Artifact } from "../../../src/features/knowledge-base/types";
@@ -105,12 +105,16 @@ vi.mock("../../../src/features/knowledge-base/components", () => ({
     selectedSources,
     onToggleSource,
     onRefresh,
+    isSelectMode,
+    onSelectModeChange,
   }: {
     searchQuery: string;
     onSearchChange: (q: string) => void;
     selectedSources?: ReadonlySet<string>;
     onToggleSource?: (source: string) => void;
     onRefresh?: () => void;
+    isSelectMode?: boolean;
+    onSelectModeChange?: (on: boolean) => void;
   }) => (
     <div data-testid="artifact-filters">
       <input
@@ -125,16 +129,39 @@ vi.mock("../../../src/features/knowledge-base/components", () => ({
         Refresh
       </button>
       <span data-testid="active-facets">{[...(selectedSources ?? [])].join(",")}</span>
+      {onSelectModeChange && (
+        <button data-testid="kb-select-toggle" onClick={() => onSelectModeChange(!isSelectMode)}>
+          Select
+        </button>
+      )}
     </div>
   ),
-  ArtifactList: ({ artifacts }: { artifacts: Artifact[] }) => (
+  ArtifactList: ({
+    artifacts,
+    selection,
+  }: {
+    artifacts: Artifact[];
+    selection?: { selectedIds: ReadonlySet<string>; onToggle: (id: string) => void };
+  }) => (
     <div data-testid="artifact-list">
       {artifacts.map((a) => (
         <div key={a.id} data-testid="artifact-card">
+          {selection && (
+            <input
+              type="checkbox"
+              aria-label={`Select ${a.title}`}
+              data-testid={`artifact-select-${a.id}`}
+              checked={selection.selectedIds.has(a.id)}
+              onChange={() => selection.onToggle(a.id)}
+            />
+          )}
           {a.title}
         </div>
       ))}
     </div>
+  ),
+  ArtifactBulkActions: ({ selected }: { selected: Artifact[] }) => (
+    <div data-testid="bulk-actions">{selected.map((a) => a.id).join(",")}</div>
   ),
   // Reports which artifact it was handed, so a test can tell "the viewer is mounted" apart
   // from "the viewer is showing the right document".
@@ -475,6 +502,61 @@ describe("KnowledgeBasePage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("after-refresh.md")).toBeInTheDocument();
+    });
+  });
+
+  describe("bulk select", () => {
+    const uploads: Artifact[] = [
+      makeArtifact({ id: "u1", title: "one.pdf", sourceSystem: "UPLOAD", sourceId: "up-1" }),
+      makeArtifact({ id: "g1", title: "gh.md", sourceSystem: "GITHUB" }),
+    ];
+
+    function renderAs(group: UserProfile["permissionGroup"]) {
+      mockProfileRef.current = { ...mockProfileRef.current, permissionGroup: group };
+      setupMockArtifacts(uploads);
+      render(
+        <MemoryRouter>
+          <KnowledgeBasePage />
+        </MemoryRouter>,
+      );
+    }
+
+    afterEach(() => {
+      mockProfileRef.current = { ...mockProfileRef.current, permissionGroup: "USER" };
+    });
+
+    it("offers no Select toggle to roles that cannot delete uploads", async () => {
+      renderAs("USER");
+      await waitFor(() => expect(screen.getAllByTestId("artifact-card")).toHaveLength(2));
+      expect(screen.queryByTestId("kb-select-toggle")).not.toBeInTheDocument();
+    });
+
+    it("lets a PM tick uploads and hands only those to the bulk actions", async () => {
+      renderAs("PM");
+      await waitFor(() => expect(screen.getAllByTestId("artifact-card")).toHaveLength(2));
+
+      await userEvent.click(screen.getByTestId("kb-select-toggle"));
+      await userEvent.click(screen.getByTestId("artifact-select-u1"));
+      // A non-upload ticked through the mock list is still filtered out by the page.
+      await userEvent.click(screen.getByTestId("artifact-select-g1"));
+
+      expect(screen.getByTestId("bulk-actions")).toHaveTextContent(/^u1$/);
+    });
+
+    it("clears the selection on a filter change and on refresh", async () => {
+      renderAs("ADMIN");
+      await waitFor(() => expect(screen.getAllByTestId("artifact-card")).toHaveLength(2));
+      await userEvent.click(screen.getByTestId("kb-select-toggle"));
+
+      await userEvent.click(screen.getByTestId("artifact-select-u1"));
+      expect(screen.getByTestId("bulk-actions")).toHaveTextContent("u1");
+      await userEvent.click(screen.getByTestId("kb-filter-upload"));
+      await waitFor(() => expect(screen.getByTestId("bulk-actions")).toBeEmptyDOMElement());
+
+      await userEvent.click(await screen.findByTestId("artifact-select-u1"));
+      expect(screen.getByTestId("bulk-actions")).toHaveTextContent("u1");
+      await userEvent.click(screen.getByTestId("kb-refresh"));
+      expect(screen.getByTestId("bulk-actions")).toBeEmptyDOMElement();
     });
   });
 });

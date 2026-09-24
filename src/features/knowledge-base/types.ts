@@ -142,6 +142,23 @@ export interface ArtifactFacets {
   languages?: FacetCount[];
 }
 
+/** One upload the backend could not delete, with a client-safe reason. */
+export interface DeleteUploadFailure {
+  /** The upload's UUID (`Artifact.sourceId`), as sent in the request. */
+  artifactId: string;
+  /** Human-readable reason; the backend never puts raw exception text here. */
+  error: string;
+}
+
+/**
+ * Per-item outcome of `DELETE /api/v1/uploads`. Every requested id lands in exactly one list: a
+ * batch can partially succeed, and the UI must report what happened rather than all-or-nothing.
+ */
+export interface DeleteUploadsResult {
+  deletedIds: string[];
+  failed: DeleteUploadFailure[];
+}
+
 /**
  * Order of the artifact list (`?sort=` on the list endpoint; the facets endpoint has none).
  *

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ArtifactList } from "../../../../../src/features/knowledge-base/components/ArtifactList";
@@ -115,5 +115,43 @@ describe("ArtifactList", () => {
     );
 
     expect(screen.queryByTestId("artifact-repo-badge")).not.toBeInTheDocument();
+  });
+});
+
+describe("ArtifactList select mode", () => {
+  const upload = makeArtifact({ id: "u1", title: "notes.pdf", sourceSystem: "UPLOAD" });
+  const github = makeArtifact({ id: "g1", title: "Main.kt" });
+
+  it("renders no checkbox at all outside select mode", () => {
+    render(<ArtifactList artifacts={[upload, github]} onSelect={vi.fn()} />);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("gives only upload cards a checkbox", () => {
+    const selection = { selectedIds: new Set(["u1"]), onToggle: vi.fn() };
+    render(<ArtifactList artifacts={[upload, github]} onSelect={vi.fn()} selection={selection} />);
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+    expect(screen.getByRole("checkbox", { name: "Select notes.pdf" })).toBeChecked();
+    expect(screen.queryByTestId("artifact-select-g1")).not.toBeInTheDocument();
+  });
+
+  it("toggles on the checkbox and still opens the drawer from the card", () => {
+    const onSelect = vi.fn();
+    const onToggle = vi.fn();
+    render(
+      <ArtifactList
+        artifacts={[upload]}
+        onSelect={onSelect}
+        selection={{ selectedIds: new Set(), onToggle }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("artifact-select-u1"));
+    expect(onToggle).toHaveBeenCalledWith("u1");
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("artifact-card"));
+    expect(onSelect).toHaveBeenCalledWith("u1");
   });
 });

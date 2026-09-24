@@ -395,3 +395,24 @@ describe("ArtifactFilters languages", () => {
     expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("2 languages");
   });
 });
+
+describe("ArtifactFilters select toggle", () => {
+  it("renders no Select button unless the parent handles select mode", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+    expect(screen.queryByTestId("kb-select-toggle")).not.toBeInTheDocument();
+  });
+
+  it("is a pressed-state toggle with a constant name", () => {
+    const onSelectModeChange = vi.fn();
+    const { rerender } = render(
+      <ArtifactFilters {...buildProps({ isSelectMode: false, onSelectModeChange })} />,
+    );
+    const toggle = screen.getByRole("button", { name: "Select" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle);
+    expect(onSelectModeChange).toHaveBeenCalledWith(true);
+
+    rerender(<ArtifactFilters {...buildProps({ isSelectMode: true, onSelectModeChange })} />);
+    expect(screen.getByRole("button", { name: "Select" })).toHaveAttribute("aria-pressed", "true");
+  });
+});

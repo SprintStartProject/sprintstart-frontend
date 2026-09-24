@@ -219,6 +219,16 @@ export function useKnowledgeBase(
     [facetsParams, requestedPage, pageSize, sort],
   );
 
+  /**
+   * Identity of the list on screen: changes with every filter, the page, the size and the
+   * order. Selection state keys on it, so a ticked row never survives into a list where the
+   * reader can no longer see it.
+   */
+  const listScopeKey = useMemo(
+    () => JSON.stringify([projectId ?? "", listParams]),
+    [projectId, listParams],
+  );
+
   const listQueryKey = queryKeys.knowledgeBase.list(projectId ?? "", listParams);
   const facetsQueryKey = queryKeys.knowledgeBase.facets(projectId ?? "", facetsParams);
 
@@ -449,6 +459,8 @@ export function useKnowledgeBase(
     setDateRange,
     handleClearFilters,
     hasActiveFilters,
+    /** Changes whenever the visible list's filters, page, size or order change. */
+    listScopeKey,
     /** The artifact open in the viewer drawer (`?artifact=`), or null. */
     selectedArtifactId: urlState.artifactId,
     /** Opens or closes the viewer drawer; `replace`s `?artifact=` so reading leaves no history. */

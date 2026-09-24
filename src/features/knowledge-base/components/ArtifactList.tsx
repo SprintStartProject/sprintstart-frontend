@@ -11,9 +11,21 @@ import {
 } from "lucide-react";
 import type { Artifact, ArtifactType } from "../types";
 import { getArtifactRepository } from "../githubMetadata";
+import { isUpload } from "../tabs";
 import { RepositoryBadge } from "./RepositoryBadge";
+import { Checkbox } from "../../../components/ui/Checkbox";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
+
+/**
+ * Select mode for the bulk delete. Absent means no checkboxes at all: they are
+ * revealed by an explicit toggle, never permanent, so the card keeps being one
+ * button that opens the drawer.
+ */
+export interface ArtifactListSelection {
+  selectedIds: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+}
 
 /**
  * Props for the ArtifactList component.
@@ -22,6 +34,7 @@ import { centralSpringToken } from "../../../styles/tokens";
 interface ArtifactListProps {
   artifacts: Artifact[];
   onSelect: (id: string) => void;
+  selection?: ArtifactListSelection;
 }
 
 const getIcon = (type: ArtifactType) => {
@@ -126,13 +139,38 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
 });
 
 /**
+ * The checkbox column in select mode. Only uploads get a checkbox — the same
+ * rule as the drawer's delete (connector artifacts are removed by their sync,
+ * not by hand); every other row keeps an empty slot so the cards stay aligned.
+ * It sits beside the card, never inside it, so no control nests in the
+ * card's button.
+ */
+function SelectSlot({
+  artifact,
+  selection,
+}: {
+  artifact: Artifact;
+  selection: ArtifactListSelection;
+}) {
+  if (!isUpload(artifact)) return <span className="w-5 shrink-0" aria-hidden="true" />;
+  return (
+    <Checkbox
+      checked={selection.selectedIds.has(artifact.id)}
+      onChange={() => selection.onToggle(artifact.id)}
+      aria-label={`Select ${artifact.title ?? "upload"}`}
+      data-testid={`artifact-select-${artifact.id}`}
+    />
+  );
+}
+
+/**
  * ArtifactList
  *
  * Renders the unified list of knowledge base items (Uploads, PRs, Commits, Issues).
  * Uses Framer Motion's AnimatePresence to handle layout transitions as filters are applied
  * and items enter/exit the dashboard list.
  */
-export function ArtifactList({ artifacts, onSelect }: ArtifactListProps) {
+export function ArtifactList({ artifacts, onSelect, selection }: ArtifactListProps) {
   if (artifacts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-app-text-muted">
@@ -153,8 +191,12 @@ export function ArtifactList({ artifacts, onSelect }: ArtifactListProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={centralSpringToken}
+            className={selection ? "flex items-center gap-3" : undefined}
           >
-            <ArtifactCard key={artifact.id} artifact={artifact} onSelect={onSelect} />
+            {selection && <SelectSlot artifact={artifact} selection={selection} />}
+            <div className={selection ? "min-w-0 flex-1" : undefined}>
+              <ArtifactCard artifact={artifact} onSelect={onSelect} />
+            </div>
           </motion.div>
         ))}
       </AnimatePresence>
