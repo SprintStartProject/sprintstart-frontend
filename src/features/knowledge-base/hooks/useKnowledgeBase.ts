@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { NavigationType, useNavigationType } from "react-router-dom";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
@@ -20,6 +20,7 @@ import {
   type KnowledgeTab,
   SOURCE_LABELS,
 } from "../tabs";
+import { useDebouncedValue } from "../../../hooks/useDebouncedValue.ts";
 import { DEFAULT_PAGE_SIZE, useKnowledgeBaseUrlState } from "./useKnowledgeBaseUrlState.ts";
 import type { KnowledgeBaseUrlStateOptions } from "./useKnowledgeBaseUrlState.ts";
 
@@ -57,6 +58,13 @@ export function loadKnowledgeBaseFacets(
 ): Promise<ArtifactFacets> {
   return knowledgeService.getArtifactFacets(projectId, params);
 }
+
+/**
+ * How long the search box must stay unchanged before its text reaches `?q=` and the server.
+ * 300 ms is below the pause people make between words but above the gap between keystrokes, so
+ * typing "readme" costs one list request and one facets request instead of six of each.
+ */
+export const KB_SEARCH_DEBOUNCE_MS = 300;
 
 /**
  * State + data layer for the Knowledge Base page.
@@ -123,6 +131,22 @@ export function useKnowledgeBase(
     setSyncedSearch(urlState.search);
     if (navigationType === NavigationType.Pop) setSearchQuery(urlState.search);
   }
+
+  /*
+    Only the settled text is written to `?q=` (with `replace`, so a typed word is one history
+    entry at most), and the queries read `?q=` - so a burst of keystrokes is one request, not one
+    per character. The ref remembers the last settled value this effect acted on: the effect also
+    re-runs when `?q=` itself changes, and without the guard a Back navigation (which moves `?q=`
+    before the debounced copy of the adopted text catches up) would be overwritten again with the
+    input's previous, now-stale settled value.
+  */
+  const debouncedSearch = useDebouncedValue(searchQuery, KB_SEARCH_DEBOUNCE_MS);
+  const lastSettledSearchRef = useRef(debouncedSearch);
+  useEffect(() => {
+    if (lastSettledSearchRef.current === debouncedSearch) return;
+    lastSettledSearchRef.current = debouncedSearch;
+    if (debouncedSearch !== urlState.search) setSearch(debouncedSearch);
+  }, [debouncedSearch, urlState.search, setSearch]);
 
   const typesParam: ArtifactType[] | undefined = useMemo(() => {
     if (activeTab === "ALL") return undefined;
@@ -308,13 +332,9 @@ export function useKnowledgeBase(
     }));
   }, [selectedSources, selectedRepositories, facetsData?.repositories, repoCounts]);
 
-  const handleSearchChange = useCallback(
-    (query: string) => {
-      setSearchQuery(query);
-      setSearch(query);
-    },
-    [setSearch],
-  );
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
 
   const handleTabChange = useCallback((tab: KnowledgeTab) => setTab(tab), [setTab]);
 

@@ -178,6 +178,18 @@ describe("ArtifactFilters", () => {
     expect(onSearchChange).toHaveBeenCalledWith("readme");
   });
 
+  it("says what the search looks at and ties the hint to the field", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+
+    const hint = screen.getByTestId("kb-search-hint");
+    expect(hint).toHaveTextContent("Searches titles and links");
+    const input = screen.getByTestId("kb-search-input");
+    expect(input.getAttribute("aria-describedby")).toContain(hint.id);
+    expect(
+      screen.getByRole("textbox", { name: "Search knowledge base" }),
+    ).toHaveAccessibleDescription("Searches titles and links");
+  });
+
   it("renders the repositories section only when repository options are provided", () => {
     const { unmount } = render(<ArtifactFilters {...buildProps()} />);
 

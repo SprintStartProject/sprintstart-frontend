@@ -1140,6 +1140,8 @@ describe("useKnowledgeBase URL state", () => {
     const { result } = await renderAt(["/kb"], makeFacetFixture());
 
     act(() => result.current.kb.handleSearchChange("Add"));
+    // The text reaches the URL once it settles; only then does the next click get its own entry.
+    await waitFor(() => expect(result.current.location.search).toBe("?q=Add"));
     act(() => result.current.kb.toggleSource("GITHUB"));
     await waitFor(() => expect(result.current.location.search).toBe("?q=Add&sources=GITHUB"));
 
@@ -1175,5 +1177,59 @@ describe("useKnowledgeBase URL state", () => {
       expect(result.current.kb.searchQuery).toBe("");
       expect(result.current.location.search).toBe("");
     });
+  });
+});
+
+describe("useKnowledgeBase debounced search", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends one request for a burst of keystrokes, with the settled text", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    const { result } = await renderAt(["/kb"], [makeArtifact("a1", "readme.md")]);
+
+    for (const text of ["r", "re", "rea", "read", "readm"]) {
+      act(() => result.current.kb.handleSearchChange(text));
+    }
+    // The field follows every keystroke; the URL and the server see none of them yet.
+    expect(result.current.kb.searchQuery).toBe("readm");
+    expect(result.current.kb.hasActiveFilters).toBe(true);
+    expect(result.current.location.search).toBe("");
+
+    await waitFor(() => expect(result.current.location.search).toBe("?q=readm"));
+    await waitFor(() => expect(result.current.kb.artifacts).toHaveLength(1));
+
+    const searches = vi
+      .mocked(knowledgeService.getArtifactPage)
+      .mock.calls.map(([, params]) => params?.search)
+      .filter((search) => search !== undefined);
+    expect(searches).toEqual(["readm"]);
+    const facetSearches = vi
+      .mocked(knowledgeService.getArtifactFacets)
+      .mock.calls.map(([, params]) => params?.search)
+      .filter((search) => search !== undefined);
+    expect(facetSearches).toEqual(["readm"]);
+  });
+
+  it("keeps the text Back restored instead of re-writing the stale settled value", async () => {
+    const { result } = await renderAt(["/kb"], [makeArtifact("a1", "readme.md")]);
+
+    act(() => result.current.kb.handleSearchChange("readme"));
+    await waitFor(() => expect(result.current.location.search).toBe("?q=readme"));
+    act(() => result.current.kb.toggleSource("UPLOAD"));
+    act(() => result.current.kb.handleSearchChange(""));
+    await waitFor(() => expect(result.current.location.search).toBe("?sources=UPLOAD"));
+
+    act(() => {
+      void result.current.navigate(-1);
+    });
+    await waitFor(() => expect(result.current.location.search).toBe("?q=readme"));
+    expect(result.current.kb.searchQuery).toBe("readme");
+
+    // Well past the debounce window: nothing may have written the old "" back over it.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(result.current.location.search).toBe("?q=readme");
+    expect(result.current.kb.searchQuery).toBe("readme");
   });
 });

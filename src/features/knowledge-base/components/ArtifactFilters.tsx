@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { ReactNode } from "react";
 import {
   BookOpen,
@@ -35,7 +36,10 @@ export type { ArtifactType, KnowledgeTab, SourceSystem, TabOption };
 /** Props for {@link ArtifactFilters}. */
 export interface ArtifactFiltersProps {
   searchQuery: string;
-  /** Fired on every keystroke with the new search text. Resets pagination in the parent. */
+  /**
+   * Fired on every keystroke with the new search text. The parent debounces it before it reaches
+   * the URL and the server, and resets pagination once it does.
+   */
   onSearchChange: (query: string) => void;
   /** Currently active artifact type tab. */
   activeTab: KnowledgeTab;
@@ -164,6 +168,7 @@ export function ArtifactFilters({
   onRefresh,
   isRefreshing,
 }: ArtifactFiltersProps) {
+  const searchHintId = useId();
   const sections: MultiSelectFilterSection<string>[] = [];
 
   if (sourceOptions.length > 0) {
@@ -230,33 +235,44 @@ export function ArtifactFilters({
   return (
     <div className="mb-6 flex flex-col gap-5">
       {/* Tier 1: Search bar with integrated refresh button */}
-      <Input
-        type="text"
-        placeholder="Search knowledge base..."
-        value={searchQuery}
-        onChange={(event) => onSearchChange(event.target.value)}
-        data-testid="kb-search-input"
-        aria-label="Search knowledge base"
-        icon={<Search className="h-4 w-4" />}
-        trailing={
-          onRefresh && (
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              title="Refresh Knowledge Base"
-              aria-label="Refresh knowledge base"
-              data-testid="kb-refresh"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin text-app-brand" : ""}`}
-              />
-            </Button>
-          )
-        }
-      />
+      <div className="flex flex-col gap-1.5">
+        <Input
+          type="text"
+          placeholder="Search knowledge base..."
+          value={searchQuery}
+          onChange={(event) => onSearchChange(event.target.value)}
+          data-testid="kb-search-input"
+          aria-label="Search knowledge base"
+          aria-describedby={searchHintId}
+          icon={<Search className="h-4 w-4" />}
+          trailing={
+            onRefresh && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                title="Refresh Knowledge Base"
+                aria-label="Refresh knowledge base"
+                data-testid="kb-refresh"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isRefreshing ? "animate-spin text-app-brand" : ""}`}
+                />
+              </Button>
+            )
+          }
+        />
+        {/*
+        The backend matches the text against titles and source links only, never the content,
+        so the hint says so: otherwise a phrase from inside a document finding nothing reads as
+        "the knowledge base does not have it" rather than "search does not look there".
+      */}
+        <p id={searchHintId} className="text-xs text-app-text-muted" data-testid="kb-search-hint">
+          Searches titles and links
+        </p>
+      </div>
 
       {/* Tier 2: Tab switcher for artifact types */}
       <SegmentedTabs
