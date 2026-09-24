@@ -27,3 +27,19 @@ export function teamProgressData(members: TeamOverviewUser[]) {
 
   return { stages, averageProgress };
 }
+
+/**
+ * Where the members underway are, phase by phase, most crowded first — the team's shape along the
+ * path. Members not started or done have no phase to be in.
+ */
+export function phaseSpread(members: TeamOverviewUser[]): { title: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const member of members) {
+    if (memberStage(member) !== "underway") continue;
+    const title = member.currentPhase?.title?.trim() || "No phase";
+    counts.set(title, (counts.get(title) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([title, count]) => ({ title, count }))
+    .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title));
+}

@@ -222,10 +222,10 @@ function HealthFigure({
   attention?: boolean;
 }) {
   return (
-    <li className="flex min-w-0 items-center gap-2.5 rounded-xl bg-app-surface-muted px-3 py-2">
+    <li className="flex min-w-0 items-center gap-2 rounded-xl bg-app-surface-muted px-2.5 py-2">
       <span
         aria-hidden="true"
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
           attention
             ? "bg-app-warning-bg text-app-warning-text"
             : "bg-app-cyan-bg text-app-cyan-text"
@@ -305,10 +305,10 @@ export function OnboardingHealthSummary() {
               colorClassName="text-app-cyan-text"
             />
           )}
-          <ul className="mt-4 grid grid-cols-2 gap-2">
+          <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <HealthFigure
               icon={Rocket}
-              label="To first accepted work"
+              label="To accepted work"
               value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
             />
             <HealthFigure
@@ -330,6 +330,85 @@ export function OnboardingHealthSummary() {
             />
           </ul>
         </>
+      )}
+    </section>
+  );
+}
+
+/** How long ago, in the fewest words: "today", "3d ago", "5w ago". */
+function ago(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "today";
+  if (days < 14) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+}
+
+/** How many milestones the list shows. */
+const MILESTONES = 6;
+
+/**
+ * The team's latest milestones — a hire joining, claiming a first task, putting work up, hearing
+ * back, having it accepted — newest first. The funnel beside it says how many got how far; this
+ * says what happened lately, and to whom, which is what a manager glancing in wants to hear.
+ */
+export function RecentMilestones() {
+  const { selectedProjectId } = useProjectContext();
+  const { data: metrics, loading } = useQueryFetch(
+    queryKeys.onboardingMetrics.project(selectedProjectId),
+    () =>
+      selectedProjectId
+        ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
+        : Promise.resolve(null),
+  );
+
+  const milestones = (metrics?.hires ?? [])
+    .flatMap((hire) =>
+      hireMoments(hire)
+        .filter((moment): moment is typeof moment & { at: string } => moment.at !== null)
+        .map((moment) => ({ ...moment, hire })),
+    )
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    .slice(0, MILESTONES);
+
+  return (
+    <section aria-label="Recent milestones" className="min-w-0">
+      <p className="mb-3 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+        Recent milestones
+      </p>
+      {loading ? (
+        <CardSkeleton label="Loading milestones" />
+      ) : milestones.length === 0 ? (
+        <p className="text-sm text-app-text-muted">Nothing has happened yet.</p>
+      ) : (
+        <ol className="relative space-y-2.5 before:absolute before:top-2 before:bottom-2 before:left-[13px] before:w-px before:bg-app-border">
+          {milestones.map((milestone) => {
+            const Icon = milestone.icon;
+            return (
+              <li
+                key={`${milestone.hire.userId}-${milestone.label}`}
+                className="relative flex items-center gap-2.5"
+              >
+                <span
+                  aria-hidden="true"
+                  className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-app-border bg-app-surface text-app-cyan-text"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-app-text">
+                    {milestone.hire.displayName}
+                  </span>
+                  <span className="block truncate text-xs text-app-text-muted">
+                    {milestone.label}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs text-app-text-subtle tabular-nums">
+                  {ago(milestone.at)}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </section>
   );
