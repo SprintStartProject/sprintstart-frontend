@@ -234,6 +234,15 @@ export function useKnowledgeBase(
   const totalPages = Math.max(1, pageMeta?.totalPages ?? 1);
   const totalElements = pageMeta?.totalElements ?? artifacts.length;
 
+  // Positions of the rows actually on screen, read from the page that produced
+  // them: while a new page loads the previous one stays visible (placeholder
+  // data), and the line must describe what the reader sees, not what is coming.
+  const resultRange = useMemo(() => {
+    if (!pageMeta || artifacts.length === 0) return undefined;
+    const start = pageMeta.number * pageMeta.size + 1;
+    return { start, end: start + artifacts.length - 1 };
+  }, [pageMeta, artifacts.length]);
+
   /*
     A `?page=` past the end (a stale link, a result set that shrank) is pulled back into range.
     The render already reports the clamped page; the URL is corrected afterwards with a `replace`,
@@ -369,6 +378,7 @@ export function useKnowledgeBase(
     currentPage,
     totalPages,
     totalElements,
+    resultRange,
     pageSize,
     handleSearchChange,
     handleTabChange,

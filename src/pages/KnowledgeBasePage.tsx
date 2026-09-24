@@ -16,6 +16,10 @@ import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeB
 import { useArtifactById } from "../features/knowledge-base/hooks/useArtifactById";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
+import { useDebouncedValue } from "../hooks/useDebouncedValue.ts";
+import { ArtifactPageSizeSelect } from "../features/knowledge-base/components/ArtifactPageSizeSelect.tsx";
+import { PAGE_SIZE_OPTIONS } from "../features/knowledge-base/hooks/useKnowledgeBaseUrlState.ts";
+import { formatResultRange } from "../features/knowledge-base/resultRange.ts";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
 
 /** Placeholder for one `ArtifactCard`, matching its icon box, title/badge row and meta row. */
@@ -54,6 +58,9 @@ const DELETE_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
   PermissionGroup.ADMIN,
 ]);
 
+/** How long the result total must hold still before the live region announces it. */
+const RESULTS_ANNOUNCE_DELAY_MS = 600;
+
 /**
  * Unified Knowledge Base view for project resources.
  *
@@ -91,6 +98,9 @@ export function KnowledgeBasePage() {
     currentPage,
     totalPages,
     totalElements,
+    resultRange,
+    pageSize,
+    setPageSize,
     handleSearchChange,
     handleTabChange,
     toggleSource,
@@ -105,6 +115,16 @@ export function KnowledgeBasePage() {
 
   const isLoading = isProjectLoading || isArtifactsLoading;
   const showLoadingSkeleton = useDelayedFlag(isLoading);
+
+  /*
+    What a screen reader hears after a filter, search or page change: the new total, said once
+    the results have settled. Debounced so four quick facet clicks announce one number, not four,
+    and empty while loading or failed - the error banner speaks for itself (assertively).
+  */
+  const resultsAnnouncement = useDebouncedValue(
+    isLoading || fetchError ? "" : formatResultRange(totalElements),
+    RESULTS_ANNOUNCE_DELAY_MS,
+  );
 
   /*
     `?artifact=<id>` says which document is open, and it is in the URL the whole time one is.
@@ -208,11 +228,20 @@ export function KnowledgeBasePage() {
                   selectedRepositories={selectedRepositories}
                   onToggleRepository={toggleRepository}
                   resultCount={totalElements}
+                  resultRange={resultRange}
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={handleClearFilters}
                   onRefresh={() => void fetchArtifacts()}
                   isRefreshing={isLoading}
                 />
+                <p
+                  className="sr-only"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  data-testid="kb-results-announcement"
+                >
+                  {resultsAnnouncement}
+                </p>
               </motion.div>
 
               {fetchError && !isLoading && (
@@ -250,16 +279,31 @@ export function KnowledgeBasePage() {
                   transition={prefersReducedMotion ? { duration: 0 } : centralSpringToken}
                 >
                   <ArtifactList artifacts={artifacts} onSelect={setSelectedArtifactId} />
-                  {totalPages > 1 && (
-                    <Pagination
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      onPageChange={(page) => {
-                        setCurrentPage(page);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="mt-8 mb-12"
-                    />
+                  {(totalPages > 1 || totalElements > PAGE_SIZE_OPTIONS[0]) && (
+                    // Both controls carry the same top margin (Pagination's own `mt-6`) so the row
+                    // lines up without overriding a primitive's classes.
+                    <div
+                      className="mb-12 flex flex-wrap items-center justify-center gap-x-6"
+                      data-testid="kb-list-footer"
+                    >
+                      {totalPages > 1 && (
+                        <Pagination
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          onPageChange={(page) => {
+                            setCurrentPage(page);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        />
+                      )}
+                      {totalElements > PAGE_SIZE_OPTIONS[0] && (
+                        <ArtifactPageSizeSelect
+                          pageSize={pageSize}
+                          onPageSizeChange={setPageSize}
+                          className="mt-6"
+                        />
+                      )}
+                    </div>
                   )}
                 </motion.div>
               )}

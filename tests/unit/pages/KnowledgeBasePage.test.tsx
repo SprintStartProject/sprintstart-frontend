@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -270,6 +270,59 @@ describe("KnowledgeBasePage", () => {
       expect(mockGetArtifactPage).toHaveBeenCalledWith(
         "proj1",
         expect.objectContaining({ search: "readme", sources: ["UPLOAD"] }),
+      );
+    });
+  });
+
+  it("announces the settled result total in a polite live region", async () => {
+    setupMockArtifacts([
+      makeArtifact({ id: "a1", title: "readme.md" }),
+      makeArtifact({ id: "a2", title: "runbook.md" }),
+    ]);
+
+    render(
+      <MemoryRouter>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    );
+
+    const region = screen.getByTestId("kb-results-announcement");
+    expect(region).toHaveAttribute("aria-live", "polite");
+    await waitFor(() => expect(region).toHaveTextContent("2 artifacts"), { timeout: 3000 });
+  });
+
+  it("offers a page size once results outgrow a page, and requests the chosen size", async () => {
+    const artifacts = Array.from({ length: 20 }, (_, i) =>
+      makeArtifact({ id: `a${i}`, title: `doc-${i}.md` }),
+    );
+    setupMockArtifacts(artifacts);
+    mockGetArtifactPage.mockImplementation((_pid: string, params: { size?: number } = {}) =>
+      Promise.resolve({
+        items: artifacts,
+        page: {
+          number: 0,
+          size: params.size ?? 20,
+          totalElements: 45,
+          totalPages: Math.ceil(45 / (params.size ?? 20)),
+          hasNext: true,
+          hasPrevious: false,
+        },
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    );
+
+    const select = await screen.findByTestId("kb-page-size");
+    fireEvent.change(select, { target: { value: "50" } });
+
+    await waitFor(() => {
+      expect(mockGetArtifactPage).toHaveBeenLastCalledWith(
+        "proj1",
+        expect.objectContaining({ page: 1, size: 50 }),
       );
     });
   });

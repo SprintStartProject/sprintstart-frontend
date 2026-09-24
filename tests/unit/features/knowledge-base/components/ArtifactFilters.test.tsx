@@ -68,7 +68,7 @@ describe("ArtifactFilters", () => {
     expect(screen.getByTestId("kb-search-input")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /all/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /pull requests/i })).toBeInTheDocument();
-    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("10 results");
+    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("10 artifacts");
     expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("All sources");
 
     fireEvent.click(screen.getByTestId("kb-refresh"));
@@ -251,5 +251,55 @@ describe("ArtifactFilters", () => {
     );
 
     expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("2 repositories");
+  });
+
+  it("words the result line as a range of the total", () => {
+    render(
+      <ArtifactFilters
+        {...buildProps({ resultCount: 412, resultRange: { start: 21, end: 40 } })}
+      />,
+    );
+    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("21–40 of 412 artifacts");
+  });
+
+  it("says No artifacts instead of a zero range", () => {
+    render(<ArtifactFilters {...buildProps({ resultCount: 0 })} />);
+    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("No artifacts");
+  });
+
+  it("explains what the facet counts mean inside the menu", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(screen.getByTestId("kb-filter-footnote")).toHaveTextContent(
+      "Counts show what you would get if you added this option.",
+    );
+  });
+
+  it("gives a long repository list a filter box and folds it to ten", () => {
+    const manyRepos = Array.from({ length: 14 }, (_, i) => ({
+      value: `acme/repo-${i}`,
+      label: `acme/repo-${i}`,
+      count: 20 - i,
+    }));
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          repositoryOptions: manyRepos,
+          selectedSources: new Set<SourceSystem>(["GITHUB"]),
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+
+    expect(screen.getByTestId("kb-filter-section-repositories-search")).toBeInTheDocument();
+    expect(screen.getByTestId("kb-filter-section-repositories-show-all")).toHaveTextContent(
+      "Show all (14)",
+    );
+    expect(screen.queryByTestId("kb-filter-option-acme/repo-13")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("kb-filter-section-repositories-search"), {
+      target: { value: "repo-13" },
+    });
+    expect(screen.getByTestId("kb-filter-option-acme/repo-13")).toBeInTheDocument();
   });
 });

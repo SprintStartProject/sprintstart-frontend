@@ -15,6 +15,13 @@ export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
 
 /**
+ * Page sizes the page-size control offers. All inside the backend's 1..100 bound;
+ * a hand-edited `?size=` outside this list still works (it is only clamped) and
+ * is shown as an extra option, so the control never lies about the current size.
+ */
+export const PAGE_SIZE_OPTIONS: readonly number[] = [DEFAULT_PAGE_SIZE, 50, MAX_PAGE_SIZE];
+
+/**
  * Query-string keys the Knowledge Base page owns. Short, human-readable names, because these
  * URLs are meant to be pasted into chats and tickets.
  */

@@ -30,6 +30,7 @@ import {
   type UploadFormat,
 } from "../tabs";
 import type { ArtifactType, SourceSystem } from "../types";
+import { formatResultRange } from "../resultRange.ts";
 
 export type { ArtifactType, KnowledgeTab, SourceSystem, TabOption };
 
@@ -70,6 +71,11 @@ export interface ArtifactFiltersProps {
   onToggleRepository: (repository: string) => void;
   /** Total count of matching artifacts. */
   resultCount: number;
+  /**
+   * 1-based position of the first and last artifact on the current page, for the
+   * "1–20 of 412 artifacts" line. Omitted, the line falls back to the total alone.
+   */
+  resultRange?: { start: number; end: number };
   /** Whether any filter, facet, or search query is currently non-default. */
   hasActiveFilters: boolean;
   /** Clears all active filters, facets, and search query. */
@@ -138,6 +144,15 @@ function isUploadFormat(value: string): value is UploadFormat {
   return (DEFAULT_FORMAT_ORDER as readonly string[]).includes(value);
 }
 
+/** Repositories shown before the section folds behind "Show all". */
+const REPOSITORY_VISIBLE_LIMIT = 10;
+
+/**
+ * What the numbers beside each option mean. They are "what you would get if you
+ * added this", not a project total, and nothing on screen said so.
+ */
+const FACET_COUNT_FOOTNOTE = "Counts show what you would get if you added this option.";
+
 /**
  * ArtifactFilters
  *
@@ -163,6 +178,7 @@ export function ArtifactFilters({
   onToggleFormat,
   onToggleRepository,
   resultCount,
+  resultRange,
   hasActiveFilters,
   onClearFilters,
   onRefresh,
@@ -207,6 +223,11 @@ export function ArtifactFilters({
         count: option.count,
         icon: <FolderGit2 className={ICON_CLASS} aria-hidden="true" />,
       })),
+      // A connected org can bring dozens of repositories; past the threshold the
+      // section gets a filter box and folds to the ten biggest (facets arrive
+      // count-descending), with ticked ones always kept in view.
+      searchable: true,
+      visibleLimit: REPOSITORY_VISIBLE_LIMIT,
     });
   }
 
@@ -294,7 +315,7 @@ export function ArtifactFilters({
           className="flex h-9 shrink-0 items-center text-sm leading-none font-medium whitespace-nowrap text-app-text-muted"
           data-testid="kb-result-count"
         >
-          {resultCount} {resultCount === 1 ? "result" : "results"}
+          {formatResultRange(resultCount, resultRange)}
         </p>
 
         <div className="ml-auto flex w-full items-center justify-end gap-3 sm:w-auto">
@@ -322,6 +343,7 @@ export function ArtifactFilters({
               testId="kb-filter"
               className="w-full"
               collapsible={false}
+              footnote={FACET_COUNT_FOOTNOTE}
             />
           </div>
         </div>
