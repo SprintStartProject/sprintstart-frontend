@@ -65,6 +65,10 @@ vi.mock("../../../src/features/data-ingestion/components/IngestionStatusWidget",
   IngestionStatusWidget: () => <section aria-label="Data ingestion" />,
 }));
 
+// The analysis has its own tests; here it would only run a scan against every service.
+vi.mock("../../../src/features/pm-area/analysis/ProjectAnalysisLauncher", () => ({
+  ProjectAnalysisLauncher: () => <div>project analysis</div>,
+}));
 vi.mock("../../../src/features/projects/industry/ProjectIndustryWidget", () => ({
   ProjectIndustryWidget: () => <section aria-label="Industry" />,
 }));

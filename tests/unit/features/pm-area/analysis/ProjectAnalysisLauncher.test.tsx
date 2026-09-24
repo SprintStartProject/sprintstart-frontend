@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { axe } from "vitest-axe";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { ProjectAnalysisLauncher } from "../../../../../src/features/pm-area/analysis/ProjectAnalysisLauncher";
 
@@ -216,6 +217,18 @@ describe("ProjectAnalysisLauncher", () => {
       expect(screen.queryByTestId("project-analysis-dialog")).not.toBeInTheDocument();
     });
   }, 20000);
+
+  it("has no a11y violations, before the scan or on its results", async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderLauncher();
+
+    await user.click(screen.getByRole("button", { name: /Analyse project/ }));
+    expect(await axe(baseElement)).toHaveNoViolations();
+
+    await user.click(screen.getByRole("button", { name: /Start analysis/ }));
+    await screen.findByText(/worth your attention/, {}, { timeout: 8000 });
+    expect(await axe(baseElement)).toHaveNoViolations();
+  }, 30000);
 
   it("remembers the score for the next visit", async () => {
     const user = userEvent.setup();
