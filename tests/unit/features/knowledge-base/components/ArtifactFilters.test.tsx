@@ -302,4 +302,24 @@ describe("ArtifactFilters", () => {
     });
     expect(screen.getByTestId("kb-filter-option-acme/repo-13")).toBeInTheDocument();
   });
+  it("offers the three list orders and reports a pick", () => {
+    const onSortChange = vi.fn();
+    render(<ArtifactFilters {...buildProps({ sort: "ADDED_DESC", onSortChange })} />);
+
+    const select = screen.getByTestId<HTMLSelectElement>("kb-sort");
+    expect(select).toHaveAccessibleName("Sort artifacts");
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
+      "Newest added",
+      "Recently changed",
+      "Title A–Z",
+    ]);
+
+    fireEvent.change(select, { target: { value: "CHANGED_DESC" } });
+    expect(onSortChange).toHaveBeenCalledWith("CHANGED_DESC");
+  });
+
+  it("renders no sort control when the parent does not handle one", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+    expect(screen.queryByTestId("kb-sort")).not.toBeInTheDocument();
+  });
 });

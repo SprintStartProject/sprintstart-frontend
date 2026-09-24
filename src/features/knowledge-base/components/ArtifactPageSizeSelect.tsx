@@ -34,20 +34,22 @@ export function ArtifactPageSizeSelect({
       <label htmlFor={selectId} className="text-sm whitespace-nowrap text-app-text-muted">
         Per page
       </label>
-      <Select
-        id={selectId}
-        size="sm"
-        value={String(pageSize)}
-        onChange={(event) => onPageSizeChange(Number(event.target.value))}
-        className="w-20"
-        data-testid="kb-page-size"
-      >
-        {sizes.map((size) => (
-          <option key={size} value={size}>
-            {size}
-          </option>
-        ))}
-      </Select>
+      {/* The field style is `w-full`; a `w-20` on the select itself would fight it. */}
+      <div className="w-20">
+        <Select
+          id={selectId}
+          size="sm"
+          value={String(pageSize)}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+          data-testid="kb-page-size"
+        >
+          {sizes.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </Select>
+      </div>
     </div>
   );
 }

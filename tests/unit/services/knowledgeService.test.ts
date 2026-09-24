@@ -318,6 +318,74 @@ describe("knowledgeService", () => {
     });
   });
 
+  describe("list order and filter parity", () => {
+    const projectId = "proj-uuid";
+    const emptyPage = {
+      items: [],
+      page: {
+        number: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false,
+      },
+    };
+    const emptyFacets = { types: [], sources: [], formats: [], repositories: [] };
+
+    it("sends the sort order with the list request", async () => {
+      let seen: URLSearchParams | null = null;
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          seen = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyPage);
+        }),
+      );
+
+      await knowledgeService.getArtifactPage(projectId, { page: 0, size: 20, sort: "TITLE_ASC" });
+
+      expect(seen!.get("sort")).toBe("TITLE_ASC");
+    });
+
+    it("leaves sort out when none is given, so the default request is unchanged", async () => {
+      let seen: URLSearchParams | null = null;
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          seen = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyPage);
+        }),
+      );
+
+      await knowledgeService.getArtifactPage(projectId, { page: 1, size: 20 });
+
+      expect(seen!.has("sort")).toBe(false);
+    });
+
+    it("never sends page, size or sort to the facets endpoint", async () => {
+      let seen: URLSearchParams | null = null;
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts/facets`, ({ request }) => {
+          seen = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyFacets);
+        }),
+      );
+
+      await knowledgeService.getArtifactFacets(projectId, {
+        page: 3,
+        size: 50,
+        sort: "CHANGED_DESC",
+        search: "guide",
+        sources: ["GITHUB"],
+      });
+
+      expect(seen!.has("page")).toBe(false);
+      expect(seen!.has("size")).toBe(false);
+      expect(seen!.has("sort")).toBe(false);
+      expect(seen!.get("search")).toBe("guide");
+      expect(seen!.getAll("sources")).toEqual(["GITHUB"]);
+    });
+  });
+
   describe("getArtifactById", () => {
     const projectId = "proj-uuid";
     const artifactId = "art-uuid";

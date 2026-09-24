@@ -264,3 +264,44 @@ describe("useKnowledgeBaseUrlState project switches", () => {
     expect(result.current.location.search).toBe("?tab=FILE");
   });
 });
+
+describe("useKnowledgeBaseUrlState sort", () => {
+  it("parses a known order case-insensitively and drops an unknown one", () => {
+    expect(parse("?sort=title_asc").sort).toBe("TITLE_ASC");
+    expect(parse("?sort=CHANGED_DESC").sort).toBe("CHANGED_DESC");
+    // The backend answers an unknown order with a 400; the URL must never be able to cause one.
+    expect(parse("?sort=POPULAR").sort).toBe("ADDED_DESC");
+    expect(parse("").sort).toBe("ADDED_DESC");
+  });
+
+  it("writes a non-default order, omits the default, and restarts at page 1", () => {
+    const { result } = renderUrlState(["/kb?page=4"], { projectId: "p1" });
+
+    act(() => result.current.api.setSort("CHANGED_DESC"));
+    expect(result.current.location.search).toBe("?sort=CHANGED_DESC");
+
+    act(() => result.current.api.setSort("ADDED_DESC"));
+    expect(result.current.location.search).toBe("");
+  });
+
+  it("pushes a sort change so Back restores the previous order", () => {
+    const { result } = renderUrlState(["/kb"], { projectId: "p1" });
+
+    act(() => result.current.api.setSort("TITLE_ASC"));
+    act(() => void result.current.navigate(-1));
+
+    expect(result.current.api.state.sort).toBe("ADDED_DESC");
+  });
+
+  it("keeps the order through Clear filters and a project switch", () => {
+    const { result, rerender } = renderUrlState(["/kb?sort=TITLE_ASC&sources=JIRA"], {
+      projectId: "p1",
+    });
+
+    act(() => result.current.api.clearFilters());
+    expect(result.current.location.search).toBe("?sort=TITLE_ASC");
+
+    rerender({ projectId: "p2" });
+    expect(result.current.api.state.sort).toBe("TITLE_ASC");
+  });
+});

@@ -33,6 +33,23 @@ type UploadResponseItem = {
   error?: string;
 };
 
+/**
+ * Serialises the *filter* half of {@link KnowledgeListParams} — the part the list and the facets
+ * endpoints share. One builder for both calls is the parity guarantee: a filter added here reaches
+ * the counts and the rows alike, so a facet can never promise "12" for a list that shows 30.
+ * Sets are repeated params (`types=A&types=B`), which is how Spring binds a `List` parameter.
+ */
+function buildFilterQuery(params: KnowledgeListParams): URLSearchParams {
+  const query = new URLSearchParams();
+  const search = params.search?.trim();
+  if (search) query.set("search", search);
+  for (const type of params.types ?? []) query.append("types", type);
+  for (const source of params.sources ?? []) query.append("sources", source);
+  for (const repository of params.repositories ?? []) query.append("repositories", repository);
+  if (params.format) query.set("format", params.format);
+  return query;
+}
+
 export const knowledgeService = {
   /**
    * Whether the project has anything ingested at all -- what an onboarding path is built from.
@@ -79,30 +96,17 @@ export const knowledgeService = {
    * Fetches a paginated, server-side filtered page of artifacts for a project.
    *
    * @param projectId UUID of the project.
-   * @param params Query parameters including page, size, search, types, sources, repositories, format.
+   * @param params Filter criteria (see `buildFilterQuery`) plus the list-only page, size and sort.
    */
   async getArtifactPage(
     projectId: string,
     params: KnowledgeListParams = {},
   ): Promise<ArtifactPage> {
-    const query = new URLSearchParams();
+    const query = buildFilterQuery(params);
     if (params.page !== undefined) query.set("page", String(params.page));
     if (params.size !== undefined) query.set("size", String(params.size));
-    if (params.search && params.search.trim().length > 0) {
-      query.set("search", params.search.trim());
-    }
-    if (params.types && params.types.length > 0) {
-      for (const t of params.types) query.append("types", t);
-    }
-    if (params.sources && params.sources.length > 0) {
-      for (const s of params.sources) query.append("sources", s);
-    }
-    if (params.repositories && params.repositories.length > 0) {
-      for (const r of params.repositories) query.append("repositories", r);
-    }
-    if (params.format) {
-      query.set("format", params.format);
-    }
+    // List-only: order changes which rows a page holds, never how many match.
+    if (params.sort) query.set("sort", params.sort);
 
     const queryString = query.toString();
     const endpoint = `/api/v1/projects/${projectId}/artifacts${queryString ? `?${queryString}` : ""}`;
@@ -112,6 +116,10 @@ export const knowledgeService = {
   /**
    * Fetches faceted counts for artifact types, source systems, upload formats, and repositories.
    *
+   * Sends exactly the filter criteria the list sends (see `buildFilterQuery`) and nothing of its
+   * paging or order: `page`, `size` and `sort` are ignored even when present in `params`, because
+   * a count must not depend on which page is on screen or how it is ordered.
+   *
    * @param projectId UUID of the project.
    * @param params Active filter criteria to calculate dynamic facet counts.
    */
@@ -119,24 +127,7 @@ export const knowledgeService = {
     projectId: string,
     params: KnowledgeListParams = {},
   ): Promise<ArtifactFacets> {
-    const query = new URLSearchParams();
-    if (params.search && params.search.trim().length > 0) {
-      query.set("search", params.search.trim());
-    }
-    if (params.types && params.types.length > 0) {
-      for (const t of params.types) query.append("types", t);
-    }
-    if (params.sources && params.sources.length > 0) {
-      for (const s of params.sources) query.append("sources", s);
-    }
-    if (params.repositories && params.repositories.length > 0) {
-      for (const r of params.repositories) query.append("repositories", r);
-    }
-    if (params.format) {
-      query.set("format", params.format);
-    }
-
-    const queryString = query.toString();
+    const queryString = buildFilterQuery(params).toString();
     const endpoint = `/api/v1/projects/${projectId}/artifacts/facets${queryString ? `?${queryString}` : ""}`;
     return apiClient.fetch<ArtifactFacets>(endpoint);
   },

@@ -111,6 +111,8 @@ export function KnowledgeBasePage() {
     hasActiveFilters,
     selectedArtifactId,
     setSelectedArtifactId,
+    sort,
+    setSort,
   } = useKnowledgeBase(projectId, { projectSettled: !isProjectLoading });
 
   const isLoading = isProjectLoading || isArtifactsLoading;
@@ -231,6 +233,8 @@ export function KnowledgeBasePage() {
                   resultRange={resultRange}
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={handleClearFilters}
+                  sort={sort}
+                  onSortChange={setSort}
                   onRefresh={() => void fetchArtifacts()}
                   isRefreshing={isLoading}
                 />

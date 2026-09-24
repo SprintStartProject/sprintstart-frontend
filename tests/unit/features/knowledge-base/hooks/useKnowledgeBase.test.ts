@@ -1233,3 +1233,39 @@ describe("useKnowledgeBase debounced search", () => {
     expect(result.current.kb.searchQuery).toBe("readme");
   });
 });
+
+describe("useKnowledgeBase sort", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("asks the list for the chosen order and keeps it out of the facets request", async () => {
+    const { result } = await renderAt(["/kb"], makeFacetFixture());
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    act(() => result.current.kb.setSort("TITLE_ASC"));
+
+    await waitFor(() => {
+      const calls = vi.mocked(knowledgeService.getArtifactPage).mock.calls;
+      expect(calls.at(-1)?.[1]).toMatchObject({ sort: "TITLE_ASC", page: 1 });
+    });
+    for (const [, params] of vi.mocked(knowledgeService.getArtifactFacets).mock.calls) {
+      expect(params).not.toHaveProperty("sort");
+    }
+    expect(result.current.kb.sort).toBe("TITLE_ASC");
+    expect(result.current.location.search).toBe("?sort=TITLE_ASC");
+  });
+
+  it("does not send the default order, so the default request is what it always was", async () => {
+    const { getArtifactPage } = await renderAt(["/kb"], makeFacetFixture());
+
+    expect(getArtifactPage.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ page: 1, size: 20, sort: undefined }),
+    );
+  });
+
+  it("does not count an order as an active filter", async () => {
+    const { result } = await renderAt(["/kb?sort=CHANGED_DESC"], makeFacetFixture());
+    expect(result.current.kb.hasActiveFilters).toBe(false);
+  });
+});

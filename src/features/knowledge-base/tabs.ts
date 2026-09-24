@@ -1,4 +1,4 @@
-import type { Artifact, ArtifactType, SourceSystem, UploadFormat } from "./types";
+import type { Artifact, ArtifactSort, ArtifactType, SourceSystem, UploadFormat } from "./types";
 
 /**
  * Upload file formats the knowledge base classifies an upload into. Declared
@@ -97,6 +97,19 @@ export const FORMAT_LABELS: Record<UploadFormat, string> = {
 
 /** Standard order for the file-format facet. */
 export const DEFAULT_FORMAT_ORDER: UploadFormat[] = ["PDF", "MARKDOWN", "IMAGE", "OTHER"];
+
+/** The list order used when the URL names none — and the one the backend applies unasked. */
+export const DEFAULT_ARTIFACT_SORT: ArtifactSort = "ADDED_DESC";
+
+/** Display names for the sort control, phrased as what the reader sees first. */
+export const SORT_LABELS: Record<ArtifactSort, string> = {
+  ADDED_DESC: "Newest added",
+  CHANGED_DESC: "Recently changed",
+  TITLE_ASC: "Title A–Z",
+};
+
+/** Order of the options in the sort control. */
+export const ARTIFACT_SORT_ORDER: ArtifactSort[] = ["ADDED_DESC", "CHANGED_DESC", "TITLE_ASC"];
 
 /** Whether an artifact came from a direct upload rather than a connector. */
 export function isUpload(artifact: Artifact): boolean {

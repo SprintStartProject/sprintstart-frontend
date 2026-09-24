@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { DEFAULT_FORMAT_ORDER, DEFAULT_SOURCE_ORDER, KNOWLEDGE_TAB_ORDER } from "../tabs.ts";
+import {
+  ARTIFACT_SORT_ORDER,
+  DEFAULT_ARTIFACT_SORT,
+  DEFAULT_FORMAT_ORDER,
+  DEFAULT_SOURCE_ORDER,
+  KNOWLEDGE_TAB_ORDER,
+} from "../tabs.ts";
 import type { KnowledgeTab } from "../tabs.ts";
-import type { SourceSystem, UploadFormat } from "../types.ts";
+import type { ArtifactSort, SourceSystem, UploadFormat } from "../types.ts";
 
 /** Page size used when the URL names none. Mirrors the backend's list default. */
 export const DEFAULT_PAGE_SIZE = 20;
@@ -33,14 +39,15 @@ export const KB_URL_PARAM = {
   format: "format",
   page: "page",
   size: "size",
+  sort: "sort",
   artifact: "artifact",
 } as const;
 
 /**
  * The params that describe *one project's* corpus. A project switch drops them: a repository or
  * an open artifact from project A means nothing in project B, and the empty list it would produce
- * reads as "this project has no knowledge". `size` is deliberately not in here — it is a reading
- * preference, not a statement about the project's content.
+ * reads as "this project has no knowledge". `size` and `sort` are deliberately not in here — they
+ * are reading preferences, not statements about the project's content.
  */
 const PROJECT_SCOPED_PARAMS: readonly string[] = [
   KB_URL_PARAM.tab,
@@ -52,7 +59,10 @@ const PROJECT_SCOPED_PARAMS: readonly string[] = [
   KB_URL_PARAM.artifact,
 ];
 
-/** Everything "Clear filters" resets. Unlike a project switch it keeps the open artifact. */
+/**
+ * Everything "Clear filters" resets. Unlike a project switch it keeps the open artifact, and like
+ * one it keeps `size` and `sort`: an order is not a filter, and clearing must not reshuffle.
+ */
 const FILTER_PARAMS: readonly string[] = [
   KB_URL_PARAM.tab,
   KB_URL_PARAM.search,
@@ -65,6 +75,7 @@ const FILTER_PARAMS: readonly string[] = [
 const TAB_VALUES: ReadonlySet<string> = new Set(KNOWLEDGE_TAB_ORDER);
 const SOURCE_VALUES: ReadonlySet<string> = new Set(DEFAULT_SOURCE_ORDER);
 const FORMAT_VALUES: ReadonlySet<string> = new Set(DEFAULT_FORMAT_ORDER);
+const SORT_VALUES: ReadonlySet<string> = new Set(ARTIFACT_SORT_ORDER);
 const NO_SOURCES: ReadonlySet<SourceSystem> = new Set<SourceSystem>();
 const NO_STRINGS: ReadonlySet<string> = new Set<string>();
 
@@ -82,6 +93,8 @@ export interface KnowledgeBaseUrlState {
   /** 1-based. Not clamped to the result's page count here — the URL cannot know it. */
   page: number;
   size: number;
+  /** List order; {@link DEFAULT_ARTIFACT_SORT} when the URL names none or an unknown one. */
+  sort: ArtifactSort;
   /** The artifact open in the viewer drawer, if any. */
   artifactId: string | null;
 }
@@ -141,6 +154,10 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
   const repositories: ReadonlySet<string> =
     repositoryList.length > 0 ? new Set(repositoryList) : NO_STRINGS;
 
+  // An unknown order is dropped, not sent: the backend answers it with a 400.
+  const rawSort = params.get(KB_URL_PARAM.sort)?.trim().toUpperCase() ?? "";
+  const sort = SORT_VALUES.has(rawSort) ? (rawSort as ArtifactSort) : DEFAULT_ARTIFACT_SORT;
+
   return {
     tab,
     search: params.get(KB_URL_PARAM.search) ?? "",
@@ -149,6 +166,7 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
     format,
     page: readPositiveInt(params.get(KB_URL_PARAM.page), 1, Number.MAX_SAFE_INTEGER),
     size: readPositiveInt(params.get(KB_URL_PARAM.size), DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
+    sort,
     artifactId: params.get(KB_URL_PARAM.artifact) || null,
   };
 }
@@ -226,7 +244,9 @@ export interface KnowledgeBaseUrlStateApi {
   setPage: (page: number, mode?: KnowledgeBaseHistoryMode) => void;
   /** Push-mode write of `?size=`, resetting the page. */
   setSize: (size: number) => void;
-  /** Resets every filter (not the page size, not the open artifact) in one history entry. */
+  /** Push-mode write of `?sort=` (omitted at the default), resetting the page. */
+  setSort: (sort: ArtifactSort) => void;
+  /** Resets every filter (not size, not sort, not the open artifact) in one history entry. */
   clearFilters: () => void;
   /** Opens (`id`) or closes (`null`) the viewer drawer, in replace mode. */
   setArtifactId: (artifactId: string | null) => void;
@@ -387,6 +407,17 @@ export function useKnowledgeBaseUrlState(
     [commit],
   );
 
+  const setSort = useCallback(
+    (sort: ArtifactSort) =>
+      commit((params) => {
+        if (sort === DEFAULT_ARTIFACT_SORT) params.delete(KB_URL_PARAM.sort);
+        else params.set(KB_URL_PARAM.sort, sort);
+        // Page 3 of a different order is an arbitrary slice; start the new order at its top.
+        params.delete(KB_URL_PARAM.page);
+      }, "push"),
+    [commit],
+  );
+
   const clearFilters = useCallback(
     () =>
       commit((params) => {
@@ -414,6 +445,7 @@ export function useKnowledgeBaseUrlState(
     toggleRepository,
     setPage,
     setSize,
+    setSort,
     clearFilters,
     setArtifactId,
   };

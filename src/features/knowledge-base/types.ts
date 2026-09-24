@@ -132,6 +132,17 @@ export interface ArtifactFacets {
 }
 
 /**
+ * Order of the artifact list (`?sort=` on the list endpoint; the facets endpoint has none).
+ *
+ * - `ADDED_DESC`: newest first by `ingestedAt` (the backend default).
+ * - `CHANGED_DESC`: most recently changed first, by `lastChangedAt` falling back to `ingestedAt`.
+ * - `TITLE_ASC`: title A–Z, case-insensitive, untitled artifacts last.
+ *
+ * Every order breaks ties on `id`, so paging never shows a row twice or skips one.
+ */
+export type ArtifactSort = "ADDED_DESC" | "CHANGED_DESC" | "TITLE_ASC";
+
+/**
  * Query parameters for filtering and paginating knowledge base artifacts.
  */
 export interface KnowledgeListParams {
@@ -142,4 +153,9 @@ export interface KnowledgeListParams {
   sources?: SourceSystem[];
   repositories?: string[];
   format?: UploadFormat;
+  /**
+   * List order. Sent by `getArtifactPage` only — counts do not depend on order, and the facets
+   * endpoint does not accept it. Omitted means the backend default (`ADDED_DESC`).
+   */
+  sort?: ArtifactSort;
 }

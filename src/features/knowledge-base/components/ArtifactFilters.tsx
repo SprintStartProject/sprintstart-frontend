@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Select } from "../../../components/ui/Select.tsx";
 import {
   MultiSelectFilter,
   type MultiSelectFilterSection,
@@ -22,14 +23,17 @@ import {
 import { SegmentedTabs } from "../../../components/ui/SegmentedTabs";
 import type { FacetOption, TabOption } from "../hooks/useKnowledgeBase";
 import {
+  ARTIFACT_SORT_ORDER,
+  DEFAULT_ARTIFACT_SORT,
   DEFAULT_FORMAT_ORDER,
   DEFAULT_SOURCE_ORDER,
   FORMAT_LABELS,
+  SORT_LABELS,
   SOURCE_LABELS,
   type KnowledgeTab,
   type UploadFormat,
 } from "../tabs";
-import type { ArtifactType, SourceSystem } from "../types";
+import type { ArtifactSort, ArtifactType, SourceSystem } from "../types";
 import { formatResultRange } from "../resultRange.ts";
 
 export type { ArtifactType, KnowledgeTab, SourceSystem, TabOption };
@@ -80,6 +84,10 @@ export interface ArtifactFiltersProps {
   hasActiveFilters: boolean;
   /** Clears all active filters, facets, and search query. */
   onClearFilters: () => void;
+  /** Current list order. Defaults to newest added. */
+  sort?: ArtifactSort;
+  /** Fired when the reader picks another order. The sort control is only shown when given. */
+  onSortChange?: (sort: ArtifactSort) => void;
   /** Fired when the user clicks the refresh button. */
   onRefresh?: () => void;
   /** Whether a refresh is currently in progress. */
@@ -183,6 +191,8 @@ export function ArtifactFilters({
   onClearFilters,
   onRefresh,
   isRefreshing,
+  sort = DEFAULT_ARTIFACT_SORT,
+  onSortChange,
 }: ArtifactFiltersProps) {
   const searchHintId = useId();
   const sections: MultiSelectFilterSection<string>[] = [];
@@ -329,6 +339,25 @@ export function ArtifactFilters({
             >
               Clear filters
             </Button>
+          )}
+
+          {onSortChange && (
+            // The field style is `w-full`, so the width lives on a wrapper, as the filter's does.
+            <div className="w-44 shrink-0">
+              <Select
+                size="sm"
+                value={sort}
+                onChange={(event) => onSortChange(event.target.value as ArtifactSort)}
+                aria-label="Sort artifacts"
+                data-testid="kb-sort"
+              >
+                {ARTIFACT_SORT_ORDER.map((option) => (
+                  <option key={option} value={option}>
+                    {SORT_LABELS[option]}
+                  </option>
+                ))}
+              </Select>
+            </div>
           )}
 
           <div className="min-w-0 flex-1 sm:w-80 sm:flex-none">

@@ -13,6 +13,7 @@ import type {
   UploadFormat,
 } from "../types";
 import {
+  DEFAULT_ARTIFACT_SORT,
   DEFAULT_FORMAT_ORDER,
   DEFAULT_SOURCE_ORDER,
   FORMAT_LABELS,
@@ -101,6 +102,7 @@ export function useKnowledgeBase(
     toggleRepository,
     setPage,
     setSize,
+    setSort,
     clearFilters,
     setArtifactId,
   } = useKnowledgeBaseUrlState(projectId, options);
@@ -112,6 +114,7 @@ export function useKnowledgeBase(
     repositories: selectedRepositories,
     page: requestedPage,
     size: pageSize,
+    sort,
   } = urlState;
 
   /*
@@ -174,10 +177,14 @@ export function useKnowledgeBase(
       sources: sourcesParam,
       repositories: repositoriesParam,
       format: selectedFormat ?? undefined,
+      // The default order is left unsaid, so the default request (and its cache key, which the
+      // route prefetch warms) is byte-for-byte what it was before sorting existed.
+      sort: sort === DEFAULT_ARTIFACT_SORT ? undefined : sort,
     }),
     [
       requestedPage,
       pageSize,
+      sort,
       searchParam,
       typesParam,
       sourcesParam,
@@ -186,6 +193,7 @@ export function useKnowledgeBase(
     ],
   );
 
+  // No page, size or sort: counts describe the whole filtered result, whatever its order.
   const facetsParams: KnowledgeListParams = useMemo(
     () => ({
       search: searchParam,
@@ -380,6 +388,7 @@ export function useKnowledgeBase(
     totalElements,
     resultRange,
     pageSize,
+    sort,
     handleSearchChange,
     handleTabChange,
     toggleSource,
@@ -387,6 +396,8 @@ export function useKnowledgeBase(
     toggleRepository,
     setCurrentPage,
     setPageSize: setSize,
+    /** Changes the list order; pushes history and starts the new order at page 1. */
+    setSort,
     handleClearFilters,
     hasActiveFilters,
     /** The artifact open in the viewer drawer (`?artifact=`), or null. */
