@@ -138,3 +138,11 @@ export function matchesFilter(finding: Finding, filter: FindingFilter): boolean 
   if (filter === "all") return true;
   return filter === "good" ? finding.severity === "good" : finding.severity !== "good";
 }
+
+/** The colour a health score glows in: green when all is well, red when the project needs you. */
+export function scoreGlow(score: number): string {
+  if (score >= 85) return "var(--success-text)";
+  if (score >= 65) return "var(--brand-text)";
+  if (score >= 40) return "var(--warning-text)";
+  return "var(--danger-text)";
+}

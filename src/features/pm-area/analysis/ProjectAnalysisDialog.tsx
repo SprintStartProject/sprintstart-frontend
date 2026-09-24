@@ -1,16 +1,18 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleDashed, Loader2, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Checkbox } from "../../../components/ui/Checkbox";
 import { Modal } from "../../../components/ui/Modal";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
-import { AnalysisConstellation } from "./AnalysisConstellation";
-import { AnalysisMap } from "./AnalysisMap";
-import { AREA_META, AREA_ORDER, SEVERITY_RANK, type FindingFilter } from "./analysisMeta";
-import { scoreVerdict, type Finding, type FindingArea } from "./findings";
+import { AnalysisMap, type MapSelection } from "./AnalysisMap";
+import { AnalysisOrbit } from "./AnalysisOrbit";
+import { scoreGlow, type FindingFilter } from "./analysisMeta";
+import { scoreVerdict, type Finding } from "./findings";
 import { HealthPanel } from "./HealthPanel";
+import { ScanPanel } from "./ScanPanel";
 import type {
+  AnalysisLogEntry,
   AnalysisOptions,
   AnalysisPhase,
   AnalysisRunSummary,
@@ -22,6 +24,9 @@ type ProjectAnalysisDialogProps = {
   onClose: () => void;
   phase: AnalysisPhase;
   tasks: readonly AnalysisTask[];
+  /** The live log of the running analysis. */
+  log: readonly AnalysisLogEntry[];
+  runStartedAt: number | null;
   findings: readonly Finding[];
   score: number | null;
   /** When the results on screen were produced. */
@@ -37,14 +42,6 @@ type ProjectAnalysisDialogProps = {
   onOpenFinding: (to: string) => void;
   keptAsChecklist: boolean;
   onKeepChecklist: () => void;
-};
-
-const TASK_STATUS_LABEL: Record<AnalysisTask["status"], string> = {
-  pending: "Waiting",
-  running: "Checking…",
-  done: "Done",
-  failed: "Failed",
-  skipped: "Skipped",
 };
 
 /** The frosted panel the reference sets its readouts on. */
@@ -92,62 +89,6 @@ function OptionRow({
   );
 }
 
-function TaskList({ tasks }: { tasks: readonly AnalysisTask[] }) {
-  return (
-    <ol className="space-y-1">
-      {tasks.map((task) => {
-        const Icon = AREA_META[task.id].icon;
-        return (
-          <li key={task.id} className="flex items-center gap-2.5 rounded-xl px-1.5 py-1.5 text-sm">
-            <span
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${AREA_META[task.id].chip}`}
-            >
-              <Icon aria-hidden="true" className="h-3.5 w-3.5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-app-text">{task.label}</span>
-              {task.note && (
-                <span
-                  className={`block truncate text-xs ${task.status === "failed" ? "text-app-danger-text" : "text-app-text-muted"}`}
-                  title={task.note}
-                >
-                  {task.note}
-                </span>
-              )}
-            </span>
-            <span
-              className={`flex shrink-0 items-center gap-1 text-xs font-medium ${
-                task.status === "done"
-                  ? "text-app-success-text"
-                  : task.status === "failed"
-                    ? "text-app-danger-text"
-                    : task.status === "running"
-                      ? "text-app-brand-text"
-                      : "text-app-text-subtle"
-              }`}
-            >
-              {task.status === "running" ? (
-                <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
-              ) : task.status === "pending" ? (
-                <CircleDashed aria-hidden="true" className="h-3.5 w-3.5" />
-              ) : null}
-              {TASK_STATUS_LABEL[task.status]}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-/** The area the results open on: wherever the most pressing finding is. */
-function firstArea(findings: readonly Finding[]): FindingArea {
-  const worst = [...findings].sort(
-    (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity],
-  )[0];
-  return worst?.area ?? AREA_ORDER[0];
-}
-
 function Results({
   findings,
   score,
@@ -170,7 +111,8 @@ function Results({
   | "onStart"
 > & { score: number }) {
   const [filter, setFilter] = useState<FindingFilter>("act");
-  const [area, setArea] = useState<FindingArea>(() => firstArea(findings));
+  // Opens on everything at once; an area narrows it.
+  const [selected, setSelected] = useState<MapSelection>("all");
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -179,16 +121,18 @@ function Results({
           findings={findings}
           filter={filter}
           onFilterChange={setFilter}
-          selectedArea={area}
-          onSelectArea={setArea}
+          selected={selected}
+          onSelect={setSelected}
           onOpenFinding={onOpenFinding}
-          core={
+          score={score}
+          scoreAccent={scoreGlow(score)}
+          caption={
             <>
               {projectName && (
                 <span className="text-sm font-semibold text-app-text">{projectName}</span>
               )}
               <span className="text-xs text-app-text-muted">
-                {score}/100 · {scoreVerdict(score).toLowerCase()}
+                Health · {scoreVerdict(score).toLowerCase()}
               </span>
             </>
           }
@@ -221,6 +165,8 @@ export function ProjectAnalysisDialog({
   onClose,
   phase,
   tasks,
+  log,
+  runStartedAt,
   findings,
   score,
   resultsAt,
@@ -237,10 +183,6 @@ export function ProjectAnalysisDialog({
 }: ProjectAnalysisDialogProps) {
   const running = phase === "running";
   const done = phase === "done" && score !== null;
-  const finished = tasks.filter(
-    (task) => task.status !== "pending" && task.status !== "running",
-  ).length;
-
   const footer = done ? undefined : running ? (
     <Button variant="secondary" onClick={onClose}>
       Keep running in the background
@@ -262,7 +204,8 @@ export function ProjectAnalysisDialog({
       onClose={onClose}
       size="full"
       // Dark regardless of the app's theme, on a ground lit from two sides like the reference.
-      panelClassName="dark bg-[radial-gradient(ellipse_at_18%_40%,color-mix(in_oklab,var(--cyan-text)_12%,transparent),transparent_55%),radial-gradient(ellipse_at_85%_0%,color-mix(in_oklab,var(--purple-text)_10%,transparent),transparent_50%)]"
+      // A planet's glowing rim along the bottom edge and a faint nebula above, like the reference.
+      panelClassName="dark bg-[radial-gradient(ellipse_70%_42%_at_50%_122%,color-mix(in_oklab,var(--purple-text)_16%,transparent)_58%,color-mix(in_oklab,var(--orange-text)_42%,transparent)_65%,color-mix(in_oklab,var(--purple-text)_22%,transparent)_71%,transparent_80%),radial-gradient(ellipse_at_15%_20%,color-mix(in_oklab,var(--purple-text)_12%,transparent),transparent_55%),radial-gradient(ellipse_at_90%_10%,color-mix(in_oklab,var(--cyan-text)_8%,transparent),transparent_50%)]"
       title="Project analysis"
       description={
         done
@@ -302,35 +245,15 @@ export function ProjectAnalysisDialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 1.02, filter: "blur(4px)" }}
             transition={{ duration: 0.35 }}
-            className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]"
+            className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]"
           >
-            <div className="flex min-w-0 justify-center">
-              <AnalysisConstellation tasks={tasks} active={running} projectName={projectName} />
+            {/* Stays in view beside a tall panel, rather than being centred against it. */}
+            <div className="flex min-w-0 justify-center lg:sticky lg:top-0">
+              <AnalysisOrbit tasks={tasks} active={running} projectName={projectName} />
             </div>
 
             {running ? (
-              <div role="status" aria-live="polite" className={glassClassName}>
-                <div className="mb-3 flex items-baseline justify-between text-xs text-app-text-muted">
-                  <span className="font-semibold tracking-widest text-app-brand-text uppercase">
-                    Checking
-                  </span>
-                  <span className="tabular-nums">
-                    {finished} of {tasks.length}
-                  </span>
-                </div>
-                <span
-                  aria-hidden="true"
-                  className="mb-4 block h-1.5 overflow-hidden rounded-full bg-app-progress-track"
-                >
-                  <motion.span
-                    className="block h-full rounded-full bg-gradient-to-r from-app-progress-fill to-app-progress-fill-end"
-                    style={{ boxShadow: "0 0 12px var(--brand-text)" }}
-                    animate={{ width: `${(finished / tasks.length) * 100}%` }}
-                    transition={{ duration: 0.4 }}
-                  />
-                </span>
-                <TaskList tasks={tasks} />
-              </div>
+              <ScanPanel tasks={tasks} log={log} startedAt={runStartedAt} />
             ) : (
               <div className={`${glassClassName} space-y-4`}>
                 <p className="text-sm text-app-text-muted">

@@ -3,7 +3,7 @@ import { ListChecks, RotateCcw, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
-import { AREA_META, AREA_ORDER, SEVERITY_META, SEVERITY_RANK } from "./analysisMeta";
+import { AREA_META, AREA_ORDER, SEVERITY_META, SEVERITY_RANK, scoreGlow } from "./analysisMeta";
 import {
   countBySeverity,
   pointsLostByArea,
@@ -28,13 +28,6 @@ function CountUp({ value }: { value: number }) {
   }, [reduceMotion, value]);
 
   return <>{reduceMotion ? value : shown}</>;
-}
-
-function scoreGlow(score: number): string {
-  if (score >= 85) return "var(--success-text)";
-  if (score >= 65) return "var(--brand-text)";
-  if (score >= 40) return "var(--warning-text)";
-  return "var(--danger-text)";
 }
 
 type HealthPanelProps = {
@@ -84,7 +77,8 @@ export function HealthPanel({
   return (
     <aside
       aria-label="Project health"
-      className="flex flex-col gap-5 rounded-2xl border border-app-border-muted bg-app-surface/60 p-5 backdrop-blur-xl"
+      // Its own height, and in view while the map beside it scrolls.
+      className="flex flex-col gap-5 self-start rounded-2xl border border-app-border-muted bg-app-surface/60 p-5 backdrop-blur-xl xl:sticky xl:top-0"
     >
       <div>
         <p className="text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">

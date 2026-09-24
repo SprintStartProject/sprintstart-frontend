@@ -231,6 +231,49 @@ describe("ProjectAnalysisLauncher", () => {
     expect(await axe(baseElement)).toHaveNoViolations();
   }, 30000);
 
+  it("says what it is checking while it runs, and keeps a log", async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderLauncher();
+
+    await user.click(screen.getByRole("button", { name: /Analyse project/ }));
+    await user.click(screen.getByRole("button", { name: /Start analysis/ }));
+
+    const now = within(await screen.findByRole("region", { name: "Now checking" }));
+    expect(
+      await now.findByText("Asking the AI to rescan every component's documentation"),
+    ).toBeInTheDocument();
+    const log = within(screen.getByRole("region", { name: "Log" }));
+    expect(await log.findByText(/Team & open items: 1 member ·/)).toBeInTheDocument();
+    expect(await axe(baseElement)).toHaveNoViolations();
+
+    await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
+  }, 30000);
+
+  it("opens on every area at once, and narrows to one on request", async () => {
+    const user = userEvent.setup();
+    renderLauncher();
+
+    await runAnalysis(user);
+    const dialog = within(screen.getByTestId("project-analysis-dialog"));
+    const areas = within(dialog.getByRole("navigation", { name: "Areas" }));
+
+    expect(areas.getByRole("button", { name: /All areas/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
+    expect(dialog.getByText("No sources connected")).toBeInTheDocument();
+
+    const sources = areas.getByRole("button", { name: /Data sources/ });
+    await user.click(sources);
+    expect(dialog.queryByText("1 skip request waiting for your answer")).not.toBeInTheDocument();
+    expect(dialog.getByText("No sources connected")).toBeInTheDocument();
+
+    // The area already shown, chosen again, goes back to all of them.
+    await user.click(sources);
+    expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
+  }, 20000);
+
   it("remembers the score for the next visit", async () => {
     const user = userEvent.setup();
     const { unmount } = renderLauncher();

@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, LayoutGrid } from "lucide-react";
 import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SegmentedTabs } from "../../../components/ui/SegmentedTabs";
 import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
@@ -13,6 +13,10 @@ import {
   type FindingFilter,
 } from "./analysisMeta";
 import type { Finding, FindingArea } from "./findings";
+import { NeonRing } from "./NeonRing";
+
+/** An area, or all of them at once — the overview the results open on. */
+export type MapSelection = FindingArea | "all";
 
 type Connector = {
   key: string;
@@ -26,20 +30,35 @@ type AnalysisMapProps = {
   findings: readonly Finding[];
   filter: FindingFilter;
   onFilterChange: (filter: FindingFilter) => void;
-  selectedArea: FindingArea;
-  onSelectArea: (area: FindingArea) => void;
+  selected: MapSelection;
+  onSelect: (selection: MapSelection) => void;
   onOpenFinding: (to: string) => void;
-  /** Drawn in the core. */
-  core: ReactNode;
+  /** The health score, lit round the ring in the core. */
+  score: number;
+  /** The colour the ring's arc ends in. */
+  scoreAccent: string;
+  /** Words under the ring. */
+  caption: ReactNode;
 };
 
-/** What the map shows for one filter and area: the chosen area's findings, and every area's tally. */
-function deriveMap(findings: readonly Finding[], filter: FindingFilter, selectedArea: FindingArea) {
+const bySeverity = (a: Finding, b: Finding) =>
+  SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
+
+/**
+ * What the map shows for one filter and selection: the findings fanned out (one area's, or every
+ * area's grouped in area order so their curves do not cross), and every area's tally.
+ */
+function deriveMap(findings: readonly Finding[], filter: FindingFilter, selected: MapSelection) {
   const visible = findings.filter((finding) => matchesFilter(finding, filter));
-  const bySeverity = (a: Finding, b: Finding) =>
-    SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
+  const shown =
+    selected === "all"
+      ? AREA_ORDER.flatMap((area) =>
+          visible.filter((finding) => finding.area === area).sort(bySeverity),
+        )
+      : visible.filter((finding) => finding.area === selected).sort(bySeverity);
   return {
-    shown: visible.filter((finding) => finding.area === selectedArea).sort(bySeverity),
+    visible,
+    shown,
     areaStats: AREA_ORDER.map((area) => {
       const inArea = visible.filter((finding) => finding.area === area).sort(bySeverity);
       return { area, count: inArea.length, worst: inArea[0]?.severity ?? null };
@@ -103,15 +122,84 @@ function FindingRow({ finding, onOpen }: { finding: Finding; onOpen: (to: string
   );
 }
 
+function AreaCard({
+  anchor,
+  icon: Icon,
+  chip,
+  glow,
+  label,
+  count,
+  worst,
+  selected,
+  onClick,
+}: {
+  anchor: string;
+  icon: typeof LayoutGrid;
+  chip: string;
+  glow: string;
+  label: string;
+  count: number;
+  worst: Finding["severity"] | null;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-anchor={anchor}
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`flex min-w-36 flex-1 items-center gap-3 rounded-xl border px-3 py-2 text-left backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none lg:flex-none ${
+        selected
+          ? "border-app-brand-border-strong bg-app-surface"
+          : "border-app-border-muted bg-app-surface/50 hover:bg-app-surface/80"
+      }`}
+      style={
+        selected ? { boxShadow: `0 0 30px -10px ${glow}, inset 0 0 0 1px ${glow}` } : undefined
+      }
+    >
+      <span
+        aria-hidden="true"
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${chip}`}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-base leading-tight font-bold text-app-text tabular-nums">
+          {count > 0 ? (
+            count
+          ) : (
+            <CheckCircle2 aria-label="Nothing here" className="h-4 w-4 text-app-success-text" />
+          )}
+        </span>
+        <span className="block truncate text-[11px] text-app-text-muted">{label}</span>
+      </span>
+      {worst && (
+        <span
+          aria-label={SEVERITY_META[worst].label}
+          title={SEVERITY_META[worst].label}
+          role="img"
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{
+            background: SEVERITY_META[worst].glow,
+            boxShadow: `0 0 8px ${SEVERITY_META[worst].glow}`,
+          }}
+        />
+      )}
+    </button>
+  );
+}
+
 /**
- * The results as a map: the project as a core on the left, every area as a card beside it, and
- * the chosen area's findings fanning out on the right — each tied back to its area by a luminous
- * curve that lights up in the finding's severity.
+ * The results as a map: the project as a ring of light on the left (lit as far as its health
+ * reaches), every area as a card beside it, and the findings fanning out on the right — each tied
+ * back to its area by a luminous curve in the finding's severity.
  *
- * The same reading as a list — which area, how bad, what exactly — laid out so that where the
- * trouble sits is seen before it is read. Every card is a button: an area card chooses the area,
- * a finding card opens where it can be acted on. The filter above the findings (to look at, going
- * well, all) also follows a two-finger swipe over the map, like every other tab bar in the app.
+ * It opens on "All areas": every finding at once, each curve running from its own area, so the
+ * whole picture is there without choosing anything. Picking an area narrows the fan to that area;
+ * picking it again (or "All areas") widens it back. Every card is a button, and the filter (to
+ * look at, going well, all) also follows a two-finger swipe over the map, like every other tab
+ * bar in the app.
  *
  * The curves are measured off the rendered cards, so they follow the layout at any width; on a
  * phone, where the three columns stack, they are left out.
@@ -120,10 +208,12 @@ export function AnalysisMap({
   findings,
   filter,
   onFilterChange,
-  selectedArea,
-  onSelectArea,
+  selected,
+  onSelect,
   onOpenFinding,
-  core,
+  score,
+  scoreAccent,
+  caption,
 }: AnalysisMapProps) {
   const reduceMotion = useReducedMotion();
   const uid = useId().replace(/:/g, "");
@@ -149,7 +239,8 @@ export function AnalysisMap({
     [swipeRef],
   );
 
-  const { shown, areaStats } = deriveMap(findings, filter, selectedArea);
+  const { visible, shown, areaStats } = deriveMap(findings, filter, selected);
+  const worstVisible = [...visible].sort(bySeverity)[0]?.severity ?? null;
 
   const measure = useCallback(() => {
     const box = containerRef.current;
@@ -160,42 +251,59 @@ export function AnalysisMap({
       const r = element?.getBoundingClientRect();
       return r && r.width > 0 ? r : null;
     };
+    const leftMid = (r: DOMRect) => [r.left - base.left, r.top + r.height / 2 - base.top] as const;
+    const rightMid = (r: DOMRect) =>
+      [r.right - base.left, r.top + r.height / 2 - base.top] as const;
 
-    const { shown: fanned, areaStats: areas } = deriveMap(findings, filter, selectedArea);
+    const { shown: fanned, areaStats: areas } = deriveMap(findings, filter, selected);
     const lines: Connector[] = [];
+
     const coreRect = rect(anchor("core"));
     if (coreRect) {
-      const cx = coreRect.right - base.left;
-      const cy = coreRect.top + coreRect.height / 2 - base.top;
+      const [cx, cy] = rightMid(coreRect);
       for (const { area, worst } of areas) {
         const areaRect = rect(anchor(`area-${area}`));
         if (!areaRect) continue;
+        const [ax, ay] = leftMid(areaRect);
         lines.push({
           key: `core-${area}`,
           kind: "area",
-          d: curve(
-            cx,
-            cy,
-            areaRect.left - base.left,
-            areaRect.top + areaRect.height / 2 - base.top,
-          ),
+          d: curve(cx, cy, ax, ay),
           color: worst ? SEVERITY_META[worst].glow : "var(--border-muted)",
-          strong: area === selectedArea,
+          strong: worst !== null && (selected === "all" || area === selected),
         });
       }
     }
 
-    const fromRect = rect(anchor(`area-${selectedArea}`));
-    if (fromRect) {
-      const fx = fromRect.right - base.left;
-      const fy = fromRect.top + fromRect.height / 2 - base.top;
-      for (const finding of fanned) {
-        const toRect = rect(anchor(`finding-${finding.id}`));
-        if (!toRect) continue;
+    if (selected === "all") {
+      // One curve per area, to its group of findings: a curve to each of sixteen findings made a
+      // tangle that said less than the groups do.
+      for (const { area, worst } of areas) {
+        if (!worst) continue;
+        const fromRect = rect(anchor(`area-${area}`));
+        const toRect = rect(anchor(`group-${area}`));
+        if (!fromRect || !toRect) continue;
+        const [fx, fy] = rightMid(fromRect);
+        const [tx, ty] = leftMid(toRect);
         lines.push({
-          key: `${selectedArea}-${filter}-${finding.id}`,
+          key: `all-${filter}-${area}`,
           kind: "finding",
-          d: curve(fx, fy, toRect.left - base.left, toRect.top + toRect.height / 2 - base.top),
+          d: curve(fx, fy, tx, ty),
+          color: SEVERITY_META[worst].glow,
+          strong: true,
+        });
+      }
+    } else {
+      for (const finding of fanned) {
+        const fromRect = rect(anchor(`area-${finding.area}`));
+        const toRect = rect(anchor(`finding-${finding.id}`));
+        if (!fromRect || !toRect) continue;
+        const [fx, fy] = rightMid(fromRect);
+        const [tx, ty] = leftMid(toRect);
+        lines.push({
+          key: `${selected}-${filter}-${finding.id}`,
+          kind: "finding",
+          d: curve(fx, fy, tx, ty),
           color: SEVERITY_META[finding.severity].glow,
           strong: true,
         });
@@ -203,7 +311,7 @@ export function AnalysisMap({
     }
 
     setLayout({ w: base.width, h: base.height, lines });
-  }, [findings, filter, selectedArea]);
+  }, [findings, filter, selected]);
 
   useLayoutEffect(() => {
     const box = containerRef.current;
@@ -216,15 +324,19 @@ export function AnalysisMap({
     const observer = new ResizeObserver(() => measure());
     observer.observe(box);
     window.addEventListener("resize", measure);
+    // The core is sticky inside the dialog's scrolling body, so a scroll moves one end of its
+    // curves; captured, since the scroll happens on an ancestor rather than on the window.
+    document.addEventListener("scroll", measure, true);
     return () => {
       window.cancelAnimationFrame(frame);
       settles.forEach((timer) => window.clearTimeout(timer));
       observer.disconnect();
       window.removeEventListener("resize", measure);
+      document.removeEventListener("scroll", measure, true);
     };
   }, [measure]);
 
-  const selectedMeta = AREA_META[selectedArea];
+  const heading = selected === "all" ? "All areas" : AREA_META[selected].label;
 
   return (
     <div ref={setContainer} className="relative">
@@ -250,9 +362,9 @@ export function AnalysisMap({
               d={line.d}
               fill="none"
               strokeLinecap="round"
-              strokeWidth={line.strong ? 2 : 1.2}
+              strokeWidth={line.strong ? 1.8 : 1.1}
               style={{ stroke: line.color }}
-              opacity={line.strong ? 0.9 : 0.35}
+              opacity={line.strong ? 0.8 : 0.3}
               filter={line.strong ? `url(#${uid}-glow)` : undefined}
             />
           ) : (
@@ -261,19 +373,19 @@ export function AnalysisMap({
                 d={line.d}
                 fill="none"
                 strokeLinecap="round"
-                strokeWidth={1.6}
+                strokeWidth={1.4}
                 style={{ stroke: line.color }}
-                opacity={0.85}
+                opacity={0.75}
                 filter={`url(#${uid}-glow)`}
                 initial={reduceMotion ? false : { pathLength: 0 }}
                 animate={{ pathLength: 1 }}
-                transition={{ duration: 0.7, delay: index * 0.03, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.7, delay: index * 0.025, ease: [0.22, 1, 0.36, 1] }}
               />
               {!reduceMotion && (
-                <circle r={2.4} style={{ fill: line.color }} filter={`url(#${uid}-glow)`}>
+                <circle r={2.2} style={{ fill: line.color }} filter={`url(#${uid}-glow)`}>
                   <animateMotion
-                    dur="2.4s"
-                    begin={`${(index % 5) * 0.35}s`}
+                    dur="2.6s"
+                    begin={`${(index % 7) * 0.33}s`}
                     repeatCount="indefinite"
                     path={line.d}
                   />
@@ -284,112 +396,61 @@ export function AnalysisMap({
         )}
       </svg>
 
-      <div className="relative grid gap-6 lg:grid-cols-[11rem_14rem_minmax(0,1fr)] lg:items-center lg:gap-x-16">
-        {/* The core. */}
-        <div className="hidden flex-col items-center gap-3 text-center lg:flex">
-          {/* The core, inside the faint rings of its own aura. */}
-          <div className="relative flex h-44 w-44 items-center justify-center">
-            {[0, 1, 2].map((ring) => (
-              <motion.span
-                key={ring}
-                aria-hidden="true"
-                className="absolute rounded-full border border-app-border-muted"
-                style={{ inset: ring * 14, opacity: 0.55 - ring * 0.12 }}
-                animate={reduceMotion ? undefined : { rotate: ring % 2 ? -360 : 360 }}
-                transition={{ duration: 40 + ring * 20, repeat: Infinity, ease: "linear" }}
-              />
-            ))}
-            <span
-              aria-hidden="true"
-              className="absolute inset-3 rounded-full"
-              style={{
-                background:
-                  "radial-gradient(circle, color-mix(in oklab, var(--brand-text) 22%, transparent) 0%, transparent 70%)",
-              }}
-            />
-            <motion.div
-              data-anchor="core"
-              className="relative flex h-28 w-28 items-center justify-center rounded-full"
-              style={{
-                background:
-                  "radial-gradient(circle at 36% 30%, var(--text) 0%, var(--purple-text) 24%, var(--brand) 64%, var(--bg) 100%)",
-                boxShadow:
-                  "0 0 40px color-mix(in oklab, var(--brand-text) 45%, transparent), 0 0 110px color-mix(in oklab, var(--purple-text) 25%, transparent)",
-              }}
-              animate={reduceMotion ? undefined : { scale: [1, 1.035, 1] }}
-              transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
-            />
+      <div className="relative grid gap-6 lg:grid-cols-[12rem_14rem_minmax(0,1fr)] lg:gap-x-14">
+        {/* The core: a ring lit as far as the project's health reaches. Sticky, so it stays in
+            view beside a long all-areas list. */}
+        <div className="hidden lg:block">
+          <div className="sticky top-0 flex flex-col items-center gap-3 pt-6 text-center">
+            <div data-anchor="core">
+              <NeonRing value={score} size={180} accent={scoreAccent}>
+                <span className="text-4xl leading-none font-bold text-app-text">{score}</span>
+                <span className="mt-1 text-[11px] font-medium tracking-wider text-app-text-muted uppercase">
+                  of 100
+                </span>
+              </NeonRing>
+            </div>
+            {caption}
           </div>
-          {core}
         </div>
 
         {/* The areas. */}
-        <nav aria-label="Areas" className="flex flex-wrap gap-2 lg:flex-col">
+        <nav aria-label="Areas" className="flex flex-wrap gap-2 lg:flex-col lg:pt-6">
+          <AreaCard
+            anchor="area-all"
+            icon={LayoutGrid}
+            chip="bg-app-surface-muted text-app-text"
+            glow="var(--text-muted)"
+            label="All areas"
+            count={visible.length}
+            worst={worstVisible}
+            selected={selected === "all"}
+            onClick={() => onSelect("all")}
+          />
           {areaStats.map(({ area, count, worst }) => {
             const meta = AREA_META[area];
-            const Icon = meta.icon;
-            const selected = area === selectedArea;
             return (
-              <button
+              <AreaCard
                 key={area}
-                type="button"
-                data-anchor={`area-${area}`}
-                onClick={() => onSelectArea(area)}
-                aria-pressed={selected}
-                className={`flex min-w-36 flex-1 items-center gap-3 rounded-xl border px-3 py-2 text-left backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none lg:flex-none ${
-                  selected
-                    ? "border-app-brand-border-strong bg-app-surface"
-                    : "border-app-border-muted bg-app-surface/50 hover:bg-app-surface/80"
-                }`}
-                style={
-                  selected
-                    ? { boxShadow: `0 0 30px -10px ${meta.glow}, inset 0 0 0 1px ${meta.glow}` }
-                    : undefined
-                }
-              >
-                <span
-                  aria-hidden="true"
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${meta.chip}`}
-                >
-                  <Icon className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base leading-tight font-bold text-app-text tabular-nums">
-                    {count > 0 ? (
-                      count
-                    ) : (
-                      <CheckCircle2
-                        aria-label="Nothing here"
-                        className="h-4 w-4 text-app-success-text"
-                      />
-                    )}
-                  </span>
-                  <span className="block truncate text-[11px] text-app-text-muted">
-                    {meta.label}
-                  </span>
-                </span>
-                {worst && (
-                  <span
-                    aria-label={SEVERITY_META[worst].label}
-                    title={SEVERITY_META[worst].label}
-                    role="img"
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{
-                      background: SEVERITY_META[worst].glow,
-                      boxShadow: `0 0 8px ${SEVERITY_META[worst].glow}`,
-                    }}
-                  />
-                )}
-              </button>
+                anchor={`area-${area}`}
+                icon={meta.icon}
+                chip={meta.chip}
+                glow={meta.glow}
+                label={meta.label}
+                count={count}
+                worst={worst}
+                selected={selected === area}
+                // Choosing the area already shown goes back to all of them.
+                onClick={() => onSelect(selected === area ? "all" : area)}
+              />
             );
           })}
         </nav>
 
-        {/* The chosen area's findings. */}
-        <section aria-label={`${selectedMeta.label} findings`} className="min-w-0">
+        {/* The findings. */}
+        <section aria-label={`${heading} findings`} className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-app-text">
-              {selectedMeta.label}
+              {heading}
               <span className="ml-2 font-normal text-app-text-muted">
                 {shown.length === 1 ? "1 finding" : `${shown.length} findings`}
               </span>
@@ -420,18 +481,57 @@ export function AnalysisMap({
             <p className="flex items-center gap-2 rounded-xl border border-dashed border-app-border-muted px-4 py-6 text-sm text-app-text-muted">
               <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-app-success-text" />
               {filter === "good"
-                ? `Nothing to report as going well in ${selectedMeta.label.toLowerCase()}.`
-                : `Nothing in ${selectedMeta.label.toLowerCase()} needs you.`}
+                ? `Nothing to report as going well${selected === "all" ? "" : ` in ${heading.toLowerCase()}`}.`
+                : `Nothing${selected === "all" ? "" : ` in ${heading.toLowerCase()}`} needs you.`}
             </p>
+          ) : selected === "all" ? (
+            <div className="space-y-5">
+              {areaStats
+                .filter(({ count }) => count > 0)
+                .map(({ area }) => {
+                  const meta = AREA_META[area];
+                  const Icon = meta.icon;
+                  const inArea = shown.filter((finding) => finding.area === area);
+                  return (
+                    <section key={area} aria-label={`${meta.label} findings`}>
+                      <h4
+                        data-anchor={`group-${area}`}
+                        className="mb-2 flex items-center gap-2 text-xs font-semibold text-app-text-muted"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`flex h-5 w-5 items-center justify-center rounded-md ${meta.chip}`}
+                        >
+                          <Icon className="h-3 w-3" />
+                        </span>
+                        {meta.label}
+                        <span className="font-normal text-app-text-subtle">{inArea.length}</span>
+                      </h4>
+                      <ul className="space-y-2">
+                        {inArea.map((finding, index) => (
+                          <motion.li
+                            key={`all-${filter}-${finding.id}`}
+                            initial={reduceMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.35, delay: 0.1 + Math.min(index, 8) * 0.04 }}
+                          >
+                            <FindingRow finding={finding} onOpen={onOpenFinding} />
+                          </motion.li>
+                        ))}
+                      </ul>
+                    </section>
+                  );
+                })}
+            </div>
           ) : (
-            <ul className="space-y-2.5">
+            <ul className="space-y-2">
               {shown.map((finding, index) => (
                 <motion.li
-                  key={`${filter}-${finding.id}`}
+                  key={`${selected}-${filter}-${finding.id}`}
                   data-anchor={`finding-${finding.id}`}
                   initial={reduceMotion ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ duration: 0.35, delay: 0.15 + index * 0.06 }}
+                  transition={{ duration: 0.35, delay: 0.1 + Math.min(index, 12) * 0.04 }}
                 >
                   <FindingRow finding={finding} onOpen={onOpenFinding} />
                 </motion.li>

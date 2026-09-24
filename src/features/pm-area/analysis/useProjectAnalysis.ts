@@ -39,7 +39,47 @@ export type AnalysisTask = {
   status: AnalysisTaskStatus;
   /** What the task did, in a few words: "Rescanned · 3 gaps", "Kept your industry". */
   note?: string;
+  /** What the task is doing while it runs, in a sentence — shown under "Now checking". */
+  activity?: string;
+  /** Epoch millis, for the time a check took. */
+  startedAt?: number;
+  finishedAt?: number;
 };
+
+/** One line of the live log beside the scan: a check starting, finishing or failing. */
+export type AnalysisLogEntry = {
+  id: number;
+  at: number;
+  area: FindingArea;
+  kind: "start" | "done" | "failed" | "skipped";
+  text: string;
+};
+
+/** What each check does, in the words the "Now checking" block uses — depends on the options. */
+function describeTask(id: FindingArea, options: AnalysisOptions): string {
+  switch (id) {
+    case "team":
+      return "Reading the roster, open skip requests and unread feedback";
+    case "onboarding":
+      return "Reading onboarding metrics — who is stalled, who waits on a review";
+    case "escalations":
+      return "Reading the questions the buddy passed on to a person";
+    case "questions":
+      return options.regroupQuestions
+        ? "Asking the AI to regroup every recurring question"
+        : "Reading the recurring questions and what is on the rise";
+    case "gaps":
+      return options.rescanGaps
+        ? "Asking the AI to rescan every component's documentation"
+        : "Reading the documentation gaps";
+    case "ingestion":
+      return "Checking every connected source's last sync";
+    case "industry":
+      return options.reevaluateIndustry
+        ? "Re-evaluating the project's industry with the AI"
+        : "Reading the project's industry";
+  }
+}
 
 /** The three refreshes that ask the AI to redo work; everything else is re-read either way. */
 export type AnalysisOptions = {
@@ -81,8 +121,14 @@ const TASKS: readonly Pick<AnalysisTask, "id" | "label">[] = [
  */
 const MIN_TASK_MS = 700;
 const STAGGER_MS = 260;
+const START_STAGGER_MS = 140;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** "1 member", "7 members". */
+function count(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
 
 function errorNote(error: unknown): string {
   return error instanceof Error && error.message ? error.message : "Could not be read";
@@ -111,6 +157,8 @@ export function useProjectAnalysis() {
     profile?.permissionGroup === "ADMIN" || (selectedProject?.isManaged ?? false);
 
   const [phase, setPhase] = useState<AnalysisPhase>("idle");
+  const [log, setLog] = useState<AnalysisLogEntry[]>([]);
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const [tasks, setTasks] = useState<AnalysisTask[]>(() =>
     TASKS.map((task) => ({ ...task, status: "pending" })),
   );
@@ -154,6 +202,14 @@ export function useProjectAnalysis() {
       // be written from them once everything has settled.
       let runTasks: AnalysisTask[] = TASKS.map((task) => ({ ...task, status: "pending" }));
       setTasks(runTasks);
+      setLog([]);
+      setRunStartedAt(Date.now());
+      let logId = 0;
+      const addLog = (area: FindingArea, kind: AnalysisLogEntry["kind"], text: string) => {
+        if (!current()) return;
+        const entry = { id: ++logId, at: Date.now(), area, kind, text };
+        setLog((entries) => [...entries, entry]);
+      };
 
       const update = (id: FindingArea, patch: Partial<AnalysisTask>) => {
         if (!current()) return;
@@ -166,15 +222,25 @@ export function useProjectAnalysis() {
         work: () => Promise<{ value: T; note?: string; skipped?: boolean }>,
       ): Promise<T | null> {
         const index = TASKS.findIndex((task) => task.id === id);
-        update(id, { status: "running" });
+        const label = TASKS[index].label;
+        // Started a beat apart, so the log reads as a sequence rather than seven lines at once.
+        await sleep(index * START_STAGGER_MS);
+        if (!current()) return null;
+        const activity = describeTask(id, options);
+        update(id, { status: "running", activity, startedAt: Date.now() });
+        addLog(id, "start", activity);
         const floor = sleep(MIN_TASK_MS + index * STAGGER_MS);
         try {
           const [result] = await Promise.all([work(), floor]);
-          update(id, { status: result.skipped ? "skipped" : "done", note: result.note });
+          const kind = result.skipped ? "skipped" : "done";
+          update(id, { status: kind, note: result.note, finishedAt: Date.now() });
+          addLog(id, kind, `${label}: ${result.note ?? "done"}`);
           return result.value;
         } catch (error) {
           await floor;
-          update(id, { status: "failed", note: errorNote(error) });
+          const note = errorNote(error);
+          update(id, { status: "failed", note, finishedAt: Date.now() });
+          addLog(id, "failed", `${label} failed: ${note}`);
           return null;
         }
       }
@@ -202,7 +268,7 @@ export function useProjectAnalysis() {
           const unread = Object.values(feedbackByUser).flat().filter(isUnread).length;
           return {
             value: { roster, feedbackByUser },
-            note: `${roster.length} members · ${unread} unread`,
+            note: `${count(roster.length, "member")} · ${unread} unread`,
           };
         }),
         check("onboarding", async () => {
@@ -214,7 +280,7 @@ export function useProjectAnalysis() {
               onboardingMetricsService.fetchAttention(projectId),
             ),
           ]);
-          return { value: { metrics, attention }, note: `${metrics.memberCount} hires` };
+          return { value: { metrics, attention }, note: count(metrics.memberCount, "hire") };
         }),
         check("escalations", async () => {
           const open = await fresh(queryKeys.knowledgeRequest.open(projectId), () =>
@@ -264,7 +330,7 @@ export function useProjectAnalysis() {
               lastRunAt: source.lastRunAt,
               backendStatus: source.backendStatus,
             })),
-            note: `${list.length} sources`,
+            note: count(list.length, "source"),
           };
         }),
         check("industry", async () => {
@@ -367,6 +433,10 @@ export function useProjectAnalysis() {
   return {
     phase,
     tasks,
+    /** The live log of the current run, oldest first. */
+    log,
+    /** When the current run started, epoch millis — for its elapsed time. */
+    runStartedAt,
     findings,
     score,
     lastRun,

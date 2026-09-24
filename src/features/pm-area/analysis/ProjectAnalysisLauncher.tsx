@@ -143,6 +143,8 @@ export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLa
         onClose={() => setIsOpen(false)}
         phase={analysis.phase}
         tasks={analysis.tasks}
+        log={analysis.log}
+        runStartedAt={analysis.runStartedAt}
         findings={analysis.findings}
         score={analysis.score}
         resultsAt={analysis.resultsAt}
