@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { AnalysisChecklistCard } from "../../../../../src/features/pm-area/analysis/AnalysisChecklistCard";
 import { ProjectAnalysisLauncher } from "../../../../../src/features/pm-area/analysis/ProjectAnalysisLauncher";
 
 const mocks = vi.hoisted(() => ({
@@ -82,7 +81,6 @@ function renderLauncher() {
   return render(
     <MemoryRouter initialEntries={["/pm-dashboard"]}>
       <ProjectAnalysisLauncher />
-      <AnalysisChecklistCard />
       <LocationProbe />
     </MemoryRouter>,
   );
@@ -257,10 +255,10 @@ describe("ProjectAnalysisLauncher", () => {
     const dialog = within(screen.getByTestId("project-analysis-dialog"));
     const areas = within(dialog.getByRole("navigation", { name: "Areas" }));
 
-    expect(areas.getByRole("button", { name: /All areas/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    // Nothing chosen: every area's findings at once.
+    expect(
+      areas.getAllByRole("button").every((area) => area.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
     expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
     expect(dialog.getByText("No sources connected")).toBeInTheDocument();
 
@@ -300,26 +298,6 @@ describe("ProjectAnalysisLauncher", () => {
     const dialog = within(await screen.findByTestId("project-analysis-dialog"));
     expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
     expect(mocks.getTeamOverview).not.toHaveBeenCalled();
-  }, 20000);
-
-  it("keeps the findings as a checklist on the overview, to tick off", async () => {
-    const user = userEvent.setup();
-    renderLauncher();
-
-    await runAnalysis(user);
-    await user.click(screen.getByRole("button", { name: /Keep \d+ items? as a checklist/ }));
-    expect(screen.getByRole("button", { name: /On your dashboard as a checklist/ })).toBeDisabled();
-
-    const card = within(screen.getByRole("region", { name: "Checklist from the analysis" }));
-    const item = card.getByRole("checkbox", { name: /1 skip request waiting for your answer/ });
-    await user.click(item);
-    expect(item).toBeChecked();
-    expect(card.getByText(/1 of \d+ done/)).toBeInTheDocument();
-
-    await user.click(card.getByRole("button", { name: /Remove|Clear/ }));
-    expect(
-      screen.queryByRole("region", { name: "Checklist from the analysis" }),
-    ).not.toBeInTheDocument();
   }, 20000);
 
   it("switches the findings filter with a two-finger swipe, like every other tab bar", async () => {

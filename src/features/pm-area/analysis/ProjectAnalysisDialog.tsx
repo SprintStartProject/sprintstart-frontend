@@ -40,8 +40,6 @@ type ProjectAnalysisDialogProps = {
   onStart: () => void;
   /** Opens where a finding can be acted on; the dialog closes first. */
   onOpenFinding: (to: string) => void;
-  keptAsChecklist: boolean;
-  onKeepChecklist: () => void;
 };
 
 /** The frosted panel the reference sets its readouts on. */
@@ -96,23 +94,14 @@ function Results({
   previousRun,
   projectName,
   onOpenFinding,
-  keptAsChecklist,
-  onKeepChecklist,
   onStart,
 }: Pick<
   ProjectAnalysisDialogProps,
-  | "findings"
-  | "resultsAt"
-  | "previousRun"
-  | "projectName"
-  | "onOpenFinding"
-  | "keptAsChecklist"
-  | "onKeepChecklist"
-  | "onStart"
+  "findings" | "resultsAt" | "previousRun" | "projectName" | "onOpenFinding" | "onStart"
 > & { score: number }) {
   const [filter, setFilter] = useState<FindingFilter>("act");
-  // Opens on everything at once; an area narrows it.
-  const [selected, setSelected] = useState<MapSelection>("all");
+  // Nothing chosen shows everything at once; an area narrows it.
+  const [selected, setSelected] = useState<MapSelection>(null);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -143,8 +132,6 @@ function Results({
         findings={findings}
         analysedAt={resultsAt}
         previous={previousRun ? { at: previousRun.at, score: previousRun.score } : null}
-        keptAsChecklist={keptAsChecklist}
-        onKeepChecklist={onKeepChecklist}
         onRunAgain={onStart}
       />
     </div>
@@ -178,8 +165,6 @@ export function ProjectAnalysisDialog({
   onOptionsChange,
   onStart,
   onOpenFinding,
-  keptAsChecklist,
-  onKeepChecklist,
 }: ProjectAnalysisDialogProps) {
   const running = phase === "running";
   const done = phase === "done" && score !== null;
@@ -233,8 +218,6 @@ export function ProjectAnalysisDialog({
               previousRun={previousRun}
               projectName={projectName}
               onOpenFinding={onOpenFinding}
-              keptAsChecklist={keptAsChecklist}
-              onKeepChecklist={onKeepChecklist}
               onStart={onStart}
             />
           </motion.div>

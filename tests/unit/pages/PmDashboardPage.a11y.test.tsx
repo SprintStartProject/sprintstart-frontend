@@ -75,9 +75,6 @@ vi.mock("../../../src/features/data-ingestion/components/IngestionStatusWidget",
 vi.mock("../../../src/features/pm-area/analysis/ProjectAnalysisLauncher", () => ({
   ProjectAnalysisLauncher: () => <div>project analysis</div>,
 }));
-vi.mock("../../../src/features/pm-area/analysis/AnalysisChecklistCard", () => ({
-  AnalysisChecklistCard: () => null,
-}));
 vi.mock("../../../src/features/projects/industry/ProjectIndustryWidget", () => ({
   ProjectIndustryWidget: () => <section aria-label="Industry" />,
 }));

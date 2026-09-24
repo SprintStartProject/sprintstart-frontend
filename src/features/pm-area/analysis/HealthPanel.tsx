@@ -1,5 +1,5 @@
 import { animate, useReducedMotion } from "framer-motion";
-import { ListChecks, RotateCcw, TrendingDown, TrendingUp } from "lucide-react";
+import { RotateCcw, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
@@ -36,9 +36,6 @@ type HealthPanelProps = {
   /** When the results were produced. */
   analysedAt: string | null;
   previous: { at: string; score: number } | null;
-  /** Whether these results are the checklist on the overview already. */
-  keptAsChecklist: boolean;
-  onKeepChecklist: () => void;
   onRunAgain: () => void;
 };
 
@@ -54,8 +51,6 @@ export function HealthPanel({
   findings,
   analysedAt,
   previous,
-  keptAsChecklist,
-  onKeepChecklist,
   onRunAgain,
 }: HealthPanelProps) {
   const counts = countBySeverity(findings);
@@ -63,7 +58,6 @@ export function HealthPanel({
   const highest = Math.max(1, ...lost.values());
   const delta = previous ? score - previous.score : null;
   const glow = scoreGlow(score);
-  const toAct = counts.critical + counts.warning + counts.info;
 
   const areas = AREA_ORDER.filter((area) => lost.has(area))
     .map((area) => {
@@ -189,19 +183,6 @@ export function HealthPanel({
       <div className="mt-auto space-y-2">
         <Button
           variant="primary"
-          className="w-full"
-          onClick={onKeepChecklist}
-          disabled={keptAsChecklist || toAct === 0}
-          icon={<ListChecks className="h-4 w-4" />}
-        >
-          {keptAsChecklist
-            ? "On your dashboard as a checklist"
-            : toAct === 0
-              ? "Nothing to keep as a checklist"
-              : `Keep ${toAct} ${toAct === 1 ? "item" : "items"} as a checklist`}
-        </Button>
-        <Button
-          variant="secondary"
           className="w-full"
           onClick={onRunAgain}
           icon={<RotateCcw className="h-4 w-4" />}

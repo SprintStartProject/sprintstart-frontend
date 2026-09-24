@@ -2,16 +2,15 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 import type { Finding, FindingSeverity } from "./findings";
 
 /**
- * Browser storage for the project analysis: the last finished run (so it can be reopened later)
- * and the checklist a manager kept from one.
+ * Browser storage for the project analysis: the last finished run, so it can be reopened later.
  *
- * Per viewer and project, in this browser only — there is no backend for either yet, so a run
- * or a checklist does not follow the manager to another device. Every read and write is guarded:
+ * Per viewer and project, in this browser only — there is no backend for it yet, so a run does
+ * not follow the manager to another device. Every read and write is guarded:
  * storage can be off (private window, blocked site data), and then the analysis still works, it
  * only forgets.
  *
- * Changes are announced with a window event, so the dialog that keeps a checklist and the card on
- * the overview that shows it stay in step without sharing a component.
+ * Changes are announced with a window event, so every reader of a record stays in step without
+ * sharing a component.
  */
 
 const CHANGE_EVENT = "sprintstart:pm-analysis-storage";
@@ -30,25 +29,8 @@ export type StoredAnalysis = {
   previous?: { at: string; score: number } | null;
 };
 
-export type ChecklistItem = Pick<
-  Finding,
-  "id" | "title" | "detail" | "to" | "severity" | "area"
-> & {
-  done: boolean;
-};
-
-export type AnalysisChecklist = {
-  /** When the analysis the checklist was kept from ran. */
-  analysedAt: string;
-  items: ChecklistItem[];
-};
-
 export function lastAnalysisKey(viewerId: string, projectId: string) {
   return `sprintstart.pm-analysis.${viewerId}.${projectId}`;
-}
-
-export function checklistKey(viewerId: string, projectId: string) {
-  return `sprintstart.pm-analysis-checklist.${viewerId}.${projectId}`;
 }
 
 function readRaw(key: string): string | null {

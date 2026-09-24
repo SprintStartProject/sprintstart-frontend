@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, CheckCircle2, LayoutGrid } from "lucide-react";
+import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SegmentedTabs } from "../../../components/ui/SegmentedTabs";
 import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
@@ -15,8 +15,8 @@ import {
 import type { Finding, FindingArea } from "./findings";
 import { NeonRing } from "./NeonRing";
 
-/** An area, or all of them at once — the overview the results open on. */
-export type MapSelection = FindingArea | "all";
+/** The area the map is narrowed to, or `null` for none — then every area is shown at once. */
+export type MapSelection = FindingArea | null;
 
 type Connector = {
   key: string;
@@ -51,7 +51,7 @@ const bySeverity = (a: Finding, b: Finding) =>
 function deriveMap(findings: readonly Finding[], filter: FindingFilter, selected: MapSelection) {
   const visible = findings.filter((finding) => matchesFilter(finding, filter));
   const shown =
-    selected === "all"
+    selected === null
       ? AREA_ORDER.flatMap((area) =>
           visible.filter((finding) => finding.area === area).sort(bySeverity),
         )
@@ -134,7 +134,7 @@ function AreaCard({
   onClick,
 }: {
   anchor: string;
-  icon: typeof LayoutGrid;
+  icon: typeof CheckCircle2;
   chip: string;
   glow: string;
   label: string;
@@ -195,9 +195,9 @@ function AreaCard({
  * reaches), every area as a card beside it, and the findings fanning out on the right — each tied
  * back to its area by a luminous curve in the finding's severity.
  *
- * It opens on "All areas": every finding at once, each curve running from its own area, so the
- * whole picture is there without choosing anything. Picking an area narrows the fan to that area;
- * picking it again (or "All areas") widens it back. Every card is a button, and the filter (to
+ * With no area chosen — how it opens — every finding is there at once, grouped by area with one
+ * curve from each area, so the whole picture needs no choosing. Picking an area narrows the fan to
+ * that area; picking it again lets go of it. Every card is a button, and the filter (to
  * look at, going well, all) also follows a two-finger swipe over the map, like every other tab
  * bar in the app.
  *
@@ -239,8 +239,7 @@ export function AnalysisMap({
     [swipeRef],
   );
 
-  const { visible, shown, areaStats } = deriveMap(findings, filter, selected);
-  const worstVisible = [...visible].sort(bySeverity)[0]?.severity ?? null;
+  const { shown, areaStats } = deriveMap(findings, filter, selected);
 
   const measure = useCallback(() => {
     const box = containerRef.current;
@@ -270,12 +269,12 @@ export function AnalysisMap({
           kind: "area",
           d: curve(cx, cy, ax, ay),
           color: worst ? SEVERITY_META[worst].glow : "var(--border-muted)",
-          strong: worst !== null && (selected === "all" || area === selected),
+          strong: worst !== null && (selected === null || area === selected),
         });
       }
     }
 
-    if (selected === "all") {
+    if (selected === null) {
       // One curve per area, to its group of findings: a curve to each of sixteen findings made a
       // tangle that said less than the groups do.
       for (const { area, worst } of areas) {
@@ -336,7 +335,7 @@ export function AnalysisMap({
     };
   }, [measure]);
 
-  const heading = selected === "all" ? "All areas" : AREA_META[selected].label;
+  const heading = selected === null ? "All areas" : AREA_META[selected].label;
 
   return (
     <div ref={setContainer} className="relative">
@@ -415,17 +414,6 @@ export function AnalysisMap({
 
         {/* The areas. */}
         <nav aria-label="Areas" className="flex flex-wrap gap-2 lg:flex-col lg:pt-6">
-          <AreaCard
-            anchor="area-all"
-            icon={LayoutGrid}
-            chip="bg-app-surface-muted text-app-text"
-            glow="var(--text-muted)"
-            label="All areas"
-            count={visible.length}
-            worst={worstVisible}
-            selected={selected === "all"}
-            onClick={() => onSelect("all")}
-          />
           {areaStats.map(({ area, count, worst }) => {
             const meta = AREA_META[area];
             return (
@@ -439,8 +427,8 @@ export function AnalysisMap({
                 count={count}
                 worst={worst}
                 selected={selected === area}
-                // Choosing the area already shown goes back to all of them.
-                onClick={() => onSelect(selected === area ? "all" : area)}
+                // Choosing the area already shown lets go of it, back to every area at once.
+                onClick={() => onSelect(selected === area ? null : area)}
               />
             );
           })}
@@ -481,10 +469,10 @@ export function AnalysisMap({
             <p className="flex items-center gap-2 rounded-xl border border-dashed border-app-border-muted px-4 py-6 text-sm text-app-text-muted">
               <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-app-success-text" />
               {filter === "good"
-                ? `Nothing to report as going well${selected === "all" ? "" : ` in ${heading.toLowerCase()}`}.`
-                : `Nothing${selected === "all" ? "" : ` in ${heading.toLowerCase()}`} needs you.`}
+                ? `Nothing to report as going well${selected === null ? "" : ` in ${heading.toLowerCase()}`}.`
+                : `Nothing${selected === null ? "" : ` in ${heading.toLowerCase()}`} needs you.`}
             </p>
-          ) : selected === "all" ? (
+          ) : selected === null ? (
             <div className="space-y-5">
               {areaStats
                 .filter(({ count }) => count > 0)

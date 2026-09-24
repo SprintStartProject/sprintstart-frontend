@@ -3,13 +3,11 @@ import { History, ScanSearch, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
-import { useToast } from "../../../context/useToast";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { RingGauge } from "../components/charts/RingGauge";
 import { scoreVerdict } from "./findings";
 import { ProjectAnalysisDialog } from "./ProjectAnalysisDialog";
-import { useAnalysisChecklist } from "./useAnalysisChecklist";
 import {
   DEFAULT_ANALYSIS_OPTIONS,
   useProjectAnalysis,
@@ -31,10 +29,8 @@ type ProjectAnalysisLauncherProps = {
  */
 export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLauncherProps) {
   const analysis = useProjectAnalysis();
-  const { checklist, keep } = useAnalysisChecklist();
   const { selectedProject } = useProjectContext();
   const navigate = useNavigate();
-  const toast = useToast();
   const reduceMotion = useReducedMotion();
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<AnalysisOptions>(DEFAULT_ANALYSIS_OPTIONS);
@@ -158,16 +154,6 @@ export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLa
         onOpenFinding={(to) => {
           setIsOpen(false);
           void navigate(to);
-        }}
-        keptAsChecklist={Boolean(
-          checklist && analysis.resultsAt && checklist.analysedAt === analysis.resultsAt,
-        )}
-        onKeepChecklist={() => {
-          if (!analysis.resultsAt) return;
-          keep(analysis.findings, analysis.resultsAt);
-          toast.success("Kept as a checklist", {
-            description: "It is on the overview now — tick items off as you go.",
-          });
         }}
       />
     </>
