@@ -5,9 +5,17 @@ const TOAST_DURATION_MS = 3000;
 const TOGGLE_DEBOUNCE_MS = 2000;
 const UNLOCK_THRESHOLD = 3;
 
+/**
+ * Which way the last triple-click flipped the dino game. Exposed as an
+ * explicit discriminant so the popover picks its copy from state rather than
+ * substring-matching a message — copy edits can then never silently break the
+ * lock/unlock rendering.
+ */
+export type DinoToggleKind = "unlocked" | "locked";
+
 type DinoEasterEgg = {
-  /** Current unlock toast text, or null when none is showing. */
-  toast: string | null;
+  /** Result of the most recent toggle while its notice is showing, or null when hidden. */
+  kind: DinoToggleKind | null;
   /** Registers one cogwheel click; every third click toggles the unlock. */
   handleIconClick: () => void;
 };
@@ -28,7 +36,7 @@ type DinoEasterEgg = {
  * because private-browsing modes can reject localStorage writes.
  */
 export function useDinoEasterEgg(): DinoEasterEgg {
-  const [toast, setToast] = useState<string | null>(null);
+  const [kind, setKind] = useState<DinoToggleKind | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastToggleRef = useRef(0);
 
@@ -39,11 +47,11 @@ export function useDinoEasterEgg(): DinoEasterEgg {
     };
   }, []);
 
-  const showToast = useCallback((message: string) => {
-    setToast(message);
+  const showToast = useCallback((nextKind: DinoToggleKind) => {
+    setKind(nextKind);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => {
-      setToast(null);
+      setKind(null);
     }, TOAST_DURATION_MS);
   }, []);
 
@@ -66,15 +74,13 @@ export function useDinoEasterEgg(): DinoEasterEgg {
     // a different component").
     queueMicrotask(() => window.dispatchEvent(new Event("dinoUnlockChanged")));
 
-    showToast(
-      currentlyUnlocked ? "you saw nothing... 🫣" : "shh... 🤫 press Space whenever you're waiting",
-    );
+    showToast(currentlyUnlocked ? "locked" : "unlocked");
   }, [showToast]);
 
   const handleIconClick = useRepeatClicks(UNLOCK_THRESHOLD, toggleUnlock);
 
   return {
-    toast,
+    kind,
     handleIconClick,
   };
 }

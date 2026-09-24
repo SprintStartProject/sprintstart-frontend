@@ -123,7 +123,7 @@ export function SettingsPage() {
               subtitle="Manage your profile, appearance and access tokens in one place."
               onIconClick={dino.handleIconClick}
               eggHint
-              iconPopover={<DinoUnlockPopover toast={dino.toast} />}
+              iconPopover={<DinoUnlockPopover kind={dino.kind} />}
             />
           </div>
         </div>
