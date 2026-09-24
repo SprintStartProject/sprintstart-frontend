@@ -151,6 +151,14 @@ describe("PmWorkspace", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/team-management?member=user-7");
   });
 
+  // Scrolling a member's path sideways used to fling the manager back into the roster.
+  it("stays on a member's full profile when swiped", () => {
+    renderWorkspace("/team/user-7");
+
+    swipeNext(/profile of user-7/);
+    expect(screen.getByTestId("location")).toHaveTextContent("/team/user-7");
+  });
+
   it("shows one empty state instead of the sections when no project is selected", () => {
     mocks.selectedProjectId = "";
     renderWorkspace("/pm-dashboard");

@@ -193,6 +193,11 @@ export function PmWorkspace() {
 
   const { section, viewKey, content, hasOwnPanel } = resolveSection(pathname);
   const panelOpen = hasOwnPanel || searchParams.has(MEMBER_PEEK_PARAM);
+  // A member's full profile is somewhere a manager reads and works, not a stop on the way to the
+  // next section: its journey graph pans and zooms under the same two-finger gesture, and a
+  // sideways flick while scrolling the path used to throw them back into the roster. The tab bar
+  // and the "Team" button still leave it.
+  const onMemberProfile = viewKey.startsWith("team/");
 
   const goToSection = useCallback(
     (next: PmSection) => {
@@ -233,12 +238,12 @@ export function PmWorkspace() {
   // Two-finger horizontal swipe through every stop in `SWIPE_STOPS`, the gesture every tabbed
   // page answers to. Off while a side panel is open: the panels are fixed on top of this
   // element, so a sideways scroll inside one would otherwise bubble up here and switch the
-  // section underneath it.
+  // section underneath it. Off on a member's full profile too (see `onMemberProfile`).
   const swipeRef = useSwipeableTabs<string, HTMLDivElement>({
     order: SWIPE_STOP_IDS,
     value: currentStopId(section, searchParams),
     onChange: goToStop,
-    enabled: !panelOpen,
+    enabled: !panelOpen && !onMemberProfile,
   });
 
   // Holds the column at its current height while one section slides out and the next slides in.
