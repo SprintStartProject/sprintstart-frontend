@@ -133,9 +133,13 @@ export function PmCardHeader({
         >
           <Icon aria-hidden="true" className="h-3.5 w-3.5" />
         </span>
-        <h2 className="truncate text-sm font-semibold text-app-text">{title}</h2>
+        <h2 className="min-w-0 truncate text-sm font-semibold text-app-text">{title}</h2>
+        {/* Gives way before the title does: on a narrow card a long meta line ("7 members · 1
+            through onboarding") used to keep its full width and push the title out of sight. */}
         {meta !== undefined && meta !== null && (
-          <span className="shrink-0 text-xs text-app-text-muted tabular-nums">{meta}</span>
+          <span className="min-w-0 shrink-[4] truncate text-xs text-app-text-muted tabular-nums">
+            {meta}
+          </span>
         )}
       </div>
       {action}

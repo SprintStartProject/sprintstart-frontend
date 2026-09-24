@@ -41,7 +41,8 @@ const chipClassName =
 
 /**
  * The text half of a row: a button to the step when there is one, plain otherwise. Kept apart
- * from the row's actions, since buttons cannot nest.
+ * from the row's actions, since buttons cannot nest. Its minimum width makes the actions wrap
+ * under it on a phone instead of squeezing the text to a word.
  */
 function ItemBody({
   stepId,
@@ -55,7 +56,7 @@ function ItemBody({
   children: ReactNode;
 }) {
   if (!onOpenStep || !stepId) {
-    return <div className="flex min-w-0 flex-1 items-center gap-2.5">{children}</div>;
+    return <div className="flex min-w-48 flex-1 items-center gap-2.5">{children}</div>;
   }
 
   return (
@@ -63,7 +64,7 @@ function ItemBody({
       type="button"
       onClick={() => onOpenStep(stepId)}
       aria-label={`Open the step${stepTitle ? `: ${stepTitle}` : ""}`}
-      className="group -mx-1.5 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-app-surface/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group -mx-1.5 flex min-w-48 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-app-surface/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >
       {children}
       <ChevronRight
