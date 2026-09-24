@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildFindings,
   healthScore,
+  pointsLostByArea,
   scoreVerdict,
   type AnalysisInput,
   type Finding,
@@ -176,6 +177,17 @@ describe("healthScore", () => {
         finding("d", "gaps", "warning"),
       ]),
     ).toBe(100 - (12 + 2) - 6);
+  });
+
+  it("explains itself area by area, with nothing charged for good news", () => {
+    const lost = pointsLostByArea([
+      finding("a", "team", "critical"),
+      finding("b", "team", "info"),
+      finding("c", "gaps", "warning"),
+      finding("d", "ingestion", "good"),
+    ]);
+
+    expect(Object.fromEntries(lost)).toEqual({ team: 13, gaps: 6 });
   });
 
   it("never goes below zero", () => {

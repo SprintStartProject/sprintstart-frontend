@@ -565,19 +565,27 @@ const EXTRA_PENALTY = 1;
  * to explain — every point off is a finding on the list.
  */
 export function healthScore(findings: readonly Finding[]): number {
+  const penalty = [...pointsLostByArea(findings).values()].reduce((sum, points) => sum + points, 0);
+  return Math.max(0, Math.min(100, 100 - penalty));
+}
+
+/**
+ * What each area cost the score, by the rule {@link healthScore} documents — the explanation of
+ * a score, area by area. Areas with nothing open are left out.
+ */
+export function pointsLostByArea(findings: readonly Finding[]): Map<FindingArea, number> {
   const byArea = new Map<FindingArea, Finding[]>();
   for (const finding of findings) {
     if (finding.severity === "good") continue;
     byArea.set(finding.area, [...(byArea.get(finding.area) ?? []), finding]);
   }
 
-  let penalty = 0;
-  for (const open of byArea.values()) {
+  const lost = new Map<FindingArea, number>();
+  for (const [area, open] of byArea) {
     const worst = Math.max(...open.map((finding) => AREA_PENALTY[finding.severity]));
-    penalty += worst + (open.length - 1) * EXTRA_PENALTY;
+    lost.set(area, worst + (open.length - 1) * EXTRA_PENALTY);
   }
-
-  return Math.max(0, Math.min(100, 100 - penalty));
+  return lost;
 }
 
 export function scoreVerdict(score: number): string {

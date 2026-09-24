@@ -1,8 +1,9 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter, useLocation } from "react-router-dom";
+import { AnalysisChecklistCard } from "../../../../../src/features/pm-area/analysis/AnalysisChecklistCard";
 import { ProjectAnalysisLauncher } from "../../../../../src/features/pm-area/analysis/ProjectAnalysisLauncher";
 
 const mocks = vi.hoisted(() => ({
@@ -81,6 +82,7 @@ function renderLauncher() {
   return render(
     <MemoryRouter initialEntries={["/pm-dashboard"]}>
       <ProjectAnalysisLauncher />
+      <AnalysisChecklistCard />
       <LocationProbe />
     </MemoryRouter>,
   );
@@ -94,11 +96,7 @@ async function runAnalysis(
   await beforeStart?.();
   await user.click(screen.getByRole("button", { name: /Start analysis/ }));
   // Each check shows for a moment on purpose, so the whole scan takes a couple of seconds.
-  await screen.findByText(
-    /worth your attention|Nothing needs you right now/,
-    {},
-    { timeout: 8000 },
-  );
+  await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
 }
 
 describe("ProjectAnalysisLauncher", () => {
@@ -179,7 +177,10 @@ describe("ProjectAnalysisLauncher", () => {
     expect(mocks.evaluateProjectIndustry).toHaveBeenCalledWith("p1");
     // Destructive, so off unless asked for.
     expect(mocks.refreshFAQGroups).not.toHaveBeenCalled();
-    expect(dialog.getByRole("img", { name: /Project health \d+ of 100/ })).toBeInTheDocument();
+    // The score says what it is out of, and what it means.
+    const health = within(dialog.getByRole("complementary", { name: "Project health" }));
+    expect(health.getByText("/ 100")).toBeInTheDocument();
+    expect(health.getByText(/means nothing is open/)).toBeInTheDocument();
   }, 20000);
 
   it("never re-evaluates an industry somebody set by hand", async () => {
@@ -226,7 +227,7 @@ describe("ProjectAnalysisLauncher", () => {
     expect(await axe(baseElement)).toHaveNoViolations();
 
     await user.click(screen.getByRole("button", { name: /Start analysis/ }));
-    await screen.findByText(/worth your attention/, {}, { timeout: 8000 });
+    await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
     expect(await axe(baseElement)).toHaveNoViolations();
   }, 30000);
 
@@ -239,6 +240,63 @@ describe("ProjectAnalysisLauncher", () => {
     renderLauncher();
 
     expect(screen.getByText(/Last run/)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Last score \d+ of 100/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Last health score \d+ of 100/ })).toBeInTheDocument();
+  }, 20000);
+
+  it("opens the last results again later, without running anything", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderLauncher();
+
+    await runAnalysis(user);
+    unmount();
+    vi.clearAllMocks();
+    renderLauncher();
+
+    await user.click(screen.getByRole("button", { name: /Open last results/ }));
+
+    const dialog = within(await screen.findByTestId("project-analysis-dialog"));
+    expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
+    expect(mocks.getTeamOverview).not.toHaveBeenCalled();
+  }, 20000);
+
+  it("keeps the findings as a checklist on the overview, to tick off", async () => {
+    const user = userEvent.setup();
+    renderLauncher();
+
+    await runAnalysis(user);
+    await user.click(screen.getByRole("button", { name: /Keep \d+ items? as a checklist/ }));
+    expect(screen.getByRole("button", { name: /On your dashboard as a checklist/ })).toBeDisabled();
+
+    const card = within(screen.getByRole("region", { name: "Checklist from the analysis" }));
+    const item = card.getByRole("checkbox", { name: /1 skip request waiting for your answer/ });
+    await user.click(item);
+    expect(item).toBeChecked();
+    expect(card.getByText(/1 of \d+ done/)).toBeInTheDocument();
+
+    await user.click(card.getByRole("button", { name: /Remove|Clear/ }));
+    expect(
+      screen.queryByRole("region", { name: "Checklist from the analysis" }),
+    ).not.toBeInTheDocument();
+  }, 20000);
+
+  it("switches the findings filter with a two-finger swipe, like every other tab bar", async () => {
+    const user = userEvent.setup();
+    renderLauncher();
+
+    await runAnalysis(user);
+    const dialog = within(screen.getByTestId("project-analysis-dialog"));
+    const target = dialog.getByText("1 skip request waiting for your answer");
+
+    for (let step = 0; step < 3; step += 1) {
+      fireEvent.wheel(target, { deltaX: 30, deltaY: 0 });
+    }
+
+    const filter = within(dialog.getByRole("group", { name: "Show findings" }));
+    await waitFor(() => {
+      expect(filter.getByRole("button", { name: /Going well/ })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
   }, 20000);
 });

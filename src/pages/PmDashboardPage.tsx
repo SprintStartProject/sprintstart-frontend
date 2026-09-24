@@ -11,6 +11,7 @@ import {
   KnowledgeGapsCard,
   QuestionsCard,
 } from "../features/pm-area/components/overview/InsightCards";
+import { AnalysisChecklistCard } from "../features/pm-area/analysis/AnalysisChecklistCard";
 import { ProjectAnalysisLauncher } from "../features/pm-area/analysis/ProjectAnalysisLauncher";
 import { TeamProgressCard } from "../features/pm-area/components/overview/TeamProgressCard";
 import { TeamPulseCard } from "../features/pm-area/components/overview/TeamPulseCard";
@@ -89,6 +90,7 @@ export function PmDashboardPage() {
   return (
     <section aria-label="Overview" className="space-y-5">
       <ProjectAnalysisLauncher onIndustryChanged={setIndustryRevision} />
+      <AnalysisChecklistCard />
 
       <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <PmStat

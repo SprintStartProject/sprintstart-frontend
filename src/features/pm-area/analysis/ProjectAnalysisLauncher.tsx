@@ -1,35 +1,20 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ScanSearch, Sparkles } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { History, ScanSearch, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
+import { useToast } from "../../../context/useToast";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
+import { useProjectContext } from "../../projects/useProjectContext";
 import { RingGauge } from "../components/charts/RingGauge";
 import { scoreVerdict } from "./findings";
 import { ProjectAnalysisDialog } from "./ProjectAnalysisDialog";
+import { useAnalysisChecklist } from "./useAnalysisChecklist";
 import {
   DEFAULT_ANALYSIS_OPTIONS,
   useProjectAnalysis,
   type AnalysisOptions,
 } from "./useProjectAnalysis";
-
-/** The last score — a button back to its results while they are still in this session. */
-function LastScore({ onOpen, children }: { onOpen?: () => void; children: ReactNode }) {
-  const className = "flex items-center gap-2 rounded-xl px-2 py-1 text-left";
-
-  if (!onOpen) return <div className={className}>{children}</div>;
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      title="Open the results"
-      className={`${className} transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
-    >
-      {children}
-    </button>
-  );
-}
 
 type ProjectAnalysisLauncherProps = {
   /** Told when the analysis re-evaluated the industry, so the industry card reads it again. */
@@ -37,15 +22,19 @@ type ProjectAnalysisLauncherProps = {
 };
 
 /**
- * The overview's way into the project analysis: one slim strip at the top with the last score,
- * and the button that opens {@link ProjectAnalysisDialog}.
+ * The overview's way into the project analysis: one slim strip at the top with the last run, and
+ * the button that starts a new one in {@link ProjectAnalysisDialog}.
  *
  * It owns the analysis (see {@link useProjectAnalysis}) rather than the dialog, so a run keeps
- * going with the dialog closed and the strip can say so.
+ * going with the dialog closed and the strip can say so. The last run's results stay a click away
+ * ("Open last results") — also after a reload, since they are kept in browser storage.
  */
 export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLauncherProps) {
   const analysis = useProjectAnalysis();
+  const { checklist, keep } = useAnalysisChecklist();
+  const { selectedProject } = useProjectContext();
   const navigate = useNavigate();
+  const toast = useToast();
   const reduceMotion = useReducedMotion();
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<AnalysisOptions>(DEFAULT_ANALYSIS_OPTIONS);
@@ -61,6 +50,11 @@ export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLa
   const start = () => {
     setIsOpen(true);
     void analysis.run(options);
+  };
+
+  const openLast = () => {
+    if (analysis.phase !== "done") analysis.openLast();
+    setIsOpen(true);
   };
 
   return (
@@ -93,27 +87,34 @@ export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLa
             {running
               ? "Refreshing everything and looking for what needs you…"
               : lastRun
-                ? `Last run ${formatRelativeDate(lastRun.at)} · ${scoreVerdict(lastRun.score).toLowerCase()}`
-                : "Refresh everything at once and get one list of what needs you."}
+                ? `Last run ${formatRelativeDate(lastRun.at)} · health ${lastRun.score}/100, ${scoreVerdict(lastRun.score).toLowerCase()}`
+                : "Refresh everything at once and see what needs you."}
           </p>
         </div>
 
         {lastRun && !running && (
-          <LastScore onOpen={analysis.phase === "done" ? () => setIsOpen(true) : undefined}>
+          <div className="flex items-center gap-2">
             <RingGauge
               value={lastRun.score}
               size={36}
               thickness={4}
-              ariaLabel={`Last score ${lastRun.score} of 100`}
+              ariaLabel={`Last health score ${lastRun.score} of 100`}
             >
               <span className="text-[11px] font-bold text-app-text tabular-nums">
                 {lastRun.score}
               </span>
             </RingGauge>
-            <span className="hidden text-xs text-app-text-muted sm:block">
-              {lastRun.counts.critical + lastRun.counts.warning} to look at
-            </span>
-          </LastScore>
+            {analysis.canOpenLast && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={openLast}
+                icon={<History className="h-4 w-4" />}
+              >
+                Open last results
+              </Button>
+            )}
+          </div>
         )}
 
         <Button
@@ -122,9 +123,12 @@ export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLa
           icon={<Sparkles className="h-4 w-4" />}
           loading={running}
           onClick={() => {
-            // A finished run's results stay reachable through the score beside this button;
-            // the button itself always leads to a new run.
-            if (analysis.phase === "done") analysis.reset();
+            if (running) {
+              setIsOpen(true);
+              return;
+            }
+            // The button always leads to a new run; the last results have their own way back.
+            analysis.reset();
             setIsOpen(true);
           }}
           data-testid="project-analysis-open"
@@ -135,14 +139,16 @@ export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLa
 
       <ProjectAnalysisDialog
         isOpen={isOpen}
-        // Closing never stops a run, and keeps a finished one's results for the score to reopen.
+        // Closing never stops a run, and keeps a finished one's results for "Open last results".
         onClose={() => setIsOpen(false)}
         phase={analysis.phase}
         tasks={analysis.tasks}
         findings={analysis.findings}
         score={analysis.score}
+        resultsAt={analysis.resultsAt}
         previousRun={analysis.previousRun}
         lastRun={lastRun}
+        projectName={selectedProject?.name}
         canEvaluateIndustry={analysis.canEvaluateIndustry}
         options={options}
         onOptionsChange={setOptions}
@@ -150,6 +156,16 @@ export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLa
         onOpenFinding={(to) => {
           setIsOpen(false);
           void navigate(to);
+        }}
+        keptAsChecklist={Boolean(
+          checklist && analysis.resultsAt && checklist.analysedAt === analysis.resultsAt,
+        )}
+        onKeepChecklist={() => {
+          if (!analysis.resultsAt) return;
+          keep(analysis.findings, analysis.resultsAt);
+          toast.success("Kept as a checklist", {
+            description: "It is on the overview now — tick items off as you go.",
+          });
         }}
       />
     </>
