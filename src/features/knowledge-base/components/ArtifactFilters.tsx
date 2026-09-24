@@ -34,6 +34,9 @@ import {
   type UploadFormat,
 } from "../tabs";
 import type { ArtifactSort, ArtifactType, SourceSystem } from "../types";
+import type { DateRange } from "../dateRange.ts";
+import type { KnowledgeBaseHistoryMode } from "../hooks/useKnowledgeBaseUrlState.ts";
+import { ArtifactDateRangeFilter } from "./ArtifactDateRangeFilter.tsx";
 import { formatResultRange } from "../resultRange.ts";
 
 export type { ArtifactType, KnowledgeTab, SourceSystem, TabOption };
@@ -88,6 +91,10 @@ export interface ArtifactFiltersProps {
   sort?: ArtifactSort;
   /** Fired when the reader picks another order. The sort control is only shown when given. */
   onSortChange?: (sort: ArtifactSort) => void;
+  /** The "Added" window on ingestion date; open ends are null. */
+  dateRange?: DateRange;
+  /** Fired with a valid, ordered range. The date filter is only shown when given. */
+  onDateRangeChange?: (range: DateRange, mode: KnowledgeBaseHistoryMode) => void;
   /** Fired when the user clicks the refresh button. */
   onRefresh?: () => void;
   /** Whether a refresh is currently in progress. */
@@ -159,6 +166,9 @@ const REPOSITORY_VISIBLE_LIMIT = 10;
  * What the numbers beside each option mean. They are "what you would get if you
  * added this", not a project total, and nothing on screen said so.
  */
+/** Stable empty range, so an omitted prop does not re-sync the date filter every render. */
+const NO_DATE_RANGE: DateRange = { from: null, to: null };
+
 const FACET_COUNT_FOOTNOTE = "Counts show what you would get if you added this option.";
 
 /**
@@ -193,6 +203,8 @@ export function ArtifactFilters({
   isRefreshing,
   sort = DEFAULT_ARTIFACT_SORT,
   onSortChange,
+  dateRange = NO_DATE_RANGE,
+  onDateRangeChange,
 }: ArtifactFiltersProps) {
   const searchHintId = useId();
   const sections: MultiSelectFilterSection<string>[] = [];
@@ -339,6 +351,10 @@ export function ArtifactFilters({
             >
               Clear filters
             </Button>
+          )}
+
+          {onDateRangeChange && (
+            <ArtifactDateRangeFilter range={dateRange} onRangeChange={onDateRangeChange} />
           )}
 
           {onSortChange && (

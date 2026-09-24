@@ -103,6 +103,7 @@ export function useKnowledgeBase(
     setPage,
     setSize,
     setSort,
+    setDateRange,
     clearFilters,
     setArtifactId,
   } = useKnowledgeBaseUrlState(projectId, options);
@@ -168,32 +169,14 @@ export function useKnowledgeBase(
 
   const searchParam = urlState.search.trim() || undefined;
 
-  const listParams: KnowledgeListParams = useMemo(
-    () => ({
-      page: requestedPage,
-      size: pageSize,
-      search: searchParam,
-      types: typesParam,
-      sources: sourcesParam,
-      repositories: repositoriesParam,
-      format: selectedFormat ?? undefined,
-      // The default order is left unsaid, so the default request (and its cache key, which the
-      // route prefetch warms) is byte-for-byte what it was before sorting existed.
-      sort: sort === DEFAULT_ARTIFACT_SORT ? undefined : sort,
-    }),
-    [
-      requestedPage,
-      pageSize,
-      sort,
-      searchParam,
-      typesParam,
-      sourcesParam,
-      repositoriesParam,
-      selectedFormat,
-    ],
-  );
+  const dateFrom = urlState.dateRange.from ?? undefined;
+  const dateTo = urlState.dateRange.to ?? undefined;
 
-  // No page, size or sort: counts describe the whole filtered result, whatever its order.
+  /*
+    The filter criteria, once, for both requests. The facets are counted over exactly this, and the
+    list pages through exactly this plus its own page, size and order: building the two from one
+    object is what keeps a facet count from describing a different predicate than the rows below.
+  */
   const facetsParams: KnowledgeListParams = useMemo(
     () => ({
       search: searchParam,
@@ -201,8 +184,22 @@ export function useKnowledgeBase(
       sources: sourcesParam,
       repositories: repositoriesParam,
       format: selectedFormat ?? undefined,
+      from: dateFrom,
+      to: dateTo,
     }),
-    [searchParam, typesParam, sourcesParam, repositoriesParam, selectedFormat],
+    [searchParam, typesParam, sourcesParam, repositoriesParam, selectedFormat, dateFrom, dateTo],
+  );
+
+  const listParams: KnowledgeListParams = useMemo(
+    () => ({
+      ...facetsParams,
+      page: requestedPage,
+      size: pageSize,
+      // The default order is left unsaid, so the default request (and its cache key, which the
+      // route prefetch warms) is byte-for-byte what it was before sorting existed.
+      sort: sort === DEFAULT_ARTIFACT_SORT ? undefined : sort,
+    }),
+    [facetsParams, requestedPage, pageSize, sort],
   );
 
   const listQueryKey = queryKeys.knowledgeBase.list(projectId ?? "", listParams);
@@ -367,7 +364,9 @@ export function useKnowledgeBase(
     activeTab !== "ALL" ||
     selectedSources.size > 0 ||
     selectedFormat !== null ||
-    selectedRepositories.size > 0;
+    selectedRepositories.size > 0 ||
+    dateFrom !== undefined ||
+    dateTo !== undefined;
 
   return {
     artifacts,
@@ -398,6 +397,9 @@ export function useKnowledgeBase(
     setPageSize: setSize,
     /** Changes the list order; pushes history and starts the new order at page 1. */
     setSort,
+    /** The "Added" window (`yyyy-MM-dd` ends, null when open); filters list and facets alike. */
+    dateRange: urlState.dateRange,
+    setDateRange,
     handleClearFilters,
     hasActiveFilters,
     /** The artifact open in the viewer drawer (`?artifact=`), or null. */

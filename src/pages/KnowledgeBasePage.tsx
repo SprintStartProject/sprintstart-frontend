@@ -113,6 +113,8 @@ export function KnowledgeBasePage() {
     setSelectedArtifactId,
     sort,
     setSort,
+    dateRange,
+    setDateRange,
   } = useKnowledgeBase(projectId, { projectSettled: !isProjectLoading });
 
   const isLoading = isProjectLoading || isArtifactsLoading;
@@ -235,6 +237,8 @@ export function KnowledgeBasePage() {
                   onClearFilters={handleClearFilters}
                   sort={sort}
                   onSortChange={setSort}
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
                   onRefresh={() => void fetchArtifacts()}
                   isRefreshing={isLoading}
                 />

@@ -384,6 +384,36 @@ describe("knowledgeService", () => {
       expect(seen!.get("search")).toBe("guide");
       expect(seen!.getAll("sources")).toEqual(["GITHUB"]);
     });
+
+    it("sends the date range to the list and the facets alike, unlike sort", async () => {
+      let listParams: URLSearchParams | null = null;
+      let facetParams: URLSearchParams | null = null;
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          listParams = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyPage);
+        }),
+        http.get(`/api/v1/projects/${projectId}/artifacts/facets`, ({ request }) => {
+          facetParams = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyFacets);
+        }),
+      );
+      const params = {
+        from: "2026-09-01",
+        to: "2026-09-24",
+        sort: "TITLE_ASC" as const,
+      };
+
+      await knowledgeService.getArtifactPage(projectId, params);
+      await knowledgeService.getArtifactFacets(projectId, params);
+
+      for (const seen of [listParams!, facetParams!]) {
+        expect(seen.get("from")).toBe("2026-09-01");
+        expect(seen.get("to")).toBe("2026-09-24");
+      }
+      expect(listParams!.get("sort")).toBe("TITLE_ASC");
+      expect(facetParams!.has("sort")).toBe(false);
+    });
   });
 
   describe("getArtifactById", () => {

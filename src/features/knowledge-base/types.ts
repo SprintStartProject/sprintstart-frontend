@@ -158,4 +158,11 @@ export interface KnowledgeListParams {
    * endpoint does not accept it. Omitted means the backend default (`ADDED_DESC`).
    */
   sort?: ArtifactSort;
+  /**
+   * Earliest ingestion day, `yyyy-MM-dd`, inclusive (UTC day boundaries on the server). Sent to
+   * the list and the facets alike.
+   */
+  from?: string;
+  /** Latest ingestion day, `yyyy-MM-dd`, inclusive. Sent to the list and the facets alike. */
+  to?: string;
 }

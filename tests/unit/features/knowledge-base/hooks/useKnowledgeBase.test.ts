@@ -1269,3 +1269,34 @@ describe("useKnowledgeBase sort", () => {
     expect(result.current.kb.hasActiveFilters).toBe(false);
   });
 });
+
+describe("useKnowledgeBase date range", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("filters the list and the facets by the same window", async () => {
+    const { result } = await renderAt(["/kb"], makeFacetFixture());
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    act(() => result.current.kb.setDateRange({ from: "2026-09-01", to: "2026-09-24" }));
+
+    await waitFor(() => {
+      const list = vi.mocked(knowledgeService.getArtifactPage).mock.calls.at(-1)?.[1];
+      const facets = vi.mocked(knowledgeService.getArtifactFacets).mock.calls.at(-1)?.[1];
+      expect(list).toMatchObject({ from: "2026-09-01", to: "2026-09-24", page: 1 });
+      expect(facets).toMatchObject({ from: "2026-09-01", to: "2026-09-24" });
+    });
+    expect(result.current.kb.dateRange).toEqual({ from: "2026-09-01", to: "2026-09-24" });
+  });
+
+  it("counts a date range as an active filter that Clear filters removes", async () => {
+    const { result } = await renderAt(["/kb?from=2026-09-01"], makeFacetFixture());
+    expect(result.current.kb.hasActiveFilters).toBe(true);
+
+    act(() => result.current.kb.handleClearFilters());
+
+    expect(result.current.kb.hasActiveFilters).toBe(false);
+    expect(result.current.kb.dateRange).toEqual({ from: null, to: null });
+  });
+});

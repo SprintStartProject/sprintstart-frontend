@@ -9,6 +9,7 @@ import {
 } from "../tabs.ts";
 import type { KnowledgeTab } from "../tabs.ts";
 import type { ArtifactSort, SourceSystem, UploadFormat } from "../types.ts";
+import { normalizeDateRange, type DateRange } from "../dateRange.ts";
 
 /** Page size used when the URL names none. Mirrors the backend's list default. */
 export const DEFAULT_PAGE_SIZE = 20;
@@ -40,6 +41,8 @@ export const KB_URL_PARAM = {
   page: "page",
   size: "size",
   sort: "sort",
+  from: "from",
+  to: "to",
   artifact: "artifact",
 } as const;
 
@@ -55,6 +58,8 @@ const PROJECT_SCOPED_PARAMS: readonly string[] = [
   KB_URL_PARAM.sources,
   KB_URL_PARAM.repositories,
   KB_URL_PARAM.format,
+  KB_URL_PARAM.from,
+  KB_URL_PARAM.to,
   KB_URL_PARAM.page,
   KB_URL_PARAM.artifact,
 ];
@@ -69,6 +74,8 @@ const FILTER_PARAMS: readonly string[] = [
   KB_URL_PARAM.sources,
   KB_URL_PARAM.repositories,
   KB_URL_PARAM.format,
+  KB_URL_PARAM.from,
+  KB_URL_PARAM.to,
   KB_URL_PARAM.page,
 ];
 
@@ -95,6 +102,11 @@ export interface KnowledgeBaseUrlState {
   size: number;
   /** List order; {@link DEFAULT_ARTIFACT_SORT} when the URL names none or an unknown one. */
   sort: ArtifactSort;
+  /**
+   * The "Added" window on `ingestedAt`, `yyyy-MM-dd` each end, open ends null. Always valid and
+   * ordered (see `normalizeDateRange`), so it can go to the backend as-is.
+   */
+  dateRange: DateRange;
   /** The artifact open in the viewer drawer, if any. */
   artifactId: string | null;
 }
@@ -154,6 +166,11 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
   const repositories: ReadonlySet<string> =
     repositoryList.length > 0 ? new Set(repositoryList) : NO_STRINGS;
 
+  const dateRange = normalizeDateRange({
+    from: params.get(KB_URL_PARAM.from),
+    to: params.get(KB_URL_PARAM.to),
+  });
+
   // An unknown order is dropped, not sent: the backend answers it with a 400.
   const rawSort = params.get(KB_URL_PARAM.sort)?.trim().toUpperCase() ?? "";
   const sort = SORT_VALUES.has(rawSort) ? (rawSort as ArtifactSort) : DEFAULT_ARTIFACT_SORT;
@@ -167,6 +184,7 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
     page: readPositiveInt(params.get(KB_URL_PARAM.page), 1, Number.MAX_SAFE_INTEGER),
     size: readPositiveInt(params.get(KB_URL_PARAM.size), DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
     sort,
+    dateRange,
     artifactId: params.get(KB_URL_PARAM.artifact) || null,
   };
 }
@@ -246,6 +264,11 @@ export interface KnowledgeBaseUrlStateApi {
   setSize: (size: number) => void;
   /** Push-mode write of `?sort=` (omitted at the default), resetting the page. */
   setSort: (sort: ArtifactSort) => void;
+  /**
+   * Writes `?from=`/`?to=` (normalised; open ends removed), resetting the page. Presets and
+   * "clear" push; typing into a date field replaces, so one edit is one history entry.
+   */
+  setDateRange: (range: DateRange, mode?: KnowledgeBaseHistoryMode) => void;
   /** Resets every filter (not size, not sort, not the open artifact) in one history entry. */
   clearFilters: () => void;
   /** Opens (`id`) or closes (`null`) the viewer drawer, in replace mode. */
@@ -418,6 +441,19 @@ export function useKnowledgeBaseUrlState(
     [commit],
   );
 
+  const setDateRange = useCallback(
+    (range: DateRange, mode: KnowledgeBaseHistoryMode = "push") =>
+      commit((params) => {
+        const { from, to } = normalizeDateRange(range);
+        if (from) params.set(KB_URL_PARAM.from, from);
+        else params.delete(KB_URL_PARAM.from);
+        if (to) params.set(KB_URL_PARAM.to, to);
+        else params.delete(KB_URL_PARAM.to);
+        params.delete(KB_URL_PARAM.page);
+      }, mode),
+    [commit],
+  );
+
   const clearFilters = useCallback(
     () =>
       commit((params) => {
@@ -446,6 +482,7 @@ export function useKnowledgeBaseUrlState(
     setPage,
     setSize,
     setSort,
+    setDateRange,
     clearFilters,
     setArtifactId,
   };

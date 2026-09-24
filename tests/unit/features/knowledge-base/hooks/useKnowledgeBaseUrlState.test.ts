@@ -305,3 +305,57 @@ describe("useKnowledgeBaseUrlState sort", () => {
     expect(result.current.api.state.sort).toBe("TITLE_ASC");
   });
 });
+
+describe("useKnowledgeBaseUrlState date range", () => {
+  it("reads a valid range, drops invalid ends and swaps a reversed pair", () => {
+    expect(parse("?from=2026-09-01&to=2026-09-24").dateRange).toEqual({
+      from: "2026-09-01",
+      to: "2026-09-24",
+    });
+    expect(parse("?from=2026-02-30&to=2026-09-24").dateRange).toEqual({
+      from: null,
+      to: "2026-09-24",
+    });
+    // The backend 400s on from > to; a hand-edited link must not be able to trigger it.
+    expect(parse("?from=2026-09-24&to=2026-09-01").dateRange).toEqual({
+      from: "2026-09-01",
+      to: "2026-09-24",
+    });
+    expect(parse("").dateRange).toEqual({ from: null, to: null });
+  });
+
+  it("writes the range, restarts at page 1, and removes an open end", () => {
+    const { result } = renderUrlState(["/kb?page=3"], { projectId: "p1" });
+
+    act(() => result.current.api.setDateRange({ from: "2026-09-01", to: "2026-09-24" }));
+    expect(result.current.location.search).toBe("?from=2026-09-01&to=2026-09-24");
+
+    act(() => result.current.api.setDateRange({ from: "2026-09-01", to: null }));
+    expect(result.current.location.search).toBe("?from=2026-09-01");
+  });
+
+  it("pushes by default and replaces when asked", () => {
+    const { result } = renderUrlState(["/start", "/kb"], { projectId: "p1" });
+
+    act(() => result.current.api.setDateRange({ from: "2026-09-01", to: null }));
+    act(() => result.current.api.setDateRange({ from: "2026-09-02", to: null }, "replace"));
+    act(() => void result.current.navigate(-1));
+
+    // One push, one replace: Back leaves the range entirely instead of stepping through edits.
+    expect(result.current.location.pathname).toBe("/kb");
+    expect(result.current.api.state.dateRange.from).toBeNull();
+  });
+
+  it("is cleared by Clear filters and by a project switch", () => {
+    const { result, rerender } = renderUrlState(["/kb?from=2026-09-01&to=2026-09-24"], {
+      projectId: "p1",
+    });
+
+    act(() => result.current.api.clearFilters());
+    expect(result.current.location.search).toBe("");
+
+    act(() => result.current.api.setDateRange({ from: "2026-09-01", to: null }));
+    rerender({ projectId: "p2" });
+    expect(result.current.api.state.dateRange).toEqual({ from: null, to: null });
+  });
+});

@@ -47,6 +47,8 @@ function buildFilterQuery(params: KnowledgeListParams): URLSearchParams {
   for (const source of params.sources ?? []) query.append("sources", source);
   for (const repository of params.repositories ?? []) query.append("repositories", repository);
   if (params.format) query.set("format", params.format);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
   return query;
 }
 
