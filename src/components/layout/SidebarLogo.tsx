@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, useReducedMotion, type TargetAndTransition, type Variants } from "framer-motion";
 import { useRepeatClicks } from "../../features/easter-eggs/hooks/useRepeatClicks";
+import { hoverSpringToken, logoHopSpringToken } from "../../styles/tokens";
 
 const BADGE_SIZE = 44;
 const MARK_SIZE = 28;
@@ -46,7 +47,7 @@ const DROP_PHASES: Record<Exclude<DropPhase, "idle">, TargetAndTransition> = {
     scaleX: 1,
     scaleY: 1,
     rotate: 0,
-    transition: { type: "spring", stiffness: 260, damping: 11 },
+    transition: logoHopSpringToken,
   },
 };
 
@@ -103,7 +104,7 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
         rest: { scale: 1 },
         lift: {
           scale: 1.08,
-          transition: { type: "spring", stiffness: 400, damping: 16 },
+          transition: hoverSpringToken,
         },
       };
 
@@ -119,7 +120,7 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
         lift: {
           x: 1.5,
           y: -1.5,
-          transition: { type: "spring", stiffness: 420, damping: 14 },
+          transition: hoverSpringToken,
         },
       };
 
@@ -169,10 +170,15 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
       variants={badgeVariants}
       onAnimationComplete={advanceDrop}
       onClick={handleLogoClick}
+      data-drop-phase={dropPhase}
       // The logo is deliberately decorative markup — the egg behind it is
-      // pure whimsy with no function, and making it tab-focusable on all
-      // three surfaces (including the login page's focus order) would
-      // worsen keyboard navigation for everyone to serve a secret.
+      // pure whimsy with no function, and making it tab-focusable on both
+      // in-app surfaces (the sidebar header and the mobile header) would
+      // worsen keyboard navigation for everyone to serve a secret. The
+      // login page's copy of the mark carries no egg at all.
+      //
+      // `data-drop-phase` exposes the choreography's state machine so tests
+      // (and devtools) can observe the egg without a running animation loop.
       //
       // The pointer cursor stays: unlike a plain decorative wrapper this one
       // does answer clicks (that is the whole egg), and it is the only hint

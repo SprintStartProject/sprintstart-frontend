@@ -212,6 +212,19 @@ export const celebrationSpringToken: Transition = {
   mass: 0.9,
 };
 
+/**
+ * Spring for the sidebar logo's hidden "drop" egg — the badge landing and
+ * hopping back into place. Far more under-damped than `celebrationSpringToken`
+ * on purpose: the visible bounce on landing *is* the joke, and a critically
+ * damped settle would read as a layout glitch rather than a toy. Only used by
+ * an opt-in egg that reduced-motion users never trigger; keep it off routine UI.
+ */
+export const logoHopSpringToken: Transition = {
+  type: "spring",
+  stiffness: 260,
+  damping: 11,
+};
+
 /** How long a rocket takes to cross the screen, in seconds. */
 export const FLIGHT_DURATION_S = 1.15;
 

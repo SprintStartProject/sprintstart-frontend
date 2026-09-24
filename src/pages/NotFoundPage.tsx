@@ -8,7 +8,7 @@ import { Rocket } from "lucide-react";
 /**
  * Catch-all 404 page. Shows a "not found" message with a dashboard link
  * and a small easter-egg teaser: a rocket that opens the Space Invaders
- * game for whoever notices it while waiting.
+ * game for whoever notices it while they are stranded here.
  */
 export function NotFoundPage() {
   const navigate = useNavigate();
@@ -34,20 +34,23 @@ export function NotFoundPage() {
 
         {/* Easter-egg teaser, styled to blend into the page: only people who
             read the copy closely will think of clicking it. The whole row is
-            the button (text + rocket) so the target is generous.
+            the button (text + rocket) so the target is generous, and it reuses
+            the page's "lost in space" line so the invitation reads as part of
+            the joke rather than a stray CTA.
             The accessible name starts with the words on screen (WCAG 2.5.3):
             an aria-label that replaced them would leave voice control with
             nothing to say that it can see. The hint rides along as a suffix
             inside the name instead. */}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setInvadersOpen(true)}
-          className="mt-4 flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-app-text-subtle transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          trailingIcon={<span aria-hidden="true">🚀</span>}
+          className="mt-4"
         >
-          While you wait for your manager&apos;s approval&hellip;
-          <span className="sr-only"> — open Space Invaders</span>
-          <span aria-hidden="true">🚀</span>
-        </button>
+          While you&apos;re lost in space&hellip;
+          <span className="sr-only"> play Space Invaders</span>
+        </Button>
 
         <Button
           variant="secondary"

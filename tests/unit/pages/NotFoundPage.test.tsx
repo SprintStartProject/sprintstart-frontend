@@ -39,12 +39,12 @@ describe("NotFoundPage", () => {
     expect(screen.queryByTestId("egg-modal")).not.toBeInTheDocument();
 
     // The teaser is a small muted row, not an obvious CTA. Its accessible
-    // name has to carry the visible words (WCAG 2.5.3), with the "open
-    // Space Invaders" hint appended rather than replacing them.
-    const teaser = screen.getByRole("button", { name: /while you wait for your manager/i });
-    expect(teaser).toHaveTextContent("While you wait for your manager");
+    // name has to *start with* the visible words (WCAG 2.5.3), with the
+    // "play Space Invaders" hint appended rather than replacing them.
+    const teaser = screen.getByRole("button", { name: /^while you're lost in space/i });
+    expect(teaser).toHaveTextContent("While you're lost in space");
     expect(teaser).toHaveTextContent("🚀");
-    expect(teaser).toHaveAccessibleName(/open space invaders/i);
+    expect(teaser).toHaveAccessibleName(/^While you're lost in space….*play Space Invaders$/);
 
     fireEvent.click(teaser);
     expect(screen.getByTestId("egg-modal")).toBeInTheDocument();

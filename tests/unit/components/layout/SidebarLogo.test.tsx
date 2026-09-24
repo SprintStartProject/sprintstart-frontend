@@ -1,77 +1,129 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentType, ReactNode } from "react";
+import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarLogo } from "../../../../src/components/layout/SidebarLogo";
 
-// jsdom has no rAF-driven framer-motion animation loop; these tests assert
-// the trigger contract (click counting, phase gating, reduced-motion skip),
-// not pixel choreography — same boundary as the game tests.
-vi.mock("framer-motion", async () => {
-  const actual = await vi.importActual<typeof import("framer-motion")>("framer-motion");
-  return {
-    ...actual,
-    motion: new Proxy(actual.motion, {
-      get(_target, prop) {
-        // Strip animation props the DOM would reject; keep everything else.
-        const Component = (props: Record<string, unknown>) => {
-          const {
-            initial: _i,
-            animate: _a,
-            exit: _e,
-            variants: _v,
-            transition: _t,
-            whileHover: _w,
-            onAnimationComplete: _o,
-            ...rest
-          } = props;
-          void _i;
-          void _a;
-          void _e;
-          void _v;
-          void _t;
-          void _w;
-          void _o;
-          const { [prop as string]: Tag = "div" } = {};
-          return <Tag {...rest} />;
+/**
+ * Test-controlled seams into framer-motion.
+ *
+ * `useReducedMotion` is stubbed instead of driven through `window.matchMedia`:
+ * framer-motion reads the media query once per module instance and caches it,
+ * so overriding `matchMedia` mid-file silently does nothing for later renders
+ * (and leaks into other tests if it is never restored). The badge root's
+ * `onAnimationComplete` is captured so the tests can step the drop
+ * choreography beat by beat — jsdom has no rAF-driven animation loop to do it.
+ */
+const motionControl = vi.hoisted(() => ({
+  reducedMotion: false,
+  completeRootAnimation: null as null | (() => void),
+}));
+
+vi.mock("framer-motion", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("framer-motion")>();
+  const MOTION_ONLY_PROPS = new Set([
+    "initial",
+    "animate",
+    "exit",
+    "variants",
+    "transition",
+    "whileHover",
+    "whileTap",
+    "onAnimationComplete",
+  ]);
+  // Cached per tag so React sees a stable element type across re-renders.
+  const cache = new Map<string, ComponentType<Record<string, unknown>>>();
+  const motion = new Proxy(
+    {},
+    {
+      get: (_target, tag) => {
+        if (typeof tag !== "string") return undefined;
+        const cached = cache.get(tag);
+        if (cached) return cached;
+        const Component = ({ children, ...props }: { children?: ReactNode }) => {
+          const all = props as Record<string, unknown>;
+          if ("data-drop-phase" in all) {
+            motionControl.completeRootAnimation = all.onAnimationComplete as () => void;
+          }
+          const domProps = Object.fromEntries(
+            Object.entries(all).filter(([key]) => !MOTION_ONLY_PROPS.has(key)),
+          );
+          return createElement(tag, domProps, children);
         };
+        cache.set(tag, Component);
         return Component;
       },
-    }),
-  };
+    },
+  );
+  return { ...actual, motion, useReducedMotion: () => motionControl.reducedMotion };
 });
 
 describe("SidebarLogo gravity easter egg", () => {
   beforeEach(() => {
-    localStorage.clear();
+    motionControl.reducedMotion = false;
+    motionControl.completeRootAnimation = null;
   });
 
-  const clickTimes = (times: number) => {
-    const logo = document.querySelector(".cursor-pointer");
+  const getLogo = () => {
+    const logo = document.querySelector<HTMLElement>("[data-drop-phase]");
     expect(logo).not.toBeNull();
-    for (let i = 0; i < times; i++) fireEvent.click(logo!);
+    return logo!;
   };
 
-  it("renders a decorative, cursor-pointer badge", () => {
+  const clickTimes = (times: number) => {
+    const logo = getLogo();
+    for (let i = 0; i < times; i++) fireEvent.click(logo);
+  };
+
+  const finishBeat = () => {
+    act(() => motionControl.completeRootAnimation?.());
+  };
+
+  it("renders a decorative, non-focusable badge", () => {
     render(<SidebarLogo />);
-    const logo = document.querySelector(".cursor-pointer");
-    expect(logo).not.toBeNull();
-    expect(logo!.tagName).toBe("DIV");
+    const logo = getLogo();
+    expect(logo.tagName).toBe("DIV");
+    expect(logo).not.toHaveAttribute("tabindex");
     expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("stays idle for fewer than five clicks", () => {
     render(<SidebarLogo />);
     clickTimes(4);
-    // No way to observe phases directly through the mocked motion — assert
-    // via the class contract instead: no transform-related inline style.
-    const logo = document.querySelector(".cursor-pointer") as HTMLElement;
-    expect(logo.style.transform).toBe("");
+    expect(getLogo()).toHaveAttribute("data-drop-phase", "idle");
   });
 
-  it("does not crash on five rapid clicks under reduced motion", () => {
-    window.matchMedia = vi
-      .fn()
-      .mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  it("starts the drop on the fifth click", () => {
     render(<SidebarLogo />);
-    expect(() => clickTimes(5)).not.toThrow();
+    clickTimes(5);
+    expect(getLogo()).toHaveAttribute("data-drop-phase", "falling");
+  });
+
+  it("walks falling → impact → bouncing → hopping → idle as each beat completes", () => {
+    render(<SidebarLogo />);
+    clickTimes(5);
+
+    const seen: (string | null)[] = [];
+    for (let i = 0; i < 4; i++) {
+      finishBeat();
+      seen.push(getLogo().getAttribute("data-drop-phase"));
+    }
+
+    expect(seen).toEqual(["impact", "bouncing", "hopping", "idle"]);
+  });
+
+  it("ignores another five clicks while a drop is already playing", () => {
+    render(<SidebarLogo />);
+    clickTimes(5);
+    finishBeat(); // → impact
+    clickTimes(5);
+    expect(getLogo()).toHaveAttribute("data-drop-phase", "impact");
+  });
+
+  it("never starts the drop under reduced motion", () => {
+    motionControl.reducedMotion = true;
+    render(<SidebarLogo />);
+    clickTimes(5);
+    expect(getLogo()).toHaveAttribute("data-drop-phase", "idle");
   });
 });
