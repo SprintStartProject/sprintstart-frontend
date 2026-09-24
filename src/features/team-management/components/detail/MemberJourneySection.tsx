@@ -660,7 +660,7 @@ function StepFacts({ item, taskCount }: { item: PhaseItem; taskCount?: StepTaskC
   const delta = actual && item.step.estimatedMinutes ? actual - item.step.estimatedMinutes : null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <StepOriginBadge step={item.step} />
+      <StepOriginBadge step={item.step} viewer="reviewer" />
       {taskCount ? (
         <span className="rounded-full bg-app-surface-muted px-2 py-0.5 text-app-text-muted">
           {taskCount.done}/{taskCount.total} tasks
