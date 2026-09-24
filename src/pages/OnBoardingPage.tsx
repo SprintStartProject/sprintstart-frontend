@@ -182,7 +182,8 @@ export function OnBoardingPage() {
    * conversation is a way of finding something, and starting it is the hire's own click.
    */
   const [searchParams, setSearchParams] = useSearchParams();
-  const linkedItemId = searchParams.get("step") ?? searchParams.get("question");
+  const linkedStepId = searchParams.get("step");
+  const linkedQuestionId = searchParams.get("question");
   const linkedPhaseId = searchParams.get("phase");
 
   const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
@@ -365,12 +366,14 @@ export function OnBoardingPage() {
           ? { kind: "question" as const, id: focusQuestionId }
           : wantsChooser
             ? { kind: "choose" as const, id: "" }
-            : linkedItemId
-              ? { kind: "link-item" as const, id: linkedItemId }
-              : linkedPhaseId
-                ? { kind: "link-phase" as const, id: linkedPhaseId }
-                : null,
-    [focusQuestionId, linkedItemId, linkedPhaseId, routeStepId, wantsChooser],
+            : linkedStepId
+              ? { kind: "link-step" as const, id: linkedStepId }
+              : linkedQuestionId
+                ? { kind: "link-question" as const, id: linkedQuestionId }
+                : linkedPhaseId
+                  ? { kind: "link-phase" as const, id: linkedPhaseId }
+                  : null,
+    [focusQuestionId, linkedPhaseId, linkedQuestionId, linkedStepId, routeStepId, wantsChooser],
   );
   // A link carries the navigation's key as well: the hire who scrolled away and clicks the same link
   // in the conversation again should land again.
@@ -425,7 +428,7 @@ export function OnBoardingPage() {
       );
       if (!owningPhase) {
         toast.error(
-          arrival.kind === "question"
+          arrival.kind === "question" || arrival.kind === "link-question"
             ? "That question is not on your path"
             : "That step is not on your path",
           { description: "It may have been replaced when your path was rebuilt." },
@@ -436,7 +439,7 @@ export function OnBoardingPage() {
         return;
       }
 
-      if (arrival.kind === "link-item") {
+      if (arrival.kind === "link-step" || arrival.kind === "link-question") {
         setSelectedPhaseId(owningPhase.id);
         setExpandedItemId(null);
         setLinkHighlight({ id: arrival.id, key: arrivalKey });

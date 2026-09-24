@@ -28,6 +28,18 @@ vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: { id: signedInUserId.value } }),
 }));
 
+// One stable object, as the real hook's is: the page keeps `toast` in effect dependencies.
+const toastMocks = vi.hoisted(() => ({
+  show: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  warning: vi.fn(),
+  error: vi.fn(),
+  dismiss: vi.fn(),
+  dismissAll: vi.fn(),
+}));
+vi.mock("../../../src/context/useToast", () => ({ useToast: () => toastMocks }));
+
 // The celebratory layer is decorative and lives behind its own provider; the
 // page only needs a no-op `celebrate` to render.
 vi.mock("../../../src/features/moments", () => ({
@@ -1071,6 +1083,25 @@ describe("OnBoardingPage: links from the buddy", () => {
     await screen.findByRole("heading", { name: "Meetings", level: 2 });
     expect(container.querySelector("#onboarding-item-step-phase-2")).toHaveTextContent("#1");
     expect(container.querySelector("#onboarding-item-q-linked")).toHaveTextContent("#2");
+  });
+
+  it("names a question, not a step, when a question link points at nothing", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding?question=q-gone"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(toastMocks.error).toHaveBeenCalledWith(
+        "That question is not on your path",
+        expect.anything(),
+      ),
+    );
   });
 
   it("lands on the phase a link names", async () => {

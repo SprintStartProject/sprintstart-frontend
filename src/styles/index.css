@@ -968,11 +968,20 @@ body {
   animation: app-link-highlight 1.6s ease-in-out 0.35s 1 both;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  /* No pulse, but still marked: finding the item is the point, not the motion. */
-  .app-link-highlight {
-    animation: none;
+/* No pulse, but still marked for as long as the pulse would take: finding the item is the point,
+   not the motion. A step change rather than a fade, and gone afterwards like the pulse is. */
+@keyframes app-link-highlight-still {
+  0% {
     box-shadow: 0 0 0 2px var(--color-app-brand);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-link-highlight {
+    animation: app-link-highlight-still 2s step-end 1 both;
   }
 }
 

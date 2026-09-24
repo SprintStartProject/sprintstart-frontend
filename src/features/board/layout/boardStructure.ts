@@ -90,11 +90,11 @@ export function stageOrder(stage: BoardStage): number {
  * - `TEAM` — from a card blueprint. The PM's, and the hire may not take it off.
  * - `BUDDY` — from a generated path. Named on the card so it does not look like the hire's own
  *   doing, but still theirs to clear: the buddy is an assistant, not an authority.
+ * - `HIRE` — theirs, and the only kind their own controls write.
  *
  * Nothing writes `TEAM` or `BUDDY` any more: card blueprints and the generator that copied the path
  * onto the board were retired when the onboarding path became the one plan (#311). Boards arranged
  * before then still hold such edges, and they keep their meaning.
- * - `HIRE` — theirs, and the only kind their own controls write.
  */
 export type DependencySource = "TEAM" | "BUDDY" | "HIRE";
 
