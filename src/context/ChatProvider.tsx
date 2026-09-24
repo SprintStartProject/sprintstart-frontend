@@ -11,7 +11,7 @@ import { useAuth } from "./useAuth";
 import { useToastApi } from "./useToast";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
-import type { ChatContextValue, SelectedCitation } from "./ChatContext";
+import type { ChatContextValue, ChatTurnOutcome, SelectedCitation } from "./ChatContext";
 import type {
   Chat,
   ChatMessage,
@@ -85,6 +85,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messagesByChat, setMessagesByChat] = useState<MessagesByChat>({});
 
   const [isThinking, setIsThinking] = useState(false);
+  const [lastTurnOutcome, setLastTurnOutcome] = useState<ChatTurnOutcome | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
@@ -529,6 +530,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }));
 
       setIsThinking(true);
+      setLastTurnOutcome(null);
       // A follow-up sent mid-stream would otherwise inherit the previous
       // stream's flags — a caret on a message that no longer receives tokens
       // and the previous turn's tool label under the dots.
@@ -576,6 +578,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             "The answer timed out",
             "The assistant stopped responding for five minutes.",
           );
+          setLastTurnOutcome({ chatId: currentChatId, kind: "failed" });
         }, STREAM_TIMEOUT_MS);
       };
       armStreamTimeout();
@@ -753,6 +756,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 ),
               }));
 
+              // The timeout path aborts and then lands here — keep its
+              // "failed" verdict instead of overwriting it with "done".
+              setLastTurnOutcome((prev) =>
+                prev?.chatId === currentChatId && prev.kind === "failed"
+                  ? prev
+                  : { chatId: currentChatId, kind: "done" },
+              );
+
               void refreshChats();
 
               // The answer is complete, so the next queued message may go.
@@ -770,6 +781,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
               if (!isCurrentStream()) return;
               reportFailure("The answer failed", err);
+              setLastTurnOutcome({ chatId: currentChatId, kind: "failed" });
               // A failed turn still frees the queue: the next message may well
               // be the retry, and holding it hostage to a failure the user has
               // already been told about helps nobody.
@@ -791,6 +803,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         if (!isCurrentStream()) return;
         reportFailure("The answer failed", "Unexpected error during streaming.");
+        setLastTurnOutcome({ chatId: currentChatId, kind: "failed" });
         drainRef.current(currentChatId);
       }
     },
@@ -824,6 +837,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     flushDraft();
     const stopped = draftRef.current;
     draftRef.current = null;
+    if (stopped) setLastTurnOutcome({ chatId: stopped.chatId, kind: "stopped" });
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     streamingStartedRef.current = false;
@@ -1028,6 +1042,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     streamingMessageId,
     thinkingState,
     streamingChatId,
+    lastTurnOutcome,
     selectedCitation,
     setSelectedCitation,
     newRequest,

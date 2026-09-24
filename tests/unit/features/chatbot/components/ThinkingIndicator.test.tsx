@@ -88,4 +88,21 @@ describe("ThinkingIndicator", () => {
     fireEvent.click(screen.getByText("Exit Game"));
     expect(onExit).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the game out of the live region and announces only a concise status", () => {
+    render(
+      <ThinkingIndicator
+        isThinking={true}
+        gameActive={true}
+        thinkingState={null}
+        onGameExit={vi.fn()}
+      />,
+    );
+
+    const status = screen.getByTestId("thinking-status");
+    expect(status).toHaveAttribute("role", "status");
+    expect(status).toHaveTextContent("Thinking…");
+    expect(status).not.toContainElement(screen.getByTestId("dino-game"));
+    expect(screen.getByTestId("dino-game").closest('[role="status"]')).toBeNull();
+  });
 });

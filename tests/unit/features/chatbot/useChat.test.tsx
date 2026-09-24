@@ -426,6 +426,8 @@ describe("useChat", () => {
     expect(await screen.findByText("The answer failed")).toBeInTheDocument();
     expect(screen.getByText("LLM overload")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    // The dino game reads this: a failed stream must not be labelled "Reply ready".
+    expect(result.current.turnOutcome).toBe("failed");
   });
 
   it("exposes stopStreaming function that can abort a stream", async () => {
@@ -561,6 +563,8 @@ describe("useChat", () => {
       expect(result.current.isThinking).toBe(false);
       expect(result.current.isStreaming).toBe(false);
     });
+    // A Stop is its own outcome, so the dino game does not claim a reply arrived.
+    expect(result.current.turnOutcome).toBe("stopped");
   });
 
   it("keeps isThinking true during reasoning streaming and clears isThinking on the first content token", async () => {

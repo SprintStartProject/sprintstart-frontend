@@ -36,6 +36,12 @@ type BuddyComposerProps = {
    * send would quietly make that egg unreachable on this surface.
    */
   busy?: boolean;
+  /**
+   * Whether the dino waiting-game is open. The caret is held back while it is: the game
+   * ignores keys aimed at text fields, so a refocus mid-run (the reply arriving) would kill
+   * the dino, deaden Escape and type Spaces in here. Closing the game hands the caret back.
+   */
+  gameActive?: boolean;
 };
 
 /**
@@ -59,6 +65,7 @@ export function BuddyComposer({
   compact = false,
   focusOnMount = false,
   busy = false,
+  gameActive = false,
 }: BuddyComposerProps) {
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
@@ -85,14 +92,14 @@ export function BuddyComposer({
   // back so a follow-up question does not need a click first. Skipped when somebody else holds
   // focus, so this never pulls the caret out of a field the hire moved to in the meantime.
   useEffect(() => {
-    if (busy || !handedOffCaretRef.current) return;
+    if (busy || gameActive || !handedOffCaretRef.current) return;
     handedOffCaretRef.current = false;
     const field = fieldRef.current;
     if (!field) return;
     const active = document.activeElement;
     if (active && active !== document.body) return;
     field.focus();
-  }, [busy]);
+  }, [busy, gameActive]);
 
   /**
    * Sends, then hands the caret back to the page.

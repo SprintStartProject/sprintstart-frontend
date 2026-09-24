@@ -1,6 +1,7 @@
-import { BotGlyph } from "./BotGlyph";
-import { DinoGame } from "./DinoGame";
-import { THINKING_LABELS, type ThinkingState } from "../constants";
+import { BotGlyph } from "./BotGlyph.tsx";
+import { DinoGame } from "./DinoGame.tsx";
+import { THINKING_LABELS, type ThinkingState } from "../constants.ts";
+import { dinoCompletionProps, type DinoTurnOutcome } from "../dinoOutcome.ts";
 
 type ThinkingIndicatorProps = {
   /** True while the assistant is working (before the first reply token arrives). */
@@ -11,8 +12,13 @@ type ThinkingIndicatorProps = {
   thinkingState: string | null;
   /** Whether thoughts/reasoning are actively present (suppresses duplicate dots). */
   hasReasoning?: boolean;
-  /** True if the reply is ready while the game is still active. */
+  /** True if the turn finished (reply, stop or failure) while the game is still active. */
   replyReady?: boolean;
+  /**
+   * How the finished turn ended, so the game says "Stopped" / "Reply failed"
+   * instead of "Reply ready" after a Stop or stream error.
+   */
+  turnOutcome?: DinoTurnOutcome;
   /** Called when the user exits the dino game. */
   onGameExit: () => void;
 };
@@ -29,6 +35,7 @@ export function ThinkingIndicator({
   thinkingState,
   hasReasoning = false,
   replyReady = false,
+  turnOutcome = null,
   onGameExit,
 }: ThinkingIndicatorProps) {
   // If neither thinking nor game active, nothing to render.
@@ -62,29 +69,30 @@ export function ThinkingIndicator({
   );
 
   if (gameActive) {
+    // The game (score ticks ~12x/s) must not sit inside a live region, or a
+    // screen reader re-reads it constantly. One concise, always-mounted status
+    // carries the working state; DinoGame announces its own outcome.
     return (
-      <div className="flex w-full gap-3" role="status">
+      <div className="flex w-full gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center">
           <BotGlyph size={30} state="cheering" className="text-app-brand-text" />
         </div>
 
         <div className="min-w-0 flex-1">
-          <DinoGame onExit={onGameExit} replyReady={replyReady} />
+          <span className="sr-only" role="status" data-testid="thinking-status">
+            {isThinking ? (label ?? "Thinking…") : ""}
+          </span>
+
+          <DinoGame onExit={onGameExit} {...dinoCompletionProps(replyReady, turnOutcome)} />
 
           {isThinking && (
-            <div className="mt-2 flex w-max items-center gap-1 rounded-2xl border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-app-text">
-              <span
-                className="h-2 w-2 animate-bounce rounded-full bg-app-brand"
-                aria-hidden="true"
-              />
-              <span
-                className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]"
-                aria-hidden="true"
-              />
-              <span
-                className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]"
-                aria-hidden="true"
-              />
+            <div
+              className="mt-2 flex w-max items-center gap-1 rounded-2xl border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-app-text"
+              aria-hidden="true"
+            >
+              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
               {label && <span className="animate-pulse pl-2 text-sm italic">{label}</span>}
             </div>
           )}

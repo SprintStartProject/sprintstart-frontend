@@ -3,7 +3,10 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, UserRound } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { BotGlyph } from "../../chatbot/components/BotGlyph";
-import { DinoGame } from "../../chatbot/components/DinoGame";
+import { DinoGame } from "../../chatbot/components/DinoGame.tsx";
+import { dinoCompletionProps } from "../../chatbot/dinoOutcome.ts";
+import type { DinoTurnOutcome } from "../../chatbot/dinoOutcome.ts";
+import { centralSpringToken } from "../../../styles/tokens.ts";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { useAuth } from "../../../context/useAuth";
 
@@ -222,6 +225,7 @@ export function BuddyTypingMessage({
   showName = false,
   gameActive = false,
   replyReady = false,
+  turnOutcome = null,
   onGameExit,
 }: {
   label?: string;
@@ -234,6 +238,11 @@ export function BuddyTypingMessage({
    * that has arrived is not being typed anymore.
    */
   replyReady?: boolean;
+  /**
+   * How the finished turn ended — a failed reply must not be announced as "Reply ready".
+   * Only read once `replyReady` is true.
+   */
+  turnOutcome?: DinoTurnOutcome;
   /** Called when the player leaves the dino game (Escape / exit button). */
   onGameExit?: () => void;
 }) {
@@ -253,17 +262,23 @@ export function BuddyTypingMessage({
           : {
               initial: { opacity: 0, y: 8 },
               animate: { opacity: 1, y: 0 },
-              transition: { duration: 0.26, ease: [0.16, 1, 0.3, 1] as const },
+              transition: centralSpringToken,
             })}
-        role="status"
         className="flex w-full min-w-0 gap-2.5"
       >
+        {/* The game is deliberately outside any live region: its score changes many times a
+            second and would flood a screen reader. This one concise status says what the buddy
+            is doing; the game announces its own completion and game-over lines. */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {replyReady ? "" : (label ?? "Buddy is thinking…")}
+        </p>
+
         <div className="flex size-8 shrink-0 items-center justify-center">
           <BotGlyph size={30} state="cheering" className="text-app-brand-text" />
         </div>
 
         <div className="min-w-0 flex-1">
-          <DinoGame onExit={onGameExit} replyReady={replyReady} />
+          <DinoGame onExit={onGameExit} {...dinoCompletionProps(replyReady, turnOutcome)} />
 
           {!replyReady && (
             <div className="mt-2 flex w-max max-w-full items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-2.5 shadow-sm">

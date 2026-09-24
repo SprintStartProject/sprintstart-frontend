@@ -177,6 +177,7 @@ function BuddyMentorHome() {
     openError,
     dinoGameActive,
     closeDinoGame,
+    registerDinoSurface,
     ensureOpened,
     retryOpen,
     startFreshVisit,
@@ -187,6 +188,10 @@ function BuddyMentorHome() {
     isGreeting,
     isDeciding,
   } = useBuddySession();
+
+  // The page shows the thread, so Space may open the dino game here; leaving the page releases
+  // it (and closes a game still running) — see `registerDinoSurface`.
+  useEffect(() => registerDinoSurface(), [registerDinoSurface]);
 
   // A greeting written while the hire was somewhere else still gets the buddy thinking and
   // writing it, the first time it is on screen — the same as in the dock.

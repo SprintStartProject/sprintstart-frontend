@@ -120,6 +120,7 @@ export function SourceDetailsPanel({
   const isUpdating = updateState === "loading";
   const isRefreshing = refreshState === "loading";
   const isSyncing = source.statusView.state === "syncing" || isUpdating;
+  const syncFailed = source.statusView.state === "attention";
   const dinoUnlocked = useDinoUnlocked();
   const [dinoActive, closeDino] = useSpaceOpensDino(isSyncing, dinoUnlocked, {
     keepActiveUntilExit: true,
@@ -423,11 +424,16 @@ export function SourceDetailsPanel({
           <div className="mb-3">
             <DinoGame
               onExit={closeDino}
-              // "Sync complete" may only claim the state the source actually
-              // reached: leaving syncing also happens on a failure (attention)
-              // or a disabled source, and neither is a completed sync.
-              replyReady={dinoActive && source.statusView.state === "connected"}
-              completionLabel="Sync complete"
+              // The badge may only claim the state the source actually reached,
+              // and only once nothing is in flight: an update request still
+              // pending (isUpdating) counts as syncing even while the status
+              // reads "connected". A failed run (attention) is reported as
+              // such; a disabled or stale source announces nothing.
+              replyReady={
+                dinoActive && !isSyncing && (source.statusView.state === "connected" || syncFailed)
+              }
+              completionLabel={syncFailed ? "Sync failed" : "Sync complete"}
+              completionTone={syncFailed ? "danger" : "success"}
             />
           </div>
         )}

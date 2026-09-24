@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { GenerationScreen } from "../../../../../../src/features/onboarding/components/journey/GenerationScreen";
@@ -83,6 +83,48 @@ describe("GenerationScreen", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/path ready/i)).toBeInTheDocument();
+    expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent(/path ready/i);
+  });
+
+  it("shows no phase still working once completed, and stops the clock", () => {
+    vi.useFakeTimers();
+    try {
+      const startedAt = Date.now() - 5000;
+      render(
+        <MemoryRouter>
+          <GenerationScreen phases={mockPhases} startedAt={startedAt} isCompleted />
+        </MemoryRouter>,
+      );
+
+      for (const phase of screen.getAllByTestId("generation-phase")) {
+        expect(phase).toHaveAttribute("data-state", "done");
+      }
+      expect(screen.getByText("3 of 3 phases assembled")).toBeInTheDocument();
+
+      const elapsedBefore = screen.getByTestId("generation-elapsed").textContent;
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(screen.getByTestId("generation-elapsed").textContent).toBe(elapsedBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a failed phase failed when completed", () => {
+    render(
+      <MemoryRouter>
+        <GenerationScreen
+          phases={[...mockPhases, { name: "Deep Dive", state: "failed", detail: "Nothing found" }]}
+          startedAt={Date.now()}
+          isCompleted
+        />
+      </MemoryRouter>,
+    );
+
+    const states = screen
+      .getAllByTestId("generation-phase")
+      .map((phase) => phase.getAttribute("data-state"));
+    expect(states).toEqual(["done", "done", "done", "failed"]);
   });
 });

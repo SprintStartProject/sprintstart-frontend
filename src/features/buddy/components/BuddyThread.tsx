@@ -240,6 +240,9 @@ export function BuddyThread({
           showName={showNames}
           gameActive={dinoGameActive}
           replyReady={dinoGameActive && !isThinking && !isStreaming}
+          // A failed reply carries its error on the last turn; announcing it as
+          // "Reply ready" would be a lie. The buddy has no Stop, so only two outcomes.
+          turnOutcome={messages[messages.length - 1]?.error ? "failed" : "done"}
           onGameExit={onDinoGameExit}
         />
       )}

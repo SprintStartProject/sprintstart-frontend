@@ -1,5 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isTypingTarget } from "../../easter-eggs/hooks/useDinoWaitingGame";
+import { Button } from "../../../components/ui/Button.tsx";
+import { isTypingTarget } from "../../easter-eggs/hooks/useDinoWaitingGame.ts";
+
+/**
+ * How the work the player is waiting on ended. Drives the badge colour *and*
+ * its wording, so the outcome never rests on colour alone (WCAG 1.4.1):
+ * `success` — the reply/sync/path is there; `neutral` — the user stopped it;
+ * `danger` — it failed.
+ */
+export type DinoCompletionTone = "success" | "neutral" | "danger";
+
+const TONE_DOT: Record<DinoCompletionTone, string> = {
+  success: "bg-app-success-solid",
+  neutral: "bg-app-text-muted",
+  danger: "bg-app-danger-solid",
+};
 
 type DinoGameProps = {
   /**
@@ -14,6 +29,16 @@ type DinoGameProps = {
    * Optional custom completion label shown when `replyReady` is true (defaults to "Reply ready").
    */
   completionLabel?: string;
+  /**
+   * How the awaited work ended (default `success`). A stopped or failed turn must not
+   * claim "Reply ready" — the host passes the matching label and tone instead.
+   */
+  completionTone?: DinoCompletionTone;
+  /**
+   * Label of the game-over button that leaves the game once `replyReady` is true.
+   * Defaults to "View Reply", or to `completionLabel` when one is given.
+   */
+  continueLabel?: string;
 };
 
 type Phase = "intro" | "play" | "over";
@@ -169,7 +194,13 @@ function roundedRect(
  * The whole game runs on a canvas driven by requestAnimationFrame; React state
  * is only used for the surrounding chrome (game-over overlay, score badge).
  */
-export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGameProps) {
+export function DinoGame({
+  onExit,
+  replyReady = false,
+  completionLabel,
+  completionTone = "success",
+  continueLabel,
+}: DinoGameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -276,12 +307,6 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
       // target is a text field, every key below is a character or caret move:
       // leave it unprevented and unhandled.
       if (isTypingTarget(e.target)) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onExit();
-        return;
-      }
-
       if (e.code === "Space" || e.key === "ArrowUp" || e.key === "w") {
         e.preventDefault();
         if (!e.repeat) pressJump();
@@ -306,9 +331,26 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
       }
     };
 
+    // Escape is handled in the *capture* phase on the window, i.e. before any
+    // listener on the document or an element sees it. The game is often hosted inside
+    // a surface that closes on Escape itself (SidePanel listens on the document, which
+    // fires before a bubbling window listener). One Escape must close only the
+    // innermost thing — the game — so it is claimed here: preventDefault for hosts
+    // that check `defaultPrevented`, stopPropagation for the ones that do not. It is
+    // honoured even from a text field: Escape types nothing, and leaving the game from
+    // wherever focus happens to be is what the "Esc ✕" label promises.
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onExit();
+    };
+
+    window.addEventListener("keydown", onEscape, true);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     return () => {
+      window.removeEventListener("keydown", onEscape, true);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
@@ -806,7 +848,21 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
       className="relative w-full overflow-hidden rounded-2xl border border-app-border bg-app-surface-muted"
       role="application"
       aria-label="Mini dino game — space jumps (hold for higher), arrow down ducks, escape exits"
+      data-testid="dino-game"
     >
+      {/*
+        The one live region of the game. Hosts must NOT wrap the game in their own
+        role="status": the score below changes ~12×/s and would be read out endlessly.
+        Only the outcome of the awaited work and the final score are announced.
+      */}
+      <span className="sr-only" role="status" aria-live="polite" data-testid="dino-game-status">
+        {replyReady
+          ? (completionLabel ?? "Reply ready")
+          : status === "over"
+            ? `Game over. Score ${score}.`
+            : ""}
+      </span>
+
       <canvas
         ref={canvasRef}
         className="block w-full touch-none"
@@ -817,7 +873,7 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
 
       {/* Top bar: score + exit */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-2.5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" aria-hidden="true">
           <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-semibold text-app-text-muted tabular-nums backdrop-blur-sm">
             HI {String(highScore).padStart(5, "0")}
           </span>
@@ -826,19 +882,30 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
           </span>
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={onExit}
-          className="pointer-events-auto flex items-center gap-1.5 rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-medium text-app-text-muted backdrop-blur-sm transition-colors hover:text-app-text"
+          aria-label={replyReady ? `${completionLabel ?? "Reply ready"}, exit game` : "Exit game"}
+          data-testid="dino-game-close"
+          className="pointer-events-auto bg-app-surface/80 backdrop-blur-sm"
+          icon={
+            replyReady ? (
+              <span
+                className={`inline-block size-1.5 rounded-full motion-safe:animate-pulse ${TONE_DOT[completionTone]}`}
+                aria-hidden="true"
+              />
+            ) : undefined
+          }
         >
-          {replyReady && (
-            <span
-              className="inline-block size-1.5 animate-pulse rounded-full bg-emerald-500"
-              aria-hidden="true"
-            />
+          {replyReady ? (
+            <span data-testid="dino-game-reply-ready" data-tone={completionTone}>
+              {`${completionLabel ?? "Reply ready"} · Esc ✕`}
+            </span>
+          ) : (
+            "Esc ✕"
           )}
-          <span>{replyReady ? `${completionLabel ?? "Reply ready"} · Esc ✕` : "Esc ✕"}</span>
-        </button>
+        </Button>
       </div>
 
       {/* Controls hint */}
@@ -856,8 +923,8 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
           <p className="text-sm font-bold tracking-wide text-app-text">GAME OVER</p>
 
           {newHighScore ? (
-            <div className="flex animate-bounce items-center gap-1.5 rounded-full bg-app-brand-soft px-3 py-1 text-xs font-bold text-app-brand-text ring-1 ring-app-brand-border">
-              <span>🏆</span>
+            <div className="flex items-center gap-1.5 rounded-full bg-app-brand-soft px-3 py-1 text-xs font-bold text-app-brand-text ring-1 ring-app-brand-border motion-safe:animate-bounce">
+              <span aria-hidden="true">🏆</span>
               <span>New High Score! {score}</span>
             </div>
           ) : (
@@ -867,29 +934,22 @@ export function DinoGame({ onExit, replyReady = false, completionLabel }: DinoGa
           )}
           <div className="mt-1 flex gap-2">
             {replyReady ? (
-              <button
-                type="button"
-                onClick={onExit}
-                className="rounded-lg bg-app-brand px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-brand-hover"
-              >
-                {completionLabel ? `${completionLabel} (Space)` : "View Reply (Space)"}
-              </button>
+              <Button variant="primary" size="xs" onClick={onExit} data-testid="dino-game-continue">
+                {`${continueLabel ?? completionLabel ?? "View Reply"} (Space)`}
+              </Button>
             ) : (
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="xs"
                 onClick={pressJump}
-                className="rounded-lg bg-app-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-app-brand-hover"
+                data-testid="dino-game-replay"
               >
                 Play Again (Space)
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              onClick={onExit}
-              className="rounded-lg border border-app-border px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:text-app-text"
-            >
+            <Button variant="secondary" size="xs" onClick={onExit}>
               Exit (Esc)
-            </button>
+            </Button>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { BookmarkPlus, MessageSquareText, X } from "lucide-react";
 import { ArrowDown } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../styles/tokens";
@@ -132,6 +132,7 @@ export function ChatPage() {
     removeQueuedMessage,
     editQueuedMessage,
     sendQueuedNow,
+    turnOutcome,
   } = useChat();
 
   const { sources: availableSources, loading: sourcesLoading } = useAvailableSources();
@@ -156,13 +157,15 @@ export function ChatPage() {
   });
 
   // When switching between chats while a waiting game is open, exit cleanly.
-  const [prevChatId, setPrevChatId] = useState(chatId);
-  if (prevChatId !== chatId) {
-    setPrevChatId(chatId);
-    if (gameActive) {
-      closeGame();
-    }
-  }
+  // An effect, not a render-phase adjustment: closing releases the shared
+  // module-level game slot, and mutating module state during render is unsafe
+  // (StrictMode double renders, discarded concurrent renders).
+  const prevChatIdRef = useRef(chatId);
+  useEffect(() => {
+    if (prevChatIdRef.current === chatId) return;
+    prevChatIdRef.current = chatId;
+    closeGame();
+  }, [chatId, closeGame]);
 
   const handleToggleFilters = useCallback(() => {
     setShowFilters((v) => !v);
@@ -201,13 +204,17 @@ export function ChatPage() {
   // works. Once the turn is over that reason is gone, focus goes back — otherwise every
   // follow-up question needs a click first. Skipped when something else already holds focus,
   // so this never steals the caret from wherever the user went in the meantime.
+  // Also held back while the dino game is open: the game ignores keys aimed at text
+  // fields, so stealing focus for the composer mid-run would kill the dino, make Esc
+  // dead and type Spaces into the composer. Closing the game re-runs this effect, which
+  // is when the composer gets focus back.
   useEffect(() => {
-    if (busy) return;
+    if (busy || gameActive) return;
     if (!chatId) return;
     const active = document.activeElement;
     if (active && active !== document.body) return;
     textareaRef.current?.focus();
-  }, [busy, chatId, textareaRef]);
+  }, [busy, chatId, gameActive, textareaRef]);
 
   // Custom submit handler to intercept easter eggs: a phrase match plays
   // the app-wide effect (via the bus) and swallows the message — it never
@@ -467,6 +474,7 @@ export function ChatPage() {
               thinkingState={thinkingState}
               hasReasoning={hasReasoning}
               replyReady={gameActive && !isThinking && !isStreaming}
+              turnOutcome={turnOutcome}
               onGameExit={closeGame}
             />
 

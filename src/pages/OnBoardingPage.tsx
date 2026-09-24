@@ -223,22 +223,45 @@ export function OnBoardingPage() {
   }, []);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [isDinoActiveInGeneration, setIsDinoActiveInGeneration] = useState(false);
+  /**
+   * The last running generation, kept so the generation screen can stay up while the dino game
+   * is still being played after the run has ended (see `isDinoActiveInGeneration`).
+   *
+   * `completed` outlives the `done` status on purpose: the page clears a finished generation as
+   * soon as the new path is fetched, so the status drops to `idle` while the game may still be
+   * open. Without the flag the screen would fall back to the frozen "working" snapshot and stop
+   * saying "Path ready".
+   */
   const [lastGeneration, setLastGeneration] = useState<{
     phases: GenerationPhaseProgress[];
     startedAt: number;
-  }>({ phases: [], startedAt: 0 });
+    completed: boolean;
+  }>(() =>
+    generation.status === "running"
+      ? { phases: generation.phases, startedAt: generation.startedAt, completed: false }
+      : { phases: [], startedAt: 0, completed: false },
+  );
 
-  useEffect(() => {
+  // Follows the generation during render (React's "adjust state when a value changes" pattern)
+  // rather than in an effect, so the screen never paints one frame with a stale outcome.
+  const [seenGeneration, setSeenGeneration] = useState(generation);
+  if (seenGeneration !== generation) {
+    setSeenGeneration(generation);
     if (generation.status === "running") {
-      const { phases: currentPhases, startedAt } = generation;
-      // Deferred out of the effect body on purpose: `react-hooks/set-state-in-effect`
-      // flags a synchronous setState here, and semantically this only needs to land
-      // before the next paint, not before the next effect runs.
-      queueMicrotask(() => {
-        setLastGeneration({ phases: currentPhases, startedAt });
+      setLastGeneration({
+        phases: generation.phases,
+        startedAt: generation.startedAt,
+        completed: false,
       });
+    } else if (generation.status === "done") {
+      setLastGeneration((previous) => ({ ...previous, completed: true }));
+    } else if (generation.status === "error") {
+      // Failure wins over the game: the snapshot's phases are still "working", so keeping the
+      // generation screen up for the game would hide the failure behind a wait that is over.
+      // Dropping the flag unmounts the screen, which releases the game's shared slot with it.
+      setIsDinoActiveInGeneration(false);
     }
-  }, [generation]);
+  }
   // Set when the page itself moves the member on, so the item they land on is scrolled to.
   const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
 
@@ -687,7 +710,12 @@ export function OnBoardingPage() {
 
   // ── Render: generating ──────────────────────────────────────
 
-  if (generation.status === "running" || isDinoActiveInGeneration) {
+  // A failed generation never keeps this screen up, game or not: its failure (the retry below, or
+  // the toast beside an existing path) has to be what the member sees.
+  if (
+    generation.status === "running" ||
+    (isDinoActiveInGeneration && generation.status !== "error")
+  ) {
     const isRunning = generation.status === "running";
     const activePhases = isRunning ? generation.phases : lastGeneration.phases;
     const startedAt = isRunning ? generation.startedAt : lastGeneration.startedAt;
@@ -696,11 +724,9 @@ export function OnBoardingPage() {
       <GenerationScreen
         phases={activePhases}
         startedAt={startedAt}
-        // Only a finished generation may claim "Path ready": a failed one also
-        // leaves the running state (and holds the game open until the user
-        // exits), and its screen says so — promising a path that failed to
-        // assemble would lie exactly where the user is looking.
-        isCompleted={generation.status === "done"}
+        // Only a finished generation may claim "Path ready" -- and keeps claiming it after the
+        // page clears the `done` status, see `lastGeneration.completed`.
+        isCompleted={!isRunning && (generation.status === "done" || lastGeneration.completed)}
         onGameActiveChange={setIsDinoActiveInGeneration}
       />
     );

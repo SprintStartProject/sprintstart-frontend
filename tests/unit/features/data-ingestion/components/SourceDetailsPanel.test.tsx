@@ -2,6 +2,7 @@ import { fireEvent, render as rtlRender, screen, waitFor, within } from "@testin
 import userEvent from "@testing-library/user-event";
 import { GitBranch } from "lucide-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SidePanel } from "../../../../../src/components/ui/SidePanel";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { SourceDetailsPanel } from "../../../../../src/features/data-ingestion/components/SourceDetailsPanel";
 import type {
@@ -565,6 +566,102 @@ describe("SourceDetailsPanel", () => {
     // Source finishes syncing
     rerender(<SourceDetailsPanel source={mockSource} onClose={vi.fn()} />);
 
-    expect(screen.getByText(/sync complete/i)).toBeInTheDocument();
+    expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent(/sync complete/i);
+  });
+
+  it("withholds the completion badge while an update request is still in flight", async () => {
+    window.localStorage.setItem("dinoUnlocked", "true");
+    const user = userEvent.setup();
+    let resolveUpdate: () => void = () => {};
+    const onUpdateSource = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveUpdate = resolve;
+        }),
+    );
+
+    render(
+      <SourceDetailsPanel source={mockSource} onUpdateSource={onUpdateSource} onClose={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Update repo/ }));
+    // Space on a focused button is that button's own activation, so the game
+    // only opens once focus has left it.
+    (document.activeElement as HTMLElement | null)?.blur();
+    // The trigger arms in an effect once the update is in flight; under a loaded
+    // runner that can land a tick after the click resolves, so retry the press.
+    await waitFor(() => {
+      fireEvent.keyDown(window, { code: "Space" });
+      expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+    });
+
+    // Status still reads "connected", but the update has not settled yet.
+    expect(screen.queryByTestId("dino-game-reply-ready")).not.toBeInTheDocument();
+
+    resolveUpdate();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent(/sync complete/i),
+    );
+    expect(screen.getByTestId("dino-game-reply-ready")).toHaveAttribute("data-tone", "success");
+  });
+
+  it("reports 'Sync failed' instead of 'Sync complete' when the sync ends in attention", () => {
+    window.localStorage.setItem("dinoUnlocked", "true");
+    const syncingSource: DataSource = {
+      ...mockSource,
+      statusView: {
+        state: "syncing",
+        label: "Syncing",
+        icon: mockSource.icon,
+        tone: "brand",
+        spinning: true,
+      },
+    };
+    const failedSource: DataSource = {
+      ...mockSource,
+      statusView: deriveSourceStatus({ hasErrors: true, hasNeverSynced: false }),
+    };
+
+    const { rerender } = render(<SourceDetailsPanel source={syncingSource} onClose={vi.fn()} />);
+    fireEvent.keyDown(window, { code: "Space" });
+
+    rerender(<SourceDetailsPanel source={failedSource} onClose={vi.fn()} />);
+
+    const badge = screen.getByTestId("dino-game-reply-ready");
+    expect(badge).toHaveTextContent(/sync failed/i);
+    expect(badge).toHaveAttribute("data-tone", "danger");
+    expect(screen.queryByText(/sync complete/i)).not.toBeInTheDocument();
+  });
+
+  it("first Escape closes the dino game but not the drawer; second Escape closes the drawer", () => {
+    window.localStorage.setItem("dinoUnlocked", "true");
+    const onDrawerClose = vi.fn();
+    const syncingSource: DataSource = {
+      ...mockSource,
+      statusView: {
+        state: "syncing",
+        label: "Syncing",
+        icon: mockSource.icon,
+        tone: "brand",
+        spinning: true,
+      },
+    };
+
+    render(
+      <SidePanel isOpen onClose={onDrawerClose} title="Source details">
+        <SourceDetailsPanel source={syncingSource} onClose={vi.fn()} />
+      </SidePanel>,
+    );
+
+    fireEvent.keyDown(window, { code: "Space" });
+    expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+
+    fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+    expect(onDrawerClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    expect(onDrawerClose).toHaveBeenCalledTimes(1);
   });
 });

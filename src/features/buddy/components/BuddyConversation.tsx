@@ -197,6 +197,7 @@ export function BuddyConversation({
             placeholder={placeholder}
             focusOnMount={focusComposerOnMount}
             busy={isThinking || isStreaming}
+            gameActive={dinoGameActive}
           />
         </div>
       </div>

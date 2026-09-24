@@ -96,12 +96,37 @@ export function useBuddyConversation(
   // offers. Closing is handled inside the hook: on exit, when the turn ends,
   // or when the cogwheel unlock flag flips off.
   const dinoUnlocked = useDinoUnlocked();
-  const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(isThinking, dinoUnlocked, {
-    // Parity with the chat and the drawer: the game outlives the turn it was armed for
-    // and stays open until the player leaves it — the reply's arrival only flips its
-    // completion badge. Without this the first token unmounted the game mid-run.
-    keepActiveUntilExit: true,
-  });
+  // How many surfaces currently show this thread (the open dock, the mounted `/buddy` page).
+  // The session lives app-wide in BuddyProvider, so arming on `isThinking` alone let Space open
+  // a game inside a minimised dock nobody could see — and with `keepActiveUntilExit` that
+  // invisible game held the shared slot for good. Surfaces register via `useDinoSurface`.
+  const [dinoSurfaceCount, setDinoSurfaceCount] = useState(0);
+  const dinoSurfaceVisible = dinoSurfaceCount > 0;
+  const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(
+    isThinking && dinoSurfaceVisible,
+    dinoUnlocked,
+    {
+      // Parity with the chat and the drawer: the game outlives the turn it was armed for
+      // and stays open until the player leaves it — the reply's arrival only flips its
+      // completion badge. Without this the first token unmounted the game mid-run.
+      keepActiveUntilExit: true,
+    },
+  );
+
+  // The last visible surface went away (dock minimised, page left): the game it hosted is gone
+  // from screen, so it must not keep running — or keep the shared slot — behind it.
+  useEffect(() => {
+    if (!dinoSurfaceVisible) closeDinoGame();
+  }, [dinoSurfaceVisible, closeDinoGame]);
+
+  /**
+   * Declares that a surface showing this thread is on screen. Returns the matching release;
+   * meant to be called from an effect (see `useDinoSurface`).
+   */
+  const registerDinoSurface = useCallback(() => {
+    setDinoSurfaceCount((count) => count + 1);
+    return () => setDinoSurfaceCount((count) => count - 1);
+  }, []);
 
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);
@@ -856,9 +881,21 @@ export function useBuddyConversation(
     // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
     // the one being switched to, exactly as it did the first time.
     loadedRef.current = false;
+    // A game left open from the previous conversation would keep claiming "Reply ready" for a
+    // thread that has just been cleared.
+    closeDinoGame();
 
     void ensureOpened();
-  }, [teamProjectId, isThinking, isStreaming, isOpening, isGreeting, isDeciding, ensureOpened]);
+  }, [
+    teamProjectId,
+    isThinking,
+    isStreaming,
+    isOpening,
+    isGreeting,
+    isDeciding,
+    ensureOpened,
+    closeDinoGame,
+  ]);
 
   /**
    * Points the buddy at a managed project (`null` returns to the hire's own onboarding). The
@@ -956,6 +993,7 @@ export function useBuddyConversation(
     dinoGameActive,
     closeDinoGame,
     dinoUnlocked,
+    registerDinoSurface,
 
     ensureOpened,
     retryOpen,

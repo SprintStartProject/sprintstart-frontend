@@ -74,6 +74,7 @@ export function BuddyWidget() {
     suggestions,
     dinoGameActive,
     closeDinoGame,
+    registerDinoSurface,
     openError,
     retryOpen,
     closeDock,
@@ -262,6 +263,14 @@ export function BuddyWidget() {
       revealTimer.current = null;
     };
   }, [handoff, closeDock]);
+
+  // The dock is a surface the dino game may live in only while it is actually on screen:
+  // minimised, or hidden behind `/buddy`, a Space press must not open a game nobody can see.
+  const dockVisible = isOpen && !(pathname === BUDDY_PAGE && handoff === "idle");
+  useEffect(() => {
+    if (!dockVisible) return;
+    return registerDinoSurface();
+  }, [dockVisible, registerDinoSurface]);
 
   // Normally the widget takes itself off `/buddy` — the launcher would offer the page you are
   // reading, and the dock would put a second composer over the first. During the hand-off it
