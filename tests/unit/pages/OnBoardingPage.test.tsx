@@ -945,6 +945,35 @@ describe("OnBoardingPage: links from the buddy", () => {
     );
   });
 
+  /**
+   * The line between a buddy link and `/onboarding/:stepId`: the address opens and starts a step,
+   * a link in the conversation only shows the hire where it is.
+   */
+  it("neither unfolds nor starts a step a link lands on", async () => {
+    const path = pathWithQuestion("OPEN");
+    path.phases[1].steps[0].status = "WAITING";
+    server.use(http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(path)));
+    const startStep = vi.spyOn(onboardingService, "startStep");
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/onboarding?step=step-phase-2"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(container.querySelector("#onboarding-item-step-phase-2")).toHaveClass(
+        "app-link-highlight",
+      ),
+    );
+    expect(startStep).not.toHaveBeenCalled();
+    expect(
+      within(container.querySelector("#onboarding-item-step-phase-2")!).queryByRole("button", {
+        expanded: true,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it("lands on the phase a link names", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),

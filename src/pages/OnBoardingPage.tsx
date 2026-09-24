@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { PageShell } from "../components/layout/PageShell";
 import { AlertDialog } from "../components/ui/AlertDialog";
@@ -56,6 +56,7 @@ import {
   phaseProgress,
   phaseState,
   phasesUnlockedBy,
+  linkedCardId,
   sortedPhases,
   waitingOn,
   type PhaseItem,
@@ -165,6 +166,20 @@ export function OnBoardingPage() {
   const focusItemId = routeStepId ?? navigationState?.focusQuestionId;
   // Set by the board's "where you are" strip when a phase on it is pressed.
   const openPhaseId = navigationState?.openPhaseId;
+  /**
+   * Where a link from the buddy points: `?step=<id>`, `?question=<id>` or `?phase=<id>`.
+   *
+   * The mentor is handed each item's link so it can write "you are on [#3](...)" and have that be
+   * clickable. In the URL rather than in router state because the model writes it into text the hire
+   * can copy, keep or open in a second tab, and state survives none of that.
+   *
+   * A link *lands* rather than starts: the phase opens, the page scrolls to the item and lights it up
+   * briefly. Unlike `/onboarding/:stepId`, nothing is unfolded or started -- following a link in a
+   * conversation is a way of finding something, and starting it is the hire's own click.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedItemId = searchParams.get("step") ?? searchParams.get("question");
+  const linkedPhaseId = searchParams.get("phase");
 
   const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
@@ -223,6 +238,9 @@ export function OnBoardingPage() {
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   // Set when the page itself moves the member on, so the item they land on is scrolled to.
   const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
+  // The item a buddy link landed on. `key` changes per arrival, so following the same link again
+  // restarts the light instead of leaving it spent.
+  const [linkHighlight, setLinkHighlight] = useState<{ id: string; key: string } | null>(null);
 
   usePathRevealMoment(loadingState === "success" ? path : null);
 
@@ -333,15 +351,28 @@ export function OnBoardingPage() {
           ? { kind: "question" as const, id: focusQuestionId }
           : wantsChooser
             ? { kind: "choose" as const, id: "" }
-            : null,
-    [focusQuestionId, routeStepId, wantsChooser],
+            : linkedItemId
+              ? { kind: "link-item" as const, id: linkedItemId }
+              : linkedPhaseId
+                ? { kind: "link-phase" as const, id: linkedPhaseId }
+                : null,
+    [focusQuestionId, linkedItemId, linkedPhaseId, routeStepId, wantsChooser],
   );
-  const arrivalKey = arrival ? `${arrival.kind}:${arrival.id}` : "";
+  // A link carries the navigation's key as well: the hire who scrolled away and clicks the same link
+  // in the conversation again should land again.
+  const arrivalKey = arrival
+    ? `${arrival.kind}:${arrival.id}${arrival.kind.startsWith("link") ? `:${location.key}` : ""}`
+    : "";
   const handledArrivalRef = useRef("");
 
   // Read by the arrival effect, which must not re-run every time one of these is recreated.
   const startStepRef = useRef<(item: PhaseItem) => void>(() => undefined);
   const scrollToChooserRef = useRef<() => void>(() => undefined);
+  /**
+   * Takes a handled link out of the address, so a reload or the hire's own next click decides what
+   * they are looking at rather than the link lighting the same card up again.
+   */
+  const clearLinkRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     if (loadingState !== "success" || !path || !arrival) return;
@@ -362,19 +393,40 @@ export function OnBoardingPage() {
         return;
       }
 
+      if (arrival.kind === "link-phase") {
+        if (path.phases.some((phase) => phase.id === arrival.id)) {
+          setSelectedPhaseId(arrival.id);
+          setExpandedItemId(null);
+        } else {
+          toast.error("That phase is not on your path", {
+            description: "It may have been replaced when your path was rebuilt.",
+          });
+        }
+        clearLinkRef.current();
+        return;
+      }
+
       const owningPhase = path.phases.find((phase) =>
         phaseItems(phase).some((item) => item.id === arrival.id),
       );
       if (!owningPhase) {
         toast.error(
-          arrival.kind === "step"
-            ? "That step is not on your path"
-            : "That question is not on your path",
+          arrival.kind === "question"
+            ? "That question is not on your path"
+            : "That step is not on your path",
           { description: "It may have been replaced when your path was rebuilt." },
         );
         // Only the step has an address of its own to go back from; a question arrives in router
         // state, which is dropped by navigating to the same place without it.
         void navigate("/onboarding", { replace: true, state: null });
+        return;
+      }
+
+      if (arrival.kind === "link-item") {
+        setSelectedPhaseId(owningPhase.id);
+        setExpandedItemId(null);
+        setLinkHighlight({ id: arrival.id, key: arrivalKey });
+        clearLinkRef.current();
         return;
       }
 
@@ -388,6 +440,27 @@ export function OnBoardingPage() {
       if (item) startStepRef.current(item);
     });
   }, [arrival, arrivalKey, loadingState, navigate, path, toast]);
+
+  useEffect(() => {
+    clearLinkRef.current = () =>
+      setSearchParams(
+        (params) => {
+          params.delete("step");
+          params.delete("question");
+          params.delete("phase");
+          return params;
+        },
+        { replace: true },
+      );
+  }, [setSearchParams]);
+
+  // Scrolls to the card a link landed on, once its phase is the one on screen.
+  useEffect(() => {
+    if (loadingState !== "success" || !linkHighlight) return;
+    document
+      .getElementById(linkedCardId(linkHighlight.id))
+      ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [linkHighlight, loadingState, selectedPhaseId]);
 
   // Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue".
   useEffect(() => {
@@ -882,6 +955,7 @@ export function OnBoardingPage() {
                     phase={selectedPhase}
                     nextItemId={nextItemId}
                     expandedItemId={expandedItemId}
+                    linkHighlight={linkHighlight}
                     onToggle={toggleItem}
                     onPrimary={openItem}
                     renderExpanded={(item) => renderItemBody(item, "inline")}

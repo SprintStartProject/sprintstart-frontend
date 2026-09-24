@@ -92,6 +92,11 @@ export function phaseItems(phase: OnboardingPhaseEndpoint): PhaseItem[] {
 }
 
 /** A phase's items in the order its graph reads, top to bottom -- the list view's order. */
+/** The DOM id of a step or question row, which a link from the buddy scrolls to. */
+export function linkedCardId(itemId: string): string {
+  return `onboarding-item-${itemId}`;
+}
+
 export function orderedPhaseItems(phase: OnboardingPhaseEndpoint): PhaseItem[] {
   return orderByGraph(phaseItems(phase));
 }
