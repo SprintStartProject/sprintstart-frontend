@@ -70,6 +70,8 @@ import type {
 } from "../features/onboarding/types";
 import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
+import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
+import { askAboutEmptyPhase, askAboutPhase } from "../features/onboarding/buddyDrafts";
 import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
 import { onboardingService } from "../services/onboardingService";
@@ -700,6 +702,7 @@ export function OnBoardingPage() {
         <QuestionWorkspace
           key={item.id}
           question={item.question}
+          phaseTitle={phase.title}
           onAnswered={(result) => handleAnswered(item.question, result)}
           continueLabel={next.label}
           onContinue={next.run}
@@ -832,6 +835,15 @@ export function OnBoardingPage() {
         >
           Try generation again
         </Button>
+        {/* Generating again is the wrong hope when the corpus is what was thin -- it comes back
+            empty a second time. The conversation is the one thing here that can produce
+            something, so it is offered beside the retry rather than instead of it. */}
+        {generationIssues.length > 0 ? (
+          <AskTheBuddy
+            question={askAboutEmptyPhase(generationIssues[0].title)}
+            label="Work it out with your buddy instead"
+          />
+        ) : null}
       </CenteredState>
     );
   }
@@ -1097,6 +1109,7 @@ function PhaseHeaderCard({
   const progress = phaseProgress(phase);
   const waitsOn = blockingPhases(phase, phases);
   const unlocks = phasesUnlockedBy(phase, phases);
+  const isEmpty = phase.steps.length === 0 && (phase.questions ?? []).length === 0;
 
   return (
     <div className="rounded-3xl border border-app-border bg-app-surface p-5">
@@ -1110,6 +1123,17 @@ function PhaseHeaderCard({
       {phase.description ? (
         <p className="mt-1 max-w-3xl text-sm text-app-text-muted">{phase.description}</p>
       ) : null}
+      {/* The phase-level way in. A hire who does not know why a phase is here is not helped by any
+          of the buttons below it -- and an empty phase is the case the buddy exists for: its title
+          still says what it was meant to cover, and the mentor can put the result on their path. */}
+      <AskTheBuddy
+        question={isEmpty ? askAboutEmptyPhase(phase.title) : askAboutPhase(phase)}
+        label={
+          isEmpty
+            ? "This phase is empty — talk it through with your buddy"
+            : "Ask your buddy about this phase"
+        }
+      />
       <div className="mt-3 flex items-center gap-3">
         <div className="h-1.5 w-40 overflow-hidden rounded-full bg-app-border-muted">
           <div

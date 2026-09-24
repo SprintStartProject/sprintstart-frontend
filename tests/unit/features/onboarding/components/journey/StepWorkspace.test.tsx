@@ -22,6 +22,13 @@ vi.mock("../../../../../../src/services/onboardingService", () => ({
   },
 }));
 
+const mockOpenAiBuddy = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../../../../src/features/buddy/aiBuddyBus", () => ({
+  openAiBuddy: mockOpenAiBuddy,
+  onBuddyPathChanged: () => () => undefined,
+}));
+
 import { onboardingService } from "../../../../../../src/services/onboardingService";
 
 const step = {
@@ -229,6 +236,27 @@ describe("StepWorkspace", () => {
 
     expect(onboardingService.startStep).toHaveBeenCalledWith("step1");
     expect(mockFlyby).toHaveBeenCalled();
+  });
+
+  it("offers the buddy on a step that is still open, with the step in the draft", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Stuck? Ask your buddy about this step" }),
+    );
+
+    expect(mockOpenAiBuddy).toHaveBeenCalledWith({
+      draft: expect.stringContaining("Setup Environment") as string,
+    });
+  });
+
+  it("does not offer the buddy on a step that is behind the hire", async () => {
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue({ ...step, status: "FINISHED" });
+    renderWorkspace();
+
+    await screen.findByText("Set up your dev environment");
+    expect(screen.queryByRole("button", { name: /ask your buddy/i })).not.toBeInTheDocument();
   });
 
   it("sends a skip request with a reason", async () => {

@@ -27,6 +27,8 @@ import type {
   OnboardingStepDetail,
   OnboardingTaskEndpoint,
 } from "../../types";
+import { AskTheBuddy } from "../../../buddy/components/AskTheBuddy";
+import { askAboutStep } from "../../buddyDrafts";
 import { StepOriginBadge } from "../StepOriginBadge";
 import { TaskCheckItem } from "../TaskCheckItem";
 
@@ -287,6 +289,14 @@ export function StepWorkspace({
           <p className={`leading-relaxed text-app-text-muted ${isFocus ? "text-base" : "text-sm"}`}>
             {step.description}
           </p>
+        ) : null}
+        {/* Where a hire sits when they are stuck on a step, so the way out of being stuck belongs
+            here. Not once it is behind them: there is nothing left to be stuck on. */}
+        {!isBehind ? (
+          <AskTheBuddy
+            question={askAboutStep(step)}
+            label="Stuck? Ask your buddy about this step"
+          />
         ) : null}
       </div>
 

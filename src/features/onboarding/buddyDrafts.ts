@@ -60,7 +60,7 @@ export function askAboutEmptyPhase(phaseTitle: string): string {
 }
 
 /** Opening a conversation about one step. */
-export function askAboutStep(step: OnboardingStepEndpoint): string {
+export function askAboutStep(step: Pick<OnboardingStepEndpoint, "title">): string {
   return `I'm on the onboarding step "${snippet(step.title)}". Can you help me get going on it?`;
 }
 
