@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useDeferredValue } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { NavigationType, useNavigationType } from "react-router-dom";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { queryKeys } from "../../../services/queryKeys";
@@ -19,11 +20,10 @@ import {
   type KnowledgeTab,
   SOURCE_LABELS,
 } from "../tabs";
+import { DEFAULT_PAGE_SIZE, useKnowledgeBaseUrlState } from "./useKnowledgeBaseUrlState.ts";
+import type { KnowledgeBaseUrlStateOptions } from "./useKnowledgeBaseUrlState.ts";
 
-const ITEMS_PER_PAGE = 20;
 const NO_ARTIFACTS: Artifact[] = [];
-const NO_SOURCES: ReadonlySet<SourceSystem> = new Set<SourceSystem>();
-const NO_REPOSITORIES: ReadonlySet<string> = new Set<string>();
 
 /** A single selectable option in a facet, with the count it would yield if added. */
 export interface FacetOption<TValue extends string> {
@@ -39,10 +39,13 @@ export interface TabOption {
   count: number;
 }
 
-/** Paginated query loader, shared with route prefetch. */
+/**
+ * Paginated query loader, shared with route prefetch. The prefetch warms the *default* state
+ * (page 1, default size, no filters); a filtered deep link simply fetches once on arrival.
+ */
 export function loadKnowledgeBasePage(
   projectId: string,
-  params: KnowledgeListParams = { page: 1, size: ITEMS_PER_PAGE },
+  params: KnowledgeListParams = { page: 1, size: DEFAULT_PAGE_SIZE },
 ): Promise<ArtifactPage> {
   return knowledgeService.getArtifactPage(projectId, params);
 }
@@ -62,31 +65,63 @@ export function loadKnowledgeBaseFacets(
  * Filtering supports sources, artifact types, file format, and repository,
  * backed by PostgreSQL indexes and projection queries.
  *
+ * Every filter, the page, the page size and the open artifact live in the URL
+ * (see {@link useKnowledgeBaseUrlState}); this hook turns them into requests and
+ * facet options. The one piece of local state is the search *input*, because the
+ * router applies location changes inside a transition and a text field bound
+ * straight to the URL would lag behind the keyboard.
+ *
  * @param projectId The project to scope artifact fetching to. When null, no
  *   fetch is attempted and the page should render its empty state.
+ * @param options Forwarded to {@link useKnowledgeBaseUrlState}; the page passes
+ *   `projectSettled` so the initial project resolution does not clear a shared link.
  */
-export function useKnowledgeBase(projectId: string | null) {
+export function useKnowledgeBase(
+  projectId: string | null,
+  options: KnowledgeBaseUrlStateOptions = {},
+) {
   const queryClient = useQueryClient();
+  const navigationType = useNavigationType();
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const {
+    state: urlState,
+    scopeProjectId,
+    setTab,
+    setSearch,
+    toggleSource,
+    toggleFormat,
+    toggleRepository,
+    setPage,
+    setSize,
+    clearFilters,
+    setArtifactId,
+  } = useKnowledgeBaseUrlState(projectId, options);
 
-  const [activeTab, setActiveTab] = useState<KnowledgeTab>("ALL");
-  const [selectedSources, setSelectedSources] = useState<ReadonlySet<SourceSystem>>(NO_SOURCES);
-  const [selectedFormat, setSelectedFormat] = useState<UploadFormat | null>(null);
-  const [selectedRepositories, setSelectedRepositories] =
-    useState<ReadonlySet<string>>(NO_REPOSITORIES);
-  const [currentPage, setCurrentPage] = useState(1);
+  const {
+    tab: activeTab,
+    sources: selectedSources,
+    format: selectedFormat,
+    repositories: selectedRepositories,
+    page: requestedPage,
+    size: pageSize,
+  } = urlState;
 
-  // Paging and filters reset when the project scope changes.
-  const [pagedProjectId, setPagedProjectId] = useState(projectId);
-  if (pagedProjectId !== projectId) {
-    setPagedProjectId(projectId);
-    setCurrentPage(1);
-    setActiveTab("ALL");
-    setSelectedSources(NO_SOURCES);
-    setSelectedFormat(null);
-    setSelectedRepositories(NO_REPOSITORIES);
+  /*
+    The search input's own copy of `?q=`. It follows the URL only when the URL changed for a reason
+    other than this input: Back/Forward (a POP navigation) or a project switch. Every other change
+    of `?q=` was written *from* this state, so adopting it back could only ever be a stale echo -
+    one that, arriving a transition late, would eat the characters typed in between.
+  */
+  const [searchQuery, setSearchQuery] = useState(urlState.search);
+  const [syncedSearch, setSyncedSearch] = useState(urlState.search);
+  const [searchScope, setSearchScope] = useState(scopeProjectId);
+  if (searchScope !== scopeProjectId) {
+    setSearchScope(scopeProjectId);
+    setSyncedSearch(urlState.search);
+    setSearchQuery(urlState.search);
+  } else if (syncedSearch !== urlState.search) {
+    setSyncedSearch(urlState.search);
+    if (navigationType === NavigationType.Pop) setSearchQuery(urlState.search);
   }
 
   const typesParam: ArtifactType[] | undefined = useMemo(() => {
@@ -104,28 +139,38 @@ export function useKnowledgeBase(projectId: string | null) {
     return Array.from(selectedRepositories);
   }, [selectedRepositories]);
 
+  const searchParam = urlState.search.trim() || undefined;
+
   const listParams: KnowledgeListParams = useMemo(
     () => ({
-      page: currentPage,
-      size: ITEMS_PER_PAGE,
-      search: deferredSearchQuery.trim() || undefined,
+      page: requestedPage,
+      size: pageSize,
+      search: searchParam,
       types: typesParam,
       sources: sourcesParam,
       repositories: repositoriesParam,
       format: selectedFormat ?? undefined,
     }),
-    [currentPage, deferredSearchQuery, typesParam, sourcesParam, repositoriesParam, selectedFormat],
+    [
+      requestedPage,
+      pageSize,
+      searchParam,
+      typesParam,
+      sourcesParam,
+      repositoriesParam,
+      selectedFormat,
+    ],
   );
 
   const facetsParams: KnowledgeListParams = useMemo(
     () => ({
-      search: deferredSearchQuery.trim() || undefined,
+      search: searchParam,
       types: typesParam,
       sources: sourcesParam,
       repositories: repositoriesParam,
       format: selectedFormat ?? undefined,
     }),
-    [deferredSearchQuery, typesParam, sourcesParam, repositoriesParam, selectedFormat],
+    [searchParam, typesParam, sourcesParam, repositoriesParam, selectedFormat],
   );
 
   const listQueryKey = queryKeys.knowledgeBase.list(projectId ?? "", listParams);
@@ -135,6 +180,7 @@ export function useKnowledgeBase(projectId: string | null) {
     data: pageData,
     isLoading: isListLoading,
     isError: isListError,
+    isPlaceholderData,
     refetch: refetchList,
   } = useQuery({
     queryKey: listQueryKey,
@@ -164,9 +210,20 @@ export function useKnowledgeBase(projectId: string | null) {
   const totalPages = Math.max(1, pageMeta?.totalPages ?? 1);
   const totalElements = pageMeta?.totalElements ?? artifacts.length;
 
-  if (currentPage > totalPages && totalPages > 0) {
-    setCurrentPage(totalPages);
-  }
+  /*
+    A `?page=` past the end (a stale link, a result set that shrank) is pulled back into range.
+    The render already reports the clamped page; the URL is corrected afterwards with a `replace`,
+    because navigating during render is not allowed. Only an answer for *this* query can prove the
+    page is out of range - placeholder data still describes the previous one, and clamping against
+    it would, say, drag a Back navigation to page 3 down to the previous filter's single page.
+  */
+  const isPageOutOfRange =
+    pageData !== undefined && !isPlaceholderData && requestedPage > totalPages;
+  const currentPage = isPageOutOfRange ? totalPages : requestedPage;
+
+  useEffect(() => {
+    if (isPageOutOfRange) setPage(totalPages, "replace");
+  }, [isPageOutOfRange, totalPages, setPage]);
 
   const fetchArtifacts = useCallback(async () => {
     if (projectId === null) return;
@@ -251,69 +308,22 @@ export function useKnowledgeBase(projectId: string | null) {
     }));
   }, [selectedSources, selectedRepositories, facetsData?.repositories, repoCounts]);
 
-  const handleSearchChange = useCallback((query: string) => {
-    setSearchQuery(query);
-    setCurrentPage(1);
-  }, []);
-
-  const handleTabChange = useCallback((tab: KnowledgeTab) => {
-    setActiveTab(tab);
-    setCurrentPage(1);
-  }, []);
-
-  const toggleSource = useCallback(
-    (source: SourceSystem) => {
-      const isRemoving = selectedSources.has(source);
-
-      setSelectedSources((current) => {
-        const next = new Set(current);
-        if (isRemoving) {
-          next.delete(source);
-        } else {
-          next.add(source);
-        }
-        return next;
-      });
-
-      if (isRemoving && source === "UPLOAD") {
-        setSelectedFormat(null);
-      }
-
-      if (isRemoving && source === "GITHUB") {
-        setSelectedRepositories(NO_REPOSITORIES);
-      }
-
-      setCurrentPage(1);
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      setSearchQuery(query);
+      setSearch(query);
     },
-    [selectedSources],
+    [setSearch],
   );
 
-  const toggleFormat = useCallback((format: UploadFormat) => {
-    setSelectedFormat((current) => (current === format ? null : format));
-    setCurrentPage(1);
-  }, []);
+  const handleTabChange = useCallback((tab: KnowledgeTab) => setTab(tab), [setTab]);
 
-  const toggleRepository = useCallback((repository: string) => {
-    setSelectedRepositories((current) => {
-      const next = new Set(current);
-      if (next.has(repository)) {
-        next.delete(repository);
-      } else {
-        next.add(repository);
-      }
-      return next;
-    });
-    setCurrentPage(1);
-  }, []);
+  const setCurrentPage = useCallback((page: number) => setPage(page), [setPage]);
 
   const handleClearFilters = useCallback(() => {
     setSearchQuery("");
-    setActiveTab("ALL");
-    setSelectedSources(NO_SOURCES);
-    setSelectedFormat(null);
-    setSelectedRepositories(NO_REPOSITORIES);
-    setCurrentPage(1);
-  }, []);
+    clearFilters();
+  }, [clearFilters]);
 
   const hasActiveFilters =
     searchQuery !== "" ||
@@ -339,13 +349,19 @@ export function useKnowledgeBase(projectId: string | null) {
     currentPage,
     totalPages,
     totalElements,
+    pageSize,
     handleSearchChange,
     handleTabChange,
     toggleSource,
     toggleFormat,
     toggleRepository,
     setCurrentPage,
+    setPageSize: setSize,
     handleClearFilters,
     hasActiveFilters,
+    /** The artifact open in the viewer drawer (`?artifact=`), or null. */
+    selectedArtifactId: urlState.artifactId,
+    /** Opens or closes the viewer drawer; `replace`s `?artifact=` so reading leaves no history. */
+    setSelectedArtifactId: setArtifactId,
   };
 }

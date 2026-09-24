@@ -1,5 +1,7 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createElement, type ReactNode } from "react";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { useKnowledgeBase } from "../../../../../src/features/knowledge-base/hooks/useKnowledgeBase";
 import type {
   Artifact,
@@ -257,13 +259,18 @@ function mockArtifactQuery(artifacts: Artifact[]) {
 }
 
 /** Renders the hook against a fixed artifact list and waits for the fetch to land. */
+/** The hook keeps its filters in the URL, so every render needs a router around it. */
+function RouterWrapper({ children }: { children: ReactNode }) {
+  return createElement(MemoryRouter, null, children);
+}
+
 async function renderWith(artifacts: Artifact[]) {
   const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
   const { getArtifactPage, getArtifactFacets } = mockArtifactQuery(artifacts);
   vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
   vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
 
-  const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+  const { result } = renderHook(() => useKnowledgeBase("proj-1"), { wrapper: RouterWrapper });
 
   await waitFor(() => {
     if (artifacts.length > 0) {
@@ -289,7 +296,7 @@ describe("useKnowledgeBase", () => {
     vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
     vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
 
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"), { wrapper: RouterWrapper });
 
     await waitFor(() => {
       expect(result.current.artifacts).toHaveLength(1);
@@ -323,7 +330,7 @@ describe("useKnowledgeBase", () => {
     mockFn.mockReturnValueOnce(firstPromise);
     mockFn.mockResolvedValueOnce(makePage("newer.md"));
 
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"), { wrapper: RouterWrapper });
 
     await act(async () => {
       void result.current.fetchArtifacts();
@@ -349,7 +356,7 @@ describe("useKnowledgeBase", () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
     vi.mocked(knowledgeService.getArtifactPage).mockRejectedValue(new Error("Server down"));
 
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"), { wrapper: RouterWrapper });
 
     await waitFor(() => {
       expect(result.current.fetchError).not.toBeNull();
@@ -724,7 +731,7 @@ describe("useKnowledgeBase", () => {
   });
 
   it("does not fetch when projectId is null", () => {
-    const { result } = renderHook(() => useKnowledgeBase(null));
+    const { result } = renderHook(() => useKnowledgeBase(null), { wrapper: RouterWrapper });
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.artifacts).toHaveLength(0);
@@ -740,6 +747,7 @@ describe("useKnowledgeBase", () => {
 
     const initialProps: { pid: string | null } = { pid: "proj-1" };
     const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      wrapper: RouterWrapper,
       initialProps,
     });
 
@@ -767,6 +775,7 @@ describe("useKnowledgeBase", () => {
 
     const initialProps: { pid: string | null } = { pid: "proj-1" };
     const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      wrapper: RouterWrapper,
       initialProps,
     });
 
@@ -827,6 +836,7 @@ describe("useKnowledgeBase", () => {
 
     const initialProps: { pid: string | null } = { pid: "proj-1" };
     const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      wrapper: RouterWrapper,
       initialProps,
     });
 
@@ -1056,6 +1066,114 @@ describe("useKnowledgeBase", () => {
       expect(backend).toBeDefined();
       expect(backend?.count).toBe(0);
       expect(result.current.artifacts).toHaveLength(0);
+    });
+  });
+});
+
+/** Renders the hook at a given URL, with the router's location alongside for assertions. */
+async function renderAt(entries: string[], artifacts: Artifact[], projectId = "proj-1") {
+  const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+  const { getArtifactPage, getArtifactFacets } = mockArtifactQuery(artifacts);
+  vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
+  vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      MemoryRouter,
+      { initialEntries: entries, initialIndex: entries.length - 1 },
+      children,
+    );
+  }
+  const view = renderHook(
+    ({ pid }: { pid: string }) => ({
+      kb: useKnowledgeBase(pid),
+      location: useLocation(),
+      navigate: useNavigate(),
+    }),
+    { wrapper: Wrapper, initialProps: { pid: projectId } },
+  );
+  await waitFor(() => expect(view.result.current.kb.isLoading).toBe(false));
+  return { ...view, getArtifactPage: vi.mocked(knowledgeService.getArtifactPage) };
+}
+
+describe("useKnowledgeBase URL state", () => {
+  it("requests exactly what a shared link describes", async () => {
+    const { result, getArtifactPage } = await renderAt(
+      [
+        "/kb?tab=PULL_REQUEST&sources=GITHUB&repos=sprintstart/sprintstart-frontend&q=feature&page=1",
+      ],
+      makeFacetFixture(),
+    );
+
+    expect(result.current.kb.activeTab).toBe("PULL_REQUEST");
+    expect(result.current.kb.searchQuery).toBe("feature");
+    expect([...result.current.kb.selectedRepositories]).toEqual([
+      "sprintstart/sprintstart-frontend",
+    ]);
+    expect(getArtifactPage).toHaveBeenCalledWith(
+      "proj-1",
+      expect.objectContaining({
+        page: 1,
+        size: 20,
+        search: "feature",
+        types: ["PULL_REQUEST"],
+        sources: ["GITHUB"],
+        repositories: ["sprintstart/sprintstart-frontend"],
+      }),
+    );
+  });
+
+  it("writes a clamped page back to the URL without adding a history entry", async () => {
+    const artifacts = Array.from({ length: 25 }, (_, i) => makeArtifact(`a${i}`, `f-${i}.md`));
+    const { result } = await renderAt(["/start", "/kb?page=9"], artifacts);
+
+    await waitFor(() => {
+      expect(result.current.kb.currentPage).toBe(2);
+      expect(result.current.location.search).toBe("?page=2");
+    });
+
+    act(() => void result.current.navigate(-1));
+    expect(result.current.location.pathname).toBe("/start");
+  });
+
+  it("restores filters and the search input on Back", async () => {
+    const { result } = await renderAt(["/kb"], makeFacetFixture());
+
+    act(() => result.current.kb.handleSearchChange("Add"));
+    act(() => result.current.kb.toggleSource("GITHUB"));
+    await waitFor(() => expect(result.current.location.search).toBe("?q=Add&sources=GITHUB"));
+
+    act(() => result.current.kb.handleSearchChange(""));
+    await waitFor(() => expect(result.current.location.search).toBe("?sources=GITHUB"));
+
+    act(() => void result.current.navigate(-1));
+    await waitFor(() => {
+      expect(result.current.kb.searchQuery).toBe("Add");
+      expect(result.current.kb.selectedSources.size).toBe(0);
+    });
+  });
+
+  it("opens and closes the drawer through ?artifact=", async () => {
+    const { result } = await renderAt(["/kb?artifact=a1"], [makeArtifact("a1", "readme.md")]);
+    expect(result.current.kb.selectedArtifactId).toBe("a1");
+
+    act(() => result.current.kb.setSelectedArtifactId(null));
+    expect(result.current.location.search).toBe("");
+    act(() => result.current.kb.setSelectedArtifactId("a1"));
+    expect(result.current.location.search).toBe("?artifact=a1");
+  });
+
+  it("empties the search input on a project switch", async () => {
+    const { result, rerender } = await renderAt(
+      ["/kb?q=readme"],
+      [makeArtifact("a1", "readme.md")],
+    );
+    expect(result.current.kb.searchQuery).toBe("readme");
+
+    rerender({ pid: "proj-2" });
+    await waitFor(() => {
+      expect(result.current.kb.searchQuery).toBe("");
+      expect(result.current.location.search).toBe("");
     });
   });
 });

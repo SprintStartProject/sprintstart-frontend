@@ -232,6 +232,48 @@ describe("KnowledgeBasePage", () => {
     });
   });
 
+  /*
+    While the project list loads, the page falls back to the user's first project and only then
+    learns the stored selection. That hop is not a project switch: treating it as one wiped the
+    filters of every shared link on arrival.
+  */
+  it("keeps a shared link's filters while the project context resolves", async () => {
+    const { createProjectContextValue, createSelectableProject } =
+      await import("../setup/projectContext");
+    const project = createSelectableProject({ id: "proj1" });
+    mockUseProjectContext.mockReturnValue(
+      createProjectContextValue({ projects: [], selectedProjectId: "", isLoading: true }),
+    );
+    setupMockArtifacts([makeArtifact({ id: "a1", title: "readme.md" })]);
+
+    const view = render(
+      <MemoryRouter initialEntries={["/knowledge-base?q=readme&sources=UPLOAD"]}>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    );
+
+    mockUseProjectContext.mockReturnValue(
+      createProjectContextValue({
+        projects: [project],
+        selectedProject: project,
+        selectedProjectId: "proj1",
+        isLoading: false,
+      }),
+    );
+    view.rerender(
+      <MemoryRouter initialEntries={["/knowledge-base?q=readme&sources=UPLOAD"]}>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockGetArtifactPage).toHaveBeenCalledWith(
+        "proj1",
+        expect.objectContaining({ search: "readme", sources: ["UPLOAD"] }),
+      );
+    });
+  });
+
   it("shows loading spinner when project context is loading", async () => {
     const { createProjectContextValue } = await import("../setup/projectContext");
     mockUseProjectContext.mockReturnValue(

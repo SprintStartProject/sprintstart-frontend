@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import {
@@ -100,7 +99,9 @@ export function KnowledgeBasePage() {
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,
-  } = useKnowledgeBase(projectId);
+    selectedArtifactId,
+    setSelectedArtifactId,
+  } = useKnowledgeBase(projectId, { projectSettled: !isProjectLoading });
 
   const isLoading = isProjectLoading || isArtifactsLoading;
   const showLoadingSkeleton = useDelayedFlag(isLoading);
@@ -122,30 +123,10 @@ export function KnowledgeBasePage() {
     closing one takes it away. `replace` throughout, so reading four documents does not leave four
     entries in the back button. The original intent survives it — a URL captured after the drawer is
     closed carries no id, so coming back later still does not reopen a document somebody shut.
+    The URL itself is now owned by `useKnowledgeBase` (every filter lives there too, and two
+    writers of one query string overwrite each other), which also drops `?artifact=` on a switch
+    between two settled projects - the id of project A's document means nothing in project B.
   */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(() =>
-    searchParams.get("artifact"),
-  );
-  const [prevProjectId, setPrevProjectId] = useState(projectId);
-
-  useEffect(() => {
-    // Compared before writing, because this effect's own write comes back to it as a new
-    // `searchParams`: without the guard that is a loop rather than a synchronisation.
-    if ((searchParams.get("artifact") ?? null) === selectedArtifactId) return;
-
-    const next = new URLSearchParams(searchParams);
-    if (selectedArtifactId) next.set("artifact", selectedArtifactId);
-    else next.delete("artifact");
-
-    setSearchParams(next, { replace: true, preventScrollReset: true });
-  }, [selectedArtifactId, searchParams, setSearchParams]);
-
-  // Reset active drawer selection whenever the project scope changes.
-  if (prevProjectId !== projectId) {
-    setPrevProjectId(projectId);
-    setSelectedArtifactId(null);
-  }
 
   const isSelectedInPage = useMemo(
     () => artifacts.some((a) => a.id === selectedArtifactId),
