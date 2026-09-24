@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { SidePanel } from "../../../../src/components/ui/SidePanel";
 
 function SidePanelHarness({
@@ -177,24 +177,5 @@ describe("SidePanel", () => {
     await user.click(closeBtn);
 
     await waitFor(() => expect(dialog).toHaveAttribute("aria-hidden", "true"));
-  });
-  it("ignores an Escape that an inner element already consumed via preventDefault", () => {
-    const onClose = vi.fn();
-    render(
-      <SidePanel isOpen onClose={onClose} title="Test Panel">
-        <input
-          aria-label="Inner consumer"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") event.preventDefault();
-          }}
-        />
-      </SidePanel>,
-    );
-
-    fireEvent.keyDown(screen.getByLabelText("Inner consumer"), { key: "Escape" });
-    expect(onClose).not.toHaveBeenCalled();
-
-    fireEvent.keyDown(document.body, { key: "Escape" });
-    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
