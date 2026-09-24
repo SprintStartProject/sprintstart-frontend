@@ -30,8 +30,9 @@ export interface ArtifactDateRangeFilterProps {
 }
 
 /**
- * The "Added" filter: a preset picker (Any time, Last 7/30/90 days, Custom range…) and, for a
- * custom range, two native date fields.
+ * The "Updated" filter: a preset picker (Any time, Last 7/30/90 days, Custom range…) and, for a
+ * custom range, two native date fields. It filters on an artifact's last activity — its last
+ * content change, or its import date if it never changed.
  *
  * Presets are resolved to absolute dates when picked, so the URL holds a fixed window a link can
  * share. The picker shows the preset a range still equals today, and "Custom range…" once it no
@@ -85,7 +86,7 @@ export function ArtifactDateRangeFilter({
           size="sm"
           value={selectValue}
           onChange={(event) => handlePresetChange(event.target.value)}
-          aria-label="Filter by date added"
+          aria-label="Filter by last update (changed, or added if never changed)"
           data-testid="kb-date-preset"
         >
           <option value={ANY}>Any time</option>
@@ -113,7 +114,7 @@ export function ArtifactDateRangeFilter({
               onChange={(event) =>
                 handleDraftChange({ ...draft, from: event.target.value || null })
               }
-              aria-label="Added from"
+              aria-label="Updated from"
               invalid={isDraftReversed}
               aria-describedby={isDraftReversed ? errorId : undefined}
               data-testid="kb-date-from"
@@ -129,7 +130,7 @@ export function ArtifactDateRangeFilter({
               value={draft.to ?? ""}
               min={draft.from ?? undefined}
               onChange={(event) => handleDraftChange({ ...draft, to: event.target.value || null })}
-              aria-label="Added to"
+              aria-label="Updated to"
               invalid={isDraftReversed}
               aria-describedby={isDraftReversed ? errorId : undefined}
               data-testid="kb-date-to"

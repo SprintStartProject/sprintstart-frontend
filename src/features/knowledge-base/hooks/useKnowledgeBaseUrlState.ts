@@ -112,7 +112,8 @@ export interface KnowledgeBaseUrlState {
   /** List order; {@link DEFAULT_ARTIFACT_SORT} when the URL names none or an unknown one. */
   sort: ArtifactSort;
   /**
-   * The "Added" window on `ingestedAt`, `yyyy-MM-dd` each end, open ends null. Always valid and
+   * The "Updated" window on last activity (`lastChangedAt`, else `ingestedAt`),
+   * `yyyy-MM-dd` each end, open ends null. Always valid and
    * ordered (see `normalizeDateRange`), so it can go to the backend as-is.
    */
   dateRange: DateRange;

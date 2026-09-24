@@ -101,7 +101,7 @@ export interface ArtifactFiltersProps {
   sort?: ArtifactSort;
   /** Fired when the reader picks another order. The sort control is only shown when given. */
   onSortChange?: (sort: ArtifactSort) => void;
-  /** The "Added" window on ingestion date; open ends are null. */
+  /** The "Updated" window on last activity (last change, else import); open ends are null. */
   dateRange?: DateRange;
   /** Fired with a valid, ordered range. The date filter is only shown when given. */
   onDateRangeChange?: (range: DateRange, mode: KnowledgeBaseHistoryMode) => void;

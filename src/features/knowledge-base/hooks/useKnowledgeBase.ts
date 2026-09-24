@@ -454,7 +454,7 @@ export function useKnowledgeBase(
     setPageSize: setSize,
     /** Changes the list order; pushes history and starts the new order at page 1. */
     setSort,
-    /** The "Added" window (`yyyy-MM-dd` ends, null when open); filters list and facets alike. */
+    /** The "Updated" window (last activity) (`yyyy-MM-dd` ends, null when open); filters list and facets alike. */
     dateRange: urlState.dateRange,
     setDateRange,
     handleClearFilters,

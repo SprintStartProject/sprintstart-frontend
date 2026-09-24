@@ -60,9 +60,11 @@ describe("dateRange", () => {
 
   it("describes closed, open and single-day ranges", () => {
     expect(describeDateRange({ from: null, to: null })).toBeNull();
-    expect(describeDateRange({ from: "2026-09-01", to: "2026-09-24" })).toMatch(/^Added .+ – .+$/);
-    expect(describeDateRange({ from: "2026-09-01", to: null })).toMatch(/^Added since .*2026/);
-    expect(describeDateRange({ from: null, to: "2026-09-24" })).toMatch(/^Added until .*2026/);
+    expect(describeDateRange({ from: "2026-09-01", to: "2026-09-24" })).toMatch(
+      /^Updated .+ – .+$/,
+    );
+    expect(describeDateRange({ from: "2026-09-01", to: null })).toMatch(/^Updated since .*2026/);
+    expect(describeDateRange({ from: null, to: "2026-09-24" })).toMatch(/^Updated until .*2026/);
     expect(describeDateRange({ from: "2026-09-24", to: "2026-09-24" })).not.toContain("–");
   });
 

@@ -44,26 +44,26 @@ describe("ArtifactDateRangeFilter", () => {
     fireEvent.change(screen.getByTestId("kb-date-preset"), { target: { value: "CUSTOM" } });
     expect(onRangeChange).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText("Added from"), { target: { value: "2026-09-01" } });
+    fireEvent.change(screen.getByLabelText("Updated from"), { target: { value: "2026-09-01" } });
     expect(onRangeChange).toHaveBeenLastCalledWith({ from: "2026-09-01", to: null }, "replace");
   });
 
   it("refuses a reversed custom range with a message instead of writing it", () => {
     const { onRangeChange } = renderFilter({ from: "2026-09-10", to: null });
 
-    fireEvent.change(screen.getByLabelText("Added to"), { target: { value: "2026-09-01" } });
+    fireEvent.change(screen.getByLabelText("Updated to"), { target: { value: "2026-09-01" } });
 
     expect(onRangeChange).not.toHaveBeenCalled();
     const error = screen.getByTestId("kb-date-error");
     expect(error).toHaveTextContent("on or before");
-    expect(screen.getByLabelText("Added to")).toHaveAttribute("aria-describedby", error.id);
-    expect(screen.getByLabelText("Added to")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Updated to")).toHaveAttribute("aria-describedby", error.id);
+    expect(screen.getByLabelText("Updated to")).toHaveAttribute("aria-invalid", "true");
   });
 
   it("names the active range in a chip whose button clears it", () => {
     const { onRangeChange } = renderFilter({ from: "2026-09-01", to: null });
 
-    expect(screen.getByTestId("kb-date-chip")).toHaveTextContent(/Added since/);
+    expect(screen.getByTestId("kb-date-chip")).toHaveTextContent(/Updated since/);
     fireEvent.click(screen.getByRole("button", { name: "Clear date range" }));
 
     expect(onRangeChange).toHaveBeenCalledWith({ from: null, to: null }, "push");

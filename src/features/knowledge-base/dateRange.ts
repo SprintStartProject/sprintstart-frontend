@@ -1,7 +1,9 @@
 /**
- * Date-range helpers for the Knowledge Base "Added" filter.
+ * Date-range helpers for the Knowledge Base "Updated" filter (last activity: the last content
+ * change, or the import date for an artifact that never changed).
  *
- * The backend filters `ingestedAt` by whole days — `from` inclusive from the start of its day,
+ * The backend filters last activity (`lastChangedAt`, else `ingestedAt`)
+ * by whole days — `from` inclusive from the start of its day,
  * `to` inclusive to the end of its day — and it cuts those days in UTC. Everything here therefore
  * reasons in UTC calendar days and speaks `yyyy-MM-dd`, the only shape the endpoint accepts.
  */
@@ -101,15 +103,15 @@ export function formatIsoDate(iso: string): string {
   return DISPLAY_FORMAT.format(new Date(`${iso}T00:00:00Z`));
 }
 
-/** Words an active range for its chip: "Added Sep 1, 2026 – Sep 24, 2026", "Added since …". */
+/** Words an active range for its chip: "Updated Sep 1, 2026 – Sep 24, 2026", "Updated since …". */
 export function describeDateRange(range: DateRange): string | null {
   const { from, to } = range;
   if (from && to) {
     return from === to
-      ? `Added ${formatIsoDate(from)}`
-      : `Added ${formatIsoDate(from)} – ${formatIsoDate(to)}`;
+      ? `Updated ${formatIsoDate(from)}`
+      : `Updated ${formatIsoDate(from)} – ${formatIsoDate(to)}`;
   }
-  if (from) return `Added since ${formatIsoDate(from)}`;
-  if (to) return `Added until ${formatIsoDate(to)}`;
+  if (from) return `Updated since ${formatIsoDate(from)}`;
+  if (to) return `Updated until ${formatIsoDate(to)}`;
   return null;
 }

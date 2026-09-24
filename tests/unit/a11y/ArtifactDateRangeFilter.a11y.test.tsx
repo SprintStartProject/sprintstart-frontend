@@ -12,7 +12,7 @@ describe("ArtifactDateRangeFilter a11y", () => {
         now={new Date("2026-09-24T10:00:00Z")}
       />,
     );
-    fireEvent.change(screen.getByLabelText("Added to"), { target: { value: "2026-09-01" } });
+    fireEvent.change(screen.getByLabelText("Updated to"), { target: { value: "2026-09-01" } });
     expect(screen.getByTestId("kb-date-error")).toBeInTheDocument();
 
     expect(await axe(container)).toHaveNoViolations();
