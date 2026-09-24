@@ -130,6 +130,13 @@ export function KnowledgeBasePage() {
 
   const uploadSelection = useUploadSelection(listScopeKey);
 
+  /*
+    Bulk selection is offered only while the Uploads source is picked: only uploads can be
+    deleted, and in any other view the toggle only crowds the filter row.
+  */
+  const canBulkSelect = canDeleteUpload && selectedSources.has("UPLOAD");
+  if (!canBulkSelect && uploadSelection.isSelectMode) uploadSelection.setSelectMode(false);
+
   /* One status request per visible page, keyed on exactly the ids on screen. */
   const visibleArtifactIds = useMemo(() => artifacts.map((a) => a.id), [artifacts]);
   const aiStatuses = useArtifactAiStatus(projectId, visibleArtifactIds);
@@ -278,7 +285,7 @@ export function KnowledgeBasePage() {
                   onDateRangeChange={setDateRange}
                   onRefresh={handleRefresh}
                   isRefreshing={isLoading}
-                  {...(canDeleteUpload
+                  {...(canBulkSelect
                     ? {
                         isSelectMode: uploadSelection.isSelectMode,
                         onSelectModeChange: uploadSelection.setSelectMode,
@@ -295,7 +302,7 @@ export function KnowledgeBasePage() {
                 </p>
               </motion.div>
 
-              {canDeleteUpload && projectId && uploadSelection.isSelectMode && (
+              {canBulkSelect && projectId && uploadSelection.isSelectMode && (
                 <div className="mb-4">
                   <ArtifactBulkActions
                     projectId={projectId}

@@ -535,8 +535,12 @@ describe("KnowledgeBasePage", () => {
     it("lets a PM tick uploads and hands only those to the bulk actions", async () => {
       renderAs("PM");
       await waitFor(() => expect(screen.getAllByTestId("artifact-card")).toHaveLength(2));
+      // Keep serving the mixed page after Uploads is picked, to prove the page's own guard.
+      const mixedPage: unknown = await mockGetArtifactPage.mock.results[0]?.value;
+      mockGetArtifactPage.mockResolvedValue(mixedPage);
 
-      await userEvent.click(screen.getByTestId("kb-select-toggle"));
+      await userEvent.click(screen.getByTestId("kb-filter-upload"));
+      await userEvent.click(await screen.findByTestId("kb-select-toggle"));
       await userEvent.click(screen.getByTestId("artifact-select-u1"));
       // A non-upload ticked through the mock list is still filtered out by the page.
       await userEvent.click(screen.getByTestId("artifact-select-g1"));
@@ -547,17 +551,37 @@ describe("KnowledgeBasePage", () => {
     it("clears the selection on a filter change and on refresh", async () => {
       renderAs("ADMIN");
       await waitFor(() => expect(screen.getAllByTestId("artifact-card")).toHaveLength(2));
-      await userEvent.click(screen.getByTestId("kb-select-toggle"));
+      await userEvent.click(screen.getByTestId("kb-filter-upload"));
+      await userEvent.click(await screen.findByTestId("kb-select-toggle"));
 
       await userEvent.click(screen.getByTestId("artifact-select-u1"));
       expect(screen.getByTestId("bulk-actions")).toHaveTextContent("u1");
-      await userEvent.click(screen.getByTestId("kb-filter-upload"));
+      await userEvent.type(screen.getByTestId("kb-search-input"), "one");
       await waitFor(() => expect(screen.getByTestId("bulk-actions")).toBeEmptyDOMElement());
 
       await userEvent.click(await screen.findByTestId("artifact-select-u1"));
       expect(screen.getByTestId("bulk-actions")).toHaveTextContent("u1");
       await userEvent.click(screen.getByTestId("kb-refresh"));
       expect(screen.getByTestId("bulk-actions")).toBeEmptyDOMElement();
+    });
+
+    it("offers Select only while Uploads is picked, and unpicking it leaves select mode", async () => {
+      renderAs("PM");
+      await waitFor(() => expect(screen.getAllByTestId("artifact-card")).toHaveLength(2));
+      expect(screen.queryByTestId("kb-select-toggle")).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByTestId("kb-filter-upload"));
+      await userEvent.click(await screen.findByTestId("kb-select-toggle"));
+      expect(screen.getByTestId("bulk-actions")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByTestId("kb-filter-upload"));
+      await waitFor(() => expect(screen.queryByTestId("kb-select-toggle")).not.toBeInTheDocument());
+      expect(screen.queryByTestId("bulk-actions")).not.toBeInTheDocument();
+
+      // Re-picking Uploads brings the toggle back, not the old select mode.
+      await userEvent.click(screen.getByTestId("kb-filter-upload"));
+      await screen.findByTestId("kb-select-toggle");
+      expect(screen.queryByTestId("bulk-actions")).not.toBeInTheDocument();
     });
   });
 });
