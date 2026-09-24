@@ -1,6 +1,6 @@
 import { ArrowLeft, Hand } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../context/useToast";
 import type {
   OnboardingPathEndpoint,
@@ -43,9 +43,10 @@ type DetailOnboardingStep = OnboardingStepEndpoint & {
 import { Button } from "../components/ui/Button";
 import { MemberHero } from "../features/pm-area/components/MemberHero";
 import { MemberOpenItems } from "../features/pm-area/components/MemberOpenItems";
-import { PmCard, PmCardHeader } from "../features/pm-area/components/PmCard";
+import { MemberSummary } from "../features/pm-area/components/MemberSummary";
 import { waitingOn } from "../features/pm-area/memberStatus";
-import type { SkipDecision } from "../features/pm-area/useMemberOpenItems";
+import { MEMBER_STEP_PARAM } from "../features/pm-area/pmWorkspacePaths";
+import { isUnread, type SkipDecision } from "../features/pm-area/useMemberOpenItems";
 import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { PanelPresence } from "../components/ui/PanelPresence";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
@@ -129,7 +130,20 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
   const [feedbackItems, setFeedbackItems] = useState<OnboardingFeedback[]>([]);
   const [onboardingPath, setOnboardingPath] = useState<OnboardingPathEndpoint | null>(null);
-  const [detailStepId, setDetailStepId] = useState("");
+  // The open step lives in the URL (see `MEMBER_STEP_PARAM`): opening pushes, so Back closes it;
+  // closing replaces, so Back does not open it again.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const detailStepId = searchParams.get(MEMBER_STEP_PARAM) ?? "";
+  const setDetailStepId = (stepId: string) =>
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (stepId) next.set(MEMBER_STEP_PARAM, stepId);
+        else next.delete(MEMBER_STEP_PARAM);
+        return next;
+      },
+      { replace: !stepId },
+    );
   // A step asked to be deleted from the graph, where there is no details panel to confirm in.
   const [graphStepToDelete, setGraphStepToDelete] = useState<string | null>(null);
   const [stepToDelete, setStepToDelete] = useState<DetailOnboardingStep | null>(null);
@@ -635,7 +649,12 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
     );
   }
 
-  const openItemCount = waitingOn(user).length;
+  // Items, not kinds: three unread comments are three things to read. The member's own flag stands
+  // in for feedback that has not loaded (or could not be), so the strip never under-reports.
+  const unreadFeedbackCount = feedbackItems.filter(isUnread).length;
+  const openItemCount =
+    (waitingOn(user).includes("skip") ? 1 : 0) +
+    (unreadFeedbackCount > 0 ? unreadFeedbackCount : user.hasFeedback ? 1 : 0);
   const phases = [...(onboardingPath?.phases ?? [])].sort((a, b) => a.position - b.position);
   const allSteps = phases.flatMap((phase) =>
     [...(phase.steps ?? [])]
@@ -702,17 +721,23 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           />
         </div>
         <div className="space-y-5">
-          {/* Only while something is open: an empty "waiting on you" card at the top of every
-              profile would push the path down to say nothing. Fed from this page's own feedback
-              and skip handling, so it shares the guard with the journey and the step panel. */}
+          {/* Only while something is open: an empty "waiting on you" strip at the top of every
+              profile would push the rest down to say nothing. A slim warning-coloured strip, not a
+              card: it is a to-do list of one or two lines, and each line opens its step. Fed from
+              this page's own feedback and skip handling, so it shares the guard with the journey
+              and the step panel. */}
           {openItemCount > 0 && (
-            <PmCard aria-label="Waiting on you" tone="warning">
-              <PmCardHeader
-                icon={Hand}
-                tone="warning"
-                title="Waiting on you"
-                meta={`${openItemCount} open`}
-              />
+            <section
+              aria-label="Waiting on you"
+              className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
+            >
+              <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wider text-app-warning-text uppercase">
+                <Hand aria-hidden="true" className="h-3.5 w-3.5" />
+                Waiting on you
+                <span className="rounded-full bg-app-surface px-1.5 py-0.5 text-[11px] tracking-normal normal-case tabular-nums">
+                  {openItemCount}
+                </span>
+              </h2>
               <MemberOpenItems
                 member={user}
                 feedback={feedbackItems}
@@ -726,9 +751,18 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
                 markingFeedbackId={markingFeedbackId}
                 onReviewSkip={(skipId, decision) => void reviewSkip(skipId, decision)}
                 onMarkRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+                onOpenStep={setDetailStepId}
               />
-            </PmCard>
+            </section>
           )}
+
+          <MemberSummary
+            member={user}
+            path={onboardingPath}
+            feedback={feedbackItems}
+            skillLevels={skillLevels}
+            knowledgeGapCount={knowledgeGaps.length}
+          />
 
           <MemberJourneySection
             userId={user.userId}

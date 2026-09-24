@@ -88,6 +88,47 @@ describe("MemberOpenItems", () => {
     expect(screen.getByRole("button", { name: /Deny/ })).toBeDisabled();
   });
 
+  it("opens the step an item is about when its text is pressed", async () => {
+    const user = userEvent.setup();
+    const onOpenStep = vi.fn();
+    renderItems({
+      onOpenStep,
+      feedback: [
+        {
+          id: "f1",
+          stepId: "s7",
+          stepTitle: "Read the style guide",
+          message: "The CI step links a dead page.",
+          read: false,
+        },
+      ],
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open the step: Set up CI" }));
+    expect(onOpenStep).toHaveBeenCalledWith("s1");
+
+    await user.click(screen.getByRole("button", { name: "Open the step: Read the style guide" }));
+    expect(onOpenStep).toHaveBeenCalledWith("s7");
+  });
+
+  it("keeps the rows as plain text when there is no step to open", () => {
+    renderItems();
+
+    expect(screen.queryByRole("button", { name: /Open the step/ })).not.toBeInTheDocument();
+  });
+
+  it("tells a thumbs-down apart from a thumbs-up", () => {
+    renderItems({
+      feedback: [
+        { id: "f1", message: "Great intro.", helpful: true, read: false },
+        { id: "f2", message: "Outdated.", helpful: false, read: false },
+      ],
+    });
+
+    expect(screen.getByRole("img", { name: "Found it helpful" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Not helpful" })).toBeInTheDocument();
+  });
+
   it("says nothing is waiting when nothing is", () => {
     renderItems({
       member: member({ currentStep: null, hasFeedback: false }),

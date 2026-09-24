@@ -1,6 +1,6 @@
 import { ArrowUpRight, Check, Clock, Flag, GraduationCap, Hand, Route } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
@@ -27,6 +27,7 @@ import {
   progressPercent,
   waitingOn,
 } from "../memberStatus";
+import { MEMBER_STEP_PARAM } from "../pmWorkspacePaths";
 import { useMemberOpenItems } from "../useMemberOpenItems";
 import { useMemberPeek } from "../useMemberPeek";
 import { useTeamRoster } from "../useTeamRoster";
@@ -126,6 +127,7 @@ const LEVEL_RANK: Record<string, number> = {
 
 function MemberPeekContent({ userId }: { userId: string }) {
   const { selectedProjectId } = useProjectContext();
+  const navigate = useNavigate();
   const { data: roster, loading: rosterLoading } = useTeamRoster();
   const member = roster?.find((candidate) => candidate.userId === userId) ?? null;
 
@@ -236,6 +238,10 @@ function MemberPeekContent({ userId }: { userId: string }) {
           markingFeedbackId={openItems.markingFeedbackId}
           onReviewSkip={(skipId, decision) => void openItems.reviewSkip(skipId, decision)}
           onMarkRead={(feedbackId) => void openItems.markRead(feedbackId)}
+          // The step itself lives on the full profile, so the item leads there with it open.
+          onOpenStep={(stepId) =>
+            void navigate(`/team/${userId}?${MEMBER_STEP_PARAM}=${encodeURIComponent(stepId)}`)
+          }
         />
       </PanelSection>
 

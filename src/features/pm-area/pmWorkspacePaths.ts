@@ -24,6 +24,13 @@ export const PM_WORKSPACE_PATHS = [
 export const TEAM_TAB_PARAM = "tab";
 export const INBOX_VIEW_PARAM = "view";
 
+/**
+ * The step whose details are open on a member's full profile (`/team/:userId?step=<id>`). In the
+ * URL so the member panel and the profile's own "Waiting on you" can link straight to the step a
+ * skip request or a comment is about, and so Back closes the step again.
+ */
+export const MEMBER_STEP_PARAM = "step";
+
 export function isPmWorkspacePath(pathname: string): boolean {
   return PM_WORKSPACE_PATHS.some((pattern) => matchPath(pattern, pathname) !== null);
 }

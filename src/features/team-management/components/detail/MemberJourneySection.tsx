@@ -16,7 +16,6 @@ import { useSwipeableTabs } from "../../../../hooks/useHorizontalWheelNavigation
 import { useToast } from "../../../../context/useToast";
 import { onboardingGraphService } from "../../../../services/onboardingGraphService";
 import { useAuth } from "../../../../context/useAuth";
-import { isSkipPending } from "../../../onboarding/journey";
 import { computeRanks } from "../../../onboarding/graph/layout";
 import {
   memberJourneyViewKey,
@@ -37,7 +36,6 @@ import {
   formatMinutes,
   itemState,
   orderedPhaseItems,
-  pathProgress,
   skipRequestOf,
   phaseItems,
   phaseProgress,
@@ -336,14 +334,6 @@ export function MemberJourneySection({
     [onPathChanged, userId],
   );
 
-  const overall = path ? pathProgress(path) : null;
-  const allSteps = phases.flatMap((candidate) => candidate.steps);
-  const skipped = allSteps.filter((step) => step.status === "SKIPPED").length;
-  // `accepted` is null while the PM has not answered yet.
-  const pendingSkips = allSteps.filter(
-    (step) => isSkipPending(step.skip) && step.status !== "SKIPPED",
-  ).length;
-
   const questionTools = (target: OnboardingPhaseEndpoint) => (
     <>
       <Button
@@ -366,6 +356,8 @@ export function MemberJourneySection({
       aria-labelledby="member-journey-title"
       className="space-y-5 rounded-3xl border border-app-border bg-app-surface/60 p-4 shadow-sm sm:p-6"
     >
+      {/* The path's figures (items, phases, skips) are the profile's summary card's job now
+          (`MemberSummary`), right above this section; repeating them here was the clutter. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 id="member-journey-title" className="text-xl font-semibold text-app-text">
@@ -376,18 +368,6 @@ export function MemberJourneySection({
             graph.
           </p>
         </div>
-        {overall ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Metric label="Items done" value={`${overall.completed}/${overall.total}`} />
-            <Metric label="Phases" value={`${overall.phasesDone}/${phases.length}`} />
-            <Metric label="Steps finished" value={String(overall.stepsDone)} />
-            <Metric
-              label={pendingSkips > 0 ? "Skip requests" : "Skipped"}
-              value={String(pendingSkips > 0 ? pendingSkips : skipped)}
-              warning={pendingSkips > 0}
-            />
-          </div>
-        ) : null}
       </div>
 
       {!path || phases.length === 0 || !phase ? (
@@ -568,31 +548,6 @@ export function MemberJourneySection({
         </>
       )}
     </section>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  warning = false,
-}: {
-  label: string;
-  value: string;
-  warning?: boolean;
-}) {
-  return (
-    <div
-      className={`min-w-24 rounded-2xl border px-3 py-2 ${
-        warning ? "border-app-warning-border bg-app-warning-bg" : "border-app-border bg-app-surface"
-      }`}
-    >
-      <p className="text-[11px] text-app-text-muted">{label}</p>
-      <p
-        className={`mt-0.5 text-sm font-semibold tabular-nums ${warning ? "text-app-warning-text" : "text-app-text"}`}
-      >
-        {value}
-      </p>
-    </div>
   );
 }
 

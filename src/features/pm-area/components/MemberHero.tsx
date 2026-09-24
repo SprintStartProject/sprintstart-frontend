@@ -1,40 +1,9 @@
-import { ChevronLeft, ChevronRight, Clock, Hand, Route, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
 import type { ProjectRole, TeamOverviewUser } from "../../team-management/types";
-import {
-  STAGE_LABEL,
-  daysOnStep,
-  formatDays,
-  isAtRisk,
-  memberName,
-  memberStage,
-  progressPercent,
-  waitingOn,
-} from "../memberStatus";
-import { MemberProgressBar } from "./MemberRow";
-
-function HeroFact({
-  label,
-  children,
-  icon: Icon,
-}: {
-  label: string;
-  children: ReactNode;
-  icon: typeof Clock;
-}) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-app-border bg-app-surface px-4 py-3">
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase">
-        <Icon aria-hidden="true" className="h-3.5 w-3.5" />
-        {label}
-      </p>
-      <div className="mt-1.5 min-w-0 text-sm text-app-text">{children}</div>
-    </div>
-  );
-}
+import { memberName } from "../memberStatus";
 
 type MemberHeroProps = {
   member: TeamOverviewUser;
@@ -50,8 +19,9 @@ type MemberHeroProps = {
 };
 
 /**
- * The top of a member's full profile: who they are, the roles they hold, where they stand, and
- * a way to step through the team without going back to the list.
+ * The top of a member's full profile: who they are, the roles they hold, and a way to step
+ * through the team without going back to the list. Where they stand is the summary card's job
+ * (`MemberSummary`), right under it.
  *
  * Roles are edited right here. They used to open a modal — press a role chip, find the select
  * inside, pick, press Add — four steps and a dialog for what is one decision. Now the chip has
@@ -65,11 +35,6 @@ export function MemberHero({
   onAddRole,
   onRemoveRole,
 }: MemberHeroProps) {
-  const percent = progressPercent(member);
-  const stage = memberStage(member);
-  const days = daysOnStep(member);
-  const waiting = waitingOn(member);
-
   const ordered = [...roster].sort((a, b) => memberName(a).localeCompare(memberName(b)));
   const index = ordered.findIndex((candidate) => candidate.userId === member.userId);
   const previous = index > 0 ? ordered[index - 1] : null;
@@ -173,38 +138,6 @@ export function MemberHero({
             )}
           </nav>
         )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <HeroFact icon={Route} label={`Onboarding · ${STAGE_LABEL[stage]}`}>
-          <MemberProgressBar percent={percent} className="mt-1" />
-        </HeroFact>
-        <HeroFact icon={Route} label="Phase">
-          <p className="truncate">
-            {stage === "done" ? "Completed" : (member.currentPhase?.title ?? "—")}
-          </p>
-        </HeroFact>
-        <HeroFact icon={Clock} label="Current step">
-          <p className="truncate">
-            {stage === "done" ? "—" : (member.currentStep?.title ?? "Not started yet")}
-          </p>
-          {days !== null && stage !== "done" && (
-            <p
-              className={`text-xs ${isAtRisk(member) ? "font-medium text-app-orange-text" : "text-app-text-muted"}`}
-            >
-              {formatDays(days)} on this step
-            </p>
-          )}
-        </HeroFact>
-        <HeroFact icon={Hand} label="Waiting on you">
-          <p className={waiting.length > 0 ? "font-semibold text-app-warning-text" : undefined}>
-            {waiting.length === 0
-              ? "Nothing"
-              : waiting
-                  .map((kind) => (kind === "skip" ? "Skip request" : "Unread feedback"))
-                  .join(" · ")}
-          </p>
-        </HeroFact>
       </div>
     </div>
   );
