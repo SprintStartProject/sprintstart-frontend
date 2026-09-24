@@ -21,10 +21,10 @@ function createUser(overrides: Partial<TeamOverviewUser> = {}): TeamOverviewUser
 }
 
 const mockSkills: Skill[] = [
-  { id: "sk1", name: "TypeScript", roleIds: ["r1"], status: "ACTIVE" },
-  { id: "sk2", name: "Docker", roleIds: ["r1"], status: "ACTIVE" },
-  { id: "sk3", name: "Unrelated", roleIds: ["r2"], status: "ACTIVE" },
-  { id: "sk4", name: "Retired", roleIds: ["r1"], status: "RETIRED" },
+  { id: "sk1", name: "TypeScript", roleIds: ["r1"], status: "ACTIVE", universal: false },
+  { id: "sk2", name: "Docker", roleIds: ["r1"], status: "ACTIVE", universal: false },
+  { id: "sk3", name: "Unrelated", roleIds: ["r2"], status: "ACTIVE", universal: false },
+  { id: "sk4", name: "Retired", roleIds: ["r1"], status: "RETIRED", universal: false },
 ];
 
 describe("SkillWizard", () => {

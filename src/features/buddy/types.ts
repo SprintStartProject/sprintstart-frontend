@@ -11,13 +11,54 @@ import type { Citation } from "../chatbot/types";
 export type ProposedActionStatus = "idle" | "confirming" | "resolved" | "error" | "dismissed";
 
 /**
+ * The fields of either proposal kind that describe its one confirm round-trip. This is the only
+ * patch shape `patchAction` accepts: confirming touches the round-trip, never the offer itself.
+ */
+export type ActionPatch = {
+  status: ProposedActionStatus;
+  /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
+  ok?: boolean;
+  /** The outcome line to show once resolved. */
+  outcome?: string;
+};
+
+/**
  * The backend's `open_orientation` action. Once confirmed, its payoff is not the outcome line
  * but the orientation packet itself, rendered in the thread (see `BuddyOrientationCard`) — the
  * conversation is the surface now, so confirming must not navigate anywhere.
  */
 export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
 
-export type ProposedAction = {
+/**
+ * The backend's `place_checklist` action: the mentor offering to keep a list it just wrote.
+ *
+ * Named here because two surfaces have to recognise it — the proposal draws the lines it would
+ * keep, and the reply's own "keep this list" button stands down beside it rather than offering a
+ * second, flatter version of the same thing.
+ */
+export const BUDDY_ACTION_PLACE_CHECKLIST = "place_checklist";
+
+/** The backend's `amend_checklist` action: lines the mentor would add to a list they already have. */
+export const BUDDY_ACTION_AMEND_CHECKLIST = "amend_checklist";
+
+/**
+ * The backend's `tick_checklist_items` action: lines the hire has said they finished.
+ *
+ * Carried in the same payload field as an amendment's, and drawn differently for it — one adds
+ * lines the mentor wrote, the other ticks lines the hire already has, and confirming the wrong one
+ * changes a card in a way they did not mean.
+ */
+export const BUDDY_ACTION_TICK_CHECKLIST = "tick_checklist_items";
+
+/** The backend's `reword_checklist_item` action: one line replaced, shown before and after. */
+export const BUDDY_ACTION_REWORD_CHECKLIST = "reword_checklist_item";
+
+/**
+ * An action proposed in hire mode: the buddy offers to do something *for this hire*, and the
+ * confirm echoes the offer's own payload back verbatim. What gets written is what was shown on
+ * the button — never something the client derived.
+ */
+export type HireActionProposal = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
   /** The action's tool name, sent back verbatim to confirm it (e.g. "claim_task_zero"). */
@@ -58,12 +99,84 @@ export type ProposedAction = {
    */
   competencyKey?: string;
   level?: string;
+  /**
+   * The `place_checklist` confirm payload: the list the buddy wrote and offered to keep.
+   *
+   * Echoed back like every payload above, and here the rule has its sharpest form: these lines are
+   * *content the model wrote*, not a pointer at something that already exists. A client that
+   * re-derived them — from the reply's markdown, say — could keep a card whose words the hire
+   * never read, which is the one thing the confirm button is there to prevent.
+   */
+  checklistTitle?: string;
+  checklistItems?: string[];
+  /**
+   * `amend_checklist`: the card of theirs the lines go on.
+   *
+   * The lines here are the *new* ones only — the card keeps what it already has, and the offer
+   * shows just the addition, because a change nobody can see is one nobody agreed to.
+   */
+  cardId?: string;
+  /** `place_note` confirm payload: the note's text, shown on the offer before it is kept. */
+  noteText?: string;
+  /**
+   * `reword_checklist_item`: the line as it reads now, and as it would read.
+   *
+   * Both, because this is the one action that *replaces* something the hire can already see. An
+   * offer showing only the new wording would be asking them to agree to a change they would have
+   * to go and diff.
+   */
+  lineBefore?: string;
+  lineAfter?: string;
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
   /** The outcome line to show once resolved. */
   outcome?: string;
 };
+
+/**
+ * How much a team-mode proposal would change, as the backend's `BuddyProposalRisk` enum spells
+ * it. Decides how loudly the card warns — see `BuddyActionProposals`.
+ */
+export type ProposalRisk = "STANDARD" | "DESTRUCTIVE" | "BULK";
+
+/**
+ * A proposal made in team mode: the buddy offers to change something about a project the
+ * *manager* runs, and the change is stored server-side (`buddy_action_proposals`) — so unlike a
+ * hire action, nothing is echoed back. Confirm goes by id, and the id is the only thing the
+ * client is trusted to send back: what the change actually is lives on the backend, where the
+ * manager already saw it described in `preview`.
+ */
+export type StoredActionProposal = {
+  /** Local id for keying and targeting the confirm — same role as a hire proposal's. */
+  id: string;
+  /** The stored proposal's backend id — the whole confirm payload. */
+  proposalId: string;
+  /** The button text, as the buddy phrased the offer. */
+  label: string;
+  /**
+   * What the manager is agreeing to, in words, as the buddy composed it. `null` when the event
+   * arrived without one — which blocks confirmation, see `BuddyActionProposals`.
+   */
+  preview: string | null;
+  /**
+   * How loudly the card should warn about the change. `null` when the event carried no known
+   * risk value — which also blocks confirmation: an approval card for a project mutation must
+   * never guess how loudly to warn.
+   */
+  risk: ProposalRisk | null;
+  status: ProposedActionStatus;
+  ok?: boolean;
+  outcome?: string;
+};
+
+/**
+ * An action the buddy proposed, whichever conversation proposed it: a hire offer echoes its
+ * payload back verbatim, a team offer confirms by stored id. Distinguish with
+ * `"proposalId" in action` — a hire offer never carries one, and a stored proposal carries no
+ * `action` name to echo.
+ */
+export type ProposedAction = HireActionProposal | StoredActionProposal;
 
 /**
  * A single turn in the user's persistent buddy conversation, as returned by the backend.
@@ -149,5 +262,22 @@ export type BuddyStreamHandlers = {
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    checklistTitle?: string;
+    checklistItems?: string[];
+    cardId?: string;
+    noteText?: string;
+    lineBefore?: string;
+    lineAfter?: string;
+  }) => void;
+  /**
+   * The buddy has proposed a *team-mode* change, stored server-side. Confirm goes by
+   * `proposalId` alone — the client echoes nothing back but that id, because what the change
+   * actually is lives on the backend.
+   */
+  onStoredProposal?: (proposal: {
+    proposalId: string;
+    label: string;
+    preview: string | null;
+    risk: ProposalRisk | null;
   }) => void;
 };

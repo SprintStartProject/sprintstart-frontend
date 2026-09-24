@@ -130,10 +130,11 @@ describe("ProjectSwitcher", () => {
       "false",
     );
 
-    // "Managed by you" also labels the trigger and the card badge, so scope
-    // the group-header assertions to the listbox.
+    // "Managed by you" is the group header only: the trigger and the cards
+    // carry a Manager/Member badge instead. Scope to the listbox anyway, so
+    // the assertion stays about the grouping.
     const listbox = screen.getByRole("listbox", { name: "Projects" });
-    expect(within(listbox).getAllByText("Managed by you").length).toBeGreaterThan(0);
+    expect(within(listbox).getByText("Managed by you")).toBeInTheDocument();
     expect(within(listbox).getByText("Member of")).toBeInTheDocument();
   });
 

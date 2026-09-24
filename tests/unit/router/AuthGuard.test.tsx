@@ -508,6 +508,7 @@ describe("AuthGuard", () => {
         roleIds: ["role1"],
         name: "Typescript",
         status: "ACTIVE",
+        universal: false,
       },
     ]);
 

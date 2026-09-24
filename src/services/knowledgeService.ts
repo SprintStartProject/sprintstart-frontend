@@ -32,16 +32,13 @@ type UploadResponseItem = {
 
 export const knowledgeService = {
   /**
-   * Whether the project has anything ingested yet.
+   * Whether the project has anything ingested at all -- what an onboarding path is built from.
    *
-   * Asks for a single artifact rather than counting: the caller only needs to
-   * know whether the set is empty.
+   * Throws when the question cannot be answered, rather than reporting "empty": a failed request
+   * and an empty project are different statements, and callers deciding whether to hide the
+   * onboarding entry treat them differently.
    *
-   * Deliberately lets failures propagate, unlike `getRecentArtifacts`, which
-   * returns `[]` on error. Callers use this to decide whether to *hide* UI, and
-   * a swallowed error would make a brief outage indistinguishable from an empty
-   * project — quietly removing navigation that should be there. An error must
-   * stay tellable apart from a genuine "nothing here".
+   * @param projectId UUID of the project.
    */
   async hasIngestedContent(projectId: string): Promise<boolean> {
     const response = await apiClient.fetch<{ items?: Artifact[] }>(

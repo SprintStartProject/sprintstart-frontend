@@ -1,27 +1,20 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
+import {
+  OnboardingJourneyContext,
+  type OnboardingJourneyValue,
+} from "../../../../src/features/onboarding/generation/OnboardingJourneyContext";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useOnboardingAvailable } from "../../../../src/features/onboarding/hooks/useOnboardingAvailable";
-import { knowledgeService } from "../../../../src/services/knowledgeService";
 import { PermissionGroup } from "../../../../src/services/types";
 import type { UserProfile } from "../../../../src/services/types";
 
 const mockAuth = vi.hoisted(() => ({
   value: { profile: null as UserProfile | null },
 }));
-const mockProject = vi.hoisted(() => ({
-  value: { selectedProjectId: null as string | null },
-}));
 
 vi.mock("../../../../src/context/useAuth", () => ({
   useAuth: () => mockAuth.value,
-}));
-
-vi.mock("../../../../src/features/projects/useProjectContext", () => ({
-  useProjectContext: () => mockProject.value,
-}));
-
-vi.mock("../../../../src/services/knowledgeService", () => ({
-  knowledgeService: { hasIngestedContent: vi.fn() },
 }));
 
 const profileWithRole = (): UserProfile => ({
@@ -43,34 +36,22 @@ describe("useOnboardingAvailable", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.value = { profile: profileWithRole() };
-    mockProject.value = { selectedProjectId: "p1" };
-    vi.mocked(knowledgeService.hasIngestedContent).mockResolvedValue(true);
   });
 
-  it("is available once a role is held and the project has content", async () => {
+  it("is available while onboarding is incomplete", () => {
     const { result } = renderHook(() => useOnboardingAvailable());
 
-    await waitFor(() => expect(knowledgeService.hasIngestedContent).toHaveBeenCalledWith("p1"));
     expect(result.current).toBe(true);
   });
 
-  it("goes away when the project has nothing ingested to build a path from", async () => {
-    vi.mocked(knowledgeService.hasIngestedContent).mockResolvedValue(false);
-
-    const { result } = renderHook(() => useOnboardingAvailable());
-
-    await waitFor(() => expect(result.current).toBe(false));
-  });
-
-  it("is unavailable without a role, and never asks about content", () => {
+  it("is available without a role or path so personalization can be started manually", () => {
     mockAuth.value = {
       profile: { ...profileWithRole(), projectRoles: [] },
     };
 
     const { result } = renderHook(() => useOnboardingAvailable());
 
-    expect(result.current).toBe(false);
-    expect(knowledgeService.hasIngestedContent).not.toHaveBeenCalled();
+    expect(result.current).toBe(true);
   });
 
   it("is unavailable once onboarding has been completed", () => {
@@ -81,34 +62,37 @@ describe("useOnboardingAvailable", () => {
     const { result } = renderHook(() => useOnboardingAvailable());
 
     expect(result.current).toBe(false);
-    expect(knowledgeService.hasIngestedContent).not.toHaveBeenCalled();
   });
 
-  it("stays visible when the content check fails, rather than hiding navigation", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.mocked(knowledgeService.hasIngestedContent).mockRejectedValue(new Error("gateway down"));
+  it("stays in the navigation even when nothing can be built yet -- the page explains why", () => {
+    const journey = (availability: OnboardingJourneyValue["availability"]) =>
+      function Wrapper({ children }: { children: ReactNode }) {
+        return (
+          <OnboardingJourneyContext.Provider
+            value={{
+              generation: { status: "idle" },
+              startGeneration: vi.fn(),
+              clearGeneration: vi.fn(),
+              availability,
+              unavailableReason: availability === "unavailable" ? "no-content" : null,
+              refreshAvailability: vi.fn(),
+            }}
+          >
+            {children}
+          </OnboardingJourneyContext.Provider>
+        );
+      };
 
-    const { result } = renderHook(() => useOnboardingAvailable());
-
-    await waitFor(() => expect(knowledgeService.hasIngestedContent).toHaveBeenCalled());
-    // A blip must not look like the feature was taken away.
-    expect(result.current).toBe(true);
-  });
-
-  it("stays visible while the answer is still in flight", () => {
-    vi.mocked(knowledgeService.hasIngestedContent).mockReturnValue(new Promise(() => {}));
-
-    const { result } = renderHook(() => useOnboardingAvailable());
-
-    expect(result.current).toBe(true);
-  });
-
-  it("stays visible when no project is selected yet", () => {
-    mockProject.value = { selectedProjectId: null };
-
-    const { result } = renderHook(() => useOnboardingAvailable());
-
-    expect(result.current).toBe(true);
-    expect(knowledgeService.hasIngestedContent).not.toHaveBeenCalled();
+    expect(
+      renderHook(() => useOnboardingAvailable(), { wrapper: journey("unavailable") }).result
+        .current,
+    ).toBe(true);
+    expect(
+      renderHook(() => useOnboardingAvailable(), { wrapper: journey("buildable") }).result.current,
+    ).toBe(true);
+    // Still unknown: keep the entry rather than blink it out and back in.
+    expect(
+      renderHook(() => useOnboardingAvailable(), { wrapper: journey("loading") }).result.current,
+    ).toBe(true);
   });
 });

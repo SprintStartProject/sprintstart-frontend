@@ -39,6 +39,10 @@ vi.mock("../../../src/services/userService", () => ({
   },
 }));
 
+vi.mock("../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "proj1" }),
+}));
+
 vi.mock("../../../src/services/onboardingService", () => ({
   onboardingService: {
     fetchPath: vi.fn().mockResolvedValue({
@@ -71,6 +75,7 @@ vi.mock("../../../src/services/onboardingService", () => ({
               skip: null,
             },
           ],
+          questions: [],
         },
       ],
     }),
@@ -88,7 +93,7 @@ describe("OnBoardingPage Accessibility", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Your onboarding journey")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Onboarding" })).toBeInTheDocument();
     });
 
     expect(

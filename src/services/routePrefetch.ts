@@ -39,6 +39,9 @@ function prefetchRouteModule(path: string): void {
     case "/onboarding":
       void import("../pages/OnBoardingPage");
       return;
+    case "/blueprints":
+      void import("../pages/BlueprintPathsPage");
+      return;
     // Every PM section ships in the workspace's one chunk.
     case "/pm-dashboard":
     case "/team-management":
@@ -51,11 +54,8 @@ function prefetchRouteModule(path: string): void {
     case "/data-ingestion":
       void import("../pages/DataIngestionPage");
       return;
-    case "/arrival-steps":
-      void import("../pages/ArrivalStepsPage");
-      return;
-    case "/starter-work":
-      void import("../pages/StarterWorkPage");
+    case "/hire-setup":
+      void import("../pages/HireSetupPage");
       return;
     case "/admin":
       void import("../pages/AdminPage");
@@ -88,7 +88,7 @@ export function prefetchRoute(
       });
       return;
 
-    case "/starter-work":
+    case "/hire-setup":
       void queryClient.prefetchQuery({
         queryKey: queryKeys.starterWork.review(),
         queryFn: loadStarterWorkReviewQueue,

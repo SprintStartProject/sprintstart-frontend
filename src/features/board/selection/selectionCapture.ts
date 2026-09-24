@@ -14,10 +14,29 @@ import { composeNote, normalise } from "../generation/noteComposition";
 export type CapturedSelection = {
   /** The selected text, trimmed and with collapsed whitespace runs. */
   text: string;
+  /**
+   * The selected text with its line structure kept, for the reply-to-AI quote.
+   *
+   * [text] collapses every whitespace run because cards and highlights want one line of words; a
+   * blockquote of a two-paragraph answer, though, is worth two paragraphs. The Reply offer sends
+   * this instead, and the chatbot's `formatMarkdownQuote` turns each line into its own quoted
+   * paragraph.
+   */
+  quoteText: string;
   /** The link the selection sits in or is, when it is one. */
   url: string | null;
   /** Where in the app it came from, in words. Null when nothing better than the app name exists. */
   source: string | null;
+  /**
+   * The page the selection was on, by the name its header shows, independent of {@link source}.
+   * Null outside a page — the buddy dock, a drawer — where there is none to name.
+   *
+   * Kept apart because the two answer different questions and a reader usually wants both: the
+   * heading says which part, the page says which page, and "the bit under Deployment" on its own
+   * could be on any page in the app. The nearest heading is often the page's own title, so the
+   * two are equal as often as not — a caller showing both has to say so only when they differ.
+   */
+  page: string | null;
   /**
    * Where in the app it came from, as something you can click.
    *
@@ -46,6 +65,8 @@ export type CapturedSelection = {
   inLink: boolean;
   /** Where the toolbar should sit, in viewport coordinates. */
   rect: DOMRect;
+  /** Whether the selection was made inside an AI assistant chat message. */
+  isAiMessage: boolean;
 };
 
 /** Anything shorter is a stray click or a double-click that caught a space, not a selection. */
@@ -61,7 +82,8 @@ const MIN_SELECTION_LENGTH = 2;
 export function captureSelection(selection: Selection | null): CapturedSelection | null {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
 
-  const text = normalise(selection.toString());
+  const rawText = selection.toString();
+  const text = normalise(rawText);
   if (text.length < MIN_SELECTION_LENGTH) return null;
 
   const anchor = selection.anchorNode;
@@ -70,13 +92,33 @@ export function captureSelection(selection: Selection | null): CapturedSelection
   const range = selection.getRangeAt(0);
   return {
     text,
+    quoteText: selectionQuoteText(rawText),
     url: linkFor(anchor, text),
     source: sourceFor(anchor),
+    page: pageTitleFor(anchor),
     origin: originUrl(window.location, text),
     cardId: elementOf(anchor)?.closest("[data-card-id]")?.getAttribute("data-card-id") ?? null,
     inLink: Boolean(elementOf(anchor)?.closest("a")),
     rect: range.getBoundingClientRect(),
+    isAiMessage: isInsideAiMessage(range),
   };
+}
+
+/**
+ * The quote-ready form of a selection's raw text: line structure kept, everything else tidied.
+ *
+ * A browser's selection `toString` puts a newline at block boundaries — paragraphs, list items —
+ * and hands back the stray spacing a drag across inline markup picks up. The quote keeps the
+ * paragraph breaks, because that is the whole point of replying with a quote, while dropping
+ * empty lines and collapsing horizontal whitespace — so the chatbot's `formatMarkdownQuote`
+ * receives one line per paragraph and nothing else.
+ */
+export function selectionQuoteText(raw: string): string {
+  return raw
+    .split("\n")
+    .map((line) => line.replace(/[^\S\n]+/g, " ").trim())
+    .filter((line) => line.length > 0)
+    .join("\n");
 }
 
 /**
@@ -148,9 +190,30 @@ function httpUrl(candidate: string): string | null {
  */
 function sourceFor(node: Node): string | null {
   const heading = nearestHeadingAbove(node);
+
   if (heading) return heading;
-  const title = document.title.trim();
+  const title = normalise(document.title);
+
   return title.length > 0 ? title : null;
+}
+
+/**
+ * The name of the page the selection is on: the title its header shows, or null.
+ *
+ * Read off the page rather than off `document.title`, because the app never changes the document
+ * title — it says "SprintStart" on every route, which names no page at all. Every page draws its
+ * name as the one `<h1>` in its header (`PageHeader`), inside the app's `<main>`, so the first
+ * `<h1>` there is what a hire would call the page.
+ *
+ * Scoped to `<main>` on purpose: the sidebar carries an `<h1>` of its own with the product name
+ * in it, and it comes first in the document. A selection outside `<main>` — the buddy dock, a
+ * drawer portalled to the body — has no page of its own to name, and gets null.
+ */
+function pageTitleFor(node: Node): string | null {
+  const title = elementOf(node)?.closest("main")?.querySelector("h1")?.textContent ?? "";
+  const text = normalise(title);
+
+  return text.length > 0 ? text : null;
 }
 
 /**
@@ -190,4 +253,18 @@ function isInsideEditable(node: Node): boolean {
 
 function elementOf(node: Node): Element | null {
   return node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+}
+
+/**
+ * Whether the selection sits entirely inside one AI assistant message bubble.
+ *
+ * Both ends have to resolve to the same bubble, which keeps the answer independent of the drag
+ * direction: a selection that runs from an answer into the next message is not a reply to that
+ * answer — its text would carry the hire's own words — whichever end the drag started at.
+ */
+function isInsideAiMessage(range: Range): boolean {
+  const bubbleOf = (node: Node): Element | null =>
+    elementOf(node)?.closest("[data-chat-message-role='ASSISTANT']") ?? null;
+  const bubble = bubbleOf(range.startContainer);
+  return bubble !== null && bubble === bubbleOf(range.endContainer);
 }

@@ -28,9 +28,14 @@ export const queryKeys = {
     byProject: (projectId: string) => ["attention", projectId] as const,
   },
   starterWork: {
+    // Bare, so `invalidateQueries({ queryKey: pool() })` prefix-matches every status's cache —
+    // a reconcile can move a task between LIVE and STALE, and both need to come back in step.
     pool: () => ["starter-work", "pool"] as const,
+    poolByStatus: (status: string) => ["starter-work", "pool", status] as const,
     review: () => ["starter-work", "review"] as const,
     corpusIssues: (projectId: string) => ["starter-work", "corpus", projectId] as const,
+    taskOrientation: (taskId: string, projectId: string) =>
+      ["starter-work", "orientation", taskId, projectId] as const,
   },
   profile: {
     mine: (userId: string) => ["profile", userId] as const,
@@ -38,6 +43,7 @@ export const queryKeys = {
   onboarding: {
     myStatuses: () => ["onboarding", "my-status"] as const,
     myStatus: (userId: string) => ["onboarding", "my-status", userId] as const,
+    unseenSkipAnswers: (userId: string) => ["onboarding", "unseen-skip-answers", userId] as const,
   },
   projectInsights: {
     byProjectIds: (projectIds: string) => ["project-insights", projectIds] as const,
@@ -57,6 +63,10 @@ export const queryKeys = {
   },
   board: {
     byProject: (projectId: string) => ["board", projectId] as const,
+    // Bare, like `starterWork.pool()` above — lets an invalidation prefix-match every project's
+    // board cache without threading a `projectId` through a caller (`PathStepCard`'s tick) that
+    // has no reason to know which project it is looking at.
+    all: () => ["board"] as const,
   },
   attestations: {
     // Not scoped by user id, like `atlassianCredentials.mine` above: the

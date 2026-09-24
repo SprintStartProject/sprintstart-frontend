@@ -28,6 +28,28 @@ export type NextUp = {
 };
 
 /**
+ * How many cards this one alone is holding up.
+ *
+ * Only the ones it alone is holding: a card that would still be blocked by something else
+ * afterwards has not been freed by finishing this, and counting it would make the line promise more
+ * than doing the work delivers.
+ *
+ * Pulled out of {@link nextUp} because the same number is worth saying on any card somebody can
+ * actually start, not only on the one the board happens to recommend — "start here" answers where
+ * to begin, this answers what begins because of it.
+ */
+export function unblockedByFinishing(
+  cards: readonly BoardCard[],
+  states: Map<string, CardState>,
+  cardId: string,
+): number {
+  return cards.filter((card) => {
+    const blockers = states.get(card.id)?.blockedBy ?? [];
+    return blockers.length === 1 && blockers[0].id === cardId;
+  }).length;
+}
+
+/**
  * What to do next, or null when the board should not be telling anybody.
  *
  * The choice is deliberately the dullest one that is defensible: **the first card in the hire's own
@@ -60,11 +82,7 @@ export function nextUp(
   return {
     card: first,
     name: cardName(first),
-    unblocks: cards.filter((card) => {
-      const blockers = states.get(card.id)?.blockedBy ?? [];
-
-      return blockers.length === 1 && blockers[0].id === first.id;
-    }).length,
+    unblocks: unblockedByFinishing(cards, states, first.id),
   };
 }
 

@@ -3,7 +3,9 @@ import type {
   CreateStarterWorkTaskInput,
   GenerateStarterWorkResult,
   PromoteStarterWorkCandidateInput,
+  ProposalStatus,
   StarterWorkCandidate,
+  StarterWorkReconcileOutcome,
   StarterWorkTask,
   UnreviewedStarterWork,
 } from "../features/starter-work/types";
@@ -35,9 +37,15 @@ export const starterWorkService = {
     return await apiClient.fetch<UnreviewedStarterWork>(`${BASE_URL}/unreviewed`);
   },
 
-  /** The whole live pool, reviewed or not — what a PM can author orientation for. */
-  async fetchPool(): Promise<StarterWorkTask[]> {
-    return await apiClient.fetch<StarterWorkTask[]>(`${BASE_URL}/pool`);
+  /**
+   * The pool at one status, reviewed or not. Defaults to `LIVE` — what a PM can author
+   * orientation for — but also takes `STALE` for what has since closed at its source.
+   * `REJECTED` is refused by the backend; this client never asks for it.
+   */
+  async fetchPool(status: ProposalStatus = "LIVE"): Promise<StarterWorkTask[]> {
+    return await apiClient.fetch<StarterWorkTask[]>(
+      `${BASE_URL}/pool?status=${encodeURIComponent(status)}`,
+    );
   },
 
   /**
@@ -102,6 +110,28 @@ export const starterWorkService = {
     return await apiClient.fetch<StarterWorkTask>(`${BASE_URL}/${id}/reject`, {
       method: "POST",
       body: JSON.stringify({ reason }),
+    });
+  },
+
+  /**
+   * Brings the pool back in line with its trackers now, rather than waiting for the next
+   * scheduled or event-driven pass. Synchronous: the counts in the response are the answer the
+   * caller is waiting for.
+   */
+  async reconcile(): Promise<StarterWorkReconcileOutcome> {
+    return await apiClient.fetch<StarterWorkReconcileOutcome>(`${BASE_URL}/reconcile`, {
+      method: "POST",
+    });
+  },
+
+  /**
+   * A PM's decision on whether a live starter-work task is suitable as a hire's Task 0 — the
+   * trivial first task somebody is auto-assigned once their environment is ready.
+   */
+  async setTaskZero(id: string, eligible: boolean): Promise<StarterWorkTask> {
+    return await apiClient.fetch<StarterWorkTask>(`${BASE_URL}/${id}/task-zero`, {
+      method: "POST",
+      body: JSON.stringify({ eligible }),
     });
   },
 };

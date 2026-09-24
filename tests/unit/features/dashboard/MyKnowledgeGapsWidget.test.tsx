@@ -147,6 +147,23 @@ describe("MyKnowledgeGapsWidget", () => {
     expect(screen.queryByText("Nothing assigned to you.")).not.toBeInTheDocument();
   });
 
+  it("does not ask for gaps about an id no loaded list has confirmed", async () => {
+    // A `?projectId=` deep link can publish an id into the context before the project list
+    // vouches for it — the non-empty id alone must not be read as "there is a project".
+    mocks.projectContext = createProjectContextValue({
+      projects: [],
+      selectedProject: null,
+      selectedProjectId: "unconfirmed-project",
+      canManageSelected: false,
+    });
+
+    renderWidget();
+
+    expect(await screen.findByText("No project selected.")).toBeInTheDocument();
+    expect(mocks.fetchMyKnowledgeGaps).not.toHaveBeenCalled();
+    expect(screen.queryByText("Could not load your knowledge gaps.")).not.toBeInTheDocument();
+  });
+
   it("asks only for the selected project", async () => {
     renderWidget();
 

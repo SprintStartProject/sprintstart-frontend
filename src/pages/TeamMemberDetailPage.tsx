@@ -1,5 +1,5 @@
 import { ArrowLeft, Hand } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../context/useToast";
 import type {
@@ -7,7 +7,6 @@ import type {
   OnboardingStepEndpoint,
   OnboardingTaskEndpoint,
 } from "../features/onboarding/types";
-import { findActivePhaseIndex } from "../features/onboarding/activePhase";
 import type { ProjectRole, TeamOverviewUser } from "../features/team-management/types";
 import type { KnowledgeGap } from "../features/knowledge-gaps/types";
 import { knowledgeGapService } from "../services/knowledgeGapService";
@@ -17,14 +16,17 @@ import {
   getTeamMember,
   unassignProjectRoleFromUser,
   getUserSkillLevels,
+  acceptOnboardingSkipRequest,
+  denyOnboardingSkipRequest,
+  getUserOnboardingFeedback,
+  markOnboardingFeedbackRead,
   getUserOnboardingPath,
-  createOnboardingStepForPhase,
   createOnboardingTaskForStep,
   deleteOnboardingStep,
   deleteOnboardingTask,
   getOnboardingTasksByStep,
-  updateOnboardingStep,
   updateOnboardingTask,
+  type OnboardingFeedback,
   type UserSkillLevel,
 } from "../services/teamManagementService";
 
@@ -43,14 +45,13 @@ import { MemberHero } from "../features/pm-area/components/MemberHero";
 import { MemberOpenItems } from "../features/pm-area/components/MemberOpenItems";
 import { PmCard, PmCardHeader } from "../features/pm-area/components/PmCard";
 import { waitingOn } from "../features/pm-area/memberStatus";
-import { useMemberOpenItems } from "../features/pm-area/useMemberOpenItems";
+import type { SkipDecision } from "../features/pm-area/useMemberOpenItems";
 import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { PanelPresence } from "../components/ui/PanelPresence";
-import { AddCustomStepModal } from "../features/team-management/components/detail/AddCustomStepModal";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
-import { MemberOnboardingSection } from "../features/team-management/components/detail/MemberOnboardingSection";
-import { MemberReviewPoolPanel } from "../features/team-management/components/detail/MemberReviewPoolPanel";
+import { MemberJourneySection } from "../features/team-management/components/detail/MemberJourneySection";
+import { AlertDialog } from "../components/ui/AlertDialog";
 import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
@@ -126,26 +127,17 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const [roleToRemove, setRoleToRemove] = useState<ProjectRole | null>(null);
   const [skillLevels, setSkillLevels] = useState<UserSkillLevel[]>([]);
   const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
+  const [feedbackItems, setFeedbackItems] = useState<OnboardingFeedback[]>([]);
   const [onboardingPath, setOnboardingPath] = useState<OnboardingPathEndpoint | null>(null);
-  const [selectedPhaseId, setSelectedPhaseId] = useState("");
-  const [selectedStepId, setSelectedStepId] = useState("");
   const [detailStepId, setDetailStepId] = useState("");
+  // A step asked to be deleted from the graph, where there is no details panel to confirm in.
+  const [graphStepToDelete, setGraphStepToDelete] = useState<string | null>(null);
   const [stepToDelete, setStepToDelete] = useState<DetailOnboardingStep | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<OnboardingTaskEndpoint | null>(null);
-  const [stepInsertTarget, setStepInsertTarget] = useState<{
-    phaseId: string;
-    position: number;
-  } | null>(null);
-  // Which tab of the knowledge-check modal is open for the selected phase (null = closed).
-  const [checkModalTab, setCheckModalTab] = useState<PhaseCheckAdminTab | null>(null);
-  const [customStepTitle, setCustomStepTitle] = useState("");
-  const [customStepDescription, setCustomStepDescription] = useState("");
-  const [customStepExpectedOutcome, setCustomStepExpectedOutcome] = useState("");
-  const [customStepMinutes, setCustomStepMinutes] = useState("30");
-  const [customStepTasks, setCustomStepTasks] = useState<
-    Array<{ title: string; description: string }>
-  >([{ title: "", description: "" }]);
-  const [addingStep, setAddingStep] = useState(false);
+  // The phase whose knowledge-check modal is open, and on which tab (null = closed).
+  const [checkModal, setCheckModal] = useState<{ phaseId: string; tab: PhaseCheckAdminTab } | null>(
+    null,
+  );
   const [taskInsertTarget, setTaskInsertTarget] = useState<{
     stepId: string;
     position: number;
@@ -158,28 +150,81 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
     Record<string, { done: number; total: number }>
   >({});
   const [stepTasksById, setStepTasksById] = useState<Record<string, OnboardingTaskEndpoint[]>>({});
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
+  const [markingFeedbackId, setMarkingFeedbackId] = useState<string | null>(null);
+  // Keyed on the skip, not on the page: the same request is answerable from the card below and
+  // from the step it belongs to. The ref is the guard (a second click in the same tick still sees
+  // it), the state is what disables both controls.
+  const skipsInReview = useRef(new Set<string>());
+  // Which member the page is about right now, for the refreshes below to check themselves against.
+  const shownUserId = useRef(userId);
+  useEffect(() => {
+    shownUserId.current = userId;
+  }, [userId]);
+  // Which decision is in flight for which skip, so the button that was pressed shows the spinner.
+  const [reviewingSkips, setReviewingSkips] = useState<Readonly<Record<string, SkipDecision>>>({});
+  // `feedbackError` stays for the feedback *load* failure (shown inline where the
+  // list would be); every action outcome on this page is a toast instead.
+  const [feedbackError, setFeedbackError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const toast = useToast();
   const { data: roster } = useTeamRoster();
-  // Skip decisions and feedback, shared with the member side panel. This page reads its member
-  // through `getTeamMember` rather than the roster, so it reloads both itself after an answer.
-  const openItems = useMemberOpenItems(userId ?? null, () =>
-    Promise.all([refreshMember(), refreshOnboardingPath()]),
-  );
 
   useEffect(() => {
+    // A response for the member (or project) this page has since moved away from is dropped: it
+    // would otherwise render member A's journey, with A's step and skip ids, under B's URL.
+    let cancelled = false;
+
     async function loadMember() {
       if (!userId) {
         setLoading(false);
         return;
       }
 
-      const [memberData, rolesData, skills, path, knowledgeGapOverview] = await Promise.all([
-        getTeamMember(userId),
-        getProjectRoles(),
-        getUserSkillLevels(userId),
-        getUserOnboardingPath(userId),
-        knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-      ]);
+      setLoading(true);
+      setLoadError("");
+      setLoadingFeedback(true);
+
+      try {
+        const [memberData, rolesData, skills, path, knowledgeGapOverview] = await Promise.all([
+          getTeamMember(userId),
+          getProjectRoles(),
+          getUserSkillLevels(userId),
+          getUserOnboardingPath(userId),
+          knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
+        ]);
+        let feedback: OnboardingFeedback[] = [];
+        try {
+          feedback = await getUserOnboardingFeedback(userId);
+        } catch (error) {
+          if (!cancelled) {
+            setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
+          }
+        }
+        if (cancelled) return;
+        applyMember(memberData, rolesData, skills, path, knowledgeGapOverview, feedback);
+      } catch (error) {
+        if (cancelled) return;
+        setUser(undefined);
+        setLoadError(
+          error instanceof Error ? error.message : "The team member could not be loaded.",
+        );
+      } finally {
+        if (!cancelled) {
+          setLoadingFeedback(false);
+          setLoading(false);
+        }
+      }
+    }
+
+    function applyMember(
+      memberData: Awaited<ReturnType<typeof getTeamMember>>,
+      rolesData: Awaited<ReturnType<typeof getProjectRoles>>,
+      skills: Awaited<ReturnType<typeof getUserSkillLevels>>,
+      path: Awaited<ReturnType<typeof getUserOnboardingPath>>,
+      knowledgeGapOverview: Awaited<ReturnType<typeof knowledgeGapService.fetchKnowledgeGaps>>,
+      feedback: OnboardingFeedback[],
+    ) {
       setUser(memberData);
       setAvailableRoles(rolesData);
       setSkillLevels(skills);
@@ -188,36 +233,52 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
       // and counting repositories that are missing nothing would overstate
       // what the member has to answer for.
       setKnowledgeGaps(knowledgeGapOverview.gaps.filter((gap) => gap.severity !== "covered"));
+      setFeedbackItems(feedback);
       setOnboardingPath(path);
-      // Open on the phase the member is actually working on. Phase 1 is almost never
-      // the interesting one for a reviewer, and it hides how far along they really are.
-      const activePhase = path?.phases?.[findActivePhaseIndex(path)];
-      setSelectedPhaseId(activePhase?.id ?? "");
-      setSelectedStepId(memberData?.currentStep?.id ?? activePhase?.steps?.[0]?.id ?? "");
-      setLoading(false);
     }
 
     void loadMember();
+    return () => {
+      cancelled = true;
+    };
     // Knowledge gaps are project-scoped, so switching projects has to reload them —
     // otherwise this page keeps showing the previous project's gaps for the member.
   }, [userId, selectedProjectId]);
 
   useEffect(() => {
+    // Re-run on every path change (each PM edit); an older run finishing last must not win.
+    let cancelled = false;
+
     async function loadPathTaskCounts() {
       const steps = onboardingPath?.phases.flatMap((phase) => phase.steps ?? []) ?? [];
 
       if (steps.length === 0) {
         setStepTaskCounts({});
+        // Cleared together: leaving the lists behind meant the previous member's tasks survived a
+        // switch to a member with no steps at all.
+        setStepTasksById({});
         return;
       }
 
-      const taskEntries = await Promise.all(
+      // Settled, not all-or-nothing: one step's request failing used to blank every count on the
+      // page, including the ones that had just been read successfully.
+      const results = await Promise.allSettled(
         steps.map(async (step) => {
           const tasks = await getOnboardingTasksByStep(step.id);
 
           return [step.id, tasks] as const;
         }),
       );
+      const failures = results.filter((result) => result.status === "rejected");
+      if (failures.length > 0) {
+        console.error(
+          `Failed to load the tasks of ${failures.length} of ${steps.length} steps:`,
+          failures[0].reason,
+        );
+      }
+      const taskEntries = results
+        .filter((result) => result.status === "fulfilled")
+        .map((result) => result.value);
       const tasksByStepId = Object.fromEntries(taskEntries);
       const counts = Object.fromEntries(
         taskEntries.map(([stepId, tasks]) => [
@@ -229,36 +290,61 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
         ]),
       );
 
+      if (cancelled) return;
       setStepTasksById(tasksByStepId);
       setStepTaskCounts(counts);
     }
 
-    void loadPathTaskCounts();
+    void loadPathTaskCounts().catch((error: unknown) => {
+      console.error("Failed to load the member's task counts:", error);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [onboardingPath]);
 
+  /**
+   * The three post-action refreshes, each dropped when the page has moved on to another member.
+   *
+   * The initial load has the same guard and names the risk: member A's journey, with A's step and
+   * skip ids, rendered under B's URL -- after which the next action sends A's ids. These run from
+   * every action handler, so they need it just as much.
+   */
   async function refreshMember() {
     if (!userId) return;
+    const forUser = userId;
 
-    const memberData = await getTeamMember(userId);
+    const memberData = await getTeamMember(forUser);
+    if (shownUserId.current !== forUser) return;
     setUser(memberData);
+  }
+
+  async function refreshFeedback() {
+    if (!userId) return;
+    const forUser = userId;
+
+    setLoadingFeedback(true);
+    setFeedbackError("");
+
+    try {
+      const feedback = await getUserOnboardingFeedback(forUser);
+      if (shownUserId.current !== forUser) return;
+      setFeedbackItems(feedback);
+    } catch (error) {
+      if (shownUserId.current !== forUser) return;
+      setFeedbackError(error instanceof Error ? error.message : "Unable to load feedback.");
+    } finally {
+      if (shownUserId.current === forUser) setLoadingFeedback(false);
+    }
   }
 
   async function refreshOnboardingPath() {
     if (!userId) return;
+    const forUser = userId;
 
-    const path = await getUserOnboardingPath(userId);
+    const path = await getUserOnboardingPath(forUser);
+    if (shownUserId.current !== forUser) return;
     setOnboardingPath(path);
-
-    // Only when the selected phase disappeared; fall back to the active one rather than
-    // to phase 1, for the same reason as on load.
-    if (path?.phases?.length && !path.phases.some((phase) => phase.id === selectedPhaseId)) {
-      setSelectedPhaseId(path.phases[findActivePhaseIndex(path)].id);
-    }
-
-    const refreshedSteps = path?.phases.flatMap((phase) => phase.steps ?? []) ?? [];
-    if (refreshedSteps.length && !refreshedSteps.some((step) => step.id === selectedStepId)) {
-      setSelectedStepId(refreshedSteps[0].id);
-    }
   }
 
   const unassignedRoles = useMemo(() => {
@@ -311,6 +397,55 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
     }
   }
 
+  /**
+   * Answers a skip request -- the current step's from the card below, or any step's from where the
+   * step is shown. Phases run side by side, so the one waiting is not always the current step.
+   *
+   * One decision per request, and only one in flight: both surfaces can be on screen at once, the
+   * answer cannot be retried once it is in, and a skip accepted and declined within the same
+   * second would be settled by whichever call the server happened to finish last.
+   */
+  async function reviewSkip(skipId: string, action: "accept" | "deny", comment = "") {
+    if (skipsInReview.current.has(skipId)) return;
+    skipsInReview.current.add(skipId);
+    setReviewingSkips((current) => ({ ...current, [skipId]: action }));
+    const release = () => {
+      skipsInReview.current.delete(skipId);
+      setReviewingSkips((current) => {
+        const next = { ...current };
+        delete next[skipId];
+        return next;
+      });
+    };
+
+    try {
+      if (action === "accept") {
+        await acceptOnboardingSkipRequest(skipId, comment);
+      } else {
+        await denyOnboardingSkipRequest(skipId, comment);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't review the skip request.");
+      // Only a decision that never landed can be made again.
+      release();
+      return;
+    }
+
+    toast.success(action === "accept" ? "Skip request approved" : "Skip request declined");
+    // Told apart from a failed decision: the answer is in, and retrying it would be refused.
+    try {
+      await Promise.all([refreshMember(), refreshOnboardingPath()]);
+      // Held until here, not released when the request came back: until the refresh lands, both
+      // surfaces still draw the request as pending, and a second decision would be sent against
+      // one the server has already answered.
+      release();
+    } catch {
+      toast.error("The answer was saved, but the page could not refresh. Reload to see it.");
+      // The guard stays on for good in this case, for the same reason: what is on screen is a
+      // request that has in fact been answered.
+    }
+  }
+
   async function handleDeleteStep(step: DetailOnboardingStep) {
     setStepActionId(step.id);
 
@@ -320,73 +455,11 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
       if (detailStepId === step.id) {
         setDetailStepId("");
       }
-      await refreshOnboardingPath();
+      // The member too: the deleted step may have been their current one.
+      await Promise.all([refreshOnboardingPath(), refreshMember()]);
       toast.success("Step deleted");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't delete the step.");
-    } finally {
-      setStepActionId(null);
-    }
-  }
-
-  async function handleReorderSteps(phaseId: string, activeStepId: string, overStepId: string) {
-    if (activeStepId === overStepId) return;
-
-    const phase = onboardingPath?.phases.find((item) => item.id === phaseId);
-    const currentSteps = [...(phase?.steps ?? [])].sort((a, b) => a.position - b.position);
-    const activeIndex = currentSteps.findIndex((step) => step.id === activeStepId);
-    const overIndex = currentSteps.findIndex((step) => step.id === overStepId);
-
-    if (!phase || activeIndex < 0 || overIndex < 0) return;
-
-    const reorderedSteps = [...currentSteps];
-    const [movedStep] = reorderedSteps.splice(activeIndex, 1);
-    reorderedSteps.splice(overIndex, 0, movedStep);
-
-    const nextSteps = reorderedSteps.map((step, index) => ({
-      ...step,
-      position: index,
-    }));
-    const changedSteps = nextSteps.filter(
-      (step) =>
-        currentSteps.find((currentStep) => currentStep.id === step.id)?.position !== step.position,
-    );
-
-    setStepActionId(activeStepId);
-    setOnboardingPath((currentPath) =>
-      currentPath
-        ? {
-            ...currentPath,
-            phases: currentPath.phases.map((currentPhase) =>
-              currentPhase.id === phaseId
-                ? {
-                    ...currentPhase,
-                    steps: nextSteps,
-                  }
-                : currentPhase,
-            ),
-          }
-        : currentPath,
-    );
-
-    try {
-      for (const step of changedSteps) {
-        await updateOnboardingStep(step.id, {
-          position: step.position,
-          title: step.title,
-          description: step.description,
-          type: step.type,
-          estimatedMinutes: step.estimatedMinutes,
-          expectedOutcome: step.expectedOutcomes?.[0] ?? "",
-          status: step.status,
-          skip: step.skip ?? null,
-        });
-      }
-
-      await refreshOnboardingPath();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't reorder the steps.");
-      await refreshOnboardingPath();
     } finally {
       setStepActionId(null);
     }
@@ -412,6 +485,9 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
 
   async function handleReorderTasks(stepId: string, activeTaskId: string, overTaskId: string) {
     if (activeTaskId === overTaskId) return;
+    // A second drag while the first is still being written would compute its move from the
+    // optimistic list and send positions against the same stale state.
+    if (stepActionId === stepId) return;
 
     const currentTasks = [...(stepTasksById[stepId] ?? [])].sort((a, b) => a.position - b.position);
     const activeIndex = currentTasks.findIndex((task) => task.id === activeTaskId);
@@ -439,6 +515,9 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
     }));
 
     try {
+      // One request per moved task: there is no batch endpoint, so a failure halfway through
+      // leaves the ones before it written. The refresh in both branches is what the list then
+      // shows -- the server's order, not this optimistic one.
       for (const task of changedTasks) {
         await updateOnboardingTask(task.id, {
           position: task.position,
@@ -450,7 +529,12 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
 
       await refreshStepTasks(stepId);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't reorder the tasks.");
+      toast.error("The new order could not be saved in full", {
+        description:
+          error instanceof Error
+            ? `${error.message} The list now shows what the server has.`
+            : "The list now shows what the server has.",
+      });
       await refreshStepTasks(stepId);
     } finally {
       setStepActionId(null);
@@ -504,65 +588,21 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
     }
   }
 
-  async function handleCreateCustomStep() {
-    const targetPhaseId = stepInsertTarget?.phaseId ?? selectedPhaseId;
-
-    if (!targetPhaseId || !customStepTitle.trim()) return;
-
-    const selectedPhase = onboardingPath?.phases.find((phase) => phase.id === targetPhaseId);
-
-    if (!selectedPhase) return;
-
-    setAddingStep(true);
+  async function handleMarkFeedbackRead(feedbackId: string) {
+    setMarkingFeedbackId(feedbackId);
 
     try {
-      const createdStep = await createOnboardingStepForPhase(targetPhaseId, {
-        position: stepInsertTarget?.position ?? selectedPhase.steps?.length ?? 0,
-        isAiAssisted: false,
-        title: customStepTitle.trim(),
-        description: customStepDescription.trim(),
-        type: "TASK",
-        estimatedMinutes: Number(customStepMinutes) || 30,
-        expectedOutcome: customStepExpectedOutcome.trim(),
-      });
-      const tasksToCreate = customStepTasks
-        .map((task) => ({
-          title: task.title.trim(),
-          description: task.description.trim(),
-        }))
-        .filter((task) => task.title.length > 0);
-
-      // Create tasks sequentially: the backend validates each task's position
-      // against the current task count, so creating them in parallel makes every
-      // task after the first fail ("Position must be between 0 and 0").
-      for (const [index, task] of tasksToCreate.entries()) {
-        await createOnboardingTaskForStep(createdStep.id, {
-          position: index,
-          title: task.title,
-          description: task.description,
-          finished: false,
-        });
-      }
-
-      setCustomStepTitle("");
-      setCustomStepDescription("");
-      setCustomStepExpectedOutcome("");
-      setCustomStepMinutes("30");
-      setCustomStepTasks([{ title: "", description: "" }]);
-      setStepInsertTarget(null);
-      setSelectedStepId(createdStep.id);
-      setDetailStepId(createdStep.id);
-      await refreshOnboardingPath();
-      if (tasksToCreate.length > 0) {
-        await refreshStepTasks(createdStep.id);
-      }
-      toast.success("Step added");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Couldn't create the custom onboarding step.",
+      await markOnboardingFeedbackRead(feedbackId);
+      setFeedbackItems((current) =>
+        current.map((feedback) =>
+          feedback.id === feedbackId ? { ...feedback, read: true } : feedback,
+        ),
       );
+      await Promise.all([refreshFeedback(), refreshMember()]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't mark the feedback as read.");
     } finally {
-      setAddingStep(false);
+      setMarkingFeedbackId(null);
     }
   }
 
@@ -584,7 +624,11 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           </div>
         ) : (
           <div className="rounded-2xl border border-app-border bg-app-surface p-8">
-            <p className="text-sm text-app-text">Team member not found.</p>
+            <p className="text-sm text-app-text">
+              {loadError
+                ? `The team member could not be loaded: ${loadError}`
+                : "Team member not found."}
+            </p>
           </div>
         )}
       </section>
@@ -598,16 +642,9 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
       .sort((a, b) => a.position - b.position)
       .map((step) => step as DetailOnboardingStep),
   );
-  const finishedSteps = allSteps.filter((step) => step.status === "FINISHED").length;
-  const skippedSteps = allSteps.filter((step) => step.status === "SKIPPED").length;
-  const pathPendingSkips = allSteps.filter((step) => step.skip?.status === "PENDING").length;
-  const estimatedMinutes = allSteps.reduce((sum, step) => sum + (step.estimatedMinutes || 0), 0);
-  const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0];
-  const selectedPhaseSteps = [...(selectedPhase?.steps ?? [])]
-    .sort((a, b) => a.position - b.position)
-    .map((step) => step as DetailOnboardingStep);
-  const selectedStep =
-    allSteps.find((step) => step.id === selectedStepId) ?? selectedPhaseSteps[0] ?? null;
+  const checkModalPhase = checkModal
+    ? (phases.find((phase) => phase.id === checkModal.phaseId) ?? null)
+    : null;
   const detailStep = allSteps.find((step) => step.id === detailStepId) ?? null;
   const detailStepTasks = detailStep ? (stepTasksById[detailStep.id] ?? []) : [];
   const sortedDetailStepTasks = [...detailStepTasks].sort((a, b) => a.position - b.position);
@@ -615,7 +652,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const detailStepActualMinutes = detailStep ? getActualMinutes(detailStep) : null;
 
   const detailStepFeedback = detailStep
-    ? openItems.feedback
+    ? feedbackItems
         .filter((feedback) => feedback.stepId === detailStep.id)
         .map((feedback) => ({
           ...feedback,
@@ -649,8 +686,6 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const topKnowledgeGaps = [...knowledgeGaps]
     .sort((a, b) => (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3))
     .slice(0, 3);
-  const nextStep =
-    allSteps.find((step) => step.status !== "FINISHED" && step.status !== "SKIPPED") ?? null;
 
   return (
     <>
@@ -668,7 +703,8 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
         </div>
         <div className="space-y-5">
           {/* Only while something is open: an empty "waiting on you" card at the top of every
-              profile would push the path down to say nothing. */}
+              profile would push the path down to say nothing. Fed from this page's own feedback
+              and skip handling, so it shares the guard with the journey and the step panel. */}
           {openItemCount > 0 && (
             <PmCard aria-label="Waiting on you" tone="warning">
               <PmCardHeader
@@ -679,51 +715,38 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
               />
               <MemberOpenItems
                 member={user}
-                feedback={openItems.feedback}
-                feedbackLoading={openItems.feedbackLoading}
-                feedbackError={openItems.feedbackError}
-                reviewingSkip={openItems.reviewingSkip}
-                markingFeedbackId={openItems.markingFeedbackId}
-                onReviewSkip={(skipId, decision) => void openItems.reviewSkip(skipId, decision)}
-                onMarkRead={(feedbackId) => void openItems.markRead(feedbackId)}
+                feedback={feedbackItems}
+                feedbackLoading={loadingFeedback}
+                feedbackError={Boolean(feedbackError)}
+                reviewingSkip={
+                  user.currentStep?.skip?.id
+                    ? (reviewingSkips[user.currentStep.skip.id] ?? null)
+                    : null
+                }
+                markingFeedbackId={markingFeedbackId}
+                onReviewSkip={(skipId, decision) => void reviewSkip(skipId, decision)}
+                onMarkRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
               />
             </PmCard>
           )}
 
-          <MemberOnboardingSection
-            phases={phases}
-            selectedPhase={selectedPhase}
-            selectedPhaseSteps={selectedPhaseSteps}
-            selectedStep={selectedStep}
-            nextStep={nextStep}
-            finishedSteps={finishedSteps}
-            totalSteps={allSteps.length}
-            estimatedMinutes={estimatedMinutes}
-            skippedSteps={skippedSteps}
-            pendingSkipCount={pathPendingSkips}
+          <MemberJourneySection
+            userId={user.userId}
+            memberName={`${user.firstname} ${user.lastname}`.trim()}
+            path={onboardingPath}
             stepTaskCounts={stepTaskCounts}
-            onSelectPhase={(phaseId, firstStepId) => {
-              setSelectedPhaseId(phaseId);
-              setSelectedStepId(firstStepId);
-            }}
-            onSelectStep={(stepId) => {
-              setSelectedStepId(stepId);
-              setDetailStepId(stepId);
-            }}
-            onAddStep={setStepInsertTarget}
-            onReorderSteps={(phaseId, activeStepId, overStepId) =>
-              void handleReorderSteps(phaseId, activeStepId, overStepId)
-            }
-            onOpenCheck={setCheckModalTab}
-            formatMinutes={formatMinutes}
-            getActualMinutes={getActualMinutes}
-            getStepStatusStyles={getStepStatusStyles}
+            onOpenStep={setDetailStepId}
+            onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
+            onDeleteStep={setGraphStepToDelete}
+            onReviewSkip={reviewSkip}
+            feedbackItems={feedbackItems}
+            onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+            markingFeedbackId={markingFeedbackId}
+            onPathChanged={refreshOnboardingPath}
           />
 
-          {/* Below the path rather than beside it: the path needs the width, and these read
-              fine as a row of cards. items-start keeps each card at its own height. */}
-          <aside aria-label="Member insights" className="grid items-start gap-5 lg:grid-cols-3">
-            {userId && <MemberReviewPoolPanel userId={userId} />}
+          {/* Below the journey rather than beside it: the graph needs the width. */}
+          <aside aria-label="Member insights">
             <MemberGapsPanel
               skillLevels={skillLevels}
               skillGaps={skillGaps}
@@ -745,33 +768,32 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           setRoleToRemove(null);
         }}
       />
-      <AddCustomStepModal
-        open={Boolean(stepInsertTarget)}
-        title={customStepTitle}
-        description={customStepDescription}
-        expectedOutcome={customStepExpectedOutcome}
-        estimatedMinutes={customStepMinutes}
-        tasks={customStepTasks}
-        addingStep={addingStep}
-        onTitleChange={setCustomStepTitle}
-        onDescriptionChange={setCustomStepDescription}
-        onExpectedOutcomeChange={setCustomStepExpectedOutcome}
-        onEstimatedMinutesChange={setCustomStepMinutes}
-        onTasksChange={(updater) => setCustomStepTasks(updater)}
-        onClose={() => setStepInsertTarget(null)}
-        onSubmit={() => void handleCreateCustomStep()}
-      />
-      {checkModalTab && selectedPhase && userId && (
+      {checkModal && checkModalPhase && userId && (
         <PhaseCheckAdminModal
           userId={userId}
-          phaseId={selectedPhase.id}
-          phaseTitle={selectedPhase.title}
+          phaseId={checkModalPhase.id}
+          phaseTitle={checkModalPhase.title}
           memberName={`${user.firstname} ${user.lastname}`.trim()}
-          initialTab={checkModalTab}
+          initialTab={checkModal.tab}
           onSaved={() => void refreshOnboardingPath()}
-          onClose={() => setCheckModalTab(null)}
+          onClose={() => setCheckModal(null)}
         />
       )}
+      <AlertDialog
+        isOpen={graphStepToDelete !== null}
+        title="Delete this step?"
+        description={`"${allSteps.find((step) => step.id === graphStepToDelete)?.title ?? "The step"}" is removed from ${user.firstname}'s path. Whatever waited on it waits on what it waited on instead.`}
+        confirmLabel="Delete step"
+        variant="danger"
+        isLoading={stepActionId === graphStepToDelete}
+        onClose={() => setGraphStepToDelete(null)}
+        onConfirm={() => {
+          const step = allSteps.find((candidate) => candidate.id === graphStepToDelete);
+          // Gone since the dialog opened (a refetch): nothing left to delete, so just close.
+          if (!step) setGraphStepToDelete(null);
+          else void handleDeleteStep(step).finally(() => setGraphStepToDelete(null));
+        }}
+      />
       <PanelPresence value={detailStep}>
         {(step) => (
           <StepDetailsPanel
@@ -801,6 +823,9 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
             onCreateTask={() => void handleCreateTask()}
             formatMinutes={formatMinutes}
             getStepStatusStyles={getStepStatusStyles}
+            onReviewSkip={reviewSkip}
+            onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+            markingFeedbackId={markingFeedbackId}
             onReorderTasks={(activeTaskId, overTaskId) =>
               void handleReorderTasks(step.id, activeTaskId, overTaskId)
             }

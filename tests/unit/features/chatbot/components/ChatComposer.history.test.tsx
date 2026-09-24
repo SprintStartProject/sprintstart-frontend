@@ -22,6 +22,11 @@ function Host({ history }: { history: string[] }) {
       onSubmit={(event) => event.preventDefault()}
       onStop={vi.fn()}
       isBusy={false}
+      queuedMessages={[]}
+      queuePaused={false}
+      onRemoveQueued={vi.fn()}
+      onEditQueued={vi.fn()}
+      onSendQueued={vi.fn()}
       hasProject
       promptHistory={history}
       availableSources={[]}

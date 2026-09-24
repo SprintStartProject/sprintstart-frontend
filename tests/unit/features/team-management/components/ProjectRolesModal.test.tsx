@@ -29,8 +29,8 @@ const mockRoles = [
 ];
 
 const mockSkills = [
-  { id: "sk1", name: "TypeScript", roleIds: ["r1"], status: "ACTIVE" as const },
-  { id: "sk2", name: "Old Skill", roleIds: ["r1"], status: "RETIRED" as const },
+  { id: "sk1", name: "TypeScript", roleIds: ["r1"], status: "ACTIVE" as const, universal: false },
+  { id: "sk2", name: "Old Skill", roleIds: ["r1"], status: "RETIRED" as const, universal: false },
 ];
 
 describe("ProjectRolesModal", () => {
@@ -49,6 +49,7 @@ describe("ProjectRolesModal", () => {
       name: "React",
       roleIds: ["r1"],
       status: "ACTIVE" as const,
+      universal: false,
     });
     vi.mocked(deleteSkill).mockResolvedValue(undefined);
     vi.mocked(reactivateSkill).mockResolvedValue({
@@ -56,6 +57,7 @@ describe("ProjectRolesModal", () => {
       name: "Old Skill",
       roleIds: ["r1"],
       status: "ACTIVE" as const,
+      universal: false,
     });
   });
 

@@ -19,6 +19,7 @@ import {
 import { onBuddyPageReady } from "../aiBuddyBus";
 import { useBuddy } from "../hooks/useBuddy";
 import { useGreetingReveal } from "../hooks/useGreetingReveal";
+import { BuddyModeSwitcher } from "./BuddyModeSwitcher";
 import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
 
@@ -75,7 +76,17 @@ export function BuddyWidget() {
     retryOpen,
     closeDock,
     startFreshVisit,
+    teamProjectId,
+    switchTeamProject,
+    isGreeting,
+    isDeciding,
   } = useBuddy();
+
+  // The switcher (and the composer, and everything else) waits: a turn in flight cannot be
+  // called back into a thread that a switch would clear. Same rule as the fresh-visit control.
+  // `isGreeting` closes the hole where the first token had already released `isOpening` while
+  // the greeting was still streaming.
+  const isTurnInFlight = isThinking || isStreaming || isOpening || isGreeting || isDeciding;
 
   // The greeting is usually written before the dock is ever opened; this is what still lets the
   // hire watch the buddy think and write it — see the hook.
@@ -295,12 +306,24 @@ export function BuddyWidget() {
             dismissAction={dismissAction}
             suggestions={suggestions}
             startFreshVisit={startFreshVisit}
+            isGreeting={isGreeting}
+            isDeciding={isDeciding}
+            teamProjectId={teamProjectId}
             openError={openError}
             onRetryOpen={() => void retryOpen()}
             onClose={toggleOpen}
             onOpenFull={openFull}
             suggestionsHidden={suggestionsHidden}
             onHideSuggestions={() => setSuggestionsHidden(true)}
+            // Hire conversation ↔ team conversations, in the header beside the title. The
+            // switcher carries the restore audit with it (see `BuddyModeSwitcher`).
+            headerControl={
+              <BuddyModeSwitcher
+                teamProjectId={teamProjectId}
+                onSwitch={(projectId) => void switchTeamProject(projectId)}
+                disabled={isTurnInFlight}
+              />
+            }
             isExpanding={handoff !== "idle"}
             isRevealing={handoff === "revealing"}
           />

@@ -77,6 +77,12 @@ body {
   --danger-text: #b91c1c;
   --danger-solid: #dc2626;
 
+  /* Question -- knowledge questions on an onboarding path, told apart from steps at a glance. */
+  --question-bg: #f5f3ff;
+  --question-border: #c4b5fd;
+  --question-text: #6d28d9;
+  --question-solid: #7c3aed;
+
   /* Highlighter — the hire's own marker pen on a board card.
      Its own four colors rather than the semantic ones: success/warning/danger mean something,
      and a sentence somebody marked green does not mean it went well. These mean nothing at all,
@@ -221,6 +227,12 @@ body {
   --danger-text: #f87171;
   --danger-solid: #dc2626;
 
+  /* Question */
+  --question-bg: rgba(76, 29, 149, 0.3);
+  --question-border: #7c3aed;
+  --question-text: #c4b5fd;
+  --question-solid: #8b5cf6;
+
   /* Highlighter — translucent on dark rather than the light theme's pastels, which would put
      black-on-white text back on a page that is neither. The ink stays the page's own. */
   --highlight-yellow: rgba(250, 204, 21, 0.3);
@@ -328,6 +340,11 @@ body {
   --color-app-danger-border: var(--danger-border);
   --color-app-danger-text: var(--danger-text);
   --color-app-danger-solid: var(--danger-solid);
+
+  --color-app-question-bg: var(--question-bg);
+  --color-app-question-border: var(--question-border);
+  --color-app-question-text: var(--question-text);
+  --color-app-question-solid: var(--question-solid);
 
   --color-app-highlight-yellow: var(--highlight-yellow);
   --color-app-highlight-green: var(--highlight-green);
@@ -921,6 +938,24 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .app-widget-wiggle {
+    animation: none;
+  }
+}
+
+/* Onboarding graphs: an edge whose blocker is done and whose target is open drifts towards the
+   target, so "this is what you can do now" reads at a glance without another colour. */
+@keyframes journey-edge-flow {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+.journey-edge-flow {
+  animation: journey-edge-flow 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-edge-flow {
     animation: none;
   }
 }

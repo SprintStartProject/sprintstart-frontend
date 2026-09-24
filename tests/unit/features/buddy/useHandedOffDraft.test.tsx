@@ -137,6 +137,9 @@ describe("the dock’s hand-off control", () => {
         dismissAction={vi.fn()}
         suggestions={[]}
         startFreshVisit={vi.fn()}
+        isGreeting={false}
+        isDeciding={false}
+        teamProjectId={null}
         onClose={vi.fn()}
       />,
     );
@@ -162,6 +165,9 @@ describe("the dock’s hand-off control", () => {
         dismissAction={vi.fn()}
         suggestions={[]}
         startFreshVisit={vi.fn()}
+        isGreeting={false}
+        isDeciding={false}
+        teamProjectId={null}
         onClose={vi.fn()}
         onOpenFull={onOpenFull}
       />,

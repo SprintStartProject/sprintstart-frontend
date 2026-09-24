@@ -26,6 +26,11 @@ vi.mock("../../../src/features/onboarding-metrics/hooks/useAttention", () => ({
   useAttention: () => ({ attention: null, isLoading: false, error: null, reload: vi.fn() }),
 }));
 
+// The roles tab reads who is signed in to decide what they may change there.
+vi.mock("../../../src/context/useAuth", () => ({
+  useAuth: () => ({ profile: { id: "pm-1", permissionGroup: "PM" } }),
+}));
+
 function LocationProbe() {
   const location = useLocation();
   return <output data-testid="location">{location.search}</output>;

@@ -76,7 +76,7 @@ function createMockUser(): TeamOverviewUser {
 
 describe("SkillWizardPage", () => {
   const mockSkills: Skill[] = [
-    { id: "skill1", name: "TypeScript", roleIds: ["role1"], status: "ACTIVE" },
+    { id: "skill1", name: "TypeScript", roleIds: ["role1"], status: "ACTIVE", universal: false },
   ];
 
   beforeEach(() => {

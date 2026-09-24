@@ -4,24 +4,26 @@ import { NavLink, useLocation } from "react-router-dom";
 import { LogOut, Menu, Settings, X } from "lucide-react";
 import { UserAvatar } from "../common/UserAvatar";
 import { useAuth } from "../../context/useAuth";
-import { canAccessRoute, type AppRoute } from "../../auth/accessPolicy";
+import { canAccessRoute, isOnboardingAccessible, type AppRoute } from "../../auth/accessPolicy";
 import { ProjectSwitcher } from "../../features/projects/components/ProjectSwitcher";
 import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
+import { useOnboardingJourney } from "../../features/onboarding/generation/OnboardingJourneyContext";
 import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledgeGaps";
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
+import { useUnseenSkipAnswerCount } from "../../features/onboarding/hooks/useUnseenSkipAnswerCount";
 import {
   AdminIcon,
-  ArrivalStepsIcon,
+  BlueprintsIcon,
   BoardIcon,
   ChatIcon,
   DashboardIcon,
   DataIngestionIcon,
+  HireSetupIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
-  StarterWorkIcon,
   type SidebarIcon,
 } from "./SidebarNavIcons";
 import { SidebarLogo } from "./SidebarLogo";
@@ -51,6 +53,8 @@ type SidebarContentProps = {
    * same reason as the flag above: this component is mounted twice at once.
    */
   openEscalationCount?: number;
+  /** Skip requests the project manager answered that the member has not looked at yet. */
+  unseenSkipAnswerCount?: number;
 };
 
 /**
@@ -111,18 +115,21 @@ const projectManagerNavItems: SidebarNavItem[] = [
     path: "/data-ingestion",
     icon: DataIngestionIcon,
   },
-  // The steps a new hire is walked through on arrival — set up here by the PM,
-  // which is why it sits with the other things a PM prepares rather than in the
-  // hire's own list. `canAccessRoute` keeps it off a hire's sidebar.
+  // After the material it is written from. A blueprint is authored against what
+  // the project has already told the system about itself, so a PM setting one up
+  // for the first time meets the two in the order they are done in.
   {
-    label: "Arrival Steps",
-    path: "/arrival-steps",
-    icon: ArrivalStepsIcon,
+    label: "Blueprints",
+    path: "/blueprints",
+    icon: BlueprintsIcon,
   },
+  // Arrival authoring and Starter Work review, as tabs of one page — set up here by the PM,
+  // which is why it sits with the other things a PM prepares rather than in the hire's own list.
+  // `canAccessRoute` keeps it off a hire's sidebar.
   {
-    label: "Starter Work",
-    path: "/starter-work",
-    icon: StarterWorkIcon,
+    label: "Hire Setup",
+    path: "/hire-setup",
+    icon: HireSetupIcon,
   },
 ];
 
@@ -148,10 +155,12 @@ function SidebarContent({
   "aria-label": ariaLabel = "Primary Navigation",
   hasPmAttentionItems = false,
   openEscalationCount = 0,
+  unseenSkipAnswerCount = 0,
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
   const isOnboardingAvailable = useOnboardingAvailable();
+  const { generation } = useOnboardingJourney();
   const location = useLocation();
   /*
     Components put in this user's name that they have not acknowledged yet. Read straight from
@@ -176,9 +185,7 @@ function SidebarContent({
   const visibleNavItems = navItems.filter(
     (item) =>
       canAccessRoute(profile, item.path, canManageSelected) &&
-      // Onboarding only appears while a path can actually exist: after a
-      // role is assigned, before the journey is completed, and once the
-      // project has something to build the path from.
+      // Offered while there is onboarding to do -- see `useOnboardingAvailable`.
       (item.path !== "/onboarding" || isOnboardingAvailable),
   );
   const visibleProjectManagerNavItems = projectManagerNavItems.filter((item) =>
@@ -290,14 +297,19 @@ function SidebarContent({
                   pointerY={pointerY}
                   hasAttentionMarker={
                     (item.path === "/pm-dashboard" && hasPmAttentionItems) ||
-                    (item.path === "/" && hasUnseenKnowledgeGaps)
+                    (item.path === "/" && hasUnseenKnowledgeGaps) ||
+                    (item.path === "/onboarding" && unseenSkipAnswerCount > 0)
                   }
                   attentionLabel={
                     item.path === "/"
                       ? "A component has been assigned to you"
-                      : "Open skip requests or unread feedback"
+                      : item.path === "/onboarding"
+                        ? "Your project manager answered a skip request"
+                        : "Open skip requests or unread feedback"
                   }
                   count={item.path === "/pm-dashboard" ? openEscalationCount : 0}
+                  busy={item.path === "/onboarding" && generation.status === "running"}
+                  busyLabel="Your onboarding path is being built"
                   countLabel={item.path === "/pm-dashboard" ? describeOpenEscalations : undefined}
                   onNavigate={onNavigate}
                 />
@@ -417,6 +429,14 @@ export function SideBar() {
     pathname,
   );
 
+  // Owned here for the same reason: read once, handed to both sidebars.
+  const { availability } = useOnboardingJourney();
+  const unseenSkipAnswerCount = useUnseenSkipAnswerCount(
+    profile?.id,
+    isOnboardingAccessible(profile) && availability === "path",
+    pathname,
+  );
+
   const closeMobileSidebar = () => {
     setIsMobileSidebarOpen(false);
   };
@@ -431,6 +451,7 @@ export function SideBar() {
           aria-label="Desktop Navigation"
           hasPmAttentionItems={hasPmAttentionItems}
           openEscalationCount={openEscalationCount}
+          unseenSkipAnswerCount={unseenSkipAnswerCount}
         />
       </aside>
 
@@ -483,6 +504,7 @@ export function SideBar() {
           onNavigate={closeMobileSidebar}
           hasPmAttentionItems={hasPmAttentionItems}
           openEscalationCount={openEscalationCount}
+          unseenSkipAnswerCount={unseenSkipAnswerCount}
         />
       </aside>
     </>

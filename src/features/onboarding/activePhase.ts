@@ -11,17 +11,18 @@ import type { OnboardingPathEndpoint, OnboardingPhaseEndpoint } from "./types";
 /**
  * Whether a phase still has something left to do.
  *
- * Open steps count, and so does an unpassed knowledge check. The check half matters:
- * finishing the last step of a phase leaves the member standing in front of that phase's
- * check, and going by steps alone would treat the phase as done and move on to the next
- * one — which is exactly where they cannot go until the check is passed.
+ * Open steps count, and so does any question that has not been passed. Both are first-class
+ * nodes of the phase, so a phase whose steps are done but whose questions are unanswered is
+ * still the phase the member is standing in.
  */
 export function isPhaseOpen(phase: OnboardingPhaseEndpoint): boolean {
-  const hasOpenStep = phase.steps.some(
+  // Hedged like `journey.ts` does: this is on the hot path of `phaseState`, so one phase arriving
+  // without its collections would take the page down rather than read as having nothing in it.
+  const hasOpenStep = (phase.steps ?? []).some(
     (step) => step.status !== "FINISHED" && step.status !== "SKIPPED",
   );
 
-  return hasOpenStep || (phase.checkSummary?.required === true && !phase.checkSummary.passed);
+  return hasOpenStep || (phase.questions ?? []).some((question) => question.status !== "PASSED");
 }
 
 /**

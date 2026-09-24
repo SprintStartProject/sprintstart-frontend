@@ -45,4 +45,75 @@ describe("ArtifactList", () => {
     expect(screen.getByText(/Ingested:/)).toBeInTheDocument();
     expect(screen.queryByText(/Changed:/)).not.toBeInTheDocument();
   });
+
+  it("shows the source repository for a GitHub artifact with repo metadata", () => {
+    render(
+      <ArtifactList
+        artifacts={[
+          makeArtifact({
+            metadata: JSON.stringify({
+              repositoryId: "r1",
+              repositoryFullName: "sprintstart/sprintstart-backend",
+            }),
+          }),
+        ]}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("artifact-repo-badge")).toHaveTextContent(
+      "sprintstart/sprintstart-backend",
+    );
+    // The chip ellipsizes rather than widening the row, so the full name has to
+    // stay reachable through the tooltip.
+    expect(screen.getByTestId("artifact-repo-badge")).toHaveAttribute(
+      "title",
+      "sprintstart/sprintstart-backend",
+    );
+    // SpotlightCard's aria-label replaces the row's contents as the accessible
+    // name, so the repository has to be folded into it to reach screen readers.
+    expect(
+      screen.getByRole("button", { name: "View readme.md from sprintstart/sprintstart-backend" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no repository badge when GitHub metadata is missing or malformed", () => {
+    render(
+      <ArtifactList
+        artifacts={[
+          makeArtifact({ metadata: undefined }),
+          makeArtifact({ id: "a2", metadata: "{not json" }),
+        ]}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("artifact-repo-badge")).not.toBeInTheDocument();
+    // Neither the repository text nor the raw metadata blob may leak into the row.
+    expect(screen.queryByText(/not json/)).not.toBeInTheDocument();
+  });
+
+  it("shows no repository badge for non-GitHub or org artifacts", () => {
+    render(
+      <ArtifactList
+        artifacts={[
+          // Well-formed repo metadata on a non-GitHub artifact must not light the badge.
+          makeArtifact({
+            sourceSystem: "UPLOAD",
+            metadata: JSON.stringify({ repositoryFullName: "owner/repo" }),
+          }),
+          // ORG_METADATA is GitHub-sourced, but its metadata is the org profile.
+          makeArtifact({
+            id: "a3",
+            artifactType: "ORG_METADATA",
+            title: "SprintStart",
+            metadata: JSON.stringify({ repositoryFullName: "owner/repo" }),
+          }),
+        ]}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("artifact-repo-badge")).not.toBeInTheDocument();
+  });
 });

@@ -5,12 +5,13 @@ import {
   Briefcase,
   ChartColumn,
   Database,
+  DoorOpen,
+  DraftingCompass,
   Inbox,
   LayoutDashboard,
   MessageSquare,
   PlaneLanding,
   Rocket,
-  Target,
   Terminal,
 } from "lucide-react";
 
@@ -251,6 +252,66 @@ export function OnboardingIcon({ isActive }: SidebarIconProps) {
 }
 
 /** Data Ingestion: the platters drop onto the stack, top last. */
+/**
+ * Blueprints: the compass opens and draws its arc.
+ *
+ * It used to borrow the hire's rocket, which is the one icon in the sidebar that
+ * already means something else — the path somebody is *walking*. A blueprint is
+ * the thing somebody *draws* for them, and a drafting compass is the oldest
+ * picture there is of that: the legs part, the lead comes down, and the curve
+ * appears under it.
+ *
+ * The arc draws itself with `pathLength` rather than being revealed by a mask,
+ * so the line appears from one end the way a drawn line does. Both legs turn
+ * about the hinge, which is the only point on a compass that does not move.
+ */
+export function BlueprintsIcon({ isActive }: SidebarIconProps) {
+  const playKey = usePlayOnActivate(isActive);
+  const hasPlayed = playKey > 0;
+  const prefersReducedMotion = useReducedMotion();
+
+  if (prefersReducedMotion) return <DraftingCompass className={ICON_CLASS} />;
+
+  const hinge = { transformOrigin: "12px 5px", transformBox: "view-box" } as const;
+
+  return (
+    <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
+      {/* The leg that holds the point. It swings out from closed, so the arc it
+          is about to draw has somewhere to start. */}
+      <motion.path
+        d="m3 21 8.02-14.26"
+        style={hinge}
+        initial={hasPlayed ? { rotate: 14 } : false}
+        animate={{ rotate: 0 }}
+        transition={bounce}
+      />
+
+      {/* The leg that holds the lead, in two pieces with the arc between them —
+          which is why they turn as one group rather than separately. */}
+      <motion.g
+        style={hinge}
+        initial={hasPlayed ? { rotate: -14 } : false}
+        animate={{ rotate: 0 }}
+        transition={bounce}
+      >
+        <path d="m12.99 6.74 1.93 3.44" />
+        <path d="m21 21-2.16-3.84" />
+      </motion.g>
+
+      {/* Drawn left to right once the legs have settled, which is the order a
+          hand does it in. */}
+      <motion.path
+        d="M19.136 12a10 10 0 0 1-14.271 0"
+        initial={hasPlayed ? { pathLength: 0 } : false}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.55, ease: "easeInOut", delay: 0.12 }}
+      />
+
+      <circle cx="12" cy="5" r="2" />
+    </IconFrame>
+  );
+}
+
 export function DataIngestionIcon({ isActive }: SidebarIconProps) {
   const playKey = usePlayOnActivate(isActive);
   const hasPlayed = playKey > 0;
@@ -285,48 +346,57 @@ export function DataIngestionIcon({ isActive }: SidebarIconProps) {
   );
 }
 
-/** Starter Work: the sight locks on — rings close in, then the bullseye lands. */
-export function StarterWorkIcon({ isActive }: SidebarIconProps) {
+/**
+ * Hire Setup: the door swings open, then the threshold settles in at its foot.
+ *
+ * Same silhouette as the page's own header icon, which is what makes the sidebar entry and the
+ * page recognisably the same thing.
+ */
+export function HireSetupIcon({ isActive }: SidebarIconProps) {
   const playKey = usePlayOnActivate(isActive);
   const hasPlayed = playKey > 0;
   const prefersReducedMotion = useReducedMotion();
 
-  if (prefersReducedMotion) return <Target className={ICON_CLASS} />;
+  if (prefersReducedMotion) return <DoorOpen className={ICON_CLASS} />;
 
   return (
     <IconFrame playKey={playKey} hasPlayed={hasPlayed}>
-      {/* The two outer rings close inward with a short stagger, so the
-                target reads as a sight settling rather than three circles
-                fading in together. Scaled about the centre they share. */}
-      {[
-        { r: 10, delay: 0 },
-        { r: 6, delay: 0.07 },
-      ].map((ring) => (
-        <motion.circle
-          key={ring.r}
-          cx={12}
-          cy={12}
-          r={ring.r}
-          style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
-          initial={hasPlayed ? { scale: 1.35, opacity: 0 } : false}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ ...bounce, delay: ring.delay }}
-        />
-      ))}
+      {/* The frame is fixed, so the door has something to swing out of. */}
+      <path d="M11 4H8a2 2 0 0 0-2 2v14" />
 
-      {/* The bullseye lands last and overshoots, so the lock-on has a
-                beat of impact instead of merely appearing. Filled rather
-                than stroked: a 2px ring at r=2 is nearly a dot anyway. */}
-      <motion.circle
-        cx={12}
-        cy={12}
-        r={2}
-        fill="currentColor"
-        stroke="none"
-        style={{ transformOrigin: "12px 12px", transformBox: "view-box" }}
+      {/* The door itself swings open from flush against the frame, pivoting on its hinge at
+                the left edge, and overshoots slightly before settling. */}
+      <motion.path
+        d="M11 4.562v16.157a1 1 0 0 0 1.242.97L19 20V5.562a2 2 0 0 0-1.515-1.94l-4-1A2 2 0 0 0 11 4.561z"
+        style={{ transformOrigin: "11px 12px", transformBox: "view-box" }}
+        initial={hasPlayed ? { scaleX: 0.1, opacity: 0 } : false}
+        animate={hasPlayed ? { scaleX: [0.1, 1.15, 1], opacity: 1 } : { scaleX: 1, opacity: 1 }}
+        transition={{ duration: 0.45, ease: "easeOut", times: [0, 0.7, 1] }}
+      />
+
+      {/* The handle pops in once the door has settled open. */}
+      <motion.path
+        d="M14 12h.01"
+        style={{ transformOrigin: "14px 12px", transformBox: "view-box" }}
         initial={hasPlayed ? { scale: 0 } : false}
-        animate={hasPlayed ? { scale: [0, 1.5, 1] } : { scale: 1 }}
-        transition={{ duration: 0.4, delay: 0.16, ease: "easeOut", times: [0, 0.6, 1] }}
+        animate={hasPlayed ? { scale: [0, 1.6, 1] } : { scale: 1 }}
+        transition={{ duration: 0.3, delay: 0.3, ease: "easeOut", times: [0, 0.6, 1] }}
+      />
+
+      {/* The threshold draws outward from the doorway last, the floor arriving under it. */}
+      <motion.path
+        d="M11 20H2"
+        style={{ transformOrigin: "11px 20px", transformBox: "view-box" }}
+        initial={hasPlayed ? { scaleX: 0 } : false}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 0.25, delay: 0.36, ease: "easeOut" }}
+      />
+      <motion.path
+        d="M22 20h-3"
+        style={{ transformOrigin: "19px 20px", transformBox: "view-box" }}
+        initial={hasPlayed ? { scaleX: 0 } : false}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 0.25, delay: 0.36, ease: "easeOut" }}
       />
     </IconFrame>
   );

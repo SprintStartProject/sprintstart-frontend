@@ -135,11 +135,9 @@ describe("SideBar", () => {
     expect(screen.getAllByText("OnBoarding").length).toBeGreaterThan(0);
   });
 
-  it("hides the OnBoarding entry until a role has been assigned", () => {
+  it("shows the OnBoarding entry before a role or path has been assigned", () => {
     vi.mocked(useAuthHook.useAuth).mockReturnValue({
       status: "authenticated",
-      // No project role yet, so the backend has no path to generate from.
-      // Linking to a page that can only fail is worse than not linking.
       profile: {
         ...mockProfile,
         hasCompletedOnboarding: false,
@@ -152,7 +150,7 @@ describe("SideBar", () => {
 
     renderWithProviders(<SideBar />);
 
-    expect(screen.queryByText("OnBoarding")).not.toBeInTheDocument();
+    expect(screen.getAllByText("OnBoarding").length).toBeGreaterThan(0);
   });
 
   it("renders admin nav items for admin user", () => {
