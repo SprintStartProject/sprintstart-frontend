@@ -9,7 +9,6 @@ import { PmStat } from "../features/pm-area/components/PmCard";
 import {
   EscalationsCard,
   KnowledgeGapsCard,
-  OnboardingHealthCard,
   QuestionsCard,
 } from "../features/pm-area/components/overview/InsightCards";
 import { ProjectAnalysisLauncher } from "../features/pm-area/analysis/ProjectAnalysisLauncher";
@@ -148,12 +147,7 @@ export function PmDashboardPage() {
         />
       </section>
 
-      {/* The two pictures of how onboarding is going: the team's stages and time on step beside
-          the hires' funnel. Charts first, lists after — a shape is read before a name is. */}
-      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <TeamProgressCard roster={members} loading={rosterLoading} error={rosterError} />
-        <OnboardingHealthCard />
-      </div>
+      <TeamProgressCard roster={members} loading={rosterLoading} error={rosterError} />
 
       <TeamPulseCard
         roster={members}

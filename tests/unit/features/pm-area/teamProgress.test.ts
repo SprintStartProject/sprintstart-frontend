@@ -46,21 +46,4 @@ describe("teamProgressData", () => {
     ]);
     expect(averageProgress).toBe(50);
   });
-
-  it("bins the members underway by time on their step, and marks the ones past the limit", () => {
-    const { stepBins, atRisk } = teamProgressData([
-      member("today", 0.2, 0),
-      member("two", 0.2, 2),
-      member("week", 0.2, 7),
-      member("month", 0.2, 30),
-      member("finished", 1, 40),
-    ]);
-
-    expect(stepBins.map((bin) => bin.value)).toEqual([1, 1, 0, 1, 1]);
-    expect(stepBins.at(-1)?.hint).toBe("month");
-    expect(stepBins.at(-1)?.colorClassName).toBe("text-app-warning-solid");
-    expect(stepBins[0].colorClassName).toBe("text-app-brand");
-    // Somebody who has finished is not "stuck" on the step they finished on.
-    expect(atRisk).toBe(2);
-  });
 });

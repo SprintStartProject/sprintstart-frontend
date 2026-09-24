@@ -61,7 +61,7 @@ vi.mock("../../../src/features/knowledge-request/useOpenEscalationCount", () => 
 }));
 
 vi.mock("../../../src/features/pm-area/components/overview/InsightCards", () => ({
-  OnboardingHealthCard: () => <section aria-label="Onboarding health" />,
+  OnboardingHealthSummary: () => <section aria-label="Onboarding health" />,
   QuestionsCard: () => <section aria-label="Recurring questions" />,
   KnowledgeGapsCard: () => <section aria-label="Knowledge gaps" />,
   EscalationsCard: () => <section aria-label="Escalations" />,

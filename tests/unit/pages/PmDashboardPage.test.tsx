@@ -55,7 +55,7 @@ vi.mock("../../../src/features/knowledge-request/useOpenEscalationCount", () => 
 // The insight cards and the project-setup cards read their own endpoints and have nothing to do
 // with what this page composes; each is a stand-in here.
 vi.mock("../../../src/features/pm-area/components/overview/InsightCards", () => ({
-  OnboardingHealthCard: () => <section aria-label="Onboarding health" />,
+  OnboardingHealthSummary: () => <section aria-label="Onboarding health" />,
   QuestionsCard: () => <section aria-label="Recurring questions" />,
   KnowledgeGapsCard: () => <section aria-label="Knowledge gaps" />,
   EscalationsCard: () => <section aria-label="Escalations" />,

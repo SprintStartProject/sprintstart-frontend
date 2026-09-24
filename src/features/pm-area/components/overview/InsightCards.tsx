@@ -248,8 +248,11 @@ function HealthFigure({
  * it accepted — as a funnel, with the four figures onboarding is judged on underneath. The funnel
  * is where a drop shows: ten hires who claimed a task and two who ever heard back is a review
  * problem, not a hiring one.
+ *
+ * No card of its own: it is the right half of the team card (`TeamProgressCard`), beside the
+ * team's stages, so the overview reads team and onboarding as one picture.
  */
-export function OnboardingHealthCard() {
+export function OnboardingHealthSummary() {
   const { selectedProjectId } = useProjectContext();
   const {
     data: metrics,
@@ -273,20 +276,19 @@ export function OnboardingHealthCard() {
         }));
 
   return (
-    <PmCard
-      aria-label="Onboarding health"
-      tone="cyan"
-      className="h-full"
-      to="/insights/onboarding"
-      linkLabel="Open onboarding details"
-    >
-      <PmCardHeader
-        icon={Gauge}
-        tone="cyan"
-        title="Onboarding health"
-        meta={metrics ? `${metrics.memberCount} hires` : undefined}
-        action={<PmCardLink to="/insights/onboarding">Details</PmCardLink>}
-      />
+    <section aria-label="Onboarding health" className="min-w-0">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="flex items-center gap-2 text-[10px] font-semibold tracking-widest text-app-cyan-text uppercase">
+          <Gauge aria-hidden="true" className="h-3.5 w-3.5" />
+          Onboarding health
+          {metrics && (
+            <span className="font-medium tracking-normal text-app-text-muted normal-case">
+              · {metrics.memberCount} hires
+            </span>
+          )}
+        </p>
+        <PmCardLink to="/insights/onboarding">Details</PmCardLink>
+      </div>
 
       {loading ? (
         <CardSkeleton label="Loading onboarding metrics" />
@@ -329,7 +331,7 @@ export function OnboardingHealthCard() {
           </ul>
         </>
       )}
-    </PmCard>
+    </section>
   );
 }
 
