@@ -23,6 +23,10 @@ export interface Artifact {
   sourceId: string;
   sourceUrl: string | null;
   mime: string | null;
+  /**
+   * Display name derived from the file extension at ingestion (`"Kotlin"`, `"Markdown"`,
+   * `"Plain Text"`); null for PRs, issues, commits and anything without a known extension.
+   */
   language: string | null;
   /** When the artifact was first imported. Never moves on later updates. */
   ingestedAt: string;
@@ -129,6 +133,13 @@ export interface ArtifactFacets {
   sources: FacetCount[];
   formats: FacetCount[];
   repositories: FacetCount[];
+  /**
+   * Programming languages as stored display names (`"Kotlin"`, `"C#"`), counted with every other
+   * filter applied but their own selection excluded. Document kinds (`Markdown`, `Plain Text`) are
+   * left out — the format facet covers them. Optional because a backend predating the language
+   * facet does not send it; absent reads as "no languages", so the section simply stays hidden.
+   */
+  languages?: FacetCount[];
 }
 
 /**
@@ -153,6 +164,12 @@ export interface KnowledgeListParams {
   sources?: SourceSystem[];
   repositories?: string[];
   format?: UploadFormat;
+  /**
+   * Language display names, matched case-insensitively by the backend. Sent to the list and the
+   * facets alike: it narrows the row set, so every count must respect it. A selected language
+   * hides rows that have none (PRs, issues, pages) — that is the honest reading of "only Kotlin".
+   */
+  languages?: string[];
   /**
    * List order. Sent by `getArtifactPage` only — counts do not depend on order, and the facets
    * endpoint does not accept it. Omitted means the backend default (`ADDED_DESC`).

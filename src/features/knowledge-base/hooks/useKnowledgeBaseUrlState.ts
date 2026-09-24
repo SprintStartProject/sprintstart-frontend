@@ -38,6 +38,7 @@ export const KB_URL_PARAM = {
   sources: "sources",
   repositories: "repos",
   format: "format",
+  languages: "languages",
   page: "page",
   size: "size",
   sort: "sort",
@@ -58,6 +59,7 @@ const PROJECT_SCOPED_PARAMS: readonly string[] = [
   KB_URL_PARAM.sources,
   KB_URL_PARAM.repositories,
   KB_URL_PARAM.format,
+  KB_URL_PARAM.languages,
   KB_URL_PARAM.from,
   KB_URL_PARAM.to,
   KB_URL_PARAM.page,
@@ -74,6 +76,7 @@ const FILTER_PARAMS: readonly string[] = [
   KB_URL_PARAM.sources,
   KB_URL_PARAM.repositories,
   KB_URL_PARAM.format,
+  KB_URL_PARAM.languages,
   KB_URL_PARAM.from,
   KB_URL_PARAM.to,
   KB_URL_PARAM.page,
@@ -97,6 +100,12 @@ export interface KnowledgeBaseUrlState {
   repositories: ReadonlySet<string>;
   /** Only ever non-null while Uploads is among `sources` — see {@link parseKnowledgeBaseSearch}. */
   format: UploadFormat | null;
+  /**
+   * Language display names, first spelling kept, de-duplicated ignoring case (the backend matches
+   * case-insensitively, so `Kotlin` and `kotlin` are one filter). Independent of `sources`: a
+   * language narrows every source, unlike the upload-only format.
+   */
+  languages: ReadonlySet<string>;
   /** 1-based. Not clamped to the result's page count here — the URL cannot know it. */
   page: number;
   size: number;
@@ -123,6 +132,20 @@ function readList(params: URLSearchParams, key: string): string[] {
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
   return Array.from(new Set(values));
+}
+
+/**
+ * {@link readList} de-duplicated ignoring case, keeping the first spelling. For values the
+ * backend matches case-insensitively, where `?languages=Kotlin,kotlin` is one filter, not two.
+ */
+function readListIgnoringCase(params: URLSearchParams, key: string): string[] {
+  const seen = new Set<string>();
+  return readList(params, key).filter((value) => {
+    const folded = value.toLowerCase();
+    if (seen.has(folded)) return false;
+    seen.add(folded);
+    return true;
+  });
 }
 
 /** Reads an integer param clamped to `[1, max]`; anything that is not an integer is the fallback. */
@@ -166,6 +189,10 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
   const repositories: ReadonlySet<string> =
     repositoryList.length > 0 ? new Set(repositoryList) : NO_STRINGS;
 
+  const languageList = readListIgnoringCase(params, KB_URL_PARAM.languages);
+  const languages: ReadonlySet<string> =
+    languageList.length > 0 ? new Set(languageList) : NO_STRINGS;
+
   const dateRange = normalizeDateRange({
     from: params.get(KB_URL_PARAM.from),
     to: params.get(KB_URL_PARAM.to),
@@ -181,6 +208,7 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
     sources,
     repositories,
     format,
+    languages,
     page: readPositiveInt(params.get(KB_URL_PARAM.page), 1, Number.MAX_SAFE_INTEGER),
     size: readPositiveInt(params.get(KB_URL_PARAM.size), DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
     sort,
@@ -259,6 +287,8 @@ export interface KnowledgeBaseUrlStateApi {
   toggleSource: (source: SourceSystem) => void;
   toggleFormat: (format: UploadFormat) => void;
   toggleRepository: (repository: string) => void;
+  /** Push-mode toggle of one language in `?languages=`, matched ignoring case, resetting the page. */
+  toggleLanguage: (language: string) => void;
   setPage: (page: number, mode?: KnowledgeBaseHistoryMode) => void;
   /** Push-mode write of `?size=`, resetting the page. */
   setSize: (size: number) => void;
@@ -410,6 +440,24 @@ export function useKnowledgeBaseUrlState(
     [commit],
   );
 
+  const toggleLanguage = useCallback(
+    (language: string) =>
+      commit((params) => {
+        // Case-folded, like the backend's match: unticking "Kotlin" must also drop a
+        // hand-typed "kotlin", or the reader could not undo the filter they see.
+        const folded = language.toLowerCase();
+        const current = readListIgnoringCase(params, KB_URL_PARAM.languages);
+        const kept = current.filter((entry) => entry.toLowerCase() !== folded);
+        writeList(
+          params,
+          KB_URL_PARAM.languages,
+          kept.length < current.length ? kept : [...current, language],
+        );
+        params.delete(KB_URL_PARAM.page);
+      }, "push"),
+    [commit],
+  );
+
   const setPage = useCallback(
     (page: number, mode: KnowledgeBaseHistoryMode = "push") =>
       commit((params) => {
@@ -479,6 +527,7 @@ export function useKnowledgeBaseUrlState(
     toggleSource,
     toggleFormat,
     toggleRepository,
+    toggleLanguage,
     setPage,
     setSize,
     setSort,

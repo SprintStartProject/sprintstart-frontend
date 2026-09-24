@@ -414,6 +414,28 @@ describe("knowledgeService", () => {
       expect(listParams!.get("sort")).toBe("TITLE_ASC");
       expect(facetParams!.has("sort")).toBe(false);
     });
+
+    it("repeats languages on the list and the facets, spelled as given", async () => {
+      const seen: URLSearchParams[] = [];
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          seen.push(new URL(request.url).searchParams);
+          return HttpResponse.json(emptyPage);
+        }),
+        http.get(`/api/v1/projects/${projectId}/artifacts/facets`, ({ request }) => {
+          seen.push(new URL(request.url).searchParams);
+          return HttpResponse.json({ ...emptyFacets, languages: [] });
+        }),
+      );
+      const params = { languages: ["Kotlin", "C#"] };
+
+      await knowledgeService.getArtifactPage(projectId, params);
+      const facets = await knowledgeService.getArtifactFacets(projectId, params);
+
+      expect(seen).toHaveLength(2);
+      for (const query of seen) expect(query.getAll("languages")).toEqual(["Kotlin", "C#"]);
+      expect(facets.languages).toEqual([]);
+    });
   });
 
   describe("getArtifactById", () => {

@@ -118,6 +118,28 @@ function makeRepoFixture(): Artifact[] {
   ];
 }
 
+/** The backend's language predicate: case-insensitive, and an artifact with no language fails. */
+function matchesLanguages(a: Artifact, languages: string[] | undefined): boolean {
+  if (!languages || languages.length === 0) return true;
+  const own = a.language?.toLowerCase();
+  return own !== undefined && languages.some((language) => language.toLowerCase() === own);
+}
+
+/** Code files in two languages, a Markdown upload and a PR without a language. */
+function makeLanguageFixture(): Artifact[] {
+  const withLanguage = (artifact: Artifact, language: string | null): Artifact => ({
+    ...artifact,
+    language,
+  });
+  return [
+    withLanguage(makeArtifact("k1", "Main.kt"), "Kotlin"),
+    withLanguage(makeArtifact("k2", "Util.kt"), "Kotlin"),
+    withLanguage(makeArtifact("t1", "app.ts"), "TypeScript"),
+    withLanguage(makeArtifact("m1", "README.md"), "Markdown"),
+    withLanguage(makeArtifact("p1", "Fix login", "PULL_REQUEST"), null),
+  ];
+}
+
 function mockArtifactQuery(artifacts: Artifact[]) {
   const getArtifactPage = vi
     .fn()
@@ -140,6 +162,7 @@ function mockArtifactQuery(artifacts: Artifact[]) {
         if (params.repositories && params.repositories.length > 0) {
           if (!matchesRepository(a, new Set(params.repositories))) return false;
         }
+        if (!matchesLanguages(a, params.languages)) return false;
         return true;
       });
 
@@ -178,8 +201,9 @@ function mockArtifactQuery(artifacts: Artifact[]) {
     .mockImplementation((_pid: string, params: KnowledgeListParams = {}) => {
       const matchesAllExcept = (
         a: Artifact,
-        excludeFacet: "types" | "sources" | "format" | "repositories",
+        excludeFacet: "types" | "sources" | "format" | "repositories" | "languages",
       ) => {
+        if (excludeFacet !== "languages" && !matchesLanguages(a, params.languages)) return false;
         if (params.search) {
           const q = params.search.toLowerCase();
           const text = [a.title ?? "", a.sourceId, a.sourceUrl ?? ""].join(" ").toLowerCase();
@@ -252,7 +276,22 @@ function mockArtifactQuery(artifacts: Artifact[]) {
         count: repoCandidates.filter((a) => matchesRepository(a, new Set([repo]))).length,
       }));
 
-      return Promise.resolve({ types, sources, formats, repositories });
+      // Backend contract: own dimension excluded, null and document kinds left out, a
+      // selected value with no match still returned at 0.
+      const languageCounts = new Map<string, number>();
+      for (const a of artifacts.filter((x) => matchesAllExcept(x, "languages"))) {
+        if (!a.language || ["markdown", "plain text"].includes(a.language.toLowerCase())) continue;
+        languageCounts.set(a.language, (languageCounts.get(a.language) ?? 0) + 1);
+      }
+      for (const selected of params.languages ?? []) {
+        const known = [...languageCounts.keys()].some(
+          (v) => v.toLowerCase() === selected.toLowerCase(),
+        );
+        if (!known) languageCounts.set(selected, 0);
+      }
+      const languages = Array.from(languageCounts, ([value, count]) => ({ value, count }));
+
+      return Promise.resolve({ types, sources, formats, repositories, languages });
     });
 
   return { getArtifactPage, getArtifactFacets };
@@ -1298,5 +1337,69 @@ describe("useKnowledgeBase date range", () => {
 
     expect(result.current.kb.hasActiveFilters).toBe(false);
     expect(result.current.kb.dateRange).toEqual({ from: null, to: null });
+  });
+});
+
+describe("useKnowledgeBase languages", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("offers the project's languages alphabetically, without document kinds or a source gate", async () => {
+    const { result } = await renderAt(["/kb"], makeLanguageFixture());
+
+    await waitFor(() => expect(result.current.kb.languageOptions.length).toBeGreaterThan(0));
+    expect(result.current.kb.languageOptions).toEqual([
+      { value: "Kotlin", label: "Kotlin", count: 2 },
+      { value: "TypeScript", label: "TypeScript", count: 1 },
+    ]);
+  });
+
+  it("sends the languages to the list and the facets alike", async () => {
+    const { result } = await renderAt(["/kb"], makeLanguageFixture());
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    act(() => result.current.kb.toggleLanguage("Kotlin"));
+
+    await waitFor(() => {
+      const list = vi.mocked(knowledgeService.getArtifactPage).mock.calls.at(-1)?.[1];
+      const facets = vi.mocked(knowledgeService.getArtifactFacets).mock.calls.at(-1)?.[1];
+      expect(list).toMatchObject({ languages: ["Kotlin"], page: 1 });
+      expect(facets).toMatchObject({ languages: ["Kotlin"] });
+    });
+    await waitFor(() => expect(result.current.kb.artifacts.map((a) => a.id)).toEqual(["k1", "k2"]));
+    // Own dimension excluded: TypeScript still counts what adding it would bring.
+    expect(result.current.kb.languageOptions.find((o) => o.value === "TypeScript")?.count).toBe(1);
+  });
+
+  it("keeps a hand-typed casing as the value so unticking it works, labelled as stored", async () => {
+    const { result } = await renderAt(["/kb?languages=kotlin"], makeLanguageFixture());
+
+    await waitFor(() =>
+      expect(result.current.kb.languageOptions).toContainEqual({
+        value: "kotlin",
+        label: "Kotlin",
+        count: 2,
+      }),
+    );
+    expect(result.current.kb.hasActiveFilters).toBe(true);
+  });
+
+  it("keeps a selected language visible at 0 after its artifacts are gone", async () => {
+    const { result } = await renderAt(["/kb?languages=Rust"], makeLanguageFixture());
+
+    await waitFor(() =>
+      expect(result.current.kb.languageOptions).toContainEqual({
+        value: "Rust",
+        label: "Rust",
+        count: 0,
+      }),
+    );
+    expect(result.current.kb.artifacts).toEqual([]);
+  });
+
+  it("offers no languages when no artifact has one, so the section stays hidden", async () => {
+    const { result } = await renderAt(["/kb"], makeFacetFixture());
+    expect(result.current.kb.languageOptions).toEqual([]);
   });
 });

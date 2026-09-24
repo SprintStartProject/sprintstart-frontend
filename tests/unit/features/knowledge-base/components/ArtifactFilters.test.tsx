@@ -323,3 +323,75 @@ describe("ArtifactFilters", () => {
     expect(screen.queryByTestId("kb-sort")).not.toBeInTheDocument();
   });
 });
+
+describe("ArtifactFilters languages", () => {
+  const LANGUAGE_OPTIONS: FacetOption<string>[] = [
+    { value: "Kotlin", label: "Kotlin", count: 4 },
+    { value: "Markdown", label: "Markdown", count: 1 },
+  ];
+
+  it("renders no language section when the project has no language values", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(screen.queryByText("Language")).not.toBeInTheDocument();
+  });
+
+  it("lists languages without needing a source and reports the raw value on toggle", () => {
+    const onToggleLanguage = vi.fn();
+    render(
+      <ArtifactFilters {...buildProps({ languageOptions: LANGUAGE_OPTIONS, onToggleLanguage })} />,
+    );
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(screen.getByText("Language")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("kb-filter-option-lang:kotlin"));
+    expect(onToggleLanguage).toHaveBeenCalledWith("Kotlin");
+  });
+
+  it("keeps a Markdown language apart from the MARKDOWN format", () => {
+    const onToggleFormat = vi.fn();
+    const onToggleLanguage = vi.fn();
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          selectedSources: new Set<SourceSystem>(["UPLOAD"]),
+          formatOptions: FORMAT_OPTIONS,
+          selectedFormat: "MARKDOWN",
+          languageOptions: LANGUAGE_OPTIONS,
+          onToggleFormat,
+          onToggleLanguage,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(screen.getByTestId("kb-filter-option-markdown")).toBeChecked();
+    expect(screen.getByTestId("kb-filter-option-lang:markdown")).not.toBeChecked();
+    fireEvent.click(screen.getByTestId("kb-filter-option-lang:markdown"));
+    expect(onToggleLanguage).toHaveBeenCalledWith("Markdown");
+    expect(onToggleFormat).not.toHaveBeenCalled();
+  });
+
+  it("checks selected languages, counts them and names them in the trigger", () => {
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          languageOptions: LANGUAGE_OPTIONS,
+          selectedLanguages: new Set<string>(["Kotlin"]),
+        })}
+      />,
+    );
+
+    const trigger = screen.getByTestId("kb-filter-trigger");
+    expect(trigger).toHaveTextContent("Kotlin");
+    fireEvent.click(trigger);
+    expect(screen.getByTestId("kb-filter-option-lang:kotlin")).toBeChecked();
+  });
+
+  it("summarises several languages by count", () => {
+    render(
+      <ArtifactFilters {...buildProps({ selectedLanguages: new Set<string>(["Kotlin", "Go"]) })} />,
+    );
+    expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("2 languages");
+  });
+});

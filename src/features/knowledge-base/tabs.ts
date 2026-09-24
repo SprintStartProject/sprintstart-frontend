@@ -139,6 +139,12 @@ function isPdfArtifact(artifact: Artifact): boolean {
   );
 }
 
+/**
+ * `language` is the backend's display name from the file extension at ingestion
+ * (`"Markdown"`), sent since the language facet; compared lowercased so it
+ * classifies a Markdown upload even when its title carries no extension. Other
+ * languages (`"Kotlin"`, `"Plain Text"`) are no Markdown signal and fall to Other.
+ */
 function isMarkdownArtifact(artifact: Artifact): boolean {
   const title = artifact.title?.toLowerCase() ?? "";
   const sourceId = artifact.sourceId.toLowerCase();

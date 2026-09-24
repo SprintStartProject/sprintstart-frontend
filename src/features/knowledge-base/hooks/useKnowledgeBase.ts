@@ -71,7 +71,7 @@ export const KB_SEARCH_DEBOUNCE_MS = 300;
  * State + data layer for the Knowledge Base page.
  *
  * Owns artifact fetching, server-side pagination, and faceted search.
- * Filtering supports sources, artifact types, file format, and repository,
+ * Filtering supports sources, artifact types, file format, repository and language,
  * backed by PostgreSQL indexes and projection queries.
  *
  * Every filter, the page, the page size and the open artifact live in the URL
@@ -100,6 +100,7 @@ export function useKnowledgeBase(
     toggleSource,
     toggleFormat,
     toggleRepository,
+    toggleLanguage,
     setPage,
     setSize,
     setSort,
@@ -113,6 +114,7 @@ export function useKnowledgeBase(
     sources: selectedSources,
     format: selectedFormat,
     repositories: selectedRepositories,
+    languages: selectedLanguages,
     page: requestedPage,
     size: pageSize,
     sort,
@@ -167,6 +169,11 @@ export function useKnowledgeBase(
     return Array.from(selectedRepositories);
   }, [selectedRepositories]);
 
+  const languagesParam: string[] | undefined = useMemo(() => {
+    if (selectedLanguages.size === 0) return undefined;
+    return Array.from(selectedLanguages);
+  }, [selectedLanguages]);
+
   const searchParam = urlState.search.trim() || undefined;
 
   const dateFrom = urlState.dateRange.from ?? undefined;
@@ -184,10 +191,20 @@ export function useKnowledgeBase(
       sources: sourcesParam,
       repositories: repositoriesParam,
       format: selectedFormat ?? undefined,
+      languages: languagesParam,
       from: dateFrom,
       to: dateTo,
     }),
-    [searchParam, typesParam, sourcesParam, repositoriesParam, selectedFormat, dateFrom, dateTo],
+    [
+      searchParam,
+      typesParam,
+      sourcesParam,
+      repositoriesParam,
+      selectedFormat,
+      languagesParam,
+      dateFrom,
+      dateTo,
+    ],
   );
 
   const listParams: KnowledgeListParams = useMemo(
@@ -346,6 +363,30 @@ export function useKnowledgeBase(
     }));
   }, [selectedSources, selectedRepositories, facetsData?.repositories, repoCounts]);
 
+  /**
+   * Languages the project actually has, plus any the URL selects. Unlike repositories the section
+   * is not gated on a source: a language narrows every source. Matched ignoring case, like the
+   * backend, and a selected entry keeps the URL's spelling as its value so unticking hits it;
+   * alphabetical so ticking one never reshuffles the rest (counts move, positions don't).
+   */
+  const languageOptions = useMemo<FacetOption<string>[]>(() => {
+    const selectedByFold = new Map(
+      Array.from(selectedLanguages, (language) => [language.toLowerCase(), language]),
+    );
+    const offered = new Map<string, FacetOption<string>>();
+    for (const { value, count } of facetsData?.languages ?? []) {
+      const fold = value.toLowerCase();
+      const selected = selectedByFold.get(fold);
+      if (count > 0 || selected !== undefined) {
+        offered.set(fold, { value: selected ?? value, label: value, count });
+      }
+    }
+    for (const [fold, language] of selectedByFold) {
+      if (!offered.has(fold)) offered.set(fold, { value: language, label: language, count: 0 });
+    }
+    return Array.from(offered.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [selectedLanguages, facetsData?.languages]);
+
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
   }, []);
@@ -365,6 +406,7 @@ export function useKnowledgeBase(
     selectedSources.size > 0 ||
     selectedFormat !== null ||
     selectedRepositories.size > 0 ||
+    selectedLanguages.size > 0 ||
     dateFrom !== undefined ||
     dateTo !== undefined;
 
@@ -379,9 +421,12 @@ export function useKnowledgeBase(
     sourceOptions,
     formatOptions,
     repositoryOptions,
+    /** Language facet options; empty when the project has no language values (section hidden). */
+    languageOptions,
     selectedSources,
     selectedFormat,
     selectedRepositories,
+    selectedLanguages,
     currentPage,
     totalPages,
     totalElements,
@@ -393,6 +438,8 @@ export function useKnowledgeBase(
     toggleSource,
     toggleFormat,
     toggleRepository,
+    /** Ticks or unticks one language (case-insensitive), resetting the page. */
+    toggleLanguage,
     setCurrentPage,
     setPageSize: setSize,
     /** Changes the list order; pushes history and starts the new order at page 1. */

@@ -8,6 +8,7 @@ import {
   FolderGit2,
   GitBranch,
   Image as ImageIcon,
+  Languages,
   RefreshCw,
   Search,
   Ticket,
@@ -76,6 +77,14 @@ export interface ArtifactFiltersProps {
   onToggleSource: (source: SourceSystem) => void;
   onToggleFormat: (format: UploadFormat) => void;
   onToggleRepository: (repository: string) => void;
+  /**
+   * Languages the project's artifacts are written in, with counts. Not gated on a
+   * source, and empty (section hidden) when the project has no language values.
+   * Optional so surfaces that predate the facet keep compiling; the page wires it.
+   */
+  languageOptions?: FacetOption<string>[];
+  selectedLanguages?: ReadonlySet<string>;
+  onToggleLanguage?: (language: string) => void;
   /** Total count of matching artifacts. */
   resultCount: number;
   /**
@@ -124,6 +133,7 @@ function summariseSources(
   sources: ReadonlySet<SourceSystem>,
   format: UploadFormat | null,
   repositories: ReadonlySet<string>,
+  languages: ReadonlySet<string>,
 ): string {
   const parts: string[] = [];
 
@@ -148,6 +158,12 @@ function summariseSources(
     parts.push(`${repositories.size} repositories`);
   }
 
+  if (languages.size === 1) {
+    parts.push([...languages][0]);
+  } else if (languages.size > 1) {
+    parts.push(`${languages.size} languages`);
+  }
+
   return parts.join(" · ");
 }
 
@@ -168,6 +184,15 @@ const REPOSITORY_VISIBLE_LIMIT = 10;
  */
 /** Stable empty range, so an omitted prop does not re-sync the date filter every render. */
 const NO_DATE_RANGE: DateRange = { from: null, to: null };
+
+/**
+ * Prefix for language values inside the shared multi-select. Languages are free
+ * strings, so an unprefixed "Markdown" (reachable by a hand-typed URL) would be
+ * mistaken for the MARKDOWN format in the one selected set and in test ids.
+ */
+const LANGUAGE_VALUE_PREFIX = "lang:";
+const NO_LANGUAGES: ReadonlySet<string> = new Set();
+const NO_LANGUAGE_OPTIONS: FacetOption<string>[] = [];
 
 const FACET_COUNT_FOOTNOTE = "Counts show what you would get if you added this option.";
 
@@ -195,6 +220,9 @@ export function ArtifactFilters({
   onToggleSource,
   onToggleFormat,
   onToggleRepository,
+  languageOptions = NO_LANGUAGE_OPTIONS,
+  selectedLanguages = NO_LANGUAGES,
+  onToggleLanguage,
   resultCount,
   resultRange,
   hasActiveFilters,
@@ -253,17 +281,38 @@ export function ArtifactFilters({
     });
   }
 
+  if (languageOptions.length > 0) {
+    sections.push({
+      id: "languages",
+      label: "Language",
+      options: languageOptions.map((option) => ({
+        value: `${LANGUAGE_VALUE_PREFIX}${option.value}`,
+        label: option.label,
+        count: option.count,
+        icon: <Languages className={ICON_CLASS} aria-hidden="true" />,
+      })),
+    });
+  }
+
   const selectedValues = new Set<string>([...selectedSources]);
   if (selectedFormat !== null) selectedValues.add(selectedFormat);
   for (const repository of selectedRepositories) selectedValues.add(repository);
+  for (const language of selectedLanguages) {
+    selectedValues.add(`${LANGUAGE_VALUE_PREFIX}${language}`);
+  }
 
   const activeCount =
-    selectedSources.size + (selectedFormat !== null ? 1 : 0) + selectedRepositories.size;
+    selectedSources.size +
+    (selectedFormat !== null ? 1 : 0) +
+    selectedRepositories.size +
+    selectedLanguages.size;
 
   const repositoryValues = new Set(repositoryOptions.map((option) => option.value));
 
   const handleToggle = (value: string) => {
-    if (isSource(value)) {
+    if (value.startsWith(LANGUAGE_VALUE_PREFIX)) {
+      onToggleLanguage?.(value.slice(LANGUAGE_VALUE_PREFIX.length));
+    } else if (isSource(value)) {
       onToggleSource(value);
     } else if (isUploadFormat(value)) {
       onToggleFormat(value);
@@ -379,7 +428,12 @@ export function ArtifactFilters({
           <div className="min-w-0 flex-1 sm:w-80 sm:flex-none">
             <MultiSelectFilter
               label="Filter sources"
-              summary={summariseSources(selectedSources, selectedFormat, selectedRepositories)}
+              summary={summariseSources(
+                selectedSources,
+                selectedFormat,
+                selectedRepositories,
+                selectedLanguages,
+              )}
               activeCount={activeCount}
               sections={sections}
               selected={selectedValues}

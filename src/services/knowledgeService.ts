@@ -47,6 +47,7 @@ function buildFilterQuery(params: KnowledgeListParams): URLSearchParams {
   for (const source of params.sources ?? []) query.append("sources", source);
   for (const repository of params.repositories ?? []) query.append("repositories", repository);
   if (params.format) query.set("format", params.format);
+  for (const language of params.languages ?? []) query.append("languages", language);
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
   return query;
@@ -116,7 +117,8 @@ export const knowledgeService = {
   },
 
   /**
-   * Fetches faceted counts for artifact types, source systems, upload formats, and repositories.
+   * Fetches faceted counts for artifact types, source systems, upload formats, repositories and
+   * languages.
    *
    * Sends exactly the filter criteria the list sends (see `buildFilterQuery`) and nothing of its
    * paging or order: `page`, `size` and `sort` are ignored even when present in `params`, because

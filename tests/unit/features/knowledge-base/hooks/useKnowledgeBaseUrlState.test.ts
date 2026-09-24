@@ -359,3 +359,40 @@ describe("useKnowledgeBaseUrlState date range", () => {
     expect(result.current.api.state.dateRange).toEqual({ from: null, to: null });
   });
 });
+
+describe("useKnowledgeBaseUrlState languages", () => {
+  it("reads a comma or repeated list, de-duplicated ignoring case, independent of sources", () => {
+    const state = parse("?languages=Kotlin,kotlin&languages=C%23");
+    expect([...state.languages]).toEqual(["Kotlin", "C#"]);
+    expect(state.sources.size).toBe(0);
+  });
+
+  it("toggles a language, restarting at page 1, and unticks any casing of it", () => {
+    const { result } = renderUrlState(["/kb?page=3&languages=kotlin"], { projectId: "p1" });
+
+    act(() => result.current.api.toggleLanguage("TypeScript"));
+    expect(result.current.location.search).toBe("?languages=kotlin,TypeScript");
+
+    act(() => result.current.api.toggleLanguage("Kotlin"));
+    expect(result.current.location.search).toBe("?languages=TypeScript");
+  });
+
+  it("pushes a toggle so Back restores the previous selection", () => {
+    const { result } = renderUrlState(["/kb"], { projectId: "p1" });
+    act(() => result.current.api.toggleLanguage("Go"));
+    act(() => void result.current.navigate(-1));
+    expect(result.current.api.state.languages.size).toBe(0);
+  });
+
+  it("is cleared by Clear filters and by a project switch", () => {
+    const { result, rerender } = renderUrlState(["/kb?languages=Go&size=50"], {
+      projectId: "p1",
+    });
+    act(() => result.current.api.clearFilters());
+    expect(result.current.location.search).toBe("?size=50");
+
+    act(() => result.current.api.toggleLanguage("Rust"));
+    rerender({ projectId: "p2" });
+    expect(result.current.api.state.languages.size).toBe(0);
+  });
+});
