@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Hand, Inbox, MessageSquareText, Rocket, SkipForward, Users } from "lucide-react";
 import { useQueries } from "@tanstack/react-query";
 import { IngestionStatusWidget } from "../features/data-ingestion/components/IngestionStatusWidget";
@@ -12,6 +12,7 @@ import {
   OnboardingHealthCard,
   QuestionsCard,
 } from "../features/pm-area/components/overview/InsightCards";
+import { ProjectAnalysisLauncher } from "../features/pm-area/analysis/ProjectAnalysisLauncher";
 import { TeamProgressCard } from "../features/pm-area/components/overview/TeamProgressCard";
 import { TeamPulseCard } from "../features/pm-area/components/overview/TeamPulseCard";
 import { useOpenEscalationCount } from "../features/knowledge-request/useOpenEscalationCount";
@@ -82,8 +83,14 @@ export function PmDashboardPage() {
 
   const figuresReady = !rosterLoading && !rosterError;
 
+  // The industry card keeps its project in its own state, so a re-evaluation by the analysis
+  // remounts it to read the new value.
+  const [industryRevision, setIndustryRevision] = useState(0);
+
   return (
     <section aria-label="Overview" className="space-y-5">
+      <ProjectAnalysisLauncher onIndustryChanged={setIndustryRevision} />
+
       <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <PmStat
           icon={Users}
@@ -167,7 +174,7 @@ export function PmDashboardPage() {
           its evidence. */}
       <div className="grid items-stretch gap-5 md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)]">
         <IngestionStatusWidget />
-        <ProjectIndustryWidget />
+        <ProjectIndustryWidget key={industryRevision} />
       </div>
     </section>
   );

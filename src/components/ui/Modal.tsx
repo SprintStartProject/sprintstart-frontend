@@ -8,7 +8,7 @@ import { Button } from "./Button";
 import { useDialogFocus } from "./useDialogFocus";
 import { useScrollLock } from "./useScrollLock";
 
-type ModalSize = "sm" | "md" | "lg" | "xl";
+type ModalSize = "sm" | "md" | "lg" | "xl" | "2xl";
 
 type ModalProps = {
   isOpen: boolean;
@@ -62,11 +62,13 @@ const sizeClassNames: Record<ModalSize, string> = {
   md: "max-w-md",
   lg: "max-w-2xl",
   xl: "max-w-4xl",
+  // For a dialog that is a small workspace of its own (the PM's project analysis), not a form.
+  "2xl": "max-w-6xl",
 };
 
 /**
  * Portal-based dialog overlay — the core modal primitive for all dialogs.
- * Supports configurable size (sm/md/lg/xl), role (dialog/alertdialog),
+ * Supports configurable size (sm/md/lg/xl/2xl), role (dialog/alertdialog),
  * escape-key and backdrop dismiss, optional header actions, and a shared
  * backdrop/dialog animation via modalBackdropVariants + getModalDialogVariants.
  */
