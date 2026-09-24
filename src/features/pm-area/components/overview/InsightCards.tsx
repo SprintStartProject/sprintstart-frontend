@@ -28,7 +28,9 @@ import { TrendBadge } from "../../../faq/components/TrendBadge";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../../../knowledge-gaps/severity";
 import { formatWaiting, hasWaitedADay } from "../../../knowledge-request/format";
 import { formatDuration } from "../../../onboarding-metrics/format";
+import { hireMoments } from "../../../onboarding-metrics/moments";
 import { useProjectContext } from "../../../projects/useProjectContext";
+import { FunnelChart, type FunnelStage } from "../charts/FunnelChart";
 import { PmCard, PmCardHeader, PmCardLink } from "../PmCard";
 
 const ROWS = 4;
@@ -208,7 +210,7 @@ export function KnowledgeGapsCard() {
   );
 }
 
-function HealthRow({
+function HealthFigure({
   icon: Icon,
   label,
   value,
@@ -220,24 +222,33 @@ function HealthRow({
   attention?: boolean;
 }) {
   return (
-    <li className="flex items-center gap-3 py-2">
+    <li className="flex min-w-0 items-center gap-2.5 rounded-xl bg-app-surface-muted px-3 py-2">
       <span
         aria-hidden="true"
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
           attention
             ? "bg-app-warning-bg text-app-warning-text"
             : "bg-app-cyan-bg text-app-cyan-text"
         }`}
       >
-        <Icon className="h-4 w-4" />
+        <Icon className="h-3.5 w-3.5" />
       </span>
-      <span className="min-w-0 flex-1 text-sm text-app-text-muted">{label}</span>
-      <span className="shrink-0 text-base font-semibold text-app-text tabular-nums">{value}</span>
+      <span className="min-w-0">
+        <span className="block text-sm leading-tight font-semibold text-app-text tabular-nums">
+          {value}
+        </span>
+        <span className="block truncate text-[11px] text-app-text-muted">{label}</span>
+      </span>
     </li>
   );
 }
 
-/** The onboarding readout's four figures, for a glance. */
+/**
+ * How far the project's hires have come — joined, claimed a task, put work up, heard back, had
+ * it accepted — as a funnel, with the four figures onboarding is judged on underneath. The funnel
+ * is where a drop shows: ten hires who claimed a task and two who ever heard back is a review
+ * problem, not a hiring one.
+ */
 export function OnboardingHealthCard() {
   const { selectedProjectId } = useProjectContext();
   const {
@@ -249,6 +260,17 @@ export function OnboardingHealthCard() {
       ? onboardingMetricsService.fetchProjectMetrics(selectedProjectId)
       : Promise.resolve(null),
   );
+
+  const hires = metrics?.hires ?? [];
+  const stages: FunnelStage[] =
+    hires.length === 0
+      ? []
+      : hireMoments(hires[0]).map((moment, index) => ({
+          key: moment.label,
+          label: moment.label,
+          icon: moment.icon,
+          value: hires.filter((hire) => hireMoments(hire)[index].at !== null).length,
+        }));
 
   return (
     <PmCard
@@ -273,30 +295,39 @@ export function OnboardingHealthCard() {
       ) : metrics.memberCount === 0 ? (
         <EmptyState size="sm">No hires on this project yet.</EmptyState>
       ) : (
-        <ul className="-my-2 divide-y divide-app-border-muted">
-          <HealthRow
-            icon={Rocket}
-            label="To first accepted work"
-            value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
-          />
-          <HealthRow
-            icon={Clock}
-            label="First-review wait"
-            value={formatDuration(metrics.medianHoursToFirstResponse)}
-          />
-          <HealthRow
-            icon={Hourglass}
-            label="Waiting on a review"
-            value={metrics.waitingOnResponseCount}
-            attention={metrics.waitingOnResponseCount > 0}
-          />
-          <HealthRow
-            icon={TrendingDown}
-            label="Stalled hires"
-            value={metrics.stalledCount}
-            attention={metrics.stalledCount > 0}
-          />
-        </ul>
+        <>
+          {stages.length > 0 && (
+            <FunnelChart
+              stages={stages}
+              ariaLabel="Hires by how far they have come"
+              colorClassName="text-app-cyan-text"
+            />
+          )}
+          <ul className="mt-4 grid grid-cols-2 gap-2">
+            <HealthFigure
+              icon={Rocket}
+              label="To first accepted work"
+              value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
+            />
+            <HealthFigure
+              icon={Clock}
+              label="First-review wait"
+              value={formatDuration(metrics.medianHoursToFirstResponse)}
+            />
+            <HealthFigure
+              icon={Hourglass}
+              label="Waiting on a review"
+              value={metrics.waitingOnResponseCount}
+              attention={metrics.waitingOnResponseCount > 0}
+            />
+            <HealthFigure
+              icon={TrendingDown}
+              label="Stalled hires"
+              value={metrics.stalledCount}
+              attention={metrics.stalledCount > 0}
+            />
+          </ul>
+        </>
       )}
     </PmCard>
   );

@@ -12,6 +12,7 @@ import {
   OnboardingHealthCard,
   QuestionsCard,
 } from "../features/pm-area/components/overview/InsightCards";
+import { TeamProgressCard } from "../features/pm-area/components/overview/TeamProgressCard";
 import { TeamPulseCard } from "../features/pm-area/components/overview/TeamPulseCard";
 import { useOpenEscalationCount } from "../features/knowledge-request/useOpenEscalationCount";
 import { memberStage, waitingOn } from "../features/pm-area/memberStatus";
@@ -140,6 +141,13 @@ export function PmDashboardPage() {
         />
       </section>
 
+      {/* The two pictures of how onboarding is going: the team's stages and time on step beside
+          the hires' funnel. Charts first, lists after — a shape is read before a name is. */}
+      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <TeamProgressCard roster={members} loading={rosterLoading} error={rosterError} />
+        <OnboardingHealthCard />
+      </div>
+
       <TeamPulseCard
         roster={members}
         queue={queue}
@@ -155,10 +163,9 @@ export function PmDashboardPage() {
         <KnowledgeGapsCard />
       </div>
 
-      {/* The project's plumbing: ingestion widest, since it lists sources; onboarding health (four
-          short figures) and industry (one label and its evidence) share the rest evenly. */}
-      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)_minmax(0,1.3fr)]">
-        <OnboardingHealthCard />
+      {/* The project's plumbing: ingestion wider, since it lists sources; industry is one label and
+          its evidence. */}
+      <div className="grid items-stretch gap-5 md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)]">
         <IngestionStatusWidget />
         <ProjectIndustryWidget />
       </div>
