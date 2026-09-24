@@ -47,6 +47,7 @@ vi.mock("../../../src/services/knowledgeService", () => ({
     getArtifactPage: mockGetArtifactPage,
     getArtifactFacets: mockGetArtifactFacets,
     getArtifactById: mockGetArtifactById,
+    getArtifactAiStatus: () => Promise.resolve({ aiAvailable: true, items: [] }),
   },
 }));
 

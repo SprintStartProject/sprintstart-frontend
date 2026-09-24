@@ -528,3 +528,66 @@ describe("knowledgeService", () => {
     });
   });
 });
+
+describe("knowledgeService.getArtifactAiStatus", () => {
+  it("sends every visible id as a repeated ids param in one request", async () => {
+    const seen: string[][] = [];
+    server.use(
+      http.get("/api/v1/projects/:projectId/artifacts/ai-status", ({ request }) => {
+        seen.push(new URL(request.url).searchParams.getAll("ids"));
+        return HttpResponse.json({
+          aiAvailable: true,
+          items: [{ artifactId: "a1", status: "INDEXED", updatedAt: null, chunkCount: 4 }],
+        });
+      }),
+    );
+
+    const result = await knowledgeService.getArtifactAiStatus("p1", ["a1", "a2"]);
+
+    expect(seen).toEqual([["a1", "a2"]]);
+    expect(result).toEqual({
+      aiAvailable: true,
+      items: [{ artifactId: "a1", status: "INDEXED", updatedAt: null, chunkCount: 4 }],
+    });
+  });
+
+  it("answers an empty page locally, without a request", async () => {
+    let calls = 0;
+    server.use(
+      http.get("/api/v1/projects/:projectId/artifacts/ai-status", () => {
+        calls += 1;
+        return HttpResponse.json({ aiAvailable: true, items: [] });
+      }),
+    );
+
+    await expect(knowledgeService.getArtifactAiStatus("p1", [])).resolves.toEqual({
+      aiAvailable: true,
+      items: [],
+    });
+    expect(calls).toBe(0);
+  });
+
+  it("reads a response without aiAvailable as unavailable, so nothing is guessed", async () => {
+    server.use(
+      http.get("/api/v1/projects/:projectId/artifacts/ai-status", () =>
+        HttpResponse.json({
+          items: [{ artifactId: "a1", status: "UNKNOWN", updatedAt: null, chunkCount: null }],
+        }),
+      ),
+    );
+
+    const result = await knowledgeService.getArtifactAiStatus("p1", ["a1"]);
+
+    expect(result.aiAvailable).toBe(false);
+  });
+
+  it("rejects when the request fails", async () => {
+    server.use(
+      http.get("/api/v1/projects/:projectId/artifacts/ai-status", () =>
+        HttpResponse.json({ message: "Too many ids" }, { status: 400 }),
+      ),
+    );
+
+    await expect(knowledgeService.getArtifactAiStatus("p1", ["a1"])).rejects.toThrow();
+  });
+});

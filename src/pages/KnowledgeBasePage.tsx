@@ -16,6 +16,7 @@ import { PermissionGroup } from "../services/types";
 import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeBase";
 import { useArtifactById } from "../features/knowledge-base/hooks/useArtifactById";
 import { useUploadSelection } from "../features/knowledge-base/hooks/useUploadSelection";
+import { useArtifactAiStatus } from "../features/knowledge-base/hooks/useArtifactAiStatus";
 import { isUpload } from "../features/knowledge-base/tabs";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
@@ -128,6 +129,10 @@ export function KnowledgeBasePage() {
   const showLoadingSkeleton = useDelayedFlag(isLoading);
 
   const uploadSelection = useUploadSelection(listScopeKey);
+
+  /* One status request per visible page, keyed on exactly the ids on screen. */
+  const visibleArtifactIds = useMemo(() => artifacts.map((a) => a.id), [artifacts]);
+  const aiStatuses = useArtifactAiStatus(projectId, visibleArtifactIds);
   /* Only ticked rows that are uploads on the page in view can be deleted: the selection is
      re-read against the list itself, so nothing off screen is ever sent. */
   const selectedUploads = useMemo(
@@ -339,6 +344,7 @@ export function KnowledgeBasePage() {
                   <ArtifactList
                     artifacts={artifacts}
                     onSelect={setSelectedArtifactId}
+                    aiStatuses={aiStatuses}
                     selection={
                       uploadSelection.isSelectMode
                         ? {

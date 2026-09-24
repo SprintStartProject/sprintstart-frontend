@@ -119,6 +119,11 @@ export const handlers = [
   http.get("/api/v1/github/pat", () => HttpResponse.json([])),
   http.get("/api/v1/atlassian/credentials", () => HttpResponse.json([])),
 
+  // AI status for the visible page: the AI answered and knows none of them. Tests about the
+  // chip override this.
+  http.get("/api/v1/projects/:projectId/artifacts/ai-status", () =>
+    HttpResponse.json({ aiAvailable: true, items: [] }),
+  ),
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
       items: [],

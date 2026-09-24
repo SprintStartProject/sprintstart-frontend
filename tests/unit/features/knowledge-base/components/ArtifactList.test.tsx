@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ArtifactList } from "../../../../../src/features/knowledge-base/components/ArtifactList";
-import type { Artifact } from "../../../../../src/features/knowledge-base/types";
+import type { Artifact, ArtifactAiStatus } from "../../../../../src/features/knowledge-base/types";
 
 function makeArtifact(overrides: Partial<Artifact> = {}): Artifact {
   return {
@@ -153,5 +153,60 @@ describe("ArtifactList select mode", () => {
 
     fireEvent.click(screen.getByTestId("artifact-card"));
     expect(onSelect).toHaveBeenCalledWith("u1");
+  });
+});
+
+describe("ArtifactList AI status chip", () => {
+  const cases: [ArtifactAiStatus, string, string][] = [
+    ["INDEXED", "Indexed", "indexed for the AI assistant"],
+    ["PROCESSING", "Indexing", "being indexed for the AI assistant"],
+    ["FAILED", "Failed", "indexing for the AI assistant failed"],
+    ["DEINDEXED", "Not indexed", "not indexed for the AI assistant"],
+    ["UNKNOWN", "Not indexed", "not indexed for the AI assistant"],
+  ];
+
+  it.each(cases)(
+    "draws %s as %s, with text and an icon, and speaks it",
+    (status, label, spoken) => {
+      render(
+        <ArtifactList
+          artifacts={[makeArtifact({ id: "a1", title: "notes.md" })]}
+          onSelect={vi.fn()}
+          aiStatuses={new Map([["a1", status]])}
+        />,
+      );
+
+      const chip = screen.getByTestId("artifact-ai-status");
+      expect(chip).toHaveAttribute("data-status", status);
+      expect(chip).toHaveTextContent(label);
+      // Never colour alone: the chip carries an icon next to its text.
+      expect(chip.querySelector("svg")).not.toBeNull();
+      // The tooltip describes the index record, not a promise the assistant finds the content.
+      expect(chip.querySelector("[title]")?.getAttribute("title")).toMatch(/AI assistant's index/);
+      expect(screen.getByTestId("artifact-card")).toHaveAttribute(
+        "aria-label",
+        `View notes.md, ${spoken}`,
+      );
+    },
+  );
+
+  it("draws no chip without statuses, or for an id the response omitted", () => {
+    const { rerender } = render(
+      <ArtifactList
+        artifacts={[makeArtifact({ id: "a1", title: "notes.md" })]}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("artifact-ai-status")).not.toBeInTheDocument();
+    expect(screen.getByTestId("artifact-card")).toHaveAttribute("aria-label", "View notes.md");
+
+    rerender(
+      <ArtifactList
+        artifacts={[makeArtifact({ id: "a1", title: "notes.md" })]}
+        onSelect={vi.fn()}
+        aiStatuses={new Map([["other", "INDEXED"]])}
+      />,
+    );
+    expect(screen.queryByTestId("artifact-ai-status")).not.toBeInTheDocument();
   });
 });

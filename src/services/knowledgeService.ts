@@ -4,6 +4,7 @@ import { userService } from "./userService";
 import keycloak from "../config/keycloak";
 import type {
   Artifact,
+  ArtifactAiStatusResponse,
   ArtifactContent,
   ArtifactFacets,
   ArtifactPage,
@@ -161,6 +162,29 @@ export const knowledgeService = {
     const queryString = buildFilterQuery(params).toString();
     const endpoint = `/api/v1/projects/${projectId}/artifacts/facets${queryString ? `?${queryString}` : ""}`;
     return apiClient.fetch<ArtifactFacets>(endpoint);
+  },
+
+  /**
+   * Fetches the AI assistant's index status for a batch of artifacts (at most 100, the backend's
+   * cap and the largest page size, so one visible page is always one request).
+   *
+   * An empty `ids` list resolves locally without a request. A response without `aiAvailable`
+   * (older backend) is read as unavailable, so no status is ever guessed.
+   *
+   * @param projectId UUID of the project.
+   * @param artifactIds Ingestion ids of the artifacts on screen.
+   */
+  async getArtifactAiStatus(
+    projectId: string,
+    artifactIds: readonly string[],
+  ): Promise<ArtifactAiStatusResponse> {
+    if (artifactIds.length === 0) return { aiAvailable: true, items: [] };
+    const query = new URLSearchParams();
+    artifactIds.forEach((id) => query.append("ids", id));
+    const body = await apiClient.fetch<Partial<ArtifactAiStatusResponse>>(
+      `/api/v1/projects/${projectId}/artifacts/ai-status?${query.toString()}`,
+    );
+    return { aiAvailable: body?.aiAvailable === true, items: body?.items ?? [] };
   },
 
   /**

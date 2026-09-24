@@ -9,7 +9,9 @@ import {
   FileText,
   GitPullRequest,
 } from "lucide-react";
-import type { Artifact, ArtifactType } from "../types";
+import type { Artifact, ArtifactAiStatus, ArtifactType } from "../types";
+import { AI_STATUS_CHIPS } from "../aiStatus";
+import { AiStatusChip } from "./AiStatusChip";
 import { getArtifactRepository } from "../githubMetadata";
 import { isUpload } from "../tabs";
 import { RepositoryBadge } from "./RepositoryBadge";
@@ -35,6 +37,11 @@ interface ArtifactListProps {
   artifacts: Artifact[];
   onSelect: (id: string) => void;
   selection?: ArtifactListSelection;
+  /**
+   * AI index status per artifact id. Absent (the AI was unavailable, the request failed or has
+   * not answered) or missing an id means no chip for that card — never a guessed one.
+   */
+  aiStatuses?: ReadonlyMap<string, ArtifactAiStatus> | null;
 }
 
 const getIcon = (type: ArtifactType) => {
@@ -78,13 +85,18 @@ const formatDate = (iso: string): string => {
 interface ArtifactCardProps {
   artifact: Artifact;
   onSelect: (id: string) => void;
+  aiStatus?: ArtifactAiStatus;
 }
 
 /**
  * Single row in the artifact list. Memoized so filtering/pagination changes that
  * leave this card's props untouched don't re-render it.
  */
-const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: ArtifactCardProps) {
+const ArtifactCard = memo(function ArtifactCard({
+  artifact,
+  onSelect,
+  aiStatus,
+}: ArtifactCardProps) {
   const repository = getArtifactRepository(artifact);
 
   return (
@@ -93,7 +105,9 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
       roundedClassName="rounded-xl"
       role="button"
       tabIndex={0}
-      aria-label={`View ${artifact.title ?? "artifact"}${repository ? ` from ${repository}` : ""}`}
+      aria-label={`View ${artifact.title ?? "artifact"}${repository ? ` from ${repository}` : ""}${
+        aiStatus ? `, ${AI_STATUS_CHIPS[aiStatus].spoken}` : ""
+      }`}
       data-testid="artifact-card"
       onClick={() => onSelect(artifact.id)}
       onKeyDown={(e) => {
@@ -111,9 +125,11 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
           {/* flex-wrap: on a phone the chips wrap below the title instead of the row
               overflowing; the title still ellipsizes within its line. */}
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            <h3 className="min-w-0 truncate font-semibold text-app-text">
+            {/* h2: the cards sit directly under the page's h1, and a skipped level fails axe's
+                heading-order once the list is on screen. */}
+            <h2 className="min-w-0 truncate font-semibold text-app-text">
               {artifact.title ?? "Untitled"}
-            </h3>
+            </h2>
             <span className="shrink-0 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
               {getTypeLabel(artifact.artifactType)}
             </span>
@@ -121,6 +137,7 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
               {artifact.sourceSystem}
             </span>
             {repository && <RepositoryBadge repository={repository} testId="artifact-repo-badge" />}
+            {aiStatus && <AiStatusChip status={aiStatus} />}
           </div>
           <div className="mt-2 flex items-center gap-4 text-xs font-medium text-app-text-muted">
             <span>Ingested: {formatDate(artifact.ingestedAt)}</span>
@@ -170,7 +187,7 @@ function SelectSlot({
  * Uses Framer Motion's AnimatePresence to handle layout transitions as filters are applied
  * and items enter/exit the dashboard list.
  */
-export function ArtifactList({ artifacts, onSelect, selection }: ArtifactListProps) {
+export function ArtifactList({ artifacts, onSelect, selection, aiStatuses }: ArtifactListProps) {
   if (artifacts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-app-text-muted">
@@ -195,7 +212,11 @@ export function ArtifactList({ artifacts, onSelect, selection }: ArtifactListPro
           >
             {selection && <SelectSlot artifact={artifact} selection={selection} />}
             <div className={selection ? "min-w-0 flex-1" : undefined}>
-              <ArtifactCard artifact={artifact} onSelect={onSelect} />
+              <ArtifactCard
+                artifact={artifact}
+                onSelect={onSelect}
+                aiStatus={aiStatuses?.get(artifact.id)}
+              />
             </div>
           </motion.div>
         ))}

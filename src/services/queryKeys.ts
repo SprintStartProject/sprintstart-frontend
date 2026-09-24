@@ -87,6 +87,9 @@ export const queryKeys = {
       ["knowledge-base", projectId, "facets", params] as const,
     detail: (projectId: string, artifactId: string) =>
       ["knowledge-base", projectId, "detail", artifactId] as const,
+    // Under the project prefix, so a delete or refresh that invalidates the page drops it too.
+    aiStatus: (projectId: string, artifactIds: readonly string[]) =>
+      ["knowledge-base", projectId, "ai-status", artifactIds] as const,
   },
   faq: {
     groups: (projectId: string) => ["faq", "groups", projectId] as const,

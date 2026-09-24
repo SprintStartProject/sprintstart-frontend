@@ -200,3 +200,27 @@ export interface KnowledgeListParams {
   /** Latest ingestion day, `yyyy-MM-dd`, inclusive. Sent to the list and the facets alike. */
   to?: string;
 }
+
+/**
+ * What the AI assistant's metadata store records for an artifact. `UNKNOWN` means the AI answered
+ * but holds no record; it never means "the AI is down" — that is `aiAvailable: false`.
+ */
+export type ArtifactAiStatus = "INDEXED" | "PROCESSING" | "FAILED" | "DEINDEXED" | "UNKNOWN";
+
+/** One artifact's entry in {@link ArtifactAiStatusResponse}. */
+export interface ArtifactAiStatusItem {
+  artifactId: string;
+  status: ArtifactAiStatus;
+  updatedAt: string | null;
+  chunkCount: number | null;
+}
+
+/**
+ * Response of `GET /projects/{id}/artifacts/ai-status`. When `aiAvailable` is false every status is
+ * `UNKNOWN` by construction and says nothing about the artifact, so no chip may be drawn from it.
+ * Ids outside the project are omitted from `items`.
+ */
+export interface ArtifactAiStatusResponse {
+  aiAvailable: boolean;
+  items: ArtifactAiStatusItem[];
+}

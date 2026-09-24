@@ -99,6 +99,14 @@ vi.mock("../../../src/services/knowledgeService", () => ({
       formats: [{ value: "PDF", count: 1 }],
       repositories: [],
     }),
+    // Chips on both cards, so axe checks them on the real page.
+    getArtifactAiStatus: vi.fn().mockResolvedValue({
+      aiAvailable: true,
+      items: [
+        { artifactId: "a1", status: "INDEXED", updatedAt: null, chunkCount: 3 },
+        { artifactId: "a2", status: "FAILED", updatedAt: null, chunkCount: null },
+      ],
+    }),
     getArtifactById: vi.fn().mockImplementation((_pid: string, id: string) => {
       return Promise.resolve(mockArtifacts.find((a) => a.id === id) ?? null);
     }),
@@ -138,6 +146,20 @@ describe("KnowledgeBasePage Accessibility", () => {
 
     fireEvent.click(screen.getByTestId("kb-filter-trigger"));
     expect(screen.getByTestId("kb-filter-menu")).toBeInTheDocument();
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("should not have any a11y violations with AI status chips on the cards", async () => {
+    const { baseElement } = render(
+      <MemoryRouter>
+        <KnowledgeBasePage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("artifact-ai-status")).toHaveLength(2);
+    });
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });
