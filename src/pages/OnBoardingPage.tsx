@@ -50,6 +50,7 @@ import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 import {
   blockingPhases,
+  isSkipPending,
   itemState,
   pathProgress,
   phaseItems,
@@ -534,6 +535,9 @@ export function OnBoardingPage() {
   /** A step the member opens for the first time is started; reopening one changes nothing. */
   const beginStepIfWaiting = async (item: PhaseItem) => {
     if (item.kind !== "step" || item.step.status !== "WAITING" || item.step.locked) return;
+    // Opened to change or withdraw a skip request -- which is what the buddy's link to the step is
+    // for -- is not beginning it. The step's own "Start" button still does that.
+    if (isSkipPending(item.step.skip)) return;
     try {
       await onboardingService.startStep(item.step.id);
       // The rocket marks a step *beginning*.

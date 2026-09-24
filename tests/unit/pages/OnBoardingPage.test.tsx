@@ -707,6 +707,53 @@ describe("OnBoardingPage", () => {
     expect(await screen.findByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
   });
 
+  /**
+   * The buddy links a step with a pending skip here so the hire can change or withdraw the reason.
+   * Opening it for that is not beginning it.
+   */
+  it("opens a step waiting on a skip decision by its address without starting it", async () => {
+    const waiting = {
+      ...phaseFixture("phase1", 1, "Phase 1").steps[0],
+      status: "WAITING",
+      skip: {
+        id: "skip1",
+        stepId: "step-phase1",
+        reason: "I did this on my last team.",
+        accepted: null,
+        reviewComment: null,
+        reviewedAt: null,
+      },
+    };
+    server.use(
+      http.get("/api/v1/onboarding/me/steps/:stepId", () => HttpResponse.json(waiting)),
+      http.get("/api/v1/onboarding/me/steps/:stepId/tasks", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/resources", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [{ ...phaseFixture("phase1", 1, "Phase 1"), steps: [waiting] }],
+        }),
+      ),
+    );
+    const startStep = vi.spyOn(onboardingService, "startStep");
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding/step-phase1"]}>
+        <OnboardingJourneyContext.Provider value={journeyValue()}>
+          <Routes>
+            <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
+          </Routes>
+        </OnboardingJourneyContext.Provider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Skip requested")).toBeInTheDocument();
+    await expectUnfolded("step-phase1");
+    expect(startStep).not.toHaveBeenCalled();
+  });
+
   it("names what a locked item is waiting on", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
