@@ -98,6 +98,10 @@ export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
 
 /**
  * Pagination metadata returned by Spring Boot Page response.
+ *
+ * `number` is **1-based**: the backend echoes the requested `page` query
+ * parameter (`ArtifactQueryService` builds `PageRequest.of(page - 1, …)` and
+ * reports `number = page`), not Spring's 0-based `Page.number`.
  */
 export interface PageMetadata {
   number: number;

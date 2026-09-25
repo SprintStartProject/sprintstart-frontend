@@ -82,7 +82,9 @@ export function useScrollLock(locked: boolean) {
       });
 
       function handleWheel(event: WheelEvent) {
-        let node: HTMLElement | null = event.target instanceof HTMLElement ? event.target : null;
+        // `Element`, not `HTMLElement`: a wheel over an icon targets an SVG
+        // node, which is no HTMLElement — the walk must still start there.
+        let node: Element | null = event.target instanceof Element ? event.target : null;
         let canScroll = false;
 
         while (node && node !== document.body && node !== document.documentElement) {
@@ -122,7 +124,8 @@ export function useScrollLock(locked: boolean) {
         const currentY = event.touches[0].clientY;
         const deltaY = touchStartY - currentY;
 
-        let node: HTMLElement | null = event.target instanceof HTMLElement ? event.target : null;
+        // Same SVG case as the wheel handler: a swipe that starts on an icon.
+        let node: Element | null = event.target instanceof Element ? event.target : null;
         let canScroll = false;
 
         while (node && node !== document.body && node !== document.documentElement) {

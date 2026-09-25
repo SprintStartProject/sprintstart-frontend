@@ -328,7 +328,7 @@ describe("KnowledgeBasePage", () => {
       Promise.resolve({
         items: artifacts,
         page: {
-          number: 0,
+          number: 1,
           size: params.size ?? 20,
           totalElements: 45,
           totalPages: Math.ceil(45 / (params.size ?? 20)),

@@ -269,9 +269,10 @@ export function useKnowledgeBase(
   // Positions of the rows actually on screen, read from the page that produced
   // them: while a new page loads the previous one stays visible (placeholder
   // data), and the line must describe what the reader sees, not what is coming.
+  // `number` is 1-based: the backend echoes the requested `?page=` (see PageMetadata).
   const resultRange = useMemo(() => {
     if (!pageMeta || artifacts.length === 0) return undefined;
-    const start = pageMeta.number * pageMeta.size + 1;
+    const start = (pageMeta.number - 1) * pageMeta.size + 1;
     return { start, end: start + artifacts.length - 1 };
   }, [pageMeta, artifacts.length]);
 

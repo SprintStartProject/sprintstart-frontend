@@ -83,4 +83,24 @@ describe("useScrollLock", () => {
     document.body.dispatchEvent(eventAfter);
     expect(eventAfter.defaultPrevented).toBe(false);
   });
+
+  it("lets a wheel over an SVG icon scroll the panel that contains it", () => {
+    // An icon is an SVGElement, not an HTMLElement: the walk up to the
+    // scrollable panel must still start at it, or hovering an icon blocks scroll.
+    const panel = document.createElement("div");
+    panel.style.overflowY = "auto";
+    Object.defineProperty(panel, "scrollHeight", { configurable: true, value: 500 });
+    Object.defineProperty(panel, "clientHeight", { configurable: true, value: 100 });
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    panel.appendChild(icon);
+    document.body.appendChild(panel);
+
+    const view = render(<Locker />);
+    const event = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 100 });
+    icon.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+
+    view.unmount();
+    panel.remove();
+  });
 });

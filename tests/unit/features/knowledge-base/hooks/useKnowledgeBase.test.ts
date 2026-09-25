@@ -839,6 +839,22 @@ describe("useKnowledgeBase", () => {
     });
   });
 
+  it("reports the on-screen range from the 1-based page number", async () => {
+    const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
+      makeArtifact(`a${i}`, `file-${i}.md`),
+    );
+    const result = await renderWith(artifacts);
+
+    expect(result.current.resultRange).toEqual({ start: 1, end: 20 });
+
+    act(() => {
+      result.current.setCurrentPage(2);
+    });
+    await waitFor(() => {
+      expect(result.current.resultRange).toEqual({ start: 21, end: 25 });
+    });
+  });
+
   it("safely indexes the page items when totalPages decreases", async () => {
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
