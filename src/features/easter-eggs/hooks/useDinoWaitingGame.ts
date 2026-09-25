@@ -159,6 +159,16 @@ export function useSpaceOpensDino(
   // the slot with it, or every other surface loses the trigger for good.
   useEffect(() => () => releaseGameSlot(host), [host]);
 
+  // The slot follows `gameActive` after commit, never during render: the
+  // closes below run in the render phase, and a render React discards
+  // (concurrent retry, StrictMode double render) must not free a slot the
+  // committed game still holds — another surface could claim it and open a
+  // second game. `close` releases eagerly as well; that runs in an event
+  // handler, where mutating module state is fine.
+  useEffect(() => {
+    if (!gameActive) releaseGameSlot(host);
+  }, [gameActive, host]);
+
   // Locking mid-game (triple-click toggle elsewhere, another tab) closes
   // it. Uses React's documented "adjust state when a value changes"
   // pattern instead of an effect, mirroring ChatPage — see
@@ -167,7 +177,6 @@ export function useSpaceOpensDino(
   if (prevUnlocked !== isUnlocked) {
     setPrevUnlocked(isUnlocked);
     if (!isUnlocked) {
-      releaseGameSlot(host);
       setGameActive(false);
     }
   }
@@ -178,14 +187,14 @@ export function useSpaceOpensDino(
   // arrives, and without this the shared slot would stay claimed by a game
   // nobody can see (the onboarding generation step has no close of its own,
   // which is how a finished generation used to eat the trigger for the rest
-  // of the visit). Same render-phase pattern as the lock above.
+  // of the visit). Same render-phase pattern as the lock above; the slot
+  // itself is freed by the `gameActive` effect once the close commits.
   // When `keepActiveUntilExit` is true, an active run is preserved until the
   // user exits or finishes their run.
   const [prevArmed, setPrevArmed] = useState(armed);
   if (prevArmed !== armed) {
     setPrevArmed(armed);
     if (!armed && (!keepActiveUntilExit || !gameActive)) {
-      releaseGameSlot(host);
       setGameActive(false);
     }
   }

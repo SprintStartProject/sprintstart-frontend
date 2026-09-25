@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../../../styles/tokens";
+import { isTypingTarget } from "../hooks/useDinoWaitingGame.ts";
 
 type SpaceInvadersProps = {
   /**
@@ -329,11 +330,10 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
   // --- Keyboard input (Escape, Space, Arrows / A-D) ---
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onExit();
-        return;
-      }
+      // Shortcuts (Ctrl/Cmd+A, Alt+D, …) and typing belong to the browser and
+      // the focused field, not the game — same guards as DinoGame.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
 
       if (e.code === "Space") {
         e.preventDefault();
@@ -367,9 +367,21 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
       }
     };
 
+    // Escape in the capture phase, as in DinoGame: one press must close only
+    // the game, before any surrounding surface that also closes on Escape
+    // sees it. Honoured from anywhere, including a text field.
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onExit();
+    };
+
+    window.addEventListener("keydown", onEscape, true);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     return () => {
+      window.removeEventListener("keydown", onEscape, true);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
