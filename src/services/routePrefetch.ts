@@ -6,6 +6,7 @@ import {
   loadKnowledgeBasePage,
   loadKnowledgeBaseFacets,
 } from "../features/knowledge-base/hooks/useKnowledgeBase";
+import { DEFAULT_PAGE_SIZE } from "../features/knowledge-base/hooks/useKnowledgeBaseUrlState";
 import { loadStarterWorkReviewQueue } from "../features/starter-work/hooks/useStarterWorkReview";
 
 /**
@@ -70,9 +71,11 @@ export function prefetchRoute(
   switch (path) {
     case "/knowledge-base":
       if (!projectId) return;
+      // The same first-page params the hook builds from an empty URL, so the
+      // key matches — a hard-coded size would silently miss if the default moved.
       void queryClient.prefetchQuery({
-        queryKey: queryKeys.knowledgeBase.list(projectId, { page: 1, size: 20 }),
-        queryFn: () => loadKnowledgeBasePage(projectId, { page: 1, size: 20 }),
+        queryKey: queryKeys.knowledgeBase.list(projectId, { page: 1, size: DEFAULT_PAGE_SIZE }),
+        queryFn: () => loadKnowledgeBasePage(projectId, { page: 1, size: DEFAULT_PAGE_SIZE }),
       });
       void queryClient.prefetchQuery({
         queryKey: queryKeys.knowledgeBase.facets(projectId, {}),

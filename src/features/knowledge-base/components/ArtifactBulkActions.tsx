@@ -18,6 +18,11 @@ export interface ArtifactBulkActionsProps {
   onClearSelection: () => void;
   /** After a request that reached the backend: ingestion ids actually deleted. */
   onDeleted: (deletedArtifactIds: string[]) => void;
+  /**
+   * Identity of the list on screen (filters, page, size, order). A change drops
+   * the last delete report, which describes a list the reader has moved away from.
+   */
+  listScopeKey: string;
 }
 
 interface BulkDeleteReport {
@@ -71,6 +76,7 @@ export function ArtifactBulkActions({
   selected,
   onClearSelection,
   onDeleted,
+  listScopeKey,
 }: ArtifactBulkActionsProps) {
   const queryClient = useQueryClient();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -79,6 +85,15 @@ export function ArtifactBulkActions({
   // Snapshot taken when the dialog opens: what was confirmed is what is sent,
   // and the dialog keeps its wording while the cleared selection animates out.
   const [pending, setPending] = useState<readonly Artifact[]>([]);
+
+  // Render-phase reset ("adjust state when a prop changes"), not an effect:
+  // the stale report must not paint for one frame over the new list. A
+  // delete's own refetch keeps the key, so its report survives that.
+  const [reportScope, setReportScope] = useState(listScopeKey);
+  if (reportScope !== listScopeKey) {
+    setReportScope(listScopeKey);
+    setReport(null);
+  }
 
   const mutation = useMutation({
     mutationFn: (uploadIds: string[]) =>
@@ -90,6 +105,7 @@ export function ArtifactBulkActions({
 
   const openConfirm = () => {
     setRequestError(null);
+    setReport(null);
     setPending(selected);
     setIsConfirmOpen(true);
   };

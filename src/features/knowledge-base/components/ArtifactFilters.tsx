@@ -186,10 +186,6 @@ function isUploadFormat(value: string): value is UploadFormat {
 /** Repositories shown before the section folds behind "Show all". */
 const REPOSITORY_VISIBLE_LIMIT = 10;
 
-/**
- * What the numbers beside each option mean. They are "what you would get if you
- * added this", not a project total, and nothing on screen said so.
- */
 /** Stable empty range, so an omitted prop does not re-sync the date filter every render. */
 const NO_DATE_RANGE: DateRange = { from: null, to: null };
 
@@ -202,6 +198,10 @@ const LANGUAGE_VALUE_PREFIX = "lang:";
 const NO_LANGUAGES: ReadonlySet<string> = new Set();
 const NO_LANGUAGE_OPTIONS: FacetOption<string>[] = [];
 
+/**
+ * What the numbers beside each option mean. They are "what you would get if you
+ * added this", not a project total, and nothing on screen said so.
+ */
 const FACET_COUNT_FOOTNOTE = "Counts show what you would get if you added this option.";
 
 /**

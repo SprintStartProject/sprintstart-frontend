@@ -103,4 +103,51 @@ describe("useScrollLock", () => {
     view.unmount();
     panel.remove();
   });
+
+  it("leaves Ctrl+wheel (browser zoom) alone while locked", () => {
+    const view = render(<Locker />);
+    const event = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      deltaY: 100,
+      ctrlKey: true,
+    });
+    document.body.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    view.unmount();
+  });
+
+  it("lets a sideways wheel scroll a horizontally scrollable block in a short panel", () => {
+    // Nothing here scrolls vertically: only the horizontal axis may decide.
+    const block = document.createElement("pre");
+    block.style.overflowX = "auto";
+    Object.defineProperty(block, "scrollWidth", { configurable: true, value: 800 });
+    Object.defineProperty(block, "clientWidth", { configurable: true, value: 200 });
+    document.body.appendChild(block);
+
+    const view = render(<Locker />);
+    const sideways = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaX: 80 });
+    block.dispatchEvent(sideways);
+    expect(sideways.defaultPrevented).toBe(false);
+
+    const down = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 80 });
+    block.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+
+    view.unmount();
+    block.remove();
+  });
+
+  it("leaves a two-finger pinch alone while locked", () => {
+    const view = render(<Locker />);
+    const touch = (y: number) => ({ clientX: 0, clientY: y }) as Touch;
+    const pinch = new TouchEvent("touchmove", {
+      bubbles: true,
+      cancelable: true,
+      touches: [touch(10), touch(50)],
+    });
+    document.body.dispatchEvent(pinch);
+    expect(pinch.defaultPrevented).toBe(false);
+    view.unmount();
+  });
 });

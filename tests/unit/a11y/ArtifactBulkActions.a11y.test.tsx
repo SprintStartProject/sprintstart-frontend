@@ -43,6 +43,7 @@ describe("bulk delete a11y", () => {
           selected={[upload, other]}
           onClearSelection={vi.fn()}
           onDeleted={vi.fn()}
+          listScopeKey="scope-1"
         />
         <ArtifactList
           artifacts={[upload, other, github]}

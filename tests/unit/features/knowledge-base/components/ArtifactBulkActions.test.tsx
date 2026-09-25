@@ -28,8 +28,10 @@ const selected = [makeUpload("a1", "notes.pdf"), makeUpload("a2", "plan.md")];
 function renderActions(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   const invalidate = vi.spyOn(client, "invalidateQueries");
-  render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
-  return { invalidate };
+  const view = render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  const rerender = (next: ReactElement) =>
+    view.rerender(<QueryClientProvider client={client}>{next}</QueryClientProvider>);
+  return { invalidate, rerender };
 }
 
 function props(overrides: Partial<Parameters<typeof ArtifactBulkActions>[0]> = {}) {
@@ -39,6 +41,7 @@ function props(overrides: Partial<Parameters<typeof ArtifactBulkActions>[0]> = {
     selected,
     onClearSelection: vi.fn(),
     onDeleted: vi.fn(),
+    listScopeKey: "scope-1",
     ...overrides,
   };
 }
@@ -76,6 +79,26 @@ describe("ArtifactBulkActions", () => {
     expect(deleteUploads).toHaveBeenCalledWith("p1", ["up-a1", "up-a2"], "user-1");
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["knowledge-base", "p1"] });
     expect(onDeleted).toHaveBeenCalledWith(["a1", "a2"]);
+    expect(screen.queryByTestId("kb-bulk-failed")).not.toBeInTheDocument();
+  });
+
+  it("drops the delete report once the reader moves to another list", async () => {
+    vi.spyOn(knowledgeService, "deleteUploads").mockResolvedValue({
+      deletedIds: ["up-a1"],
+      failed: [{ artifactId: "up-a2", error: "Locked" }],
+    });
+    const { rerender } = renderActions(<ArtifactBulkActions {...props()} />);
+
+    fireEvent.click(screen.getByTestId("kb-bulk-delete"));
+    fireEvent.click(screen.getByTestId("kb-bulk-confirm"));
+    expect(await screen.findByTestId("kb-bulk-deleted")).toHaveTextContent("1 deleted");
+
+    // Same list (the delete's own refetch): the report stays.
+    rerender(<ArtifactBulkActions {...props()} />);
+    expect(screen.getByTestId("kb-bulk-failed")).toBeInTheDocument();
+
+    rerender(<ArtifactBulkActions {...props({ listScopeKey: "scope-2" })} />);
+    expect(screen.queryByTestId("kb-bulk-deleted")).not.toBeInTheDocument();
     expect(screen.queryByTestId("kb-bulk-failed")).not.toBeInTheDocument();
   });
 

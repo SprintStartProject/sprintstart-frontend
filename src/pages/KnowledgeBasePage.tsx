@@ -310,6 +310,7 @@ export function KnowledgeBasePage() {
                     selected={selectedUploads}
                     onClearSelection={uploadSelection.clear}
                     onDeleted={handleBulkDeleted}
+                    listScopeKey={listScopeKey}
                   />
                 </div>
               )}

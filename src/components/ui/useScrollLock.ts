@@ -38,6 +38,41 @@ function lockElement(element: HTMLElement, scrollbarWidth: number): () => void {
 }
 
 /**
+ * Whether a scroll gesture starting at `target` has somewhere to go inside the
+ * overlay, so the lock can let it through. Shared by the wheel and touch
+ * handlers so the two cannot drift apart.
+ *
+ * - Walks up from `target` as an `Element`, not an `HTMLElement`: a gesture
+ *   over an icon starts on an SVG node, which is no HTMLElement.
+ * - Checks the axis the gesture mostly moves along. A sideways swipe over a
+ *   wide `overflow-x-auto` code block needs a horizontally scrollable
+ *   ancestor, not a vertical one — a short drawer has none of the latter.
+ * - A container already at its edge in the gesture's direction does not
+ *   count, so the scroll cannot chain out to the page behind.
+ */
+function canScrollFrom(target: EventTarget | null, deltaX: number, deltaY: number): boolean {
+  const horizontal = Math.abs(deltaX) > Math.abs(deltaY);
+  const delta = horizontal ? deltaX : deltaY;
+  let node: Element | null = target instanceof Element ? target : null;
+
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = window.getComputedStyle(node);
+    const overflow = horizontal ? style.overflowX : style.overflowY;
+    const scrollSize = horizontal ? node.scrollWidth : node.scrollHeight;
+    const clientSize = horizontal ? node.clientWidth : node.clientHeight;
+    const position = horizontal ? node.scrollLeft : node.scrollTop;
+
+    if ((overflow === "auto" || overflow === "scroll") && scrollSize > clientSize) {
+      const isAtStart = position <= 0 && delta < 0;
+      const isAtEnd = position + clientSize >= scrollSize - 1 && delta > 0;
+      if (!isAtStart && !isAtEnd) return true;
+    }
+    node = node.parentElement;
+  }
+  return false;
+}
+
+/**
  * Freezes the page behind an overlay while `locked` is true.
  *
  * Three things beyond `overflow: hidden`:
@@ -82,72 +117,30 @@ export function useScrollLock(locked: boolean) {
       });
 
       function handleWheel(event: WheelEvent) {
-        // `Element`, not `HTMLElement`: a wheel over an icon targets an SVG
-        // node, which is no HTMLElement — the walk must still start there.
-        let node: Element | null = event.target instanceof Element ? event.target : null;
-        let canScroll = false;
-
-        while (node && node !== document.body && node !== document.documentElement) {
-          const style = window.getComputedStyle(node);
-          const isScrollable =
-            (style.overflowY === "auto" || style.overflowY === "scroll") &&
-            node.scrollHeight > node.clientHeight;
-
-          if (isScrollable) {
-            const isAtTop = node.scrollTop <= 0 && event.deltaY < 0;
-            const isAtBottom =
-              node.scrollTop + node.clientHeight >= node.scrollHeight - 1 && event.deltaY > 0;
-
-            if (!isAtTop && !isAtBottom) {
-              canScroll = true;
-              break;
-            }
-          }
-          node = node.parentElement;
-        }
-
-        if (!canScroll) {
+        // Ctrl+wheel and trackpad pinch are browser zoom, not scrolling:
+        // blocking them would take zoom away while any panel is open.
+        if (event.ctrlKey) return;
+        if (!canScrollFrom(event.target, event.deltaX, event.deltaY)) {
           event.preventDefault();
         }
       }
 
+      let touchStartX = 0;
       let touchStartY = 0;
 
       function handleTouchStart(event: TouchEvent) {
         if (event.touches.length > 0) {
+          touchStartX = event.touches[0].clientX;
           touchStartY = event.touches[0].clientY;
         }
       }
 
       function handleTouchMove(event: TouchEvent) {
-        if (event.touches.length === 0) return;
-        const currentY = event.touches[0].clientY;
-        const deltaY = touchStartY - currentY;
-
-        // Same SVG case as the wheel handler: a swipe that starts on an icon.
-        let node: Element | null = event.target instanceof Element ? event.target : null;
-        let canScroll = false;
-
-        while (node && node !== document.body && node !== document.documentElement) {
-          const style = window.getComputedStyle(node);
-          const isScrollable =
-            (style.overflowY === "auto" || style.overflowY === "scroll") &&
-            node.scrollHeight > node.clientHeight;
-
-          if (isScrollable) {
-            const isAtTop = node.scrollTop <= 0 && deltaY < 0;
-            const isAtBottom =
-              node.scrollTop + node.clientHeight >= node.scrollHeight - 1 && deltaY > 0;
-
-            if (!isAtTop && !isAtBottom) {
-              canScroll = true;
-              break;
-            }
-          }
-          node = node.parentElement;
-        }
-
-        if (!canScroll) {
+        // Two or more fingers is a pinch zoom — the touch twin of Ctrl+wheel.
+        if (event.touches.length !== 1) return;
+        const deltaX = touchStartX - event.touches[0].clientX;
+        const deltaY = touchStartY - event.touches[0].clientY;
+        if (!canScrollFrom(event.target, deltaX, deltaY)) {
           event.preventDefault();
         }
       }
