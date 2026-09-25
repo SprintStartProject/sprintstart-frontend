@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { EggModalShell } from "../features/easter-eggs/components/EggModalShell";
-import { PageHeader } from "../components/layout/PageHeader";
-import { Button } from "../components/ui/Button";
+import { EggModalShell } from "../features/easter-eggs/components/EggModalShell.tsx";
+import { PageHeader } from "../components/layout/PageHeader.tsx";
+import { Button } from "../components/ui/Button.tsx";
 import { Rocket } from "lucide-react";
 
 /**

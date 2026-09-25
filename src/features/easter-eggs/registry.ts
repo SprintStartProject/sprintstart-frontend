@@ -11,11 +11,6 @@ import { lazy } from "react";
  * file; every trigger, page and test keeps addressing eggs by id.
  */
 
-/** Lazy-loaded: Space Invaders (chunk fetched on first open). */
-const SpaceInvaders = lazy(() =>
-  import("./components/SpaceInvaders").then((m) => ({ default: m.SpaceInvaders })),
-);
-
 export type EggId = "game-2048" | "space-invaders";
 
 type EggDefinition = {
@@ -43,6 +38,8 @@ export const EGG_REGISTRY: Record<EggId, EggDefinition> = {
   "space-invaders": {
     label: "Space Invaders game",
     kind: "canvas",
-    component: SpaceInvaders,
+    component: lazy(() =>
+      import("./components/SpaceInvaders").then((m) => ({ default: m.SpaceInvaders })),
+    ),
   },
 };

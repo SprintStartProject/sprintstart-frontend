@@ -34,11 +34,18 @@ function elapsed(startedAt: number, now: number): string {
 export function GenerationScreen({
   phases,
   startedAt,
+  isRunning,
   isCompleted = false,
   onGameActiveChange,
 }: {
   phases: GenerationPhaseProgress[];
   startedAt: number;
+  /**
+   * The generation request is still in flight (`generation.status === "running"`). The only
+   * source of "still generating": the phases are built incrementally from stage events and can
+   * all read done/idle while the path is still being persisted or between two phases.
+   */
+  isRunning: boolean;
   /** The generation finished with a path: every phase reads as done and the clock stops. */
   isCompleted?: boolean;
   /** Reports the dino game opening/closing, so the page can keep this screen up while it is played. */
@@ -47,10 +54,9 @@ export function GenerationScreen({
   const [now, setNow] = useState(() => Date.now());
   const dinoUnlocked = useDinoUnlocked();
 
-  const isGenerating =
-    !isCompleted &&
-    (phases.length === 0 ||
-      phases.some((phase) => phase.state === "waiting" || phase.state === "working"));
+  // From the run's status, never from the phases: they are presentational only, and reading them
+  // here let an open game claim "Path ready" (and the clock stop) before the run had finished.
+  const isGenerating = isRunning && !isCompleted;
   const shownPhases = isCompleted ? settle(phases) : phases;
 
   const [gameActive, closeGame] = useSpaceOpensDino(isGenerating, dinoUnlocked, {

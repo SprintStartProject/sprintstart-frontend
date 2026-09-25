@@ -1,7 +1,7 @@
-import { BotGlyph } from "./BotGlyph.tsx";
-import { DinoGame } from "./DinoGame.tsx";
-import { THINKING_LABELS, type ThinkingState } from "../constants.ts";
-import { dinoCompletionProps, type DinoTurnOutcome } from "../dinoOutcome.ts";
+import { BotGlyph } from "./BotGlyph";
+import { DinoGame } from "./DinoGame";
+import { THINKING_LABELS, type ThinkingState } from "../constants";
+import { dinoCompletionProps, type DinoTurnOutcome } from "../dinoOutcome";
 
 type ThinkingIndicatorProps = {
   /** True while the assistant is working (before the first reply token arrives). */

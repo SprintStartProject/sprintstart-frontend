@@ -724,6 +724,7 @@ export function OnBoardingPage() {
       <GenerationScreen
         phases={activePhases}
         startedAt={startedAt}
+        isRunning={isRunning}
         // Only a finished generation may claim "Path ready" -- and keeps claiming it after the
         // page clears the `done` status, see `lastGeneration.completed`.
         isCompleted={!isRunning && (generation.status === "done" || lastGeneration.completed)}

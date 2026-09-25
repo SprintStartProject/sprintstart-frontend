@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../../../styles/tokens";
-import { isTypingTarget } from "../hooks/useDinoWaitingGame.ts";
+import { isTypingTarget } from "../lib/keyTargets.ts";
 
 type SpaceInvadersProps = {
   /**

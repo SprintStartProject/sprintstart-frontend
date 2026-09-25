@@ -2,11 +2,13 @@ import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { fireEvent } from "@testing-library/react";
 import {
-  isInteractiveTarget,
-  isTypingTarget,
   useDinoUnlocked,
   useSpaceOpensDino,
 } from "../../../../src/features/easter-eggs/hooks/useDinoWaitingGame.ts";
+import {
+  isInteractiveTarget,
+  isTypingTarget,
+} from "../../../../src/features/easter-eggs/lib/keyTargets.ts";
 
 describe("useDinoWaitingGame hooks", () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../../../components/ui/Button.tsx";
-import { isTypingTarget } from "../../easter-eggs/hooks/useDinoWaitingGame.ts";
+import { isTypingTarget } from "../../easter-eggs/lib/keyTargets.ts";
 
 /**
  * How the work the player is waiting on ended. Drives the badge colour *and*
