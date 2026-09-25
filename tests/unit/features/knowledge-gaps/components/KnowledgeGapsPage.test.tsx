@@ -191,7 +191,7 @@ describe("KnowledgeGapsPage", () => {
 
     const severityGroup = within(screen.getByRole("group", { name: "Filter gaps by severity" }));
 
-    expect(severityGroup.getByRole("button", { name: "High" })).toHaveAttribute(
+    expect(severityGroup.getByRole("button", { name: /^High/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -206,7 +206,7 @@ describe("KnowledgeGapsPage", () => {
 
     const highFilter = within(
       screen.getByRole("group", { name: "Filter gaps by severity" }),
-    ).getByRole("button", { name: "High" });
+    ).getByRole("button", { name: /^High/ });
     await user.click(highFilter);
 
     expect(highFilter).toHaveAttribute("aria-pressed", "false");
@@ -233,11 +233,32 @@ describe("KnowledgeGapsPage", () => {
 
     await user.click(
       within(screen.getByRole("group", { name: "Filter gaps by severity" })).getByRole("button", {
-        name: "High",
+        name: /^High/,
       }),
     );
 
     expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
+  });
+
+  it("narrows the list to a severity from its figure, and searches by component", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /High severity/ }));
+    const severityGroup = within(screen.getByRole("group", { name: "Filter gaps by severity" }));
+    expect(severityGroup.getByRole("button", { name: /^High/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(severityGroup.getByRole("button", { name: /^Medium/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    await user.type(screen.getByRole("textbox", { name: "Search knowledge gaps" }), "gateway");
+    expect(screen.getByText("API Gateway")).toBeInTheDocument();
+    expect(screen.queryByText("Auth Service")).not.toBeInTheDocument();
   });
 });
 

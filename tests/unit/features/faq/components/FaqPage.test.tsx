@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FaqPage } from "../../../../../src/features/faq/components/FaqPage";
@@ -105,9 +105,10 @@ describe("FaqPage", () => {
 
   it("renders the statistics header", () => {
     renderPage();
-    expect(screen.getByText("Questions tracked")).toBeInTheDocument();
-    expect(screen.getByText("Times asked")).toBeInTheDocument();
-    expect(screen.getByText("Picking up")).toBeInTheDocument();
+    const figures = within(screen.getByRole("region", { name: "Key figures" }));
+    expect(figures.getByText("Questions tracked")).toBeInTheDocument();
+    expect(figures.getByText("Times asked")).toBeInTheDocument();
+    expect(figures.getByText("Picking up")).toBeInTheDocument();
   });
 
   it("headlines each entry with its generated title", () => {
@@ -254,6 +255,34 @@ describe("FaqPage", () => {
     // whole subject is repetition.
     expect(screen.getByText("Deploying to production")).toBeInTheDocument();
     expect(screen.queryByText("Asked once only")).not.toBeInTheDocument();
+  });
+
+  // The same toolbar as Team and Knowledge gaps: search, one filter at a time, reset.
+  it("searches the questions and resets the list in one go", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByRole("textbox", { name: "Search recurring questions" }), "deploy");
+    expect(screen.getByText("Deploying to production")).toBeInTheDocument();
+    expect(screen.queryByText("Understanding what X is")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    expect(screen.getByText("Understanding what X is")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
+  });
+
+  it("shows only what is picking up when that figure is chosen", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      within(screen.getByRole("region", { name: "Key figures" })).getByRole("button", {
+        name: /Picking up/,
+      }),
+    );
+
+    expect(screen.getByText("Asked once only")).toBeInTheDocument();
+    expect(screen.queryByText("Understanding what X is")).not.toBeInTheDocument();
   });
 
   it("shows loading state", async () => {

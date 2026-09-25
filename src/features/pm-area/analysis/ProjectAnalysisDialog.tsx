@@ -185,9 +185,10 @@ export function ProjectAnalysisDialog({
       isOpen={isOpen}
       onClose={onClose}
       size="full"
-      // In the app's own theme and palette: a faint wash of the brand blue from the top corner and
-      // a soft indigo horizon along the bottom — the reference's glow, in the dashboard's colours.
-      panelClassName="bg-[radial-gradient(ellipse_75%_40%_at_50%_118%,color-mix(in_oklab,var(--progress-fill-end)_14%,transparent),transparent_72%),radial-gradient(ellipse_at_10%_0%,color-mix(in_oklab,var(--brand)_9%,transparent),transparent_55%)]"
+      // A planet rising along the bottom edge, like the reference: its body a faint wash, its
+      // rim lit in the app's blue-to-indigo — and a soft nebula in the top corners. All in the
+      // app's own tokens, so it follows the theme instead of forcing a dark ground.
+      panelClassName="bg-[radial-gradient(ellipse_70%_42%_at_50%_122%,color-mix(in_oklab,var(--brand)_9%,transparent)_58%,color-mix(in_oklab,var(--progress-fill)_40%,transparent)_65%,color-mix(in_oklab,var(--progress-fill-end)_22%,transparent)_71%,transparent_80%),radial-gradient(ellipse_at_12%_0%,color-mix(in_oklab,var(--brand)_10%,transparent),transparent_55%),radial-gradient(ellipse_at_92%_6%,color-mix(in_oklab,var(--progress-fill-end)_8%,transparent),transparent_50%)]"
       title="Project analysis"
       description={
         done

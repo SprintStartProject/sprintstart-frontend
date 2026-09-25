@@ -88,16 +88,29 @@ describe("TeamManagementPage", () => {
     expect(await screen.findByText("Loading team overview")).toBeInTheDocument();
   });
 
-  it("offers members and roles, and nothing else", async () => {
+  // Members and Roles are views grown out of the workspace's Team tab (see PmWorkspace.test);
+  // the section draws no tab bar of its own, and opens on the same row of figures as the other
+  // PM lists.
+  it("opens on the team's figures, with no tab bar of its own", async () => {
     renderPage();
 
     expect(await screen.findByText("Alice Smith")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Team management sections" }),
+    ).not.toBeInTheDocument();
+    const figures = within(screen.getByRole("region", { name: "Key figures" }));
+    expect(figures.getByText("Members")).toBeInTheDocument();
+    expect(figures.getByText("Average progress")).toBeInTheDocument();
+  });
 
-    const tabs = within(screen.getByRole("group", { name: "Team management sections" }));
-    expect(tabs.getAllByRole("button").map((tab) => tab.textContent)).toEqual([
-      expect.stringContaining("Members"),
-      expect.stringContaining("Roles"),
-    ]);
+  it("moves to the roles from their figure", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const figures = within(await screen.findByRole("region", { name: "Key figures" }));
+    await user.click(figures.getByRole("button", { name: /Roles/ }));
+
+    expect(screen.getByTestId("location")).toHaveTextContent("?tab=roles");
   });
 
   it("renders the selected project's members as rows", async () => {
@@ -217,10 +230,22 @@ describe("TeamManagementPage", () => {
     expect(screen.queryByText("?member=user1")).not.toBeInTheDocument();
   });
 
-  it("shows the roles tab when the URL asks for it", async () => {
+  it("shows the roles when the URL asks for them", async () => {
     renderPage("/team-management?tab=roles");
 
-    const tabs = within(await screen.findByRole("group", { name: "Team management sections" }));
-    expect(tabs.getByRole("button", { name: /Roles/ })).toHaveAttribute("aria-pressed", "true");
+    expect((await screen.findAllByText("Create role")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("textbox", { name: "Search members" })).not.toBeInTheDocument();
+  });
+
+  it("resets search, filters and sort together", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(await screen.findByRole("textbox", { name: "Search members" }), "alice");
+    await waitFor(() => expect(screen.queryByText("Bob Jones")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    expect(screen.getByText("Bob Jones")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
   });
 });

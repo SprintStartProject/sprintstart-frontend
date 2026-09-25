@@ -147,14 +147,6 @@ export function PmDashboardPage() {
         />
       </section>
 
-      {/* The three knowledge readouts right under the figures, a row of their own so none of them
-          is squeezed; the team, with whoever needs the manager first, follows. */}
-      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <EscalationsCard />
-        <QuestionsCard />
-        <KnowledgeGapsCard />
-      </div>
-
       <TeamPulseCard
         roster={members}
         queue={queue}
@@ -162,6 +154,14 @@ export function PmDashboardPage() {
         error={rosterError}
         onOpenMember={openMember}
       />
+
+      {/* Under the team (whoever needs the manager first comes straight after the figures), the
+          three knowledge readouts in a row of their own, so none of them is squeezed. */}
+      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <EscalationsCard />
+        <QuestionsCard />
+        <KnowledgeGapsCard />
+      </div>
 
       {/* The project's plumbing: ingestion wider, since it lists sources; industry is one label and
           its evidence. */}

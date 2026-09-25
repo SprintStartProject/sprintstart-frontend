@@ -28,6 +28,7 @@ import { useProjectContext } from "../projects/useProjectContext";
 import { MemberPeekPanel } from "./components/MemberPeekPanel";
 import { PmHeaderStatus } from "./components/PmHeaderStatus";
 import { INBOX_VIEW_PARAM, TEAM_TAB_PARAM } from "./pmWorkspacePaths";
+import { usePmSectionViewCounts } from "./usePmSectionViewCounts";
 import { MEMBER_PEEK_PARAM } from "./useMemberPeek";
 
 type PmSection = "overview" | "team" | "onboarding" | "questions" | "gaps" | "escalations";
@@ -51,11 +52,10 @@ type SwipeStop = {
 /**
  * Every place a two-finger swipe can land, left to right.
  *
- * Team and Escalations each have a tab bar of their own inside the section, and swiping used to
- * skip straight past those: from Members the gesture went to the next *section*, and Roles or
- * Durable answers could only be reached by aiming at the inner bar. A slider under a slider
- * that only one of them answers to reads as broken. So the gesture walks one flat line instead
- * — through a section's inner tabs, then on to the next section — the way a reader scans them.
+ * Team and Escalations each have views of their own (Members and Roles, Open and Durable
+ * answers), which grow out of their tab in the one bar while the section is open. The gesture
+ * walks them as one flat line — through a section's views, then on to the next section — the
+ * way a reader scans the bar.
  */
 const SWIPE_STOPS: readonly SwipeStop[] = [
   { id: "overview", section: "overview" },
@@ -192,6 +192,7 @@ export function PmWorkspace() {
   const openEscalations = useOpenEscalationCount(selectedProjectId, true, pathname);
 
   const { section, viewKey, content, hasOwnPanel } = resolveSection(pathname);
+  const viewCounts = usePmSectionViewCounts(section);
   const panelOpen = hasOwnPanel || searchParams.has(MEMBER_PEEK_PARAM);
   // A member's full profile is somewhere a manager reads and works, not a stop on the way to the
   // next section: its journey graph pans and zooms under the same two-finger gesture, and a
@@ -276,7 +277,28 @@ export function PmWorkspace() {
 
   const options: SegmentedTabOption<PmSection>[] = [
     { value: "overview", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
-    { value: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
+    {
+      value: "team",
+      label: "Team",
+      icon: <Users className="h-4 w-4" />,
+      // Members and Roles grow out of the tab while Team is open — no second bar in the section.
+      subOptions: [
+        {
+          value: "members",
+          label: "Members",
+          count: viewCounts.members,
+        },
+        {
+          value: "roles",
+          label: "Roles",
+          count: viewCounts.roles,
+        },
+      ],
+      subValue:
+        searchParams.get(TEAM_TAB_PARAM) === "roles" && !onMemberProfile ? "roles" : "members",
+      onSubChange: (view) => goToStop(`team-${view}`),
+      subAriaLabel: "Team views",
+    },
     { value: "onboarding", label: "Onboarding", icon: <Gauge className="h-4 w-4" /> },
     { value: "questions", label: "Questions", icon: <MessageSquareMore className="h-4 w-4" /> },
     { value: "gaps", label: "Knowledge gaps", icon: <ShieldAlert className="h-4 w-4" /> },
@@ -285,6 +307,22 @@ export function PmWorkspace() {
       label: "Escalations",
       icon: <Inbox className="h-4 w-4" />,
       count: openEscalations > 0 ? openEscalations : undefined,
+      subOptions: [
+        {
+          value: "open",
+          label: "Open",
+          count: openEscalations,
+        },
+        {
+          value: "answered",
+          label: "Durable answers",
+          count: viewCounts.answers,
+        },
+      ],
+      subValue: searchParams.get(INBOX_VIEW_PARAM) === "answered" ? "answered" : "open",
+      onSubChange: (view) =>
+        goToStop(view === "answered" ? "escalations-answered" : "escalations-open"),
+      subAriaLabel: "Escalation views",
     },
   ];
 

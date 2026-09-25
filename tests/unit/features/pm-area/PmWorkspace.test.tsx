@@ -22,6 +22,11 @@ vi.mock("../../../../src/features/knowledge-request/useOpenEscalationCount", () 
   useOpenEscalationCount: () => 3,
 }));
 
+// The counts on the views grown out of Team and Escalations; the cache reads are that hook's.
+vi.mock("../../../../src/features/pm-area/usePmSectionViewCounts", () => ({
+  usePmSectionViewCounts: () => ({ members: 7, roles: 3, answers: 5 }),
+}));
+
 // Each section is its own test's subject; here they only have to say which one is showing.
 vi.mock("../../../../src/pages/PmDashboardPage", () => ({
   PmDashboardPage: () => <p>overview section</p>,
@@ -135,6 +140,36 @@ describe("PmWorkspace", () => {
 
     swipeNext(/team section/);
     expect(screen.getByTestId("location")).toHaveTextContent("/team-management?tab=roles");
+  });
+
+  // Instead of a second bar inside the section, Team's and Escalations' own views grow out of
+  // their tab while the section is open.
+  it("grows Team's views out of its tab, and folds them away in another section", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderWorkspace("/team-management");
+
+    const views = within(screen.getByRole("group", { name: "Team views" }));
+    expect(views.getByRole("button", { name: /Members/ })).toHaveAttribute("aria-pressed", "true");
+    expect(views.getByRole("button", { name: /Roles/ })).toHaveTextContent("3");
+
+    await user.click(views.getByRole("button", { name: /Roles/ }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/team-management?tab=roles");
+    unmount();
+
+    renderWorkspace("/insights/faq");
+    expect(screen.queryByRole("group", { name: "Team views" })).not.toBeInTheDocument();
+  });
+
+  it("switches between open escalations and durable answers from the grown tab", async () => {
+    const user = userEvent.setup();
+    renderWorkspace("/insights/knowledge-requests");
+
+    const views = within(screen.getByRole("group", { name: "Escalation views" }));
+    await user.click(views.getByRole("button", { name: /Durable answers/ }));
+
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/insights/knowledge-requests?view=answered",
+    );
   });
 
   it("swipes from the last tab of a section into the next section", () => {

@@ -1,12 +1,20 @@
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Clock, Search, Shield, Users, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Clock,
+  Gauge,
+  Hand,
+  Shield,
+  Users,
+  X,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../components/ui/FilterSelect";
-import { Input } from "../components/ui/Input";
-import { SegmentedTabs } from "../components/ui/SegmentedTabs";
 import { SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
@@ -14,9 +22,11 @@ import { useQueryFetch } from "../hooks/useQueryFetch";
 import { useAttention } from "../features/onboarding-metrics/hooks/useAttention";
 import { buildAttentionQueue } from "../features/pm-area/attentionQueue";
 import { MemberRow } from "../features/pm-area/components/MemberRow";
-import { PmSectionHeader } from "../features/pm-area/components/PmCard";
-import { daysOnStep, memberName } from "../features/pm-area/memberStatus";
+import { PmSectionHeader, PmStat } from "../features/pm-area/components/PmCard";
+import { PmFilterChip, PmListToolbar } from "../features/pm-area/components/PmListToolbar";
+import { daysOnStep, memberName, memberStage } from "../features/pm-area/memberStatus";
 import { ROSTER_COLUMNS } from "../features/pm-area/rosterLayout";
+import { teamProgressData } from "../features/pm-area/teamProgress";
 import { useMemberPeek } from "../features/pm-area/useMemberPeek";
 import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { TEAM_TAB_PARAM } from "../features/pm-area/pmWorkspacePaths";
@@ -208,18 +218,6 @@ export function TeamManagementPage() {
     );
   };
 
-  const changeTab = (tab: TeamManagementTab) => {
-    setSearchParams(
-      (current) => {
-        const params = new URLSearchParams(current);
-        if (tab === "roles") params.set(TEAM_TAB_PARAM, "roles");
-        else params.delete(TEAM_TAB_PARAM);
-        return params;
-      },
-      { replace: true },
-    );
-  };
-
   const queryClient = useQueryClient();
   const { data: roster, loading, error } = useTeamRoster();
   const { data: roles } = useQueryFetch(
@@ -264,7 +262,8 @@ export function TeamManagementPage() {
         (roleId === "all" || member.roles.some((role) => role.id === roleId)) &&
         (normalizedQuery === "" ||
           memberName(member).toLowerCase().includes(normalizedQuery) ||
-          (member.currentStep?.title.toLowerCase().includes(normalizedQuery) ?? false)),
+          // A step can come without its title (a path mid-edit); search must not throw on it.
+          (member.currentStep?.title ?? "").toLowerCase().includes(normalizedQuery)),
     ),
     sortBy,
   );
@@ -276,45 +275,41 @@ export function TeamManagementPage() {
 
   const hasNarrowing = normalizedQuery !== "" || roleId !== "all" || statusFilter !== "all";
 
-  const statusChip = (filter: StatusFilter) => {
-    const active = statusFilter === filter;
-    const flagged = filter !== "all" && statusCounts[filter] > 0;
-    const dot = STATUS_DOT[filter];
+  const doneCount = members.filter((member) => memberStage(member) === "done").length;
+  // The same average the overview's Team progress card shows.
+  const { averageProgress } = teamProgressData(members);
+  const withoutRole = members.filter((member) => member.roles.length === 0).length;
+  const figuresReady = Boolean(roster);
 
-    return (
-      <button
-        key={filter}
-        type="button"
-        aria-pressed={active}
-        onClick={() => setStatusFilter(filter)}
-        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-          active
-            ? "border-app-brand bg-app-brand text-white"
-            : "border-app-border bg-app-surface text-app-text-muted hover:border-app-brand-border-strong hover:text-app-text"
-        } ${!active && roster && statusCounts[filter] === 0 && filter !== "all" ? "opacity-60" : ""}`}
-      >
-        {dot && (
-          <span
-            aria-hidden="true"
-            className={`h-1.5 w-1.5 rounded-full ${active ? "bg-white" : dot}`}
-          />
-        )}
-        {STATUS_LABEL[filter]}
-        {roster && (
-          <span
-            className={`rounded-full px-1.5 text-[11px] font-semibold tabular-nums ${
-              active
-                ? "bg-white/20 text-white"
-                : flagged
-                  ? "bg-app-warning-bg text-app-warning-text"
-                  : "bg-app-surface-muted text-app-text-subtle"
-            }`}
-          >
-            {statusCounts[filter]}
-          </span>
-        )}
-      </button>
+  const showMembers = (filter: StatusFilter) => {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        params.delete(TEAM_TAB_PARAM);
+        if (filter === "all") params.delete("filter");
+        else params.set("filter", filter);
+        return params;
+      },
+      { replace: true },
     );
+  };
+
+  const showRoles = () => {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        params.set(TEAM_TAB_PARAM, "roles");
+        return params;
+      },
+      { replace: true },
+    );
+  };
+
+  const resetMembers = () => {
+    setQuery("");
+    setRoleId("all");
+    setStatusFilter("all");
+    setSortBy("LONGEST_STEP");
   };
 
   return (
@@ -322,61 +317,75 @@ export function TeamManagementPage() {
       <PmSectionHeader
         title="Team"
         description="Everybody on this project, where they are in their onboarding, and the roles they hold."
-        actions={
-          <SegmentedTabs
-            value={activeTab}
-            onChange={changeTab}
-            layoutId="team-management-tab-pill"
-            ariaLabel="Team management sections"
-            options={TEAM_MANAGEMENT_TAB_ORDER.map((tab) =>
-              tab === "members"
-                ? {
-                    value: tab,
-                    label: "Members",
-                    icon: <Users className="h-4 w-4" />,
-                    count: roster ? members.length : undefined,
-                  }
-                : {
-                    value: tab,
-                    label: "Roles",
-                    icon: <Shield className="h-4 w-4" />,
-                    count: roles ? roles.length : undefined,
-                  },
-            )}
-          />
-        }
       />
+      {/* The same row of figures that opens Questions and Knowledge gaps — and like theirs, a
+          figure that stands for a list is a way into it. Members and Roles themselves are in
+          the workspace's tab bar, grown out of the Team tab. */}
+      <section aria-label="Key figures" className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <PmStat
+          icon={Users}
+          label="Members"
+          value={figuresReady ? members.length : "—"}
+          hint={figuresReady ? `${doneCount} through onboarding` : "Loading the team"}
+          onClick={() => showMembers("all")}
+        />
+        <PmStat
+          icon={Hand}
+          label="Need you"
+          value={figuresReady ? statusCounts.attention : "—"}
+          hint={statusCounts.attention > 0 ? "Waiting on an answer or stuck" : "Nobody waiting"}
+          attention={statusCounts.attention > 0}
+          onClick={() => showMembers("attention")}
+        />
+        <PmStat
+          icon={Gauge}
+          tone="cyan"
+          label="Average progress"
+          value={figuresReady ? `${averageProgress}%` : "—"}
+          hint="Across everyone's path"
+        />
+        <PmStat
+          icon={Shield}
+          tone="purple"
+          label="Roles"
+          value={roles ? roles.length : "—"}
+          hint={
+            figuresReady
+              ? withoutRole > 0
+                ? `${withoutRole} ${withoutRole === 1 ? "member" : "members"} without one`
+                : "Everyone has a role"
+              : "Loading"
+          }
+          attention={figuresReady && withoutRole > 0}
+          onClick={showRoles}
+        />
+      </section>
       <SlidingTabPanel activeKey={activeTab} index={TEAM_MANAGEMENT_TAB_ORDER.indexOf(activeTab)}>
         {activeTab === "members" ? (
           <div className="space-y-4">
-            {/* One row: search, the status chips, the role filter. Sorting is on the headers. */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Sized on a wrapper: with an icon, `Input` puts its `className` on the <input>
-                  inside its own full-width box, so flex sizing given to it never reached the
-                  box that actually sits in this row. */}
-              <div className="min-w-0 flex-1 sm:max-w-xs">
-                <Input
-                  size="sm"
-                  icon={<Search className="h-4 w-4" />}
-                  aria-label="Search members"
-                  placeholder="Search by name or step…"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  // Same shape and surface as the role filter beside it (`FilterSelect`), which
-                  // the small input size otherwise undercuts with tighter corners.
-                  className="rounded-xl! border-app-border/70! bg-app-surface/70! backdrop-blur-md hover:border-app-brand-border-strong! focus:border-app-brand-border-strong!"
+            <PmListToolbar
+              search={{
+                label: "Search members",
+                placeholder: "Search by name or step…",
+                value: query,
+                onChange: setQuery,
+              }}
+              filtersLabel="Filter members by status"
+              filters={STATUS_FILTERS.map((filter) => (
+                <PmFilterChip
+                  key={filter}
+                  active={statusFilter === filter}
+                  onClick={() => setStatusFilter(filter)}
+                  label={STATUS_LABEL[filter]}
+                  count={roster ? statusCounts[filter] : undefined}
+                  dotClassName={STATUS_DOT[filter]}
+                  flagged={filter !== "all"}
                 />
-              </div>
-
-              <div
-                role="group"
-                aria-label="Filter members by status"
-                className="flex flex-wrap items-center gap-2"
-              >
-                {STATUS_FILTERS.map(statusChip)}
-              </div>
-
-              <div className="ml-auto flex items-center gap-2">
+              ))}
+              shown={roster ? visibleMembers.length : undefined}
+              total={roster ? members.length : undefined}
+              onReset={hasNarrowing || sortBy !== "LONGEST_STEP" ? resetMembers : undefined}
+              extra={
                 <FilterSelect
                   label="Filter team members by role"
                   value={roleId}
@@ -385,17 +394,14 @@ export function TeamManagementPage() {
                   disabled={(roles?.length ?? 0) === 0}
                   className="w-40"
                 />
-                {/* Sorting lives on the column headers; below `md` those are hidden, so the
-                    select stands in for them there only. */}
-                <FilterSelect
-                  label="Sort team members"
-                  value={sortBy}
-                  options={SORT_OPTIONS}
-                  onChange={setSortBy}
-                  className="w-44 md:hidden"
-                />
-              </div>
-            </div>
+              }
+              sort={{
+                label: "Sort team members",
+                value: sortBy,
+                options: SORT_OPTIONS,
+                onChange: setSortBy,
+              }}
+            />
 
             <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
               <div

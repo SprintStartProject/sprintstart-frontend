@@ -1,7 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, Clock, FileText, Filter, RefreshCw, User, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Boxes,
+  ChevronRight,
+  Clock,
+  FileText,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 
 import type { KnowledgeGapSeverity } from "../types";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
@@ -13,12 +23,13 @@ import { describeEmptyState } from "../emptyState";
 import { SEVERITIES, SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
 import { EmptyStateIcon } from "./EmptyStateIcon";
 import { KnowledgeGapPanel } from "./KnowledgeGapPanel";
-import { SeverityBar, SeveritySummaryBar } from "./SeverityIndicators";
+import { SeverityBar } from "./SeverityIndicators";
 import { Button } from "../../../components/ui/Button";
-import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import type { FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { queryKeys } from "../../../services/queryKeys";
-import { PmSectionHeader } from "../../pm-area/components/PmCard";
+import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
+import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 type GapSortOption = "severity" | "date" | "component";
@@ -61,6 +72,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
 
   const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([...SEVERITIES]);
   const [sortBy, setSortBy] = useState<GapSortOption>("severity");
+  const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
 
@@ -121,8 +133,10 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
           {lastAnalyzedAt && `Last analyzed ${formatRelativeDate(lastAnalyzedAt)}`}
         </span>
       )}
+      {/* Secondary, like "Rebuild grouping" on Questions: both redo the AI's work, and neither is
+          the one thing the page is for. */}
       <Button
-        variant="primary"
+        variant="secondary"
         onClick={() => void handleRefresh()}
         loading={refreshing || rescanning}
         disabled={loading}
@@ -134,8 +148,17 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
     </>
   );
 
+  const normalizedQuery = query.trim().toLowerCase();
   const filtered = gaps
-    .filter((gap) => severityFilter.includes(gap.severity))
+    .filter(
+      (gap) =>
+        severityFilter.includes(gap.severity) &&
+        (normalizedQuery === "" ||
+          gap.component.toLowerCase().includes(normalizedQuery) ||
+          gap.owners.some((owner) =>
+            `${owner.firstname} ${owner.lastname}`.toLowerCase().includes(normalizedQuery),
+          )),
+    )
     .sort((a, b) => {
       let primary = 0;
       switch (sortBy) {
@@ -162,6 +185,24 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
     );
   };
 
+  const severityCounts = Object.fromEntries(
+    SEVERITIES.map((severity) => [
+      severity,
+      gaps.filter((gap) => gap.severity === severity).length,
+    ]),
+  ) as Record<KnowledgeGapSeverity, number>;
+  const unassigned = gaps.filter(
+    (gap) => gap.severity !== "covered" && gap.owners.length === 0,
+  ).length;
+  const narrowed =
+    severityFilter.length < SEVERITIES.length || sortBy !== "severity" || normalizedQuery !== "";
+  const resetList = () => {
+    setSeverityFilter([...SEVERITIES]);
+    setSortBy("severity");
+    setQuery("");
+  };
+  const showOnly = (only: KnowledgeGapSeverity[]) => setSeverityFilter(only);
+
   const isEmpty = !loading && (error || !overview || gaps.length === 0);
   const empty = isEmpty ? describeEmptyState(overview, error) : null;
 
@@ -169,72 +210,79 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
     <section aria-label={PAGE_TITLE}>
       <PmSectionHeader title={PAGE_TITLE} description={PAGE_SUBTITLE} actions={headerActions} />
       <div className="space-y-4">
-        {gaps.length > 0 && <SeveritySummaryBar gaps={gaps} />}
+        {/* The same row of figures that opens Team and Questions; a severity's figure narrows
+            the list to it. */}
+        {gaps.length > 0 && (
+          <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <PmStat
+              icon={Boxes}
+              tone="neutral"
+              label="Components"
+              value={gaps.length}
+              hint={
+                unassigned > 0
+                  ? `${unassigned} open ${unassigned === 1 ? "gap" : "gaps"} without an owner`
+                  : "Every open gap has an owner"
+              }
+              onClick={resetList}
+            />
+            <PmStat
+              icon={ShieldAlert}
+              tone="pink"
+              label="High severity"
+              value={severityCounts.high}
+              hint={severityCounts.high > 0 ? "Worth fixing first" : "None right now"}
+              attention={severityCounts.high > 0}
+              onClick={() => showOnly(["high"])}
+            />
+            <PmStat
+              icon={AlertTriangle}
+              tone="warning"
+              label="Medium or low"
+              value={severityCounts.medium + severityCounts.low}
+              hint={`${severityCounts.medium} medium · ${severityCounts.low} low`}
+              onClick={() => showOnly(["medium", "low"])}
+            />
+            <PmStat
+              icon={ShieldCheck}
+              tone="success"
+              label="Covered"
+              value={severityCounts.covered}
+              hint="All expected documentation there"
+              onClick={() => showOnly(["covered"])}
+            />
+          </section>
+        )}
 
         {gaps.length > 0 && (
-          // Always visible rather than behind a disclosure: there are only four controls,
-          // and hiding them made the active filter state invisible.
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <div
-              role="group"
-              aria-label="Filter gaps by severity"
-              className="flex flex-wrap items-center gap-2"
-            >
-              <Filter aria-hidden="true" className="h-4 w-4 text-app-text-muted" />
-
-              {SEVERITIES.map((severity) => {
-                const isSelected = severityFilter.includes(severity);
-                const { badge, label } = SEVERITY_STYLES[severity];
-
-                return (
-                  <button
-                    key={severity}
-                    type="button"
-                    // Toggles, not a single choice -- `aria-pressed` is what tells
-                    // assistive tech which severities are currently included.
-                    aria-pressed={isSelected}
-                    onClick={() => toggleSeverityFilter(severity)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-                      isSelected
-                        ? `border-transparent ${badge}`
-                        : "border-app-border bg-app-surface text-app-text-muted hover:border-app-brand-border-strong hover:text-app-text"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <span className="text-xs text-app-text-muted tabular-nums">
-              {filtered.length} of {gaps.length}
-            </span>
-
-            <div className="ml-auto flex items-center gap-2">
-              {(severityFilter.length < SEVERITIES.length || sortBy !== "severity") && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSeverityFilter([...SEVERITIES]);
-                    setSortBy("severity");
-                  }}
-                  icon={<X className="h-3.5 w-3.5" />}
-                  className="text-app-brand-text"
-                >
-                  Reset
-                </Button>
-              )}
-
-              <FilterSelect
-                label="Sort knowledge gaps"
-                value={sortBy}
-                options={SORT_OPTIONS}
-                onChange={setSortBy}
-                className="w-48"
+          <PmListToolbar
+            search={{
+              label: "Search knowledge gaps",
+              placeholder: "Search by component or owner…",
+              value: query,
+              onChange: setQuery,
+            }}
+            filtersLabel="Filter gaps by severity"
+            filters={SEVERITIES.map((severity) => (
+              <PmFilterChip
+                key={severity}
+                active={severityFilter.includes(severity)}
+                onClick={() => toggleSeverityFilter(severity)}
+                label={SEVERITY_STYLES[severity].label}
+                count={severityCounts[severity]}
+                dotClassName={SEVERITY_STYLES[severity].bar}
               />
-            </div>
-          </div>
+            ))}
+            shown={filtered.length}
+            total={gaps.length}
+            onReset={narrowed ? resetList : undefined}
+            sort={{
+              label: "Sort knowledge gaps",
+              value: sortBy,
+              options: SORT_OPTIONS,
+              onChange: setSortBy,
+            }}
+          />
         )}
 
         <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
@@ -253,7 +301,9 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
             </div>
           ) : filtered.length === 0 ? (
             <p className="p-8 text-center text-sm text-app-text-muted">
-              No gaps with the selected severities.
+              {normalizedQuery === ""
+                ? "No gaps with the selected severities."
+                : "No gaps match these filters."}
             </p>
           ) : (
             // `layout="position"` on the rows only: it animates where a row sits, never its

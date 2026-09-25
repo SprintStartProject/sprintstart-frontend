@@ -1,6 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { KnowledgeRequestInboxPage } from "../../../../../src/features/knowledge-request/components/KnowledgeRequestInboxPage";
 import { knowledgeRequestService } from "../../../../../src/services/knowledgeRequestService";
@@ -88,10 +87,9 @@ describe("KnowledgeRequestInboxPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Why does npm test hang?")).toBeInTheDocument();
     });
-    // SegmentedTabs is a group of aria-pressed toggle buttons (a deliberate
-    // choice documented in the component) — Open is the default selection.
-    const openTab = screen.getByRole("button", { name: /open/i });
-    expect(openTab).toHaveAttribute("aria-pressed", "true");
+    // Open is the default view. The switch itself grows out of the workspace's Escalations tab
+    // (see PmWorkspace.test), so the section draws no bar of its own.
+    expect(screen.queryByRole("group", { name: "Inbox views" })).not.toBeInTheDocument();
   });
 
   it("distinguishes an empty inbox from a still-loading one by words, not form", async () => {
@@ -140,8 +138,8 @@ describe("KnowledgeRequestInboxPage", () => {
     expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
   });
 
-  // The two-finger swipe between the tabs is the PM workspace's now (see PmWorkspace.test);
-  // what the section owes it is reading its tab from the URL.
+  // The switch and the swipe between the views are the PM workspace's (see PmWorkspace.test);
+  // what the section owes them is reading its view from the URL.
   it("opens on the durable answers when the URL asks for them", async () => {
     mockedService.listOpen.mockResolvedValue([]);
     mockedService.listAnswers.mockResolvedValue([]);
@@ -149,10 +147,6 @@ describe("KnowledgeRequestInboxPage", () => {
     renderInbox("/insights/knowledge-requests?view=answered");
 
     expect(await screen.findByText(/No durable answers yet/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /durable answers/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
   });
 
   describe("when the user is HR (read-only)", () => {
@@ -178,10 +172,7 @@ describe("KnowledgeRequestInboxPage", () => {
         },
       ]);
 
-      const user = userEvent.setup();
-      renderInbox();
-
-      await user.click(screen.getByRole("button", { name: /durable answers/i }));
+      renderInbox("/insights/knowledge-requests?view=answered");
 
       expect(await screen.findByText("Delete node_modules.")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();

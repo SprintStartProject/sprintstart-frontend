@@ -4,7 +4,6 @@ import {
   AlertCircle,
   ChevronRight,
   FileText,
-  Filter,
   MessageSquareMore,
   RefreshCw,
   TrendingUp,
@@ -17,11 +16,12 @@ import { useLiveFetch } from "../../../hooks/useLiveFetch";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
+import type { FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
 import { Spinner } from "../../../components/ui/Spinner";
 import { queryKeys } from "../../../services/queryKeys";
 import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
+import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { formatAskedAt } from "../format";
 import { FaqGroupPanel } from "./FaqGroupPanel";
@@ -32,6 +32,32 @@ const PAGE_TITLE = "Recurring Questions";
 const PAGE_SUBTITLE = "What people keep asking the chat, ranked by frequency and kept up to date.";
 
 type FaqSortOption = "count" | "recent" | "trend" | "title";
+
+/** Which questions the list shows. One at a time, like the Team list's status chips. */
+type FaqFilter = "all" | "recurring" | "rising";
+
+const FAQ_FILTERS: readonly FaqFilter[] = ["all", "recurring", "rising"];
+
+const FAQ_FILTER_LABEL: Record<FaqFilter, string> = {
+  all: "All",
+  recurring: "Asked more than once",
+  rising: "Picking up",
+};
+
+const FAQ_FILTER_DOT: Partial<Record<FaqFilter, string>> = {
+  rising: "bg-app-warning-solid",
+};
+
+function matchesFaqFilter(group: FAQGroup, filter: FaqFilter): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "recurring":
+      return group.count > 1;
+    case "rising":
+      return group.trend === "RISING";
+  }
+}
 
 const SORT_OPTIONS: FilterSelectOption<FaqSortOption>[] = [
   { value: "count", label: "Most asked" },
@@ -88,7 +114,8 @@ export function FaqPage({ groupId }: { groupId?: string }) {
   const navigate = useNavigate();
 
   const [sortBy, setSortBy] = useState<FaqSortOption>("count");
-  const [hideOneOffs, setHideOneOffs] = useState(false);
+  const [filter, setFilter] = useState<FaqFilter>("all");
+  const [query, setQuery] = useState("");
 
   const [isRebuildDialogOpen, setRebuildDialogOpen] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
@@ -145,7 +172,26 @@ export function FaqPage({ groupId }: { groupId?: string }) {
 
   // A question asked once is not yet a recurring question — it is noise in a
   // list whose whole subject is repetition.
-  const visible = hideOneOffs ? allGroups.filter((group) => group.count > 1) : allGroups;
+  const normalizedQuery = query.trim().toLowerCase();
+  const visible = allGroups.filter(
+    (group) =>
+      matchesFaqFilter(group, filter) &&
+      (normalizedQuery === "" ||
+        group.title.toLowerCase().includes(normalizedQuery) ||
+        group.question.toLowerCase().includes(normalizedQuery)),
+  );
+  const filterCounts = Object.fromEntries(
+    FAQ_FILTERS.map((option) => [
+      option,
+      allGroups.filter((group) => matchesFaqFilter(group, option)).length,
+    ]),
+  ) as Record<FaqFilter, number>;
+  const narrowed = filter !== "all" || normalizedQuery !== "" || sortBy !== "count";
+  const resetList = () => {
+    setFilter("all");
+    setQuery("");
+    setSortBy("count");
+  };
   const sorted = [...visible].sort(SORTERS[sortBy]);
   const selectedGroup = allGroups.find((group) => group.groupId === groupId) ?? null;
   // The bar under each row is measured against the most asked question, so the list reads as a
@@ -196,6 +242,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
             label="Questions tracked"
             value={hasData ? totalGroups : "—"}
             hint={hasData ? `${oneOffCount} asked only once` : "Loading"}
+            onClick={hasData ? () => setFilter("all") : undefined}
           />
           <PmStat
             tone="indigo"
@@ -211,6 +258,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
             value={hasData ? risingCount : "—"}
             hint={risingCount > 0 ? "Asked more often lately" : "Nothing on the rise"}
             attention={risingCount > 0}
+            onClick={hasData ? () => setFilter("rising") : undefined}
           />
           <PmStat
             tone="indigo"
@@ -222,30 +270,35 @@ export function FaqPage({ groupId }: { groupId?: string }) {
         </section>
 
         {hasData && totalGroups > 0 && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <Button
-              variant={hideOneOffs ? "primary" : "secondary"}
-              size="sm"
-              onClick={() => setHideOneOffs((hidden) => !hidden)}
-              icon={<Filter className="h-3.5 w-3.5" />}
-              aria-pressed={hideOneOffs}
-            >
-              Asked more than once
-            </Button>
-            <span className="text-xs text-app-text-muted">
-              {hideOneOffs
-                ? `${oneOffCount} one-off ${oneOffCount === 1 ? "question" : "questions"} hidden`
-                : `${sorted.length} of ${totalGroups} shown`}
-            </span>
-
-            <FilterSelect
-              label="Sort recurring questions"
-              value={sortBy}
-              options={SORT_OPTIONS}
-              onChange={setSortBy}
-              className="ml-auto w-48"
-            />
-          </div>
+          <PmListToolbar
+            search={{
+              label: "Search recurring questions",
+              placeholder: "Search by question…",
+              value: query,
+              onChange: setQuery,
+            }}
+            filtersLabel="Filter recurring questions"
+            filters={FAQ_FILTERS.map((option) => (
+              <PmFilterChip
+                key={option}
+                active={filter === option}
+                onClick={() => setFilter(option)}
+                label={FAQ_FILTER_LABEL[option]}
+                count={filterCounts[option]}
+                dotClassName={FAQ_FILTER_DOT[option]}
+                flagged={option === "rising"}
+              />
+            ))}
+            shown={sorted.length}
+            total={totalGroups}
+            onReset={narrowed ? resetList : undefined}
+            sort={{
+              label: "Sort recurring questions",
+              value: sortBy,
+              options: SORT_OPTIONS,
+              onChange: setSortBy,
+            }}
+          />
         )}
 
         <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
@@ -272,9 +325,22 @@ export function FaqPage({ groupId }: { groupId?: string }) {
               </EmptyState>
             </div>
           ) : sorted.length === 0 ? (
-            <p className="p-8 text-center text-sm text-app-text-muted">
-              Every question here has only been asked once so far.
-            </p>
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <p className="text-sm text-app-text-muted">
+                {filter === "recurring" && normalizedQuery === ""
+                  ? "Every question here has only been asked once so far."
+                  : filter === "rising" && normalizedQuery === ""
+                    ? "Nothing is being asked more often lately."
+                    : "No questions match these filters."}
+              </p>
+              <button
+                type="button"
+                onClick={resetList}
+                className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
+              >
+                Clear filters
+              </button>
+            </div>
           ) : (
             <ul className="divide-y divide-app-border-muted px-3 py-1.5">
               {sorted.map((group, index) => {

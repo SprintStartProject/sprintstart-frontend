@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AlertCircle, BookCheck, FolderKanban, Inbox } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../../../components/ui/SlidingTabPanel";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useAuth } from "../../../context/useAuth";
@@ -38,20 +37,10 @@ export function KnowledgeRequestInboxPage() {
 
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjectContext();
 
-  // In the URL, so the PM workspace's swipe can move between the two views like between
-  // sections.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // In the URL: the workspace's tab bar (the views grown out of Escalations) and its swipe set
+  // it, and this section only reads it.
+  const [searchParams] = useSearchParams();
   const tab: Tab = searchParams.get(INBOX_VIEW_PARAM) === "answered" ? "answered" : "open";
-  const setTab = (next: Tab) =>
-    setSearchParams(
-      (current) => {
-        const params = new URLSearchParams(current);
-        if (next === "answered") params.set(INBOX_VIEW_PARAM, "answered");
-        else params.delete(INBOX_VIEW_PARAM);
-        return params;
-      },
-      { replace: true },
-    );
 
   const {
     data: openRequests,
@@ -116,42 +105,13 @@ export function KnowledgeRequestInboxPage() {
   const openCount = orderedOpen.length;
   const answeredCount = orderedAnswers.length;
 
-  // Counts stay undefined while their list is loading, so the pill doesn't flash a stale "0".
-  const tabOptions: SegmentedTabOption<Tab>[] = useMemo(
-    () => [
-      {
-        value: "open",
-        label: "Open",
-        icon: <Inbox className="h-4 w-4" aria-hidden="true" />,
-        count: openLoading ? undefined : openCount,
-      },
-      {
-        value: "answered",
-        label: "Durable answers",
-        icon: <BookCheck className="h-4 w-4" aria-hidden="true" />,
-        count: answersLoading ? undefined : answeredCount,
-      },
-    ],
-    [openLoading, openCount, answersLoading, answeredCount],
-  );
-
   return (
-    // A section of the PM workspace, which owns the page header and the section-level swipe.
-    // The open/answered switch sits in this section's own header row rather than as a second
-    // pill bar under the workspace's.
+    // A section of the PM workspace, which owns the page header, the section-level swipe and —
+    // grown out of its Escalations tab — the switch between Open and Durable answers.
     <section aria-label="Escalations">
       <PmSectionHeader
         title="Escalations"
         description="Questions the buddy could not answer. Answer one and it becomes durable knowledge."
-        actions={
-          <SegmentedTabs
-            value={tab}
-            options={tabOptions}
-            onChange={setTab}
-            layoutId="knowledge-request-inbox-tab-pill"
-            ariaLabel="Inbox views"
-          />
-        }
       />
 
       <div className="space-y-6">
