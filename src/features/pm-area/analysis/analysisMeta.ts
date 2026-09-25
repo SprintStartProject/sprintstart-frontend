@@ -12,7 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { Finding, FindingArea, FindingSeverity } from "./findings";
+import type { FindingArea, FindingSeverity } from "./findings";
 
 /** The order areas are drawn in, everywhere in the analysis. */
 export const AREA_ORDER = [
@@ -127,17 +127,6 @@ export const SEVERITY_RANK: Record<FindingSeverity, number> = {
   info: 2,
   good: 3,
 };
-
-/** Which findings the results show: the ones to act on, the good news, or everything. */
-export type FindingFilter = "act" | "good" | "all";
-
-/** Left to right, as the filter's tabs are drawn — and as the swipe walks them. */
-export const FILTER_ORDER: readonly FindingFilter[] = ["act", "good", "all"];
-
-export function matchesFilter(finding: Finding, filter: FindingFilter): boolean {
-  if (filter === "all") return true;
-  return filter === "good" ? finding.severity === "good" : finding.severity !== "good";
-}
 
 /** The colour a health score glows in: green when all is well, red when the project needs you. */
 export function scoreGlow(score: number): string {

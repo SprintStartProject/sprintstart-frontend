@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
@@ -300,24 +300,28 @@ describe("ProjectAnalysisLauncher", () => {
     expect(mocks.getTeamOverview).not.toHaveBeenCalled();
   }, 20000);
 
-  it("switches the findings filter with a two-finger swipe, like every other tab bar", async () => {
+  it("shows every finding in one list, with no filter bar on top", async () => {
     const user = userEvent.setup();
     renderLauncher();
 
     await runAnalysis(user);
     const dialog = within(screen.getByTestId("project-analysis-dialog"));
-    const target = dialog.getByText("1 skip request waiting for your answer");
 
-    for (let step = 0; step < 3; step += 1) {
-      fireEvent.wheel(target, { deltaX: 30, deltaY: 0 });
-    }
+    expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
+    expect(dialog.queryByRole("group", { name: "Show findings" })).not.toBeInTheDocument();
+  }, 20000);
 
-    const filter = within(dialog.getByRole("group", { name: "Show findings" }));
-    await waitFor(() => {
-      expect(filter.getByRole("button", { name: /Going well/ })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
-    });
+  it("tells the overview after every finished run, so the cards outside the cache read again", async () => {
+    const user = userEvent.setup();
+    const onRefreshed = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/pm-dashboard"]}>
+        <ProjectAnalysisLauncher onRefreshed={onRefreshed} />
+      </MemoryRouter>,
+    );
+
+    await runAnalysis(user);
+
+    await waitFor(() => expect(onRefreshed).toHaveBeenLastCalledWith(1));
   }, 20000);
 });

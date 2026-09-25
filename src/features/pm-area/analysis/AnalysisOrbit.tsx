@@ -69,9 +69,12 @@ export function AnalysisOrbit({ tasks, active, projectName }: AnalysisOrbitProps
             </feMerge>
           </filter>
           <linearGradient id={`${uid}-orbit`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" style={{ stopColor: "var(--orange-text)", stopOpacity: 0.1 }} />
-            <stop offset="50%" style={{ stopColor: "var(--text-muted)", stopOpacity: 0.55 }} />
-            <stop offset="100%" style={{ stopColor: "var(--purple-text)", stopOpacity: 0.15 }} />
+            <stop offset="0%" style={{ stopColor: "var(--progress-fill)", stopOpacity: 0.12 }} />
+            <stop offset="50%" style={{ stopColor: "var(--text-muted)", stopOpacity: 0.5 }} />
+            <stop
+              offset="100%"
+              style={{ stopColor: "var(--progress-fill-end)", stopOpacity: 0.15 }}
+            />
           </linearGradient>
         </defs>
 
@@ -81,7 +84,7 @@ export function AnalysisOrbit({ tasks, active, projectName }: AnalysisOrbitProps
             cx={speck.x}
             cy={speck.y}
             r={speck.r}
-            style={{ fill: "var(--text)" }}
+            style={{ fill: "var(--brand-text)" }}
             opacity={0.3}
           >
             {!reduceMotion && (
@@ -122,7 +125,7 @@ export function AnalysisOrbit({ tasks, active, projectName }: AnalysisOrbitProps
                   : done
                     ? meta.glow
                     : running
-                      ? "var(--text)"
+                      ? "var(--brand-border-strong)"
                       : "var(--text-subtle)";
                 const size = done || running ? 7 : 4.5;
 

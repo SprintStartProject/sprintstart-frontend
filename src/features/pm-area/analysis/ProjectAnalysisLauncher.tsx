@@ -15,8 +15,11 @@ import {
 } from "./useProjectAnalysis";
 
 type ProjectAnalysisLauncherProps = {
-  /** Told when the analysis re-evaluated the industry, so the industry card reads it again. */
-  onIndustryChanged?: (revision: number) => void;
+  /**
+   * Told after every finished run, so cards outside the shared query cache (the industry card)
+   * read their data again. The rest of the overview already updates through the cache.
+   */
+  onRefreshed?: (revision: number) => void;
 };
 
 /**
@@ -27,7 +30,7 @@ type ProjectAnalysisLauncherProps = {
  * going with the dialog closed and the strip can say so. The last run's results stay a click away
  * ("Open last results") — also after a reload, since they are kept in browser storage.
  */
-export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLauncherProps) {
+export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncherProps) {
   const analysis = useProjectAnalysis();
   const { selectedProject } = useProjectContext();
   const navigate = useNavigate();
@@ -35,10 +38,10 @@ export function ProjectAnalysisLauncher({ onIndustryChanged }: ProjectAnalysisLa
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<AnalysisOptions>(DEFAULT_ANALYSIS_OPTIONS);
 
-  const { industryRevision } = analysis;
+  const { refreshRevision } = analysis;
   useEffect(() => {
-    if (industryRevision > 0) onIndustryChanged?.(industryRevision);
-  }, [industryRevision, onIndustryChanged]);
+    if (refreshRevision > 0) onRefreshed?.(refreshRevision);
+  }, [refreshRevision, onRefreshed]);
 
   const running = analysis.phase === "running";
   const lastRun = analysis.lastRun;

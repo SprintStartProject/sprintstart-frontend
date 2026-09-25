@@ -7,7 +7,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
 import { AnalysisMap, type MapSelection } from "./AnalysisMap";
 import { AnalysisOrbit } from "./AnalysisOrbit";
-import { scoreGlow, type FindingFilter } from "./analysisMeta";
+import { scoreGlow } from "./analysisMeta";
 import { scoreVerdict, type Finding } from "./findings";
 import { HealthPanel } from "./HealthPanel";
 import { ScanPanel } from "./ScanPanel";
@@ -99,7 +99,6 @@ function Results({
   ProjectAnalysisDialogProps,
   "findings" | "resultsAt" | "previousRun" | "projectName" | "onOpenFinding" | "onStart"
 > & { score: number }) {
-  const [filter, setFilter] = useState<FindingFilter>("act");
   // Nothing chosen shows everything at once; an area narrows it.
   const [selected, setSelected] = useState<MapSelection>(null);
 
@@ -108,8 +107,6 @@ function Results({
       <div className="min-w-0 xl:py-4">
         <AnalysisMap
           findings={findings}
-          filter={filter}
-          onFilterChange={setFilter}
           selected={selected}
           onSelect={setSelected}
           onOpenFinding={onOpenFinding}
@@ -141,9 +138,9 @@ function Results({
 /**
  * The project analysis: choose what to refresh, watch it run, read what it found.
  *
- * Always dark, whatever the app's theme: modelled on a node-graph reference where the project is
- * a glowing core in a small universe and everything connects to it by luminous lines — which only
- * reads on a dark ground. One dialog through all three stages, so the time between pressing the
+ * Modelled on a node-graph reference where the project is a glowing core in a small universe and
+ * everything connects to it by luminous lines — but in the app's own theme and its blue-to-indigo
+ * brand gradient, so it reads as part of the dashboard rather than a different product. One dialog through all three stages, so the time between pressing the
  * button and reading the result is spent watching the checks come in rather than on a spinner.
  * Closing it while it runs does not stop the run — the launcher keeps the state.
  */
@@ -188,9 +185,9 @@ export function ProjectAnalysisDialog({
       isOpen={isOpen}
       onClose={onClose}
       size="full"
-      // Dark regardless of the app's theme, on a ground lit from two sides like the reference.
-      // A planet's glowing rim along the bottom edge and a faint nebula above, like the reference.
-      panelClassName="dark bg-[radial-gradient(ellipse_70%_42%_at_50%_122%,color-mix(in_oklab,var(--purple-text)_16%,transparent)_58%,color-mix(in_oklab,var(--orange-text)_42%,transparent)_65%,color-mix(in_oklab,var(--purple-text)_22%,transparent)_71%,transparent_80%),radial-gradient(ellipse_at_15%_20%,color-mix(in_oklab,var(--purple-text)_12%,transparent),transparent_55%),radial-gradient(ellipse_at_90%_10%,color-mix(in_oklab,var(--cyan-text)_8%,transparent),transparent_50%)]"
+      // In the app's own theme and palette: a faint wash of the brand blue from the top corner and
+      // a soft indigo horizon along the bottom — the reference's glow, in the dashboard's colours.
+      panelClassName="bg-[radial-gradient(ellipse_75%_40%_at_50%_118%,color-mix(in_oklab,var(--progress-fill-end)_14%,transparent),transparent_72%),radial-gradient(ellipse_at_10%_0%,color-mix(in_oklab,var(--brand)_9%,transparent),transparent_55%)]"
       title="Project analysis"
       description={
         done

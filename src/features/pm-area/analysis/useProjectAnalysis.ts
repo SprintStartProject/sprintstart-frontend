@@ -171,8 +171,11 @@ export function useProjectAnalysis() {
     : null;
   /** The run before the current one — what the results compare against. */
   const [previousRun, setPreviousRun] = useState<AnalysisRunSummary | null>(null);
-  /** Bumped when the industry was re-evaluated, for the industry card to read it again. */
-  const [industryRevision, setIndustryRevision] = useState(0);
+  /**
+   * Bumped whenever a run finishes, for the cards that keep their data outside the shared query
+   * cache (the industry card) to read it again. Everything else refreshes through the cache.
+   */
+  const [refreshRevision, setRefreshRevision] = useState(0);
 
   // Only the newest run may write: a project switch or a second run makes an older one moot.
   const runRef = useRef(0);
@@ -354,7 +357,6 @@ export function useProjectAnalysis() {
           }
           await projectService.evaluateProjectIndustry(projectId);
           const after = await projectService.getAccessibleProject(projectId);
-          if (current()) setIndustryRevision((revision) => revision + 1);
           return {
             value: toIndustry(after, before.industry || null),
             note: after.industry ? `Re-evaluated · ${after.industry}` : "Re-evaluated",
@@ -390,6 +392,7 @@ export function useProjectAnalysis() {
       setFindings(result);
       setScore(nextScore);
       setPhase("done");
+      setRefreshRevision((revision) => revision + 1);
     },
     [canEvaluateIndustry, projectId, queryClient, viewerId, writeStored],
   );
@@ -445,7 +448,7 @@ export function useProjectAnalysis() {
     canOpenLast,
     openLast,
     previousRun,
-    industryRevision,
+    refreshRevision,
     canEvaluateIndustry,
     run,
     reset,

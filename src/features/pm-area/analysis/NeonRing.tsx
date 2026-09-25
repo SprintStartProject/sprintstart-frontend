@@ -7,7 +7,7 @@ type NeonRingProps = {
   size?: number;
   /** A comet of light circles the ring while something is running. */
   active?: boolean;
-  /** CSS colour the lit arc ends in — a palette variable. The arc starts in the brand colour. */
+  /** CSS colour the lit arc ends in — a palette variable. The arc starts in the app's progress gradient. */
   accent?: string;
   children?: ReactNode;
 };
@@ -24,7 +24,7 @@ export function NeonRing({
   value,
   size = 200,
   active = false,
-  accent = "var(--cyan-text)",
+  accent = "var(--brand-text)",
   children,
 }: NeonRingProps) {
   const reduceMotion = useReducedMotion();
@@ -42,12 +42,13 @@ export function NeonRing({
         height={size}
         viewBox={`0 0 ${size} ${size}`}
         aria-hidden="true"
-        className="absolute inset-0 -rotate-90"
+        className="absolute inset-0 -rotate-90 overflow-visible"
       >
         <defs>
           <linearGradient id={`${uid}-arc`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" style={{ stopColor: "var(--brand-text)" }} />
-            <stop offset="55%" style={{ stopColor: "var(--purple-text)" }} />
+            {/* The same blue-to-indigo the app's progress bars and brand badges use. */}
+            <stop offset="0%" style={{ stopColor: "var(--progress-fill)" }} />
+            <stop offset="55%" style={{ stopColor: "var(--progress-fill-end)" }} />
             <stop offset="100%" style={{ stopColor: accent }} />
           </linearGradient>
           <filter id={`${uid}-blur`} x="-50%" y="-50%" width="200%" height="200%">
@@ -55,12 +56,12 @@ export function NeonRing({
           </filter>
         </defs>
 
-        {/* Inner haze, so the ring reads as light on dark rather than a line drawing. */}
+        {/* Inner haze, so the ring reads as light rather than a line drawing. */}
         <circle
           cx={center}
           cy={center}
           r={radius - stroke}
-          style={{ fill: "var(--purple-text)" }}
+          style={{ fill: "var(--brand)" }}
           opacity={0.05}
         />
         <circle
@@ -83,7 +84,7 @@ export function NeonRing({
           stroke={`url(#${uid}-arc)`}
           strokeDasharray={circumference}
           filter={`url(#${uid}-blur)`}
-          opacity={0.7}
+          opacity={0.5}
           initial={reduceMotion ? false : { strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: circumference * (1 - lit) }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
@@ -110,7 +111,7 @@ export function NeonRing({
             strokeWidth={stroke * 0.9}
             strokeLinecap="round"
             strokeDasharray={`${circumference * 0.06} ${circumference}`}
-            style={{ stroke: "var(--text)", originX: "50%", originY: "50%" }}
+            style={{ stroke: "var(--brand-border-strong)", originX: "50%", originY: "50%" }}
             filter={`url(#${uid}-blur)`}
             animate={{ rotate: 360 }}
             transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}

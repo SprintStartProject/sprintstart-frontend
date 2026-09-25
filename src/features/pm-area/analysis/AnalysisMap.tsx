@@ -1,17 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { SegmentedTabs } from "../../../components/ui/SegmentedTabs";
-import { useSwipeableTabs } from "../../../hooks/useHorizontalWheelNavigation";
-import {
-  AREA_META,
-  AREA_ORDER,
-  SEVERITY_META,
-  SEVERITY_RANK,
-  FILTER_ORDER,
-  matchesFilter,
-  type FindingFilter,
-} from "./analysisMeta";
+import { AREA_META, AREA_ORDER, SEVERITY_META, SEVERITY_RANK } from "./analysisMeta";
 import type { Finding, FindingArea } from "./findings";
 import { NeonRing } from "./NeonRing";
 
@@ -28,8 +18,6 @@ type Connector = {
 
 type AnalysisMapProps = {
   findings: readonly Finding[];
-  filter: FindingFilter;
-  onFilterChange: (filter: FindingFilter) => void;
   selected: MapSelection;
   onSelect: (selection: MapSelection) => void;
   onOpenFinding: (to: string) => void;
@@ -45,11 +33,11 @@ const bySeverity = (a: Finding, b: Finding) =>
   SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
 
 /**
- * What the map shows for one filter and selection: the findings fanned out (one area's, or every
- * area's grouped in area order so their curves do not cross), and every area's tally.
+ * What the map shows for one selection: the findings fanned out (one area's, or every area's
+ * grouped in area order so their curves do not cross), worst first, and every area's tally.
  */
-function deriveMap(findings: readonly Finding[], filter: FindingFilter, selected: MapSelection) {
-  const visible = findings.filter((finding) => matchesFilter(finding, filter));
+function deriveMap(findings: readonly Finding[], selected: MapSelection) {
+  const visible = findings;
   const shown =
     selected === null
       ? AREA_ORDER.flatMap((area) =>
@@ -197,17 +185,14 @@ function AreaCard({
  *
  * With no area chosen — how it opens — every finding is there at once, grouped by area with one
  * curve from each area, so the whole picture needs no choosing. Picking an area narrows the fan to
- * that area; picking it again lets go of it. Every card is a button, and the filter (to
- * look at, going well, all) also follows a two-finger swipe over the map, like every other tab
- * bar in the app.
+ * that area; picking it again lets go of it. Every card is a button. There is no filter on top:
+ * the findings are ordered worst first, so what is going well sits at the end of each group.
  *
  * The curves are measured off the rendered cards, so they follow the layout at any width; on a
  * phone, where the three columns stack, they are left out.
  */
 export function AnalysisMap({
   findings,
-  filter,
-  onFilterChange,
   selected,
   onSelect,
   onOpenFinding,
@@ -224,22 +209,7 @@ export function AnalysisMap({
     lines: [],
   });
 
-  const swipeRef = useSwipeableTabs<FindingFilter, HTMLDivElement>({
-    order: FILTER_ORDER,
-    value: filter,
-    onChange: onFilterChange,
-    // Inside a dialog, which opts the page's own swipe out: this one owns its own area.
-    boundary: "self",
-  });
-  const setContainer = useCallback(
-    (node: HTMLDivElement | null) => {
-      containerRef.current = node;
-      swipeRef(node);
-    },
-    [swipeRef],
-  );
-
-  const { shown, areaStats } = deriveMap(findings, filter, selected);
+  const { shown, areaStats } = deriveMap(findings, selected);
 
   const measure = useCallback(() => {
     const box = containerRef.current;
@@ -254,7 +224,7 @@ export function AnalysisMap({
     const rightMid = (r: DOMRect) =>
       [r.right - base.left, r.top + r.height / 2 - base.top] as const;
 
-    const { shown: fanned, areaStats: areas } = deriveMap(findings, filter, selected);
+    const { shown: fanned, areaStats: areas } = deriveMap(findings, selected);
     const lines: Connector[] = [];
 
     const coreRect = rect(anchor("core"));
@@ -285,7 +255,7 @@ export function AnalysisMap({
         const [fx, fy] = rightMid(fromRect);
         const [tx, ty] = leftMid(toRect);
         lines.push({
-          key: `all-${filter}-${area}`,
+          key: `all-${area}`,
           kind: "finding",
           d: curve(fx, fy, tx, ty),
           color: SEVERITY_META[worst].glow,
@@ -300,7 +270,7 @@ export function AnalysisMap({
         const [fx, fy] = rightMid(fromRect);
         const [tx, ty] = leftMid(toRect);
         lines.push({
-          key: `${selected}-${filter}-${finding.id}`,
+          key: `${selected}-${finding.id}`,
           kind: "finding",
           d: curve(fx, fy, tx, ty),
           color: SEVERITY_META[finding.severity].glow,
@@ -310,7 +280,7 @@ export function AnalysisMap({
     }
 
     setLayout({ w: base.width, h: base.height, lines });
-  }, [findings, filter, selected]);
+  }, [findings, selected]);
 
   useLayoutEffect(() => {
     const box = containerRef.current;
@@ -338,7 +308,7 @@ export function AnalysisMap({
   const heading = selected === null ? "All areas" : AREA_META[selected].label;
 
   return (
-    <div ref={setContainer} className="relative">
+    <div ref={containerRef} className="relative">
       <svg
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 hidden lg:block"
@@ -443,34 +413,12 @@ export function AnalysisMap({
                 {shown.length === 1 ? "1 finding" : `${shown.length} findings`}
               </span>
             </h3>
-            <SegmentedTabs
-              value={filter}
-              onChange={onFilterChange}
-              layoutId="project-analysis-filter"
-              ariaLabel="Show findings"
-              size="sm"
-              options={[
-                {
-                  value: "act",
-                  label: "To look at",
-                  count: findings.filter((finding) => matchesFilter(finding, "act")).length,
-                },
-                {
-                  value: "good",
-                  label: "Going well",
-                  count: findings.filter((finding) => matchesFilter(finding, "good")).length,
-                },
-                { value: "all", label: "All", count: findings.length },
-              ]}
-            />
           </div>
 
           {shown.length === 0 ? (
             <p className="flex items-center gap-2 rounded-xl border border-dashed border-app-border-muted px-4 py-6 text-sm text-app-text-muted">
               <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-app-success-text" />
-              {filter === "good"
-                ? `Nothing to report as going well${selected === null ? "" : ` in ${heading.toLowerCase()}`}.`
-                : `Nothing${selected === null ? "" : ` in ${heading.toLowerCase()}`} needs you.`}
+              {`Nothing${selected === null ? "" : ` in ${heading.toLowerCase()}`} to report.`}
             </p>
           ) : selected === null ? (
             <div className="space-y-5">
@@ -498,7 +446,7 @@ export function AnalysisMap({
                       <ul className="space-y-2">
                         {inArea.map((finding, index) => (
                           <motion.li
-                            key={`all-${filter}-${finding.id}`}
+                            key={`all-${finding.id}`}
                             initial={reduceMotion ? false : { opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.35, delay: 0.1 + Math.min(index, 8) * 0.04 }}
@@ -515,7 +463,7 @@ export function AnalysisMap({
             <ul className="space-y-2">
               {shown.map((finding, index) => (
                 <motion.li
-                  key={`${selected}-${filter}-${finding.id}`}
+                  key={`${selected}-${finding.id}`}
                   data-anchor={`finding-${finding.id}`}
                   initial={reduceMotion ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}

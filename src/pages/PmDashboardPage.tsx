@@ -82,14 +82,14 @@ export function PmDashboardPage() {
 
   const figuresReady = !rosterLoading && !rosterError;
 
-  // The industry card keeps its project in its own state, so a re-evaluation by the analysis
-  // remounts it to read the new value.
-  const [industryRevision, setIndustryRevision] = useState(0);
+  // The industry card keeps its project in its own state rather than the query cache, so every
+  // finished analysis remounts it to read the project again. Everything else on the page reads
+  // the cache the analysis has just refreshed.
+  const [refreshRevision, setRefreshRevision] = useState(0);
 
   return (
     <section aria-label="Overview" className="space-y-5">
-      <ProjectAnalysisLauncher onIndustryChanged={setIndustryRevision} />
-
+      <ProjectAnalysisLauncher onRefreshed={setRefreshRevision} />
       <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <PmStat
           icon={Users}
@@ -147,7 +147,13 @@ export function PmDashboardPage() {
         />
       </section>
 
-      <TeamProgressCard roster={members} loading={rosterLoading} error={rosterError} />
+      {/* The three knowledge readouts right under the figures, a row of their own so none of them
+          is squeezed; the team, with whoever needs the manager first, follows. */}
+      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <EscalationsCard />
+        <QuestionsCard />
+        <KnowledgeGapsCard />
+      </div>
 
       <TeamPulseCard
         roster={members}
@@ -157,19 +163,16 @@ export function PmDashboardPage() {
         onOpenMember={openMember}
       />
 
-      {/* The three knowledge readouts get a row of their own, so none of them is squeezed. */}
-      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <EscalationsCard />
-        <QuestionsCard />
-        <KnowledgeGapsCard />
-      </div>
-
       {/* The project's plumbing: ingestion wider, since it lists sources; industry is one label and
           its evidence. */}
       <div className="grid items-stretch gap-5 md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)]">
         <IngestionStatusWidget />
-        <ProjectIndustryWidget key={industryRevision} />
+        <ProjectIndustryWidget key={refreshRevision} />
       </div>
+
+      {/* The long view comes last: how far the team has got, the onboarding funnel and the latest
+          milestones — context for everything above rather than something to act on. */}
+      <TeamProgressCard roster={members} loading={rosterLoading} error={rosterError} />
     </section>
   );
 }
