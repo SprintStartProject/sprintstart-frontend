@@ -67,8 +67,8 @@ function toAttentionItems(users: TeamOverviewUser[]): AttentionItem[] {
 async function loadOne(queryClient: QueryClient, projectId: string): Promise<ProjectInsights> {
   const [sources, users, artifacts] = await Promise.all([
     getIngestionSourceStatuses(projectId).catch(() => null),
-    // Shares the cache entry `TeamOverviewWidget` and `usePmAttentionFlag` read the same
-    // project's overview under, instead of firing a fourth independent request for it.
+    // Shares the cache entry `TeamOverviewWidget` reads the same project's overview under,
+    // instead of firing another independent request for it.
     queryClient
       .fetchQuery({
         queryKey: queryKeys.teamOverview.filtered(projectId),

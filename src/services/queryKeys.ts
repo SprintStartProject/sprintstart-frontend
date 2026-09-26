@@ -85,6 +85,10 @@ export const queryKeys = {
     // `projectId` is `null` for the unfiltered, org-wide read.
     filtered: (projectId: string | null) => ["team-overview", projectId ?? "all"] as const,
   },
+  pmAttention: {
+    // The sidebar's count of pending skip requests and unread feedback for one project.
+    count: (projectId: string) => ["pm-attention", "count", projectId] as const,
+  },
   ingestion: {
     sourceStatuses: (projectId: string) => ["ingestion", "source-statuses", projectId] as const,
   },

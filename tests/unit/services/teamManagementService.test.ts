@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getTeamOverview,
   getTeamMember,
+  getPmAttentionCount,
   getProjectRoles,
   createProjectRole,
   acceptSkillSuggestion,
@@ -38,6 +39,74 @@ describe("teamManagementService", () => {
     const member = await getTeamMember("user1");
     expect(member).not.toBeNull();
     expect(member?.userId).toBe("user1");
+  });
+
+  describe("getPmAttentionCount", () => {
+    const member = (userId: string, skipStatus?: "PENDING" | "ACCEPTED") => ({
+      userId,
+      firstname: userId,
+      lastname: "",
+      roles: [],
+      progressPercentage: 0,
+      currentStep: skipStatus
+        ? {
+            id: `step-${userId}`,
+            title: "Step",
+            skip: { id: `skip-${userId}`, status: skipStatus },
+          }
+        : null,
+    });
+
+    it("adds pending skip requests and the project's unread feedback", async () => {
+      let requestedProject: string | null = null;
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", ({ request }) => {
+          requestedProject = new URL(request.url).searchParams.get("projectIds");
+          return HttpResponse.json({
+            content: [member("u1", "PENDING"), member("u2", "ACCEPTED"), member("u3")],
+          });
+        }),
+        http.get("/api/v1/admin/onboarding/feedback", () =>
+          HttpResponse.json([
+            { id: "f1", userId: "u2", message: "unclear", read: false },
+            { id: "f2", userId: "u3", message: "thanks", readAt: null },
+            { id: "f3", userId: "u3", message: "seen", read: true },
+            // Somebody from another project: the feedback list is not scoped by project.
+            { id: "f4", userId: "elsewhere", message: "hi", read: false },
+          ]),
+        ),
+      );
+
+      await expect(getPmAttentionCount("proj1")).resolves.toEqual({
+        pendingSkips: 1,
+        unreadFeedback: 2,
+        total: 3,
+      });
+      expect(requestedProject).toBe("proj1");
+    });
+
+    it("fails instead of counting mock members when the overview is unavailable", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () => new HttpResponse(null, { status: 500 })),
+        http.get("/api/v1/admin/onboarding/feedback", () => HttpResponse.json([])),
+      );
+
+      await expect(getPmAttentionCount("proj1")).rejects.toThrow();
+    });
+
+    it("fails instead of leaving feedback out when the feedback list is unavailable", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () =>
+          HttpResponse.json({ content: [member("u1", "PENDING")] }),
+        ),
+        http.get(
+          "/api/v1/admin/onboarding/feedback",
+          () => new HttpResponse(null, { status: 500 }),
+        ),
+      );
+
+      await expect(getPmAttentionCount("proj1")).rejects.toThrow();
+    });
   });
 
   it("getProjectRoles returns project roles", async () => {

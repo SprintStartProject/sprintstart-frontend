@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -7,6 +7,7 @@ import * as useAuthHook from "../../../../src/context/useAuth";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
 import { PermissionGroup } from "../../../../src/services/types";
 import { knowledgeRequestService } from "../../../../src/services/knowledgeRequestService";
+import { getPmAttentionCount } from "../../../../src/services/teamManagementService";
 
 // Mutable so individual tests can flip it mid-suite. Module-level mock
 // factories cannot close over `let`, hence the `vi.hoisted` shared object
@@ -42,6 +43,23 @@ vi.mock("../../../../src/services/knowledgeRequestService", () => ({
   onOpenEscalationsChanged: () => () => {},
 }));
 
+// The other half of the PM Dashboard's number: pending skip requests and unread feedback. The
+// emitter is kept real so a skip decision or a read feedback can be announced mid-test.
+const { attentionListeners } = vi.hoisted(() => ({ attentionListeners: new Set<() => void>() }));
+vi.mock("../../../../src/services/teamManagementService", () => ({
+  getPmAttentionCount: vi.fn(),
+  onPmAttentionChanged: (listener: () => void) => {
+    attentionListeners.add(listener);
+    return () => attentionListeners.delete(listener);
+  },
+}));
+
+const attention = (pendingSkips: number, unreadFeedback: number) => ({
+  pendingSkips,
+  unreadFeedback,
+  total: pendingSkips + unreadFeedback,
+});
+
 const mockProfile = {
   id: "1",
   authId: "auth",
@@ -68,6 +86,8 @@ function renderWithProviders(ui: React.ReactElement, at = "/") {
 describe("SideBar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    attentionListeners.clear();
+    vi.mocked(getPmAttentionCount).mockResolvedValue(attention(0, 0));
     window.localStorage.clear();
     document.documentElement.className = "";
     projectState.canManageSelected = true;
@@ -338,7 +358,7 @@ describe("SideBar", () => {
    * The count is owned by `SideBar`, not by `SidebarContent` — that renders
    * twice at once, once for the desktop rail and once for the mobile drawer,
    * so owning the read there would fire it twice on every page load and every
-   * project switch. Same reason the PM attention flag lives up there.
+   * project switch. Same reason the PM attention count lives up there.
    */
   describe("open escalation count", () => {
     const asPm = () => {
@@ -361,7 +381,7 @@ describe("SideBar", () => {
       expect(knowledgeRequestService.countOpen).toHaveBeenCalledTimes(1);
     });
 
-    it("puts the number on the Escalation Inbox entry", async () => {
+    it("counts escalations into the PM Dashboard entry's number", async () => {
       asPm();
       vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(3);
 
@@ -369,7 +389,90 @@ describe("SideBar", () => {
 
       // Once per sidebar: the desktop rail and the mobile drawer both render it.
       await waitFor(() => expect(screen.getAllByText("3").length).toBeGreaterThan(0));
-      expect(screen.getAllByText("3 open escalations").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText("3 items need your attention: 3 open escalations").length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("adds pending skip requests and unread feedback, and says what the number is", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(1);
+      vi.mocked(getPmAttentionCount).mockResolvedValue(attention(2, 1));
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(screen.getAllByText("4").length).toBeGreaterThan(0));
+      expect(
+        screen.getAllByText(
+          "4 items need your attention: 2 pending skip requests, 1 unread feedback, 1 open escalation",
+        ).length,
+      ).toBeGreaterThan(0);
+      expect(getPmAttentionCount).toHaveBeenCalledTimes(1);
+      expect(getPmAttentionCount).toHaveBeenCalledWith("proj1");
+    });
+
+    it("shows no number when nothing is waiting", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(0);
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(getPmAttentionCount).toHaveBeenCalled());
+      await waitFor(() => expect(knowledgeRequestService.countOpen).toHaveBeenCalled());
+      expect(screen.queryByText(/need(s)? your attention/)).not.toBeInTheDocument();
+      expect(screen.queryByText("Open skip requests, unread feedback or escalations")).toBeNull();
+    });
+
+    it("shows no number while part of it is still loading", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(2);
+      vi.mocked(getPmAttentionCount).mockReturnValue(new Promise(() => {}));
+
+      renderWithProviders(<SideBar />);
+
+      // The known part still raises the marker, but no count claims to be the total.
+      await waitFor(() =>
+        expect(
+          screen.getAllByText("Open skip requests, unread feedback or escalations").length,
+        ).toBeGreaterThan(0),
+      );
+      expect(screen.queryByText("2")).not.toBeInTheDocument();
+    });
+
+    it("shows no number when the read fails", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(0);
+      vi.mocked(getPmAttentionCount).mockRejectedValue(new Error("boom"));
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(getPmAttentionCount).toHaveBeenCalled());
+      expect(screen.queryByText(/need(s)? your attention/)).not.toBeInTheDocument();
+      expect(screen.queryByText("0")).not.toBeInTheDocument();
+    });
+
+    it("updates after a skip decision or read feedback is announced", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(0);
+      vi.mocked(getPmAttentionCount).mockResolvedValue(attention(1, 1));
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(screen.getAllByText("2").length).toBeGreaterThan(0));
+
+      vi.mocked(getPmAttentionCount).mockResolvedValue(attention(0, 1));
+      act(() => {
+        attentionListeners.forEach((listener) => {
+          listener();
+        });
+      });
+
+      await waitFor(() =>
+        expect(
+          screen.getAllByText("1 item needs your attention: 1 unread feedback").length,
+        ).toBeGreaterThan(0),
+      );
+      expect(screen.queryByText("2")).not.toBeInTheDocument();
     });
 
     it("never reads it for somebody who cannot open the inbox", () => {
@@ -384,6 +487,7 @@ describe("SideBar", () => {
       renderWithProviders(<SideBar />);
 
       expect(knowledgeRequestService.countOpen).not.toHaveBeenCalled();
+      expect(getPmAttentionCount).not.toHaveBeenCalled();
     });
   });
 
