@@ -73,4 +73,24 @@ describe("SideBar Accessibility", () => {
       "true",
     );
   });
+
+  it("has no axe violations folded to icons either", async () => {
+    const user = userEvent.setup();
+    window.localStorage.clear();
+    const { baseElement } = render(
+      <MemoryRouter>
+        <main>
+          <SideBar />
+        </main>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
 });

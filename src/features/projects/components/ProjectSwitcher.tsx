@@ -13,6 +13,8 @@ const SWITCHER_CHORD = IS_MAC ? "⌘ + K" : "Ctrl + K";
 
 type ProjectSwitcherProps = {
   className?: string;
+  /** Only the project's monogram, for the sidebar folded to icons. Same button, same modal. */
+  compact?: boolean;
 };
 
 /**
@@ -22,7 +24,7 @@ type ProjectSwitcherProps = {
  * sidebar layout is unaffected for those users. Opens a modal picker on click
  * or with Cmd/Ctrl+K; focus trapping and restoration are handled by `Modal`.
  */
-export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
+export function ProjectSwitcher({ className = "", compact = false }: ProjectSwitcherProps) {
   const {
     projects,
     selectedProject,
@@ -75,12 +77,18 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         aria-label={`Switch project. Current project: ${triggerLabel}`}
-        title={`Switch project (${SWITCHER_CHORD})`}
+        title={
+          compact
+            ? `${triggerLabel} — switch project (${SWITCHER_CHORD})`
+            : `Switch project (${SWITCHER_CHORD})`
+        }
         onClick={() => setIsOpen(true)}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         transition={hoverSpringToken}
-        className="group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 px-[10px] text-left backdrop-blur-md transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className={`group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 text-left backdrop-blur-md ${
+          compact ? "justify-center px-0" : "px-[10px]"
+        } transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
       >
         {selectedProject ? (
           <span
@@ -95,7 +103,7 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
           </span>
         )}
 
-        <span className="flex min-w-0 flex-col gap-[3px]">
+        <span className={compact ? "hidden" : "flex min-w-0 flex-col gap-[3px]"}>
           <span className="truncate text-sm leading-tight font-semibold text-app-text">
             {triggerLabel}
           </span>
@@ -116,7 +124,7 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
           )}
         </span>
 
-        <span className="ml-auto flex shrink-0 items-center gap-1">
+        <span className={compact ? "hidden" : "ml-auto flex shrink-0 items-center gap-1"}>
           <ShortcutHint keys={SWITCHER_CHORD} className="border-app-border text-app-text-muted" />
           <ChevronsUpDown className="h-4 w-4 text-app-text-muted transition-colors group-hover:text-app-text" />
         </span>

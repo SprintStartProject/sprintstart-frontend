@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -387,6 +387,96 @@ describe("SideBar", () => {
       renderWithProviders(<SideBar />);
 
       expect(knowledgeRequestService.countOpen).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("desktop sidebar size", () => {
+    const signIn = () =>
+      vi.mocked(useAuthHook.useAuth).mockReturnValue({
+        status: "authenticated",
+        profile: mockProfile,
+        login: vi.fn(),
+        logout: vi.fn(),
+        refetchProfile: vi.fn(),
+      });
+    const desktop = () => screen.getByRole("complementary", { name: "Desktop Sidebar" });
+    // The width lives in a CSS variable on the root, which the page's margin reads as well.
+    const sidebarWidth = () =>
+      document.documentElement.style.getPropertyValue("--app-sidebar-desktop-width");
+    // Closed, the drawer is `inert` and hidden from the accessibility tree, so no role query finds it.
+    const mobile = () => document.querySelector<HTMLElement>('aside[aria-label="Mobile Sidebar"]')!;
+
+    it("folds to icons, keeps every entry named, and remembers it", async () => {
+      const user = userEvent.setup();
+      signIn();
+      const { unmount } = renderWithProviders(<SideBar />);
+
+      await user.click(within(desktop()).getByRole("button", { name: "Collapse sidebar" }));
+
+      expect(sidebarWidth()).toBe("76px");
+      // Icon only, but still a link with its name.
+      expect(within(desktop()).getByRole("link", { name: /Dashboard/ })).toBeInTheDocument();
+      expect(within(desktop()).queryByRole("separator")).not.toBeInTheDocument();
+
+      unmount();
+      renderWithProviders(<SideBar />);
+      expect(sidebarWidth()).toBe("76px");
+      expect(within(desktop()).getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
+    });
+
+    it("shows an entry's name as a tooltip when it gets keyboard focus while folded", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+
+      await user.click(within(desktop()).getByRole("button", { name: "Collapse sidebar" }));
+      within(desktop())
+        .getByRole("link", { name: /Dashboard/ })
+        .focus();
+
+      // Rendered into the page body so the nav cannot clip it.
+      await waitFor(() =>
+        expect(
+          [...document.body.children].some(
+            (child) => child.textContent === "Dashboard" && child.classList.contains("fixed"),
+          ),
+        ).toBe(true),
+      );
+    });
+
+    it("resizes from the keyboard within its limits, and remembers the width", async () => {
+      const user = userEvent.setup();
+      signIn();
+      const { unmount } = renderWithProviders(<SideBar />);
+
+      const handle = within(desktop()).getByRole("separator", { name: "Resize sidebar" });
+      expect(handle).toHaveAttribute("aria-valuenow", "286");
+
+      handle.focus();
+      await user.keyboard("{ArrowRight}{ArrowRight}");
+      expect(sidebarWidth()).toBe("318px");
+
+      await user.keyboard("{End}{ArrowRight}");
+      expect(sidebarWidth()).toBe("400px");
+
+      await user.keyboard("{Home}{ArrowLeft}");
+      expect(sidebarWidth()).toBe("240px");
+
+      unmount();
+      renderWithProviders(<SideBar />);
+      expect(within(desktop()).getByRole("separator")).toHaveAttribute("aria-valuenow", "240");
+    });
+
+    it("leaves the mobile drawer as it was", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+
+      await user.click(within(desktop()).getByRole("button", { name: "Collapse sidebar" }));
+
+      expect(mobile()).toHaveClass("w-[var(--app-sidebar-width)]");
+      expect(mobile().querySelector('[aria-label="Collapse sidebar"]')).toBeNull();
+      expect(mobile().querySelector('[role="separator"]')).toBeNull();
     });
   });
 

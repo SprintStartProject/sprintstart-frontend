@@ -1,7 +1,7 @@
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useState } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
-import { LogOut, Menu, Settings, X } from "lucide-react";
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, X } from "lucide-react";
 import { UserAvatar } from "../common/UserAvatar";
 import { useAuth } from "../../context/useAuth";
 import { canAccessRoute, isOnboardingAccessible, type AppRoute } from "../../auth/accessPolicy";
@@ -29,6 +29,8 @@ import {
 } from "./SidebarNavIcons";
 import { SidebarLogo } from "./SidebarLogo";
 import { SidebarNavLink } from "./SidebarNavLink";
+import { SidebarResizeHandle } from "./SidebarResizeHandle";
+import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH_VAR, useSidebarLayout } from "./useSidebarLayout";
 import { hoverSpringToken } from "../../styles/tokens";
 
 type SidebarNavItem = {
@@ -56,6 +58,10 @@ type SidebarContentProps = {
   openEscalationCount?: number;
   /** Skip requests the project manager answered that the member has not looked at yet. */
   unseenSkipAnswerCount?: number;
+  /** Folded to icons -- the desktop sidebar only; the mobile drawer is always full width. */
+  collapsed?: boolean;
+  /** Folds or unfolds the desktop sidebar. Without it there is no toggle (the mobile drawer). */
+  onToggleCollapsed?: () => void;
 };
 
 /**
@@ -167,6 +173,8 @@ function SidebarContent({
   hasPmAttentionItems = false,
   openEscalationCount = 0,
   unseenSkipAnswerCount = 0,
+  collapsed = false,
+  onToggleCollapsed,
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
@@ -258,10 +266,39 @@ function SidebarContent({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-app-bg text-app-text">
-      <div className="flex shrink-0 items-center gap-3 px-[24px] py-[24px]">
+      <div
+        className={`flex shrink-0 items-center gap-3 py-[24px] ${
+          collapsed ? "flex-col px-0" : "px-[24px]"
+        }`}
+      >
         <SidebarLogo />
 
-        <h1 className="text-lg leading-none font-bold tracking-tight text-app-text">SprintStart</h1>
+        <h1
+          className={
+            collapsed ? "sr-only" : "text-lg leading-none font-bold tracking-tight text-app-text"
+          }
+        >
+          SprintStart
+        </h1>
+
+        {onToggleCollapsed && (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+              collapsed ? "" : "ml-auto"
+            }`}
+          >
+            {collapsed ? (
+              <PanelLeftOpen aria-hidden="true" className="h-[18px] w-[18px]" />
+            ) : (
+              <PanelLeftClose aria-hidden="true" className="h-[18px] w-[18px]" />
+            )}
+          </button>
+        )}
       </div>
 
       <nav
@@ -276,12 +313,15 @@ function SidebarContent({
         onPointerLeave={() => pointerY.set(Number.NEGATIVE_INFINITY)}
         // 24px inner padding. This and DOCK_HOVER_SCALE trade directly
         // against each other: the item grows rightwards from a fixed
-        // left edge, so 286px sidebar - 2x24 = 238px wide, x1.06 = 252px,
+        // left edge, so at the default 286px sidebar - 2x24 = 238px wide, x1.06 = 252px,
         // finishing ~10px short of the border. Pulling the content
         // further left again would need a smaller scale to keep that
         // gap. Header and footer share the inset, so everything lines
         // up on one left edge.
-        className="app-scrollbar min-h-0 flex-1 space-y-[5px] overflow-x-hidden overflow-y-auto px-[24px] py-[20px]"
+        // Folded to icons the inset shrinks to 16px, which leaves each 44px row centred.
+        className={`app-scrollbar min-h-0 flex-1 space-y-[5px] overflow-x-hidden overflow-y-auto py-[20px] ${
+          collapsed ? "px-[16px]" : "px-[24px]"
+        }`}
       >
         {sections.map((section, sectionIndex) => (
           <div
@@ -289,9 +329,21 @@ function SidebarContent({
             className={sectionIndex > 0 ? "pt-[20px]" : undefined}
           >
             {section.heading ? (
-              <p className="px-[12px] pb-[8px] text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
-                {section.heading}
-              </p>
+              collapsed ? (
+                // No room for the words: a short rule marks where the group starts, and the
+                // heading stays for assistive technology.
+                <>
+                  <p className="sr-only">{section.heading}</p>
+                  <span
+                    aria-hidden="true"
+                    className="mx-auto mb-[12px] block h-px w-6 bg-app-border"
+                  />
+                </>
+              ) : (
+                <p className="px-[12px] pb-[8px] text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+                  {section.heading}
+                </p>
+              )
             ) : null}
 
             <div className="space-y-[5px]">
@@ -327,6 +379,7 @@ function SidebarContent({
                     item.path === ESCALATION_INBOX_PATH ? describeOpenEscalations : undefined
                   }
                   onNavigate={onNavigate}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
@@ -337,10 +390,18 @@ function SidebarContent({
       {/* Floating glass card instead of a full-bleed bar. The 12px outer
                 gutter plus 12px inner padding lines its content up with the
                 24px inset used by the nav items above. */}
-      <div className="shrink-0 px-[12px] pt-[8px] pb-[16px]">
-        <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+      <div className={`shrink-0 pt-[8px] pb-[16px] ${collapsed ? "px-[8px]" : "px-[12px]"}`}>
+        <div
+          className={`space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl ${
+            collapsed ? "p-[6px]" : "p-[12px]"
+          }`}
+        >
           {profile && (
-            <div className="flex items-center justify-between gap-2 py-[2px]">
+            <div
+              className={`flex items-center gap-2 py-[2px] ${
+                collapsed ? "flex-col" : "justify-between"
+              }`}
+            >
               <div className="flex items-center gap-3 overflow-hidden">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
                   <UserAvatar
@@ -351,7 +412,7 @@ function SidebarContent({
                   />
                 </div>
 
-                <div className="flex flex-col overflow-hidden">
+                <div className={collapsed ? "sr-only" : "flex flex-col overflow-hidden"}>
                   <span className="truncate text-sm font-semibold text-app-text">
                     {profile.username}
                   </span>
@@ -386,7 +447,7 @@ function SidebarContent({
             </div>
           )}
 
-          <ProjectSwitcher className="w-full" />
+          <ProjectSwitcher className="w-full" compact={collapsed} />
 
           <motion.button
             type="button"
@@ -397,10 +458,12 @@ function SidebarContent({
             whileHover={status === "loading" ? undefined : { scale: 1.02 }}
             whileTap={status === "loading" ? undefined : { scale: 0.98 }}
             transition={hoverSpringToken}
+            aria-label={collapsed ? "Logout" : undefined}
+            title={collapsed ? "Logout" : undefined}
             className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <LogOut className="h-[16px] w-[16px]" />
-            Logout
+            <LogOut aria-hidden="true" className="h-[16px] w-[16px]" />
+            {!collapsed && "Logout"}
           </motion.button>
         </div>
       </div>
@@ -452,6 +515,20 @@ export function SideBar() {
     pathname,
   );
 
+  // The desktop sidebar's width and folded state, remembered across visits. The mobile drawer
+  // does not use either: it keeps its fixed width and opens over the page.
+  const sidebarLayout = useSidebarLayout();
+  const desktopWidth = sidebarLayout.collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarLayout.width;
+  // On the root, where the page's own margin reads it too. Set before paint, so a folded sidebar
+  // never shows at full width for a frame on load.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty(SIDEBAR_WIDTH_VAR, `${desktopWidth}px`);
+    return () => {
+      root.style.removeProperty(SIDEBAR_WIDTH_VAR);
+    };
+  }, [desktopWidth]);
+
   const closeMobileSidebar = () => {
     setIsMobileSidebarOpen(false);
   };
@@ -460,14 +537,26 @@ export function SideBar() {
     <>
       <aside
         aria-label="Desktop Sidebar"
-        className="fixed top-0 bottom-0 left-0 hidden w-[var(--app-sidebar-width)] flex-col border-r border-app-border bg-app-bg lg:flex"
+        // Fixed from `lg` up and out of the page's flow (the page leaves its width free, see
+        // App), so the width lives in a CSS variable both read. It eases when the sidebar folds
+        // and follows the pointer exactly while the edge is dragged (`app-sidebar-eases`).
+        className="app-sidebar-eases fixed top-0 bottom-0 left-0 hidden w-[var(--app-sidebar-desktop-width,var(--app-sidebar-width))] flex-col border-r border-app-border bg-app-bg lg:flex"
       >
         <SidebarContent
           aria-label="Desktop Navigation"
           hasPmAttentionItems={hasPmAttentionItems}
           openEscalationCount={openEscalationCount}
           unseenSkipAnswerCount={unseenSkipAnswerCount}
+          collapsed={sidebarLayout.collapsed}
+          onToggleCollapsed={sidebarLayout.toggleCollapsed}
         />
+        {!sidebarLayout.collapsed && (
+          <SidebarResizeHandle
+            width={sidebarLayout.width}
+            onResize={sidebarLayout.setWidth}
+            onCollapse={() => sidebarLayout.setCollapsed(true)}
+          />
+        )}
       </aside>
 
       <header className="fixed top-0 right-0 left-0 z-40 flex h-[64px] items-center justify-between border-b border-app-border bg-app-bg px-[16px] lg:hidden">
