@@ -8,7 +8,16 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { Button } from "../../../../components/ui/Button";
 import { SegmentedTabs } from "../../../../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../../../../components/ui/SlidingTabPanel";
@@ -57,7 +66,17 @@ const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
 
 type StepTaskCount = { total: number; done: number };
 
+/** What the rest of the profile can ask of the path section. */
+export type MemberJourneyHandle = {
+  /**
+   * Scrolls the path into view, showing `phaseId` in whichever view is open: selected in the
+   * list, opened in the graph. Without a phase it only scrolls.
+   */
+  showPhase: (phaseId?: string) => void;
+};
+
 type Props = {
+  ref?: Ref<MemberJourneyHandle>;
   userId: string;
   memberName: string;
   path: OnboardingPathEndpoint | null;
@@ -98,6 +117,7 @@ function actualMinutesOf(item: PhaseItem): number | null {
  * blueprint is untouched.
  */
 export function MemberJourneySection({
+  ref,
   userId,
   memberName,
   path,
@@ -155,6 +175,24 @@ export function MemberJourneySection({
     onChange: setViewMode,
     enabled: phases.length > 0,
   });
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      showPhase: (phaseId) => {
+        if (phaseId) {
+          setSelectedPhaseId(phaseId);
+          setSelectedItemId(null);
+          if (viewMode === "graph") setGraphPhaseId(phaseId);
+        }
+        document
+          .getElementById("member-journey-title")
+          ?.closest("section")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    }),
+    [viewMode],
+  );
 
   const phase =
     phases.find((candidate) => candidate.id === selectedPhaseId) ??
@@ -354,7 +392,7 @@ export function MemberJourneySection({
     <section
       ref={swipeRef}
       aria-labelledby="member-journey-title"
-      className="space-y-5 rounded-3xl border border-app-border bg-app-surface/60 p-4 shadow-sm sm:p-6"
+      className="scroll-mt-6 space-y-5 rounded-3xl border border-app-border bg-app-surface/60 p-4 shadow-sm sm:p-6"
     >
       {/* The path's figures (items, phases, skips) are the profile's summary card's job now
           (`MemberSummary`), right above this section; repeating them here was the clutter. */}

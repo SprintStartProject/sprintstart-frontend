@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
@@ -16,6 +17,8 @@ type MemberHeroProps = {
   onAddRole: (roleId: string) => void;
   /** Asks to remove a role; the page confirms before it does. */
   onRemoveRole: (role: ProjectRole) => void;
+  /** A row of small figures beside the name, before the team stepper. */
+  figures?: ReactNode;
 };
 
 /**
@@ -34,6 +37,7 @@ export function MemberHero({
   savingRoleId,
   onAddRole,
   onRemoveRole,
+  figures,
 }: MemberHeroProps) {
   const ordered = [...roster].sort((a, b) => memberName(a).localeCompare(memberName(b)));
   const index = ordered.findIndex((candidate) => candidate.userId === member.userId);
@@ -96,6 +100,8 @@ export function MemberHero({
             )}
           </div>
         </div>
+
+        {figures}
 
         {ordered.length > 1 && index >= 0 && (
           <nav aria-label="Other team members" className="flex items-center gap-2">

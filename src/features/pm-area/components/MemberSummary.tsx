@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { WidgetBar } from "../../dashboard/components/WidgetBar";
 import { formatMinutes, type PhaseState } from "../../onboarding/journey";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
 import type { TeamOverviewUser } from "../../team-management/types";
@@ -51,23 +50,43 @@ const LEVEL_SEGMENTS = [
   { level: "EXPERT", label: "expert", className: "bg-app-success-solid" },
 ] as const;
 
+/**
+ * One compact figure beside the member's name. A button when `onOpen` is given: the figures are
+ * about the path, so pressing one takes the manager down to it.
+ */
 function Signal({
   icon: Icon,
   title,
   children,
+  onOpen,
 }: {
   icon: LucideIcon;
   title: string;
   children: ReactNode;
+  onOpen?: () => void;
 }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-app-surface-muted px-3.5 py-3">
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase">
-        <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+  const body = (
+    <>
+      <span className="flex items-center gap-1 text-[10px] font-semibold tracking-wider text-app-text-subtle uppercase">
+        <Icon aria-hidden="true" className="h-3 w-3" />
         {title}
-      </p>
-      <div className="mt-2 min-w-0 text-sm text-app-text">{children}</div>
-    </div>
+      </span>
+      <span className="mt-1 block min-w-0 text-xs text-app-text">{children}</span>
+    </>
+  );
+  const className =
+    "block w-36 min-w-0 shrink-0 rounded-xl border border-app-border bg-app-surface px-3 py-2 text-left";
+
+  return onOpen ? (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`${className} transition-colors hover:border-app-brand-border-strong focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+    >
+      {body}
+    </button>
+  ) : (
+    <div className={className}>{body}</div>
   );
 }
 
@@ -84,7 +103,7 @@ function Count({
 }) {
   return (
     <span className="inline-flex items-center gap-1" title={label}>
-      <Icon aria-hidden="true" className={`h-3.5 w-3.5 ${className}`} />
+      <Icon aria-hidden="true" className={`h-3 w-3 ${className}`} />
       <span className="font-semibold tabular-nums">{value}</span>
       <span className="sr-only">{label}</span>
     </span>
@@ -95,9 +114,8 @@ type MemberSummaryProps = {
   member: TeamOverviewUser;
   path: OnboardingPathEndpoint | null;
   feedback: readonly OnboardingFeedback[];
-  skillLevels: readonly UserSkillLevel[];
-  /** Knowledge gaps in the project that concern this member. */
-  knowledgeGapCount: number;
+  /** Shows a phase in the path below, in whichever view (list or graph) it is in. */
+  onOpenPhase?: (phaseId: string) => void;
 };
 
 /**
@@ -106,21 +124,15 @@ type MemberSummaryProps = {
  * The profile used to open on the path itself: a graph of every step, with the numbers a manager
  * actually came for (how far, where, is anything off) scattered across the page. This card
  * answers those in one read: overall progress as a ring, the phases (the current one up close,
- * the rest as a strip and a line each), the steps by state, then the three signals worth a second look — workload by estimate, what the member said
- * about their steps, and their skills. The path underneath is for working on it.
+ * the rest as a strip and a line each) and the steps by state. The four smaller figures sit
+ * beside the name ({@link MemberSignals}). The path underneath is for working on it; pressing a
+ * phase here shows it there.
  */
-export function MemberSummary({
-  member,
-  path,
-  feedback,
-  skillLevels,
-  knowledgeGapCount,
-}: MemberSummaryProps) {
+export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSummaryProps) {
   const data = memberSummaryData(path, feedback);
   const stage = memberStage(member);
   const days = daysOnStep(member);
   const percent = data.progress ? data.progress.percentage : progressPercent(member);
-  const workload = data.estimated > 0 ? (data.closedEstimate / data.estimated) * 100 : 0;
 
   // The phase they are in gets the close look: every phase underway, or — before any is — the
   // first one they can start. Done and still-ahead phases are only counted and named.
@@ -132,11 +144,20 @@ export function MemberSummary({
     (phase) => phase.state !== "done" && !focusPhases.includes(phase),
   );
 
-  const levelSegments = LEVEL_SEGMENTS.map((segment) => ({
-    label: segment.label,
-    value: skillLevels.filter((skill) => skill.level === segment.level).length,
-    className: segment.className,
-  }));
+  /** A phase's name as a way to it in the path below, when the page offers one. */
+  const phaseLink = (phase: { id: string; title: string }, children: ReactNode, className = "") =>
+    onOpenPhase ? (
+      <button
+        type="button"
+        onClick={() => onOpenPhase(phase.id)}
+        title={`Show ${phase.title} in the path`}
+        className={`rounded text-left hover:text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${className}`}
+      >
+        {children}
+      </button>
+    ) : (
+      <span className={className}>{children}</span>
+    );
 
   return (
     // Laid out by its own width, not the window's: beside the "Waiting on you" column the card
@@ -196,20 +217,30 @@ export function MemberSummary({
             <p className="text-sm text-app-text-muted">No onboarding path yet.</p>
           ) : (
             <div className="space-y-3">
+              {/* Each segment is a way to its phase too, for a mouse; the names below are the
+                  keyboard's and screen reader's way, so the strip stays out of both. */}
               <div aria-hidden="true" className="flex gap-1">
                 {data.phases.map((phase) => (
-                  <span
+                  <button
                     key={phase.id}
+                    type="button"
+                    tabIndex={-1}
                     title={`${phase.title} · ${phase.progress.completed}/${phase.progress.total}`}
-                    className={`block h-1.5 flex-1 overflow-hidden rounded-full bg-app-progress-track ${
-                      focusPhases.includes(phase) ? "ring-2 ring-app-brand/25" : ""
-                    }`}
+                    onClick={() => onOpenPhase?.(phase.id)}
+                    disabled={!onOpenPhase}
+                    className="block flex-1 py-1 enabled:cursor-pointer"
                   >
                     <span
-                      className={`block h-full rounded-full transition-[width] duration-700 ${PHASE_BAR[phase.state]}`}
-                      style={{ width: `${phase.progress.percentage}%` }}
-                    />
-                  </span>
+                      className={`block h-1.5 overflow-hidden rounded-full bg-app-progress-track ${
+                        focusPhases.includes(phase) ? "ring-2 ring-app-brand/25" : ""
+                      }`}
+                    >
+                      <span
+                        className={`block h-full rounded-full transition-[width] duration-700 ${PHASE_BAR[phase.state]}`}
+                        style={{ width: `${phase.progress.percentage}%` }}
+                      />
+                    </span>
+                  </button>
                 ))}
               </div>
 
@@ -225,12 +256,11 @@ export function MemberSummary({
                           <span className="shrink-0 text-app-text-subtle tabular-nums">
                             {data.phases.indexOf(phase) + 1}
                           </span>
-                          <span
-                            className="truncate text-sm font-semibold text-app-text"
-                            title={phase.title}
-                          >
-                            {phase.title}
-                          </span>
+                          {phaseLink(
+                            phase,
+                            phase.title,
+                            "truncate text-sm font-semibold text-app-text",
+                          )}
                           {phase.state === "open" && (
                             <span className="shrink-0 text-app-text-subtle">up next</span>
                           )}
@@ -273,11 +303,13 @@ export function MemberSummary({
                       <span className="shrink-0 font-semibold text-app-text tabular-nums">
                         {donePhases.length} done
                       </span>
-                      <span
-                        className="truncate"
-                        title={donePhases.map((phase) => phase.title).join(" · ")}
-                      >
-                        {donePhases.map((phase) => phase.title).join(" · ")}
+                      <span className="truncate">
+                        {donePhases.map((phase, index) => (
+                          <span key={phase.id}>
+                            {index > 0 && " · "}
+                            {phaseLink(phase, phase.title)}
+                          </span>
+                        ))}
                       </span>
                     </p>
                   )}
@@ -290,11 +322,13 @@ export function MemberSummary({
                       <span className="shrink-0 font-semibold text-app-text tabular-nums">
                         {aheadPhases.length} ahead
                       </span>
-                      <span
-                        className="truncate"
-                        title={aheadPhases.map((phase) => phase.title).join(" · ")}
-                      >
-                        {aheadPhases.map((phase) => phase.title).join(" · ")}
+                      <span className="truncate">
+                        {aheadPhases.map((phase, index) => (
+                          <span key={phase.id}>
+                            {index > 0 && " · "}
+                            {phaseLink(phase, phase.title)}
+                          </span>
+                        ))}
                       </span>
                     </p>
                   )}
@@ -326,79 +360,131 @@ export function MemberSummary({
           </div>
         )}
       </div>
-
-      <div className="mt-5 grid gap-3 @md:grid-cols-2 @2xl:grid-cols-4">
-        <Signal icon={Timer} title="Workload">
-          {data.estimated > 0 ? (
-            <>
-              <p>
-                <span className="font-semibold">{formatMinutes(data.closedEstimate)}</span>
-                <span className="text-app-text-muted"> of {formatMinutes(data.estimated)}</span>
-              </p>
-              <span
-                aria-hidden="true"
-                className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-app-progress-track"
-              >
-                <span
-                  className="block h-full rounded-full bg-app-brand"
-                  style={{ width: `${workload}%` }}
-                />
-              </span>
-            </>
-          ) : (
-            <p className="text-app-text-muted">No estimates on the steps</p>
-          )}
-        </Signal>
-
-        <Signal icon={CalendarClock} title="Onboarding for">
-          <p className="font-semibold">
-            {data.runningDays === null ? "—" : formatDays(data.runningDays)}
-          </p>
-          <p className="text-xs text-app-text-muted">since the path was created</p>
-        </Signal>
-
-        <Signal icon={MessageSquareText} title="What they said">
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Count
-              icon={ThumbsUp}
-              value={data.helpful}
-              label="steps found helpful"
-              className="text-app-success-text"
-            />
-            <Count
-              icon={ThumbsDown}
-              value={data.unhelpful}
-              label="steps found not helpful"
-              className="text-app-danger-text"
-            />
-            <Count
-              icon={SkipForward}
-              value={data.pendingSkips + data.approvedSkips + data.declinedSkips}
-              label="skip requests"
-              className="text-app-warning-text"
-            />
-          </p>
-          <p className="mt-1 text-xs text-app-text-muted">
-            {data.pendingSkips > 0
-              ? `${data.pendingSkips} skip ${data.pendingSkips === 1 ? "request" : "requests"} open`
-              : `${data.comments} ${data.comments === 1 ? "comment" : "comments"}`}
-          </p>
-        </Signal>
-
-        <Signal icon={GraduationCap} title="Skills">
-          {skillLevels.length === 0 ? (
-            <p className="text-app-text-muted">Not assessed yet</p>
-          ) : (
-            <WidgetBar segments={levelSegments} />
-          )}
-          {knowledgeGapCount > 0 && (
-            <p className="mt-1 text-xs text-app-text-muted">
-              {knowledgeGapCount} knowledge {knowledgeGapCount === 1 ? "gap" : "gaps"} in the
-              project
-            </p>
-          )}
-        </Signal>
-      </div>
     </PmCard>
+  );
+}
+
+type MemberSignalsProps = {
+  path: OnboardingPathEndpoint | null;
+  feedback: readonly OnboardingFeedback[];
+  skillLevels: readonly UserSkillLevel[];
+  /** Knowledge gaps in the project that concern this member. */
+  knowledgeGapCount: number;
+  /** Takes the manager down to the path. */
+  onOpen?: () => void;
+};
+
+/**
+ * The four smaller figures — workload, how long they have been at it, what they said, their
+ * skills — as one row of small tiles beside the member's name.
+ *
+ * They used to be a second row inside the summary card, at full size, which made the card the
+ * tallest thing above the path and pushed the path most of a screen down.
+ */
+export function MemberSignals({
+  path,
+  feedback,
+  skillLevels,
+  knowledgeGapCount,
+  onOpen,
+}: MemberSignalsProps) {
+  const data = memberSummaryData(path, feedback);
+  const workload = data.estimated > 0 ? (data.closedEstimate / data.estimated) * 100 : 0;
+  const levels = LEVEL_SEGMENTS.map((segment) => ({
+    ...segment,
+    value: skillLevels.filter((skill) => skill.level === segment.level).length,
+  })).filter((segment) => segment.value > 0);
+  const assessed = levels.reduce((sum, segment) => sum + segment.value, 0);
+
+  return (
+    <div role="group" aria-label="Figures" className="flex flex-wrap gap-2">
+      <Signal icon={Timer} title="Workload" onOpen={onOpen}>
+        {data.estimated > 0 ? (
+          <>
+            <span className="font-semibold">{formatMinutes(data.closedEstimate)}</span>
+            <span className="text-app-text-muted"> of {formatMinutes(data.estimated)}</span>
+            <span
+              aria-hidden="true"
+              className="mt-1 block h-1 overflow-hidden rounded-full bg-app-progress-track"
+            >
+              <span
+                className="block h-full rounded-full bg-app-brand"
+                style={{ width: `${workload}%` }}
+              />
+            </span>
+          </>
+        ) : (
+          <span className="text-app-text-muted">No estimates</span>
+        )}
+      </Signal>
+
+      <Signal icon={CalendarClock} title="Onboarding for" onOpen={onOpen}>
+        <span className="font-semibold">
+          {data.runningDays === null ? "—" : formatDays(data.runningDays)}
+        </span>
+        <span className="block truncate text-[11px] text-app-text-muted">since the path began</span>
+      </Signal>
+
+      <Signal icon={MessageSquareText} title="What they said" onOpen={onOpen}>
+        <span className="flex flex-wrap items-center gap-x-2.5">
+          <Count
+            icon={ThumbsUp}
+            value={data.helpful}
+            label="steps found helpful"
+            className="text-app-success-text"
+          />
+          <Count
+            icon={ThumbsDown}
+            value={data.unhelpful}
+            label="steps found not helpful"
+            className="text-app-danger-text"
+          />
+          <Count
+            icon={SkipForward}
+            value={data.pendingSkips + data.approvedSkips + data.declinedSkips}
+            label="skip requests"
+            className="text-app-warning-text"
+          />
+        </span>
+        <span className="block truncate text-[11px] text-app-text-muted">
+          {data.pendingSkips > 0
+            ? `${data.pendingSkips} skip ${data.pendingSkips === 1 ? "request" : "requests"} open`
+            : `${data.comments} ${data.comments === 1 ? "comment" : "comments"}`}
+        </span>
+      </Signal>
+
+      <Signal icon={GraduationCap} title="Skills" onOpen={onOpen}>
+        {assessed === 0 ? (
+          <span className="text-app-text-muted">Not assessed yet</span>
+        ) : (
+          // The bar alone, with the levels in its tooltip: the legend under it took three lines
+          // in a tile this size.
+          <span
+            className="block"
+            title={levels.map((segment) => `${segment.value} ${segment.label}`).join(" · ")}
+          >
+            <span className="font-semibold tabular-nums">{assessed}</span>
+            <span className="text-app-text-muted"> assessed</span>
+            <span aria-hidden="true" className="mt-1 flex h-1 gap-0.5 overflow-hidden rounded-full">
+              {levels.map((segment) => (
+                <span
+                  key={segment.level}
+                  className={`rounded-full ${segment.className}`}
+                  style={{ width: `${(segment.value / assessed) * 100}%` }}
+                />
+              ))}
+            </span>
+            <span className="sr-only">
+              : {levels.map((segment) => `${segment.value} ${segment.label}`).join(", ")}
+            </span>
+          </span>
+        )}
+        {knowledgeGapCount > 0 && (
+          <span className="block truncate text-[11px] text-app-text-muted">
+            {knowledgeGapCount} knowledge {knowledgeGapCount === 1 ? "gap" : "gaps"}
+          </span>
+        )}
+      </Signal>
+    </div>
   );
 }

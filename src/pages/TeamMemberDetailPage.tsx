@@ -43,7 +43,7 @@ type DetailOnboardingStep = OnboardingStepEndpoint & {
 import { Button } from "../components/ui/Button";
 import { MemberHero } from "../features/pm-area/components/MemberHero";
 import { MemberOpenItems } from "../features/pm-area/components/MemberOpenItems";
-import { MemberSummary } from "../features/pm-area/components/MemberSummary";
+import { MemberSignals, MemberSummary } from "../features/pm-area/components/MemberSummary";
 import { waitingOn } from "../features/pm-area/memberStatus";
 import { MEMBER_STEP_PARAM } from "../features/pm-area/pmWorkspacePaths";
 import { isUnread, type SkipDecision } from "../features/pm-area/useMemberOpenItems";
@@ -51,7 +51,10 @@ import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { PanelPresence } from "../components/ui/PanelPresence";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
-import { MemberJourneySection } from "../features/team-management/components/detail/MemberJourneySection";
+import {
+  MemberJourneySection,
+  type MemberJourneyHandle,
+} from "../features/team-management/components/detail/MemberJourneySection";
 import { AlertDialog } from "../components/ui/AlertDialog";
 import {
   PhaseCheckAdminModal,
@@ -122,6 +125,8 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const navigate = useNavigate();
 
   const [user, setUser] = useState<TeamOverviewUser | undefined>(undefined);
+  // The figures and phases at the top take the manager down to the path through this.
+  const journeyRef = useRef<MemberJourneyHandle>(null);
   const [availableRoles, setAvailableRoles] = useState<ProjectRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
@@ -718,6 +723,15 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
             savingRoleId={savingRoleId}
             onAddRole={(roleId) => void handleAddRole(roleId)}
             onRemoveRole={setRoleToRemove}
+            figures={
+              <MemberSignals
+                path={onboardingPath}
+                feedback={feedbackItems}
+                skillLevels={skillLevels}
+                knowledgeGapCount={knowledgeGaps.length}
+                onOpen={() => journeyRef.current?.showPhase()}
+              />
+            }
           />
         </div>
         <div className="space-y-5">
@@ -730,8 +744,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
                 member={user}
                 path={onboardingPath}
                 feedback={feedbackItems}
-                skillLevels={skillLevels}
-                knowledgeGapCount={knowledgeGaps.length}
+                onOpenPhase={(phaseId) => journeyRef.current?.showPhase(phaseId)}
               />
             </div>
             {/* Only while something is open: an empty "waiting on you" column would take a quarter
@@ -772,6 +785,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           </div>
 
           <MemberJourneySection
+            ref={journeyRef}
             userId={user.userId}
             memberName={`${user.firstname} ${user.lastname}`.trim()}
             path={onboardingPath}
