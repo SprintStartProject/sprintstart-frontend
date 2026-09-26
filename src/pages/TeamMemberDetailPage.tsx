@@ -721,48 +721,55 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           />
         </div>
         <div className="space-y-5">
-          {/* Only while something is open: an empty "waiting on you" strip at the top of every
-              profile would push the rest down to say nothing. A slim warning-coloured strip, not a
-              card: it is a to-do list of one or two lines, and each line opens its step. Fed from
-              this page's own feedback and skip handling, so it shares the guard with the journey
-              and the step panel. */}
-          {openItemCount > 0 && (
-            <section
-              aria-label="Waiting on you"
-              className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
-            >
-              <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wider text-app-warning-text uppercase">
-                <Hand aria-hidden="true" className="h-3.5 w-3.5" />
-                Waiting on you
-                <span className="rounded-full bg-app-surface px-1.5 py-0.5 text-[11px] tracking-normal normal-case tabular-nums">
-                  {openItemCount}
-                </span>
-              </h2>
-              <MemberOpenItems
+          {/* The summary and what is waiting side by side — three quarters and one — so the path
+              starts a screen higher; they used to stack, and the path was a long scroll away. With
+              nothing open the summary takes the whole row. */}
+          <div className={`grid gap-5 ${openItemCount > 0 ? "lg:grid-cols-4" : ""}`}>
+            <div className={openItemCount > 0 ? "min-w-0 lg:col-span-3" : "min-w-0"}>
+              <MemberSummary
                 member={user}
+                path={onboardingPath}
                 feedback={feedbackItems}
-                feedbackLoading={loadingFeedback}
-                feedbackError={Boolean(feedbackError)}
-                reviewingSkip={
-                  user.currentStep?.skip?.id
-                    ? (reviewingSkips[user.currentStep.skip.id] ?? null)
-                    : null
-                }
-                markingFeedbackId={markingFeedbackId}
-                onReviewSkip={(skipId, decision) => void reviewSkip(skipId, decision)}
-                onMarkRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
-                onOpenStep={setDetailStepId}
+                skillLevels={skillLevels}
+                knowledgeGapCount={knowledgeGaps.length}
               />
-            </section>
-          )}
-
-          <MemberSummary
-            member={user}
-            path={onboardingPath}
-            feedback={feedbackItems}
-            skillLevels={skillLevels}
-            knowledgeGapCount={knowledgeGaps.length}
-          />
+            </div>
+            {/* Only while something is open: an empty "waiting on you" column would take a quarter
+                of the row to say nothing. A warning-coloured list, not a card: each line opens its
+                step. Fed from this page's own feedback and skip handling, so it shares the guard
+                with the journey and the step panel. As tall as the summary and no taller
+                (`h-0 min-h-full`): a long list scrolls inside it instead of pushing the path down.
+                First on narrow screens, where the two stack. */}
+            {openItemCount > 0 && (
+              <section
+                aria-label="Waiting on you"
+                className="app-scrollbar order-first rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 lg:order-none lg:col-span-1 lg:h-0 lg:min-h-full lg:overflow-y-auto"
+              >
+                <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wider text-app-warning-text uppercase">
+                  <Hand aria-hidden="true" className="h-3.5 w-3.5" />
+                  Waiting on you
+                  <span className="rounded-full bg-app-surface px-1.5 py-0.5 text-[11px] tracking-normal normal-case tabular-nums">
+                    {openItemCount}
+                  </span>
+                </h2>
+                <MemberOpenItems
+                  member={user}
+                  feedback={feedbackItems}
+                  feedbackLoading={loadingFeedback}
+                  feedbackError={Boolean(feedbackError)}
+                  reviewingSkip={
+                    user.currentStep?.skip?.id
+                      ? (reviewingSkips[user.currentStep.skip.id] ?? null)
+                      : null
+                  }
+                  markingFeedbackId={markingFeedbackId}
+                  onReviewSkip={(skipId, decision) => void reviewSkip(skipId, decision)}
+                  onMarkRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+                  onOpenStep={setDetailStepId}
+                />
+              </section>
+            )}
+          </div>
 
           <MemberJourneySection
             userId={user.userId}

@@ -139,10 +139,12 @@ export function MemberSummary({
   }));
 
   return (
-    <PmCard aria-label="At a glance" tone="brand">
-      <div className="grid gap-6 lg:grid-cols-[auto_minmax(0,1.2fr)_auto]">
+    // Laid out by its own width, not the window's: beside the "Waiting on you" column the card
+    // is three quarters wide, and the window's breakpoints would squeeze three columns into it.
+    <PmCard aria-label="At a glance" tone="brand" className="@container">
+      <div className="grid gap-6 @xl:grid-cols-[auto_minmax(0,1.2fr)_auto]">
         {/* Where they are, overall. */}
-        <div className="flex items-center gap-4 lg:flex-col lg:items-start">
+        <div className="flex items-center gap-4 @xl:flex-col @xl:items-start">
           <RingGauge
             value={percent}
             size={96}
@@ -153,7 +155,7 @@ export function MemberSummary({
             <span className="text-xl leading-none font-bold text-app-text">{percent}%</span>
             <span className="mt-1 text-[11px] text-app-text-muted">{STAGE_LABEL[stage]}</span>
           </RingGauge>
-          <div className="min-w-0 space-y-1 text-xs text-app-text-muted lg:max-w-44">
+          <div className="min-w-0 space-y-1 text-xs text-app-text-muted @xl:max-w-44">
             {data.progress && (
               <p>
                 <span className="font-semibold text-app-text tabular-nums">
@@ -325,7 +327,7 @@ export function MemberSummary({
         )}
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-3 @md:grid-cols-2 @2xl:grid-cols-4">
         <Signal icon={Timer} title="Workload">
           {data.estimated > 0 ? (
             <>
