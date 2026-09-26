@@ -4,7 +4,12 @@ import { userService } from "./userService";
 import keycloak from "../config/keycloak";
 import type {
   Artifact,
+  ArtifactAiStatusResponse,
   ArtifactContent,
+  ArtifactFacets,
+  ArtifactPage,
+  DeleteUploadsResult,
+  KnowledgeListParams,
   SummaryStreamHandlers,
 } from "../features/knowledge-base/types";
 
@@ -30,6 +35,52 @@ type UploadResponseItem = {
   error?: string;
 };
 
+/**
+ * Serialises the *filter* half of {@link KnowledgeListParams} — the part the list and the facets
+ * endpoints share. One builder for both calls is the parity guarantee: a filter added here reaches
+ * the counts and the rows alike, so a facet can never promise "12" for a list that shows 30.
+ * Sets are repeated params (`types=A&types=B`), which is how Spring binds a `List` parameter.
+ */
+function buildFilterQuery(params: KnowledgeListParams): URLSearchParams {
+  const query = new URLSearchParams();
+  const search = params.search?.trim();
+  if (search) query.set("search", search);
+  for (const type of params.types ?? []) query.append("types", type);
+  for (const source of params.sources ?? []) query.append("sources", source);
+  for (const repository of params.repositories ?? []) query.append("repositories", repository);
+  if (params.format) query.set("format", params.format);
+  for (const language of params.languages ?? []) query.append("languages", language);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  return query;
+}
+
+/** Reason recorded for an id the backend answered for in neither list. */
+const UNCONFIRMED_DELETE = "The server did not confirm this deletion.";
+
+/**
+ * Normalises a delete answer. No `deletedIds`/`failed` at all is the old
+ * backend's empty 204: every requested id is taken as deleted.
+ */
+function readDeleteOutcome(
+  requested: readonly string[],
+  body: Partial<DeleteUploadsResult> | undefined,
+): DeleteUploadsResult {
+  if (!body || (!Array.isArray(body.deletedIds) && !Array.isArray(body.failed))) {
+    return { deletedIds: [...requested], failed: [] };
+  }
+  const failed = body.failed ?? [];
+  const deleted = new Set(body.deletedIds ?? []);
+  const answered = new Set([...deleted, ...failed.map((item) => item.artifactId)]);
+  const unconfirmed = requested
+    .filter((id) => !answered.has(id))
+    .map((artifactId) => ({ artifactId, error: UNCONFIRMED_DELETE }));
+  return {
+    deletedIds: requested.filter((id) => deleted.has(id)),
+    failed: [...failed, ...unconfirmed],
+  };
+}
+
 export const knowledgeService = {
   /**
    * Whether the project has anything ingested at all -- what an onboarding path is built from.
@@ -52,9 +103,9 @@ export const knowledgeService = {
    * Fetches a single short page of project artifacts for at-a-glance views
    * such as the dashboard widget.
    *
-   * Deliberately separate from {@link knowledgeService.getUnifiedArtifacts},
-   * which pages through the entire project and additionally merges personal
-   * uploads — far more work than a preview card needs.
+   * Deliberately separate from {@link knowledgeService.getArtifactPage}: a
+   * preview card wants the newest handful of rows and nothing else, so it must
+   * not drag facet counts or a full page size along with it.
    *
    * @param projectId UUID of the project to scope the listing.
    * @param limit Maximum number of artifacts to return.
@@ -73,36 +124,77 @@ export const knowledgeService = {
   },
 
   /**
-   * Fetches all unified artifacts for a specific project.
+   * Fetches a paginated, server-side filtered page of artifacts for a project.
    *
-   * @param projectId UUID of the project to scope the artifact listing.
-   * @returns List of project-scoped artifacts.
-   * @throws ApiError when the backend request fails so callers can distinguish
-   *   between an empty project and a failed fetch.
+   * @param projectId UUID of the project.
+   * @param params Filter criteria (see `buildFilterQuery`) plus the list-only page, size and sort.
    */
-  async getUnifiedArtifacts(projectId: string): Promise<Artifact[]> {
-    let artifacts: Artifact[] = [];
+  async getArtifactPage(
+    projectId: string,
+    params: KnowledgeListParams = {},
+  ): Promise<ArtifactPage> {
+    const query = buildFilterQuery(params);
+    if (params.page !== undefined) query.set("page", String(params.page));
+    if (params.size !== undefined) query.set("size", String(params.size));
+    // List-only: order changes which rows a page holds, never how many match.
+    if (params.sort) query.set("sort", params.sort);
 
-    interface PageResponse {
-      items: Artifact[];
-      page: {
-        totalPages: number;
-      };
-    }
+    const queryString = query.toString();
+    const endpoint = `/api/v1/projects/${projectId}/artifacts${queryString ? `?${queryString}` : ""}`;
+    return apiClient.fetch<ArtifactPage>(endpoint);
+  },
 
-    let currentPage = 1;
-    let totalPages = 1;
+  /**
+   * Fetches faceted counts for artifact types, source systems, upload formats, repositories and
+   * languages.
+   *
+   * Sends exactly the filter criteria the list sends (see `buildFilterQuery`) and nothing of its
+   * paging or order: `page`, `size` and `sort` are ignored even when present in `params`, because
+   * a count must not depend on which page is on screen or how it is ordered.
+   *
+   * @param projectId UUID of the project.
+   * @param params Active filter criteria to calculate dynamic facet counts.
+   */
+  async getArtifactFacets(
+    projectId: string,
+    params: KnowledgeListParams = {},
+  ): Promise<ArtifactFacets> {
+    const queryString = buildFilterQuery(params).toString();
+    const endpoint = `/api/v1/projects/${projectId}/artifacts/facets${queryString ? `?${queryString}` : ""}`;
+    return apiClient.fetch<ArtifactFacets>(endpoint);
+  },
 
-    while (currentPage <= totalPages) {
-      const response = await apiClient.fetch<PageResponse>(
-        `/api/v1/projects/${projectId}/artifacts?page=${currentPage}&size=100`,
-      );
-      artifacts = [...artifacts, ...(response.items || [])];
-      totalPages = response.page?.totalPages ?? 1;
-      currentPage++;
-    }
+  /**
+   * Fetches the AI assistant's index status for a batch of artifacts (at most 100, the backend's
+   * cap and the largest page size, so one visible page is always one request).
+   *
+   * An empty `ids` list resolves locally without a request. A response without `aiAvailable`
+   * (older backend) is read as unavailable, so no status is ever guessed.
+   *
+   * @param projectId UUID of the project.
+   * @param artifactIds Ingestion ids of the artifacts on screen.
+   */
+  async getArtifactAiStatus(
+    projectId: string,
+    artifactIds: readonly string[],
+  ): Promise<ArtifactAiStatusResponse> {
+    if (artifactIds.length === 0) return { aiAvailable: true, items: [] };
+    const query = new URLSearchParams();
+    artifactIds.forEach((id) => query.append("ids", id));
+    const body = await apiClient.fetch<Partial<ArtifactAiStatusResponse>>(
+      `/api/v1/projects/${projectId}/artifacts/ai-status?${query.toString()}`,
+    );
+    return { aiAvailable: body?.aiAvailable === true, items: body?.items ?? [] };
+  },
 
-    return artifacts;
+  /**
+   * Fetches metadata for a single artifact by ID within a project.
+   *
+   * @param projectId UUID of the project.
+   * @param artifactId UUID of the artifact.
+   */
+  async getArtifactById(projectId: string, artifactId: string): Promise<Artifact> {
+    return apiClient.fetch<Artifact>(`/api/v1/projects/${projectId}/artifacts/${artifactId}`);
   },
 
   /**
@@ -264,7 +356,45 @@ export const knowledgeService = {
   },
 
   /**
+   * Deletes a batch of uploaded artifacts and reports what happened to each.
+   *
+   * Sends one multipart DELETE to `/api/v1/uploads` (`request` JSON part with
+   * `artifactIds`, `removerId`, `projectId`). The backend answers 200 with
+   * `{ deletedIds, failed }`; an older backend answers an empty 204, which is
+   * read as "every requested id deleted" — that was its only success signal.
+   *
+   * An id the new shape reports in neither list is counted as failed: a
+   * deletion nobody confirmed must not be shown as a success.
+   *
+   * @param uploadIds Upload UUIDs (`Artifact.sourceId`), not ingestion ids.
+   * @throws ApiError on a non-2xx response; per-item failures do not throw.
+   */
+  async deleteUploads(
+    projectId: string,
+    uploadIds: readonly string[],
+    removerId: string,
+  ): Promise<DeleteUploadsResult> {
+    const formData = new FormData();
+    const requestPayload = { artifactIds: [...uploadIds], removerId, projectId };
+    formData.append(
+      "request",
+      new Blob([JSON.stringify(requestPayload)], { type: "application/json" }),
+    );
+
+    const body = await apiClient.fetch<Partial<DeleteUploadsResult> | undefined>(
+      `/api/v1/uploads`,
+      { method: "DELETE", body: formData },
+    );
+    return readDeleteOutcome(uploadIds, body);
+  },
+
+  /**
    * Deletes a single uploaded artifact by its id.
+   *
+   * Delegates to {@link knowledgeService.deleteUploads} so the single and bulk
+   * paths cannot drift, and throws when the backend reports this id as failed —
+   * the batch endpoint answers 200 for per-item failures, which used to make a
+   * failed single delete look like a success.
    *
    * Sends a multipart DELETE to `/api/v1/uploads` with a `request`
    * JSON part containing the artifactIds batch, the removerId (authenticated user)
@@ -284,23 +414,12 @@ export const knowledgeService = {
    *   which resolves the remover from the JWT subject.
    * @throws ApiError on a non-2xx response (e.g. 403 if the caller lacks access
    *   to the supplied projectId, 404 if the artifact does not exist).
+   * @throws Error carrying the backend's reason when the id is in `failed`.
    */
   async deleteUpload(projectId: string, artifactId: string, removerId: string): Promise<void> {
-    const formData = new FormData();
-    const requestPayload = {
-      artifactIds: [artifactId],
-      removerId,
-      projectId,
-    };
-    formData.append(
-      "request",
-      new Blob([JSON.stringify(requestPayload)], { type: "application/json" }),
-    );
-
-    await apiClient.fetch<void>(`/api/v1/uploads`, {
-      method: "DELETE",
-      body: formData,
-    });
+    const { failed } = await knowledgeService.deleteUploads(projectId, [artifactId], removerId);
+    const failure = failed.find((item) => item.artifactId === artifactId);
+    if (failure) throw new Error(failure.error);
   },
 
   /**

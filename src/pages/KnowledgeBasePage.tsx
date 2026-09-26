@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import {
+  ArtifactBulkActions,
   ArtifactFilters,
   ArtifactList,
   ArtifactViewerDrawer,
@@ -14,8 +14,16 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { useAuth } from "../context/useAuth";
 import { PermissionGroup } from "../services/types";
 import { useKnowledgeBase } from "../features/knowledge-base/hooks/useKnowledgeBase";
+import { useArtifactById } from "../features/knowledge-base/hooks/useArtifactById";
+import { useUploadSelection } from "../features/knowledge-base/hooks/useUploadSelection";
+import { useArtifactAiStatus } from "../features/knowledge-base/hooks/useArtifactAiStatus";
+import { isUpload } from "../features/knowledge-base/tabs";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useDelayedFlag } from "../hooks/useDelayedFlag";
+import { useDebouncedValue } from "../hooks/useDebouncedValue.ts";
+import { ArtifactPageSizeSelect } from "../features/knowledge-base/components/ArtifactPageSizeSelect.tsx";
+import { PAGE_SIZE_OPTIONS } from "../features/knowledge-base/hooks/useKnowledgeBaseUrlState.ts";
+import { formatResultRange } from "../features/knowledge-base/resultRange.ts";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../components/ui/Skeleton";
 
 /** Placeholder for one `ArtifactCard`, matching its icon box, title/badge row and meta row. */
@@ -54,14 +62,18 @@ const DELETE_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
   PermissionGroup.ADMIN,
 ]);
 
+/** How long the result total must hold still before the live region announces it. */
+const RESULTS_ANNOUNCE_DELAY_MS = 600;
+
 /**
  * Unified Knowledge Base view for project resources.
  *
  * Bound to the `/knowledge-base` route (accessible to all permission groups).
  * Displays all artifacts (uploads, github, etc.) in a filtered grid, with a side
- * drawer for viewing raw content and AI summaries. Artifacts are fetched via
- * `knowledgeService.getUnifiedArtifacts`, scoped to the globally selected
- * project.
+ * drawer for viewing raw content and AI summaries. Artifacts arrive one page at
+ * a time from `knowledgeService.getArtifactPage`, with the facet counts beside
+ * them from `knowledgeService.getArtifactFacets`, scoped to the globally
+ * selected project.
  *
  * Users without a project switcher fall back to their first assigned project,
  * which is what the global selection resolves to for them anyway.
@@ -84,25 +96,80 @@ export function KnowledgeBasePage() {
     sourceOptions,
     formatOptions,
     repositoryOptions,
+    languageOptions,
     selectedSources,
     selectedFormat,
     selectedRepositories,
+    selectedLanguages,
     currentPage,
     totalPages,
-    filteredArtifacts,
-    paginatedArtifacts,
+    totalElements,
+    resultRange,
+    pageSize,
+    setPageSize,
     handleSearchChange,
     handleTabChange,
     toggleSource,
     toggleFormat,
     toggleRepository,
+    toggleLanguage,
     setCurrentPage,
     handleClearFilters,
     hasActiveFilters,
-  } = useKnowledgeBase(projectId);
+    listScopeKey,
+    selectedArtifactId,
+    setSelectedArtifactId,
+    sort,
+    setSort,
+    dateRange,
+    setDateRange,
+  } = useKnowledgeBase(projectId, { projectSettled: !isProjectLoading });
 
   const isLoading = isProjectLoading || isArtifactsLoading;
   const showLoadingSkeleton = useDelayedFlag(isLoading);
+
+  const uploadSelection = useUploadSelection(listScopeKey);
+
+  /*
+    Bulk selection is offered only while the Uploads source is picked: only uploads can be
+    deleted, and in any other view the toggle only crowds the filter row.
+  */
+  const canBulkSelect = canDeleteUpload && selectedSources.has("UPLOAD");
+  if (!canBulkSelect && uploadSelection.isSelectMode) uploadSelection.setSelectMode(false);
+
+  /* One status request per visible page, keyed on exactly the ids on screen. */
+  const visibleArtifactIds = useMemo(() => artifacts.map((a) => a.id), [artifacts]);
+  const aiStatuses = useArtifactAiStatus(projectId, visibleArtifactIds);
+  /* Only ticked rows that are uploads on the page in view can be deleted: the selection is
+     re-read against the list itself, so nothing off screen is ever sent. */
+  const selectedUploads = useMemo(
+    () => artifacts.filter((a) => isUpload(a) && uploadSelection.selectedIds.has(a.id)),
+    [artifacts, uploadSelection.selectedIds],
+  );
+
+  /** Refresh drops the selection: the rows it named may no longer be the rows shown. */
+  const handleRefresh = () => {
+    uploadSelection.clear();
+    void fetchArtifacts();
+  };
+
+  /** After a bulk delete: nothing stays ticked, and a drawer showing a deleted row closes. */
+  const handleBulkDeleted = (deletedIds: string[]) => {
+    uploadSelection.clear();
+    if (selectedArtifactId && deletedIds.includes(selectedArtifactId)) {
+      setSelectedArtifactId(null);
+    }
+  };
+
+  /*
+    What a screen reader hears after a filter, search or page change: the new total, said once
+    the results have settled. Debounced so four quick facet clicks announce one number, not four,
+    and empty while loading or failed - the error banner speaks for itself (assertively).
+  */
+  const resultsAnnouncement = useDebouncedValue(
+    isLoading || fetchError ? "" : formatResultRange(totalElements),
+    RESULTS_ANNOUNCE_DELAY_MS,
+  );
 
   /*
     `?artifact=<id>` says which document is open, and it is in the URL the whole time one is.
@@ -121,34 +188,26 @@ export function KnowledgeBasePage() {
     closing one takes it away. `replace` throughout, so reading four documents does not leave four
     entries in the back button. The original intent survives it — a URL captured after the drawer is
     closed carries no id, so coming back later still does not reopen a document somebody shut.
+    The URL itself is now owned by `useKnowledgeBase` (every filter lives there too, and two
+    writers of one query string overwrite each other), which also drops `?artifact=` on a switch
+    between two settled projects - the id of project A's document means nothing in project B.
   */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(() =>
-    searchParams.get("artifact"),
+
+  const isSelectedInPage = useMemo(
+    () => artifacts.some((a) => a.id === selectedArtifactId),
+    [artifacts, selectedArtifactId],
   );
-  const [prevProjectId, setPrevProjectId] = useState(projectId);
 
-  useEffect(() => {
-    // Compared before writing, because this effect's own write comes back to it as a new
-    // `searchParams`: without the guard that is a loop rather than a synchronisation.
-    if ((searchParams.get("artifact") ?? null) === selectedArtifactId) return;
-
-    const next = new URLSearchParams(searchParams);
-    if (selectedArtifactId) next.set("artifact", selectedArtifactId);
-    else next.delete("artifact");
-
-    setSearchParams(next, { replace: true });
-  }, [selectedArtifactId, searchParams, setSearchParams]);
-
-  // Reset active drawer selection whenever the project scope changes.
-  if (prevProjectId !== projectId) {
-    setPrevProjectId(projectId);
-    setSelectedArtifactId(null);
-  }
+  const { data: fetchedArtifact } = useArtifactById(
+    projectId,
+    selectedArtifactId && !isSelectedInPage ? selectedArtifactId : null,
+  );
 
   const selectedArtifact = useMemo(
-    () => artifacts.find((a) => a.id === selectedArtifactId) ?? null,
-    [artifacts, selectedArtifactId],
+    () =>
+      artifacts.find((a) => a.id === selectedArtifactId) ??
+      (fetchedArtifact?.id === selectedArtifactId ? fetchedArtifact : null),
+    [artifacts, selectedArtifactId, fetchedArtifact],
   );
 
   const prefersReducedMotion = useReducedMotion();
@@ -162,7 +221,7 @@ export function KnowledgeBasePage() {
     connector. There is no index any more -- a multi-select selection has no direction, and a slide
     chosen from a set's iteration order would move left on a change the reader reads as forward.
   */
-  const facetKey = `${activeTab}|${[...selectedSources].sort().join(",")}|${selectedFormat ?? ""}|${[...selectedRepositories].sort().join(",")}`;
+  const facetKey = `${activeTab}|${[...selectedSources].sort().join(",")}|${selectedFormat ?? ""}|${[...selectedRepositories].sort().join(",")}|${[...selectedLanguages].sort().join(",")}`;
 
   return (
     <div className="flex min-h-screen flex-col text-app-text">
@@ -213,13 +272,48 @@ export function KnowledgeBasePage() {
                   repositoryOptions={repositoryOptions}
                   selectedRepositories={selectedRepositories}
                   onToggleRepository={toggleRepository}
-                  resultCount={filteredArtifacts.length}
+                  languageOptions={languageOptions}
+                  selectedLanguages={selectedLanguages}
+                  onToggleLanguage={toggleLanguage}
+                  resultCount={totalElements}
+                  resultRange={resultRange}
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={handleClearFilters}
-                  onRefresh={() => void fetchArtifacts()}
+                  sort={sort}
+                  onSortChange={setSort}
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
+                  onRefresh={handleRefresh}
                   isRefreshing={isLoading}
+                  {...(canBulkSelect
+                    ? {
+                        isSelectMode: uploadSelection.isSelectMode,
+                        onSelectModeChange: uploadSelection.setSelectMode,
+                      }
+                    : {})}
                 />
+                <p
+                  className="sr-only"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  data-testid="kb-results-announcement"
+                >
+                  {resultsAnnouncement}
+                </p>
               </motion.div>
+
+              {canBulkSelect && projectId && uploadSelection.isSelectMode && (
+                <div className="mb-4">
+                  <ArtifactBulkActions
+                    projectId={projectId}
+                    removerId={profile?.id ?? null}
+                    selected={selectedUploads}
+                    onClearSelection={uploadSelection.clear}
+                    onDeleted={handleBulkDeleted}
+                    listScopeKey={listScopeKey}
+                  />
+                </div>
+              )}
 
               {fetchError && !isLoading && (
                 <div
@@ -255,17 +349,44 @@ export function KnowledgeBasePage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={prefersReducedMotion ? { duration: 0 } : centralSpringToken}
                 >
-                  <ArtifactList artifacts={paginatedArtifacts} onSelect={setSelectedArtifactId} />
-                  {totalPages > 1 && (
-                    <Pagination
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      onPageChange={(page) => {
-                        setCurrentPage(page);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="mt-8 mb-12"
-                    />
+                  <ArtifactList
+                    artifacts={artifacts}
+                    onSelect={setSelectedArtifactId}
+                    aiStatuses={aiStatuses}
+                    selection={
+                      uploadSelection.isSelectMode
+                        ? {
+                            selectedIds: uploadSelection.selectedIds,
+                            onToggle: uploadSelection.toggle,
+                          }
+                        : undefined
+                    }
+                  />
+                  {(totalPages > 1 || totalElements > PAGE_SIZE_OPTIONS[0]) && (
+                    // Both controls carry the same top margin (Pagination's own `mt-6`) so the row
+                    // lines up without overriding a primitive's classes.
+                    <div
+                      className="mb-12 flex flex-wrap items-center justify-center gap-x-6"
+                      data-testid="kb-list-footer"
+                    >
+                      {totalPages > 1 && (
+                        <Pagination
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          onPageChange={(page) => {
+                            setCurrentPage(page);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        />
+                      )}
+                      {totalElements > PAGE_SIZE_OPTIONS[0] && (
+                        <ArtifactPageSizeSelect
+                          pageSize={pageSize}
+                          onPageSizeChange={setPageSize}
+                          className="mt-6"
+                        />
+                      )}
+                    </div>
                   )}
                 </motion.div>
               )}

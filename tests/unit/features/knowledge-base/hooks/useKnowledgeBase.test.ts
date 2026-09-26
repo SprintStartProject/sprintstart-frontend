@@ -1,11 +1,23 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createElement, type ReactNode } from "react";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { useKnowledgeBase } from "../../../../../src/features/knowledge-base/hooks/useKnowledgeBase";
-import type { Artifact } from "../../../../../src/features/knowledge-base/types";
+import type {
+  Artifact,
+  ArtifactPage,
+  KnowledgeListParams,
+} from "../../../../../src/features/knowledge-base/types";
+import { matchesFormat } from "../../../../../src/features/knowledge-base/tabs";
+import {
+  getArtifactRepository,
+  matchesRepository,
+} from "../../../../../src/features/knowledge-base/githubMetadata";
 
 vi.mock("../../../../../src/services/knowledgeService", () => ({
   knowledgeService: {
-    getUnifiedArtifacts: vi.fn(),
+    getArtifactPage: vi.fn(),
+    getArtifactFacets: vi.fn(),
   },
 }));
 
@@ -106,15 +118,205 @@ function makeRepoFixture(): Artifact[] {
   ];
 }
 
+/** The backend's language predicate: case-insensitive, and an artifact with no language fails. */
+function matchesLanguages(a: Artifact, languages: string[] | undefined): boolean {
+  if (!languages || languages.length === 0) return true;
+  const own = a.language?.toLowerCase();
+  return own !== undefined && languages.some((language) => language.toLowerCase() === own);
+}
+
+/** Code files in two languages, a Markdown upload and a PR without a language. */
+function makeLanguageFixture(): Artifact[] {
+  const withLanguage = (artifact: Artifact, language: string | null): Artifact => ({
+    ...artifact,
+    language,
+  });
+  return [
+    withLanguage(makeArtifact("k1", "Main.kt"), "Kotlin"),
+    withLanguage(makeArtifact("k2", "Util.kt"), "Kotlin"),
+    withLanguage(makeArtifact("t1", "app.ts"), "TypeScript"),
+    withLanguage(makeArtifact("m1", "README.md"), "Markdown"),
+    withLanguage(makeArtifact("p1", "Fix login", "PULL_REQUEST"), null),
+  ];
+}
+
+function mockArtifactQuery(artifacts: Artifact[]) {
+  const getArtifactPage = vi
+    .fn()
+    .mockImplementation((_pid: string, params: KnowledgeListParams = {}) => {
+      const filtered = artifacts.filter((a) => {
+        if (params.search) {
+          const q = params.search.toLowerCase();
+          const text = [a.title ?? "", a.sourceId, a.sourceUrl ?? ""].join(" ").toLowerCase();
+          if (!text.includes(q)) return false;
+        }
+        if (params.types && params.types.length > 0) {
+          if (!params.types.includes(a.artifactType)) return false;
+        }
+        if (params.sources && params.sources.length > 0) {
+          if (!params.sources.includes(a.sourceSystem)) return false;
+        }
+        if (params.format) {
+          if (!matchesFormat(a, params.format)) return false;
+        }
+        if (params.repositories && params.repositories.length > 0) {
+          if (!matchesRepository(a, new Set(params.repositories))) return false;
+        }
+        if (!matchesLanguages(a, params.languages)) return false;
+        return true;
+      });
+
+      const page = params.page ?? 1;
+      const size = params.size ?? 20;
+      const totalElements = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(totalElements / size));
+      const start = (page - 1) * size;
+      const items = filtered.slice(start, start + size);
+
+      return Promise.resolve({
+        items,
+        page: {
+          number: page,
+          size,
+          totalElements,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrevious: page > 1,
+        },
+        metadata: {
+          pageNumber: page,
+          pageSize: size,
+          totalElements,
+          totalPages,
+          isFirst: page === 1,
+          isLast: page === totalPages,
+          hasNext: page < totalPages,
+          hasPrevious: page > 1,
+        },
+      });
+    });
+
+  const getArtifactFacets = vi
+    .fn()
+    .mockImplementation((_pid: string, params: KnowledgeListParams = {}) => {
+      const matchesAllExcept = (
+        a: Artifact,
+        excludeFacet: "types" | "sources" | "format" | "repositories" | "languages",
+      ) => {
+        if (excludeFacet !== "languages" && !matchesLanguages(a, params.languages)) return false;
+        if (params.search) {
+          const q = params.search.toLowerCase();
+          const text = [a.title ?? "", a.sourceId, a.sourceUrl ?? ""].join(" ").toLowerCase();
+          if (!text.includes(q)) return false;
+        }
+        if (excludeFacet !== "types" && params.types && params.types.length > 0) {
+          if (!params.types.includes(a.artifactType)) return false;
+        }
+        if (excludeFacet !== "sources" && params.sources && params.sources.length > 0) {
+          if (!params.sources.includes(a.sourceSystem)) return false;
+        }
+        if (excludeFacet !== "format" && params.format) {
+          if (!matchesFormat(a, params.format)) return false;
+        }
+        if (
+          excludeFacet !== "repositories" &&
+          params.repositories &&
+          params.repositories.length > 0
+        ) {
+          if (!matchesRepository(a, new Set(params.repositories))) return false;
+        }
+        return true;
+      };
+
+      const typeCandidates = artifacts.filter((a) => matchesAllExcept(a, "types"));
+      const typeCounts = new Map<string, number>();
+      for (const a of typeCandidates) {
+        typeCounts.set(a.artifactType, (typeCounts.get(a.artifactType) ?? 0) + 1);
+      }
+      const types = Array.from(typeCounts.entries()).map(([value, count]) => ({ value, count }));
+
+      const presentSources = new Set(artifacts.map((a) => a.sourceSystem));
+      const sourceCandidates = artifacts.filter((a) => matchesAllExcept(a, "sources"));
+      const sourceCounts = new Map<string, number>();
+      for (const s of presentSources) {
+        sourceCounts.set(s, 0);
+      }
+      for (const a of sourceCandidates) {
+        sourceCounts.set(a.sourceSystem, (sourceCounts.get(a.sourceSystem) ?? 0) + 1);
+      }
+      const sources = Array.from(sourceCounts.entries()).map(([value, count]) => ({
+        value,
+        count,
+      }));
+
+      const formatCandidates = artifacts.filter((a) => matchesAllExcept(a, "format"));
+      const formatCounts = new Map<string, number>();
+      for (const a of formatCandidates) {
+        for (const fmt of ["PDF", "MARKDOWN", "IMAGE", "OTHER"] as const) {
+          if (matchesFormat(a, fmt)) {
+            formatCounts.set(fmt, (formatCounts.get(fmt) ?? 0) + 1);
+          }
+        }
+      }
+      const formats = Array.from(formatCounts.entries()).map(([value, count]) => ({
+        value,
+        count,
+      }));
+
+      const repoCandidates = artifacts.filter(
+        (a) => matchesAllExcept(a, "repositories") && a.sourceSystem === "GITHUB",
+      );
+      const distinctRepos = new Set<string>();
+      for (const a of repoCandidates) {
+        const repo = getArtifactRepository(a);
+        if (repo) distinctRepos.add(repo);
+      }
+      const repositories = Array.from(distinctRepos).map((repo) => ({
+        value: repo,
+        count: repoCandidates.filter((a) => matchesRepository(a, new Set([repo]))).length,
+      }));
+
+      // Backend contract: own dimension excluded, null and document kinds left out, a
+      // selected value with no match still returned at 0.
+      const languageCounts = new Map<string, number>();
+      for (const a of artifacts.filter((x) => matchesAllExcept(x, "languages"))) {
+        if (!a.language || ["markdown", "plain text"].includes(a.language.toLowerCase())) continue;
+        languageCounts.set(a.language, (languageCounts.get(a.language) ?? 0) + 1);
+      }
+      for (const selected of params.languages ?? []) {
+        const known = [...languageCounts.keys()].some(
+          (v) => v.toLowerCase() === selected.toLowerCase(),
+        );
+        if (!known) languageCounts.set(selected, 0);
+      }
+      const languages = Array.from(languageCounts, ([value, count]) => ({ value, count }));
+
+      return Promise.resolve({ types, sources, formats, repositories, languages });
+    });
+
+  return { getArtifactPage, getArtifactFacets };
+}
+
 /** Renders the hook against a fixed artifact list and waits for the fetch to land. */
+/** The hook keeps its filters in the URL, so every render needs a router around it. */
+function RouterWrapper({ children }: { children: ReactNode }) {
+  return createElement(MemoryRouter, null, children);
+}
+
 async function renderWith(artifacts: Artifact[]) {
   const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-  vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+  const { getArtifactPage, getArtifactFacets } = mockArtifactQuery(artifacts);
+  vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
+  vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
 
-  const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+  const { result } = renderHook(() => useKnowledgeBase("proj-1"), { wrapper: RouterWrapper });
 
   await waitFor(() => {
-    expect(result.current.artifacts).toHaveLength(artifacts.length);
+    if (artifacts.length > 0) {
+      expect(result.current.artifacts.length).toBeGreaterThan(0);
+    } else {
+      expect(result.current.isLoading).toBe(false);
+    }
   });
 
   return result;
@@ -127,11 +329,13 @@ describe("useKnowledgeBase", () => {
 
   it("loads artifacts on mount", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+    const { getArtifactPage, getArtifactFacets } = mockArtifactQuery([
       makeArtifact("a1", "first.md"),
     ]);
+    vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
+    vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
 
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"), { wrapper: RouterWrapper });
 
     await waitFor(() => {
       expect(result.current.artifacts).toHaveLength(1);
@@ -143,17 +347,29 @@ describe("useKnowledgeBase", () => {
 
   it("a newer fetch overwrites a stale one, not the other way around", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    const mockFn = vi.mocked(knowledgeService.getUnifiedArtifacts);
+    const mockFn = vi.mocked(knowledgeService.getArtifactPage);
 
-    let resolveFirst: (value: Artifact[]) => void = () => {};
-    const firstPromise = new Promise<Artifact[]>((resolve) => {
+    const makePage = (title: string): ArtifactPage => ({
+      items: [makeArtifact("a", title)],
+      page: {
+        number: 1,
+        size: 20,
+        totalElements: 1,
+        totalPages: 1,
+        hasNext: false,
+        hasPrevious: false,
+      },
+    });
+
+    let resolveFirst: (value: ArtifactPage) => void = () => {};
+    const firstPromise = new Promise<ArtifactPage>((resolve) => {
       resolveFirst = resolve;
     });
 
     mockFn.mockReturnValueOnce(firstPromise);
-    mockFn.mockResolvedValueOnce([makeArtifact("a2", "newer.md")]);
+    mockFn.mockResolvedValueOnce(makePage("newer.md"));
 
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"), { wrapper: RouterWrapper });
 
     await act(async () => {
       void result.current.fetchArtifacts();
@@ -168,7 +384,7 @@ describe("useKnowledgeBase", () => {
     });
 
     await act(async () => {
-      resolveFirst([makeArtifact("a1", "stale.md")]);
+      resolveFirst(makePage("stale.md"));
       await Promise.resolve();
     });
 
@@ -177,9 +393,9 @@ describe("useKnowledgeBase", () => {
 
   it("sets fetchError when the fetch rejects", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockRejectedValue(new Error("Server down"));
+    vi.mocked(knowledgeService.getArtifactPage).mockRejectedValue(new Error("Server down"));
 
-    const { result } = renderHook(() => useKnowledgeBase("proj-1"));
+    const { result } = renderHook(() => useKnowledgeBase("proj-1"), { wrapper: RouterWrapper });
 
     await waitFor(() => {
       expect(result.current.fetchError).not.toBeNull();
@@ -199,9 +415,11 @@ describe("useKnowledgeBase", () => {
       result.current.handleSearchChange("readme");
     });
 
-    expect(result.current.filteredArtifacts).toHaveLength(1);
-    expect(result.current.filteredArtifacts[0].title).toBe("readme.md");
-    expect(result.current.currentPage).toBe(1);
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(1);
+      expect(result.current.artifacts[0].title).toBe("readme.md");
+      expect(result.current.currentPage).toBe(1);
+    });
   });
 
   it("resets to page 1 when search changes", async () => {
@@ -215,12 +433,16 @@ describe("useKnowledgeBase", () => {
     act(() => {
       result.current.setCurrentPage(2);
     });
-    expect(result.current.currentPage).toBe(2);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(2);
+    });
 
     act(() => {
       result.current.handleSearchChange("file-0");
     });
-    expect(result.current.currentPage).toBe(1);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(1);
+    });
   });
 
   it("narrows to a single source", async () => {
@@ -230,9 +452,11 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("UPLOAD");
     });
 
-    expect(result.current.filteredArtifacts).toHaveLength(1);
-    expect(result.current.filteredArtifacts[0].sourceSystem).toBe("UPLOAD");
-    expect(result.current.hasActiveFilters).toBe(true);
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(1);
+      expect(result.current.artifacts[0].sourceSystem).toBe("UPLOAD");
+      expect(result.current.hasActiveFilters).toBe(true);
+    });
   });
 
   it("unions several sources instead of replacing the last one", async () => {
@@ -243,12 +467,14 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("JIRA");
     });
 
-    expect(result.current.selectedSources.size).toBe(2);
-    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
-      "gh-issue",
-      "gh-pr",
-      "jira-issue",
-    ]);
+    await waitFor(() => {
+      expect(result.current.selectedSources.size).toBe(2);
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
+        "gh-issue",
+        "gh-pr",
+        "jira-issue",
+      ]);
+    });
   });
 
   it("ANDs the tab filter with the source facet", async () => {
@@ -259,8 +485,10 @@ describe("useKnowledgeBase", () => {
       result.current.handleTabChange("PULL_REQUEST");
     });
 
-    expect(result.current.filteredArtifacts).toHaveLength(1);
-    expect(result.current.filteredArtifacts[0].id).toBe("gh-pr");
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(1);
+      expect(result.current.artifacts[0].id).toBe("gh-pr");
+    });
   });
 
   it("matches one type across every source, so Issues covers GitHub and Jira alike", async () => {
@@ -270,14 +498,15 @@ describe("useKnowledgeBase", () => {
       result.current.handleTabChange("ISSUE");
     });
 
-    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
-      "gh-issue",
-      "jira-issue",
-    ]);
-
-    const tabValues = result.current.tabOptions.map((option) => option.value);
-    expect(tabValues).toContain("ISSUE");
-    expect(tabValues).toContain("ALL");
+    await waitFor(() => {
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
+        "gh-issue",
+        "jira-issue",
+      ]);
+      const tabValues = result.current.tabOptions.map((option) => option.value);
+      expect(tabValues).toContain("ISSUE");
+      expect(tabValues).toContain("ALL");
+    });
   });
 
   it("offers the file-format facet only while Uploads is selected", async () => {
@@ -289,8 +518,10 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("UPLOAD");
     });
 
-    // The fixture holds one PDF upload, so that is the only format worth offering.
-    expect(result.current.formatOptions.map((option) => option.value)).toEqual(["PDF"]);
+    await waitFor(() => {
+      // The fixture holds one PDF upload, so that is the only format worth offering.
+      expect(result.current.formatOptions.map((option) => option.value)).toEqual(["PDF"]);
+    });
   });
 
   it("narrows only the uploads when a format is chosen", async () => {
@@ -304,12 +535,14 @@ describe("useKnowledgeBase", () => {
       result.current.toggleFormat("PDF");
     });
 
-    // The format facet describes uploads; it must not hide the GitHub artifacts.
-    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
-      "gh-issue",
-      "gh-pr",
-      "up-pdf",
-    ]);
+    await waitFor(() => {
+      // The format facet describes uploads; it must not hide the GitHub artifacts.
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
+        "gh-issue",
+        "gh-pr",
+        "up-pdf",
+      ]);
+    });
   });
 
   it("clears the format selection when Uploads is deselected", async () => {
@@ -321,17 +554,19 @@ describe("useKnowledgeBase", () => {
     act(() => {
       result.current.toggleFormat("PDF");
     });
-    expect(result.current.selectedFormat).toBe("PDF");
+    await waitFor(() => {
+      expect(result.current.selectedFormat).toBe("PDF");
+    });
 
     act(() => {
       result.current.toggleSource("UPLOAD");
     });
 
-    // Otherwise a hidden facet keeps filtering and the trigger badge counts
-    // something the reader can no longer see or clear.
-    expect(result.current.selectedFormat).toBeNull();
-    expect(result.current.formatOptions).toHaveLength(0);
-    expect(result.current.filteredArtifacts).toHaveLength(5);
+    await waitFor(() => {
+      expect(result.current.selectedFormat).toBeNull();
+      expect(result.current.formatOptions).toHaveLength(0);
+      expect(result.current.artifacts).toHaveLength(5);
+    });
   });
 
   it("offers the repository facet only while GitHub is selected", async () => {
@@ -343,17 +578,17 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("GITHUB");
     });
 
-    // Alphabetical; counts come from the repo-scoped artifacts only, so the
-    // org artifact (not repo-scoped) contributes to neither option.
-    expect(result.current.repositoryOptions.map((option) => option.value)).toEqual([
-      "sprintstart/sprintstart-backend",
-      "sprintstart/sprintstart-frontend",
-    ]);
-    expect(
-      result.current.repositoryOptions.find(
-        (option) => option.value === "sprintstart/sprintstart-frontend",
-      )?.count,
-    ).toBe(3);
+    await waitFor(() => {
+      expect(result.current.repositoryOptions.map((option) => option.value)).toEqual([
+        "sprintstart/sprintstart-backend",
+        "sprintstart/sprintstart-frontend",
+      ]);
+      expect(
+        result.current.repositoryOptions.find(
+          (option) => option.value === "sprintstart/sprintstart-frontend",
+        )?.count,
+      ).toBe(3);
+    });
   });
 
   it("promises with its count exactly what choosing the repository delivers", async () => {
@@ -363,19 +598,22 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("GITHUB");
     });
 
-    // The owning org's profile counts toward the repo it owns — the number is
-    // a promise about what clicking does, so the list the reader gets must
-    // have exactly that many rows.
-    const frontend = result.current.repositoryOptions.find(
-      (option) => option.value === "sprintstart/sprintstart-frontend",
-    );
-    expect(frontend?.count).toBe(3);
+    let frontendCount = 0;
+    await waitFor(() => {
+      const frontend = result.current.repositoryOptions.find(
+        (option) => option.value === "sprintstart/sprintstart-frontend",
+      );
+      expect(frontend?.count).toBe(3);
+      frontendCount = frontend?.count ?? 0;
+    });
 
     act(() => {
       result.current.toggleRepository("sprintstart/sprintstart-frontend");
     });
 
-    expect(result.current.filteredArtifacts).toHaveLength(frontend?.count ?? -1);
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(frontendCount);
+    });
   });
 
   it("narrows only the github artifacts when a repository is chosen", async () => {
@@ -389,15 +627,14 @@ describe("useKnowledgeBase", () => {
       result.current.toggleRepository("sprintstart/sprintstart-frontend");
     });
 
-    // The repository facet narrows repo-scoped GitHub artifacts; it must not
-    // hide the upload (outside the facet's reach), it hides the unrelated org's
-    // profile, and it keeps the profile of the org that owns the chosen repo.
-    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
-      "gh-fe-1",
-      "gh-fe-2",
-      "gh-org",
-      "up-pdf",
-    ]);
+    await waitFor(() => {
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
+        "gh-fe-1",
+        "gh-fe-2",
+        "gh-org",
+        "up-pdf",
+      ]);
+    });
   });
 
   it("shows the owning org profile under a checked repository, never an unrelated one", async () => {
@@ -410,12 +647,12 @@ describe("useKnowledgeBase", () => {
       result.current.toggleRepository("sprintstart/sprintstart-backend");
     });
 
-    // The org profile belongs to the checked repo's owner org; the unrelated
-    // org's profile does not.
-    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
-      "gh-be-1",
-      "gh-org",
-    ]);
+    await waitFor(() => {
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
+        "gh-be-1",
+        "gh-org",
+      ]);
+    });
   });
 
   it("unions several repositories instead of replacing the choice", async () => {
@@ -429,13 +666,15 @@ describe("useKnowledgeBase", () => {
       result.current.toggleRepository("sprintstart/sprintstart-backend");
     });
 
-    expect(result.current.selectedRepositories.size).toBe(2);
-    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
-      "gh-be-1",
-      "gh-fe-1",
-      "gh-fe-2",
-      "gh-org",
-    ]);
+    await waitFor(() => {
+      expect(result.current.selectedRepositories.size).toBe(2);
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
+        "gh-be-1",
+        "gh-fe-1",
+        "gh-fe-2",
+        "gh-org",
+      ]);
+    });
   });
 
   it("clears the repository selection when GitHub is deselected", async () => {
@@ -447,17 +686,19 @@ describe("useKnowledgeBase", () => {
     act(() => {
       result.current.toggleRepository("sprintstart/sprintstart-frontend");
     });
-    expect(result.current.selectedRepositories.size).toBe(1);
+    await waitFor(() => {
+      expect(result.current.selectedRepositories.size).toBe(1);
+    });
 
     act(() => {
       result.current.toggleSource("GITHUB");
     });
 
-    // Same rule as the format facet: a hidden facet may not keep filtering and
-    // the trigger badge may not count what the reader can no longer see.
-    expect(result.current.selectedRepositories.size).toBe(0);
-    expect(result.current.repositoryOptions).toHaveLength(0);
-    expect(result.current.filteredArtifacts).toHaveLength(6);
+    await waitFor(() => {
+      expect(result.current.selectedRepositories.size).toBe(0);
+      expect(result.current.repositoryOptions).toHaveLength(0);
+      expect(result.current.artifacts).toHaveLength(6);
+    });
   });
 
   it("counts each option against the other facets, not just the search", async () => {
@@ -469,14 +710,15 @@ describe("useKnowledgeBase", () => {
       result.current.handleTabChange("ISSUE");
     });
 
-    // With Issues on, GitHub can only contribute one artifact — the count has to
-    // say so, or the number promises rows that clicking will not deliver.
-    expect(result.current.sourceOptions.find((option) => option.value === "GITHUB")?.count).toBe(1);
-    expect(
-      result.current.sourceOptions.find((option) => option.value === "CONFLUENCE")?.count,
-    ).toBe(0);
-    // Tab options reflect the available types and their counts
-    expect(result.current.tabOptions.find((option) => option.value === "PAGE")?.count).toBe(1);
+    await waitFor(() => {
+      expect(result.current.sourceOptions.find((option) => option.value === "GITHUB")?.count).toBe(
+        1,
+      );
+      expect(
+        result.current.sourceOptions.find((option) => option.value === "CONFLUENCE")?.count,
+      ).toBe(0);
+      expect(result.current.tabOptions.find((option) => option.value === "PAGE")?.count).toBe(1);
+    });
   });
 
   it("resets to page 1 when a tab is changed", async () => {
@@ -488,13 +730,17 @@ describe("useKnowledgeBase", () => {
     act(() => {
       result.current.setCurrentPage(2);
     });
-    expect(result.current.currentPage).toBe(2);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(2);
+    });
 
     act(() => {
       result.current.handleTabChange("FILE");
     });
 
-    expect(result.current.currentPage).toBe(1);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(1);
+    });
   });
 
   it("clears the search and every facet at once", async () => {
@@ -520,11 +766,11 @@ describe("useKnowledgeBase", () => {
     expect(result.current.selectedFormat).toBeNull();
     expect(result.current.selectedRepositories.size).toBe(0);
     expect(result.current.searchQuery).toBe("");
-    expect(result.current.filteredArtifacts).toHaveLength(5);
+    expect(result.current.artifacts).toHaveLength(5);
   });
 
   it("does not fetch when projectId is null", () => {
-    const { result } = renderHook(() => useKnowledgeBase(null));
+    const { result } = renderHook(() => useKnowledgeBase(null), { wrapper: RouterWrapper });
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.artifacts).toHaveLength(0);
@@ -532,12 +778,15 @@ describe("useKnowledgeBase", () => {
 
   it("resets artifacts and loading state when projectId transitions to null", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue([
+    const { getArtifactPage, getArtifactFacets } = mockArtifactQuery([
       makeArtifact("a1", "first.md"),
     ]);
+    vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
+    vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
 
     const initialProps: { pid: string | null } = { pid: "proj-1" };
     const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      wrapper: RouterWrapper,
       initialProps,
     });
 
@@ -559,15 +808,18 @@ describe("useKnowledgeBase", () => {
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+    const { getArtifactPage, getArtifactFacets } = mockArtifactQuery(artifacts);
+    vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
+    vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
 
     const initialProps: { pid: string | null } = { pid: "proj-1" };
     const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      wrapper: RouterWrapper,
       initialProps,
     });
 
     await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(25);
+      expect(result.current.artifacts).toHaveLength(20);
     });
 
     act(() => {
@@ -587,7 +839,23 @@ describe("useKnowledgeBase", () => {
     });
   });
 
-  it("safely indexes paginatedArtifacts when totalPages decreases", async () => {
+  it("reports the on-screen range from the 1-based page number", async () => {
+    const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
+      makeArtifact(`a${i}`, `file-${i}.md`),
+    );
+    const result = await renderWith(artifacts);
+
+    expect(result.current.resultRange).toEqual({ start: 1, end: 20 });
+
+    act(() => {
+      result.current.setCurrentPage(2);
+    });
+    await waitFor(() => {
+      expect(result.current.resultRange).toEqual({ start: 21, end: 25 });
+    });
+  });
+
+  it("safely indexes the page items when totalPages decreases", async () => {
     const artifacts: Artifact[] = Array.from({ length: 25 }, (_, i) =>
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
@@ -596,16 +864,20 @@ describe("useKnowledgeBase", () => {
     act(() => {
       result.current.setCurrentPage(2);
     });
-    expect(result.current.currentPage).toBe(2);
-    expect(result.current.paginatedArtifacts).toHaveLength(5);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(2);
+      expect(result.current.artifacts).toHaveLength(5);
+    });
 
     // Narrow to a source with 0 items.
     act(() => {
       result.current.toggleSource("UPLOAD");
     });
 
-    expect(result.current.currentPage).toBe(1);
-    expect(result.current.paginatedArtifacts).toHaveLength(0);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(1);
+      expect(result.current.artifacts).toHaveLength(0);
+    });
   });
 
   it("resets currentPage to 1 when switching projectId", async () => {
@@ -613,21 +885,26 @@ describe("useKnowledgeBase", () => {
       makeArtifact(`a${i}`, `file-${i}.md`),
     );
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
-    vi.mocked(knowledgeService.getUnifiedArtifacts).mockResolvedValue(artifacts);
+    const { getArtifactPage, getArtifactFacets } = mockArtifactQuery(artifacts);
+    vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
+    vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
 
     const initialProps: { pid: string | null } = { pid: "proj-1" };
     const { result, rerender } = renderHook(({ pid }) => useKnowledgeBase(pid), {
+      wrapper: RouterWrapper,
       initialProps,
     });
 
     await waitFor(() => {
-      expect(result.current.artifacts).toHaveLength(25);
+      expect(result.current.artifacts).toHaveLength(20);
     });
 
     act(() => {
       result.current.setCurrentPage(2);
     });
-    expect(result.current.currentPage).toBe(2);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(2);
+    });
 
     rerender({ pid: "proj-2" });
 
@@ -645,14 +922,18 @@ describe("useKnowledgeBase", () => {
     act(() => {
       result.current.setCurrentPage(2);
     });
-    expect(result.current.currentPage).toBe(2);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(2);
+    });
 
     await act(async () => {
       await result.current.fetchArtifacts();
     });
 
-    expect(result.current.currentPage).toBe(2);
-    expect(result.current.paginatedArtifacts).toHaveLength(5);
+    await waitFor(() => {
+      expect(result.current.currentPage).toBe(2);
+      expect(result.current.artifacts).toHaveLength(5);
+    });
   });
 
   it("pulls the current page back into range when it exceeds the available pages", async () => {
@@ -666,10 +947,12 @@ describe("useKnowledgeBase", () => {
       result.current.setCurrentPage(5);
     });
 
-    // Without the clamp the control would report page 5 while the slice runs off
-    // the end of the list and renders nothing.
-    expect(result.current.currentPage).toBe(2);
-    expect(result.current.paginatedArtifacts).toHaveLength(5);
+    await waitFor(() => {
+      // Without the clamp the control would report page 5 while the slice runs off
+      // the end of the list and renders nothing.
+      expect(result.current.currentPage).toBe(2);
+      expect(result.current.artifacts).toHaveLength(5);
+    });
   });
 
   it("combines the source, type and format facets with a search query", async () => {
@@ -681,17 +964,21 @@ describe("useKnowledgeBase", () => {
       result.current.handleTabChange("ISSUE");
     });
 
-    expect(result.current.filteredArtifacts.map((artifact) => artifact.id).sort()).toEqual([
-      "gh-issue",
-      "jira-issue",
-    ]);
+    await waitFor(() => {
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
+        "gh-issue",
+        "jira-issue",
+      ]);
+    });
 
     act(() => {
       result.current.handleSearchChange("ticket");
     });
 
-    expect(result.current.filteredArtifacts).toHaveLength(1);
-    expect(result.current.filteredArtifacts[0].id).toBe("jira-issue");
+    await waitFor(() => {
+      expect(result.current.artifacts).toHaveLength(1);
+      expect(result.current.artifacts[0].id).toBe("jira-issue");
+    });
   });
 
   it("identifies uploaded PDFs, Markdown and images with a UUID sourceId and no mime", async () => {
@@ -729,23 +1016,29 @@ describe("useKnowledgeBase", () => {
     const countOf = (value: string) =>
       result.current.formatOptions.find((option) => option.value === value)?.count;
 
-    // The filename is the only dependable signal: `mime` is null and `sourceId`
-    // is a UUID, so an extension check on `sourceId` would have counted zero here.
-    expect(countOf("PDF")).toBe(1);
-    expect(countOf("MARKDOWN")).toBe(1);
-    expect(countOf("IMAGE")).toBe(1);
-    expect(countOf("OTHER")).toBe(1);
+    await waitFor(() => {
+      // The filename is the only dependable signal: `mime` is null and `sourceId`
+      // is a UUID, so an extension check on `sourceId` would have counted zero here.
+      expect(countOf("PDF")).toBe(1);
+      expect(countOf("MARKDOWN")).toBe(1);
+      expect(countOf("IMAGE")).toBe(1);
+      expect(countOf("OTHER")).toBe(1);
+    });
 
     act(() => {
       result.current.toggleFormat("IMAGE");
     });
-    expect(result.current.filteredArtifacts[0].title).toBe("wireframe.png");
+    await waitFor(() => {
+      expect(result.current.artifacts[0].title).toBe("wireframe.png");
+    });
 
     act(() => {
       result.current.toggleFormat("OTHER");
     });
-    // "Other" no longer swallows images — that is what the Images option is for.
-    expect(result.current.filteredArtifacts[0].title).toBe("archive.tar.gz");
+    await waitFor(() => {
+      // "Other" no longer swallows images — that is what the Images option is for.
+      expect(result.current.artifacts[0].title).toBe("archive.tar.gz");
+    });
   });
 
   it("offers tab options for types available from the selected sources plus ALL", async () => {
@@ -763,9 +1056,11 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("JIRA");
     });
 
-    // Jira carries issues and nothing else, so unrelated artifact-type tabs disappear.
-    expect(result.current.tabOptions.map((option) => option.value)).toEqual(["ALL", "ISSUE"]);
-    expect(result.current.tabOptions.find((option) => option.value === "ISSUE")?.count).toBe(1);
+    await waitFor(() => {
+      // Jira carries issues and nothing else, so unrelated artifact-type tabs disappear.
+      expect(result.current.tabOptions.map((option) => option.value)).toEqual(["ALL", "ISSUE"]);
+      expect(result.current.tabOptions.find((option) => option.value === "ISSUE")?.count).toBe(1);
+    });
   });
 
   it("keeps an active tab visible even if chosen sources cannot produce it", async () => {
@@ -776,12 +1071,15 @@ describe("useKnowledgeBase", () => {
       result.current.toggleSource("GITHUB");
     });
 
-    const page = result.current.tabOptions.find((option) => option.value === "PAGE");
+    await waitFor(() => {
+      const page = result.current.tabOptions.find((option) => option.value === "PAGE");
 
-    expect(page).toBeDefined();
-    expect(page?.count).toBe(0);
-    expect(result.current.filteredArtifacts).toHaveLength(0);
+      expect(page).toBeDefined();
+      expect(page?.count).toBe(0);
+      expect(result.current.artifacts).toHaveLength(0);
+    });
   });
+
   it("keeps a chosen format visible after the uploads that matched it are gone", async () => {
     const result = await renderWith(makeFacetFixture());
 
@@ -792,12 +1090,15 @@ describe("useKnowledgeBase", () => {
       result.current.toggleFormat("IMAGE");
     });
 
-    const image = result.current.formatOptions.find((option) => option.value === "IMAGE");
+    await waitFor(() => {
+      const image = result.current.formatOptions.find((option) => option.value === "IMAGE");
 
-    expect(image).toBeDefined();
-    expect(image?.count).toBe(0);
-    expect(result.current.filteredArtifacts).toHaveLength(0);
+      expect(image).toBeDefined();
+      expect(image?.count).toBe(0);
+      expect(result.current.artifacts).toHaveLength(0);
+    });
   });
+
   it("keeps a chosen repository visible after its artifacts are gone", async () => {
     const result = await renderWith(makeRepoFixture());
 
@@ -809,15 +1110,312 @@ describe("useKnowledgeBase", () => {
       result.current.handleTabChange("ISSUE");
     });
 
-    // None of the repo-scoped GitHub artifacts is an ISSUE, so the backend repo
-    // can no longer be produced in scope — but the reader chose it, so the
-    // option stays offered with count 0 and can still be unchosen.
-    const backend = result.current.repositoryOptions.find(
-      (option) => option.value === "sprintstart/sprintstart-backend",
+    await waitFor(() => {
+      // None of the repo-scoped GitHub artifacts is an ISSUE, so the backend repo
+      // can no longer be produced in scope — but the reader chose it, so the
+      // option stays offered with count 0 and can still be unchosen.
+      const backend = result.current.repositoryOptions.find(
+        (option) => option.value === "sprintstart/sprintstart-backend",
+      );
+
+      expect(backend).toBeDefined();
+      expect(backend?.count).toBe(0);
+      expect(result.current.artifacts).toHaveLength(0);
+    });
+  });
+});
+
+/** Renders the hook at a given URL, with the router's location alongside for assertions. */
+async function renderAt(entries: string[], artifacts: Artifact[], projectId = "proj-1") {
+  const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+  const { getArtifactPage, getArtifactFacets } = mockArtifactQuery(artifacts);
+  vi.mocked(knowledgeService.getArtifactPage).mockImplementation(getArtifactPage);
+  vi.mocked(knowledgeService.getArtifactFacets).mockImplementation(getArtifactFacets);
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      MemoryRouter,
+      { initialEntries: entries, initialIndex: entries.length - 1 },
+      children,
+    );
+  }
+  const view = renderHook(
+    ({ pid }: { pid: string }) => ({
+      kb: useKnowledgeBase(pid),
+      location: useLocation(),
+      navigate: useNavigate(),
+    }),
+    { wrapper: Wrapper, initialProps: { pid: projectId } },
+  );
+  await waitFor(() => expect(view.result.current.kb.isLoading).toBe(false));
+  return { ...view, getArtifactPage: vi.mocked(knowledgeService.getArtifactPage) };
+}
+
+describe("useKnowledgeBase URL state", () => {
+  it("requests exactly what a shared link describes", async () => {
+    const { result, getArtifactPage } = await renderAt(
+      [
+        "/kb?tab=PULL_REQUEST&sources=GITHUB&repos=sprintstart/sprintstart-frontend&q=feature&page=1",
+      ],
+      makeFacetFixture(),
     );
 
-    expect(backend).toBeDefined();
-    expect(backend?.count).toBe(0);
-    expect(result.current.filteredArtifacts).toHaveLength(0);
+    expect(result.current.kb.activeTab).toBe("PULL_REQUEST");
+    expect(result.current.kb.searchQuery).toBe("feature");
+    expect([...result.current.kb.selectedRepositories]).toEqual([
+      "sprintstart/sprintstart-frontend",
+    ]);
+    expect(getArtifactPage).toHaveBeenCalledWith(
+      "proj-1",
+      expect.objectContaining({
+        page: 1,
+        size: 20,
+        search: "feature",
+        types: ["PULL_REQUEST"],
+        sources: ["GITHUB"],
+        repositories: ["sprintstart/sprintstart-frontend"],
+      }),
+    );
+  });
+
+  it("writes a clamped page back to the URL without adding a history entry", async () => {
+    const artifacts = Array.from({ length: 25 }, (_, i) => makeArtifact(`a${i}`, `f-${i}.md`));
+    const { result } = await renderAt(["/start", "/kb?page=9"], artifacts);
+
+    await waitFor(() => {
+      expect(result.current.kb.currentPage).toBe(2);
+      expect(result.current.location.search).toBe("?page=2");
+    });
+
+    act(() => void result.current.navigate(-1));
+    expect(result.current.location.pathname).toBe("/start");
+  });
+
+  it("restores filters and the search input on Back", async () => {
+    const { result } = await renderAt(["/kb"], makeFacetFixture());
+
+    act(() => result.current.kb.handleSearchChange("Add"));
+    // The text reaches the URL once it settles; only then does the next click get its own entry.
+    await waitFor(() => expect(result.current.location.search).toBe("?q=Add"));
+    act(() => result.current.kb.toggleSource("GITHUB"));
+    await waitFor(() => expect(result.current.location.search).toBe("?q=Add&sources=GITHUB"));
+
+    act(() => result.current.kb.handleSearchChange(""));
+    await waitFor(() => expect(result.current.location.search).toBe("?sources=GITHUB"));
+
+    act(() => void result.current.navigate(-1));
+    await waitFor(() => {
+      expect(result.current.kb.searchQuery).toBe("Add");
+      expect(result.current.kb.selectedSources.size).toBe(0);
+    });
+  });
+
+  it("opens and closes the drawer through ?artifact=", async () => {
+    const { result } = await renderAt(["/kb?artifact=a1"], [makeArtifact("a1", "readme.md")]);
+    expect(result.current.kb.selectedArtifactId).toBe("a1");
+
+    act(() => result.current.kb.setSelectedArtifactId(null));
+    expect(result.current.location.search).toBe("");
+    act(() => result.current.kb.setSelectedArtifactId("a1"));
+    expect(result.current.location.search).toBe("?artifact=a1");
+  });
+
+  it("empties the search input on a project switch", async () => {
+    const { result, rerender } = await renderAt(
+      ["/kb?q=readme"],
+      [makeArtifact("a1", "readme.md")],
+    );
+    expect(result.current.kb.searchQuery).toBe("readme");
+
+    rerender({ pid: "proj-2" });
+    await waitFor(() => {
+      expect(result.current.kb.searchQuery).toBe("");
+      expect(result.current.location.search).toBe("");
+    });
+  });
+});
+
+describe("useKnowledgeBase debounced search", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends one request for a burst of keystrokes, with the settled text", async () => {
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+    const { result } = await renderAt(["/kb"], [makeArtifact("a1", "readme.md")]);
+
+    for (const text of ["r", "re", "rea", "read", "readm"]) {
+      act(() => result.current.kb.handleSearchChange(text));
+    }
+    // The field follows every keystroke; the URL and the server see none of them yet.
+    expect(result.current.kb.searchQuery).toBe("readm");
+    expect(result.current.kb.hasActiveFilters).toBe(true);
+    expect(result.current.location.search).toBe("");
+
+    await waitFor(() => expect(result.current.location.search).toBe("?q=readm"));
+    await waitFor(() => expect(result.current.kb.artifacts).toHaveLength(1));
+
+    const searches = vi
+      .mocked(knowledgeService.getArtifactPage)
+      .mock.calls.map(([, params]) => params?.search)
+      .filter((search) => search !== undefined);
+    expect(searches).toEqual(["readm"]);
+    const facetSearches = vi
+      .mocked(knowledgeService.getArtifactFacets)
+      .mock.calls.map(([, params]) => params?.search)
+      .filter((search) => search !== undefined);
+    expect(facetSearches).toEqual(["readm"]);
+  });
+
+  it("keeps the text Back restored instead of re-writing the stale settled value", async () => {
+    const { result } = await renderAt(["/kb"], [makeArtifact("a1", "readme.md")]);
+
+    act(() => result.current.kb.handleSearchChange("readme"));
+    await waitFor(() => expect(result.current.location.search).toBe("?q=readme"));
+    act(() => result.current.kb.toggleSource("UPLOAD"));
+    act(() => result.current.kb.handleSearchChange(""));
+    await waitFor(() => expect(result.current.location.search).toBe("?sources=UPLOAD"));
+
+    act(() => {
+      void result.current.navigate(-1);
+    });
+    await waitFor(() => expect(result.current.location.search).toBe("?q=readme"));
+    expect(result.current.kb.searchQuery).toBe("readme");
+
+    // Well past the debounce window: nothing may have written the old "" back over it.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(result.current.location.search).toBe("?q=readme");
+    expect(result.current.kb.searchQuery).toBe("readme");
+  });
+});
+
+describe("useKnowledgeBase sort", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("asks the list for the chosen order and keeps it out of the facets request", async () => {
+    const { result } = await renderAt(["/kb"], makeFacetFixture());
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    act(() => result.current.kb.setSort("TITLE_ASC"));
+
+    await waitFor(() => {
+      const calls = vi.mocked(knowledgeService.getArtifactPage).mock.calls;
+      expect(calls.at(-1)?.[1]).toMatchObject({ sort: "TITLE_ASC", page: 1 });
+    });
+    for (const [, params] of vi.mocked(knowledgeService.getArtifactFacets).mock.calls) {
+      expect(params).not.toHaveProperty("sort");
+    }
+    expect(result.current.kb.sort).toBe("TITLE_ASC");
+    expect(result.current.location.search).toBe("?sort=TITLE_ASC");
+  });
+
+  it("does not send the default order, so the default request is what it always was", async () => {
+    const { getArtifactPage } = await renderAt(["/kb"], makeFacetFixture());
+
+    expect(getArtifactPage.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ page: 1, size: 20, sort: undefined }),
+    );
+  });
+
+  it("does not count an order as an active filter", async () => {
+    const { result } = await renderAt(["/kb?sort=CHANGED_DESC"], makeFacetFixture());
+    expect(result.current.kb.hasActiveFilters).toBe(false);
+  });
+});
+
+describe("useKnowledgeBase date range", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("filters the list and the facets by the same window", async () => {
+    const { result } = await renderAt(["/kb"], makeFacetFixture());
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    act(() => result.current.kb.setDateRange({ from: "2026-09-01", to: "2026-09-24" }));
+
+    await waitFor(() => {
+      const list = vi.mocked(knowledgeService.getArtifactPage).mock.calls.at(-1)?.[1];
+      const facets = vi.mocked(knowledgeService.getArtifactFacets).mock.calls.at(-1)?.[1];
+      expect(list).toMatchObject({ from: "2026-09-01", to: "2026-09-24", page: 1 });
+      expect(facets).toMatchObject({ from: "2026-09-01", to: "2026-09-24" });
+    });
+    expect(result.current.kb.dateRange).toEqual({ from: "2026-09-01", to: "2026-09-24" });
+  });
+
+  it("counts a date range as an active filter that Clear filters removes", async () => {
+    const { result } = await renderAt(["/kb?from=2026-09-01"], makeFacetFixture());
+    expect(result.current.kb.hasActiveFilters).toBe(true);
+
+    act(() => result.current.kb.handleClearFilters());
+
+    expect(result.current.kb.hasActiveFilters).toBe(false);
+    expect(result.current.kb.dateRange).toEqual({ from: null, to: null });
+  });
+});
+
+describe("useKnowledgeBase languages", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("offers the project's languages alphabetically, without document kinds or a source gate", async () => {
+    const { result } = await renderAt(["/kb"], makeLanguageFixture());
+
+    await waitFor(() => expect(result.current.kb.languageOptions.length).toBeGreaterThan(0));
+    expect(result.current.kb.languageOptions).toEqual([
+      { value: "Kotlin", label: "Kotlin", count: 2 },
+      { value: "TypeScript", label: "TypeScript", count: 1 },
+    ]);
+  });
+
+  it("sends the languages to the list and the facets alike", async () => {
+    const { result } = await renderAt(["/kb"], makeLanguageFixture());
+    const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+
+    act(() => result.current.kb.toggleLanguage("Kotlin"));
+
+    await waitFor(() => {
+      const list = vi.mocked(knowledgeService.getArtifactPage).mock.calls.at(-1)?.[1];
+      const facets = vi.mocked(knowledgeService.getArtifactFacets).mock.calls.at(-1)?.[1];
+      expect(list).toMatchObject({ languages: ["Kotlin"], page: 1 });
+      expect(facets).toMatchObject({ languages: ["Kotlin"] });
+    });
+    await waitFor(() => expect(result.current.kb.artifacts.map((a) => a.id)).toEqual(["k1", "k2"]));
+    // Own dimension excluded: TypeScript still counts what adding it would bring.
+    expect(result.current.kb.languageOptions.find((o) => o.value === "TypeScript")?.count).toBe(1);
+  });
+
+  it("keeps a hand-typed casing as the value so unticking it works, labelled as stored", async () => {
+    const { result } = await renderAt(["/kb?languages=kotlin"], makeLanguageFixture());
+
+    await waitFor(() =>
+      expect(result.current.kb.languageOptions).toContainEqual({
+        value: "kotlin",
+        label: "Kotlin",
+        count: 2,
+      }),
+    );
+    expect(result.current.kb.hasActiveFilters).toBe(true);
+  });
+
+  it("keeps a selected language visible at 0 after its artifacts are gone", async () => {
+    const { result } = await renderAt(["/kb?languages=Rust"], makeLanguageFixture());
+
+    await waitFor(() =>
+      expect(result.current.kb.languageOptions).toContainEqual({
+        value: "Rust",
+        label: "Rust",
+        count: 0,
+      }),
+    );
+    expect(result.current.kb.artifacts).toEqual([]);
+  });
+
+  it("offers no languages when no artifact has one, so the section stays hidden", async () => {
+    const { result } = await renderAt(["/kb"], makeFacetFixture());
+    expect(result.current.kb.languageOptions).toEqual([]);
   });
 });

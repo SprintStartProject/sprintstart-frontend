@@ -64,17 +64,30 @@ export function useScrollRestoration(): void {
   const location = useLocation();
   const navigationType = useNavigationType();
   const pendingRestorationRef = useRef<PendingRestoration | null>(null);
+  const prevPathnameRef = useRef(location.pathname);
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     history.scrollRestoration = "manual";
   }, []);
 
   useLayoutEffect(() => {
+    const isFirstRender = isFirstRenderRef.current;
+    isFirstRenderRef.current = false;
     const initialHost = getScrollHost();
+    const pathnameChanged = prevPathnameRef.current !== location.pathname;
+    prevPathnameRef.current = location.pathname;
 
     if (navigationType !== NavigationType.Pop) {
-      pendingRestorationRef.current = null;
-      scrollHostTo(initialHost, 0);
+      // Only a new page starts at the top. A navigation that changes nothing but
+      // the search string — the knowledge base writing `?artifact=<id>`, a filter
+      // landing in the URL — stays inside the page the reader is already on, so
+      // it keeps its position. (React Router's `preventScrollReset` option is not
+      // observable here: it rides the navigation, not `location.state`.)
+      if (pathnameChanged || isFirstRender) {
+        pendingRestorationRef.current = null;
+        scrollHostTo(initialHost, 0);
+      }
       return;
     }
 
@@ -151,7 +164,7 @@ export function useScrollRestoration(): void {
         pendingRestorationRef.current = null;
       }
     };
-  }, [location.key, navigationType]);
+  }, [location.key, location.pathname, navigationType]);
 
   // Keeps the current page's position current for whenever the reader comes back to it.
   useEffect(() => {

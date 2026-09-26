@@ -1,3 +1,5 @@
+import type { KnowledgeListParams } from "../features/knowledge-base/types";
+
 /**
  * Central query-key factory, shared by every migrated hook, invalidation call and
  * prefetch (sidebar hover/press). Keeping one factory is what makes those three
@@ -75,7 +77,19 @@ export const queryKeys = {
     pending: () => ["attestations", "pending"] as const,
   },
   knowledgeBase: {
-    byProject: (projectId: string) => ["knowledge-base", projectId] as const,
+    // Scope prefix for everything the Knowledge Base page holds: invalidating it
+    // clears the current page, the facet counts, and any open artifact's detail
+    // at once — React Query matches keys by prefix.
+    project: (projectId: string) => ["knowledge-base", projectId] as const,
+    list: (projectId: string, params: KnowledgeListParams = {}) =>
+      ["knowledge-base", projectId, "list", params] as const,
+    facets: (projectId: string, params: KnowledgeListParams = {}) =>
+      ["knowledge-base", projectId, "facets", params] as const,
+    detail: (projectId: string, artifactId: string) =>
+      ["knowledge-base", projectId, "detail", artifactId] as const,
+    // Under the project prefix, so a delete or refresh that invalidates the page drops it too.
+    aiStatus: (projectId: string, artifactIds: readonly string[]) =>
+      ["knowledge-base", projectId, "ai-status", artifactIds] as const,
   },
   faq: {
     groups: (projectId: string) => ["faq", "groups", projectId] as const,

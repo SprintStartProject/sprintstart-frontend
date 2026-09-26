@@ -139,3 +139,123 @@ describe("MultiSelectFilter", () => {
     expect(screen.getByRole("checkbox", { name: /PDFs/ })).toBeInTheDocument();
   });
 });
+
+describe("MultiSelectFilter long sections", () => {
+  // Twelve repositories: past both the filter-box threshold and a visible limit of 10.
+  const REPOS = Array.from({ length: 12 }, (_, i) => ({
+    value: `org/repo-${String(i).padStart(2, "0")}`,
+    label: `org/repo-${String(i).padStart(2, "0")}`,
+    count: 12 - i,
+  }));
+
+  function renderLong(
+    section: Partial<{ searchable: boolean; visibleLimit: number }> = {},
+    selected: ReadonlySet<string> = new Set<string>(),
+  ) {
+    render(
+      <MultiSelectFilter<string>
+        label="Filter artifacts"
+        summary="All sources"
+        activeCount={selected.size}
+        sections={[{ id: "repositories", label: "Repositories", options: REPOS, ...section }]}
+        selected={selected}
+        onToggle={vi.fn()}
+        testId="kb-filter"
+      />,
+    );
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+  }
+
+  it("filters a searchable section by label, case-insensitively", () => {
+    renderLong({ searchable: true });
+
+    fireEvent.change(screen.getByTestId("kb-filter-section-repositories-search"), {
+      target: { value: "REPO-1" },
+    });
+
+    const ids = screen.getAllByRole("checkbox").map((box) => box.getAttribute("data-testid"));
+    expect(ids).toEqual(["kb-filter-option-org/repo-10", "kb-filter-option-org/repo-11"]);
+  });
+
+  it("says so when the filter text matches nothing", () => {
+    renderLong({ searchable: true });
+
+    fireEvent.change(screen.getByTestId("kb-filter-section-repositories-search"), {
+      target: { value: "nope" },
+    });
+
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(screen.getByTestId("kb-filter-section-repositories-no-matches")).toHaveTextContent(
+      "No matches",
+    );
+  });
+
+  it("offers no filter box to a short section even when searchable", () => {
+    render(
+      <MultiSelectFilter<Value>
+        label="Filter artifacts"
+        summary="All sources"
+        activeCount={0}
+        sections={[{ ...SECTIONS[0], searchable: true }]}
+        selected={new Set<Value>()}
+        onToggle={vi.fn()}
+        testId="kb-filter"
+      />,
+    );
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+
+    expect(screen.queryByTestId("kb-filter-section-sources-search")).not.toBeInTheDocument();
+  });
+
+  it("folds a long section to its limit and unfolds it on Show all", () => {
+    renderLong({ visibleLimit: 10 });
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(10);
+    const showAll = screen.getByTestId("kb-filter-section-repositories-show-all");
+    expect(showAll).toHaveTextContent("Show all (12)");
+    expect(showAll).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(showAll);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(12);
+    expect(showAll).toHaveTextContent("Show fewer");
+    expect(showAll).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("never hides a ticked option behind the fold", () => {
+    renderLong({ visibleLimit: 10 }, new Set(["org/repo-11"]));
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(11);
+    expect(screen.getByTestId("kb-filter-option-org/repo-11")).toBeChecked();
+  });
+
+  it("shows every match while filtering, ignoring the limit", () => {
+    renderLong({ searchable: true, visibleLimit: 3 });
+
+    fireEvent.change(screen.getByTestId("kb-filter-section-repositories-search"), {
+      target: { value: "org/" },
+    });
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(12);
+    expect(screen.queryByTestId("kb-filter-section-repositories-show-all")).not.toBeInTheDocument();
+  });
+
+  it("prints the footnote at the foot of the menu", () => {
+    render(
+      <MultiSelectFilter<Value>
+        label="Filter artifacts"
+        summary="All sources"
+        activeCount={0}
+        sections={SECTIONS}
+        selected={new Set<Value>()}
+        onToggle={vi.fn()}
+        footnote="Counts show what you would get if you added this option."
+        testId="kb-filter"
+      />,
+    );
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+
+    expect(screen.getByTestId("kb-filter-footnote")).toHaveTextContent(
+      "Counts show what you would get if you added this option.",
+    );
+  });
+});

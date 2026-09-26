@@ -24,6 +24,9 @@ body {
   --app-page-gutter: 1.25rem;
   --app-page-block-gutter: 1.25rem;
   --app-page-max-width: 80rem;
+  /* Width of the desktop sidebar. The sidebar itself and the margin the page
+     content leaves for it both read this, so the two can never disagree. */
+  --app-sidebar-width: 286px;
 
   /* Backgrounds */
   --bg: #f9fafb;

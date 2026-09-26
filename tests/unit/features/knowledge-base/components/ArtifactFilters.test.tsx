@@ -68,7 +68,7 @@ describe("ArtifactFilters", () => {
     expect(screen.getByTestId("kb-search-input")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /all/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /pull requests/i })).toBeInTheDocument();
-    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("10 results");
+    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("10 artifacts");
     expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("All sources");
 
     fireEvent.click(screen.getByTestId("kb-refresh"));
@@ -178,6 +178,18 @@ describe("ArtifactFilters", () => {
     expect(onSearchChange).toHaveBeenCalledWith("readme");
   });
 
+  it("says what the search looks at and ties the hint to the field", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+
+    const hint = screen.getByTestId("kb-search-hint");
+    expect(hint).toHaveTextContent("Searches titles and links");
+    const input = screen.getByTestId("kb-search-input");
+    expect(input.getAttribute("aria-describedby")).toContain(hint.id);
+    expect(
+      screen.getByRole("textbox", { name: "Search knowledge base" }),
+    ).toHaveAccessibleDescription("Searches titles and links");
+  });
+
   it("renders the repositories section only when repository options are provided", () => {
     const { unmount } = render(<ArtifactFilters {...buildProps()} />);
 
@@ -239,5 +251,168 @@ describe("ArtifactFilters", () => {
     );
 
     expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("2 repositories");
+  });
+
+  it("words the result line as a range of the total", () => {
+    render(
+      <ArtifactFilters
+        {...buildProps({ resultCount: 412, resultRange: { start: 21, end: 40 } })}
+      />,
+    );
+    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("21–40 of 412 artifacts");
+  });
+
+  it("says No artifacts instead of a zero range", () => {
+    render(<ArtifactFilters {...buildProps({ resultCount: 0 })} />);
+    expect(screen.getByTestId("kb-result-count")).toHaveTextContent("No artifacts");
+  });
+
+  it("explains what the facet counts mean inside the menu", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(screen.getByTestId("kb-filter-footnote")).toHaveTextContent(
+      "Counts show what you would get if you added this option.",
+    );
+  });
+
+  it("gives a long repository list a filter box and folds it to ten", () => {
+    const manyRepos = Array.from({ length: 14 }, (_, i) => ({
+      value: `acme/repo-${i}`,
+      label: `acme/repo-${i}`,
+      count: 20 - i,
+    }));
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          repositoryOptions: manyRepos,
+          selectedSources: new Set<SourceSystem>(["GITHUB"]),
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+
+    expect(screen.getByTestId("kb-filter-section-repositories-search")).toBeInTheDocument();
+    expect(screen.getByTestId("kb-filter-section-repositories-show-all")).toHaveTextContent(
+      "Show all (14)",
+    );
+    expect(screen.queryByTestId("kb-filter-option-acme/repo-13")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("kb-filter-section-repositories-search"), {
+      target: { value: "repo-13" },
+    });
+    expect(screen.getByTestId("kb-filter-option-acme/repo-13")).toBeInTheDocument();
+  });
+  it("offers the three list orders and reports a pick", () => {
+    const onSortChange = vi.fn();
+    render(<ArtifactFilters {...buildProps({ sort: "ADDED_DESC", onSortChange })} />);
+
+    const select = screen.getByTestId<HTMLSelectElement>("kb-sort");
+    expect(select).toHaveAccessibleName("Sort artifacts");
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
+      "Newest added",
+      "Recently changed",
+      "Title A–Z",
+    ]);
+
+    fireEvent.change(select, { target: { value: "CHANGED_DESC" } });
+    expect(onSortChange).toHaveBeenCalledWith("CHANGED_DESC");
+  });
+
+  it("renders no sort control when the parent does not handle one", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+    expect(screen.queryByTestId("kb-sort")).not.toBeInTheDocument();
+  });
+});
+
+describe("ArtifactFilters languages", () => {
+  const LANGUAGE_OPTIONS: FacetOption<string>[] = [
+    { value: "Kotlin", label: "Kotlin", count: 4 },
+    { value: "Markdown", label: "Markdown", count: 1 },
+  ];
+
+  it("renders no language section when the project has no language values", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(screen.queryByText("Language")).not.toBeInTheDocument();
+  });
+
+  it("lists languages without needing a source and reports the raw value on toggle", () => {
+    const onToggleLanguage = vi.fn();
+    render(
+      <ArtifactFilters {...buildProps({ languageOptions: LANGUAGE_OPTIONS, onToggleLanguage })} />,
+    );
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(screen.getByText("Language")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("kb-filter-option-lang:kotlin"));
+    expect(onToggleLanguage).toHaveBeenCalledWith("Kotlin");
+  });
+
+  it("keeps a Markdown language apart from the MARKDOWN format", () => {
+    const onToggleFormat = vi.fn();
+    const onToggleLanguage = vi.fn();
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          selectedSources: new Set<SourceSystem>(["UPLOAD"]),
+          formatOptions: FORMAT_OPTIONS,
+          selectedFormat: "MARKDOWN",
+          languageOptions: LANGUAGE_OPTIONS,
+          onToggleFormat,
+          onToggleLanguage,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+    expect(screen.getByTestId("kb-filter-option-markdown")).toBeChecked();
+    expect(screen.getByTestId("kb-filter-option-lang:markdown")).not.toBeChecked();
+    fireEvent.click(screen.getByTestId("kb-filter-option-lang:markdown"));
+    expect(onToggleLanguage).toHaveBeenCalledWith("Markdown");
+    expect(onToggleFormat).not.toHaveBeenCalled();
+  });
+
+  it("checks selected languages, counts them and names them in the trigger", () => {
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          languageOptions: LANGUAGE_OPTIONS,
+          selectedLanguages: new Set<string>(["Kotlin"]),
+        })}
+      />,
+    );
+
+    const trigger = screen.getByTestId("kb-filter-trigger");
+    expect(trigger).toHaveTextContent("Kotlin");
+    fireEvent.click(trigger);
+    expect(screen.getByTestId("kb-filter-option-lang:kotlin")).toBeChecked();
+  });
+
+  it("summarises several languages by count", () => {
+    render(
+      <ArtifactFilters {...buildProps({ selectedLanguages: new Set<string>(["Kotlin", "Go"]) })} />,
+    );
+    expect(screen.getByTestId("kb-filter-trigger")).toHaveTextContent("2 languages");
+  });
+});
+
+describe("ArtifactFilters select toggle", () => {
+  it("renders no Select button unless the parent handles select mode", () => {
+    render(<ArtifactFilters {...buildProps()} />);
+    expect(screen.queryByTestId("kb-select-toggle")).not.toBeInTheDocument();
+  });
+
+  it("is a pressed-state toggle with a constant name", () => {
+    const onSelectModeChange = vi.fn();
+    const { rerender } = render(
+      <ArtifactFilters {...buildProps({ isSelectMode: false, onSelectModeChange })} />,
+    );
+    const toggle = screen.getByRole("button", { name: "Select" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle);
+    expect(onSelectModeChange).toHaveBeenCalledWith(true);
+
+    rerender(<ArtifactFilters {...buildProps({ isSelectMode: true, onSelectModeChange })} />);
+    expect(screen.getByRole("button", { name: "Select" })).toHaveAttribute("aria-pressed", "true");
   });
 });

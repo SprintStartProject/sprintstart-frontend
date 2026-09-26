@@ -9,11 +9,25 @@ import {
   FileText,
   GitPullRequest,
 } from "lucide-react";
-import type { Artifact, ArtifactType } from "../types";
+import type { Artifact, ArtifactAiStatus, ArtifactType } from "../types";
+import { AI_STATUS_CHIPS } from "../aiStatus";
+import { AiStatusChip } from "./AiStatusChip";
 import { getArtifactRepository } from "../githubMetadata";
+import { isUpload } from "../tabs";
 import { RepositoryBadge } from "./RepositoryBadge";
+import { Checkbox } from "../../../components/ui/Checkbox";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { centralSpringToken } from "../../../styles/tokens";
+
+/**
+ * Select mode for the bulk delete. Absent means no checkboxes at all: they are
+ * revealed by an explicit toggle, never permanent, so the card keeps being one
+ * button that opens the drawer.
+ */
+export interface ArtifactListSelection {
+  selectedIds: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+}
 
 /**
  * Props for the ArtifactList component.
@@ -22,6 +36,12 @@ import { centralSpringToken } from "../../../styles/tokens";
 interface ArtifactListProps {
   artifacts: Artifact[];
   onSelect: (id: string) => void;
+  selection?: ArtifactListSelection;
+  /**
+   * AI index status per artifact id. Absent (the AI was unavailable, the request failed or has
+   * not answered) or missing an id means no chip for that card — never a guessed one.
+   */
+  aiStatuses?: ReadonlyMap<string, ArtifactAiStatus> | null;
 }
 
 const getIcon = (type: ArtifactType) => {
@@ -65,13 +85,18 @@ const formatDate = (iso: string): string => {
 interface ArtifactCardProps {
   artifact: Artifact;
   onSelect: (id: string) => void;
+  aiStatus?: ArtifactAiStatus;
 }
 
 /**
  * Single row in the artifact list. Memoized so filtering/pagination changes that
  * leave this card's props untouched don't re-render it.
  */
-const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: ArtifactCardProps) {
+const ArtifactCard = memo(function ArtifactCard({
+  artifact,
+  onSelect,
+  aiStatus,
+}: ArtifactCardProps) {
   const repository = getArtifactRepository(artifact);
 
   return (
@@ -80,7 +105,9 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
       roundedClassName="rounded-xl"
       role="button"
       tabIndex={0}
-      aria-label={`View ${artifact.title ?? "artifact"}${repository ? ` from ${repository}` : ""}`}
+      aria-label={`View ${artifact.title ?? "artifact"}${repository ? ` from ${repository}` : ""}${
+        aiStatus ? `, ${AI_STATUS_CHIPS[aiStatus].spoken}` : ""
+      }`}
       data-testid="artifact-card"
       onClick={() => onSelect(artifact.id)}
       onKeyDown={(e) => {
@@ -98,9 +125,11 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
           {/* flex-wrap: on a phone the chips wrap below the title instead of the row
               overflowing; the title still ellipsizes within its line. */}
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            <h3 className="min-w-0 truncate font-semibold text-app-text">
+            {/* h2: the cards sit directly under the page's h1, and a skipped level fails axe's
+                heading-order once the list is on screen. */}
+            <h2 className="min-w-0 truncate font-semibold text-app-text">
               {artifact.title ?? "Untitled"}
-            </h3>
+            </h2>
             <span className="shrink-0 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
               {getTypeLabel(artifact.artifactType)}
             </span>
@@ -108,6 +137,7 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
               {artifact.sourceSystem}
             </span>
             {repository && <RepositoryBadge repository={repository} testId="artifact-repo-badge" />}
+            {aiStatus && <AiStatusChip status={aiStatus} />}
           </div>
           <div className="mt-2 flex items-center gap-4 text-xs font-medium text-app-text-muted">
             <span>Ingested: {formatDate(artifact.ingestedAt)}</span>
@@ -126,13 +156,38 @@ const ArtifactCard = memo(function ArtifactCard({ artifact, onSelect }: Artifact
 });
 
 /**
+ * The checkbox column in select mode. Only uploads get a checkbox — the same
+ * rule as the drawer's delete (connector artifacts are removed by their sync,
+ * not by hand); every other row keeps an empty slot so the cards stay aligned.
+ * It sits beside the card, never inside it, so no control nests in the
+ * card's button.
+ */
+function SelectSlot({
+  artifact,
+  selection,
+}: {
+  artifact: Artifact;
+  selection: ArtifactListSelection;
+}) {
+  if (!isUpload(artifact)) return <span className="w-5 shrink-0" aria-hidden="true" />;
+  return (
+    <Checkbox
+      checked={selection.selectedIds.has(artifact.id)}
+      onChange={() => selection.onToggle(artifact.id)}
+      aria-label={`Select ${artifact.title ?? "upload"}`}
+      data-testid={`artifact-select-${artifact.id}`}
+    />
+  );
+}
+
+/**
  * ArtifactList
  *
  * Renders the unified list of knowledge base items (Uploads, PRs, Commits, Issues).
  * Uses Framer Motion's AnimatePresence to handle layout transitions as filters are applied
  * and items enter/exit the dashboard list.
  */
-export function ArtifactList({ artifacts, onSelect }: ArtifactListProps) {
+export function ArtifactList({ artifacts, onSelect, selection, aiStatuses }: ArtifactListProps) {
   if (artifacts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-app-text-muted">
@@ -153,8 +208,16 @@ export function ArtifactList({ artifacts, onSelect }: ArtifactListProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={centralSpringToken}
+            className={selection ? "flex items-center gap-3" : undefined}
           >
-            <ArtifactCard key={artifact.id} artifact={artifact} onSelect={onSelect} />
+            {selection && <SelectSlot artifact={artifact} selection={selection} />}
+            <div className={selection ? "min-w-0 flex-1" : undefined}>
+              <ArtifactCard
+                artifact={artifact}
+                onSelect={onSelect}
+                aiStatus={aiStatuses?.get(artifact.id)}
+              />
+            </div>
           </motion.div>
         ))}
       </AnimatePresence>

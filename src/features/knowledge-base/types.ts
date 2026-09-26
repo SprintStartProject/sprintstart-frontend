@@ -23,6 +23,10 @@ export interface Artifact {
   sourceId: string;
   sourceUrl: string | null;
   mime: string | null;
+  /**
+   * Display name derived from the file extension at ingestion (`"Kotlin"`, `"Markdown"`,
+   * `"Plain Text"`); null for PRs, issues, commits and anything without a known extension.
+   */
   language: string | null;
   /** When the artifact was first imported. Never moves on later updates. */
   ingestedAt: string;
@@ -85,4 +89,142 @@ export interface SummaryStreamHandlers {
   onDone: () => void;
   /** Called when an in-stream error event is received (non-HTTP failure). */
   onError?: (error: string) => void;
+}
+
+/**
+ * Filter classification for direct uploaded artifact formats.
+ */
+export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
+
+/**
+ * Pagination metadata returned by Spring Boot Page response.
+ *
+ * `number` is **1-based**: the backend echoes the requested `page` query
+ * parameter (`ArtifactQueryService` builds `PageRequest.of(page - 1, …)` and
+ * reports `number = page`), not Spring's 0-based `Page.number`.
+ */
+export interface PageMetadata {
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+/**
+ * Paginated list response for artifacts from GET /api/v1/projects/{projectId}/artifacts.
+ */
+export interface ArtifactPage {
+  items: Artifact[];
+  /** Spring's `Page` envelope — the only shape the endpoint sends. */
+  page: PageMetadata;
+}
+
+/**
+ * Single facet entry value and matched artifact count.
+ */
+export interface FacetCount {
+  value: string;
+  count: number;
+}
+
+/**
+ * Aggregated facet breakdown for knowledge base artifacts in a project.
+ */
+export interface ArtifactFacets {
+  types: FacetCount[];
+  sources: FacetCount[];
+  formats: FacetCount[];
+  repositories: FacetCount[];
+  /**
+   * Programming languages as stored display names (`"Kotlin"`, `"C#"`), counted with every other
+   * filter applied but their own selection excluded. Document kinds (`Markdown`, `Plain Text`) are
+   * left out — the format facet covers them. Optional because a backend predating the language
+   * facet does not send it; absent reads as "no languages", so the section simply stays hidden.
+   */
+  languages?: FacetCount[];
+}
+
+/** One upload the backend could not delete, with a client-safe reason. */
+export interface DeleteUploadFailure {
+  /** The upload's UUID (`Artifact.sourceId`), as sent in the request. */
+  artifactId: string;
+  /** Human-readable reason; the backend never puts raw exception text here. */
+  error: string;
+}
+
+/**
+ * Per-item outcome of `DELETE /api/v1/uploads`. Every requested id lands in exactly one list: a
+ * batch can partially succeed, and the UI must report what happened rather than all-or-nothing.
+ */
+export interface DeleteUploadsResult {
+  deletedIds: string[];
+  failed: DeleteUploadFailure[];
+}
+
+/**
+ * Order of the artifact list (`?sort=` on the list endpoint; the facets endpoint has none).
+ *
+ * - `ADDED_DESC`: newest first by `ingestedAt` (the backend default).
+ * - `CHANGED_DESC`: most recently changed first, by `lastChangedAt` falling back to `ingestedAt`.
+ * - `TITLE_ASC`: title A–Z, case-insensitive, untitled artifacts last.
+ *
+ * Every order breaks ties on `id`, so paging never shows a row twice or skips one.
+ */
+export type ArtifactSort = "ADDED_DESC" | "CHANGED_DESC" | "TITLE_ASC";
+
+/**
+ * Query parameters for filtering and paginating knowledge base artifacts.
+ */
+export interface KnowledgeListParams {
+  page?: number;
+  size?: number;
+  search?: string;
+  types?: ArtifactType[];
+  sources?: SourceSystem[];
+  repositories?: string[];
+  format?: UploadFormat;
+  /**
+   * Language display names, matched case-insensitively by the backend. Sent to the list and the
+   * facets alike: it narrows the row set, so every count must respect it. A selected language
+   * hides rows that have none (PRs, issues, pages) — that is the honest reading of "only Kotlin".
+   */
+  languages?: string[];
+  /**
+   * List order. Sent by `getArtifactPage` only — counts do not depend on order, and the facets
+   * endpoint does not accept it. Omitted means the backend default (`ADDED_DESC`).
+   */
+  sort?: ArtifactSort;
+  /**
+   * Earliest ingestion day, `yyyy-MM-dd`, inclusive (UTC day boundaries on the server). Sent to
+   * the list and the facets alike.
+   */
+  from?: string;
+  /** Latest ingestion day, `yyyy-MM-dd`, inclusive. Sent to the list and the facets alike. */
+  to?: string;
+}
+
+/**
+ * What the AI assistant's metadata store records for an artifact. `UNKNOWN` means the AI answered
+ * but holds no record; it never means "the AI is down" — that is `aiAvailable: false`.
+ */
+export type ArtifactAiStatus = "INDEXED" | "PROCESSING" | "FAILED" | "DEINDEXED" | "UNKNOWN";
+
+/** One artifact's entry in {@link ArtifactAiStatusResponse}. */
+export interface ArtifactAiStatusItem {
+  artifactId: string;
+  status: ArtifactAiStatus;
+  updatedAt: string | null;
+  chunkCount: number | null;
+}
+
+/**
+ * Response of `GET /projects/{id}/artifacts/ai-status`. When `aiAvailable` is false every status is
+ * `UNKNOWN` by construction and says nothing about the artifact, so no chip may be drawn from it.
+ * Ids outside the project are omitted from `items`.
+ */
+export interface ArtifactAiStatusResponse {
+  aiAvailable: boolean;
+  items: ArtifactAiStatusItem[];
 }
