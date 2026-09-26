@@ -77,6 +77,11 @@ export function memberSummaryData(
       title: phase.title,
       state: phaseState(phase),
       progress: phaseProgress(phase),
+      /** The steps the member is on right now in this phase, for the summary's closer look. */
+      currentSteps: [...(phase.steps ?? [])]
+        .sort((a, b) => a.position - b.position)
+        .filter((step) => step.status === "IN_PROGRESS")
+        .map((step) => step.title),
     })),
     progress,
     stepStates,

@@ -50,7 +50,10 @@ import { getProjectRoles } from "../services/teamManagementService";
  * too many. The reasons column in every row says which kind of "needs you" it is. The stage
  * chips (not started / underway / done) went too — the progress column and the sort answer
  * that — and so did "Long on a step": everyone on a step too long is in "Needs you" already, and
- * "Longest on step" sorts them to the top.
+ * the roster opens sorted by time on step, longest first.
+ *
+ * The sort has no select of its own any more: the "Time on step" and "Progress" column headers
+ * sort, and a select beside them saying "Longest on step" was the same control twice.
  */
 type StatusFilter = "all" | "attention";
 
@@ -60,13 +63,6 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
   all: "Everyone",
   attention: "Needs you",
 };
-
-const SORT_OPTIONS: FilterSelectOption<TeamOverviewFilters["sortBy"]>[] = [
-  { value: "LONGEST_STEP", label: "Longest on step" },
-  { value: "SHORTEST_STEP", label: "Shortest on step" },
-  { value: "HIGHEST_PROGRESS", label: "Highest progress" },
-  { value: "LOWEST_PROGRESS", label: "Lowest progress" },
-];
 
 type SortColumn = "step" | "progress";
 
@@ -279,6 +275,24 @@ export function TeamManagementPage() {
   // The same average the overview's Team progress card shows.
   const { averageProgress } = teamProgressData(members);
   const withoutRole = members.filter((member) => member.roles.length === 0).length;
+  // What is open with the manager, by kind — the part of "Need you" only they can close.
+  const openOfKind = (kind: "skip" | "feedback") =>
+    [...attentionById.values()].filter((entry) =>
+      entry.reasons.some((reason) => reason.kind === kind),
+    ).length;
+  const openSkips = openOfKind("skip");
+  const openFeedback = openOfKind("feedback");
+  const needYouHint =
+    openSkips + openFeedback > 0
+      ? [
+          openSkips > 0 && `${openSkips} skip ${openSkips === 1 ? "request" : "requests"}`,
+          openFeedback > 0 && `${openFeedback} feedback`,
+        ]
+          .filter(Boolean)
+          .join(" · ") + " open"
+      : statusCounts.attention > 0
+        ? "Waiting on a review or stuck"
+        : "Nobody waiting";
   const figuresReady = Boolean(roster);
 
   const showMembers = (filter: StatusFilter) => {
@@ -333,7 +347,7 @@ export function TeamManagementPage() {
           icon={Hand}
           label="Need you"
           value={figuresReady ? statusCounts.attention : "—"}
-          hint={statusCounts.attention > 0 ? "Waiting on an answer or stuck" : "Nobody waiting"}
+          hint={needYouHint}
           attention={statusCounts.attention > 0}
           onClick={() => showMembers("attention")}
         />
@@ -395,12 +409,6 @@ export function TeamManagementPage() {
                   className="w-40"
                 />
               }
-              sort={{
-                label: "Sort team members",
-                value: sortBy,
-                options: SORT_OPTIONS,
-                onChange: setSortBy,
-              }}
             />
 
             <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">

@@ -191,16 +191,17 @@ describe("KnowledgeGapsPage", () => {
 
     const severityGroup = within(screen.getByRole("group", { name: "Filter gaps by severity" }));
 
+    // Nothing chosen by default: the list shows every severity without four chips lit up.
     expect(severityGroup.getByRole("button", { name: /^High/ })).toHaveAttribute(
       "aria-pressed",
-      "true",
+      "false",
     );
     expect(screen.getByRole("combobox", { name: "Sort knowledge gaps" })).toHaveTextContent(
       "Severity",
     );
   });
 
-  it("filters gaps by severity when a filter is toggled off", async () => {
+  it("narrows gaps to a severity when its filter is chosen, and back when it is cleared", async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -209,8 +210,14 @@ describe("KnowledgeGapsPage", () => {
     ).getByRole("button", { name: /^High/ });
     await user.click(highFilter);
 
+    expect(highFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Auth Service")).toBeInTheDocument();
+    expect(screen.queryByText("API Gateway")).not.toBeInTheDocument();
+
+    await user.click(highFilter);
+
     expect(highFilter).toHaveAttribute("aria-pressed", "false");
-    expect(screen.queryByText("Auth Service")).not.toBeInTheDocument();
+    expect(screen.getByText("Auth Service")).toBeInTheDocument();
     expect(screen.getByText("API Gateway")).toBeInTheDocument();
   });
 

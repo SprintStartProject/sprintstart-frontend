@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { dockMagnifySpringToken, slidingIndicatorSpringToken } from "../../styles/tokens";
 
@@ -102,10 +102,11 @@ type SegmentedTabsProps<TValue extends string> = {
  * sign of where they are. The container is scrolled directly rather than
  * through `scrollIntoView`, which would also scroll the page vertically.
  *
- * **An option can hold views of its own** (`subOptions`). While it is selected the pill widens
- * and they pop out beside its label, as smaller pills on the brand fill; choosing another option
- * folds them away. A tab inside the tab, rather than a second bar further down that looks like a
- * sibling and slides on its own.
+ * **An option can hold views of its own** (`subOptions`). While it is selected they hang below
+ * its pill as a droplet -- a small brand-coloured bubble joined to the pill by a tail -- and
+ * choosing another option folds it back up. A tab inside the tab, rather than a second bar
+ * further down that looks like a sibling and slides on its own. Below rather than beside: the
+ * views used to widen the pill sideways, which pushed every tab after it along the bar.
  */
 export function SegmentedTabs<TValue extends string>({
   value,
@@ -122,7 +123,59 @@ export function SegmentedTabs<TValue extends string>({
   const prefersReducedMotion = useReducedMotion();
   const rowRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
+  const dropletRef = useRef<HTMLDivElement>(null);
+  const tailRef = useRef<HTMLSpanElement>(null);
+  /** The droplet element last placed, so a freshly mounted one lands without sliding in. */
+  const placedDropletRef = useRef<HTMLDivElement | null>(null);
   const isCompact = size === "sm";
+
+  const activeOption = options.find((option) => option.value === value);
+  const activeViews = activeOption?.subOptions ?? [];
+  const showDroplet = activeViews.length > 1;
+  // Bars without views anywhere keep their old, single-element shape.
+  const hasNestedViews = options.some((option) => (option.subOptions?.length ?? 0) > 1);
+
+  // Hangs the droplet under the selected pill: centred on it, but kept inside the bar's width, with
+  // the tail still pointing at the pill. Written to the elements rather than kept in state -- it is
+  // pure layout, measured after every change that can move the pill (a new selection, the row
+  // scrolling, the window resizing).
+  useLayoutEffect(() => {
+    if (!showDroplet) return;
+
+    const place = () => {
+      const outer = outerRef.current;
+      const active = activeRef.current;
+      const droplet = dropletRef.current;
+      if (!outer || !active || !droplet) return;
+
+      const outerBox = outer.getBoundingClientRect();
+      const activeBox = active.getBoundingClientRect();
+      const center = activeBox.left - outerBox.left + activeBox.width / 2;
+      const width = droplet.offsetWidth;
+      const left = Math.min(Math.max(center - width / 2, 0), Math.max(outerBox.width - width, 0));
+
+      const fresh = placedDropletRef.current !== droplet;
+      if (fresh) droplet.style.transition = "none";
+      droplet.style.left = `${left}px`;
+      if (tailRef.current) tailRef.current.style.left = `${center - left}px`;
+      if (fresh) {
+        // Commits the position before the transition comes back, so it does not animate from 0.
+        void droplet.offsetWidth;
+        droplet.style.transition = "";
+        placedDropletRef.current = droplet;
+      }
+    };
+
+    place();
+    const row = rowRef.current;
+    row?.addEventListener("scroll", place, { passive: true });
+    window.addEventListener("resize", place);
+    return () => {
+      row?.removeEventListener("scroll", place);
+      window.removeEventListener("resize", place);
+    };
+  }, [value, showDroplet, options.length]);
 
   // Brings the selected option back into the row when it is off either edge, and does nothing
   // when it is already visible -- so an ordinary click on a visible tab never scrolls anything.
@@ -157,7 +210,7 @@ export function SegmentedTabs<TValue extends string>({
     }
   }, [value, prefersReducedMotion, wrap]);
 
-  return (
+  const row = (
     <div
       ref={rowRef}
       role="group"
@@ -177,9 +230,8 @@ export function SegmentedTabs<TValue extends string>({
       {options.map((option) => {
         const isActive = value === option.value;
         const isMagnified = !prefersReducedMotion && hovered === option.value;
-        const subOptions = option.subOptions ?? [];
-        // Grows only while selected, and only when there is more than one view to choose from.
-        const grown = isActive && subOptions.length > 1;
+        // Its views hang below it while selected, and only when there is more than one of them.
+        const grown = isActive && (option.subOptions?.length ?? 0) > 1;
 
         const pill = (
           <motion.span
@@ -194,7 +246,7 @@ export function SegmentedTabs<TValue extends string>({
           />
         );
 
-        const button = (
+        return (
           <motion.button
             key={option.value}
             ref={isActive ? activeRef : undefined}
@@ -204,8 +256,7 @@ export function SegmentedTabs<TValue extends string>({
             onClick={() => onChange(option.value)}
             onHoverStart={() => setHovered(option.value)}
             onHoverEnd={() => setHovered((current) => (current === option.value ? null : current))}
-            // The grown pill does not magnify: it is already the widest thing in the bar, and a
-            // label scaling inside a fill that does not would come apart from it.
+            // The pill with a droplet under it does not magnify: the droplet would come apart from it.
             animate={{ scale: isMagnified && !grown ? TAB_HOVER_SCALE : 1 }}
             transition={dockMagnifySpringToken}
             className={`group relative inline-flex ${
@@ -216,14 +267,10 @@ export function SegmentedTabs<TValue extends string>({
                 : "gap-2 rounded-xl px-4 py-2 text-sm"
             } font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
               fullWidth && !wrap ? "flex-1" : ""
-            } ${grown ? (isCompact ? "pr-2" : "pr-2.5") : ""} ${
-              isActive ? "text-white" : "text-app-text-muted hover:text-app-text"
-            }`}
+            } ${isActive ? "text-white" : "text-app-text-muted hover:text-app-text"}`}
           >
             {isActive ? (
-              grown ? null : (
-                pill
-              )
+              pill
             ) : (
               <span
                 aria-hidden="true"
@@ -239,7 +286,7 @@ export function SegmentedTabs<TValue extends string>({
 
             <span className="relative z-10 leading-none">{option.label}</span>
 
-            {/* Once grown, the views carry their own counts; the section's would repeat one. */}
+            {/* While its views are out they carry their own counts; the section's would repeat one. */}
             {typeof option.count === "number" && !grown && (
               // `leading-none` on both label and count is what
               // actually centres them: the count's smaller font
@@ -254,74 +301,85 @@ export function SegmentedTabs<TValue extends string>({
             )}
           </motion.button>
         );
-
-        if (subOptions.length <= 1) return button;
-
-        return (
-          <div
-            key={option.value}
-            className={`relative inline-flex ${wrap ? "min-w-fit" : "shrink-0"} items-center ${
-              fullWidth && !wrap ? "flex-1" : ""
-            }`}
-          >
-            {grown && pill}
-            {button}
-            <AnimatePresence initial={false}>
-              {grown && (
-                <motion.div
-                  key="views"
-                  role="group"
-                  aria-label={option.subAriaLabel ?? `${option.label} views`}
-                  initial={prefersReducedMotion ? false : { width: 0, opacity: 0 }}
-                  animate={{ width: "auto", opacity: 1 }}
-                  exit={prefersReducedMotion ? { opacity: 0 } : { width: 0, opacity: 0 }}
-                  transition={
-                    prefersReducedMotion
-                      ? { duration: 0 }
-                      : { type: "spring", stiffness: 420, damping: 36 }
-                  }
-                  className="relative z-10 flex items-center overflow-hidden"
-                >
-                  <span aria-hidden="true" className="mr-1 h-4 w-px shrink-0 bg-white/30" />
-                  <span className={`flex items-center gap-0.5 ${isCompact ? "pr-0.5" : "pr-1"}`}>
-                    {subOptions.map((sub) => {
-                      const selected = (option.subValue ?? subOptions[0].value) === sub.value;
-                      return (
-                        <button
-                          key={sub.value}
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() => option.onSubChange?.(sub.value)}
-                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none ${
-                            isCompact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"
-                          } ${
-                            selected
-                              ? "bg-app-surface text-app-text shadow-sm"
-                              : "text-white/80 hover:bg-white/15 hover:text-white"
-                          }`}
-                        >
-                          <span className="leading-none">{sub.label}</span>
-                          {typeof sub.count === "number" && (
-                            <span
-                              className={`inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold tabular-nums ${
-                                selected
-                                  ? "bg-app-brand-soft text-app-brand-text"
-                                  : "bg-white/20 text-white"
-                              }`}
-                            >
-                              {sub.count}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        );
       })}
+    </div>
+  );
+
+  if (!hasNestedViews) return row;
+
+  return (
+    <div
+      ref={outerRef}
+      className={`relative ${wrap || fullWidth ? "flex w-full" : "inline-flex max-w-full"}`}
+    >
+      {row}
+      <AnimatePresence initial={false}>
+        {showDroplet && activeOption && (
+          <motion.div
+            key="views"
+            ref={dropletRef}
+            role="group"
+            aria-label={activeOption.subAriaLabel ?? `${activeOption.label} views`}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: -10, scaleY: 0.3 }}
+            animate={{ opacity: 1, y: 0, scaleY: 1 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -10, scaleY: 0.3 }}
+            transition={
+              prefersReducedMotion
+                ? { duration: 0 }
+                : { type: "spring", stiffness: 420, damping: 30 }
+            }
+            style={{ originY: 0 }}
+            // `mt-1.5` clears the bar's border; the tail reaches back up through it towards the pill.
+            // Slides along with the pill when another section with views is chosen.
+            className="absolute top-full left-0 z-20 mt-1.5 transition-[left] duration-300 ease-out motion-reduce:transition-none"
+          >
+            <span
+              ref={tailRef}
+              aria-hidden="true"
+              className={`absolute -top-1.5 h-3.5 w-3.5 -translate-x-1/2 rotate-45 bg-app-brand ${
+                isCompact ? "rounded-[2px]" : "rounded-[3px]"
+              }`}
+            />
+            <span
+              className={`relative flex items-center gap-0.5 bg-app-brand shadow-[0_8px_20px_-10px_var(--color-app-brand)] ${
+                isCompact ? "rounded-lg p-0.5" : "rounded-xl p-1"
+              }`}
+            >
+              {activeViews.map((sub) => {
+                const selected = (activeOption.subValue ?? activeViews[0].value) === sub.value;
+                return (
+                  <button
+                    key={sub.value}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => activeOption.onSubChange?.(sub.value)}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none ${
+                      isCompact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"
+                    } ${
+                      selected
+                        ? "bg-app-surface text-app-text shadow-sm"
+                        : "text-white/80 hover:bg-white/15 hover:text-white"
+                    }`}
+                  >
+                    <span className="leading-none">{sub.label}</span>
+                    {typeof sub.count === "number" && (
+                      <span
+                        className={`inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold tabular-nums ${
+                          selected
+                            ? "bg-app-brand-soft text-app-brand-text"
+                            : "bg-white/20 text-white"
+                        }`}
+                      >
+                        {sub.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

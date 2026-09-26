@@ -70,7 +70,9 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
   const { selectedProjectId } = useProjectContext();
   const navigate = useNavigate();
 
-  const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([...SEVERITIES]);
+  // The severities chosen to narrow the list; none chosen shows them all. It used to start with all
+  // four chosen, which drew four brand-filled chips on every visit for a list nobody had narrowed.
+  const [severityFilter, setSeverityFilter] = useState<KnowledgeGapSeverity[]>([]);
   const [sortBy, setSortBy] = useState<GapSortOption>("severity");
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -152,7 +154,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
   const filtered = gaps
     .filter(
       (gap) =>
-        severityFilter.includes(gap.severity) &&
+        (severityFilter.length === 0 || severityFilter.includes(gap.severity)) &&
         (normalizedQuery === "" ||
           gap.component.toLowerCase().includes(normalizedQuery) ||
           gap.owners.some((owner) =>
@@ -180,9 +182,13 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
   const selectedGap = gaps.find((gap) => gap.id === gapId) ?? null;
 
   const toggleSeverityFilter = (severity: KnowledgeGapSeverity) => {
-    setSeverityFilter((prev) =>
-      prev.includes(severity) ? prev.filter((s) => s !== severity) : [...prev, severity],
-    );
+    setSeverityFilter((prev) => {
+      const next = prev.includes(severity)
+        ? prev.filter((s) => s !== severity)
+        : [...prev, severity];
+      // Every severity chosen is the same list as none chosen — back to the quiet default.
+      return next.length === SEVERITIES.length ? [] : next;
+    });
   };
 
   const severityCounts = Object.fromEntries(
@@ -194,10 +200,9 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
   const unassigned = gaps.filter(
     (gap) => gap.severity !== "covered" && gap.owners.length === 0,
   ).length;
-  const narrowed =
-    severityFilter.length < SEVERITIES.length || sortBy !== "severity" || normalizedQuery !== "";
+  const narrowed = severityFilter.length > 0 || sortBy !== "severity" || normalizedQuery !== "";
   const resetList = () => {
-    setSeverityFilter([...SEVERITIES]);
+    setSeverityFilter([]);
     setSortBy("severity");
     setQuery("");
   };

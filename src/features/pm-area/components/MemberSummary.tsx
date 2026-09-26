@@ -1,8 +1,9 @@
 import {
   CalendarClock,
+  CheckCircle2,
+  CircleDashed,
   Clock,
   GraduationCap,
-  Lock,
   MessageSquareText,
   SkipForward,
   ThumbsDown,
@@ -104,8 +105,8 @@ type MemberSummaryProps = {
  *
  * The profile used to open on the path itself: a graph of every step, with the numbers a manager
  * actually came for (how far, where, is anything off) scattered across the page. This card
- * answers those in one read: overall progress as a ring, every phase as a bar, the steps by
- * state, then the three signals worth a second look — workload by estimate, what the member said
+ * answers those in one read: overall progress as a ring, the phases (the current one up close,
+ * the rest as a strip and a line each), the steps by state, then the three signals worth a second look — workload by estimate, what the member said
  * about their steps, and their skills. The path underneath is for working on it.
  */
 export function MemberSummary({
@@ -121,6 +122,16 @@ export function MemberSummary({
   const percent = data.progress ? data.progress.percentage : progressPercent(member);
   const workload = data.estimated > 0 ? (data.closedEstimate / data.estimated) * 100 : 0;
 
+  // The phase they are in gets the close look: every phase underway, or — before any is — the
+  // first one they can start. Done and still-ahead phases are only counted and named.
+  const activePhases = data.phases.filter((phase) => phase.state === "active");
+  const firstOpen = data.phases.find((phase) => phase.state === "open");
+  const focusPhases = activePhases.length > 0 ? activePhases : firstOpen ? [firstOpen] : [];
+  const donePhases = data.phases.filter((phase) => phase.state === "done");
+  const aheadPhases = data.phases.filter(
+    (phase) => phase.state !== "done" && !focusPhases.includes(phase),
+  );
+
   const levelSegments = LEVEL_SEGMENTS.map((segment) => ({
     label: segment.label,
     value: skillLevels.filter((skill) => skill.level === segment.level).length,
@@ -134,12 +145,12 @@ export function MemberSummary({
         <div className="flex items-center gap-4 lg:flex-col lg:items-start">
           <RingGauge
             value={percent}
-            size={112}
-            thickness={10}
+            size={96}
+            thickness={9}
             colorClassName={stage === "done" ? "text-app-success-solid" : "text-app-brand"}
             ariaLabel={`${percent}% of the onboarding path complete`}
           >
-            <span className="text-2xl leading-none font-bold text-app-text">{percent}%</span>
+            <span className="text-xl leading-none font-bold text-app-text">{percent}%</span>
             <span className="mt-1 text-[11px] text-app-text-muted">{STAGE_LABEL[stage]}</span>
           </RingGauge>
           <div className="min-w-0 space-y-1 text-xs text-app-text-muted lg:max-w-44">
@@ -167,50 +178,127 @@ export function MemberSummary({
           </div>
         </div>
 
-        {/* Every phase as a bar. */}
+        {/* The phases: the whole path as one strip, the phase they are in up close, and what is
+            done or still ahead folded into a line each. Every phase used to get its own labelled
+            bar, which listed nearly the whole path in the card that is meant to be the glance. */}
         <div className="min-w-0">
-          <PmEyebrow className="mb-3">Phases</PmEyebrow>
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <PmEyebrow>Phases</PmEyebrow>
+            {data.phases.length > 0 && (
+              <span className="text-xs text-app-text-muted tabular-nums">
+                {donePhases.length} of {data.phases.length} done
+              </span>
+            )}
+          </div>
           {data.phases.length === 0 ? (
             <p className="text-sm text-app-text-muted">No onboarding path yet.</p>
           ) : (
-            <ol className="space-y-2.5">
-              {data.phases.map((phase, index) => (
-                <li key={phase.id} className="min-w-0">
-                  <div className="flex items-baseline justify-between gap-3 text-xs">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="shrink-0 text-app-text-subtle tabular-nums">
-                        {index + 1}
-                      </span>
-                      <span
-                        className={`truncate ${phase.state === "active" ? "font-semibold text-app-text" : "text-app-text-muted"}`}
-                        title={phase.title}
-                      >
-                        {phase.title}
-                      </span>
-                      {phase.state === "locked" && (
-                        <Lock
-                          aria-hidden="true"
-                          className="h-3 w-3 shrink-0 text-app-text-subtle"
-                        />
-                      )}
-                    </span>
-                    <span className="shrink-0 text-app-text-muted tabular-nums">
-                      {phase.progress.completed}/{phase.progress.total}
-                      <span className="sr-only"> done, {PHASE_LABEL[phase.state]}</span>
-                    </span>
-                  </div>
+            <div className="space-y-3">
+              <div aria-hidden="true" className="flex gap-1">
+                {data.phases.map((phase) => (
                   <span
-                    aria-hidden="true"
-                    className="mt-1 block h-1.5 overflow-hidden rounded-full bg-app-progress-track"
+                    key={phase.id}
+                    title={`${phase.title} · ${phase.progress.completed}/${phase.progress.total}`}
+                    className={`block h-1.5 flex-1 overflow-hidden rounded-full bg-app-progress-track ${
+                      focusPhases.includes(phase) ? "ring-2 ring-app-brand/25" : ""
+                    }`}
                   >
                     <span
                       className={`block h-full rounded-full transition-[width] duration-700 ${PHASE_BAR[phase.state]}`}
                       style={{ width: `${phase.progress.percentage}%` }}
                     />
                   </span>
-                </li>
-              ))}
-            </ol>
+                ))}
+              </div>
+
+              {focusPhases.length > 0 && (
+                <ul className="space-y-2">
+                  {focusPhases.map((phase) => (
+                    <li
+                      key={phase.id}
+                      className="min-w-0 rounded-xl border border-app-brand-border bg-app-brand-soft/40 px-3 py-2.5"
+                    >
+                      <div className="flex items-baseline justify-between gap-3 text-xs">
+                        <span className="flex min-w-0 items-baseline gap-1.5">
+                          <span className="shrink-0 text-app-text-subtle tabular-nums">
+                            {data.phases.indexOf(phase) + 1}
+                          </span>
+                          <span
+                            className="truncate text-sm font-semibold text-app-text"
+                            title={phase.title}
+                          >
+                            {phase.title}
+                          </span>
+                          {phase.state === "open" && (
+                            <span className="shrink-0 text-app-text-subtle">up next</span>
+                          )}
+                        </span>
+                        <span className="shrink-0 text-app-text-muted tabular-nums">
+                          {phase.progress.completed}/{phase.progress.total}
+                          <span className="sr-only"> done, {PHASE_LABEL[phase.state]}</span>
+                        </span>
+                      </div>
+                      <span
+                        aria-hidden="true"
+                        className="mt-1.5 block h-2 overflow-hidden rounded-full bg-app-progress-track"
+                      >
+                        <span
+                          className={`block h-full rounded-full transition-[width] duration-700 ${PHASE_BAR[phase.state]}`}
+                          style={{ width: `${phase.progress.percentage}%` }}
+                        />
+                      </span>
+                      {phase.currentSteps.length > 0 && (
+                        <p
+                          className="mt-1.5 truncate text-xs text-app-text-muted"
+                          title={phase.currentSteps.join(", ")}
+                        >
+                          On: <span className="text-app-text">{phase.currentSteps.join(", ")}</span>
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {(donePhases.length > 0 || aheadPhases.length > 0) && (
+                <div className="space-y-1 text-xs text-app-text-muted">
+                  {donePhases.length > 0 && (
+                    <p className="flex min-w-0 items-center gap-1.5">
+                      <CheckCircle2
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 shrink-0 text-app-success-text"
+                      />
+                      <span className="shrink-0 font-semibold text-app-text tabular-nums">
+                        {donePhases.length} done
+                      </span>
+                      <span
+                        className="truncate"
+                        title={donePhases.map((phase) => phase.title).join(" · ")}
+                      >
+                        {donePhases.map((phase) => phase.title).join(" · ")}
+                      </span>
+                    </p>
+                  )}
+                  {aheadPhases.length > 0 && (
+                    <p className="flex min-w-0 items-center gap-1.5">
+                      <CircleDashed
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 shrink-0 text-app-text-subtle"
+                      />
+                      <span className="shrink-0 font-semibold text-app-text tabular-nums">
+                        {aheadPhases.length} ahead
+                      </span>
+                      <span
+                        className="truncate"
+                        title={aheadPhases.map((phase) => phase.title).join(" · ")}
+                      >
+                        {aheadPhases.map((phase) => phase.title).join(" · ")}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -221,8 +309,8 @@ export function MemberSummary({
             <DonutChart
               data={data.stepStates}
               ariaLabel="Steps by state"
-              size={112}
-              thickness={12}
+              size={96}
+              thickness={11}
               legend="below"
               center={
                 <>

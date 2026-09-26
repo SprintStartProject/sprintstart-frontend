@@ -143,8 +143,10 @@ describe("TeamManagementPage", () => {
 
     expect(await screen.findByText("Alice Smith")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("combobox", { name: "Sort team members" }));
-    await user.click(await screen.findByRole("option", { name: "Lowest progress" }));
+    // The column header sorts: the first press is highest first, the second flips it.
+    const progressHeader = screen.getByRole("button", { name: "Sort by progress" });
+    await user.click(progressHeader);
+    await user.click(progressHeader);
 
     await waitFor(() => {
       const nameElements = within(roster()).getAllByText(/^(Bob Jones|Alice Smith)$/);

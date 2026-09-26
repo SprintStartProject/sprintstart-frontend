@@ -37,7 +37,7 @@ describe("TeamManagementPage Accessibility", () => {
     expect(
       screen.getByRole("combobox", { name: "Filter team members by role" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Sort team members" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sort by progress" })).toBeInTheDocument();
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });
