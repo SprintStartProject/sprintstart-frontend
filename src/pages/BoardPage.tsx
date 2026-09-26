@@ -6,6 +6,7 @@ import {
   Check,
   FolderPlus,
   LayoutDashboard,
+  LayoutList,
   ListTree,
   Maximize2,
   Milestone,
@@ -42,6 +43,7 @@ import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
 import { readPathWindowShown, writePathWindowShown } from "../features/board/layout/pathWindowFold";
+import { readTaskPoolShown, writeTaskPoolShown } from "../features/board/layout/taskPoolShown";
 import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
 import {
   ALL_SECTIONS,
@@ -313,6 +315,32 @@ export function BoardPage() {
     });
   }, [showPathWindow, toast]);
 
+  // The task pool card, on or off — a switch like the path strip rather than a dismissal. See
+  // `layout/taskPoolShown.ts` for why this one card does not get the sticky server-side removal.
+  const [isTaskPoolShown, setIsTaskPoolShown] = useState(true);
+  const [taskPoolReadFor, setTaskPoolReadFor] = useState<string | null>(null);
+
+  if (storedFor !== taskPoolReadFor) {
+    setTaskPoolReadFor(storedFor);
+    setIsTaskPoolShown(readTaskPoolShown(boardId));
+  }
+
+  const showTaskPool = useCallback(
+    (shown: boolean) => {
+      setIsTaskPoolShown(shown);
+      writeTaskPoolShown(boardId, shown);
+    },
+    [boardId],
+  );
+
+  const removeTaskPool = useCallback(() => {
+    showTaskPool(false);
+    toast.info("Task pool hidden", {
+      description: "You can put it back from the switches on the right.",
+      action: { label: "Undo", onClick: () => showTaskPool(true) },
+    });
+  }, [showTaskPool, toast]);
+
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [pinsReadFor, setPinsReadFor] = useState<string | null>(null);
 
@@ -436,6 +464,11 @@ export function BoardPage() {
   }
 
   function handleDismiss(cardId: string) {
+    if (board?.cards.find((card) => card.id === cardId)?.content.kind === "TASK_POOL") {
+      removeTaskPool();
+      return;
+    }
+
     setPendingRemovals((current) => new Set(current).add(cardId));
 
     const timer = window.setTimeout(() => {
@@ -475,8 +508,14 @@ export function BoardPage() {
    * hire's attention.
    */
   const allCards = useMemo(
-    () => board?.cards.filter((card) => card !== pathCard && !pendingRemovals.has(card.id)) ?? [],
-    [board, pathCard, pendingRemovals],
+    () =>
+      board?.cards.filter(
+        (card) =>
+          card !== pathCard &&
+          !pendingRemovals.has(card.id) &&
+          (isTaskPoolShown || card.content.kind !== "TASK_POOL"),
+      ) ?? [],
+    [board, pathCard, pendingRemovals, isTaskPoolShown],
   );
 
   const {
@@ -1113,6 +1152,22 @@ export function BoardPage() {
                 aria-label={isPathShown ? "Hide where you are in your path" : "Show where you are"}
               >
                 <Milestone className="h-4 w-4" aria-hidden="true" />
+              </Button>
+
+              {/* The task pool, on or off — the same kind of switch as the path strip above, and
+                  for the same reason: the card's own X only hides it, so the way back has to live
+                  somewhere the card is not. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() => showTaskPool(!isTaskPoolShown)}
+                disabled={!board}
+                aria-pressed={isTaskPoolShown}
+                title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+              >
+                <LayoutList className="h-4 w-4" aria-hidden="true" />
               </Button>
 
               {/* Which cards, by where they came from. It sits below the switches that change the
