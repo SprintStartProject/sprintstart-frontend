@@ -31,6 +31,13 @@ export const INBOX_VIEW_PARAM = "view";
  */
 export const MEMBER_STEP_PARAM = "step";
 
+/**
+ * A phase to show on arrival at a member's full profile (`/team/:userId?phase=<id>`): the
+ * profile scrolls down to the path and shows it there, in whichever view is open. Dropped from
+ * the URL once shown, so a reload lands at the top again.
+ */
+export const MEMBER_PHASE_PARAM = "phase";
+
 export function isPmWorkspacePath(pathname: string): boolean {
   return PM_WORKSPACE_PATHS.some((pattern) => matchPath(pattern, pathname) !== null);
 }

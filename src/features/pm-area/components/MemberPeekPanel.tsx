@@ -1,4 +1,5 @@
-import { ArrowUpRight, Check, Clock, Flag, GraduationCap, Hand, Route } from "lucide-react";
+import { ArrowUpRight, Flag, GraduationCap, Hand } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
@@ -11,29 +12,17 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../services/queryKeys";
 import { getUserOnboardingPath, getUserSkillLevels } from "../../../services/teamManagementService";
-import { findActivePhaseIndex } from "../../onboarding/activePhase";
-import type { OnboardingPathEndpoint } from "../../onboarding/types";
 import { formatDuration, formatMoment } from "../../onboarding-metrics/format";
 import { isAwaitingFirstResponse } from "../../onboarding-metrics/hireStatus";
 import { hireMoments } from "../../onboarding-metrics/moments";
 import { useProjectContext } from "../../projects/useProjectContext";
-import {
-  STAGE_LABEL,
-  daysOnStep,
-  formatDays,
-  isAtRisk,
-  memberName,
-  memberStage,
-  progressPercent,
-  waitingOn,
-} from "../memberStatus";
-import { MEMBER_STEP_PARAM } from "../pmWorkspacePaths";
+import { memberName, waitingOn } from "../memberStatus";
+import { MEMBER_PHASE_PARAM, MEMBER_STEP_PARAM } from "../pmWorkspacePaths";
 import { useMemberOpenItems } from "../useMemberOpenItems";
 import { useMemberPeek } from "../useMemberPeek";
 import { useTeamRoster } from "../useTeamRoster";
 import { MemberOpenItems } from "./MemberOpenItems";
-import { MemberProgressBar } from "./MemberRow";
-import { PmEyebrow } from "./PmCard";
+import { MemberSummary } from "./MemberSummary";
 
 function PanelSection({
   icon: Icon,
@@ -41,7 +30,7 @@ function PanelSection({
   meta,
   children,
 }: {
-  icon: typeof Route;
+  icon: LucideIcon;
   title: string;
   meta?: string;
   children: ReactNode;
@@ -57,64 +46,6 @@ function PanelSection({
       </div>
       {children}
     </section>
-  );
-}
-
-/**
- * Where the member is in their path, counted: "Phase 2 of 4", one segment per phase, and how far
- * into the current phase they are. A progress percentage says how much is done; this says how
- * much is left, and in what shape — which is what a manager asks when deciding whether to step in.
- */
-function PhaseProgress({ path, done }: { path: OnboardingPathEndpoint; done: boolean }) {
-  const phases = [...path.phases].sort((a, b) => a.position - b.position);
-  if (phases.length === 0) return null;
-
-  const activeIndex = done ? phases.length - 1 : findActivePhaseIndex({ ...path, phases });
-  const active = phases[activeIndex];
-  const steps = active.steps ?? [];
-  const closedSteps = steps.filter(
-    (step) => step.status === "FINISHED" || step.status === "SKIPPED",
-  ).length;
-
-  return (
-    <div className="mt-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="min-w-0 truncate text-sm text-app-text">
-          <span className="font-semibold">
-            Phase {activeIndex + 1} of {phases.length}
-          </span>
-          <span className="text-app-text-muted"> · {active.title}</span>
-        </p>
-        {!done && steps.length > 0 && (
-          <span className="shrink-0 text-xs text-app-text-muted tabular-nums">
-            {closedSteps} of {steps.length} steps
-          </span>
-        )}
-      </div>
-      <ol aria-label="Phases" className="mt-2 flex gap-1">
-        {phases.map((phase, index) => {
-          const state =
-            done || index < activeIndex ? "done" : index === activeIndex ? "current" : "next";
-
-          return (
-            <li
-              key={phase.id}
-              title={`${index + 1}. ${phase.title}`}
-              aria-label={`Phase ${index + 1}: ${phase.title}${
-                state === "done" ? ", done" : state === "current" ? ", current" : ""
-              }`}
-              className={`h-1.5 flex-1 rounded-full ${
-                state === "done"
-                  ? "bg-app-success-solid"
-                  : state === "current"
-                    ? "bg-app-brand"
-                    : "bg-app-progress-track"
-              }`}
-            />
-          );
-        })}
-      </ol>
-    </div>
   );
 }
 
@@ -168,10 +99,6 @@ function MemberPeekContent({ userId }: { userId: string }) {
     );
   }
 
-  const percent = progressPercent(member);
-  const stage = memberStage(member);
-  const days = daysOnStep(member);
-  const atRisk = isAtRisk(member);
   const waitingCount = waitingOn(member).length;
 
   const sortedSkills = [...(skills ?? [])].sort(
@@ -180,49 +107,16 @@ function MemberPeekContent({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-4">
-      <PanelSection icon={Route} title="Onboarding" meta={STAGE_LABEL[stage]}>
-        <MemberProgressBar percent={percent} />
-        {path && <PhaseProgress path={path} done={stage === "done"} />}
-
-        {stage === "done" ? (
-          <p className="mt-3 flex items-center gap-2 text-sm text-app-text">
-            <Check aria-hidden="true" className="h-4 w-4 text-app-success-solid" />
-            Through the whole path.
-          </p>
-        ) : (
-          <dl className={`mt-4 grid grid-cols-1 gap-3 ${path ? "" : "sm:grid-cols-2"}`}>
-            {/* The phase is named in the "Phase 2 of 4" line above once the path is in. */}
-            {!path && (
-              <div className="min-w-0">
-                <dt>
-                  <PmEyebrow>Phase</PmEyebrow>
-                </dt>
-                <dd className="mt-1 truncate text-sm text-app-text">
-                  {member.currentPhase?.title ?? "—"}
-                </dd>
-              </div>
-            )}
-            <div className="min-w-0">
-              <dt>
-                <PmEyebrow>Current step</PmEyebrow>
-              </dt>
-              <dd className="mt-1 text-sm text-app-text">
-                {member.currentStep?.title ?? "Not started yet"}
-              </dd>
-              {days !== null && (
-                <dd
-                  className={`mt-0.5 flex items-center gap-1 text-xs ${
-                    atRisk ? "font-medium text-app-orange-text" : "text-app-text-muted"
-                  }`}
-                >
-                  <Clock aria-hidden="true" className="h-3 w-3" />
-                  {formatDays(days)} on this step
-                </dd>
-              )}
-            </div>
-          </dl>
-        )}
-      </PanelSection>
+      {/* The member's onboarding at a glance — the card the full profile used to open on. A phase
+          in it leads to the full profile with that phase shown in the path. */}
+      <MemberSummary
+        member={member}
+        path={path ?? null}
+        feedback={openItems.feedback ?? []}
+        onOpenPhase={(phaseId) =>
+          void navigate(`/team/${userId}?${MEMBER_PHASE_PARAM}=${encodeURIComponent(phaseId)}`)
+        }
+      />
 
       <PanelSection
         icon={Hand}
