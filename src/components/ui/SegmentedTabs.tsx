@@ -136,7 +136,7 @@ export function SegmentedTabs<TValue extends string>({
   // Bars without views anywhere keep their old, single-element shape.
   const hasNestedViews = options.some((option) => (option.subOptions?.length ?? 0) > 1);
 
-  // Hangs the droplet under the selected pill: centred on it, but kept inside the bar's width, with
+  // Hangs the droplet under the selected pill: centred on it, but kept inside the column, with
   // the tail still pointing at the pill. Written to the elements rather than kept in state -- it is
   // pure layout, measured after every change that can move the pill (a new selection, the row
   // scrolling, the window resizing).
@@ -145,7 +145,12 @@ export function SegmentedTabs<TValue extends string>({
 
     const place = () => {
       const outer = outerRef.current;
-      const active = activeRef.current;
+      // The pressed option read from the row itself, not from `activeRef`: a motion button hands
+      // its ref over only after this effect has run, so on a switch from Team to Escalations the
+      // ref still pointed at Team and the droplet stayed under the tab that was left.
+      const active = rowRef.current?.querySelector<HTMLElement>(
+        ':scope > button[aria-pressed="true"]',
+      );
       const droplet = dropletRef.current;
       if (!outer || !active || !droplet) return;
 
@@ -153,7 +158,12 @@ export function SegmentedTabs<TValue extends string>({
       const activeBox = active.getBoundingClientRect();
       const center = activeBox.left - outerBox.left + activeBox.width / 2;
       const width = droplet.offsetWidth;
-      const left = Math.min(Math.max(center - width / 2, 0), Math.max(outerBox.width - width, 0));
+      // Free to reach past the bar's own right end, as long as it stays inside the column the bar
+      // sits in: under the last tab a droplet wider than the tab would otherwise sit off-centre.
+      const room = outer.parentElement
+        ? outer.parentElement.getBoundingClientRect().right - outerBox.left
+        : outerBox.width;
+      const left = Math.min(Math.max(center - width / 2, 0), Math.max(room - width, 0));
 
       const fresh = placedDropletRef.current !== droplet;
       if (fresh) droplet.style.transition = "none";
@@ -329,20 +339,22 @@ export function SegmentedTabs<TValue extends string>({
                 : { type: "spring", stiffness: 420, damping: 30 }
             }
             style={{ originY: 0 }}
-            // `mt-1.5` clears the bar's border; the tail reaches back up through it towards the pill.
+            // `mt-2` clears the bar's border; the tail reaches back up through it towards the pill.
             // Slides along with the pill when another section with views is chosen.
-            className="absolute top-full left-0 z-20 mt-1.5 transition-[left] duration-300 ease-out motion-reduce:transition-none"
+            className="absolute top-full left-0 z-20 mt-2 transition-[left] duration-300 ease-out motion-reduce:transition-none"
           >
             <span
               ref={tailRef}
               aria-hidden="true"
-              className={`absolute -top-1.5 h-3.5 w-3.5 -translate-x-1/2 rotate-45 bg-app-brand ${
+              className={`absolute -top-2 h-4 w-4 -translate-x-1/2 rotate-45 bg-app-progress-fill ${
                 isCompact ? "rounded-[2px]" : "rounded-[3px]"
               }`}
             />
+            {/* The app's brand gradient, blue into indigo, with a soft halo: set apart from the
+                flat blue pill above it, so the views read as the thing to pick next. */}
             <span
-              className={`relative flex items-center gap-0.5 bg-app-brand shadow-[0_8px_20px_-10px_var(--color-app-brand)] ${
-                isCompact ? "rounded-lg p-0.5" : "rounded-xl p-1"
+              className={`relative flex items-center gap-1 bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end shadow-[0_10px_28px_-10px_var(--color-app-progress-fill-end)] ring-4 ring-app-brand/15 ${
+                isCompact ? "rounded-xl p-1" : "rounded-2xl p-1.5"
               }`}
             >
               {activeViews.map((sub) => {
@@ -353,18 +365,20 @@ export function SegmentedTabs<TValue extends string>({
                     type="button"
                     aria-pressed={selected}
                     onClick={() => activeOption.onSubChange?.(sub.value)}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none ${
-                      isCompact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"
+                    className={`inline-flex shrink-0 items-center gap-1.5 font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none ${
+                      isCompact
+                        ? "rounded-lg px-2.5 py-1.5 text-xs"
+                        : "rounded-xl px-3.5 py-2 text-sm"
                     } ${
                       selected
                         ? "bg-app-surface text-app-text shadow-sm"
-                        : "text-white/80 hover:bg-white/15 hover:text-white"
+                        : "text-white/85 hover:bg-white/15 hover:text-white"
                     }`}
                   >
                     <span className="leading-none">{sub.label}</span>
                     {typeof sub.count === "number" && (
                       <span
-                        className={`inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold tabular-nums ${
+                        className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] leading-none font-bold tabular-nums ${
                           selected
                             ? "bg-app-brand-soft text-app-brand-text"
                             : "bg-white/20 text-white"

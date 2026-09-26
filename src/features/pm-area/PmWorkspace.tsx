@@ -367,9 +367,9 @@ export function PmWorkspace() {
                 24px to the side, and without the clip that briefly widened the page and flashed
                 a horizontal scrollbar under the header. `clip` rather than `hidden`, which would
                 make this a scroll container and break the sticky and fixed elements inside.
-                `mt-10` is the room the Team and Escalations views hang into as a droplet under
+                `mt-16` is the room the Team and Escalations views hang into as a droplet under
                 their tab — kept on every section so the content does not move as you cross. */}
-            <div ref={sectionFrameRef} className="-mx-2 mt-10 overflow-x-clip px-2">
+            <div ref={sectionFrameRef} className="-mx-2 mt-16 overflow-x-clip px-2">
               <SlidingTabPanel activeKey={viewKey} index={PM_SECTION_ORDER.indexOf(section)}>
                 {content}
               </SlidingTabPanel>
