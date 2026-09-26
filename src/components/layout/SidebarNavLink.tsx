@@ -543,7 +543,10 @@ export function SidebarNavLink({
                     <span className="sr-only">{busyLabel ?? "In progress"}</span>
                   </span>
                 ) : count > 0 ? (
-                  <span className="ml-auto flex items-center">
+                  // The same words a screen reader hears, as a tooltip: a bare "4" beside the
+                  // PM Dashboard did not say four of what, and the row has no room to spell out
+                  // skip requests, feedback and escalations.
+                  <span className="ml-auto flex items-center" title={countLabel?.(count)}>
                     {/* The same amber as the icon beside it, and the same
                                             amber on the active row as off it. This is the
                                             second half of one signal, not a badge of its

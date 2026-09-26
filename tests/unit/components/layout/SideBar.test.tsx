@@ -409,6 +409,11 @@ describe("SideBar", () => {
       ).toBeGreaterThan(0);
       expect(getPmAttentionCount).toHaveBeenCalledTimes(1);
       expect(getPmAttentionCount).toHaveBeenCalledWith("proj1");
+      // And for sighted users, on hover.
+      expect(screen.getAllByText("4")[0].parentElement).toHaveAttribute(
+        "title",
+        "4 items need your attention: 2 pending skip requests, 1 unread feedback, 1 open escalation",
+      );
     });
 
     it("shows no number when nothing is waiting", async () => {
