@@ -25,7 +25,6 @@ import {
   memberStage,
   progressPercent,
 } from "../memberStatus";
-import { DonutChart } from "./charts/DonutChart";
 import { RingGauge } from "./charts/RingGauge";
 import { PmCard, PmEyebrow } from "./PmCard";
 
@@ -124,7 +123,8 @@ type MemberSummaryProps = {
  * The profile used to open on the path itself: a graph of every step, with the numbers a manager
  * actually came for (how far, where, is anything off) scattered across the page. This card
  * answers those in one read: overall progress as a ring, the phases (the current one up close,
- * the rest as a strip and a line each) and the steps by state. The four smaller figures sit
+ * the rest as a strip and a line each). The steps by state were a donut here too; in the
+ * member panel it made the card long for what the phases already say. The four smaller figures sit
  * beside the name ({@link MemberSignals}). The path underneath is for working on it; pressing a
  * phase here shows it there.
  */
@@ -163,7 +163,7 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
     // Laid out by its own width, not the window's: beside the "Waiting on you" column the card
     // is three quarters wide, and the window's breakpoints would squeeze three columns into it.
     <PmCard aria-label="At a glance" tone="brand" className="@container">
-      <div className="grid gap-6 @xl:grid-cols-[auto_minmax(0,1.2fr)_auto]">
+      <div className="grid gap-6 @xl:grid-cols-[auto_minmax(0,1fr)]">
         {/* Where they are, overall. */}
         <div className="flex items-center gap-4 @xl:flex-col @xl:items-start">
           <RingGauge
@@ -246,49 +246,65 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
 
               {focusPhases.length > 0 && (
                 <ul className="space-y-2">
-                  {focusPhases.map((phase) => (
-                    <li
-                      key={phase.id}
-                      className="min-w-0 rounded-xl border border-app-brand-border bg-app-brand-soft/40 px-3 py-2.5"
-                    >
-                      <div className="flex items-baseline justify-between gap-3 text-xs">
-                        <span className="flex min-w-0 items-baseline gap-1.5">
-                          <span className="shrink-0 text-app-text-subtle tabular-nums">
-                            {data.phases.indexOf(phase) + 1}
+                  {focusPhases.map((phase) => {
+                    // Spans only, so the whole card can be one button: the phase it stands for,
+                    // wherever on it the manager presses.
+                    const content = (
+                      <>
+                        <span className="flex items-baseline justify-between gap-3 text-xs">
+                          <span className="flex min-w-0 items-baseline gap-1.5">
+                            <span className="shrink-0 text-app-text-subtle tabular-nums">
+                              {data.phases.indexOf(phase) + 1}
+                            </span>
+                            <span className="truncate text-sm font-semibold text-app-text">
+                              {phase.title}
+                            </span>
+                            {phase.state === "open" && (
+                              <span className="shrink-0 text-app-text-subtle">up next</span>
+                            )}
                           </span>
-                          {phaseLink(
-                            phase,
-                            phase.title,
-                            "truncate text-sm font-semibold text-app-text",
-                          )}
-                          {phase.state === "open" && (
-                            <span className="shrink-0 text-app-text-subtle">up next</span>
-                          )}
+                          <span className="shrink-0 text-app-text-muted tabular-nums">
+                            {phase.progress.completed}/{phase.progress.total}
+                            <span className="sr-only"> done, {PHASE_LABEL[phase.state]}</span>
+                          </span>
                         </span>
-                        <span className="shrink-0 text-app-text-muted tabular-nums">
-                          {phase.progress.completed}/{phase.progress.total}
-                          <span className="sr-only"> done, {PHASE_LABEL[phase.state]}</span>
-                        </span>
-                      </div>
-                      <span
-                        aria-hidden="true"
-                        className="mt-1.5 block h-2 overflow-hidden rounded-full bg-app-progress-track"
-                      >
                         <span
-                          className={`block h-full rounded-full transition-[width] duration-700 ${PHASE_BAR[phase.state]}`}
-                          style={{ width: `${phase.progress.percentage}%` }}
-                        />
-                      </span>
-                      {phase.currentSteps.length > 0 && (
-                        <p
-                          className="mt-1.5 truncate text-xs text-app-text-muted"
-                          title={phase.currentSteps.join(", ")}
+                          aria-hidden="true"
+                          className="mt-1.5 block h-2 overflow-hidden rounded-full bg-app-progress-track"
                         >
-                          On: <span className="text-app-text">{phase.currentSteps.join(", ")}</span>
-                        </p>
-                      )}
-                    </li>
-                  ))}
+                          <span
+                            className={`block h-full rounded-full transition-[width] duration-700 ${PHASE_BAR[phase.state]}`}
+                            style={{ width: `${phase.progress.percentage}%` }}
+                          />
+                        </span>
+                        {phase.currentSteps.length > 0 && (
+                          <span className="mt-1.5 block truncate text-xs text-app-text-muted">
+                            On:{" "}
+                            <span className="text-app-text">{phase.currentSteps.join(", ")}</span>
+                          </span>
+                        )}
+                      </>
+                    );
+                    const cardClassName =
+                      "block w-full min-w-0 rounded-xl border border-app-brand-border bg-app-brand-soft/40 px-3 py-2.5 text-left";
+
+                    return (
+                      <li key={phase.id} className="min-w-0">
+                        {onOpenPhase ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenPhase(phase.id)}
+                            title={`Show ${phase.title} in the path`}
+                            className={`${cardClassName} transition-colors hover:border-app-brand-border-strong hover:bg-app-brand-soft/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+                          >
+                            {content}
+                          </button>
+                        ) : (
+                          <div className={cardClassName}>{content}</div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
 
@@ -337,28 +353,6 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
             </div>
           )}
         </div>
-
-        {/* The steps by state. */}
-        {data.stepCount > 0 && (
-          <div>
-            <PmEyebrow className="mb-3">Steps</PmEyebrow>
-            <DonutChart
-              data={data.stepStates}
-              ariaLabel="Steps by state"
-              size={96}
-              thickness={11}
-              legend="below"
-              center={
-                <>
-                  <span className="text-xl leading-none font-bold text-app-text">
-                    {data.stepCount}
-                  </span>
-                  <span className="mt-1 text-[11px] text-app-text-muted">steps</span>
-                </>
-              }
-            />
-          </div>
-        )}
       </div>
     </PmCard>
   );

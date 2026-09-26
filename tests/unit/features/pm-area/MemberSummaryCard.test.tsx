@@ -94,7 +94,8 @@ describe("MemberSummary", () => {
     // The step they are on, in the close-up of the phase underway.
     expect(screen.getByText(/^On:/)).toHaveTextContent("On: Read the ADRs");
 
-    await user.click(screen.getByRole("button", { name: "Architecture" }));
+    // The whole card of the phase underway is the button, not only its title.
+    await user.click(screen.getByRole("button", { name: /Architecture/ }));
     expect(onOpenPhase).toHaveBeenLastCalledWith("phase2");
 
     await user.click(screen.getByRole("button", { name: "Environment Setup" }));
