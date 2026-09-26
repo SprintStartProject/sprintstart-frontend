@@ -294,6 +294,8 @@ describe("OnBoardingPage", () => {
 
     expect(screen.getAllByText("Phase 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Step 1").length).toBeGreaterThan(0);
+    // Rebuilding throws the member's progress away: that is the PM's call, from the PM area.
+    expect(screen.queryByRole("button", { name: /rebuild|regenerate/i })).not.toBeInTheDocument();
   });
 
   it("computes progress correctly", async () => {
