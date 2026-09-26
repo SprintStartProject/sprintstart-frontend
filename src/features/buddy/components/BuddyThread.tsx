@@ -11,6 +11,12 @@ import { BuddyMessage, BuddyTypingMessage } from "./BuddyMessage";
 type BuddyThreadProps = {
   messages: BuddyMessageView[];
   isThinking: boolean;
+  /**
+   * True while the reply is still receiving tokens. Together with `isThinking`
+   * this is what keeps the waiting game's "reply ready" badge honest: the game
+   * only claims the reply is there once the turn has actually finished.
+   */
+  isStreaming?: boolean;
   /** The tool the buddy is running right now, if any — becomes "Checking your progress…". */
   activeTool: string | null;
   /** Confirms a buddy-proposed action (the only path that mutates). */
@@ -55,6 +61,14 @@ type BuddyThreadProps = {
   /** Tries the read again. The banner is only worth showing when there is something to press. */
   onRetryOpen?: () => void;
   /**
+   * Whether the dino waiting-game is open while the buddy thinks (unlocked
+   * users only; Space opens it — see useSpaceOpensDino). Both surfaces pass
+   * it so dock and page offer the same deal.
+   */
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
+  /**
    * Clears the conversation above the visit divider and opens a clean one.
    *
    * Offered from the divider itself rather than from a button in the page header, because the
@@ -90,6 +104,7 @@ type BuddyThreadProps = {
 export function BuddyThread({
   messages,
   isThinking,
+  isStreaming = false,
   activeTool,
   confirmAction,
   dismissAction,
@@ -101,6 +116,8 @@ export function BuddyThread({
   renderReplyAction,
   openError,
   onRetryOpen,
+  dinoGameActive = false,
+  onDinoGameExit,
   onStartFreshVisit,
   freshVisitShortcut,
 }: BuddyThreadProps) {
@@ -217,10 +234,16 @@ export function BuddyThread({
         );
       })}
 
-      {isThinking && (
+      {(isThinking || dinoGameActive) && (
         <BuddyTypingMessage
           label={activeTool ? toolLabel(activeTool) : undefined}
           showName={showNames}
+          gameActive={dinoGameActive}
+          replyReady={dinoGameActive && !isThinking && !isStreaming}
+          // A failed reply carries its error on the last turn; announcing it as
+          // "Reply ready" would be a lie. The buddy has no Stop, so only two outcomes.
+          turnOutcome={messages[messages.length - 1]?.error ? "failed" : "done"}
+          onGameExit={onDinoGameExit}
         />
       )}
     </div>

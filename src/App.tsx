@@ -18,6 +18,7 @@ import { SelectionActions } from "./features/board/selection/SelectionActions";
 import { CardMarksProvider } from "./features/board/marks/CardMarksProvider";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
+import { EggEffectsLayer } from "./features/easter-eggs/components/EggEffectsLayer";
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
@@ -139,6 +140,12 @@ function AppContent() {
           sits on top of the login screen, and off unless turned on in
           Settings (see AppearanceSection). */}
         {signedIn && showRocketPet && <RocketPet />}
+
+        {/* Whole-window egg effects (barrel roll, matrix rain), rendered
+          once for the whole app. Any chat surface fires them through the
+          bus (playEggEffect); this is where they actually draw. Not gated
+          on signedIn: a fired effect must always have its renderer. */}
+        <EggEffectsLayer />
       </div>
     </BuddyProvider>
   );

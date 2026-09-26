@@ -76,6 +76,14 @@ type BuddyDockProps = Pick<
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
+  /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
+  dinoGameActive?: boolean;
+  /**
+   * Called when the player leaves the dino waiting-game. Named `onDinoGameExit` to match
+   * BuddyThread, which is what the dock forwards it to — one name across the dock → thread
+   * boundary so callers pass it once and forget.
+   */
+  onDinoGameExit?: () => void;
   /** Whether the hire has put the suggestion row away for this session. */
   suggestionsHidden?: boolean;
   /** Puts it away. Held by the widget so it survives closing and reopening the dock. */
@@ -131,6 +139,8 @@ export function BuddyDock({
   confirmAction,
   dismissAction,
   suggestions,
+  dinoGameActive = false,
+  onDinoGameExit,
   startFreshVisit,
   isGreeting,
   isDeciding,
@@ -323,6 +333,7 @@ export function BuddyDock({
             compact
             messages={messages}
             isThinking={isThinking}
+            isStreaming={isStreaming}
             activeTool={activeTool}
             lastMessageFooter={lastMessageFooter}
             confirmAction={confirmAction}
@@ -334,6 +345,8 @@ export function BuddyDock({
             }
             openError={openError}
             onRetryOpen={onRetryOpen}
+            dinoGameActive={dinoGameActive}
+            onDinoGameExit={onDinoGameExit}
             onStartFreshVisit={() => void startFreshVisit()}
           />
         </div>
@@ -382,6 +395,8 @@ export function BuddyDock({
             handleSubmit={handleSubmit}
             compact
             focusOnMount
+            busy={isBusy}
+            gameActive={dinoGameActive}
           />
         </div>
       </motion.div>

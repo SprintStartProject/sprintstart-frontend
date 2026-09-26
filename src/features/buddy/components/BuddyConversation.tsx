@@ -16,7 +16,11 @@ type BuddyConversationProps = {
   activeTool: string | null;
   draft: string;
   setDraft: (value: string) => void;
-  handleSubmit: (event: React.FormEvent) => void;
+  /**
+   * Submits the composer. Returns whether a turn started — an egg phrase comes back `false`,
+   * because nothing was sent for it.
+   */
+  handleSubmit: (event: React.FormEvent) => boolean;
   /** Confirms a buddy-proposed action (the only path that mutates). */
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
@@ -50,6 +54,21 @@ type BuddyConversationProps = {
   hasFloatingControl?: boolean;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
+  /**
+   * Whether the buddy's reply is actively streaming in.
+   *
+   * Read by the composer's focus dance only: together with `isThinking` this is
+   * "the buddy is still writing", and the caret returns to the box when that
+   * ends. Kept separate from `isThinking` because they are genuinely different
+   * states — the thinking dots stop at the first token while the answer keeps
+   * arriving — and folding streaming into `isThinking` would change what the
+   * thread draws.
+   */
+  isStreaming?: boolean;
+  /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
 };
 
 /**
@@ -92,6 +111,9 @@ export function BuddyConversation({
   freshVisitShortcut,
   hasFloatingControl = false,
   focusComposerOnMount = false,
+  isStreaming = false,
+  dinoGameActive = false,
+  onDinoGameExit,
 }: BuddyConversationProps) {
   const { containerRef, onScroll } = useStickToBottom(messages);
 
@@ -144,6 +166,7 @@ export function BuddyConversation({
             )}
             messages={messages}
             isThinking={isThinking}
+            isStreaming={isStreaming}
             activeTool={activeTool}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
@@ -153,6 +176,8 @@ export function BuddyConversation({
             renderQuestionAction={renderQuestionAction}
             openError={openError}
             onRetryOpen={onRetryOpen}
+            dinoGameActive={dinoGameActive}
+            onDinoGameExit={onDinoGameExit}
             onStartFreshVisit={onStartFreshVisit}
             freshVisitShortcut={freshVisitShortcut}
           />
@@ -171,6 +196,8 @@ export function BuddyConversation({
             handleSubmit={handleSubmit}
             placeholder={placeholder}
             focusOnMount={focusComposerOnMount}
+            busy={isThinking || isStreaming}
+            gameActive={dinoGameActive}
           />
         </div>
       </div>

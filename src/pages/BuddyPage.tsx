@@ -175,6 +175,9 @@ function BuddyMentorHome() {
     confirmAction,
     dismissAction,
     openError,
+    dinoGameActive,
+    closeDinoGame,
+    registerDinoSurface,
     ensureOpened,
     retryOpen,
     startFreshVisit,
@@ -185,6 +188,10 @@ function BuddyMentorHome() {
     isGreeting,
     isDeciding,
   } = useBuddySession();
+
+  // The page shows the thread, so Space may open the dino game here; leaving the page releases
+  // it (and closes a game still running) — see `registerDinoSurface`.
+  useEffect(() => registerDinoSurface(), [registerDinoSurface]);
 
   // A greeting written while the hire was somewhere else still gets the buddy thinking and
   // writing it, the first time it is on screen — the same as in the dock.
@@ -365,12 +372,15 @@ function BuddyMentorHome() {
       <BuddyConversation
         messages={greeting.messages}
         isThinking={isThinking || isOpening || greeting.isThinking}
+        isStreaming={isStreaming}
         activeTool={activeTool}
         draft={draft}
         setDraft={setDraft}
         handleSubmit={handleSubmit}
         confirmAction={confirmAction}
         dismissAction={dismissAction}
+        dinoGameActive={dinoGameActive}
+        onDinoGameExit={closeDinoGame}
         // Escalating hangs off the hire's own question now, not off the buddy's answer — see
         // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered
         // where a messenger offers a quick reply: right under the message that suggested it. It
