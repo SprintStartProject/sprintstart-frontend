@@ -125,8 +125,10 @@ export const starterWorkService = {
   },
 
   /**
-   * A PM's decision on whether a live starter-work task is suitable as a hire's Task 0 — the
-   * trivial first task somebody is auto-assigned once their environment is ready.
+   * A PM's judgement that a live starter-work task is a good first one for somebody ("Task 0").
+   *
+   * A label on the task, not an assignment: nothing hands a flagged task to a hire, and an
+   * unflagged one is claimable by anybody. Onboarding is the path their blueprint prescribes.
    */
   async setTaskZero(id: string, eligible: boolean): Promise<StarterWorkTask> {
     return await apiClient.fetch<StarterWorkTask>(`${BASE_URL}/${id}/task-zero`, {

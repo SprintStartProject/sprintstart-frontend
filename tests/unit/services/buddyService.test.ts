@@ -254,7 +254,7 @@ describe("buddyService", () => {
         start(controller) {
           controller.enqueue(
             encoder.encode(
-              'data: {"type":"action_proposal","action":"claim_task_zero","label":"Start Task 0"}\n\n',
+              'data: {"type":"action_proposal","action":"claim_goal","label":"Work toward this task"}\n\n',
             ),
           );
           controller.enqueue(
@@ -284,8 +284,8 @@ describe("buddyService", () => {
       });
 
       expect(onActionProposal).toHaveBeenCalledWith({
-        action: "claim_task_zero",
-        label: "Start Task 0",
+        action: "claim_goal",
+        label: "Work toward this task",
         question: undefined,
         taskId: undefined,
       });
@@ -460,14 +460,14 @@ describe("buddyService", () => {
       server.use(
         http.post("/api/v1/onboarding/me/buddy/actions", async ({ request }) => {
           capturedBody = await request.json();
-          return HttpResponse.json({ ok: true, message: "Task 0 is yours." });
+          return HttpResponse.json({ ok: true, message: "You are now working toward it." });
         }),
       );
 
-      const result = await performAction("claim_task_zero");
+      const result = await performAction("claim_goal");
 
-      expect(result).toEqual({ ok: true, message: "Task 0 is yours." });
-      expect(capturedBody).toMatchObject({ action: "claim_task_zero" });
+      expect(result).toEqual({ ok: true, message: "You are now working toward it." });
+      expect(capturedBody).toMatchObject({ action: "claim_goal" });
     });
 
     it("sends the composed question for a flag-to-PM confirmation", async () => {

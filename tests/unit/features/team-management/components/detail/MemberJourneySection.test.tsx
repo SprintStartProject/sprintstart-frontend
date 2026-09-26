@@ -182,6 +182,27 @@ describe("MemberJourneySection", () => {
     expect(request).toMatchObject({ waitsOn: ["verify"], unlocks: [] });
   });
 
+  /** The PM reads this, so "you" in the badge would be about the PM. */
+  it("names the hire, not the reader, on a step the hire added", () => {
+    const withHireStep: OnboardingPathEndpoint = {
+      ...path,
+      phases: [
+        {
+          ...path.phases[0],
+          steps: [
+            ...path.phases[0].steps,
+            step({ id: "own", position: 3, title: "My own step", origin: "HIRE" }),
+          ],
+        },
+        path.phases[1],
+      ],
+    };
+    renderSection({ path: withHireStep });
+
+    expect(screen.getByText("Added by the hire")).toBeInTheDocument();
+    expect(screen.queryByText("You added this")).not.toBeInTheDocument();
+  });
+
   it("says so when the member has no path yet", () => {
     renderSection({ path: null });
 

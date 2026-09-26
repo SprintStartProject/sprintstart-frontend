@@ -15,7 +15,6 @@ import {
   type BoardStage,
   type BoardStructure,
   type CardState,
-  type DependencySource,
 } from "../layout/boardStructure";
 
 export type UseBoardStructureResult = {
@@ -36,18 +35,6 @@ export type UseBoardStructureResult = {
    * there, so the two never drift into disagreeing.
    */
   setPredecessor: (cardId: string, blockerId: string | null) => void;
-  /**
-   * Applies a whole generated plan at once: every card's stage, and every link in every chain.
-   *
-   * One write rather than a call per card, and not for tidiness. Every other function here derives
-   * the next structure from the one it closed over, so calling them in a loop would have each
-   * iteration overwrite the last and leave only the final card sequenced — the kind of bug that
-   * looks like "the generator only did the last phase" and is nothing of the sort.
-   */
-  applyPlan: (
-    stages: Record<string, BoardStage>,
-    chain: Record<string, { id: string; source: DependencySource }>,
-  ) => void;
 };
 
 /**
@@ -90,16 +77,11 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
    * Pruned on every write rather than on load: a card dismissed in this session should stop
    * blocking things immediately, and storage should not accumulate rows for cards long gone.
    *
-   * `alsoKnown` is what keeps that from eating a freshly generated plan. Cards created a moment ago
-   * are not in `cards` until the board is re-read, so pruning against `cards` alone would drop
-   * every stage and every chain the generator just wrote — the whole plan, silently, between the
-   * write and the reload.
-   *
    * Plain functions rather than `useCallback`: this project compiles with the React Compiler, which
    * memoizes them itself and rejects hand-written dependency lists it cannot verify.
    */
-  function save(next: BoardStructure, alsoKnown: readonly string[] = []) {
-    const known = new Set([...cards.map((card) => card.id), ...alsoKnown]);
+  function save(next: BoardStructure) {
+    const known = new Set(cards.map((card) => card.id));
     const pruned = pruneStructure(next, known);
     setStructure(pruned);
     writeBoardStructure(boardId, pruned);
@@ -120,16 +102,6 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
       const cleared = clearHireDependencies(structure, cardId);
 
       save(blockerId ? setDependency(cleared, cardId, blockerId, true, "HIRE") : cleared);
-    },
-    applyPlan: (stages, chain) => {
-      let next = structure;
-      for (const [cardId, stage] of Object.entries(stages)) {
-        next = setCardStage(next, cardId, stage);
-      }
-      for (const [cardId, predecessor] of Object.entries(chain)) {
-        next = setDependency(next, cardId, predecessor.id, true, predecessor.source);
-      }
-      save(next, Object.keys(stages));
     },
   };
 }

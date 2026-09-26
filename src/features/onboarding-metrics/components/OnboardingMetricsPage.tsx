@@ -125,8 +125,12 @@ function OnboardingMetricsSkeleton() {
 }
 
 /**
- * The PM readout for the numbers the onboarding redesign is judged on:
- * time-to-first-accepted-work, response latency, and who is stalled. The
+ * The PM readout for how a project's people get their work in:
+ * time-to-first-accepted-work, response latency, and whose work is stalled.
+ *
+ * Not onboarding progress. Onboarding is the path a PM's blueprint prescribes, and how far a hire
+ * is along it is on the team pages; this is the contribution side beside it. The route and the
+ * file names still say "onboarding" from before that split. The
  * aggregates lead, and the per-hire timelines follow, stalled first.
  *
  * Deliberately a measurement readout, not another dashboard: no completion
@@ -187,12 +191,12 @@ export function OnboardingMetricsPage() {
     pendingRefreshRef.current = false;
     setRefreshing(false);
     if (error || refetchError) {
-      toast.error("Couldn't refresh onboarding metrics", { description: "Try again shortly." });
+      toast.error("Couldn't refresh contribution metrics", { description: "Try again shortly." });
       return;
     }
     if (!metrics || metrics.memberCount === 0) return;
     if (!hasActivity(metrics.hires)) {
-      toast.info("No onboarding activity yet", {
+      toast.info("No contribution activity yet", {
         description:
           "Nothing has happened on this project yet — that's different from nobody being here.",
       });
@@ -210,8 +214,8 @@ export function OnboardingMetricsPage() {
     }
     if (!errorToastRef.current && !pendingRefreshRef.current) {
       errorToastRef.current = true;
-      toast.error("Couldn't load onboarding metrics", {
-        description: "The onboarding metrics couldn't be loaded. Try again shortly.",
+      toast.error("Couldn't load contribution metrics", {
+        description: "The contribution metrics couldn't be loaded. Try again shortly.",
       });
     }
   }, [isFetching, error, toast]);
@@ -302,8 +306,8 @@ export function OnboardingMetricsPage() {
           <div className="flex items-start justify-between gap-4">
             <PageHeader
               icon={Gauge}
-              title="Onboarding metrics"
-              subtitle="Track each new hire's path from joining to their first accepted contribution, and where they get held up."
+              title="Contribution metrics"
+              subtitle="How each hire gets from joining to their first accepted contribution, and where their work waits on someone."
             />
             {refreshButton}
           </div>
@@ -322,11 +326,11 @@ export function OnboardingMetricsPage() {
             icon={<AlertCircle className="h-8 w-8 text-app-danger-solid" />}
             title="Couldn't load metrics"
           >
-            The onboarding metrics couldn&apos;t be loaded. Try again shortly.
+            The contribution metrics couldn&apos;t be loaded. Try again shortly.
           </EmptyState>
         ) : !metrics || metrics.memberCount === 0 ? (
           <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No hires yet">
-            Once people join this project, their onboarding shows up here.
+            Once people join this project, their contributions show up here.
           </EmptyState>
         ) : !hasActivity(metrics.hires) ? (
           <EmptyState icon={<Gauge className="h-8 w-8" />} title="No data yet">

@@ -133,6 +133,19 @@ interface BuddyStreamChunk {
   github_login?: string;
   competency_key?: string;
   level?: string;
+  // Path-action confirm payloads: which node of the hire's own onboarding path the action names,
+  // the answer `answer_question` would send in their own words, and a new step's description.
+  step_id?: string;
+  question_id?: string;
+  phase_id?: string;
+  onboarding_task_id?: string;
+  answer?: string;
+  description?: string;
+  /** `request_skip` confirm payload: the reason that goes to the PM. */
+  reason?: string;
+  /** `add_path_step` confirm payload: where the step goes in its phase's graph. */
+  waits_on_ids?: string[];
+  unlocks_ids?: string[];
   /**
    * `place_checklist` confirm payload: the list the buddy offered to keep.
    *
@@ -168,7 +181,9 @@ export interface BuddyActionResult {
  * changed nothing. The project is re-resolved server-side from the caller, so only the action name
  * and the proposal's own confirm payloads are sent: `question` for flag-to-PM, `taskId` for a
  * goal claim, `title` + `attesterId` for an attestation request, `githubLogin` for saving a
- * username, `competencyKey` + `level` for recording where a conversation placed the hire.
+ * username, `competencyKey` + `level` for recording where a conversation placed the hire, and the
+ * path-node ids (`stepId`, `questionId`, `phaseId`, plus `answer`, `description` and `reason`) for
+ * the actions that move the hire along their onboarding path.
  */
 export async function performAction(
   action: string,
@@ -180,6 +195,15 @@ export async function performAction(
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    stepId?: string;
+    questionId?: string;
+    phaseId?: string;
+    onboardingTaskId?: string;
+    answer?: string;
+    description?: string;
+    reason?: string;
+    waitsOnIds?: string[];
+    unlocksIds?: string[];
     checklistTitle?: string;
     checklistItems?: string[];
     cardId?: string;
@@ -199,6 +223,15 @@ export async function performAction(
       githubLogin: extras.githubLogin,
       competencyKey: extras.competencyKey,
       level: extras.level,
+      stepId: extras.stepId,
+      questionId: extras.questionId,
+      phaseId: extras.phaseId,
+      onboardingTaskId: extras.onboardingTaskId,
+      answer: extras.answer,
+      description: extras.description,
+      reason: extras.reason,
+      waitsOnIds: extras.waitsOnIds,
+      unlocksIds: extras.unlocksIds,
       checklistTitle: extras.checklistTitle,
       checklistItems: extras.checklistItems,
       cardId: extras.cardId,
@@ -446,6 +479,15 @@ export async function streamMessage(
               githubLogin: event.github_login,
               competencyKey: event.competency_key,
               level: event.level,
+              stepId: event.step_id,
+              questionId: event.question_id,
+              phaseId: event.phase_id,
+              onboardingTaskId: event.onboarding_task_id,
+              answer: event.answer,
+              description: event.description,
+              reason: event.reason,
+              waitsOnIds: event.waits_on_ids,
+              unlocksIds: event.unlocks_ids,
               checklistTitle: event.checklist_title,
               checklistItems: event.checklist_items,
               cardId: event.card_id,

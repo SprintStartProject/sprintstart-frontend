@@ -89,8 +89,7 @@ const ORANGE: CardAccent = {
 };
 
 const ACCENTS: Record<BoardCardKind, CardAccent> = {
-  // What the board is steering by: where you are going, and what you are on right now.
-  PATH_TO_FIRST_CONTRIBUTION: BRAND,
+  // What the board is steering by: what you are on right now.
   CURRENT_TASK: BRAND,
 
   // Things that come from somewhere outside the board — the joining process, and the repository.

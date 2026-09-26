@@ -8,6 +8,8 @@ import {
   streamMessage,
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
+import { announceBuddyPathChanged } from "../aiBuddyBus";
+import { BUDDY_PATH_ACTIONS } from "../types";
 import { useAuth } from "../../../context/useAuth";
 import type { ActionPatch, BuddyMessageView, ProposedAction } from "../types";
 
@@ -552,6 +554,15 @@ export function useBuddyConversation(
                 noteText: proposal.noteText,
                 lineBefore: proposal.lineBefore,
                 lineAfter: proposal.lineAfter,
+                stepId: proposal.stepId,
+                questionId: proposal.questionId,
+                phaseId: proposal.phaseId,
+                onboardingTaskId: proposal.onboardingTaskId,
+                answer: proposal.answer,
+                description: proposal.description,
+                reason: proposal.reason,
+                waitsOnIds: proposal.waitsOnIds,
+                unlocksIds: proposal.unlocksIds,
                 status: "idle",
               });
             },
@@ -690,12 +701,26 @@ export function useBuddyConversation(
                   noteText: action.noteText,
                   lineBefore: action.lineBefore,
                   lineAfter: action.lineAfter,
+                  stepId: action.stepId,
+                  questionId: action.questionId,
+                  phaseId: action.phaseId,
+                  onboardingTaskId: action.onboardingTaskId,
+                  answer: action.answer,
+                  description: action.description,
+                  reason: action.reason,
+                  waitsOnIds: action.waitsOnIds,
+                  unlocksIds: action.unlocksIds,
                 });
           patchAction(messageId, action.id, {
             status: "resolved",
             ok: result.ok,
             outcome: result.message,
           });
+          // A path action just moved something on a page that may be open behind this dock. Told
+          // rather than polled, and only on success: a refused confirm changed nothing to refresh.
+          if (result.ok && "action" in action && BUDDY_PATH_ACTIONS.includes(action.action)) {
+            announceBuddyPathChanged();
+          }
         } catch (e) {
           console.error(e);
           // A settled proposal does NOT come back 404 — the backend answers 200 with ok: false

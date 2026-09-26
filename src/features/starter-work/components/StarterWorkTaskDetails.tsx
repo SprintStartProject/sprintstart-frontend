@@ -248,7 +248,8 @@ export function StarterWorkTaskDetails({
               <div>
                 <p className="text-sm font-semibold text-app-text">Use as Task 0</p>
                 <p className="text-xs text-app-text-muted">
-                  Handed to a new hire as their very first task, on any project.
+                  Marks this as a gentle first task. A hint in the pool — it is not handed to
+                  anybody.
                 </p>
               </div>
               {canAct ? (

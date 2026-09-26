@@ -33,7 +33,6 @@ function currentTaskContent(over: Partial<CurrentTaskContent> = {}): CurrentTask
     title: "Fix the flaky login test",
     summary: "It fails about one run in five.",
     url: null,
-    chosen: true,
     closedAtSource: false,
     ...over,
   };

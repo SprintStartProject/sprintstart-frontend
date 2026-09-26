@@ -12,8 +12,8 @@ vi.mock("../../../../src/features/buddy/components/BuddyOrientationCard", () => 
 function action(overrides: Partial<ProposedAction> = {}): ProposedAction {
   return {
     id: "a1",
-    action: "claim_task_zero",
-    label: "Start Task 0",
+    action: "claim_goal",
+    label: "Work toward this task",
     status: "idle",
     ...overrides,
   };
@@ -34,7 +34,7 @@ describe("BuddyActionProposals", () => {
     // Rendering the offer must not fire the action.
     expect(onConfirm).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: /Start Task 0/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Work toward this task/ }));
 
     expect(onConfirm).toHaveBeenCalledWith("m1", expect.objectContaining({ id: "a1" }));
   });
@@ -61,14 +61,16 @@ describe("BuddyActionProposals", () => {
     render(
       <BuddyActionProposals
         messageId="m1"
-        actions={[action({ status: "resolved", ok: true, outcome: "Task 0 is yours." })]}
+        actions={[
+          action({ status: "resolved", ok: true, outcome: "You are now working toward it." }),
+        ]}
         onConfirm={vi.fn()}
         onDismiss={vi.fn()}
       />,
     );
 
-    expect(screen.getByText("Task 0 is yours.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Start Task 0/ })).not.toBeInTheDocument();
+    expect(screen.getByText("You are now working toward it.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Work toward this task/ })).not.toBeInTheDocument();
   });
 
   it("offers a retry on a transport error", () => {
@@ -83,7 +85,7 @@ describe("BuddyActionProposals", () => {
 
     expect(screen.getByText(/try again/i)).toBeInTheDocument();
     // The confirm button is still there to retry.
-    expect(screen.getByRole("button", { name: /Start Task 0/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Work toward this task/ })).toBeInTheDocument();
   });
 
   it("renders the orientation packet in the thread once open_orientation resolves", () => {
@@ -112,7 +114,9 @@ describe("BuddyActionProposals", () => {
     const { rerender } = render(
       <BuddyActionProposals
         messageId="m1"
-        actions={[action({ status: "resolved", ok: true, outcome: "Task 0 is yours." })]}
+        actions={[
+          action({ status: "resolved", ok: true, outcome: "You are now working toward it." }),
+        ]}
         onConfirm={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -138,6 +142,64 @@ describe("BuddyActionProposals", () => {
     );
 
     expect(screen.queryByTestId("buddy-orientation-card")).not.toBeInTheDocument();
+  });
+
+  it("shows the question a flag will send, not just the button", () => {
+    // The button only says that something will be flagged. What lands in the PM's inbox is
+    // the question the buddy composed, and the hire sends it in their name.
+    render(
+      <BuddyActionProposals
+        messageId="m1"
+        actions={[
+          action({
+            action: "flag_to_pm",
+            label: "Flag this to your PM",
+            question: "Who owns the staging database credentials?",
+          }),
+        ]}
+        onConfirm={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Sends to your PM: “Who owns the staging database credentials?”"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no message line for an action that sends nobody anything", () => {
+    render(
+      <BuddyActionProposals
+        messageId="m1"
+        actions={[action({ action: "claim_goal", label: "Work toward this task", taskId: "t1" })]}
+        onConfirm={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/Sends to your PM/)).not.toBeInTheDocument();
+  });
+
+  it("shows the whole skip reason before the hire sends it in their name", () => {
+    render(
+      <BuddyActionProposals
+        messageId="m1"
+        actions={[
+          action({
+            action: "request_skip",
+            label: "Ask your PM to skip “Set up the VPN”",
+            stepId: "s1",
+            reason: "I already have VPN access from my last team.",
+          }),
+        ]}
+        onConfirm={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("Your reason: “I already have VPN access from my last team.”"),
+    ).toBeInTheDocument();
   });
 
   /**

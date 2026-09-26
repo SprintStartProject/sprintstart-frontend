@@ -2,6 +2,7 @@ import { Check, Info, Loader2, RotateCcw, TriangleAlert, Users, X } from "lucide
 import type { ProposedAction, ProposalRisk } from "../types";
 import {
   BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_FLAG_TO_PM,
   BUDDY_ACTION_OPEN_ORIENTATION,
   BUDDY_ACTION_REWORD_CHECKLIST,
   BUDDY_ACTION_TICK_CHECKLIST,
@@ -247,6 +248,20 @@ export function BuddyActionProposals({
                   Not now
                 </button>
               </div>
+            )}
+            {/* Anything that leaves the product in the hire's name shows its words before the
+                click -- the label only names the kind of thing it is. A skip request carries the
+                reason; a flag to the PM carries the question the buddy composed, which is the whole
+                of what that person will read. */}
+            {!isStored && action.reason && (
+              <p className="px-1 text-xs break-words text-app-text-muted">
+                Your reason: &ldquo;{action.reason}&rdquo;
+              </p>
+            )}
+            {!isStored && action.action === BUDDY_ACTION_FLAG_TO_PM && action.question && (
+              <p className="px-1 text-xs break-words text-app-text-muted">
+                Sends to your PM: &ldquo;{action.question}&rdquo;
+              </p>
             )}
             {action.status === "error" && (
               <p className="text-xs text-app-danger-text">

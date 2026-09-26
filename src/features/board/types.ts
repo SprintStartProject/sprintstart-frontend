@@ -10,7 +10,6 @@ import type { StepStatus } from "../onboarding/types";
 
 /** Every card kind the board understands. Closed set — see the module comment. */
 export type BoardCardKind =
-  | "PATH_TO_FIRST_CONTRIBUTION"
   | "ARRIVAL_STEPS"
   | "OPEN_PULL_REQUESTS"
   | "CURRENT_TASK"
@@ -36,32 +35,6 @@ export type AuthoredCardKind = "NOTE" | "LINK" | "CHECKLIST";
  * content is a live read. `HIRE` cards are theirs, and the mentor never removes one.
  */
 export type BoardCardOwner = "AI" | "HIRE";
-
-/** The moments a path card reports, in the order they normally happen. */
-export type BoardMomentKey =
-  "JOINED" | "TASK_CLAIMED" | "WORK_SUBMITTED" | "FIRST_RESPONSE" | "WORK_ACCEPTED";
-
-/** One moment, and whether it has happened. `null` is "not yet", and renders as a dash, never a zero. */
-export type BoardMoment = {
-  key: BoardMomentKey;
-  reachedAt: string | null;
-};
-
-/**
- * The path from joining to a first accepted piece of work.
- *
- * Composed from contributions, not pull requests, so it says something true whatever produces
- * this hire's work.
- */
-export type PathToFirstContributionContent = {
-  kind: "PATH_TO_FIRST_CONTRIBUTION";
-  moments: BoardMoment[];
-  acceptedCount: number;
-  /** When onboarding ended, dated. Null while it is still going. */
-  autonomyReachedAt: string | null;
-  /** Why the hire currently reads as stalled, in plain words; null when they do not. */
-  stalledReason: string | null;
-};
 
 /** One open pull request. `waitingHours` is null once somebody has responded — the clock stopped. */
 export type BoardPullRequest = {
@@ -117,8 +90,6 @@ export type CurrentTaskContent = {
   title: string | null;
   summary: string | null;
   url: string | null;
-  /** True when the hire claimed this as their goal, false when it is the Task 0 they were handed. */
-  chosen: boolean;
   /**
    * True once the issue behind this task is closed where it lives. False when there is no task at
    * all, which says nothing about anything.
@@ -321,7 +292,6 @@ export type ChecklistContent = {
 
 /** The rendered content of one card, discriminated by `kind`. */
 export type BoardCardContent =
-  | PathToFirstContributionContent
   | ArrivalStepsContent
   | OpenPullRequestsContent
   | CurrentTaskContent
