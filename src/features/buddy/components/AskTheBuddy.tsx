@@ -14,9 +14,10 @@ type AskTheBuddyProps = {
  * One mechanism serves every surface that has one. A card can seed a question and the mentor
  * answers it with its own tools — which means a card never needs its own action machinery, and
  * anything that *would* change the hire's onboarding still arrives as a proposal the hire confirms.
- * Claiming a suggested task is the case that proves it: "I want to work on X" makes the mentor
- * propose `claim_goal`, and the confirm button is still the thing that claims it. A claim button on
- * the card would have gone around that gate.
+ *
+ * Grabbing a task is the one exception with its own button (`task-pool/GrabTaskButton`), because a
+ * hire who already knows what they want should not need a conversation to say so. It keeps a
+ * confirm step of its own, and this stays beside it for the hire who wants help choosing.
  *
  * The draft is pre-filled rather than sent, so the hire can change it before it goes — it is their
  * question, and a card that speaks for somebody is a card they stop trusting.

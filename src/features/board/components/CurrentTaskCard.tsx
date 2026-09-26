@@ -5,6 +5,7 @@ import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { AddTaskToBoard } from "./AddTaskToBoard";
+import { BrowseTasksButton } from "../../task-pool/components/BrowseTasksButton";
 import type { BoardCard, CurrentTaskContent } from "../types";
 
 type CurrentTaskCardProps = {
@@ -31,6 +32,10 @@ type CurrentTaskCardProps = {
  * looking current: the task block is kept but muted, a warning stripe above it says what happened
  * and where to go next, and the buddy question is repointed at picking a new one. Silently
  * dropping the card would leave the hire still thinking this is their goal.
+ *
+ * The pool is one press away in every state: browsing is how a hire with nothing picks a task, how
+ * a hire whose task closed picks the next one, and how a hire who changed their mind switches. The
+ * buddy is offered beside it, never instead of it.
  */
 export function CurrentTaskCard({
   content,
@@ -69,8 +74,8 @@ export function CurrentTaskCard({
             <p className="flex items-start gap-2 rounded-xl bg-app-warning-bg/40 p-3 text-xs text-app-warning-text">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>
-                This issue was closed where it lives. Pick a new task from the &quot;Good next
-                tasks&quot; card.
+                This issue was closed where it lives. Browse the pool for a new one, or ask your
+                buddy which would fit.
               </span>
             </p>
           )}
@@ -98,8 +103,8 @@ export function CurrentTaskCard({
         </div>
       ) : (
         <EmptyState size="sm">
-          Nothing claimed yet. Ask your buddy what would be a good one to pick up — they can suggest
-          tasks that fit what you&apos;ve already shown.
+          Nothing grabbed yet. Browse the pool and pick one yourself — or ask your buddy, who can
+          suggest tasks that fit what you&apos;ve already shown.
         </EmptyState>
       )}
 
@@ -127,16 +132,24 @@ export function CurrentTaskCard({
                 It asks for a checklist, which is not decoration: a task that states no steps of
                 its own gets them here or nowhere, and the offer to keep a reply as a card only
                 appears under a reply that holds a list. See `AddTaskToBoard`. */}
-      <AskTheBuddy
-        question={
-          closed
-            ? `My task "${content.title ?? "my task"}" was closed. Which one should I take instead?`
-            : hasTask
-              ? `How do I get started on "${content.title ?? "my task"}"? A short checklist of first steps would help.`
-              : "What would be a good task for me to pick up?"
-        }
-        label={closed ? "Help me pick another one" : undefined}
-      />
+      <div className="flex flex-wrap items-center gap-x-4">
+        <div className="mt-3">
+          <BrowseTasksButton
+            label={hasTask && !closed ? "Switch task" : "Browse tasks"}
+            variant={hasTask && !closed ? "ghost" : "primary"}
+          />
+        </div>
+        <AskTheBuddy
+          question={
+            closed
+              ? `My task "${content.title ?? "my task"}" was closed. Which one should I take instead?`
+              : hasTask
+                ? `How do I get started on "${content.title ?? "my task"}"? A short checklist of first steps would help.`
+                : "What would be a good task for me to pick up?"
+          }
+          label={closed || !hasTask ? "Help me choose" : undefined}
+        />
+      </div>
     </BoardCardFrame>
   );
 }

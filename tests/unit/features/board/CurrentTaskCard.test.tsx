@@ -14,6 +14,12 @@ vi.mock("../../../../src/features/board/marks/useCardMarks", () => ({
   }),
 }));
 
+// The card offers the task browser, which reads the selected project — stood in, as in
+// `BoardGrid.test.tsx`, rather than wrapping the card in a provider.
+vi.mock("../../../../src/features/projects/useProjectContext", () => ({
+  useProjectContext: () => ({ selectedProjectId: "p1" }),
+}));
+
 vi.mock("../../../../src/features/buddy/aiBuddyBus", () => ({
   openAiBuddy: vi.fn(),
 }));
@@ -48,11 +54,11 @@ function lastDraft(): string {
 describe("the current-task card when the issue behind it was closed", () => {
   beforeEach(() => vi.mocked(openAiBuddy).mockReset());
 
-  it("shows the warning and points at the good-next-tasks card", () => {
+  it("shows the warning and points at the task pool", () => {
     render(<CurrentTaskCard content={currentTaskContent({ closedAtSource: true })} card={card} />);
 
     expect(screen.getByText(/this issue was closed where it lives/i)).toBeInTheDocument();
-    expect(screen.getByText(/good next tasks/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /browse tasks/i })).toBeInTheDocument();
   });
 
   it("keeps the card and the task on screen rather than falling back to the empty state", () => {
@@ -60,13 +66,13 @@ describe("the current-task card when the issue behind it was closed", () => {
 
     expect(screen.getByText("What you're working on")).toBeInTheDocument();
     expect(screen.getByText("Fix the flaky login test")).toBeInTheDocument();
-    expect(screen.queryByText(/nothing claimed yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/nothing grabbed yet/i)).not.toBeInTheDocument();
   });
 
   it("seeds the buddy composer with a question about picking a different task", () => {
     render(<CurrentTaskCard content={currentTaskContent({ closedAtSource: true })} card={card} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /help me pick another one/i }));
+    fireEvent.click(screen.getByRole("button", { name: /help me choose/i }));
 
     expect(lastDraft()).toContain("Fix the flaky login test");
     expect(lastDraft()).toContain("closed");
@@ -80,6 +86,8 @@ describe("the current-task card when the issue behind it was closed", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /ask your buddy about this/i }));
     expect(lastDraft()).toMatch(/how do I get started/i);
+    // Somebody already on a task can still change their mind without asking anyone.
+    expect(screen.getByRole("button", { name: /switch task/i })).toBeInTheDocument();
   });
 
   it("still shows the empty state when there is no task, closedAtSource notwithstanding", () => {
@@ -95,6 +103,10 @@ describe("the current-task card when the issue behind it was closed", () => {
       />,
     );
 
-    expect(screen.getByText(/nothing claimed yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing grabbed yet/i)).toBeInTheDocument();
+    // Both ways in: browsing yourself, and asking the buddy to help pick.
+    expect(screen.getByRole("button", { name: /browse tasks/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /help me choose/i }));
+    expect(lastDraft()).toMatch(/good task for me/i);
   });
 });

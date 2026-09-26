@@ -5,6 +5,8 @@ import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { AddTaskToBoard } from "./AddTaskToBoard";
+import { BrowseTasksButton } from "../../task-pool/components/BrowseTasksButton";
+import { GrabTaskButton } from "../../task-pool/components/GrabTaskButton";
 import type { BoardCard, SuggestedTasksContent } from "../types";
 
 type SuggestedTasksCardProps = {
@@ -23,9 +25,10 @@ type SuggestedTasksCardProps = {
  * line per signal, and a number is not something a hire can act on. The order already carries
  * everything a score would say.
  *
- * Claiming is deliberately not a button here. It changes what the hire's whole plan aims at, so it
- * stays where every other onboarding-changing action is: proposed by the buddy, confirmed by the
- * hire, in the conversation.
+ * Grabbing is a button here, with its own confirm step (see `GrabTaskButton`). It used to be
+ * buddy-only — "I want to work on this" opened the conversation and the mentor proposed the claim —
+ * but a hire who already knows what they want should not need a conversation to say so. The buddy
+ * is still one press away, for the hire who wants a second opinion first.
  */
 export function SuggestedTasksCard({
   content,
@@ -72,15 +75,16 @@ export function SuggestedTasksCard({
                   </a>
                 )}
               </div>
-              {/* Two different things, and only one of them is a commitment. Saying "I want to
-                  work on this" aims the hire's whole plan at the task and goes through the
-                  mentor's confirm button; keeping it is a working copy on their own board that
-                  claims nothing. A hire who is not ready to claim anything should still be able to
-                  put a task somewhere they will find it again. */}
+              {/* Grabbing is the commitment — it aims the hire's whole plan at the task. Keeping it
+                  is a working copy on their own board that claims nothing, for a hire who is not
+                  ready to commit but wants to find the task again. */}
               <div className="flex flex-wrap items-center gap-x-3">
+                <div className="mt-3">
+                  <GrabTaskButton taskId={task.taskId} title={task.title} />
+                </div>
                 <AskTheBuddy
-                  question={`I'd like to work on "${task.title}". Can you set that as my goal?`}
-                  label="I want to work on this"
+                  question={`Is "${task.title}" a good fit for me? What would I need to know before I start?`}
+                  label="Is this a good fit?"
                 />
                 <div className="mt-3">
                   <AddTaskToBoard title={task.title} url={task.url} onAdded={onCardAdded} />
@@ -99,6 +103,9 @@ export function SuggestedTasksCard({
           ))}
         </ol>
       )}
+      <div className="mt-3">
+        <BrowseTasksButton label="Browse all tasks" variant="ghost" />
+      </div>
     </BoardCardFrame>
   );
 }
