@@ -1,5 +1,6 @@
 import type { ArrivalStep } from "../arrival/types";
 import type { StepStatus } from "../onboarding/types";
+import type { TaskType } from "../starter-work/types";
 
 /**
  * The board: a hire's persistent working surface on one project.
@@ -15,6 +16,7 @@ export type BoardCardKind =
   | "OPEN_PULL_REQUESTS"
   | "CURRENT_TASK"
   | "SUGGESTED_TASKS"
+  | "TASK_POOL"
   | "COMPETENCY_PROGRESS"
   | "MEMORY_RECAP"
   | "DIAGRAM"
@@ -138,6 +140,32 @@ export type BoardSuggestedTask = {
 export type SuggestedTasksContent = {
   kind: "SUGGESTED_TASKS";
   tasks: BoardSuggestedTask[];
+};
+
+/** One task in the pool, with what a hire needs to choose it. Never a score. */
+export type BoardPoolTask = {
+  taskId: string;
+  title: string;
+  summary: string | null;
+  /** Why this is a reasonable first task, in the words of whoever put it in the pool. */
+  rationale: string | null;
+  url: string | null;
+  taskType: TaskType;
+  reasons: string[];
+  /** Near the top of the ranking and matched on at least one signal. */
+  bestFit: boolean;
+  /** Three-valued: only `true` means the tracker shows somebody on it. */
+  sourceHasAssignee: boolean | null;
+};
+
+/**
+ * The whole live pool, best fit first, to browse and grab from by hand. The order is the ranking —
+ * filter it, never re-sort it. `currentTaskId` is the task the hire is on, if any.
+ */
+export type TaskPoolContent = {
+  kind: "TASK_POOL";
+  tasks: BoardPoolTask[];
+  currentTaskId: string | null;
 };
 
 /** One competency, with the bar it is measured against — never a score out of a hundred. */
@@ -326,6 +354,7 @@ export type BoardCardContent =
   | OpenPullRequestsContent
   | CurrentTaskContent
   | SuggestedTasksContent
+  | TaskPoolContent
   | CompetencyProgressContent
   | MemoryRecapContent
   | DiagramContent

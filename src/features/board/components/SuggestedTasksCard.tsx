@@ -5,7 +5,6 @@ import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { AddTaskToBoard } from "./AddTaskToBoard";
-import { BrowseTasksButton } from "../../task-pool/components/BrowseTasksButton";
 import { GrabTaskButton } from "../../task-pool/components/GrabTaskButton";
 import type { BoardCard, SuggestedTasksContent } from "../types";
 
@@ -103,9 +102,6 @@ export function SuggestedTasksCard({
           ))}
         </ol>
       )}
-      <div className="mt-3">
-        <BrowseTasksButton label="Browse all tasks" variant="ghost" />
-      </div>
     </BoardCardFrame>
   );
 }

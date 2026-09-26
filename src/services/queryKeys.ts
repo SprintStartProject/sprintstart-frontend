@@ -36,8 +36,6 @@ export const queryKeys = {
     corpusIssues: (projectId: string) => ["starter-work", "corpus", projectId] as const,
     taskOrientation: (taskId: string, projectId: string) =>
       ["starter-work", "orientation", taskId, projectId] as const,
-    /** The live pool ranked for the signed-in hire — the task browser's read. */
-    myMatches: (projectId: string) => ["starter-work", "my-matches", projectId] as const,
   },
   profile: {
     mine: (userId: string) => ["profile", userId] as const,

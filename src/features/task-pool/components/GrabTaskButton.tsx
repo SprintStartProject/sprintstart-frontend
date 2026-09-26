@@ -10,6 +10,8 @@ import { useCurrentTask, useGrabTask } from "../hooks/useTaskPool";
 type GrabTaskButtonProps = {
   taskId: string;
   title: string;
+  /** Whether this is already the hire's task. Read off the board when not given. */
+  isCurrent?: boolean;
   /** Told once the task really is the hire's, e.g. so a dialog around the button can close. */
   onGrabbed?: () => void;
 };
@@ -22,14 +24,14 @@ type GrabTaskButtonProps = {
  * and only the second press claims. That keeps the confirm the buddy route always had, without the
  * detour through a conversation for somebody who already knows what they want.
  */
-export function GrabTaskButton({ taskId, title, onGrabbed }: GrabTaskButtonProps) {
+export function GrabTaskButton({ taskId, title, isCurrent, onGrabbed }: GrabTaskButtonProps) {
   const { selectedProjectId } = useProjectContext();
   const current = useCurrentTask(selectedProjectId);
   const grab = useGrabTask(selectedProjectId);
   const toast = useToastApi();
   const [confirming, setConfirming] = useState(false);
 
-  if (current?.taskId === taskId) {
+  if (isCurrent ?? current?.taskId === taskId) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-app-brand-text">
         <Hand className="h-3.5 w-3.5" aria-hidden="true" />

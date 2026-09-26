@@ -1,26 +1,17 @@
 import { apiClient } from "./apiClient";
-import type { Goal, RankedStarterWorkTask } from "../features/starter-work/types";
+import type { Goal } from "../features/starter-work/types";
 
 const BASE_URL = "/api/v1/onboarding/starter-work/me";
 
 /**
- * The hire's side of the starter-work pool: browsing it and grabbing a task from it.
+ * The hire's side of the starter-work pool: grabbing a task from it. Browsing needs no call of its
+ * own — the board's `TASK_POOL` card carries the ranked pool.
  *
- * Kept apart from `starterWorkService`, which is the PM's side. Both endpoints existed before this
- * client did — the buddy's `claim_goal` action ends in the same `POST /me/goal` — so grabbing by
- * hand and grabbing through the buddy land in exactly the same place.
+ * Kept apart from `starterWorkService`, which is the PM's side. The buddy's `claim_goal` action ends
+ * in the same `POST /me/goal`, so grabbing by hand and grabbing through the buddy land in exactly
+ * the same place — including the current-task card being pinned to the board.
  */
 export const myStarterWorkService = {
-  /**
-   * Every live task this hire may take on the project, best fit first, each with the reasons it
-   * ranks where it does. Deterministic and local on the backend — no model call.
-   */
-  async fetchMatches(projectId: string): Promise<RankedStarterWorkTask[]> {
-    return await apiClient.fetch<RankedStarterWorkTask[]>(
-      `${BASE_URL}/matches?projectId=${encodeURIComponent(projectId)}`,
-    );
-  },
-
   /**
    * Makes a pool task the hire's current task, replacing whatever they were on.
    *
