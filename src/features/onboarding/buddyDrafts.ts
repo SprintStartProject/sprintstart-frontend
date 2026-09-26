@@ -59,6 +59,17 @@ export function askAboutEmptyPhase(phaseTitle: string): string {
   return `The "${snippet(phaseTitle)}" phase of my onboarding came back empty — nothing was generated for it. Can we work out together what it should contain for me?`;
 }
 
+/**
+ * The same opening for every phase that came back empty at once, so a hire with several is not
+ * handed a draft about only the first of them.
+ */
+export function askAboutEmptyPhases(phaseTitles: readonly string[]): string {
+  if (phaseTitles.length === 1) return askAboutEmptyPhase(phaseTitles[0]);
+  const names = phaseTitles.map((title) => `"${snippet(title)}"`);
+  const listed = `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return `The ${listed} phases of my onboarding came back empty — nothing was generated for them. Can we work out together what they should contain for me?`;
+}
+
 /** Opening a conversation about one step. */
 export function askAboutStep(step: Pick<OnboardingStepEndpoint, "title">): string {
   return `I'm on the onboarding step "${snippet(step.title)}". Can you help me get going on it?`;

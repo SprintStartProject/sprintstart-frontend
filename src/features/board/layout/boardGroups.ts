@@ -79,7 +79,7 @@ export function readBoardGroups(boardId: string): BoardGroup[] {
   }
 }
 
-/** What the generator calls the area holding a team's card blueprints. */
+/** What the since-removed generator called the area holding a team's card blueprints. */
 const TEAM_AREA = "From your team";
 
 /**

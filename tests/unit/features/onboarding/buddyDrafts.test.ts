@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   askAboutEmptyPhase,
+  askAboutEmptyPhases,
   askAboutPhase,
   askAboutQuestion,
   askAboutStep,
@@ -85,6 +86,13 @@ describe("buddy drafts", () => {
       "Which meeting sets the sprint scope?",
     );
     expect(askAboutQuestion(question(), "Meetings")).toContain("Meetings");
+  });
+
+  it("names every phase that came back empty, not only the first", () => {
+    expect(askAboutEmptyPhases(["Deployment"])).toBe(askAboutEmptyPhase("Deployment"));
+    const draft = askAboutEmptyPhases(["Deployment", "Testing", "Release"]);
+    expect(draft).toContain('The "Deployment", "Testing" and "Release" phases');
+    expect(draft).toContain("?");
   });
 
   it("says the hire wants to understand the question, not be handed the answer", () => {

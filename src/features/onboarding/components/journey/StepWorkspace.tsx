@@ -114,7 +114,27 @@ export function StepWorkspace({
     onSkipAnswerSeenRef.current = onSkipAnswerSeen;
   }, [onSkipAnswerSeen]);
 
+  // What the last read brought, so a re-read can tell the member's own typing from the server's
+  // text, and the page's path refresh after a buddy change need not read the step a second time.
+  const loadedRef = useRef<{
+    stepId: string;
+    buddyChanges: number;
+    status: string;
+    skipReason: string;
+    comment: string;
+  } | null>(null);
+
   useEffect(() => {
+    const last = loadedRef.current;
+    // The buddy's change is announced here and to the page at once; the page's refresh then moves
+    // `stepStatus` to what the read for `buddyChanges` already brought.
+    if (
+      last?.stepId === stepId &&
+      last.buddyChanges === buddyChanges &&
+      last.status === stepStatus
+    ) {
+      return;
+    }
     let cancelled = false;
     Promise.all([
       onboardingService.fetchStep(stepId),
@@ -135,12 +155,20 @@ export function StepWorkspace({
         }
         setTasks([...fetchedTasks].sort((left, right) => left.position - right.position));
         setResources(fetchedResources);
-        setSkipReason(detail.skip?.reason ?? "");
+        // A re-read of the same step keeps what the member is typing: it runs whenever the buddy
+        // changes anything on the path, and used to wipe a half-written skip reason or comment.
+        const sameStep = last?.stepId === stepId;
+        const skipReason = detail.skip?.reason ?? "";
+        const comment = detail.feedback?.comment ?? "";
+        setSkipReason((current) =>
+          sameStep && current !== last.skipReason ? current : skipReason,
+        );
         if (detail.feedback) {
           setHelpful(detail.feedback.helpful);
-          setComment(detail.feedback.comment ?? "");
+          setComment((current) => (sameStep && current !== last.comment ? current : comment));
           setFeedbackSent(true);
         }
+        loadedRef.current = { stepId, buddyChanges, status: detail.status, skipReason, comment };
       })
       .catch((reason: unknown) => {
         if (!cancelled) setError(reason instanceof Error ? reason.message : "Unknown error");

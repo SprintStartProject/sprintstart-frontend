@@ -10,10 +10,11 @@ import remarkGfm from "remark-gfm";
  * in a new tab would reload the whole SPA and lose the conversation the hire was having.
  *
  * Root-relative only, and deliberately: a protocol-relative `//evil.example` is also "relative" to a
- * careless check, and the model's output is not a place to be careless.
+ * careless check, and the model's output is not a place to be careless. `/\evil.example` is the same
+ * thing in disguise -- browsers read the backslash as a slash.
  */
 function isInAppPath(href: string | undefined): href is string {
-  return href !== undefined && href.startsWith("/") && !href.startsWith("//");
+  return href !== undefined && href.startsWith("/") && href[1] !== "/" && href[1] !== "\\";
 }
 
 /**

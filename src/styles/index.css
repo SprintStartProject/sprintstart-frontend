@@ -964,8 +964,9 @@ body {
   }
 }
 
+/* `backwards`, not `both`: a last frame that outlived the animation beat the card's own shadow. */
 .app-link-highlight {
-  animation: app-link-highlight 1.6s ease-in-out 0.35s 1 both;
+  animation: app-link-highlight 1.6s ease-in-out 0.35s 1 backwards;
 }
 
 /* No pulse, but still marked for as long as the pulse would take: finding the item is the point,
@@ -981,7 +982,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .app-link-highlight {
-    animation: app-link-highlight-still 2s step-end 1 both;
+    animation: app-link-highlight-still 2s step-end 1 backwards;
   }
 }
 

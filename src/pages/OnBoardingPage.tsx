@@ -73,7 +73,11 @@ import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
-import { askAboutEmptyPhase, askAboutPhase } from "../features/onboarding/buddyDrafts";
+import {
+  askAboutEmptyPhase,
+  askAboutEmptyPhases,
+  askAboutPhase,
+} from "../features/onboarding/buddyDrafts";
 import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
 import { onboardingService } from "../services/onboardingService";
@@ -93,6 +97,9 @@ import {
 
 type LoadingState = "loading" | "empty" | "success" | "error";
 type ViewMode = "list" | "graph";
+
+/** How a step came to be opened: by its address, or by the member on the page. */
+type StartOptions = { byAddress?: boolean };
 
 const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
 
@@ -243,9 +250,11 @@ export function OnBoardingPage() {
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   // Set when the page itself moves the member on, so the item they land on is scrolled to.
   const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
-  // The item a buddy link landed on. `key` changes per arrival, so following the same link again
-  // restarts the light instead of leaving it spent.
+  // The item a buddy link landed on, for as long as its light plays. `key` changes per arrival, so
+  // following the same link again scrolls to it again. Cleared when the light has played or the
+  // member moves to another phase, so neither the scroll nor the light comes back on its own later.
   const [linkHighlight, setLinkHighlight] = useState<{ id: string; key: string } | null>(null);
+  const clearLinkHighlight = useCallback(() => setLinkHighlight(null), []);
 
   usePathRevealMoment(loadingState === "success" ? path : null);
 
@@ -383,7 +392,7 @@ export function OnBoardingPage() {
   const handledArrivalRef = useRef("");
 
   // Read by the arrival effect, which must not re-run every time one of these is recreated.
-  const startStepRef = useRef<(item: PhaseItem) => void>(() => undefined);
+  const startStepRef = useRef<(item: PhaseItem, options: StartOptions) => void>(() => undefined);
   const scrollToChooserRef = useRef<() => void>(() => undefined);
   /**
    * Takes a handled link out of the address, so a reload or the hire's own next click decides what
@@ -410,10 +419,18 @@ export function OnBoardingPage() {
         return;
       }
 
+      // A link is followed in the list, so a step left open on the graph is let go of too --
+      // otherwise swiping stayed off and the graph reopened it on the way back.
+      if (arrival.kind.startsWith("link")) setGraphItemId(null);
+
       if (arrival.kind === "link-phase") {
-        if (path.phases.some((phase) => phase.id === arrival.id)) {
+        const linkedPhase = path.phases.find((phase) => phase.id === arrival.id);
+        if (linkedPhase) {
           setSelectedPhaseId(arrival.id);
-          setExpandedItemId(null);
+          // An item open in the linked phase stays open: it may hold a typed answer.
+          setExpandedItemId((current) =>
+            phaseItems(linkedPhase).some((item) => item.id === current) ? current : null,
+          );
         } else {
           toast.error("That phase is not on your path", {
             description: "It may have been replaced when your path was rebuilt.",
@@ -441,7 +458,9 @@ export function OnBoardingPage() {
 
       if (arrival.kind === "link-step" || arrival.kind === "link-question") {
         setSelectedPhaseId(owningPhase.id);
-        setExpandedItemId(null);
+        // "You're on #3" is most likely clicked while #3 is open -- collapsing it would throw away
+        // a typed answer or skip reason.
+        setExpandedItemId((current) => (current === arrival.id ? current : null));
         setLinkHighlight({ id: arrival.id, key: arrivalKey });
         clearLinkRef.current();
         return;
@@ -454,7 +473,7 @@ export function OnBoardingPage() {
       // A step opened by its address is started like one opened by a click -- including the
       // second link of a visit, which the load-time version could not see.
       const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
-      if (item) startStepRef.current(item);
+      if (item) startStepRef.current(item, { byAddress: true });
     });
   }, [arrival, arrivalKey, loadingState, navigate, path, toast]);
 
@@ -471,13 +490,24 @@ export function OnBoardingPage() {
       );
   }, [setSearchParams]);
 
-  // Scrolls to the card a link landed on, once its phase is the one on screen.
+  // Scrolls to the card a link landed on, once per link. A link followed from the graph switches to
+  // the list, which `SlidingTabPanel` mounts only after the graph has slid out -- so a card that is
+  // not there yet is looked for again once it can be, the same wait `scrollToChooser` makes.
+  const scrolledLinkRef = useRef("");
   useEffect(() => {
     if (loadingState !== "success" || !linkHighlight) return;
-    document
-      .getElementById(linkedCardId(linkHighlight.id))
-      ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-  }, [linkHighlight, loadingState, selectedPhaseId]);
+    if (scrolledLinkRef.current === linkHighlight.key) return;
+    const scroll = () => {
+      const card = document.getElementById(linkedCardId(linkHighlight.id));
+      if (!card) return false;
+      scrolledLinkRef.current = linkHighlight.key;
+      card.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      return true;
+    };
+    if (scroll()) return;
+    const timer = window.setTimeout(scroll, SLIDING_PANEL_EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [linkHighlight, loadingState, selectedPhaseId, viewMode]);
 
   // Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue".
   useEffect(() => {
@@ -536,11 +566,12 @@ export function OnBoardingPage() {
     );
 
   /** A step the member opens for the first time is started; reopening one changes nothing. */
-  const beginStepIfWaiting = async (item: PhaseItem) => {
+  const beginStepIfWaiting = async (item: PhaseItem, { byAddress = false }: StartOptions = {}) => {
     if (item.kind !== "step" || item.step.status !== "WAITING" || item.step.locked) return;
-    // Opened to change or withdraw a skip request -- which is what the buddy's link to the step is
-    // for -- is not beginning it. The step's own "Start" button still does that.
-    if (isSkipPending(item.step.skip)) return;
+    // Arriving at `/onboarding/<id>` for a step with a skip request open is arriving to change or
+    // withdraw it, not to begin the step; its own "Start step" button still does that. Only the
+    // address: the list's button says "Start", and a click on it should do what it says.
+    if (byAddress && isSkipPending(item.step.skip)) return;
     try {
       await onboardingService.startStep(item.step.id);
       // The rocket marks a step *beginning*.
@@ -557,7 +588,7 @@ export function OnBoardingPage() {
   // Refreshed every render, so the arrival effect can call the latest of each without taking a
   // dependency on a function that is recreated on every render.
   useEffect(() => {
-    startStepRef.current = (item) => void beginStepIfWaiting(item);
+    startStepRef.current = (item, options) => void beginStepIfWaiting(item, options);
     scrollToChooserRef.current = scrollToChooser;
   });
 
@@ -614,6 +645,7 @@ export function OnBoardingPage() {
   const selectPhase = (phaseId: string) => {
     setSelectedPhaseId(phaseId);
     setExpandedItemId(null);
+    setLinkHighlight(null);
   };
 
   const choosePhase = (phaseId: string) => {
@@ -858,7 +890,7 @@ export function OnBoardingPage() {
             something, so it is offered beside the retry rather than instead of it. */}
         {generationIssues.length > 0 ? (
           <AskTheBuddy
-            question={askAboutEmptyPhase(generationIssues[0].title)}
+            question={askAboutEmptyPhases(generationIssues.map((issue) => issue.title))}
             label="Work it out with your buddy instead"
           />
         ) : null}
@@ -985,7 +1017,8 @@ export function OnBoardingPage() {
                     phase={selectedPhase}
                     nextItemId={nextItemId}
                     expandedItemId={expandedItemId}
-                    linkHighlight={linkHighlight}
+                    linkedItemId={linkHighlight?.id ?? null}
+                    onLinkHighlightEnd={clearLinkHighlight}
                     onToggle={toggleItem}
                     onPrimary={openItem}
                     renderExpanded={(item) => renderItemBody(item, "inline")}
@@ -1127,7 +1160,7 @@ function PhaseHeaderCard({
   const progress = phaseProgress(phase);
   const waitsOn = blockingPhases(phase, phases);
   const unlocks = phasesUnlockedBy(phase, phases);
-  const isEmpty = phase.steps.length === 0 && (phase.questions ?? []).length === 0;
+  const isEmpty = phase.steps.length === 0 && phase.questions.length === 0;
 
   return (
     <div className="rounded-3xl border border-app-border bg-app-surface p-5">

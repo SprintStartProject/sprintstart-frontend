@@ -1,4 +1,4 @@
-import { MessageCircle, Sparkles, UserRound } from "lucide-react";
+import { MessageCircle, PenLine, UserRound } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import type { OnboardingStepEndpoint } from "../types";
 
@@ -41,7 +41,7 @@ export function StepOriginBadge({ step, viewer = "hire" }: StepOriginBadgeProps)
   if (step.origin === "HIRE") {
     return (
       <Badge variant="neutral" className="gap-1.5">
-        <Sparkles className="h-3.5 w-3.5" />
+        <PenLine className="h-3.5 w-3.5" />
         {viewer === "hire" ? "You added this" : "Added by the hire"}
       </Badge>
     );

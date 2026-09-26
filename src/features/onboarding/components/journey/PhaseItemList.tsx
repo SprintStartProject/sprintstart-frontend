@@ -20,11 +20,10 @@ type Props = {
   nextItemId: string | null;
   /** The item unfolded in place, if any. */
   expandedItemId: string | null;
-  /**
-   * The item a link from the buddy landed on, lit up once. `key` is per arrival, so the same link
-   * followed twice plays the light twice.
-   */
-  linkHighlight?: { id: string; key: string } | null;
+  /** The item a link from the buddy landed on, lit up until `onLinkHighlightEnd` says it played. */
+  linkedItemId?: string | null;
+  /** The light on `linkedItemId` has played; the page takes it away so it does not play again. */
+  onLinkHighlightEnd?: () => void;
   onToggle: (item: PhaseItem) => void;
   /** Start, continue or answer: opens the item in place, starting a step that was not started. */
   onPrimary: (item: PhaseItem) => void;
@@ -44,7 +43,8 @@ export function PhaseItemList({
   phase,
   nextItemId,
   expandedItemId,
-  linkHighlight = null,
+  linkedItemId = null,
+  onLinkHighlightEnd,
   onToggle,
   onPrimary,
   renderExpanded,
@@ -74,11 +74,13 @@ export function PhaseItemList({
         const minutes = item.kind === "step" ? item.step.estimatedMinutes : null;
         const muted = state === "done" || state === "skipped" || state === "locked";
         const canUnfold = state !== "locked";
-        const isLinked = linkHighlight?.id === item.id;
+        const isLinked = linkedItemId === item.id;
 
         return (
           <li
-            key={isLinked ? `${item.id}:${linkHighlight.key}` : item.id}
+            // Keyed on the item alone: a key per link remounted the row, and with it a step that
+            // was open with a typed answer in it.
+            key={item.id}
             id={linkedCardId(item.id)}
             data-item-id={item.id}
             className={`overflow-hidden rounded-2xl border transition-colors ${
@@ -94,6 +96,13 @@ export function PhaseItemList({
                     ? "border-app-question-border/60 bg-app-question-bg/30 hover:bg-app-question-bg/60"
                     : "border-app-border/70 bg-app-surface/60 hover:bg-app-surface"
             } ${isLinked ? "app-link-highlight" : ""}`}
+            onAnimationEnd={
+              isLinked
+                ? (event) => {
+                    if (event.target === event.currentTarget) onLinkHighlightEnd?.();
+                  }
+                : undefined
+            }
           >
             <div className="flex items-center gap-3 p-3 pr-4">
               <button

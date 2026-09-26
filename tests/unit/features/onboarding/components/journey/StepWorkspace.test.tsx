@@ -265,6 +265,31 @@ describe("StepWorkspace", () => {
     await waitFor(() => expect(screen.getByText("2/2 done")).toBeInTheDocument());
   });
 
+  it("keeps a half-written skip reason when the buddy changes the path", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+
+    await user.click(await screen.findByRole("button", { name: "Skip" }));
+    await user.type(screen.getByLabelText("Reason for skipping"), "Already know it");
+    act(() => announceBuddyPathChanged());
+
+    await waitFor(() => expect(onboardingService.fetchStep).toHaveBeenCalledTimes(2));
+    expect(screen.getByLabelText("Reason for skipping")).toHaveValue("Already know it");
+  });
+
+  it("does not read the step again when the path catches up with a buddy change", async () => {
+    const { rerender, props } = renderWaitingWorkspace({ status: "WAITING" });
+    await screen.findByText("1/2 done");
+    vi.mocked(onboardingService.fetchStep).mockResolvedValue({ ...step, status: "FINISHED" });
+
+    act(() => announceBuddyPathChanged());
+    await waitFor(() => expect(onboardingService.fetchStep).toHaveBeenCalledTimes(2));
+    rerender(<StepWorkspace {...props} stepStatus="FINISHED" />);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onboardingService.fetchStep).toHaveBeenCalledTimes(2);
+  });
+
   it("does not offer the buddy on a step that is behind the hire", async () => {
     vi.mocked(onboardingService.fetchStep).mockResolvedValue({ ...step, status: "FINISHED" });
     renderWorkspace();
