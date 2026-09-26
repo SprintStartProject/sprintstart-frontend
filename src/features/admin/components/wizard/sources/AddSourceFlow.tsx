@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type Ref,
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
@@ -22,6 +23,7 @@ import { JiraConnectStep } from "../../../../data-ingestion/components/JiraConne
 import { ConfluenceConnectStep } from "../../../../data-ingestion/components/ConfluenceConnectStep";
 import { SourceTypeStep } from "../../../../data-ingestion/components/SourceTypeStep";
 import { FileUploadZone } from "../../../../knowledge-base/components/FileUploadZone";
+import { useDialogFocus } from "../../../../../components/ui/useDialogFocus";
 import { TokenAddForm } from "../../../../settings/components/TokenAddForm";
 import { AtlassianCredentialAddForm } from "../../../../settings/components/atlassian/AtlassianCredentialAddForm";
 import type { SourceSystem } from "../../../../data-ingestion/types";
@@ -137,9 +139,23 @@ type AddSourceFlowProps = {
  * and closes itself once the token/credential is saved. The form owns save +
  * cancel; this only decides where it is shown.
  */
-function TriggerButton({ label, onClick }: { label: string; onClick: () => void }) {
+function TriggerButton({
+  label,
+  onClick,
+  ref,
+}: {
+  label: string;
+  onClick: () => void;
+  ref?: Ref<HTMLButtonElement>;
+}) {
   return (
-    <Button variant="secondary" size="sm" onClick={onClick} icon={<KeyRound className="h-4 w-4" />}>
+    <Button
+      ref={ref}
+      variant="secondary"
+      size="sm"
+      onClick={onClick}
+      icon={<KeyRound className="h-4 w-4" />}
+    >
       {label}
     </Button>
   );
@@ -171,6 +187,12 @@ const VIEWPORT_MARGIN = 12;
  * and it slides in/out. Escape closes only the companion — a capture-phase
  * handler stops the event before the wizard modal's own Escape-to-close fires.
  *
+ * Being portalled beside the wizard, it sits outside the wizard's Tab trap, so
+ * it runs its own: focus moves in on open, Tab stays inside while open, and
+ * focus returns to the trigger on close. Without that, a keyboard user who saved
+ * a token was left with focus on `<body>`, and the next Tab landed on the page
+ * underneath the wizard.
+ *
  * The position is measured from the wizard dialog (found via `anchorRef`) and
  * re-measured on scroll/resize; it clamps into the viewport if the modal sits
  * too far right for the full gap.
@@ -189,6 +211,7 @@ function CompanionModal({
   children: ReactNode;
 }) {
   const prefersReducedMotion = useReducedMotion();
+  const dialogRef = useDialogFocus<HTMLDivElement>(isOpen);
   const [style, setStyle] = useState<CSSProperties>({ position: "fixed", top: -9999, left: -9999 });
   // Remembers the last applied top/left so the per-frame tracker only triggers a
   // re-render when the position actually moves.
@@ -258,6 +281,8 @@ function CompanionModal({
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          ref={dialogRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="false"
           aria-label={title}
@@ -322,7 +347,18 @@ function CredentialSlot({
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
   const close = () => setIsOpen(false);
+
+  // Hand focus back to the trigger once the form closes (saved or cancelled).
+  // The focused control was inside the form, so without this focus drops to
+  // `<body>` and the next Tab escapes the wizard onto the page behind it. On
+  // phone the trigger remounts in place of the inline form, hence the effect.
+  useEffect(() => {
+    if (wasOpenRef.current && !isOpen) triggerRef.current?.focus();
+    wasOpenRef.current = isOpen;
+  }, [isOpen]);
 
   const companionOpen = isDesktop && isOpen;
   useEffect(() => {
@@ -337,7 +373,7 @@ function CredentialSlot({
       <>{renderForm(close, false)}</>
     ) : (
       <div className="flex flex-wrap items-center gap-3">
-        <TriggerButton label={buttonLabel} onClick={() => setIsOpen(true)} />
+        <TriggerButton ref={triggerRef} label={buttonLabel} onClick={() => setIsOpen(true)} />
         {missingLabel && <MissingCredentialChip label={missingLabel} />}
       </div>
     );
@@ -345,7 +381,7 @@ function CredentialSlot({
 
   return (
     <div ref={anchorRef} className="flex flex-wrap items-center gap-3">
-      <TriggerButton label={buttonLabel} onClick={() => setIsOpen(true)} />
+      <TriggerButton ref={triggerRef} label={buttonLabel} onClick={() => setIsOpen(true)} />
       {missingLabel && <MissingCredentialChip label={missingLabel} />}
       <CompanionModal isOpen={isOpen} onClose={close} title={panelTitle} anchorRef={anchorRef}>
         {renderForm(close, true)}
