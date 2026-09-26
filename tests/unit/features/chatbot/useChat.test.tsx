@@ -426,6 +426,8 @@ describe("useChat", () => {
     expect(await screen.findByText("The answer failed")).toBeInTheDocument();
     expect(screen.getByText("LLM overload")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    // The dino game reads this: a failed stream must not be labelled "Reply ready".
+    expect(result.current.turnOutcome).toBe("failed");
   });
 
   it("exposes stopStreaming function that can abort a stream", async () => {
@@ -555,6 +557,97 @@ describe("useChat", () => {
     // Stop before any token arrives.
     act(() => {
       result.current.stopStreaming();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isThinking).toBe(false);
+      expect(result.current.isStreaming).toBe(false);
+    });
+    // A Stop is its own outcome, so the dino game does not claim a reply arrived.
+    expect(result.current.turnOutcome).toBe("stopped");
+  });
+
+  it("keeps isThinking true during reasoning streaming and clears isThinking on the first content token", async () => {
+    mockNavigate.mockReset();
+
+    const encoder = new TextEncoder();
+    let controllerRef!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        controllerRef = c;
+      },
+    });
+
+    server.use(
+      http.get("/api/v1/chats/me", () => HttpResponse.json({ chats: [] })),
+      http.get("/api/v1/chats/me/chat1", () => HttpResponse.json({ messages: [] })),
+      http.get("/api/v1/users/me", () =>
+        HttpResponse.json({
+          id: "user1",
+          authId: "auth-1",
+          username: "testuser",
+          email: "test@example.com",
+          firstName: "Test",
+          lastName: "User",
+          projectRoles: [],
+          permissionGroup: "USER",
+          enabled: true,
+          profileIcon: null,
+          hasCompletedOnboarding: true,
+        }),
+      ),
+      http.post(
+        "/api/v1/chats/me/prompt",
+        () =>
+          new HttpResponse(stream, {
+            headers: { "Content-Type": "text/event-stream" },
+          }),
+      ),
+      http.post("/api/v1/chats/me", () => HttpResponse.json({ id: "newChatId" })),
+    );
+
+    const { result } = renderHook(() => useChat(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.chats).toEqual([]);
+    });
+
+    act(() => {
+      void result.current.addMessage("hello");
+    });
+
+    await waitFor(() => {
+      expect(result.current.isThinking).toBe(true);
+    });
+
+    // Enqueue reasoning event
+    act(() => {
+      controllerRef.enqueue(
+        encoder.encode('data: {"type":"reasoning","reasoning":"Thinking..."}\n\n'),
+      );
+    });
+
+    // isThinking must remain true while thoughts are streaming, and isStreaming must be true
+    await waitFor(() => {
+      expect(result.current.isThinking).toBe(true);
+      expect(result.current.isStreaming).toBe(true);
+    });
+
+    // Enqueue first content token
+    act(() => {
+      controllerRef.enqueue(encoder.encode('data: {"type":"token","content":"Answer"}\n\n'));
+    });
+
+    // isThinking flips to false once reply content arrives!
+    await waitFor(() => {
+      expect(result.current.isThinking).toBe(false);
+      expect(result.current.isStreaming).toBe(true);
+    });
+
+    // Finish stream
+    act(() => {
+      controllerRef.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+      controllerRef.close();
     });
 
     await waitFor(() => {

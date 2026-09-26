@@ -11,7 +11,7 @@ import { useAuth } from "./useAuth";
 import { useToastApi } from "./useToast";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
-import type { ChatContextValue, SelectedCitation } from "./ChatContext";
+import type { ChatContextValue, ChatTurnOutcome, SelectedCitation } from "./ChatContext";
 import type {
   Chat,
   ChatMessage,
@@ -85,6 +85,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [messagesByChat, setMessagesByChat] = useState<MessagesByChat>({});
 
   const [isThinking, setIsThinking] = useState(false);
+  const [lastTurnOutcome, setLastTurnOutcome] = useState<ChatTurnOutcome | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
@@ -173,6 +174,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // first token of the post-tool answer glues onto pre-tool preamble text
   // ("Let me search…Searching knowledge base…") inside the same bubble.
   const sawToolUseRef = useRef(false);
+  // Set to true on the first content token from onToken. Keeps isThinking true
+  // during any reasoning/thoughts streaming phase so that the waiting game stays active.
+  const replyStartedRef = useRef(false);
 
   // Monotonic id per `sendMessage` call. Each handler captures the streamId
   // it was created for and no-ops if it doesn't match the current value —
@@ -317,6 +321,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       clearStreamTimeout();
       streamingStartedRef.current = false;
       sawToolUseRef.current = false;
+      replyStartedRef.current = false;
       streamIdRef.current += 1;
       latestLoadRef.current = null;
       if (draftRef.current && draftRef.current.rafId !== null) {
@@ -525,6 +530,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       }));
 
       setIsThinking(true);
+      setLastTurnOutcome(null);
       // A follow-up sent mid-stream would otherwise inherit the previous
       // stream's flags — a caret on a message that no longer receives tokens
       // and the previous turn's tool label under the dots.
@@ -534,6 +540,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       commitStreamingChat(currentChatId);
       streamingStartedRef.current = false;
       sawToolUseRef.current = false;
+      replyStartedRef.current = false;
 
       // Initialize the rAF-batched draft so token/reasoning/citation events
       // append to a mutable buffer instead of triggering a state update each.
@@ -571,6 +578,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             "The answer timed out",
             "The assistant stopped responding for five minutes.",
           );
+          setLastTurnOutcome({ chatId: currentChatId, kind: "failed" });
         }, STREAM_TIMEOUT_MS);
       };
       armStreamTimeout();
@@ -592,6 +600,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         if (!isCurrentStream()) return;
         streamingStartedRef.current = false;
         sawToolUseRef.current = false;
+        replyStartedRef.current = false;
         abortControllerRef.current = null;
         setIsStreaming(false);
         setIsThinking(false);
@@ -648,7 +657,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               if (!streamingStartedRef.current) {
                 streamingStartedRef.current = true;
                 setIsStreaming(true);
-                setIsThinking(false);
+                // Keep isThinking true while thoughts/reasoning stream,
+                // so the Dino waiting game remains armed until the actual reply arrives.
                 setStreamingMessageId(assistantId);
               }
 
@@ -666,8 +676,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               if (!streamingStartedRef.current) {
                 streamingStartedRef.current = true;
                 setIsStreaming(true);
-                setIsThinking(false);
                 setStreamingMessageId(assistantId);
+              }
+              if (!replyStartedRef.current) {
+                replyStartedRef.current = true;
+                setIsThinking(false);
               }
 
               const draft = draftRef.current;
@@ -743,6 +756,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 ),
               }));
 
+              // The timeout path aborts and then lands here — keep its
+              // "failed" verdict instead of overwriting it with "done".
+              setLastTurnOutcome((prev) =>
+                prev?.chatId === currentChatId && prev.kind === "failed"
+                  ? prev
+                  : { chatId: currentChatId, kind: "done" },
+              );
+
               void refreshChats();
 
               // The answer is complete, so the next queued message may go.
@@ -760,6 +781,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
               if (!isCurrentStream()) return;
               reportFailure("The answer failed", err);
+              setLastTurnOutcome({ chatId: currentChatId, kind: "failed" });
               // A failed turn still frees the queue: the next message may well
               // be the retry, and holding it hostage to a failure the user has
               // already been told about helps nobody.
@@ -781,6 +803,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         if (!isCurrentStream()) return;
         reportFailure("The answer failed", "Unexpected error during streaming.");
+        setLastTurnOutcome({ chatId: currentChatId, kind: "failed" });
         drainRef.current(currentChatId);
       }
     },
@@ -814,10 +837,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     flushDraft();
     const stopped = draftRef.current;
     draftRef.current = null;
+    if (stopped) setLastTurnOutcome({ chatId: stopped.chatId, kind: "stopped" });
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     streamingStartedRef.current = false;
     sawToolUseRef.current = false;
+    replyStartedRef.current = false;
     setIsStreaming(false);
     setIsThinking(false);
     setStreamingMessageId(null);
@@ -1017,6 +1042,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     streamingMessageId,
     thinkingState,
     streamingChatId,
+    lastTurnOutcome,
     selectedCitation,
     setSelectedCitation,
     newRequest,

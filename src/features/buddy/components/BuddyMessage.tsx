@@ -2,6 +2,11 @@ import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, UserRound } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { BotGlyph } from "../../chatbot/components/BotGlyph";
+import { DinoGame } from "../../chatbot/components/DinoGame.tsx";
+import { dinoCompletionProps } from "../../chatbot/dinoOutcome.ts";
+import type { DinoTurnOutcome } from "../../chatbot/dinoOutcome.ts";
+import { centralSpringToken } from "../../../styles/tokens.ts";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { useAuth } from "../../../context/useAuth";
 
@@ -218,11 +223,77 @@ function SpeakerAvatar({ speaker, isStreaming }: { speaker: BuddySpeaker; isStre
 export function BuddyTypingMessage({
   label,
   showName = false,
+  gameActive = false,
+  replyReady = false,
+  turnOutcome = null,
+  onGameExit,
 }: {
   label?: string;
   showName?: boolean;
+  /** True when the dino waiting-game is open instead of the dots. */
+  gameActive?: boolean;
+  /**
+   * True when the turn has finished while the game is open: forwarded to the
+   * game as its completion badge and used to stop showing the dots — a reply
+   * that has arrived is not being typed anymore.
+   */
+  replyReady?: boolean;
+  /**
+   * How the finished turn ended — a failed reply must not be announced as "Reply ready".
+   * Only read once `replyReady` is true.
+   */
+  turnOutcome?: DinoTurnOutcome;
+  /** Called when the player leaves the dino game (Escape / exit button). */
+  onGameExit?: () => void;
 }) {
   const prefersReducedMotion = useReducedMotion();
+
+  // The unlocked dino waiting-game replaces the dots while the buddy works —
+  // the same deal the AI chat's ThinkingIndicator offers. The dots stay
+  // underneath as the status row while the buddy is still working, and the
+  // label keeps explaining what the buddy is doing behind the game. Once the
+  // turn has finished (replyReady) the dots stop: nobody is typing anymore,
+  // and the game's own completion badge takes over as the status line.
+  if (gameActive && onGameExit) {
+    return (
+      <motion.div
+        {...(prefersReducedMotion
+          ? {}
+          : {
+              initial: { opacity: 0, y: 8 },
+              animate: { opacity: 1, y: 0 },
+              transition: centralSpringToken,
+            })}
+        className="flex w-full min-w-0 gap-2.5"
+      >
+        {/* The game is deliberately outside any live region: its score changes many times a
+            second and would flood a screen reader. This one concise status says what the buddy
+            is doing; the game announces its own completion and game-over lines. */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {replyReady ? "" : (label ?? "Buddy is thinking…")}
+        </p>
+
+        <div className="flex size-8 shrink-0 items-center justify-center">
+          <BotGlyph size={30} state="cheering" className="text-app-brand-text" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <DinoGame onExit={onGameExit} {...dinoCompletionProps(replyReady, turnOutcome)} />
+
+          {!replyReady && (
+            <div className="mt-2 flex w-max max-w-full items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-2.5 shadow-sm">
+              <span className="flex gap-1" aria-hidden="true">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
+              </span>
+              {label && <span className="text-sm text-app-text-muted italic">{label}</span>}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

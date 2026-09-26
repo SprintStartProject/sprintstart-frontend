@@ -335,8 +335,10 @@ describe("chat message queue", () => {
       first.fail("LLM overload");
     });
 
-    await waitFor(() => expect(prompts).toEqual(["Q1", "Q2"]));
-    expect(result.current.queuedMessages).toHaveLength(0);
+    await waitFor(() => {
+      expect(prompts).toEqual(["Q1", "Q2"]);
+      expect(result.current.queuedMessages).toHaveLength(0);
+    });
   });
 
   it("interrupts the running answer when the message belongs to another chat", async () => {

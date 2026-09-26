@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
+import { matchEggPhrase } from "../../easter-eggs/lib/eggPhrases";
+import { playEggEffect } from "../../easter-eggs/eggEffectBus";
 import {
   getMessages,
   streamOpenBuddy,
@@ -87,6 +90,44 @@ export function useBuddyConversation(
   // The tool the buddy is running right now, if any -- drives "Checking your progress…"
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
+
+  // Dino waiting-game: unlocked users may press Space while the buddy thinks
+  // to play the runner until the answer arrives — the same deal the AI chat
+  // offers. Closing is handled inside the hook: on exit, when the turn ends,
+  // or when the cogwheel unlock flag flips off.
+  const dinoUnlocked = useDinoUnlocked();
+  // How many surfaces currently show this thread (the open dock, the mounted `/buddy` page).
+  // The session lives app-wide in BuddyProvider, so arming on `isThinking` alone let Space open
+  // a game inside a minimised dock nobody could see — and with `keepActiveUntilExit` that
+  // invisible game held the shared slot for good. Surfaces register via `useDinoSurface`.
+  const [dinoSurfaceCount, setDinoSurfaceCount] = useState(0);
+  const dinoSurfaceVisible = dinoSurfaceCount > 0;
+  const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(
+    isThinking && dinoSurfaceVisible,
+    dinoUnlocked,
+    {
+      // Parity with the chat and the drawer: the game outlives the turn it was armed for
+      // and stays open until the player leaves it — the reply's arrival only flips its
+      // completion badge. Without this the first token unmounted the game mid-run.
+      keepActiveUntilExit: true,
+    },
+  );
+
+  // The last visible surface went away (dock minimised, page left): the game it hosted is gone
+  // from screen, so it must not keep running — or keep the shared slot — behind it.
+  useEffect(() => {
+    if (!dinoSurfaceVisible) closeDinoGame();
+  }, [dinoSurfaceVisible, closeDinoGame]);
+
+  /**
+   * Declares that a surface showing this thread is on screen. Returns the matching release;
+   * meant to be called from an effect (see `useDinoSurface`).
+   */
+  const registerDinoSurface = useCallback(() => {
+    setDinoSurfaceCount((count) => count + 1);
+    return () => setDinoSurfaceCount((count) => count - 1);
+  }, []);
+
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);
   // True while a surface is opening the conversation, so it can show a loading state rather
@@ -121,8 +162,15 @@ export function useBuddyConversation(
   const { profile } = useAuth();
   const userId = profile?.id ?? null;
   const userIdRef = useRef<string | null>(null);
+  // Declared before the effect that resets it: the target binding must not outlive the user whose
+  // thread created it.
+  const teamTargetRef = useRef<string | null>(null);
   useEffect(() => {
     userIdRef.current = userId;
+    // A signed-in-user change drops the old user's project binding here, not just the visible
+    // mode: a stale target would make the adopt effect compare the next user's selection against
+    // it and overwrite their restored preference with a bogus exit.
+    teamTargetRef.current = null;
     // Re-read on every subject change: a logout or an account switch must not inherit the
     // previous user's preference. Nothing persisted while there is no user to own it.
     // Deferred to a microtask so the setState never runs synchronously in the effect body.
@@ -137,7 +185,6 @@ export function useBuddyConversation(
    * target while a switch is pending. `null` means team mode is on but has not adopted a
    * project yet (a restored preference waiting for the list to vouch).
    */
-  const teamTargetRef = useRef<string | null>(null);
 
   const setTeamMode = useCallback((value: boolean) => {
     setIsTeamMode(value);
@@ -426,8 +473,17 @@ export function useBuddyConversation(
     // second open. The backend replays the greeting it has just written rather than composing
     // another, so the hire would read the identical words twice.
     // `pendingDecisionsRef` is read alongside the state: a decision and this click can land
-    // in one frame, before the "deciding" state has re-rendered.
-    if (greetingRef.current || isDeciding || pendingDecisionsRef.current > 0) return;
+    // in one frame, before the "deciding" state has re-rendered. A live reply is also a
+    // reason to refuse: clearing mid-stream would silently drop the tokens, citations and
+    // proposed actions still on their way.
+    if (
+      greetingRef.current ||
+      isDeciding ||
+      isThinking ||
+      isStreaming ||
+      pendingDecisionsRef.current > 0
+    )
+      return;
     greetingRef.current = true;
 
     setMessages([]);
@@ -443,7 +499,7 @@ export function useBuddyConversation(
       greetingRef.current = false;
       setIsOpening(false);
     }
-  }, [greet, isDeciding]);
+  }, [greet, isDeciding, isThinking, isStreaming]);
 
   /**
    * Marks the turn a reply was streaming into as failed, so the thread says so.
@@ -825,9 +881,21 @@ export function useBuddyConversation(
     // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
     // the one being switched to, exactly as it did the first time.
     loadedRef.current = false;
+    // A game left open from the previous conversation would keep claiming "Reply ready" for a
+    // thread that has just been cleared.
+    closeDinoGame();
 
     void ensureOpened();
-  }, [teamProjectId, isThinking, isStreaming, isOpening, isGreeting, isDeciding, ensureOpened]);
+  }, [
+    teamProjectId,
+    isThinking,
+    isStreaming,
+    isOpening,
+    isGreeting,
+    isDeciding,
+    ensureOpened,
+    closeDinoGame,
+  ]);
 
   /**
    * Points the buddy at a managed project (`null` returns to the hire's own onboarding). The
@@ -866,17 +934,33 @@ export function useBuddyConversation(
     [isThinking, isStreaming, isOpening, isGreeting, isDeciding, selection, setTeamMode],
   );
 
+  /**
+   * Handles a composer submission: an egg phrase plays its effect and is swallowed, anything
+   * else is sent. Returns whether a turn was started — `false` means the submission went
+   * nowhere, which the composer uses to decide whether the caret should be handed off.
+   */
   const handleSubmit = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
 
+      // Easter-egg phrases are intercepted before anything is sent: the
+      // effect plays app-wide (EggEffectsLayer) and the message is swallowed
+      // silently — no reply, no request. Same contract as the AI chat.
+      const eggEffect = matchEggPhrase(draft);
+      if (eggEffect) {
+        setDraft("");
+        playEggEffect(eggEffect);
+        return false;
+      }
+
       const text = draft;
-      if (!text.trim()) return;
+      if (!text.trim()) return false;
 
       setDraft("");
       void sendMessage(text);
+      return true;
     },
-    [draft, sendMessage],
+    [draft, sendMessage, setDraft],
   );
 
   return {
@@ -905,6 +989,11 @@ export function useBuddyConversation(
     handleSubmit,
     confirmAction,
     dismissAction,
+
+    dinoGameActive,
+    closeDinoGame,
+    dinoUnlocked,
+    registerDinoSurface,
 
     ensureOpened,
     retryOpen,

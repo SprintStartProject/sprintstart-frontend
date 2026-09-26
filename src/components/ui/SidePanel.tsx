@@ -118,7 +118,15 @@ export function SidePanel({
   useEffect(() => {
     if (!isOpen) return;
 
+    /**
+     * Escape closes the drawer only when nothing inside it has already claimed
+     * the key. Inner consumers (e.g. the dino mini-game, which exits on Escape)
+     * call `preventDefault()`; without this check one keypress would close both
+     * the inner widget and the whole drawer.
+     */
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && event.defaultPrevented) return;
+
       if (event.key === "Escape" && closeOnEscape) {
         onClose();
         return;
