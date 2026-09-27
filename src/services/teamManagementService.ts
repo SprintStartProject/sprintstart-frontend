@@ -550,10 +550,21 @@ export async function getSkillById(skillId: string): Promise<Skill> {
   return toSkill(response);
 }
 
-export async function updateSkill(
-  skillId: string,
-  data: { name?: string; roleIds?: string[] },
-): Promise<Skill> {
+export type UpdateSkillRequest = {
+  name?: string;
+  roleIds?: string[];
+  /**
+   * Required, not optional: the backend `PATCH` sets `category` to `null`
+   * whenever it is missing from the body, so a caller that only means to
+   * change the name or the roles must still resend the skill's current
+   * category or silently clear it.
+   */
+  category: string | null;
+  universal?: boolean;
+};
+
+/** Updates a skill through the admin endpoint. ADMIN only; a PM or HR caller gets a 403. */
+export async function updateSkill(skillId: string, data: UpdateSkillRequest): Promise<Skill> {
   const response = await apiClient.fetch<SkillResponseDto>(`/api/v1/admin/skills/${skillId}`, {
     method: "PATCH",
     body: JSON.stringify(data),
@@ -641,74 +652,46 @@ export async function updateRoleSkills(roleId: string, skillIds: string[]): Prom
   return response.map(toSkill);
 }
 
+/**
+ * Reactivates a retired skill by name through the admin create endpoint, since the
+ * backend reactivates on a name match instead of exposing a dedicated endpoint.
+ * ADMIN only; a PM or HR caller gets a 403.
+ */
 export async function reactivateSkill(
-  skillId: string,
+  _skillId: string,
   name: string,
   roleIds: string[],
 ): Promise<Skill> {
-  try {
-    const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        roleIds,
-      }),
-    });
-
-    return toSkill(response);
-  } catch {
-    mockSkills = mockSkills.map((s) =>
-      s.id === skillId ? { ...s, status: "ACTIVE" as const } : s,
-    );
-
-    return (
-      mockSkills.find((s) => s.id === skillId) ?? {
-        id: skillId,
-        name,
-        roleIds,
-        status: "ACTIVE",
-        universal: false,
-      }
-    );
-  }
-}
-
-export async function createSkill(name: string, roleIds: string[]): Promise<Skill> {
-  try {
-    const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        roleIds,
-      }),
-    });
-
-    return toSkill(response);
-  } catch {
-    const existing = mockSkills.find(
-      (s) => s.name.toLowerCase() === name.toLowerCase() && s.status === "RETIRED",
-    );
-
-    if (existing) {
-      const reactivated: Skill = { ...existing, roleIds, status: "ACTIVE" };
-
-      mockSkills = mockSkills.map((s) => (s.id === existing.id ? reactivated : s));
-
-      return reactivated;
-    }
-
-    const newSkill: Skill = {
-      id: `mock-skill-${Date.now()}`,
+  const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
+    method: "POST",
+    body: JSON.stringify({
       name,
       roleIds,
-      status: "ACTIVE",
-      universal: false,
-    };
+    }),
+  });
 
-    mockSkills = [...mockSkills, newSkill];
+  return toSkill(response);
+}
 
-    return newSkill;
-  }
+export type CreateSkillRequest = {
+  name: string;
+  roleIds: string[];
+  category?: string | null;
+  universal?: boolean;
+};
+
+/**
+ * Creates a new skill, or reactivates a retired one of the same name, through the
+ * admin endpoint. ADMIN only; a PM or HR caller gets a 403. A name that collides with
+ * an already-active skill answers 409.
+ */
+export async function createSkill(request: CreateSkillRequest): Promise<Skill> {
+  const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+
+  return toSkill(response);
 }
 
 export async function deleteProjectRole(roleId: string): Promise<void> {
@@ -733,18 +716,11 @@ export async function deleteProjectRole(roleId: string): Promise<void> {
   }
 }
 
+/** Retires a skill globally through the admin endpoint. ADMIN only; a PM or HR caller gets a 403. */
 export async function deleteSkill(skillId: string): Promise<void> {
-  try {
-    await apiClient.fetch(`/api/v1/admin/skills/${skillId}`, {
-      method: "DELETE",
-    });
-
-    return;
-  } catch {
-    mockSkills = mockSkills.map((skill) =>
-      skill.id === skillId ? { ...skill, status: "RETIRED" } : skill,
-    );
-  }
+  await apiClient.fetch(`/api/v1/admin/skills/${skillId}`, {
+    method: "DELETE",
+  });
 }
 
 // Removed mock role functions
