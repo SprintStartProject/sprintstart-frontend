@@ -581,7 +581,7 @@ export function AdminPage() {
           <PageHeader
             icon={Terminal}
             title="Access Management"
-            subtitle="Manage users, projects and access tokens."
+            subtitle="Manage users, projects, access tokens and the skill pool."
             actions={<AdminMetrics userCount={users.length} projectCount={projects.length} />}
           />
         </div>
