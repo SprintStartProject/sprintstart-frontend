@@ -32,6 +32,7 @@ import { AdminUsersToolbar } from "../features/admin/components/AdminUsersToolba
 import { CreateProjectWizard } from "../features/admin/components/CreateProjectWizard";
 import { ProjectDetailsDrawer } from "../features/admin/components/ProjectDetailsDrawer";
 import { ProjectsTab } from "../features/admin/components/ProjectsTab";
+import { SkillDetailsDrawer } from "../features/admin/components/SkillDetailsDrawer";
 import { SkillsTab } from "../features/admin/components/SkillsTab";
 import { TabSwitcher } from "../features/admin/components/TabSwitcher";
 import { TokensTab } from "../features/admin/components/TokensTab";
@@ -47,6 +48,7 @@ import type {
   AdminTab,
   AdminUser,
   ProjectOverview,
+  Skill,
   SkillStatusFilter,
   UserFilter,
 } from "../features/admin/types";
@@ -94,6 +96,8 @@ export function AdminPage() {
   }, [searchParams, setSearchParams]);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+  const [isCreatingSkill, setIsCreatingSkill] = useState(false);
 
   const [searchValue, setSearchValue] = useState("");
   const [projectSearchValue, setProjectSearchValue] = useState("");
@@ -165,6 +169,7 @@ export function AdminPage() {
     loadingState: skillPoolLoadingState,
     errorMessage: skillPoolErrorMessage,
     loadSkillPool,
+    upsertSkill,
   } = useSkillPool();
 
   // Lazy, like the tokens section: only fetched once this tab is actually
@@ -252,6 +257,8 @@ export function AdminPage() {
   const openUserDetails = (user: AdminUser) => {
     setOpenUserMenuId(null);
     setSelectedProject(null);
+    setSelectedSkill(null);
+    setIsCreatingSkill(false);
     setSelectedUser(user);
     setIsDrawerOpen(true);
   };
@@ -386,8 +393,33 @@ export function AdminPage() {
   const openProjectDetails = (project: ProjectOverview) => {
     setOpenUserMenuId(null);
     setSelectedUser(null);
+    setSelectedSkill(null);
+    setIsCreatingSkill(false);
     setSelectedProject(project);
     setIsDrawerOpen(true);
+  };
+
+  const openSkillDetails = (skill: Skill) => {
+    setOpenUserMenuId(null);
+    setSelectedUser(null);
+    setSelectedProject(null);
+    setIsCreatingSkill(false);
+    setSelectedSkill(skill);
+    setIsDrawerOpen(true);
+  };
+
+  const openCreateSkillDrawer = () => {
+    setOpenUserMenuId(null);
+    setSelectedUser(null);
+    setSelectedProject(null);
+    setSelectedSkill(null);
+    setIsCreatingSkill(true);
+    setIsDrawerOpen(true);
+  };
+
+  const handleSkillSaved = (updatedSkill: Skill) => {
+    upsertSkill(updatedSkill);
+    setSelectedSkill((current) => (current?.id === updatedSkill.id ? updatedSkill : current));
   };
 
   const openProjectDetailsFromUserDrawer = (projectId: string) => {
@@ -495,6 +527,8 @@ export function AdminPage() {
     drawerCloseTimeoutRef.current = setTimeout(() => {
       setSelectedUser(null);
       setSelectedProject(null);
+      setSelectedSkill(null);
+      setIsCreatingSkill(false);
     }, DRAWER_CLOSE_DELAY_MS);
   };
 
@@ -698,8 +732,7 @@ export function AdminPage() {
                       setSkillRoleFilter(value);
                       setSkillPage(1);
                     }}
-                    // Wired up once the Skill Details Drawer exists.
-                    onCreateSkill={() => {}}
+                    onCreateSkill={openCreateSkillDrawer}
                   />
 
                   <SkillsTab
@@ -709,8 +742,7 @@ export function AdminPage() {
                     errorMessage={skillPoolErrorMessage}
                     hasSearchQuery={skillSearchValue.trim().length > 0}
                     totalCount={skillPool.length}
-                    // Wired up once the Skill Details Drawer exists.
-                    onOpenSkillDetails={() => {}}
+                    onOpenSkillDetails={openSkillDetails}
                     onRetryLoad={() => void loadSkillPool(true)}
                   />
 
@@ -731,7 +763,7 @@ export function AdminPage() {
         </div>
       </main>
 
-      {(selectedUser || selectedProject) && (
+      {(selectedUser || selectedProject || selectedSkill || isCreatingSkill) && (
         <button
           type="button"
           aria-label="Close details overlay"
@@ -767,6 +799,20 @@ export function AdminPage() {
           onOpenSourceDetails={openSourceDetails}
           onProjectUpdated={handleProjectUpdated}
           onProjectDeleted={handleProjectDeleted}
+        />
+      )}
+
+      {(selectedSkill || isCreatingSkill) && (
+        // Keyed the same way as the project drawer, so switching between two
+        // skills (or into create mode) always starts from a fresh draft.
+        <SkillDetailsDrawer
+          key={selectedSkill?.id ?? "create-skill"}
+          skill={selectedSkill}
+          skills={skillPool}
+          roles={skillPoolRoles}
+          isOpen={isDrawerOpen}
+          onClose={closeDetails}
+          onSkillSaved={handleSkillSaved}
         />
       )}
 
