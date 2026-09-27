@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ListPlus } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
+import { queryKeys } from "../../../services/queryKeys";
 import { extractChecklist, toChecklistRequest } from "../../board/generation/checklistFromMarkdown";
 import { useProjectContext } from "../../projects/useProjectContext";
 
@@ -29,6 +31,7 @@ type SaveReplyToBoardProps = {
 export function SaveReplyToBoard({ content }: SaveReplyToBoardProps) {
   const { selectedProjectId } = useProjectContext();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -42,6 +45,12 @@ export function SaveReplyToBoard({ content }: SaveReplyToBoardProps) {
     setSaving(true);
     try {
       await boardService.addCard(selectedProjectId, toChecklistRequest(checklist));
+      // The board this list just joined is very often already cached — this dock can be floating
+      // over it, and a visit within `staleTime` would otherwise serve the pre-card board. Marking
+      // it stale is what makes the open board (or the next visit) show the list the hire kept.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.board.byProject(selectedProjectId),
+      });
       setSaved(true);
       toast.success("Kept on your board", {
         description: `"${checklist.title}" — ${checklist.items.length} things to tick off.`,

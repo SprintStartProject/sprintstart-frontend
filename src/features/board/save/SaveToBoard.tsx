@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button, type ButtonSize } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
+import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { rememberOrigin, type CardOrigin } from "../layout/cardOrigins";
 import type { AuthoredCardRequest } from "../types";
@@ -76,6 +78,7 @@ export function SaveToBoard({
 }: SaveToBoardProps) {
   const { selectedProjectId } = useProjectContext();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -89,6 +92,14 @@ export function SaveToBoard({
     setSaving(true);
     try {
       const created = await boardService.addCard(selectedProjectId, card);
+
+      // Kept from wherever this was found — a chat, a buddy reply, a task card — so the board is
+      // usually not on screen, and even where it is (this button lives on it too) what drew it is
+      // an earlier read. Marking the cache stale is what makes whichever comes next — the open
+      // board, or the next visit — show the card instead of the state it was read at.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.board.byProject(selectedProjectId),
+      });
 
       const where = origin?.();
       // Never allowed to fail the save: the card is what was asked for, the trail back is extra.
