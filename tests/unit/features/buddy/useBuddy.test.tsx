@@ -1,10 +1,13 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
 import { BuddyProviderWithStubs } from "./buddyTestHarness";
 import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
+import { queryKeys } from "../../../../src/services/queryKeys";
 
 /**
  * A greeting that opens the visit and writes nothing.
@@ -453,6 +456,179 @@ describe("useBuddy", () => {
 
       expect(calls()).toBe(1);
       expect(result.current.messages[1].actions?.[0].status).toBe("resolved");
+    });
+  });
+
+  /**
+   * The board a confirmed action writes to is a cache entry nobody here is looking at: the dock
+   * can float over the board page, and a visit within `staleTime` serves the board as it was read.
+   * These pin which confirms mark it stale — and which correctly do not.
+   */
+  describe("board synchronisation", () => {
+    /** A client already holding this hire's board, and a wrapper that puts it under the session. */
+    function boardContext() {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      client.setQueryData(queryKeys.board.byProject("p1"), {
+        boardId: "b1",
+        projectId: "p1",
+        cards: [],
+      });
+
+      function Wrapper({ children }: { children: ReactNode }) {
+        return (
+          <QueryClientProvider client={client}>
+            <BuddyProviderWithStubs>{children}</BuddyProviderWithStubs>
+          </QueryClientProvider>
+        );
+      }
+
+      return { client, Wrapper };
+    }
+
+    const boardIsStale = (client: QueryClient) =>
+      client.getQueryState(queryKeys.board.byProject("p1"))?.isInvalidated ?? false;
+
+    function stream(events: string[]) {
+      const encoder = new TextEncoder();
+      return new HttpResponse(
+        new ReadableStream({
+          start(controller) {
+            for (const event of events) controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+            controller.close();
+          },
+        }),
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    }
+
+    /** Opens the session, sends a question whose reply proposes `proposalEvent`, and confirms it. */
+    async function confirmProposal(
+      proposalEvent: string,
+      outcome: { ok: boolean; message: string },
+    ) {
+      const { client, Wrapper } = boardContext();
+      server.use(
+        http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+        http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
+        http.post("/api/v1/onboarding/me/buddy/messages", () => stream([proposalEvent])),
+        http.post("/api/v1/onboarding/me/buddy/actions", () => HttpResponse.json(outcome)),
+      );
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: Wrapper });
+      act(() => {
+        result.current.toggleOpen();
+      });
+      await waitFor(() => expect(result.current.messages).toHaveLength(0));
+      act(() => {
+        result.current.setDraft("how do I start?");
+      });
+      act(() => {
+        result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+      await waitFor(() => expect(result.current.messages[1]?.actions?.[0]).toBeDefined());
+
+      act(() => {
+        result.current.confirmAction(
+          result.current.messages[1].id,
+          result.current.messages[1].actions![0],
+        );
+      });
+      await waitFor(() => expect(result.current.messages[1].actions?.[0].status).toBe("resolved"));
+
+      return { client };
+    }
+
+    const PLACE_CHECKLIST =
+      '{"type":"action_proposal","action":"place_checklist","label":"Keep this as a checklist",' +
+      '"checklist_title":"Getting started","checklist_items":["Run it locally","Open a PR"]}';
+
+    it("marks the board stale when a confirmed action wrote a card", async () => {
+      const { client } = await confirmProposal(PLACE_CHECKLIST, { ok: true, message: "Kept." });
+
+      expect(boardIsStale(client)).toBe(true);
+    });
+
+    /** `claim_goal` writes twice: the claim, and the CURRENT_TASK card it pins on the board. */
+    it("marks the board stale when claim_goal pins a task card", async () => {
+      const { client } = await confirmProposal(
+        '{"type":"action_proposal","action":"claim_goal","label":"Work toward this task","task_id":"t-1"}',
+        { ok: true, message: "You're now working toward it." },
+      );
+
+      expect(boardIsStale(client)).toBe(true);
+    });
+
+    it("leaves the board alone when the action changed nothing", async () => {
+      const { client } = await confirmProposal(PLACE_CHECKLIST, {
+        ok: false,
+        message: "I couldn't keep that just now.",
+      });
+
+      expect(boardIsStale(client)).toBe(false);
+    });
+
+    it("leaves the board alone for an action that never touches it", async () => {
+      const { client } = await confirmProposal(
+        '{"type":"action_proposal","action":"request_attestation","label":"Ask them to confirm this","title":"the auth fix","attester_id":"u-9"}',
+        { ok: true, message: "Asked them to confirm it." },
+      );
+
+      expect(boardIsStale(client)).toBe(false);
+    });
+
+    /** Runs a full turn — open, ask, answer — with the given stream events. */
+    async function completeTurn(events: string[]) {
+      const { client, Wrapper } = boardContext();
+      server.use(
+        http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+        http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
+        http.post("/api/v1/onboarding/me/buddy/messages", () => stream(events)),
+      );
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: Wrapper });
+      act(() => {
+        result.current.toggleOpen();
+      });
+      await waitFor(() => expect(result.current.messages).toHaveLength(0));
+      act(() => {
+        result.current.setDraft("put the PR review task on my board");
+      });
+      act(() => {
+        result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+      await waitFor(() => expect(result.current.isThinking).toBe(false));
+      // The board check runs when the stream call resolves, a beat after the last event — settle
+      // before asserting an absence.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      return { client };
+    }
+
+    /**
+     * `place_card` is the one board write that is not confirmed — it applies the moment the
+     * mentor runs it — so the tool_use event during the turn is the whole signal the client gets
+     * that the board moved.
+     */
+    it("marks the board stale when the turn placed a card on it", async () => {
+      const { client } = await completeTurn([
+        '{"type":"tool_use","name":"place_card"}',
+        '{"type":"token","content":"It is on your board."}',
+        '{"type":"done"}',
+      ]);
+
+      expect(boardIsStale(client)).toBe(true);
+    });
+
+    it("leaves the board alone when the turn ran other tools", async () => {
+      const { client } = await completeTurn([
+        '{"type":"tool_use","name":"get_my_metrics"}',
+        '{"type":"token","content":"You are on track."}',
+        '{"type":"done"}',
+      ]);
+
+      expect(boardIsStale(client)).toBe(false);
     });
   });
 });
