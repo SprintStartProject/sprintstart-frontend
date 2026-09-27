@@ -10,11 +10,14 @@ import {
   areAllVisibleUsersSelected,
   filterAdminProjects,
   filterAdminUsers,
+  filterSkills,
   getAvailableProjects,
   getDisplayName,
   getPaginatedProjects,
+  getPaginatedSkills,
   getPaginatedUsers,
   getSafePage,
+  getSkillCategories,
   getTotalPages,
   removeUsersFromProjects,
   toggleSelectedUserId,
@@ -24,15 +27,18 @@ import { DEFAULT_ACCESS_SOURCE_FILTER } from "../features/access/components/Acce
 import { AdminMetrics } from "../features/admin/components/AdminMetrics";
 import { AdminPagination } from "../features/admin/components/AdminPagination";
 import { AdminProjectsToolbar } from "../features/admin/components/AdminProjectsToolbar";
+import { AdminSkillsToolbar } from "../features/admin/components/AdminSkillsToolbar";
 import { AdminUsersToolbar } from "../features/admin/components/AdminUsersToolbar";
 import { CreateProjectWizard } from "../features/admin/components/CreateProjectWizard";
 import { ProjectDetailsDrawer } from "../features/admin/components/ProjectDetailsDrawer";
 import { ProjectsTab } from "../features/admin/components/ProjectsTab";
+import { SkillsTab } from "../features/admin/components/SkillsTab";
 import { TabSwitcher } from "../features/admin/components/TabSwitcher";
 import { TokensTab } from "../features/admin/components/TokensTab";
 import { UserDetailsDrawer } from "../features/admin/components/UserDetailsDrawer";
 import { UsersTab } from "../features/admin/components/UsersTab";
 import { useAdminData } from "../features/admin/hooks/useAdminData";
+import { useSkillPool } from "../features/admin/hooks/useSkillPool";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ADMIN_TAB_ORDER } from "../features/admin/types";
@@ -41,6 +47,7 @@ import type {
   AdminTab,
   AdminUser,
   ProjectOverview,
+  SkillStatusFilter,
   UserFilter,
 } from "../features/admin/types";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
@@ -52,6 +59,12 @@ export function AdminPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { reloadProjects } = useProjectContext();
+  // Skills is ADMIN-only: every mutation on it (create/update/retire) 403s for
+  // HR, so the tab itself is hidden rather than shown and failing on click.
+  const visibleAdminTabs = useMemo(
+    () => ADMIN_TAB_ORDER.filter((tab) => tab !== "skills" || profile?.permissionGroup === "ADMIN"),
+    [profile],
+  );
   /*
     `?tab=projects` opens the page on that section. The dashboard's Projects card links here,
     and without this it always landed on Users — a card about projects dropping the reader on
@@ -64,7 +77,7 @@ export function AdminPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     const requested = searchParams.get("tab");
-    return ADMIN_TAB_ORDER.find((tab) => tab === requested) ?? "users";
+    return visibleAdminTabs.find((tab) => tab === requested) ?? "users";
   });
 
   const tabParamConsumed = useRef(false);
@@ -91,9 +104,17 @@ export function AdminPage() {
   const [accessSourceFilter, setAccessSourceFilter] = useState<string>(
     DEFAULT_ACCESS_SOURCE_FILTER,
   );
+  // Same reasoning as the filter above: the Skills tab unmounts when you
+  // leave it, so its search/filters live here instead of resetting on every
+  // visit.
+  const [skillSearchValue, setSkillSearchValue] = useState("");
+  const [skillStatusFilter, setSkillStatusFilter] = useState<SkillStatusFilter>("all");
+  const [skillCategoryFilter, setSkillCategoryFilter] = useState("all");
+  const [skillRoleFilter, setSkillRoleFilter] = useState("all");
 
   const [page, setPage] = useState(1);
   const [projectPage, setProjectPage] = useState(1);
+  const [skillPage, setSkillPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
   const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
@@ -138,6 +159,23 @@ export function AdminPage() {
     loadTokenNames,
   } = useAdminData();
 
+  const {
+    skills: skillPool,
+    roles: skillPoolRoles,
+    loadingState: skillPoolLoadingState,
+    errorMessage: skillPoolErrorMessage,
+    loadSkillPool,
+  } = useSkillPool();
+
+  // Lazy, like the tokens section: only fetched once this tab is actually
+  // opened. `loadSkillPool` itself no-ops on repeat calls unless forced, so
+  // switching back to the tab later does not refetch.
+  useEffect(() => {
+    if (activeTab === "skills") {
+      void loadSkillPool();
+    }
+  }, [activeTab, loadSkillPool]);
+
   const availableProjects = useMemo(() => getAvailableProjects(projects), [projects]);
 
   const filteredUsers = useMemo(() => {
@@ -161,6 +199,25 @@ export function AdminPage() {
   const paginatedProjects = useMemo(() => {
     return getPaginatedProjects(filteredProjects, safeProjectPage);
   }, [filteredProjects, safeProjectPage]);
+
+  const skillCategories = useMemo(() => getSkillCategories(skillPool), [skillPool]);
+
+  const filteredSkills = useMemo(() => {
+    return filterSkills(
+      skillPool,
+      skillSearchValue,
+      skillStatusFilter,
+      skillCategoryFilter,
+      skillRoleFilter,
+    );
+  }, [skillPool, skillSearchValue, skillStatusFilter, skillCategoryFilter, skillRoleFilter]);
+
+  const skillTotalPages = getTotalPages(filteredSkills.length);
+  const safeSkillPage = getSafePage(skillPage, skillTotalPages);
+
+  const paginatedSkills = useMemo(() => {
+    return getPaginatedSkills(filteredSkills, safeSkillPage);
+  }, [filteredSkills, safeSkillPage]);
 
   const allVisibleUsersSelected = areAllVisibleUsersSelected(paginatedUsers, selectedUserIds);
 
@@ -452,12 +509,22 @@ export function AdminPage() {
   // Two-finger swipe between the sections, for people who would rather not aim
   // at the bar.
   const swipeRef = useSwipeableTabs<AdminTab, HTMLElement>({
-    order: ADMIN_TAB_ORDER,
+    order: visibleAdminTabs,
     value: activeTab,
     onChange: handleTabChange,
   });
 
   const showInitialLoading = loadingState === "idle" || loadingState === "loading";
+  const isSkillsTabActive = activeTab === "skills";
+
+  const handleRefresh = () => {
+    if (isSkillsTabActive) {
+      void loadSkillPool(true);
+      return;
+    }
+
+    void refreshAdminData();
+  };
 
   return (
     // The swipe listens on the page rather than the panel: needing to be over
@@ -491,16 +558,22 @@ export function AdminPage() {
             box drew a second frame inside the page frame and made the tab bar
             look like it belonged to a widget rather than to the page. */}
         <div className="mb-6 flex items-center gap-3 sm:justify-between">
-          <TabSwitcher activeTab={activeTab} onChange={handleTabChange} />
+          <TabSwitcher activeTab={activeTab} onChange={handleTabChange} tabs={visibleAdminTabs} />
 
           <button
             type="button"
-            onClick={() => void refreshAdminData()}
-            disabled={isRefreshing}
+            onClick={handleRefresh}
+            disabled={isSkillsTabActive ? skillPoolLoadingState === "loading" : isRefreshing}
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Refresh admin data"
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${
+                (isSkillsTabActive ? skillPoolLoadingState === "loading" : isRefreshing)
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
           </button>
         </div>
 
@@ -536,7 +609,7 @@ export function AdminPage() {
           ) : (
             // Only the tab content slides; the loading and error states above
             // are not tabs and would otherwise animate on their way in too.
-            <SlidingTabPanel activeKey={activeTab} index={ADMIN_TAB_ORDER.indexOf(activeTab)}>
+            <SlidingTabPanel activeKey={activeTab} index={visibleAdminTabs.indexOf(activeTab)}>
               {activeTab === "users" ? (
                 <>
                   <AdminUsersToolbar
@@ -597,6 +670,54 @@ export function AdminPage() {
                     safePage={safeProjectPage}
                     totalPages={projectTotalPages}
                     onPageChange={setProjectPage}
+                  />
+                </>
+              ) : activeTab === "skills" ? (
+                <>
+                  <AdminSkillsToolbar
+                    skillCount={filteredSkills.length}
+                    searchValue={skillSearchValue}
+                    statusFilter={skillStatusFilter}
+                    categoryFilter={skillCategoryFilter}
+                    categoryOptions={skillCategories}
+                    roleFilter={skillRoleFilter}
+                    roleOptions={skillPoolRoles}
+                    onSearchChange={(value) => {
+                      setSkillSearchValue(value);
+                      setSkillPage(1);
+                    }}
+                    onStatusFilterChange={(value) => {
+                      setSkillStatusFilter(value);
+                      setSkillPage(1);
+                    }}
+                    onCategoryFilterChange={(value) => {
+                      setSkillCategoryFilter(value);
+                      setSkillPage(1);
+                    }}
+                    onRoleFilterChange={(value) => {
+                      setSkillRoleFilter(value);
+                      setSkillPage(1);
+                    }}
+                    // Wired up once the Skill Details Drawer exists.
+                    onCreateSkill={() => {}}
+                  />
+
+                  <SkillsTab
+                    skills={paginatedSkills}
+                    roles={skillPoolRoles}
+                    loadingState={skillPoolLoadingState}
+                    errorMessage={skillPoolErrorMessage}
+                    hasSearchQuery={skillSearchValue.trim().length > 0}
+                    totalCount={skillPool.length}
+                    // Wired up once the Skill Details Drawer exists.
+                    onOpenSkillDetails={() => {}}
+                    onRetryLoad={() => void loadSkillPool(true)}
+                  />
+
+                  <AdminPagination
+                    safePage={safeSkillPage}
+                    totalPages={skillTotalPages}
+                    onPageChange={setSkillPage}
                   />
                 </>
               ) : (

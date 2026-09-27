@@ -3,15 +3,24 @@ import {
   areAllVisibleUsersSelected,
   filterAdminProjects,
   filterAdminUsers,
+  filterSkills,
   getPaginatedProjects,
+  getPaginatedSkills,
   getPaginatedUsers,
   getSafePage,
+  getSkillCategories,
+  getSkillRoleNames,
   getTotalPages,
   removeUsersFromProjects,
   toggleSelectedUserId,
   toggleVisibleUserSelection,
 } from "../../../../src/features/admin/data";
-import type { AdminUser, ProjectOverview } from "../../../../src/features/admin/types";
+import type {
+  AdminUser,
+  ProjectOverview,
+  ProjectRole,
+  Skill,
+} from "../../../../src/features/admin/types";
 
 const users: AdminUser[] = [
   {
@@ -106,5 +115,63 @@ describe("admin data helpers", () => {
 
     expect(updatedProjects[0].users).toEqual([]);
     expect(projects[0].users).toHaveLength(1);
+  });
+});
+
+describe("skill pool helpers", () => {
+  const roles: ProjectRole[] = [
+    { id: "role-1", name: "Frontend", description: "" },
+    { id: "role-2", name: "Backend", description: "" },
+  ];
+
+  const skills: Skill[] = [
+    {
+      id: "skill-1",
+      name: "React",
+      roleIds: ["role-1"],
+      status: "ACTIVE",
+      category: "Engineering",
+      universal: false,
+    },
+    {
+      id: "skill-2",
+      name: "Kubernetes",
+      roleIds: ["role-2"],
+      status: "RETIRED",
+      category: "Ops",
+      universal: false,
+    },
+    {
+      id: "skill-3",
+      name: "Communication",
+      roleIds: [],
+      status: "ACTIVE",
+      category: null,
+      universal: true,
+    },
+  ];
+
+  it("resolves a skill's role ids to names, dropping ids with no matching role", () => {
+    expect(getSkillRoleNames(skills[0], roles)).toEqual(["Frontend"]);
+    expect(getSkillRoleNames({ ...skills[0], roleIds: ["role-1", "unknown"] }, roles)).toEqual([
+      "Frontend",
+    ]);
+  });
+
+  it("lists every distinct, non-null category alphabetically", () => {
+    expect(getSkillCategories(skills)).toEqual(["Engineering", "Ops"]);
+  });
+
+  it("filters skills by name, status, category and role", () => {
+    expect(filterSkills(skills, "react", "all", "all", "all")).toEqual([skills[0]]);
+    expect(filterSkills(skills, "", "RETIRED", "all", "all")).toEqual([skills[1]]);
+    expect(filterSkills(skills, "", "all", "Ops", "all")).toEqual([skills[1]]);
+    expect(filterSkills(skills, "", "all", "all", "role-1")).toEqual([skills[0]]);
+    expect(filterSkills(skills, "", "all", "all", "all")).toEqual(skills);
+  });
+
+  it("paginates skills by slicing the requested page", () => {
+    expect(getPaginatedSkills(skills, 1, 2)).toEqual([skills[0], skills[1]]);
+    expect(getPaginatedSkills(skills, 2, 2)).toEqual([skills[2]]);
   });
 });

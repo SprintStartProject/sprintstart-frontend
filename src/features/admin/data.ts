@@ -1,10 +1,12 @@
 import type { BadgeVariant } from "../../components/ui/Badge";
 import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
+import type { ProjectRole, Skill } from "../team-management/types";
 import type {
   AdminUser,
   ProjectEditFormState,
   ProjectOverview,
   ProjectSummary,
+  SkillStatusFilter,
   UserEditFormState,
   UserFilter,
 } from "./types";
@@ -258,4 +260,52 @@ export function removeUsersFromProjects(
     ...project,
     users: project.users.filter((user) => !userIdsToRemove.has(user.id)),
   }));
+}
+
+export const SKILL_STATUS_FILTER_OPTIONS: Array<{ value: SkillStatusFilter; label: string }> = [
+  { value: "all", label: "All statuses" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "RETIRED", label: "Retired" },
+];
+
+/** Role names a skill is linked to, in the order `roles` lists them. */
+export function getSkillRoleNames(skill: Skill, roles: ProjectRole[]): string[] {
+  const roleNamesById = new Map(roles.map((role) => [role.id, role.name]));
+
+  return skill.roleIds
+    .map((roleId) => roleNamesById.get(roleId))
+    .filter((name): name is string => Boolean(name));
+}
+
+/** Every distinct category currently in use, alphabetically. */
+export function getSkillCategories(skills: Skill[]): string[] {
+  return Array.from(
+    new Set(skills.flatMap((skill) => (skill.category ? [skill.category] : []))),
+  ).sort((left, right) => left.localeCompare(right));
+}
+
+export function filterSkills(
+  skills: Skill[],
+  searchValue: string,
+  statusFilter: SkillStatusFilter,
+  categoryFilter: string,
+  roleFilter: string,
+): Skill[] {
+  const normalizedSearch = searchValue.trim().toLowerCase();
+
+  return skills.filter((skill) => {
+    const matchesSearch =
+      normalizedSearch.length === 0 || skill.name.toLowerCase().includes(normalizedSearch);
+    const matchesStatus = statusFilter === "all" || skill.status === statusFilter;
+    const matchesCategory = categoryFilter === "all" || skill.category === categoryFilter;
+    const matchesRole = roleFilter === "all" || skill.roleIds.includes(roleFilter);
+
+    return matchesSearch && matchesStatus && matchesCategory && matchesRole;
+  });
+}
+
+export function getPaginatedSkills(skills: Skill[], page: number, pageSize = PAGE_SIZE): Skill[] {
+  const startIndex = (page - 1) * pageSize;
+
+  return skills.slice(startIndex, startIndex + pageSize);
 }
