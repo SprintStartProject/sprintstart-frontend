@@ -144,30 +144,219 @@ describe("BuddyActionProposals", () => {
     expect(screen.queryByTestId("buddy-orientation-card")).not.toBeInTheDocument();
   });
 
-  it("shows the question a flag will send, not just the button", () => {
-    // The button only says that something will be flagged. What lands in the PM's inbox is
-    // the question the buddy composed, and the hire sends it in their name.
-    render(
-      <BuddyActionProposals
-        messageId="m1"
-        actions={[
-          action({
-            action: "flag_to_pm",
-            label: "Flag this to your PM",
-            question: "Who owns the staging database credentials?",
-          }),
-        ]}
-        onConfirm={vi.fn()}
-        onDismiss={vi.fn()}
-      />,
-    );
+  /**
+   * The one proposal whose payload is a message a person reads: the buddy composes the question,
+   * the hire sends it in their own name. So the whole question is on screen — and editable, because
+   * what leaves the product in somebody's name is theirs to word.
+   */
+  describe("a proposed flag to the PM", () => {
+    const flag = (overrides: Partial<ProposedAction> = {}) =>
+      action({
+        action: "flag_to_pm",
+        label: "Flag this to your PM",
+        question: "How do we request staging database credentials?",
+        ...overrides,
+      });
 
-    expect(
-      screen.getByText("Sends to your PM: “Who owns the staging database credentials?”"),
-    ).toBeInTheDocument();
+    it("shows the composed question in an editable field, not just a button", () => {
+      // The button only says that something will be flagged. What lands in the PM's inbox is
+      // the question the buddy composed — shown in full, and in a field, not a caption.
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag()]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByLabelText(/sends to your PM/i)).toHaveValue(
+        "How do we request staging database credentials?",
+      );
+    });
+
+    it("sends the text the hire edited, not the one the buddy composed", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag()]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      const field = screen.getByLabelText(/sends to your PM/i);
+      await userEvent.clear(field);
+      await userEvent.type(field, "Who manages the staging DB secrets?");
+
+      await userEvent.click(screen.getByRole("button", { name: /Flag this to your PM/i }));
+
+      expect(onConfirm).toHaveBeenCalledWith(
+        "m1",
+        expect.objectContaining({
+          action: "flag_to_pm",
+          question: "Who manages the staging DB secrets?",
+        }),
+      );
+    });
+
+    it("sends the composed question untouched when the hire does not edit it", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag()]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /Flag this to your PM/i }));
+
+      expect(onConfirm).toHaveBeenCalledWith(
+        "m1",
+        expect.objectContaining({
+          action: "flag_to_pm",
+          question: "How do we request staging database credentials?",
+        }),
+      );
+    });
+
+    it("sends the question trimmed — what goes out is a message, not a field value", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag()]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      const field = screen.getByLabelText(/sends to your PM/i);
+      await userEvent.clear(field);
+      await userEvent.type(field, "  Who owns the staging box?  ");
+
+      await userEvent.click(screen.getByRole("button", { name: /Flag this to your PM/i }));
+
+      expect(onConfirm.mock.calls[0][1]).toMatchObject({ question: "Who owns the staging box?" });
+    });
+
+    it("cannot be confirmed while the field is empty", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag()]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      await userEvent.clear(screen.getByLabelText(/sends to your PM/i));
+
+      const confirm = screen.getByRole("button", { name: /Flag this to your PM/i });
+      expect(confirm).toBeDisabled();
+      await userEvent.click(confirm);
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it("cannot be confirmed on whitespace alone — a blank flag is not a question", async () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag()]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      const field = screen.getByLabelText(/sends to your PM/i);
+      await userEvent.clear(field);
+      await userEvent.type(field, "   ");
+
+      expect(screen.getByRole("button", { name: /Flag this to your PM/i })).toBeDisabled();
+    });
+
+    it("freezes the field while the flag is on its way", () => {
+      // What is sent is what is on screen. Editing mid-flight is the one way to break that.
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag({ status: "confirming" })]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByLabelText(/sends to your PM/i)).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Flag this to your PM/i })).toBeDisabled();
+    });
+
+    it("declines without flagging anything at all", async () => {
+      const onConfirm = vi.fn();
+      const onDismiss = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag()]}
+          onConfirm={onConfirm}
+          onDismiss={onDismiss}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: /Not now/i }));
+
+      // Declining a hire offer is purely local: no knowledge request, and no confirm.
+      expect(onDismiss).toHaveBeenCalledWith("m1", "a1");
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it("retries a refusal with the text the hire last edited", async () => {
+      const onConfirm = vi.fn();
+      const { rerender } = render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[flag()]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      const field = screen.getByLabelText(/sends to your PM/i);
+      await userEvent.clear(field);
+      await userEvent.type(field, "Updated question?");
+
+      // The backend answered "couldn't": the outcome stays, the offer comes back under it — and
+      // the text it would send is still the text the hire last read, not the original proposal.
+      rerender(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            flag({
+              status: "resolved",
+              ok: false,
+              outcome: "I need the question to flag — tell me what to ask.",
+            }),
+          ]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Try again: Flag this to your PM/i }),
+      );
+
+      expect(onConfirm).toHaveBeenCalledWith(
+        "m1",
+        expect.objectContaining({ question: "Updated question?" }),
+      );
+    });
   });
 
-  it("shows no message line for an action that sends nobody anything", () => {
+  it("grows no field for an action that sends nobody anything", () => {
     render(
       <BuddyActionProposals
         messageId="m1"
@@ -177,7 +366,7 @@ describe("BuddyActionProposals", () => {
       />,
     );
 
-    expect(screen.queryByText(/Sends to your PM/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/sends to your PM/i)).not.toBeInTheDocument();
   });
 
   it("shows the whole skip reason before the hire sends it in their name", () => {

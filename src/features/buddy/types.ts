@@ -88,8 +88,9 @@ export type HireActionProposal = {
   /** The button text ("Work toward this task"). */
   label: string;
   /**
-   * Carried through only for flag-to-PM: the question the buddy composed, and the one that is
-   * actually sent. Shown under the button — see `BuddyActionProposals`.
+   * Carried through only for flag-to-PM: the question the buddy composed. Shown in an editable
+   * field *above* the confirm — this one is a message, so the hire may reword it, and what reaches
+   * the PM is whatever that field held. See `BuddyActionProposals`.
    */
   question?: string;
   /**
