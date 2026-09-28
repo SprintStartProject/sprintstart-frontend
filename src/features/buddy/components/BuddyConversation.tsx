@@ -21,8 +21,6 @@ type BuddyConversationProps = {
   dismissAction: (messageId: string, action: ProposedAction) => void;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
-  /** Rendered above the first message: what came back from the hire's PM. */
-  before?: ReactNode;
   /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
   lastMessageFooter?: ReactNode;
   /** Rendered under each of the hire's own questions, handed that question's text. */
@@ -92,7 +90,6 @@ export function BuddyConversation({
   confirmAction,
   dismissAction,
   placeholder,
-  before,
   lastMessageFooter,
   renderQuestionAction,
   aboveComposer,
@@ -173,7 +170,6 @@ export function BuddyConversation({
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             showNames
-            before={before}
             lastMessageFooter={lastMessageFooter}
             renderQuestionAction={renderQuestionAction}
             openError={openError}

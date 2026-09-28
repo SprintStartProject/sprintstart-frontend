@@ -27,8 +27,6 @@ type BuddyThreadProps = {
   showNames?: boolean;
   /** The dock's narrow layout — see `BuddyMessage`'s `compact`. */
   compact?: boolean;
-  /** Rendered above the first message: what came back from the hire's PM. */
-  before?: ReactNode;
   /**
    * Rendered under the buddy's most recent reply — the greeting's suggested next step.
    */
@@ -248,7 +246,6 @@ function BuddyThreadImpl({
   dismissAction,
   showNames = false,
   compact = false,
-  before,
   lastMessageFooter,
   renderQuestionAction,
   renderReplyAction,
@@ -283,8 +280,6 @@ function BuddyThreadImpl({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      {before}
-
       {/* Above the thread rather than in it: what failed is the whole conversation, so there is
                 nothing below for it to belong to -- and on a first visit there is nothing below at
                 all. `alert`, because it arrives without the hire doing anything. */}
