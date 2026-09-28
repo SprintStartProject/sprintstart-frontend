@@ -254,10 +254,10 @@ describe("CreateProjectWizard", () => {
     await screen.findByText(/Team token - me@example.com/i);
 
     await user.type(
-      screen.getByLabelText("Confluence base URL"),
+      screen.getByLabelText(/^Confluence base URL/),
       "https://acme.atlassian.net/wiki",
     );
-    await user.type(screen.getByLabelText("Space ID"), "123456");
+    await user.type(screen.getByLabelText(/^Space ID/), "123456");
     await user.click(screen.getByRole("button", { name: /add to list/i }));
   }
 
@@ -384,7 +384,7 @@ describe("CreateProjectWizard", () => {
     await settleModalFocus();
 
     await user.type(screen.getByLabelText(/^Name/), "Apollo");
-    await user.type(screen.getByLabelText("Industry"), "Fintech");
+    await user.type(screen.getByLabelText(/^Industry/), "Fintech");
 
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
@@ -424,7 +424,7 @@ describe("CreateProjectWizard", () => {
     expect(await screen.findByText("Not set")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Go to Details" }));
-    await user.type(screen.getByLabelText("Industry"), "Fintech");
+    await user.type(screen.getByLabelText(/^Industry/), "Fintech");
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
@@ -675,12 +675,12 @@ describe("CreateProjectWizard", () => {
     await screen.findByText(/Team token - me@example.com/i);
 
     await user.type(
-      screen.getByLabelText("Confluence base URL"),
+      screen.getByLabelText(/^Confluence base URL/),
       "https://acme.atlassian.net/wiki",
     );
     // "DOCS" is what Confluence's own UI shows, so it is the obvious thing to
     // paste — and the backend would only reject it at provisioning time.
-    await user.type(screen.getByLabelText("Space ID"), "DOCS");
+    await user.type(screen.getByLabelText(/^Space ID/), "DOCS");
 
     expect(screen.getByRole("button", { name: /add to list/i })).toBeDisabled();
   });

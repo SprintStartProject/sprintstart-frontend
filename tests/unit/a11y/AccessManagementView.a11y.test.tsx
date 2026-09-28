@@ -98,7 +98,7 @@ describe("AccessManagementView Accessibility", () => {
     expect(await axe(baseElement)).toHaveNoViolations();
 
     await user.click(screen.getByTestId("access-add-source-github"));
-    expect(await screen.findByLabelText("Token name")).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Token name/)).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 
