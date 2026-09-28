@@ -114,8 +114,11 @@ function BuddyProposalCard({
   // Until they edit, the field holds the question the buddy composed.
   const editedQuestion = actionDrafts[draftKey] ?? (isFlagToPm ? (action.question ?? "") : "");
   /** A flag with nothing in it is not a question — the confirm stays out of reach rather than
-   *  letting the backend answer with a refusal the hire cannot act on. */
-  const canConfirm = !isConfirming && (!isFlagToPm || editedQuestion.trim().length > 0);
+   *  letting the backend answer with a refusal the hire cannot act on. The field says so out
+   *  loud (`error` below): a disabled button is not a reason, and a screen reader gets nothing
+   *  from it. */
+  const hasQuestion = editedQuestion.trim().length > 0;
+  const canConfirm = !isConfirming && (!isFlagToPm || hasQuestion);
 
   /** The card's only way out: the offer's button before it has run, and the very same button after
    *  a refusal. Both come through here, so neither can send a question other than the one on
@@ -124,6 +127,9 @@ function BuddyProposalCard({
     if (isFlagToPm) {
       const question = editedQuestion.trim();
       if (!question) return;
+      // What was sent is what the field now holds; only the trim can differ. A refused retry
+      // has to hand the wording back exactly as the PM would have read it, not padded.
+      if (question !== editedQuestion) setActionDraft(draftKey, question);
       onConfirm(messageId, { ...action, question });
       return;
     }
@@ -301,15 +307,18 @@ function BuddyProposalCard({
         )}
         {/* The one proposal whose payload is a *message*: the buddy composes the question,
                 the hire sends it under their own name, and a person reads it — so it is shown in
-                full, editable, above the button that sends it. Three things follow from that, and
-                all are enforced: what goes out is the field's own text (`handleConfirm`), an empty
-                field cannot be confirmed at all, and the wording is held by the session rather
-                than by this card (`actionDrafts`) — neither a dock the hire closes nor the
-                hand-off to `/buddy` may throw away a half-worded question. */}
+                full, editable, above the button that sends it. Four things follow from that, and
+                all are enforced: what goes out is the field's own text (`handleConfirm`), the field
+                is then made to hold exactly that, an empty field cannot be confirmed and *says why*
+                (`Field`'s `error` — its presence is the error state, and it is announced), and the
+                wording is held by the session rather than by this card (`actionDrafts`) — neither a
+                dock the hire closes nor the hand-off to `/buddy` may throw away a half-worded
+                question. */}
         {isFlagToPm && (
           <Field
             label="Sends to your PM"
             hint="Edit it if it is not quite right — this exact text is what they will read."
+            error={hasQuestion ? undefined : "Write a question before sending."}
             disabled={isConfirming}
           >
             <Textarea

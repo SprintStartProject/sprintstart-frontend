@@ -221,7 +221,15 @@ describe("BuddyActionProposals", () => {
 
     it("sends the question trimmed — what goes out is a message, not a field value", async () => {
       const onConfirm = vi.fn();
-      render(<Proposals actions={[flag()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
+      const onDraftChange = vi.fn();
+      render(
+        <Proposals
+          actions={[flag()]}
+          onConfirm={onConfirm}
+          onDraftChange={onDraftChange}
+          onDismiss={vi.fn()}
+        />,
+      );
 
       const field = screen.getByLabelText(/sends to your PM/i);
       await userEvent.clear(field);
@@ -230,18 +238,34 @@ describe("BuddyActionProposals", () => {
       await userEvent.click(screen.getByRole("button", { name: /Flag this to your PM/i }));
 
       expect(onConfirm.mock.calls[0][1]).toMatchObject({ question: "Who owns the staging box?" });
+      // And the field is handed back what it sent: a retry after a refusal has to show the copy
+      // the PM would have read, not the padded one it was typed with.
+      expect(onDraftChange).toHaveBeenLastCalledWith("m1:a1", "Who owns the staging box?");
+      expect(field).toHaveValue("Who owns the staging box?");
     });
 
-    it("cannot be confirmed while the field is empty", async () => {
+    it("cannot be confirmed while the field is empty — and the field says why", async () => {
       const onConfirm = vi.fn();
       render(<Proposals actions={[flag()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
-      await userEvent.clear(screen.getByLabelText(/sends to your PM/i));
+      const field = screen.getByLabelText(/sends to your PM/i);
+      await userEvent.clear(field);
 
       const confirm = screen.getByRole("button", { name: /Flag this to your PM/i });
       expect(confirm).toBeDisabled();
       await userEvent.click(confirm);
       expect(onConfirm).not.toHaveBeenCalled();
+
+      // A disabled button is not a reason anyone can read. The message is `Field`'s `error` —
+      // announced, with the control marked invalid and described by it — and it appears in
+      // response to the hire's own clearing, not on a field they have not touched.
+      expect(screen.getByRole("alert")).toHaveTextContent("Write a question before sending.");
+      expect(field).toHaveAttribute("aria-invalid", "true");
+
+      // It goes the moment there is a question again.
+      await userEvent.type(field, "Who signs off?");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(confirm).toBeEnabled();
     });
 
     it("cannot be confirmed on whitespace alone — a blank flag is not a question", async () => {

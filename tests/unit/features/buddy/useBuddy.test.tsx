@@ -485,11 +485,43 @@ describe("useBuddy", () => {
         session.setActionDraft(key, "Who owns the staging box?");
       };
 
-      const refused = await confirmOnce(false, record);
-      expect(refused.result.current.actionDrafts[refused.key]).toBe("Who owns the staging box?");
+      // One session, one offer, the way a hire meets it: refused first, then retried and sent.
+      const { result, key } = await confirmOnce(false, record);
+      expect(result.current.actionDrafts[key]).toBe("Who owns the staging box?");
 
-      const accepted = await confirmOnce(true, record);
-      expect(accepted.result.current.actionDrafts).not.toHaveProperty(accepted.key);
+      // The retry is the same offer in the same conversation — the endpoint answers this time.
+      let retries = 0;
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/actions", () => {
+          retries += 1;
+          return HttpResponse.json({ ok: true, message: "Kept." });
+        }),
+      );
+      act(() => {
+        result.current.confirmAction(
+          result.current.messages[1].id,
+          result.current.messages[1].actions![0],
+        );
+      });
+      await waitFor(() => expect(result.current.messages[1].actions?.[0].ok).toBe(true));
+
+      expect(retries).toBe(1);
+      expect(result.current.actionDrafts).not.toHaveProperty(key);
+    });
+
+    /** The same reasoning one transition further: a fresh visit leaves its offers behind. */
+    it("starts a fresh visit without the flag wording of the visit before", async () => {
+      const { result, key } = await confirmOnce(false, (session, key) => {
+        session.setActionDraft(key, "Who owns the staging box?");
+      });
+      expect(result.current.actionDrafts[key]).toBe("Who owns the staging box?");
+
+      await act(async () => {
+        await result.current.startFreshVisit();
+      });
+
+      expect(result.current.messages).toHaveLength(0);
+      expect(result.current.actionDrafts).toEqual({});
     });
   });
 });

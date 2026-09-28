@@ -47,4 +47,12 @@ describe("BuddyActionProposals Accessibility", () => {
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });
+
+  it("has no violations on a flag the hire has emptied out", async () => {
+    // Emptied is an *error* state, not a silent dead button: the message is announced
+    // (`role="alert"`), and the field is marked invalid and described by it.
+    const { baseElement } = renderFlag(flag({ question: "   " }));
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
 });

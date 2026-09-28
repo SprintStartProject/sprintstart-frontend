@@ -432,7 +432,8 @@ export function useBuddyConversation(
    *
    * Nothing is deleted. The whole transcript stays in `buddy_messages`, and the buddy's durable
    * memory note is untouched — it is what the greeting is written from, which is why starting
-   * fresh does not mean starting over. Only the hire's scrollback moves on.
+   * fresh does not mean starting over. Only the hire's scrollback moves on — together with any
+   * flag wording they had half-edited, which belonged to the offers in it.
    */
   const startFreshVisit = useCallback(async () => {
     // The button stays enabled while the greeting is written, so a second click would run a
@@ -447,6 +448,9 @@ export function useBuddyConversation(
     setOpenerAction(null);
     setOpenError(null);
     setDraft("");
+    // Wording the hire had half-edited belongs to the offers that are going with the
+    // transcript — it is not a composer draft and must not outlive them.
+    setActionDrafts({});
     setIsOpening(true);
     try {
       await greet();
@@ -856,9 +860,10 @@ export function useBuddyConversation(
    * The thread on screen always belongs to exactly one conversation, and when the derived
    * target moves — a switch, a restored preference arriving, an involuntary exit — the thread
    * is cleared and the new conversation opens exactly as an untouched visit would: read first,
-   * then greeted. The backend keeps the conversations separate, so reusing the latch would show
-   * one inside the other. Mid-turn the move waits: the busy flags are in the dependency list,
-   * so the effect re-runs the moment the turn ends and applies then.
+   * then greeted. The drafts of the thread it clears go with it, like every other piece of
+   * state that belonged to those offers. The backend keeps the conversations separate, so
+   * reusing the latch would show one inside the other. Mid-turn the move waits: the busy flags
+   * are in the dependency list, so the effect re-runs the moment the turn ends and applies then.
    */
   const openedForRef = useRef<string>("hire");
   useEffect(() => {
@@ -883,6 +888,9 @@ export function useBuddyConversation(
     setOpenerAction(null);
     setOpenError(null);
     setDraft("");
+    // Bound to the offers of the conversation being left, not to the tab: a switch starts
+    // with no wording of its own, like every other piece of session state here.
+    setActionDrafts({});
     setActiveTool(null);
     setIsThinking(false);
     setIsStreaming(false);
