@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { CreateProjectWizard } from "../../../src/features/admin/components/CreateProjectWizard";
@@ -70,6 +70,13 @@ describe("CreateProjectWizard Accessibility", () => {
   beforeEach(() => {
     // Narrowest layout by default — the credential form opens inline. The
     // companion test flips this to a desktop viewport for itself.
+    mockViewport(false);
+  });
+
+  afterEach(() => {
+    // `mockViewport` swaps the global `matchMedia` out without restoring it.
+    // Put the suite default (narrowest) back, so a test added after the
+    // desktop-flipping one cannot inherit the wide viewport by accident.
     mockViewport(false);
   });
 
