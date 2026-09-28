@@ -316,8 +316,15 @@ function BuddyThreadImpl({
           // Resolved here rather than inside the row: only the buddy's latest reply gets it, and
           // only once the thinking bubble is gone — so the offer lands under a finished answer
           // rather than under a promise.
+          // The opener suggestion hangs under the newest reply — unless that reply brought a next
+          // step of its own: a proposal card and a suggestion under one bubble are two competing
+          // offers. (`streamOpenBuddy` has no `action_proposal` case and never writes `actions`,
+          // so a greeting cannot carry a proposal today; this is the line that keeps it that way,
+          // not a fix for a bug you can reach.)
           lastMessageFooter={
-            !isThinking && message.id === lastAssistantId ? lastMessageFooter : undefined
+            !isThinking && message.id === lastAssistantId && !message.actions?.length
+              ? lastMessageFooter
+              : undefined
           }
           onStartFreshVisit={onStartFreshVisit}
           freshVisitShortcut={freshVisitShortcut}
