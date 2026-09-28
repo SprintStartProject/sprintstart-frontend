@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { BuddyActionProposals } from "../../../../src/features/buddy/components/BuddyActionProposals";
+import { BuddyActionProposals as BuddyActionList } from "../../../../src/features/buddy/components/BuddyActionProposals";
 import type { ProposedAction } from "../../../../src/features/buddy/types";
 
 // The card has its own test file; here we only assert *whether* it renders.
@@ -19,17 +20,49 @@ function action(overrides: Partial<ProposedAction> = {}): ProposedAction {
   };
 }
 
+/**
+ * The list as the thread renders it: the draft store comes from the session (`actionDrafts`), not
+ * from the card — which is what keeps the hire's wording across a closed dock and the hand-off to
+ * `/buddy`. These tests hold a store of their own, so one test can seed what another surface would
+ * have left behind, and another can watch where a keystroke goes.
+ */
+function Proposals({
+  actions,
+  onConfirm = vi.fn(),
+  onDismiss = vi.fn(),
+  initialDrafts,
+  onDraftChange,
+}: {
+  actions: ProposedAction[];
+  onConfirm?: (messageId: string, action: ProposedAction) => void;
+  onDismiss?: (messageId: string, actionId: string) => void;
+  /** Wording another surface already put in — as if the hire had typed it there. */
+  initialDrafts?: Record<string, string>;
+  /** Watches the store, for the tests that assert *where* a draft is kept. */
+  onDraftChange?: (key: string, text: string) => void;
+}) {
+  const [drafts, setDrafts] = useState<Record<string, string>>(initialDrafts ?? {});
+  const setActionDraft = (key: string, text: string) => {
+    onDraftChange?.(key, text);
+    setDrafts((current) => ({ ...current, [key]: text }));
+  };
+
+  return (
+    <BuddyActionList
+      messageId="m1"
+      actions={actions}
+      actionDrafts={drafts}
+      setActionDraft={setActionDraft}
+      onConfirm={onConfirm}
+      onDismiss={onDismiss}
+    />
+  );
+}
+
 describe("BuddyActionProposals", () => {
   it("confirms only when the hire clicks — the proposal itself mutates nothing", async () => {
     const onConfirm = vi.fn();
-    render(
-      <BuddyActionProposals
-        messageId="m1"
-        actions={[action()]}
-        onConfirm={onConfirm}
-        onDismiss={vi.fn()}
-      />,
-    );
+    render(<Proposals actions={[action()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
     // Rendering the offer must not fire the action.
     expect(onConfirm).not.toHaveBeenCalled();
@@ -42,14 +75,7 @@ describe("BuddyActionProposals", () => {
   it("declines without mutating", async () => {
     const onDismiss = vi.fn();
     const onConfirm = vi.fn();
-    render(
-      <BuddyActionProposals
-        messageId="m1"
-        actions={[action()]}
-        onConfirm={onConfirm}
-        onDismiss={onDismiss}
-      />,
-    );
+    render(<Proposals actions={[action()]} onConfirm={onConfirm} onDismiss={onDismiss} />);
 
     await userEvent.click(screen.getByRole("button", { name: /Not now/ }));
 
@@ -59,8 +85,7 @@ describe("BuddyActionProposals", () => {
 
   it("shows the outcome line once resolved instead of the buttons", () => {
     render(
-      <BuddyActionProposals
-        messageId="m1"
+      <Proposals
         actions={[
           action({ status: "resolved", ok: true, outcome: "You are now working toward it." }),
         ]}
@@ -75,12 +100,7 @@ describe("BuddyActionProposals", () => {
 
   it("offers a retry on a transport error", () => {
     render(
-      <BuddyActionProposals
-        messageId="m1"
-        actions={[action({ status: "error" })]}
-        onConfirm={vi.fn()}
-        onDismiss={vi.fn()}
-      />,
+      <Proposals actions={[action({ status: "error" })]} onConfirm={vi.fn()} onDismiss={vi.fn()} />,
     );
 
     expect(screen.getByText(/try again/i)).toBeInTheDocument();
@@ -91,8 +111,7 @@ describe("BuddyActionProposals", () => {
   it("renders the orientation packet in the thread once open_orientation resolves", () => {
     // The conversation is the surface now: confirming must not navigate anywhere.
     render(
-      <BuddyActionProposals
-        messageId="m1"
+      <Proposals
         actions={[
           action({
             action: "open_orientation",
@@ -112,8 +131,7 @@ describe("BuddyActionProposals", () => {
 
   it("renders no orientation card for other actions, or when open_orientation could not", () => {
     const { rerender } = render(
-      <BuddyActionProposals
-        messageId="m1"
+      <Proposals
         actions={[
           action({ status: "resolved", ok: true, outcome: "You are now working toward it." }),
         ]}
@@ -125,8 +143,7 @@ describe("BuddyActionProposals", () => {
     expect(screen.queryByTestId("buddy-orientation-card")).not.toBeInTheDocument();
 
     rerender(
-      <BuddyActionProposals
-        messageId="m1"
+      <Proposals
         actions={[
           action({
             action: "open_orientation",
@@ -161,14 +178,7 @@ describe("BuddyActionProposals", () => {
     it("shows the composed question in an editable field, not just a button", () => {
       // The button only says that something will be flagged. What lands in the PM's inbox is
       // the question the buddy composed — shown in full, and in a field, not a caption.
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[flag()]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[flag()]} onConfirm={vi.fn()} onDismiss={vi.fn()} />);
 
       expect(screen.getByLabelText(/sends to your PM/i)).toHaveValue(
         "How do we request staging database credentials?",
@@ -177,14 +187,7 @@ describe("BuddyActionProposals", () => {
 
     it("sends the text the hire edited, not the one the buddy composed", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[flag()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[flag()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       const field = screen.getByLabelText(/sends to your PM/i);
       await userEvent.clear(field);
@@ -203,14 +206,7 @@ describe("BuddyActionProposals", () => {
 
     it("sends the composed question untouched when the hire does not edit it", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[flag()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[flag()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       await userEvent.click(screen.getByRole("button", { name: /Flag this to your PM/i }));
 
@@ -225,14 +221,7 @@ describe("BuddyActionProposals", () => {
 
     it("sends the question trimmed — what goes out is a message, not a field value", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[flag()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[flag()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       const field = screen.getByLabelText(/sends to your PM/i);
       await userEvent.clear(field);
@@ -245,14 +234,7 @@ describe("BuddyActionProposals", () => {
 
     it("cannot be confirmed while the field is empty", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[flag()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[flag()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       await userEvent.clear(screen.getByLabelText(/sends to your PM/i));
 
@@ -263,14 +245,7 @@ describe("BuddyActionProposals", () => {
     });
 
     it("cannot be confirmed on whitespace alone — a blank flag is not a question", async () => {
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[flag()]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[flag()]} onConfirm={vi.fn()} onDismiss={vi.fn()} />);
 
       const field = screen.getByLabelText(/sends to your PM/i);
       await userEvent.clear(field);
@@ -282,8 +257,7 @@ describe("BuddyActionProposals", () => {
     it("freezes the field while the flag is on its way", () => {
       // What is sent is what is on screen. Editing mid-flight is the one way to break that.
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[flag({ status: "confirming" })]}
           onConfirm={vi.fn()}
           onDismiss={vi.fn()}
@@ -297,14 +271,7 @@ describe("BuddyActionProposals", () => {
     it("declines without flagging anything at all", async () => {
       const onConfirm = vi.fn();
       const onDismiss = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[flag()]}
-          onConfirm={onConfirm}
-          onDismiss={onDismiss}
-        />,
-      );
+      render(<Proposals actions={[flag()]} onConfirm={onConfirm} onDismiss={onDismiss} />);
 
       await userEvent.click(screen.getByRole("button", { name: /Not now/i }));
 
@@ -316,23 +283,18 @@ describe("BuddyActionProposals", () => {
     it("retries a refusal with the text the hire last edited", async () => {
       const onConfirm = vi.fn();
       const { rerender } = render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[flag()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
+        <Proposals actions={[flag()]} onConfirm={onConfirm} onDismiss={vi.fn()} />,
       );
 
       const field = screen.getByLabelText(/sends to your PM/i);
       await userEvent.clear(field);
       await userEvent.type(field, "Updated question?");
 
-      // The backend answered "couldn't": the outcome stays, the offer comes back under it — and
-      // the text it would send is still the text the hire last read, not the original proposal.
+      // The backend answered "couldn't": the reason stays, and the card stays under it — field and
+      // all, because a flag that came back unsent is exactly the one whose wording needs another
+      // look. What it would send is still the text the hire last read, never the original proposal.
       rerender(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[
             flag({
               status: "resolved",
@@ -345,21 +307,106 @@ describe("BuddyActionProposals", () => {
         />,
       );
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /Try again: Flag this to your PM/i }),
-      );
+      expect(screen.getByText(/I need the question to flag/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/sends to your PM/i)).toHaveValue("Updated question?");
+
+      await userEvent.click(screen.getByRole("button", { name: /Flag this to your PM/i }));
 
       expect(onConfirm).toHaveBeenCalledWith(
         "m1",
         expect.objectContaining({ question: "Updated question?" }),
       );
     });
+
+    it("keeps the reason on screen while the retry is on its way", () => {
+      // The retry re-runs the confirm. Without this the card would blank the sentence the hire is
+      // acting on the instant they press the button.
+      const { rerender } = render(
+        <Proposals
+          actions={[
+            flag({ status: "resolved", ok: false, outcome: "Could not send that just now." }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      // The card the hire would retry from is still there, with their words in it...
+      expect(screen.getByLabelText(/sends to your PM/i)).toHaveValue(
+        "How do we request staging database credentials?",
+      );
+
+      rerender(
+        <Proposals
+          actions={[
+            flag({ status: "confirming", ok: false, outcome: "Could not send that just now." }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Could not send that just now.")).toBeInTheDocument();
+      // ...frozen on its way out, the way it is on the way in.
+      expect(screen.getByLabelText(/sends to your PM/i)).toBeDisabled();
+    });
+
+    it("cannot retry a refusal with an empty field — a blank flag is not a question", async () => {
+      render(
+        <Proposals
+          actions={[
+            flag({ status: "resolved", ok: false, outcome: "I need the question to flag." }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      await userEvent.clear(screen.getByLabelText(/sends to your PM/i));
+
+      // The button cannot be pressed into a no-op: it says so instead.
+      expect(screen.getByRole("button", { name: /Flag this to your PM/i })).toBeDisabled();
+    });
+
+    it("keeps the hire's wording when the surface they typed it on goes away", () => {
+      // Closing the dock, handing the conversation over to `/buddy`, a route change: the card
+      // unmounts and re-mounts, and the session's store is what carries the words to the next one.
+      render(
+        <Proposals
+          actions={[flag()]}
+          initialDrafts={{ "m1:a1": "Written in the dock" }}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByLabelText(/sends to your PM/i)).toHaveValue("Written in the dock");
+    });
+
+    it("records a keystroke against its message and action, not against the card", async () => {
+      const onDraftChange = vi.fn();
+      render(
+        <Proposals
+          actions={[flag()]}
+          onDraftChange={onDraftChange}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      await userEvent.type(screen.getByLabelText(/sends to your PM/i), "!");
+
+      // Keyed by both halves, so one message's wording can never surface in another's card.
+      expect(onDraftChange).toHaveBeenLastCalledWith(
+        "m1:a1",
+        "How do we request staging database credentials?!",
+      );
+    });
   });
 
   it("grows no field for an action that sends nobody anything", () => {
     render(
-      <BuddyActionProposals
-        messageId="m1"
+      <Proposals
         actions={[action({ action: "claim_goal", label: "Work toward this task", taskId: "t1" })]}
         onConfirm={vi.fn()}
         onDismiss={vi.fn()}
@@ -371,8 +418,7 @@ describe("BuddyActionProposals", () => {
 
   it("shows the whole skip reason before the hire sends it in their name", () => {
     render(
-      <BuddyActionProposals
-        messageId="m1"
+      <Proposals
         actions={[
           action({
             action: "request_skip",
@@ -406,14 +452,7 @@ describe("BuddyActionProposals", () => {
       });
 
     it("shows what would be kept, before it is kept", () => {
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[proposal()]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[proposal()]} onConfirm={vi.fn()} onDismiss={vi.fn()} />);
 
       expect(screen.getByText("Getting started on the skill-gap view")).toBeInTheDocument();
       expect(screen.getByText(/Find the component/)).toBeInTheDocument();
@@ -423,14 +462,7 @@ describe("BuddyActionProposals", () => {
     /** The lines ride back verbatim, so what is kept is what they read. */
     it("hands the lines back on confirm rather than re-deriving them", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[proposal()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[proposal()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       await userEvent.click(screen.getByRole("button", { name: /keep this as a checklist/i }));
 
@@ -442,14 +474,7 @@ describe("BuddyActionProposals", () => {
 
     /** Every other action carries a target, not content — nothing to preview there. */
     it("previews nothing for an action that carries no list", () => {
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[action({})]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[action({})]} onConfirm={vi.fn()} onDismiss={vi.fn()} />);
 
       expect(screen.queryByRole("list")).not.toBeInTheDocument();
     });
@@ -459,8 +484,7 @@ describe("BuddyActionProposals", () => {
   describe("a proposed amendment", () => {
     it("names it as an addition and shows only the new lines", () => {
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[
             action({
               action: "amend_checklist",
@@ -481,8 +505,7 @@ describe("BuddyActionProposals", () => {
     it("carries the card it would be added to back on confirm", async () => {
       const onConfirm = vi.fn();
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[
             action({
               action: "amend_checklist",
@@ -520,14 +543,7 @@ describe("BuddyActionProposals", () => {
       });
 
     it("says it ticks, and never that it adds", () => {
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[ticks()]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[ticks()]} onConfirm={vi.fn()} onDismiss={vi.fn()} />);
 
       expect(screen.getByText(/ticked off on that list/i)).toBeInTheDocument();
       expect(screen.queryByText(/added to the end/i)).not.toBeInTheDocument();
@@ -536,14 +552,7 @@ describe("BuddyActionProposals", () => {
 
     it("carries the card and the lines back on confirm", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[ticks()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[ticks()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       await userEvent.click(screen.getByRole("button", { name: /tick these off/i }));
 
@@ -568,12 +577,7 @@ describe("BuddyActionProposals", () => {
 
     it("marks the old wording as removed and the new one as added", () => {
       const { container } = render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[reword()]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
+        <Proposals actions={[reword()]} onConfirm={vi.fn()} onDismiss={vi.fn()} />,
       );
 
       // The elements carry the meaning; the spoken labels carry it where they are not announced.
@@ -585,14 +589,7 @@ describe("BuddyActionProposals", () => {
 
     it("carries both wordings back on confirm", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[reword()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[reword()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       await userEvent.click(screen.getByRole("button", { name: /reword this line/i }));
 
@@ -605,8 +602,7 @@ describe("BuddyActionProposals", () => {
 
     it("renders no rewording for another action that happens to carry both fields", () => {
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[reword({ action: "amend_checklist", label: "Add these to the list" })]}
           onConfirm={vi.fn()}
           onDismiss={vi.fn()}
@@ -623,8 +619,7 @@ describe("BuddyActionProposals", () => {
   describe("a proposed note", () => {
     it("shows the words that would be kept", () => {
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[
             action({
               action: "place_note",
@@ -657,19 +652,11 @@ describe("BuddyActionProposals", () => {
 
     it("keeps the reason and offers it again under it", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[refused()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[refused()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       expect(screen.getByText(/couldn't put a packet together/i)).toBeInTheDocument();
-      await userEvent.click(
-        screen.getByRole("button", { name: /try again: open the task packet/i }),
-      );
+      // The offer is back under the reason, whole: the same button the hire pressed the first time.
+      await userEvent.click(screen.getByRole("button", { name: /open the task packet/i }));
 
       expect(onConfirm).toHaveBeenCalledTimes(1);
       expect(onConfirm.mock.calls[0][0]).toBe("m1");
@@ -678,8 +665,7 @@ describe("BuddyActionProposals", () => {
     /** Running a confirmed action twice is how somebody claims the same task twice. */
     it("offers nothing again once it worked", () => {
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[action({ status: "resolved", ok: true, outcome: "Task 0 is yours." })]}
           onConfirm={vi.fn()}
           onDismiss={vi.fn()}
@@ -703,14 +689,7 @@ describe("BuddyActionProposals", () => {
     }
 
     it("shows what the manager is agreeing to, and how loud the warning is", () => {
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[storedAction()]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[storedAction()]} onConfirm={vi.fn()} onDismiss={vi.fn()} />);
 
       expect(screen.getByText("Jonas takes Task 0 instead.")).toBeInTheDocument();
       // Colour-blind rule: the risk badge is words next to an icon, never colour alone.
@@ -723,8 +702,7 @@ describe("BuddyActionProposals", () => {
       const onConfirm = vi.fn();
       const onDismiss = vi.fn();
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[storedAction({ risk: null, preview: null })]}
           onConfirm={onConfirm}
           onDismiss={onDismiss}
@@ -745,14 +723,7 @@ describe("BuddyActionProposals", () => {
     });
 
     it("puts the details before the controls and describes the confirm by them", () => {
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[storedAction()]}
-          onConfirm={vi.fn()}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[storedAction()]} onConfirm={vi.fn()} onDismiss={vi.fn()} />);
 
       const preview = screen.getByText("Jonas takes Task 0 instead.");
       const confirm = screen.getByRole("button", { name: /Shift Task 0/ });
@@ -766,8 +737,7 @@ describe("BuddyActionProposals", () => {
 
     it("tones the badge down for a standard change", () => {
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[storedAction({ risk: "STANDARD" })]}
           onConfirm={vi.fn()}
           onDismiss={vi.fn()}
@@ -779,8 +749,7 @@ describe("BuddyActionProposals", () => {
 
     it("scales to bulk changes", () => {
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[storedAction({ risk: "BULK" })]}
           onConfirm={vi.fn()}
           onDismiss={vi.fn()}
@@ -792,14 +761,7 @@ describe("BuddyActionProposals", () => {
 
     it("confirms by id — the click passes the whole stored proposal through", async () => {
       const onConfirm = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[storedAction()]}
-          onConfirm={onConfirm}
-          onDismiss={vi.fn()}
-        />,
-      );
+      render(<Proposals actions={[storedAction()]} onConfirm={onConfirm} onDismiss={vi.fn()} />);
 
       await userEvent.click(screen.getByRole("button", { name: /Shift Task 0/ }));
 
@@ -811,14 +773,7 @@ describe("BuddyActionProposals", () => {
 
     it("dismisses without mutating", async () => {
       const onDismiss = vi.fn();
-      render(
-        <BuddyActionProposals
-          messageId="m1"
-          actions={[storedAction()]}
-          onConfirm={vi.fn()}
-          onDismiss={onDismiss}
-        />,
-      );
+      render(<Proposals actions={[storedAction()]} onConfirm={vi.fn()} onDismiss={onDismiss} />);
 
       await userEvent.click(screen.getByRole("button", { name: /Not now/ }));
 
@@ -828,8 +783,7 @@ describe("BuddyActionProposals", () => {
 
     it("hides the buttons once the outcome is known, whatever it was", () => {
       render(
-        <BuddyActionProposals
-          messageId="m1"
+        <Proposals
           actions={[storedAction({ status: "resolved", ok: false, outcome: "Nothing changed." })]}
           onConfirm={vi.fn()}
           onDismiss={vi.fn()}

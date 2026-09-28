@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import type { BuddyMessageView, ProposedAction } from "../types";
+import type { ActionDrafts } from "../actionDrafts";
 import { toolLabel } from "../toolLabel";
 import { BuddyActionProposals } from "./BuddyActionProposals";
 import { BuddyMarkdown } from "./BuddyMarkdown";
@@ -17,6 +18,10 @@ type BuddyThreadProps = {
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
   dismissAction: (messageId: string, actionId: string) => void;
+  /** The session's wording for offers that carry an editable message — see `actionDrafts`. */
+  actionDrafts: ActionDrafts;
+  /** Records one, so it outlives whichever surface is on screen. */
+  setActionDraft: (key: string, text: string) => void;
   /** Names above the bubbles — on for the page, off in the dock. */
   showNames?: boolean;
   /** The dock's narrow layout — see `BuddyMessage`'s `compact`. */
@@ -93,6 +98,8 @@ export function BuddyThread({
   activeTool,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   showNames = false,
   compact = false,
   before,
@@ -197,6 +204,8 @@ export function BuddyThread({
                     <BuddyActionProposals
                       messageId={message.id}
                       actions={message.actions ?? []}
+                      actionDrafts={actionDrafts}
+                      setActionDraft={setActionDraft}
                       onConfirm={confirmAction}
                       onDismiss={dismissAction}
                     />

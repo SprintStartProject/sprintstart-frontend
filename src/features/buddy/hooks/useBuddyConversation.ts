@@ -9,6 +9,8 @@ import {
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
 import { announceBuddyPathChanged } from "../aiBuddyBus";
+import { actionDraftKey } from "../actionDrafts";
+import type { ActionDrafts } from "../actionDrafts";
 import { BUDDY_PATH_ACTIONS } from "../types";
 import { useAuth } from "../../../context/useAuth";
 import type { ActionPatch, BuddyMessageView, ProposedAction } from "../types";
@@ -105,6 +107,15 @@ export function useBuddyConversation(
   // failed, which carries its own reason. Nothing is on screen to hang that on, so it is state.
   const [openError, setOpenError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  /**
+   * The hire's wording for the proposals that carry an editable message — a flag's question, the
+   * only payload a person reads and the hire therefore rewords (see `actionDrafts` for the key).
+   *
+   * Session state rather than card state, for the same reason the composer's draft is: the dock
+   * unmounts when it closes, the full page mounts a second card for the same action, and either
+   * one would otherwise throw away words the hire was halfway through.
+   */
+  const [actionDrafts, setActionDrafts] = useState<ActionDrafts>({});
   /**
    * The last greeting a surface has actually put in front of the hire — either watched while it
    * streamed, or revealed by `useGreetingReveal`. Held here, not per surface, so a greeting the
@@ -639,6 +650,29 @@ export function useBuddyConversation(
   const inFlightRef = useRef<Set<string>>(new Set());
 
   /**
+   * Records what the hire typed into a proposal's field, so it survives a closed dock, a handed-
+   * over conversation and the retry a refusal offers — see `actionDrafts` for why it is session
+   * state and not the card's own.
+   */
+  const setActionDraft = useCallback((key: string, text: string) => {
+    setActionDrafts((current) => ({ ...current, [key]: text }));
+  }, []);
+
+  /**
+   * Forgets a draft whose proposal is done with — it was sent, or the hire declined it. Nothing
+   * is left to edit, and a card re-rendered later must not offer wording that has already left
+   * the product.
+   */
+  const clearActionDraft = useCallback((key: string) => {
+    setActionDrafts((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  /**
    * Confirms a proposed action: the one call that mutates. Reflects the outcome inline — a
    * legible line whether it changed something (`ok`) or legibly couldn't, or a retryable error
    * if the request itself failed.
@@ -716,6 +750,9 @@ export function useBuddyConversation(
             ok: result.ok,
             outcome: result.message,
           });
+          // It went out: the wording has left the product, so the session keeps none of it. A
+          // refusal keeps it — that card is about to be handed the hire's text back to correct.
+          if (result.ok) clearActionDraft(actionDraftKey(messageId, action.id));
           // A path action just moved something on a page that may be open behind this dock. Told
           // rather than polled, and only on success: a refused confirm changed nothing to refresh.
           if (result.ok && "action" in action && BUDDY_PATH_ACTIONS.includes(action.action)) {
@@ -744,7 +781,7 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, patchAction],
+    [beginDecision, endDecision, patchAction, clearActionDraft],
   );
 
   /**
@@ -764,6 +801,9 @@ export function useBuddyConversation(
       // Unknown action: nothing to decline at the backend, but still worth putting away here.
       if (!action || !("proposalId" in action)) {
         patchAction(messageId, actionId, { status: "dismissed" });
+        // A hire offer is the only kind that carries a draft, and this is the only place one is
+        // declined — the wording goes with the offer it belonged to.
+        clearActionDraft(actionDraftKey(messageId, actionId));
         return;
       }
 
@@ -809,7 +849,7 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, messages, patchAction],
+    [beginDecision, endDecision, messages, patchAction, clearActionDraft],
   );
 
   /**
@@ -926,6 +966,10 @@ export function useBuddyConversation(
 
     draft,
     setDraft,
+    // The same idea for the fields a proposal carries: a flag's question is the hire's to word,
+    // and the session is what keeps that wording across a closed dock and a handed-over page.
+    actionDrafts,
+    setActionDraft,
     sendMessage,
     handleSubmit,
     confirmAction,

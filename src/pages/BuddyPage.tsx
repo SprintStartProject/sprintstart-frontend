@@ -174,6 +174,8 @@ function BuddyMentorHome() {
     handleSubmit,
     confirmAction,
     dismissAction,
+    actionDrafts,
+    setActionDraft,
     openError,
     ensureOpened,
     retryOpen,
@@ -371,6 +373,8 @@ function BuddyMentorHome() {
         handleSubmit={handleSubmit}
         confirmAction={confirmAction}
         dismissAction={dismissAction}
+        actionDrafts={actionDrafts}
+        setActionDraft={setActionDraft}
         // Escalating hangs off the hire's own question now, not off the buddy's answer — see
         // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered
         // where a messenger offers a quick reply: right under the message that suggested it. It

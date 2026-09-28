@@ -52,6 +52,8 @@ function renderDock(
       handleSubmit={vi.fn()}
       confirmAction={vi.fn()}
       dismissAction={vi.fn()}
+      actionDrafts={{}}
+      setActionDraft={vi.fn()}
       suggestions={suggestions}
       startFreshVisit={startFreshVisit}
       isGreeting={false}

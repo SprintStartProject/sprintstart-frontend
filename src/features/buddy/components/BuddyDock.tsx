@@ -46,6 +46,8 @@ type BuddyDockProps = Pick<
   | "handleSubmit"
   | "confirmAction"
   | "dismissAction"
+  | "actionDrafts"
+  | "setActionDraft"
   | "suggestions"
   | "startFreshVisit"
   | "isGreeting"
@@ -130,6 +132,8 @@ export function BuddyDock({
   handleSubmit,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   suggestions,
   startFreshVisit,
   isGreeting,
@@ -327,6 +331,8 @@ export function BuddyDock({
             lastMessageFooter={lastMessageFooter}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
+            actionDrafts={actionDrafts}
+            setActionDraft={setActionDraft}
             // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
             // team-mode conversation is not one — the offer must not even render there.
             renderQuestionAction={(question) =>

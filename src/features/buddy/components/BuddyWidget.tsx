@@ -71,6 +71,8 @@ export function BuddyWidget() {
     handleSubmit,
     confirmAction,
     dismissAction,
+    actionDrafts,
+    setActionDraft,
     suggestions,
     openError,
     retryOpen,
@@ -304,6 +306,8 @@ export function BuddyWidget() {
             handleSubmit={handleSubmit}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
+            actionDrafts={actionDrafts}
+            setActionDraft={setActionDraft}
             suggestions={suggestions}
             startFreshVisit={startFreshVisit}
             isGreeting={isGreeting}
