@@ -22,7 +22,7 @@ type BuddyThreadProps = {
   /** Confirms a buddy-proposed action (the only path that mutates). */
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
-  dismissAction: (messageId: string, actionId: string) => void;
+  dismissAction: (messageId: string, action: ProposedAction) => void;
   /** Names above the bubbles — on for the page, off in the dock. */
   showNames?: boolean;
   /** The dock's narrow layout — see `BuddyMessage`'s `compact`. */
@@ -102,7 +102,7 @@ type BuddyThreadRowProps = {
   showNames: boolean;
   compact: boolean;
   confirmAction: (messageId: string, action: ProposedAction) => void;
-  dismissAction: (messageId: string, actionId: string) => void;
+  dismissAction: (messageId: string, action: ProposedAction) => void;
   renderQuestionAction?: (question: string) => ReactNode;
   renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
   /** The greeting's suggested next step — present on the row it hangs under, nowhere else. */

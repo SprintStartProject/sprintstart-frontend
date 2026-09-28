@@ -18,7 +18,7 @@ type BuddyConversationProps = {
   /** Confirms a buddy-proposed action (the only path that mutates). */
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
-  dismissAction: (messageId: string, actionId: string) => void;
+  dismissAction: (messageId: string, action: ProposedAction) => void;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
   /** Rendered above the first message: what came back from the hire's PM. */

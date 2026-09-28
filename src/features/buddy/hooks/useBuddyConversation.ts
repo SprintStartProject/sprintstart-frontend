@@ -787,21 +787,12 @@ export function useBuddyConversation(
   );
 
   /**
-   * The transcript as of the last render, for `dismissAction` to read.
-   *
-   * A dismissal has to find the *action object* (a stored proposal is declined by id at the
-   * backend, and only the object says which kind it is), but reading it from `messages` state
-   * would rebuild this callback every time a token lands — and every memoised row would then
-   * re-render for a token that belongs to one of them. A click always happens after the render
-   * that recorded it, so the ref is never behind what is on screen.
-   */
-  const messagesRef = useRef(messages);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  /**
    * Declines a proposed action — nothing changes; the conversation simply continues.
+   *
+   * The action itself arrives from the card that drew it, the way `confirmAction`'s does. It used
+   * to arrive as an id and be looked up in the transcript, which is what forced a
+   * `messagesRef` to keep this callback's identity stable — the callback now depends on nothing
+   * that a token can change, and the lookup (and its staleness question) is gone with it.
    *
    * A stored proposal is declined *at the backend* rather than only on screen, because it may
    * also be sitting in another tab waiting to be confirmed: dismissal closes that door too, and
@@ -809,13 +800,12 @@ export function useBuddyConversation(
    * backend — declining is purely local, as it has always been.
    */
   const dismissAction = useCallback(
-    (messageId: string, actionId: string) => {
-      const action = messagesRef.current
-        .find((m) => m.id === messageId)
-        ?.actions?.find((a) => a.id === actionId);
+    (messageId: string, action: ProposedAction) => {
+      const actionId = action.id;
 
-      // Unknown action: nothing to decline at the backend, but still worth putting away here.
-      if (!action || !("proposalId" in action)) {
+      // A hire offer, or one that arrived without its details: nothing to decline at the backend,
+      // but still worth putting away here.
+      if (!("proposalId" in action)) {
         patchAction(messageId, actionId, { status: "dismissed" });
         return;
       }
