@@ -38,6 +38,11 @@ type ProjectAnalysisDialogProps = {
   options: AnalysisOptions;
   onOptionsChange: (options: AnalysisOptions) => void;
   onStart: () => void;
+  /**
+   * "Run again" on the results: back to the choice of what to refresh, the same step a first run
+   * starts on — not straight into a run with whatever was ticked last time.
+   */
+  onRunAgain: () => void;
   /** Opens where a finding can be acted on; the dialog closes first. */
   onOpenFinding: (to: string) => void;
 };
@@ -94,10 +99,10 @@ function Results({
   previousRun,
   projectName,
   onOpenFinding,
-  onStart,
+  onRunAgain,
 }: Pick<
   ProjectAnalysisDialogProps,
-  "findings" | "resultsAt" | "previousRun" | "projectName" | "onOpenFinding" | "onStart"
+  "findings" | "resultsAt" | "previousRun" | "projectName" | "onOpenFinding" | "onRunAgain"
 > & { score: number }) {
   // Nothing chosen shows everything at once; an area narrows it.
   const [selected, setSelected] = useState<MapSelection>(null);
@@ -129,7 +134,7 @@ function Results({
         findings={findings}
         analysedAt={resultsAt}
         previous={previousRun ? { at: previousRun.at, score: previousRun.score } : null}
-        onRunAgain={onStart}
+        onRunAgain={onRunAgain}
       />
     </div>
   );
@@ -161,6 +166,7 @@ export function ProjectAnalysisDialog({
   options,
   onOptionsChange,
   onStart,
+  onRunAgain,
   onOpenFinding,
 }: ProjectAnalysisDialogProps) {
   const running = phase === "running";
@@ -216,7 +222,7 @@ export function ProjectAnalysisDialog({
               previousRun={previousRun}
               projectName={projectName}
               onOpenFinding={onOpenFinding}
-              onStart={onStart}
+              onRunAgain={onRunAgain}
             />
           </motion.div>
         ) : (

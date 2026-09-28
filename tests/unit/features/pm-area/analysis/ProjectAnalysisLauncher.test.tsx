@@ -181,6 +181,21 @@ describe("ProjectAnalysisLauncher", () => {
     expect(health.getByText(/means nothing is open/)).toBeInTheDocument();
   }, 20000);
 
+  it("asks what to refresh again before running again", async () => {
+    const user = userEvent.setup();
+    renderLauncher();
+
+    await runAnalysis(user);
+    expect(mocks.refreshKnowledgeGaps).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: /Run again/ }));
+
+    // The same first step as the strip's button: the options and a start button, no run yet.
+    expect(await screen.findByLabelText(/Rescan knowledge gaps/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Start analysis/ })).toBeInTheDocument();
+    expect(mocks.refreshKnowledgeGaps).toHaveBeenCalledTimes(1);
+  }, 20000);
+
   it("never re-evaluates an industry somebody set by hand", async () => {
     mocks.industryCustom = true;
     const user = userEvent.setup();

@@ -154,6 +154,8 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
         options={options}
         onOptionsChange={setOptions}
         onStart={start}
+        // Back to the options, as the strip's own button does -- the dialog stays open.
+        onRunAgain={analysis.reset}
         onOpenFinding={(to) => {
           setIsOpen(false);
           void navigate(to);
