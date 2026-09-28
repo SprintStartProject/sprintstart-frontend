@@ -547,14 +547,14 @@ export function buildFindings(input: AnalysisInput): Finding[] {
 }
 
 /** What the worst open finding of an area costs the score. Good news costs nothing. */
-const AREA_PENALTY: Record<FindingSeverity, number> = {
+export const AREA_PENALTY: Record<FindingSeverity, number> = {
   critical: 12,
   warning: 6,
   info: 2,
   good: 0,
 };
 /** What every further open finding in the same area adds on top. */
-const EXTRA_PENALTY = 1;
+export const EXTRA_PENALTY = 1;
 
 /**
  * A 0–100 reading of how much the project needs its manager right now: 100 is nothing open.
