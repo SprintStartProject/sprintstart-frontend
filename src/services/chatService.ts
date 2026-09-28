@@ -79,6 +79,12 @@ export async function cancelMessage(chatId: string) {
   });
 }
 
+export async function deleteMessage(messageId: string) {
+  await apiClient.fetch<void>(`/api/v1/chats/messages/me/${messageId}`, {
+    method: "DELETE",
+  });
+}
+
 /**
  * Discriminated union for SSE events returned by the backend when sending a
  * prompt. Each variant carries exactly the fields its `type` needs, so the

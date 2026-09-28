@@ -108,6 +108,12 @@ export type ChatContextValue = {
    * Stops the active chat stream, marking the user prompt as canceled. Called by the "Stop" button in the chat UI.
    */
   cancelActiveMessage: () => Promise<void>
+
+  /**
+   * Stops the active chat stream, deletes the corresponding user prompt and copies its content back into the input
+   * field.
+   */
+  cancelAndEditActiveMessage: () => Promise<string | undefined>;
 };
 
 export const ChatContext = createContext<ChatContextValue | undefined>(undefined);

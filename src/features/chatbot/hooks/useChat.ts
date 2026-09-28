@@ -143,6 +143,7 @@ export function useChat() {
     stopStreaming,
     deleteChat: ctxDeleteChat,
     cancelActiveMessage: ctxCancelActiveMessage,
+    cancelAndEditActiveMessage: ctxCancelAndEditActiveMessage,
   } = ctx;
 
   /**
@@ -407,6 +408,20 @@ export function useChat() {
       ctxCancelActiveMessage
   ]);
 
+  const cancelAndEditActiveMessage = useCallback(async () => {
+    if (!isActiveChatStreaming) return;
+
+    const text = await ctxCancelAndEditActiveMessage();
+
+    if (text) {
+      setNewRequest(text);
+    }
+  }, [
+    isActiveChatStreaming,
+    ctxCancelAndEditActiveMessage,
+    setNewRequest
+  ]);
+
   return {
     chats: sortedChats,
     chatId,
@@ -423,6 +438,7 @@ export function useChat() {
     stopStreaming: stopActiveStream,
     deleteChat,
     cancelActiveMessage,
+    cancelAndEditActiveMessage,
 
     newRequest,
     setNewRequest,

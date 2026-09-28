@@ -7,6 +7,7 @@ import {
   getMessages,
   streamMessage,
   cancelMessage,
+  deleteMessage
 } from "../services/chatService";
 import { useAuth } from "./useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
@@ -759,6 +760,47 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     markAsCanceled,
   ]);
 
+  /**
+   * Stops the active chat stream, deletes the corresponding user prompt and copies its content back into the input
+   * field.
+   */
+  const cancelAndEditActiveMessage = useCallback(async () => {
+    const stopped = draftRef.current;
+
+    if (!stopped) return;
+
+    const chatId = stopped.chatId;
+    const userMessages = await getMessages(chatId)
+
+    const userMessage = userMessages
+      .messages
+      .filter(
+          (message) => message.role === "USER"
+      )
+      .at(-1)
+
+    if (!userMessage) return;
+
+    const { id, content } = userMessage;
+
+    stopStreaming();
+
+    await deleteMessage(id);
+
+    setMessagesByChat((prev) => ({
+      ...prev,
+      [chatId]: (prev[chatId] ?? []).filter(
+          (message) =>
+              message.id !== stopped.assistantId &&
+              message.id !== id,
+      ),
+    }));
+
+    return content;
+  }, [
+    stopStreaming,
+  ]);
+
   const value: ChatContextValue = {
     chats,
     sortedChats,
@@ -790,6 +832,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     refreshChats,
     deleteChat,
     cancelActiveMessage,
+    cancelAndEditActiveMessage,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

@@ -1,4 +1,4 @@
-import { Check, Filter, Send, Square, X } from "lucide-react";
+import {Check, Filter, Pencil, Send, Square, X} from "lucide-react";
 import { useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { SOURCE_META } from "../../data-ingestion/data";
@@ -13,6 +13,8 @@ type ChatComposerProps = {
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   /** Stop the in-flight stream. */
   onStop: () => Promise<void>;
+  /** Stops the in-flight stream and copies the prompt content back into the input field. */
+  onStopAndEdit: () => Promise<void>;
   /** True while the assistant is thinking or streaming. */
   isBusy: boolean;
   /**
@@ -60,6 +62,7 @@ export function ChatComposer({
   onChange,
   onSubmit,
   onStop,
+  onStopAndEdit,
   isBusy,
   hasProject,
   promptHistory,
@@ -346,17 +349,31 @@ export function ChatComposer({
         />
 
         {isBusy ? (
-          <button
-            type="button"
-            aria-label="Stop generation"
-            data-testid="chat-stop-button"
-            onClick={() => {
-              void onStop();
-            }}
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-app-danger-border bg-app-danger-solid text-white transition-colors hover:opacity-90"
-          >
-            <Square size={16} className="fill-current" />
-          </button>
+            <div className="flex shrink-0 gap-1">
+              <button
+                  type="button"
+                  aria-label="Stop generation and edit prompt"
+                  data-testid="chat-stop-edit-button"
+                  onClick={() => {
+                    void onStopAndEdit();
+                  }}
+                  className="flex size-9 items-center justify-center rounded-xl border border-app-danger-border bg-app-danger-solid text-white transition-colors hover:opacity-90"
+              >
+                <Pencil size={16} />
+              </button>
+
+              <button
+                  type="button"
+                  aria-label="Stop generation"
+                  data-testid="chat-stop-button"
+                  onClick={() => {
+                    void onStop();
+                  }}
+                  className="flex size-9 items-center justify-center rounded-xl border border-app-danger-border bg-app-danger-solid text-white transition-colors hover:opacity-90"
+              >
+                <Square size={16} className="fill-current" />
+              </button>
+            </div>
         ) : (
           <button
             type="submit"
