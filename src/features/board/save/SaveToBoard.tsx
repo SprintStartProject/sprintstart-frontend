@@ -4,6 +4,7 @@ import { Button, type ButtonSize } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin, type CardOrigin } from "../layout/cardOrigins";
 import type { AuthoredCardRequest } from "../types";
 
@@ -76,6 +77,7 @@ export function SaveToBoard({
 }: SaveToBoardProps) {
   const { selectedProjectId } = useProjectContext();
   const toast = useToast();
+  const invalidateBoard = useInvalidateBoard(selectedProjectId);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -89,6 +91,9 @@ export function SaveToBoard({
     setSaving(true);
     try {
       const created = await boardService.addCard(selectedProjectId, card);
+
+      // This button is often pressed far away from the board — see `useInvalidateBoard`.
+      invalidateBoard();
 
       const where = origin?.();
       // Never allowed to fail the save: the card is what was asked for, the trail back is extra.

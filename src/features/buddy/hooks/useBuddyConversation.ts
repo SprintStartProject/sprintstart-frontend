@@ -12,6 +12,15 @@ import {
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
 import { useAuth } from "../../../context/useAuth";
+import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
+import {
+  BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_CLAIM_GOAL,
+  BUDDY_ACTION_PLACE_CHECKLIST,
+  BUDDY_ACTION_PLACE_NOTE,
+  BUDDY_ACTION_REWORD_CHECKLIST,
+  BUDDY_ACTION_TICK_CHECKLIST,
+} from "../types";
 import type { ActionPatch, BuddyMessageView, ProposedAction } from "../types";
 
 /**
@@ -43,6 +52,29 @@ const PROPOSAL_GONE = "This proposal is no longer available.";
 function isNotFound(e: unknown): boolean {
   return e instanceof Error && "status" in e && (e as { status: number }).status === 404;
 }
+
+/**
+ * The hire-confirmed buddy actions that write to the board, by their wire names: the five
+ * `BuddyBoardWriteActions` handles (placing, amending, ticking and rewording a checklist, and
+ * the note), plus `claim_goal`, which pins the claimed task as the board's CURRENT_TASK card —
+ * its own outcome line says so ("It's on your board too"). Every other confirm changes something
+ * else — a task claim, an attestation request, a flag, a username — and needs no board sync.
+ */
+const BUDDY_BOARD_ACTIONS = new Set<string>([
+  BUDDY_ACTION_PLACE_CHECKLIST,
+  BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_TICK_CHECKLIST,
+  BUDDY_ACTION_REWORD_CHECKLIST,
+  BUDDY_ACTION_PLACE_NOTE,
+  BUDDY_ACTION_CLAIM_GOAL,
+]);
+
+/**
+ * The mid-answer tool that puts a card on the board. `place_card` is deliberately not a confirmed
+ * action — it applies the moment the mentor runs it — so a turn that ran it is the only signal
+ * the client ever gets that the board moved. Acted on by `sendMessage` when the turn ends.
+ */
+const BUDDY_BOARD_TOOLS = new Set<string>(["place_card"]);
 
 /**
  * Where "is the buddy in team mode" lives between reloads — scoped to the signed-in user, the
@@ -87,6 +119,7 @@ export function useBuddyConversation(
   const [messages, setMessages] = useState<BuddyMessageView[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const invalidateBoard = useInvalidateBoard();
   // The tool the buddy is running right now, if any -- drives "Checking your progress…"
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -557,12 +590,27 @@ export function useBuddyConversation(
       // Once the hire says anything, the opener's one-click suggestion has served its purpose.
       setOpenerAction(null);
 
+      // Whether this turn ran a tool that puts a card on the board. A property rather than a
+      // `let`, so the reads below see the writes made in the stream callbacks — see `greet`.
+      const touched = { board: false };
+
+      /**
+       * `place_card` is the one board write that is not confirmed: its `tool_use` event is the
+       * whole signal the client gets, and it cannot say whether the tool wrote a card or was
+       * refused. So the board is marked stale when the turn ends — the failing paths included.
+       * See `useInvalidateBoard` for why the mark is what makes this visible.
+       */
+      const syncBoardIfTouched = () => {
+        if (touched.board) invalidateBoard();
+      };
+
       try {
         await streamMessage(
           text,
           {
             onToolUse: (name) => {
               setActiveTool(name);
+              if (BUDDY_BOARD_TOOLS.has(name)) touched.board = true;
             },
 
             onToken: (token) => {
@@ -655,15 +703,20 @@ export function useBuddyConversation(
           // Read at call time: a turn speaks to whichever conversation is current when it starts.
           teamProjectIdRef.current ?? undefined,
         );
+
+        // The turn is over — the first moment a card placed mid-answer is certainly on the board.
+        syncBoardIfTouched();
       } catch (e) {
         console.error(e);
         setIsStreaming(false);
         setIsThinking(false);
         setActiveTool(null);
         failReply(assistantId);
+        // Same reason as above: a turn that placed a card and then broke still wrote it.
+        syncBoardIfTouched();
       }
     },
-    [failReply],
+    [failReply, invalidateBoard],
   );
 
   /** Patches one proposed action in place, keyed by its message and action id. */
@@ -752,6 +805,13 @@ export function useBuddyConversation(
             ok: result.ok,
             outcome: result.message,
           });
+
+          // `board.all()`, not a project key: the backend re-resolves the project server-side
+          // (the caller's single onboarding project) and never tells the client which board —
+          // see `useInvalidateBoard`.
+          if (result.ok && "action" in action && BUDDY_BOARD_ACTIONS.has(action.action)) {
+            invalidateBoard();
+          }
         } catch (e) {
           console.error(e);
           // A settled proposal does NOT come back 404 — the backend answers 200 with ok: false
@@ -775,7 +835,7 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, patchAction],
+    [beginDecision, endDecision, patchAction, invalidateBoard],
   );
 
   /**
