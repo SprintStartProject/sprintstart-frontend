@@ -656,4 +656,8 @@ export const handlers = [
   http.get("/api/v1/connectors/confluence/sources", () =>
     HttpResponse.json({ connectorId: "confluence", sources: [] }),
   ),
+  // Every surface that opens the buddy dock asks for its suggestion chips. A default empty list
+  // keeps that request handled for the many tests that open the dock without being about the
+  // chips; `useBuddySuggestions`' own suite mocks the service directly and never sees this.
+  http.get("/api/v1/onboarding/me/buddy/suggestions", () => HttpResponse.json([])),
 ];

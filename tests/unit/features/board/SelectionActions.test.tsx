@@ -126,6 +126,24 @@ describe("SelectionActions", () => {
     );
   });
 
+  /** The other half of the stale-marking rule: a write that never landed must not cost the board. */
+  it("leaves the board alone when the write failed", async () => {
+    vi.spyOn(boardService, "addCard").mockRejectedValue(new Error("nope"));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(queryKeys.board.byProject("p1"), {
+      boardId: "b1",
+      projectId: "p1",
+      cards: [],
+    });
+    renderToolbar({ client });
+    highlight("Run the migration first.");
+
+    await userEvent.click(await screen.findByRole("button", { name: /add to board/i }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(client.getQueryState(queryKeys.board.byProject("p1"))?.isInvalidated).toBe(false);
+  });
+
   /**
    * Being pulled to the board to confirm something landed is the interruption this feature exists
    * to avoid. The toast carries the way there for whoever wants it.

@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
 import { BuddyProviderWithStubs } from "./buddyTestHarness";
 import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 import { queryKeys } from "../../../../src/services/queryKeys";
 
@@ -542,21 +542,49 @@ describe("useBuddy", () => {
       '{"type":"action_proposal","action":"place_checklist","label":"Keep this as a checklist",' +
       '"checklist_title":"Getting started","checklist_items":["Run it locally","Open a PR"]}';
 
-    it("marks the board stale when a confirmed action wrote a card", async () => {
-      const { client } = await confirmProposal(PLACE_CHECKLIST, { ok: true, message: "Kept." });
-
-      expect(boardIsStale(client)).toBe(true);
-    });
-
-    /** `claim_goal` writes twice: the claim, and the CURRENT_TASK card it pins on the board. */
-    it("marks the board stale when claim_goal pins a task card", async () => {
-      const { client } = await confirmProposal(
+    /**
+     * Every confirmed action that writes to the board, by its wire name: the five board-write
+     * handles plus `claim_goal`, which writes twice — the claim, and the CURRENT_TASK card it
+     * pins ("it's on your board too"). A table beats six near-identical tests drifting apart one
+     * rename at a time.
+     */
+    const BOARD_WRITING_PROPOSALS: [string, string][] = [
+      ["place_checklist", PLACE_CHECKLIST],
+      [
+        "amend_checklist",
+        '{"type":"action_proposal","action":"amend_checklist","label":"Add that step",' +
+          '"card_id":"c-1","checklist_title":"Getting started",' +
+          '"checklist_items":["Run it locally","Open a PR","Ping the PM"]}',
+      ],
+      [
+        "tick_checklist_items",
+        '{"type":"action_proposal","action":"tick_checklist_items","label":"Tick those off",' +
+          '"card_id":"c-1","checklist_items":["Run it locally"]}',
+      ],
+      [
+        "reword_checklist_item",
+        '{"type":"action_proposal","action":"reword_checklist_item","label":"Reword that step",' +
+          '"card_id":"c-1","line_before":"Run it locally","line_after":"Run the app locally"}',
+      ],
+      [
+        "place_note",
+        '{"type":"action_proposal","action":"place_note","label":"Keep this as a note",' +
+          '"note_text":"Deploys need the VPN."}',
+      ],
+      [
+        "claim_goal",
         '{"type":"action_proposal","action":"claim_goal","label":"Work toward this task","task_id":"t-1"}',
-        { ok: true, message: "You're now working toward it." },
-      );
+      ],
+    ];
 
-      expect(boardIsStale(client)).toBe(true);
-    });
+    it.each(BOARD_WRITING_PROPOSALS)(
+      "marks the board stale when a confirmed %s wrote a card",
+      async (_action, proposal) => {
+        const { client } = await confirmProposal(proposal, { ok: true, message: "Done." });
+
+        expect(boardIsStale(client)).toBe(true);
+      },
+    );
 
     it("leaves the board alone when the action changed nothing", async () => {
       const { client } = await confirmProposal(PLACE_CHECKLIST, {
@@ -576,13 +604,14 @@ describe("useBuddy", () => {
       expect(boardIsStale(client)).toBe(false);
     });
 
-    /** Runs a full turn — open, ask, answer — with the given stream events. */
-    async function completeTurn(events: string[]) {
+    /** Opens the session; each question asked answers with the next entry of `answers`. */
+    async function openSession(answers: string[][]) {
       const { client, Wrapper } = boardContext();
+      let answered = 0;
       server.use(
         http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
         http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
-        http.post("/api/v1/onboarding/me/buddy/messages", () => stream(events)),
+        http.post("/api/v1/onboarding/me/buddy/messages", () => stream(answers[answered++])),
       );
 
       const { result } = renderHook(() => useBuddy(), { wrapper: Wrapper });
@@ -590,45 +619,89 @@ describe("useBuddy", () => {
         result.current.toggleOpen();
       });
       await waitFor(() => expect(result.current.messages).toHaveLength(0));
+
+      return { client, result };
+    }
+
+    /** Sends one question and waits for its turn to end. */
+    async function ask(result: { current: ReturnType<typeof useBuddy> }, text: string) {
       act(() => {
-        result.current.setDraft("put the PR review task on my board");
+        result.current.setDraft(text);
       });
       act(() => {
         result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
       });
       await waitFor(() => expect(result.current.isThinking).toBe(false));
-      // The board check runs when the stream call resolves, a beat after the last event — settle
-      // before asserting an absence.
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      });
-
-      return { client };
     }
+
+    const PLACE_CARD_TURN = [
+      '{"type":"tool_use","name":"place_card"}',
+      '{"type":"token","content":"It is on your board."}',
+      '{"type":"done"}',
+    ];
+    const METRICS_TURN = [
+      '{"type":"tool_use","name":"get_my_metrics"}',
+      '{"type":"token","content":"You are on track."}',
+      '{"type":"done"}',
+    ];
 
     /**
      * `place_card` is the one board write that is not confirmed — it applies the moment the
-     * mentor runs it — so the tool_use event during the turn is the whole signal the client gets
-     * that the board moved.
+     * mentor runs it — so its `tool_use` event during the turn is the whole signal the client
+     * gets that the board may have moved.
      */
     it("marks the board stale when the turn placed a card on it", async () => {
-      const { client } = await completeTurn([
-        '{"type":"tool_use","name":"place_card"}',
-        '{"type":"token","content":"It is on your board."}',
-        '{"type":"done"}',
-      ]);
+      const { client, result } = await openSession([PLACE_CARD_TURN]);
 
-      expect(boardIsStale(client)).toBe(true);
+      await ask(result, "put the PR review task on my board");
+
+      await waitFor(() => expect(boardIsStale(client)).toBe(true));
     });
 
     it("leaves the board alone when the turn ran other tools", async () => {
-      const { client } = await completeTurn([
-        '{"type":"tool_use","name":"get_my_metrics"}',
-        '{"type":"token","content":"You are on track."}',
-        '{"type":"done"}',
-      ]);
+      const { client, result } = await openSession([METRICS_TURN, PLACE_CARD_TURN]);
+      const invalidations = vi.spyOn(client, "invalidateQueries");
 
-      expect(boardIsStale(client)).toBe(false);
+      await ask(result, "how am I doing?");
+      await ask(result, "put the PR review task on my board");
+
+      // Waiting for the *second* turn's sync closes the window: whatever the board-silent first
+      // turn was going to do has happened by now, so a single invalidation proves the metrics
+      // read marked nothing on its own.
+      await waitFor(() => expect(boardIsStale(client)).toBe(true));
+      expect(invalidations).toHaveBeenCalledTimes(1);
+    });
+
+    /** A reply that delivers its events and then drops — the failure lands after `place_card` ran. */
+    function streamThenBreak(events: string[]) {
+      const encoder = new TextEncoder();
+      return new HttpResponse(
+        new ReadableStream({
+          async start(controller) {
+            for (const event of events) controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+            await delay(20);
+            controller.error(new Error("connection lost"));
+          },
+        }),
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    }
+
+    /**
+     * The turn can fail after the tool already ran — the card is on the board either way, so the
+     * sync must not wait for a clean finish. This is the "failing paths included" claim, pinned.
+     */
+    it("still marks the board stale when the turn broke after placing a card", async () => {
+      const { client, result } = await openSession([]);
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/messages", () =>
+          streamThenBreak(['{"type":"tool_use","name":"place_card"}']),
+        ),
+      );
+
+      await ask(result, "put the PR review task on my board");
+
+      await waitFor(() => expect(boardIsStale(client)).toBe(true));
     });
   });
 });

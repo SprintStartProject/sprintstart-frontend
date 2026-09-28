@@ -596,12 +596,14 @@ export function useBuddyConversation(
       const touched = { board: false };
 
       /**
-       * Marks the board stale when this turn placed a card on it, and only then.
+       * Marks the board stale when this turn ran the card-placing tool, and only then.
        *
-       * `place_card` is not confirmed and reports nothing on the wire, so the `tool_use` event
-       * during the turn is the whole signal that the board moved. It is acted on once the turn
-       * ends, the failing paths included: the card lands as the tool runs, so a turn that wrote
-       * one and then broke still wrote it.
+       * `place_card` is not confirmed and the wire reports nothing about its outcome — the
+       * `tool_use` event is the whole signal, and it cannot say whether the tool wrote a card or
+       * was refused. So the mark is applied once the turn ends, the failing paths included: a
+       * turn that wrote a card and then broke still wrote it, and a turn whose tool refused
+       * costs one refetch of an unchanged board. Refreshing a board that did not change beats
+       * missing one that did.
        */
       const syncBoardIfTouched = () => {
         if (touched.board) void queryClient.invalidateQueries({ queryKey: queryKeys.board.all() });

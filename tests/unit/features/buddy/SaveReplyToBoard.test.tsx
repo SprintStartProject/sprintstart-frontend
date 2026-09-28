@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SaveReplyToBoard } from "../../../../src/features/buddy/components/SaveReplyToBoard";
@@ -80,6 +80,39 @@ describe("SaveReplyToBoard", () => {
     await waitFor(() => expect(boardIsStale(client)).toBe(true));
     // And the button acknowledges, as it always has.
     expect(screen.getByRole("button", { name: /checklist on your board/i })).toBeInTheDocument();
+  });
+
+  /**
+   * The mechanical promise of #233 in one test: a board mounted behind the dock is an *active
+   * reader* of the key the keep invalidates, and invalidation alone would be a comment if it
+   * never reached one. The flag assertions above are about the cache; this one is about the
+   * refetch the mounted board actually gets.
+   */
+  it("refetches a mounted board after the keep", async () => {
+    vi.spyOn(boardService, "addCard").mockResolvedValue({ id: "c1" } as never);
+    const fetchBoard = vi
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValue({ boardId: "b1", projectId: "p1", cards: [] });
+
+    function MountedBoard() {
+      useQuery({ queryKey: queryKeys.board.byProject("p1"), queryFn: () => fetchBoard() });
+      return null;
+    }
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <SaveReplyToBoard content={REPLY} />
+        <MountedBoard />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(fetchBoard).toHaveBeenCalledOnce());
+
+    await userEvent.click(screen.getByRole("button", { name: /keep as checklist/i }));
+
+    // The initial read plus the one the invalidation triggered.
+    await waitFor(() => expect(fetchBoard.mock.calls.length).toBeGreaterThanOrEqual(2));
   });
 
   it("leaves the board alone when the save failed", async () => {
