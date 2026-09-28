@@ -513,7 +513,7 @@ describe("useBuddy", () => {
         http.post("/api/v1/onboarding/me/buddy/actions", () => HttpResponse.json(outcome)),
       );
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: Wrapper });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: Wrapper });
       act(() => {
         result.current.toggleOpen();
       });
@@ -613,7 +613,7 @@ describe("useBuddy", () => {
         http.post("/api/v1/onboarding/me/buddy/messages", () => stream(answers[answered++])),
       );
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: Wrapper });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: Wrapper });
       act(() => {
         result.current.toggleOpen();
       });
@@ -623,7 +623,7 @@ describe("useBuddy", () => {
     }
 
     /** Sends one question and waits for its turn to end. */
-    async function ask(result: { current: ReturnType<typeof useBuddy> }, text: string) {
+    async function ask(result: { current: ReturnType<typeof useBuddyWithDraft> }, text: string) {
       act(() => {
         result.current.setDraft(text);
       });
