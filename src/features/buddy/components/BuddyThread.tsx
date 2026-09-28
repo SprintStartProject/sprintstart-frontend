@@ -260,14 +260,26 @@ function BuddyThreadImpl({
   freshVisitShortcut,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
-  // one is the turn receiving tokens.
+  // one is the turn receiving tokens — while a turn is running at all. Being last is not on its
+  // own "live": holding the newest row awake forever is a bot that never sleeps, so the row is
+  // only flagged while tokens are actually arriving. The chat draws the same line in its
+  // `MessageRow` (`streamingMessageId` is null when idle) — see `SleepyBot`'s `canSleep`.
   const streamingId = messages[messages.length - 1]?.id;
 
-  // Which message the escalation offer hangs under: the buddy's most recent reply. Not every
-  // reply — an offer to give up repeated under all of them reads as the buddy expecting to fail.
+  // Which turn the footer hangs under: the buddy's most recent reply. Not every reply — the same
+  // suggestion repeated under all of them reads as the buddy repeating itself. (This started as
+  // the escalation offer, which now lives under the hire's own questions — see
+  // `renderQuestionAction` on the props above.)
+  //
+  // A reply carrying only a proposal counts as a reply: the *empty* message the send loop appends
+  // up front is the one to skip, and skipping it means "nothing written yet, and nothing offered".
   const lastAssistantId = [...messages]
     .reverse()
-    .find((message) => message.role === "ASSISTANT" && message.content.trim().length > 0)?.id;
+    .find(
+      (message) =>
+        message.role === "ASSISTANT" &&
+        (message.content.trim().length > 0 || (message.actions?.length ?? 0) > 0),
+    )?.id;
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -295,7 +307,11 @@ function BuddyThreadImpl({
         <BuddyThreadRow
           key={message.id}
           message={message}
-          isStreaming={message.id === streamingId}
+          isStreaming={
+            // `Boolean`, not the bare comparison: `streamingId` is the latest message even after
+            // a turn has finished, and this flag means "receiving tokens right now".
+            Boolean(isStreaming && message.id === streamingId)
+          }
           showNames={showNames}
           compact={compact}
           confirmAction={confirmAction}
