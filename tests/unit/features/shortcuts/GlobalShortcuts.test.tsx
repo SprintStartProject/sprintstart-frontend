@@ -52,16 +52,22 @@ function LocationProbe() {
 
 function Harness({
   children,
-  extraDialog = false,
+  dialog,
 }: {
   children?: ReactNode;
-  extraDialog?: boolean;
+  /**
+   * A stand-in overlay. `"modal"` is how `ui/Modal` and the canvas covers announce
+   * themselves; `"popover"` is the buddy dock and the popup-style dialogs, which are
+   * deliberately non-modal — the difference is the whole point of the global layer's guard.
+   */
+  dialog?: "modal" | "popover";
 }) {
   return (
     <MemoryRouter initialEntries={["/board"]}>
       <GlobalShortcuts />
       <LocationProbe />
-      {extraDialog && <div role="dialog" aria-label="Another dialog" />}
+      {dialog === "modal" && <div role="dialog" aria-modal="true" aria-label="Another dialog" />}
+      {dialog === "popover" && <div role="dialog" aria-label="Another dialog" />}
       {children}
     </MemoryRouter>
   );
@@ -185,14 +191,38 @@ describe("GlobalShortcuts", () => {
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
   });
 
-  it("does not stack the help on top of another dialog", async () => {
+  it("leaves the keyboard to a modal surface while one is up", async () => {
     const user = userEvent.setup();
-    render(<Harness extraDialog />);
+    render(<Harness dialog="modal" />);
+
+    await user.keyboard("{Alt>}h{/Alt}");
+    expect(pathname()).toBe("/board");
 
     await user.keyboard("?");
 
     expect(screen.queryByRole("dialog", { name: "Keyboard shortcuts" })).not.toBeInTheDocument();
     // Only the stand-in is on screen — one Escape, one dialog, as it should stay.
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  });
+
+  it("still navigates when the open overlay is a non-modal popover", async () => {
+    // The buddy dock and the popover-style dialogs are `role="dialog"` without `aria-modal`,
+    // on purpose: treating them as keyboard owners would freeze every chord while they sit
+    // open — which, with the dock, is most of a working session.
+    const user = userEvent.setup();
+    render(<Harness dialog="popover" />);
+
+    await user.keyboard("{Alt>}k{/Alt}");
+
+    expect(pathname()).toBe("/knowledge-base");
+  });
+
+  it("consumes a denied chord instead of handing it to the browser", () => {
+    render(<Harness />);
+
+    // `fireEvent` resolves to `!event.defaultPrevented`, so a consumed chord comes back
+    // `false` — the observable for "the app owns Alt+P even when this profile may not use it".
+    expect(fireEvent.keyDown(window, { code: "KeyP", altKey: true })).toBe(false);
+    expect(pathname()).toBe("/board");
   });
 });

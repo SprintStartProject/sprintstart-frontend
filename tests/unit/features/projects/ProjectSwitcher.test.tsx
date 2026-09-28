@@ -228,4 +228,30 @@ describe("ProjectSwitcher", () => {
 
     expect(screen.getByRole("dialog", { name: "Switch project" })).toBeInTheDocument();
   });
+
+  it("answers Cmd/Ctrl+K while a text field has focus", () => {
+    // The chord came out of a hand-rolled window listener that never asked where the
+    // keystroke landed, so this is behaviour the registry must not quietly narrow: switching
+    // project mid-sentence is the whole point, and Ctrl/Cmd+K is not a character a text field
+    // could produce for itself.
+    render(
+      <nav aria-label="Sidebar">
+        <input aria-label="Message" />
+        <ProjectSwitcher />
+      </nav>,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Message" });
+    input.focus();
+
+    act(() => {
+      // Dispatched at the input and left to bubble, the way a real keypress reaches a window
+      // listener — `window.dispatchEvent` would have `target === window` and test nothing.
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true, bubbles: true }),
+      );
+    });
+
+    expect(screen.getByRole("dialog", { name: "Switch project" })).toBeInTheDocument();
+  });
 });

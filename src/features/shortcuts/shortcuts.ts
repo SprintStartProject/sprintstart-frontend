@@ -31,9 +31,13 @@ export type ShortcutItem = {
   label: string;
   category: ShortcutCategory;
   scope: ShortcutScope;
-  /** Physical key, layout-independent. One of `code` / `key` is set, never both. */
+  /**
+   * Physical key, layout-independent. `code` and `key` may be declared together, and then
+   * either spelling fires — `Alt+,` declares both, because a modifier that rewrites the
+   * character somewhere (Option+, is "≤" on macOS) changes `key` but never `code`.
+   */
   code?: string;
-  /** The produced character, for keys no single `code` owns. */
+  /** The produced character, for keys no single `code` owns, or that a layout moves. */
   key?: string;
   altKey?: boolean;
   /** Ctrl on Windows/Linux, Cmd on macOS. */
@@ -41,7 +45,11 @@ export type ShortcutItem = {
   shiftKey?: boolean;
   /** Navigation destination. Its presence means `canAccessRoute` gates the chord. */
   path?: AppRoute;
-  /** Fires while a text field has focus. Only the new-conversation chord wants that. */
+  /**
+   * Fires while a text field has focus. Set on chords that are *for* arriving mid-typing
+   * (`Alt+N`) and on modifier chords a text field never produces itself (`Ctrl/Cmd+K`) —
+   * a plain character chord stays out of any composer.
+   */
   allowInInput?: boolean;
   /** A word for the odd one out, where a chord only works somewhere specific. */
   note?: string;
@@ -124,10 +132,13 @@ const NAVIGATE_PM_DASHBOARD: ShortcutItem = {
 };
 
 /**
- * Character-matched like the other punctuation: the comma is the character somebody
- * presses for, and every layout spells it the same way while placing it differently
- * (QWERTZ and QWERTY leave it unshifted, AZERTY shifts it) — a `code` chord would work
- * here and fail there.
+ * The comma gets both spellings. Character first: every layout spells the character the
+ * same way while placing it differently (QWERTZ and QWERTY leave it unshifted, AZERTY moves
+ * it onto the `KeyM` position), so a `code`-only chord would work here and fail there. The
+ * code is the fallback for the one place that rewrites the character under Alt — macOS turns
+ * Option+, into a literal "≤", and there the physical key still answers. Everywhere else it
+ * spells the same key twice: on AZERTY the `Comma` code is the `;` key, where `Alt+;` is
+ * nobody's chord and landing on Settings by accident costs one click back.
  */
 const NAVIGATE_SETTINGS: ShortcutItem = {
   id: "nav-settings",
@@ -135,6 +146,7 @@ const NAVIGATE_SETTINGS: ShortcutItem = {
   category: "Navigation",
   scope: "global",
   key: ",",
+  code: "Comma",
   altKey: true,
   path: "/settings",
 };
@@ -143,6 +155,10 @@ const NAVIGATE_SETTINGS: ShortcutItem = {
  * Ctrl/Cmd+K, the one chord with a platform split. The dialog it opens is the project
  * switcher's, so the switcher answers it (`scope: "surface"`) — the registry's job is only
  * to guarantee the hint on its trigger and its handler read the same definition.
+ *
+ * `allowInInput` keeps the behaviour this chord has always had: jumping to another project
+ * mid-sentence is the point of it, and a text field can never produce Ctrl/Cmd+K itself, so
+ * nothing is stolen from the composer.
  */
 export const SWITCH_PROJECT_SHORTCUT: ShortcutItem = {
   id: "act-switcher",
@@ -151,6 +167,7 @@ export const SWITCH_PROJECT_SHORTCUT: ShortcutItem = {
   scope: "surface",
   code: "KeyK",
   ctrlOrMeta: true,
+  allowInInput: true,
 };
 
 /**
@@ -184,10 +201,14 @@ export const SIDEBAR_TOGGLE_SHORTCUT: ShortcutItem = {
 };
 
 /**
- * `/` focuses the chat composer (ChatPage, since before this registry existed, the way
- * Slack and GitHub do it). Character-matched: on a German keyboard `/` is Shift+7.
+ * `/` focuses the chat composer — the way Slack and GitHub do it. Character-matched: on a
+ * German keyboard `/` is Shift+7, on a US one it is the slash key unshifted, and the
+ * character is the part both keyboards agree on.
+ *
+ * Exported because ChatPage answers it (`useShortcutListener`). Before that it had its own
+ * listener, which made this row a description of behaviour rather than the source of it.
  */
-const FOCUS_COMPOSER: ShortcutItem = {
+export const FOCUS_COMPOSER_SHORTCUT: ShortcutItem = {
   id: "act-focus-composer",
   label: "Jump to the message box",
   category: "Actions",
@@ -238,32 +259,26 @@ export const SHORTCUTS: readonly ShortcutItem[] = [
   SWITCH_PROJECT_SHORTCUT,
   NEW_CONVERSATION_SHORTCUT,
   SIDEBAR_TOGGLE_SHORTCUT,
-  FOCUS_COMPOSER,
+  FOCUS_COMPOSER_SHORTCUT,
   SHOW_SHORTCUTS,
   DISMISS,
 ];
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
-/** Keys whose `code` is not their character, mapped to what a person sees on the cap. */
+/** Codes a person would not recognise if printed as themselves. Anything else is either a
+ * `Key…` code, whose letter is the cap, or a character chord, labelled by its own `key`. */
 const KEY_LABELS: Partial<Record<string, string>> = {
-  Comma: ",",
-  Period: ".",
-  Slash: "/",
-  Semicolon: ";",
-  Backquote: "`",
   Escape: "Esc",
-  Space: "Space",
 };
 
-/** One key of a chord, as it is printed: "H" for `KeyH`, "," for `Comma`, "?" for `?`. */
+/** One key of a chord, as it is printed: "H" for `KeyH`, "Esc" for `Escape`, "," for `,`. */
 function shortcutKeyLabel(shortcut: ShortcutItem): string {
   if (shortcut.key !== undefined) return shortcut.key;
 
   const code = shortcut.code ?? "";
   if (KEY_LABELS[code] !== undefined) return KEY_LABELS[code];
   if (code.startsWith("Key")) return code.slice(3);
-  if (code.startsWith("Digit")) return code.slice(5);
 
   return code;
 }
@@ -292,6 +307,9 @@ export function shortcutChord(shortcut: ShortcutItem): string {
  * - Text fields own their keys, except where a chord says otherwise (`allowInInput`).
  * - Modifiers must match exactly. Shift is the exception for character chords: producing
  *   `?` *requires* Shift on every layout that has it, so the character is the whole claim.
+ * - A chord may declare both a `code` and a `key`, and then either spelling answers — the
+ *   character where the layout produces it, the physical key where a modifier rewrites the
+ *   character instead (`Alt+,` is Option+`≤` on macOS).
  */
 export function isShortcutPress(event: KeyboardEvent, shortcut: ShortcutItem): boolean {
   if (event.repeat) return false;
@@ -302,10 +320,10 @@ export function isShortcutPress(event: KeyboardEvent, shortcut: ShortcutItem): b
   if ((shortcut.altKey === true) !== event.altKey) return false;
   if (!shortcut.key && (shortcut.shiftKey === true) !== event.shiftKey) return false;
 
-  if (shortcut.code !== undefined) return event.code === shortcut.code;
-  if (shortcut.key !== undefined) return event.key === shortcut.key;
+  const codeMatches = shortcut.code !== undefined && event.code === shortcut.code;
+  const keyMatches = shortcut.key !== undefined && event.key === shortcut.key;
 
-  return false;
+  return codeMatches || keyMatches;
 }
 
 /**

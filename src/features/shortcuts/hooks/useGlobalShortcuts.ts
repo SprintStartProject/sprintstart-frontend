@@ -6,11 +6,16 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { SHORTCUTS, isShortcutPress } from "../shortcuts";
 
 /**
- * Open dialogs own the keyboard while they are up, so the help must not stack on top of
- * one: two `z-50` overlays appear at once and a single Escape closes both. `?` is simply
- * ignored while anything dialog-shaped is open — including this help itself.
+ * A modal surface owns the keyboard while it is up, so no global chord may act behind one:
+ * navigating off a half-filled dialog would unmount it mid-edit, and the help would stack a
+ * second overlay on the first with one Escape closing both.
+ *
+ * `aria-modal="true"` is the precise line. `ui/Modal` (dialogs and alert dialogs), the canvas
+ * covers, the side panel and the celebration overlays all set it; the buddy dock and the
+ * popover-style popups deliberately do not, because they are non-modal by design — treating
+ * those as keyboard owners would freeze every chord for as long as the dock stayed open.
  */
-const OPEN_DIALOG_SELECTOR = '[role="dialog"], [role="alertdialog"]';
+const MODAL_SURFACE_SELECTOR = '[aria-modal="true"]';
 
 export type GlobalShortcutsState = {
   isHelpOpen: boolean;
@@ -43,20 +48,22 @@ export function useGlobalShortcuts(): GlobalShortcutsState {
         if (shortcut.scope !== "global") continue;
         if (!isShortcutPress(event, shortcut)) continue;
 
+        // Matched, so the keystroke belongs to the app from here on: consuming it keeps the
+        // browser's own accelerator — and anything else listening — out of a vocabulary the
+        // app owns, whether or not this profile may go where the chord points.
+        event.preventDefault();
+
+        // A modal surface is up: no chord acts behind it (see MODAL_SURFACE_SELECTOR).
+        if (document.querySelector(MODAL_SURFACE_SELECTOR)) return;
+
         if (shortcut.path) {
-          // Spoken for either way: a chord the profile may not use does nothing, rather
-          // than falling through to whatever else might be listening.
           if (!canAccessRoute(profile, shortcut.path, canManageSelected)) return;
 
-          event.preventDefault();
           void navigate(shortcut.path);
           return;
         }
 
         if (shortcut.id === "gen-shortcuts") {
-          if (document.querySelector(OPEN_DIALOG_SELECTOR)) return;
-
-          event.preventDefault();
           setIsHelpOpen(true);
           return;
         }

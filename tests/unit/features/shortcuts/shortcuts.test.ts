@@ -56,14 +56,15 @@ describe("the registered chords", () => {
     expect(navigationShortcut("/settings")).toBeDefined();
   });
 
-  it("describes every chord with exactly one of code or key", () => {
-    // Both set would make the matcher prefer `code` silently; neither would make a dead entry.
+  it("describes every chord with a code, a key, or both — never neither", () => {
+    // Neither would make a dead entry. Both is legitimate: the comma declares its character
+    // and its physical key, because macOS rewrites the character under Option but not the code.
     for (const shortcut of SHORTCUTS) {
       const described = [shortcut.code !== undefined, shortcut.key !== undefined].filter(
         Boolean,
       ).length;
 
-      expect(described, `${shortcut.id} needs a code or a key`).toBe(1);
+      expect(described, `${shortcut.id} needs a code or a key`).toBeGreaterThanOrEqual(1);
     }
   });
 });
@@ -119,6 +120,36 @@ describe("isShortcutPress", () => {
     expect(isShortcutPress(pressFrom(window, { code: "KeyK" }), SWITCH_PROJECT_SHORTCUT)).toBe(
       false,
     );
+  });
+
+  it("takes either spelling of a character the platform rewrites under a modifier", () => {
+    const settings = shortcutById("nav-settings");
+
+    // Windows and Linux: the character. macOS: Option+, is a literal "≤", so the physical key
+    // answers — both spellings are the one chord, and neither may drift from the label.
+    expect(isShortcutPress(pressFrom(window, { key: ",", altKey: true }), settings)).toBe(true);
+    expect(
+      isShortcutPress(pressFrom(window, { key: "≤", code: "Comma", altKey: true }), settings),
+    ).toBe(true);
+    // A neighbour key on some layouts is not a spelling of it.
+    expect(
+      isShortcutPress(pressFrom(window, { key: ";", code: "Semicolon", altKey: true }), settings),
+    ).toBe(false);
+  });
+
+  it("routes the switcher chord through a focused text field — it always did", () => {
+    const input = document.createElement("input");
+    document.body.append(input);
+
+    try {
+      // The chord predates the registry as a bare window listener with no typing guard;
+      // `allowInInput` is what keeps Ctrl/Cmd+K from silently dying in any composer.
+      expect(
+        isShortcutPress(pressFrom(input, { code: "KeyK", ctrlKey: true }), SWITCH_PROJECT_SHORTCUT),
+      ).toBe(true);
+    } finally {
+      input.remove();
+    }
   });
 
   it("matches the produced character, whatever Shift the layout needed for it", () => {
