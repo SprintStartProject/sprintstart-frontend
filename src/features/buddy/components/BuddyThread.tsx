@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, memo } from "react";
 import type { ReactNode } from "react";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
@@ -40,6 +40,9 @@ type BuddyThreadProps = {
    * verdict on the reply — but a hire does not flag an answer, they flag the question they
    * still need answered, and they may well want to send one they asked ten minutes ago. Under
    * every question, they can. Both surfaces pass it, so the corner window can escalate too.
+   *
+   * Must be referentially stable, like `renderReplyAction`: the rows below are memoised, and a
+   * fresh function per render of the caller would re-render every turn with it.
    */
   renderQuestionAction?: (question: string) => ReactNode;
   /**
@@ -48,6 +51,9 @@ type BuddyThreadProps = {
    * Where keeping something from the conversation belongs. The thread does not know what is worth
    * keeping or how — it hands over the text and lets the caller decide, which is what stops this
    * component from growing a dependency on the board.
+   *
+   * Must be referentially stable: a fresh function per render of the caller would hand every
+   * memoised row a new prop and re-parse every reply's markdown with it.
    */
   renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
   /**
@@ -89,6 +95,133 @@ type BuddyThreadProps = {
   freshVisitShortcut?: string;
 };
 
+type BuddyThreadRowProps = {
+  message: BuddyMessageView;
+  /** Whether this row is the turn currently receiving tokens. */
+  isStreaming: boolean;
+  showNames: boolean;
+  compact: boolean;
+  confirmAction: (messageId: string, action: ProposedAction) => void;
+  dismissAction: (messageId: string, actionId: string) => void;
+  renderQuestionAction?: (question: string) => ReactNode;
+  renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
+  /** The greeting's suggested next step — present on the row it hangs under, nowhere else. */
+  lastMessageFooter?: ReactNode;
+  onStartFreshVisit?: () => void;
+  freshVisitShortcut?: string;
+};
+
+/**
+ * One turn: the visit divider if it opens one, then the bubble.
+ *
+ * Extracted from the thread's map and memoised for the same reason `MessageRow` in the chat is:
+ * with the thread memoised, a keystroke never reaches it — and when a token arrives, only the row
+ * it belongs to re-renders, while every other row's props stay referentially equal and it bails
+ * out instead of re-running `ReactMarkdown` over its reply. In a fifty-message thread that is the
+ * difference between one markdown parse and fifty per keystroke (issue #236).
+ *
+ * Which makes referential stability a *contract* on the props: the render callbacks must come
+ * from `useCallback` in the caller, and `lastMessageFooter` from one `useMemo`.
+ *
+ * `lastMessageFooter` is resolved by the thread rather than here — "is this the last reply, and
+ * has the buddy stopped writing" is a question about the whole list, and answering it in the row
+ * would make each row depend on its neighbours.
+ */
+function BuddyThreadRowImpl({
+  message,
+  isStreaming,
+  showNames,
+  compact,
+  confirmAction,
+  dismissAction,
+  renderQuestionAction,
+  renderReplyAction,
+  lastMessageFooter,
+  onStartFreshVisit,
+  freshVisitShortcut,
+}: BuddyThreadRowProps) {
+  const isUser = message.role === "USER";
+  const hasText = message.content.trim().length > 0;
+  const hasActions = (message.actions?.length ?? 0) > 0;
+
+  // Until the first token (or an action proposal) arrives the streaming placeholder has
+  // nothing to show, and the typing bubble below already stands in for it — so skip it,
+  // otherwise an empty second bubble appears while the buddy is working. A turn that
+  // failed before writing a word is the exception: its reason *is* the message, and
+  // dropping it here is what made a failed reply look like no reply.
+  if (!isUser && !hasText && !hasActions && !message.error) return null;
+
+  return (
+    <Fragment>
+      {/* Everything above belongs to the last conversation; the buddy has just opened a
+                        new one under it, grounded in what it remembers rather than in the text
+                        above. Saying so is what stops the greeting reading as a non-sequitur
+                        replying to a question from an hour ago. */}
+      {message.startsVisit && (
+        <div className="flex items-center gap-3 py-1">
+          <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
+
+          <span className="flex items-center gap-1">
+            <span className="text-xs font-medium text-app-text-muted">New conversation</span>
+
+            {onStartFreshVisit && (
+              <button
+                type="button"
+                onClick={onStartFreshVisit}
+                data-testid="buddy-clear-previous"
+                aria-label="Clear the earlier conversation"
+                title={
+                  freshVisitShortcut
+                    ? `Clear the earlier conversation (${freshVisitShortcut})`
+                    : "Clear the earlier conversation"
+                }
+                className="rounded-full p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
+          </span>
+
+          <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
+        </div>
+      )}
+
+      <BuddyMessage
+        speaker={isUser ? "YOU" : "BUDDY"}
+        showName={showNames}
+        compact={compact}
+        isStreaming={isStreaming}
+        error={message.error}
+        footer={
+          <>
+            {isUser && renderQuestionAction?.(message.content)}
+            {!isUser && hasText && renderReplyAction?.(message.content, message)}
+            {!isUser && hasActions && (
+              <BuddyActionProposals
+                messageId={message.id}
+                actions={message.actions ?? []}
+                onConfirm={confirmAction}
+                onDismiss={dismissAction}
+              />
+            )}
+            {lastMessageFooter}
+          </>
+        }
+      >
+        {hasText ? (
+          isUser ? (
+            message.content
+          ) : (
+            <BuddyMarkdown content={message.content} />
+          )
+        ) : undefined}
+      </BuddyMessage>
+    </Fragment>
+  );
+}
+
+const BuddyThreadRow = memo(BuddyThreadRowImpl);
+
 /**
  * The conversation itself: every message, in order, with whoever is talking beside it.
  *
@@ -100,8 +233,13 @@ type BuddyThreadProps = {
  * because a flex item's default `min-width: auto` refuses to shrink below its content — without
  * it a wide code block widens the bubble, the column and the panel, and the per-block scrollers
  * never engage.
+ *
+ * Both this and every row in it are memoised: re-rendering a long thread is what used to make
+ * each keystroke re-run `ReactMarkdown` over every reply and every bubble's animation hooks
+ * (issue #236). A keystroke no longer reaches this component at all, and a token reaches one row
+ * — see `BuddyThreadRow` for the contract that keeps that true.
  */
-export function BuddyThread({
+function BuddyThreadImpl({
   messages,
   isThinking,
   isStreaming = false,
@@ -153,86 +291,27 @@ export function BuddyThread({
         </div>
       )}
 
-      {messages.map((message) => {
-        const isUser = message.role === "USER";
-        const hasText = message.content.trim().length > 0;
-        const hasActions = (message.actions?.length ?? 0) > 0;
-
-        // Until the first token (or an action proposal) arrives the streaming placeholder has
-        // nothing to show, and the typing bubble below already stands in for it — so skip it,
-        // otherwise an empty second bubble appears while the buddy is working. A turn that
-        // failed before writing a word is the exception: its reason *is* the message, and
-        // dropping it here is what made a failed reply look like no reply.
-        if (!isUser && !hasText && !hasActions && !message.error) return null;
-
-        return (
-          <Fragment key={message.id}>
-            {/* Everything above belongs to the last conversation; the buddy has just opened a
-                            new one under it, grounded in what it remembers rather than in the text
-                            above. Saying so is what stops the greeting reading as a non-sequitur
-                            replying to a question from an hour ago. */}
-            {message.startsVisit && (
-              <div className="flex items-center gap-3 py-1">
-                <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-
-                <span className="flex items-center gap-1">
-                  <span className="text-xs font-medium text-app-text-muted">New conversation</span>
-
-                  {onStartFreshVisit && (
-                    <button
-                      type="button"
-                      onClick={onStartFreshVisit}
-                      data-testid="buddy-clear-previous"
-                      aria-label="Clear the earlier conversation"
-                      title={
-                        freshVisitShortcut
-                          ? `Clear the earlier conversation (${freshVisitShortcut})`
-                          : "Clear the earlier conversation"
-                      }
-                      className="rounded-full p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-                  )}
-                </span>
-
-                <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-              </div>
-            )}
-
-            <BuddyMessage
-              speaker={isUser ? "YOU" : "BUDDY"}
-              showName={showNames}
-              compact={compact}
-              isStreaming={message.id === streamingId}
-              error={message.error}
-              footer={
-                <>
-                  {isUser && renderQuestionAction?.(message.content)}
-                  {!isUser && hasText && renderReplyAction?.(message.content, message)}
-                  {!isUser && hasActions && (
-                    <BuddyActionProposals
-                      messageId={message.id}
-                      actions={message.actions ?? []}
-                      onConfirm={confirmAction}
-                      onDismiss={dismissAction}
-                    />
-                  )}
-                  {!isThinking && message.id === lastAssistantId && lastMessageFooter}
-                </>
-              }
-            >
-              {hasText ? (
-                isUser ? (
-                  message.content
-                ) : (
-                  <BuddyMarkdown content={message.content} />
-                )
-              ) : undefined}
-            </BuddyMessage>
-          </Fragment>
-        );
-      })}
+      {messages.map((message) => (
+        <BuddyThreadRow
+          key={message.id}
+          message={message}
+          isStreaming={message.id === streamingId}
+          showNames={showNames}
+          compact={compact}
+          confirmAction={confirmAction}
+          dismissAction={dismissAction}
+          renderQuestionAction={renderQuestionAction}
+          renderReplyAction={renderReplyAction}
+          // Resolved here rather than inside the row: only the buddy's latest reply gets it, and
+          // only once the thinking bubble is gone — so the offer lands under a finished answer
+          // rather than under a promise.
+          lastMessageFooter={
+            !isThinking && message.id === lastAssistantId ? lastMessageFooter : undefined
+          }
+          onStartFreshVisit={onStartFreshVisit}
+          freshVisitShortcut={freshVisitShortcut}
+        />
+      ))}
 
       {(isThinking || dinoGameActive) && (
         <BuddyTypingMessage
@@ -249,3 +328,5 @@ export function BuddyThread({
     </div>
   );
 }
+
+export const BuddyThread = memo(BuddyThreadImpl);
