@@ -15,7 +15,9 @@ export type FieldContextValue = {
   /**
    * Mirrors `Field`'s `required`, so the control can put `aria-required` on the
    * real element — the asterisk in the label is `aria-hidden` decoration and
-   * tells assistive tech nothing on its own.
+   * tells assistive tech nothing on its own. The native `required` attribute is
+   * deliberately left to the caller: this flag is ARIA, not constraint
+   * validation.
    */
   required: boolean;
 };

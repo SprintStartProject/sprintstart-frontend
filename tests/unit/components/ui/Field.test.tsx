@@ -155,6 +155,31 @@ describe("Field", () => {
     expect(screen.getByLabelText("Search")).toHaveAttribute("aria-required", "true");
   });
 
+  it("keeps the browser's own constraint validation off unless the control asks for it", () => {
+    const { rerender } = render(
+      <Field label="Name" required>
+        <Input />
+      </Field>,
+    );
+
+    // The field mark is presentation and ARIA: no native attribute, so no
+    // `:required` styling and no browser "fill out this field" popup — these
+    // forms gate their own submits with guards and inline errors.
+    const fieldOnly = screen.getByLabelText(/^Name/);
+    expect(fieldOnly).not.toHaveAttribute("required");
+    expect((fieldOnly as HTMLInputElement).required).toBe(false);
+
+    rerender(
+      <Field label="Name" required>
+        <Input required />
+      </Field>,
+    );
+
+    const controlLevel = screen.getByLabelText(/^Name/);
+    expect(controlLevel).toHaveAttribute("required");
+    expect((controlLevel as HTMLInputElement).required).toBe(true);
+  });
+
   it("lets an explicit aria-required on the control override the field", () => {
     render(
       <Field label="Name" required>

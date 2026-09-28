@@ -20,6 +20,14 @@ export type FieldProps = {
    * Appends the conventional asterisk and carries the semantics through
    * context, so the wrapped control also gets `aria-required` — the asterisk
    * itself is `aria-hidden` and invisible to a screen reader.
+   *
+   * Presentation and ARIA, not constraint validation: this does **not** put the
+   * native `required` attribute on the wrapped control, so no `:required`
+   * styling and no browser "fill out this field" popup appear. The forms in
+   * this app validate themselves — guarded submit buttons, inline errors — and
+   * a label-level flag should not switch browser validation on behind their
+   * backs. Pass `required` to the control itself when the native attribute is
+   * wanted; the two stay separate on purpose.
    */
   required?: boolean;
   /**
