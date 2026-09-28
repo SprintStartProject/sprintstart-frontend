@@ -336,6 +336,30 @@ function BuddyMentorHome() {
     [hasUserMessage, openerAction, greeting.isRevealing, sendMessage],
   );
 
+  /**
+   * The suggestion row above the composer, held in one identity — the conversation below it is
+   * memoised now, and an element built inline in the render would be the one prop that always
+   * changed.
+   *
+   * The chips *fill* the composer instead of sending, which is why they sit on top of it. The
+   * hire presses send: the words stay theirs, and they can edit the question first — which is how
+   * somebody learns they are allowed to. The list is the backend's, built from the tools it
+   * actually mounts for this hire, so the chips and the mentor cannot disagree about whether this
+   * role has pull requests. Hire-only, matching the fetch gate: a team-mode conversation would
+   * otherwise show the heading over an empty list, since there is nothing team-scoped to load.
+   */
+  const aboveComposer = useMemo(
+    () =>
+      isHireMode && !hasUserMessage ? (
+        <BuddySuggestionChips
+          suggestions={suggestions}
+          onPick={setDraft}
+          heading="Not sure where to start?"
+        />
+      ) : undefined,
+    [isHireMode, hasUserMessage, suggestions, setDraft],
+  );
+
   // The keyboard half of the control in the visit divider. Gated the same way that control is:
   // a visit nobody has spoken in is already the fresh one, and re-opening it would only replay
   // the greeting — and, like the chat's, only while this is the half on screen, since the shell
@@ -430,22 +454,9 @@ function BuddyMentorHome() {
         // the transcript is shorter than the viewport, which is exactly the first few turns this
         // control exists for.
         hasFloatingControl={(isHireMode && replies.hasAny && !rail.open) || hasUserMessage}
-        aboveComposer={
-          // The chips *fill* the composer instead of sending, which is why they sit on top of
-          // it. The hire presses send: the words stay theirs, and they can edit the question
-          // first — which is how somebody learns they are allowed to. The list is the
-          // backend's, built from the tools it actually mounts for this hire, so the chips and
-          // the mentor cannot disagree about whether this role has pull requests.
-          // Hire-only, matching the fetch gate above: a team-mode conversation would otherwise
-          // show the heading over an empty list, since there is nothing team-scoped to load.
-          isHireMode && !hasUserMessage ? (
-            <BuddySuggestionChips
-              suggestions={suggestions}
-              onPick={setDraft}
-              heading="Not sure where to start?"
-            />
-          ) : undefined
-        }
+        // Built above, in one identity — the conversation is memoised, and the chips' own reasons
+        // are written where they are built.
+        aboveComposer={aboveComposer}
         focusComposerOnMount
       />
     </BuddyPageShell>

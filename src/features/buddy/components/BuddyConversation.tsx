@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { memo, useCallback } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
@@ -83,7 +83,7 @@ type BuddyConversationProps = {
  * It scrolls down, never sideways — `overflow-x-hidden` plus the `min-w-0` chain running down
  * to `BuddyMarkdown`, where wide blocks get their own scrollers.
  */
-export function BuddyConversation({
+function BuddyConversationImpl({
   messages,
   isThinking,
   activeTool,
@@ -199,3 +199,15 @@ export function BuddyConversation({
     </>
   );
 }
+
+/**
+ * Memoised, and its props are the contract: everything in that list is a plain value, an element
+ * or callback the page holds in one identity (see the `useMemo`/`useCallback`s above its render),
+ * or a motion value. A fresh inline element added to it later — a `footer={`…`}` built in the
+ * page's render — is silently the one prop that always changed, and the memo stops paying.
+ *
+ * The thread *inside* this carries the per-message boundary; this one is about the page's own
+ * re-renders (the rail opening, a toast landing, a visit divider moving) not walking the whole
+ * conversation.
+ */
+export const BuddyConversation = memo(BuddyConversationImpl);
