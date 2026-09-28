@@ -16,8 +16,19 @@ export type FieldProps = {
    * or an empty string when the field is fine.
    */
   error?: ReactNode;
-  /** Appends the conventional asterisk and sets `required` semantics visually. */
+  /**
+   * Appends the conventional asterisk and carries the semantics through
+   * context, so the wrapped control also gets `aria-required` — the asterisk
+   * itself is `aria-hidden` and invisible to a screen reader.
+   */
   required?: boolean;
+  /**
+   * Appends a visible "(optional)" to the label, the counterpart for fields the
+   * form genuinely does not need. Rendered inside the `<label>` so it lands in
+   * the control's accessible name and announces with the field; ignored when
+   * `required` is also set, since the two are mutually exclusive in practice.
+   */
+  optional?: boolean;
   /**
    * Fixed id for the control, when something outside the field has to point at
    * it (`aria-controls`, a `ref`-free `focus()` by id, an existing E2E
@@ -60,6 +71,7 @@ export function Field({
   hint,
   error,
   required = false,
+  optional = false,
   controlId: providedControlId,
   disabled = false,
   className = "",
@@ -83,8 +95,9 @@ export function Field({
       describedBy: described || undefined,
       invalid: hasError,
       disabled,
+      required,
     };
-  }, [controlId, hintId, errorId, hasHint, hasError, disabled]);
+  }, [controlId, hintId, errorId, hasHint, hasError, disabled, required]);
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`.trim()}>
@@ -95,6 +108,12 @@ export function Field({
             <span className="ml-0.5 text-app-danger-text" aria-hidden="true">
               *
             </span>
+          )}
+          {optional && !required && (
+            <>
+              {" "}
+              <span className="ml-1 text-xs font-normal text-app-text-subtle">(optional)</span>
+            </>
           )}
         </label>
       )}
