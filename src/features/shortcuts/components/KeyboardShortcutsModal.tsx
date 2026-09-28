@@ -3,7 +3,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { canAccessRoute } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
 import { useProjectContext } from "../../projects/useProjectContext";
-import { SHORTCUTS, shortcutChord, type ShortcutCategory } from "../shortcuts";
+import { SHORTCUTS, shortcutChord, type ShortcutCategory, type ShortcutItem } from "../shortcuts";
 
 /** Reading order of the help — the registry's own order inside each group. */
 const CATEGORY_ORDER: readonly ShortcutCategory[] = ["Navigation", "Actions", "General"];
@@ -35,6 +35,37 @@ type KeyboardShortcutsModalProps = {
   onClose: () => void;
 };
 
+type ShortcutSectionProps = {
+  category: ShortcutCategory;
+  shortcuts: readonly ShortcutItem[];
+};
+
+/** One category: its heading, and a row per chord. */
+function ShortcutSection({ category, shortcuts }: ShortcutSectionProps) {
+  return (
+    <section>
+      <h3 className="text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+        {category}
+      </h3>
+
+      <ul className="mt-3 space-y-2.5">
+        {shortcuts.map((shortcut) => (
+          <li key={shortcut.id} className="flex items-center justify-between gap-4">
+            <span className="text-sm text-app-text">
+              {shortcut.label}
+              {shortcut.note ? (
+                <span className="text-app-text-subtle"> — {shortcut.note}</span>
+              ) : null}
+            </span>
+
+            <ChordKeys chord={shortcutChord(shortcut)} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * The whole keyboard in one dialog, grouped by what the keys are for.
  *
@@ -54,6 +85,13 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
   const visibleShortcuts = SHORTCUTS.filter(
     (shortcut) => !shortcut.path || canAccessRoute(profile, shortcut.path, canManageSelected),
   );
+  const navigation = visibleShortcuts.filter((shortcut) => shortcut.category === "Navigation");
+  const otherSections = CATEGORY_ORDER.filter((category) => category !== "Navigation")
+    .map((category) => ({
+      category,
+      shortcuts: visibleShortcuts.filter((shortcut) => shortcut.category === category),
+    }))
+    .filter((section) => section.shortcuts.length > 0);
 
   return (
     <Modal
@@ -64,34 +102,19 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
       testId="keyboard-shortcuts"
       onClose={onClose}
     >
+      {/*
+       * Navigation is the tallest group, so it holds the left column alone and the rest stack
+       * beside it — three sections flowing through a two-column grid would leave the fourth
+       * cell empty under a lone "General" on every screen wide enough for two columns.
+       */}
       <div className="grid gap-6 sm:grid-cols-2">
-        {CATEGORY_ORDER.map((category) => {
-          const shortcuts = visibleShortcuts.filter((shortcut) => shortcut.category === category);
-          if (shortcuts.length === 0) return null;
+        {navigation.length > 0 && <ShortcutSection category="Navigation" shortcuts={navigation} />}
 
-          return (
-            <section key={category}>
-              <h3 className="text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
-                {category}
-              </h3>
-
-              <ul className="mt-3 space-y-2.5">
-                {shortcuts.map((shortcut) => (
-                  <li key={shortcut.id} className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-app-text">
-                      {shortcut.label}
-                      {shortcut.note ? (
-                        <span className="text-app-text-subtle"> — {shortcut.note}</span>
-                      ) : null}
-                    </span>
-
-                    <ChordKeys chord={shortcutChord(shortcut)} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}
+        <div className="flex flex-col gap-6">
+          {otherSections.map((section) => (
+            <ShortcutSection key={section.category} {...section} />
+          ))}
+        </div>
       </div>
     </Modal>
   );

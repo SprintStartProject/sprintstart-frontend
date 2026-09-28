@@ -65,7 +65,9 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         type="button"
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        aria-label={`Switch project. Current project: ${triggerLabel}`}
+        // The chord belongs in the label, not only in `title`: `aria-label` wins the
+        // accessible-name computation, so a title alone would leave screen readers without it.
+        aria-label={`Switch project (${SWITCHER_CHORD}). Current project: ${triggerLabel}`}
         title={`Switch project (${SWITCHER_CHORD})`}
         onClick={openSwitcher}
         whileHover={{ scale: 1.02 }}

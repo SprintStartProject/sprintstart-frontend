@@ -437,6 +437,10 @@ describe("SideBar", () => {
     // The desktop rail and the mobile drawer are two renders of one list, so compare counts.
     expect(screen.getAllByText("Alt + H").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Alt + K").length).toBeGreaterThan(0);
+
+    // The settings button is icon-only — no room for a chip — so its chord rides in the
+    // accessible name, and `aria-label` is what makes that name, not the `title`.
+    expect(screen.getAllByRole("link", { name: "Settings (Alt + ,)" }).length).toBeGreaterThan(0);
   });
 
   it("keeps the shortcut chip out of the link's accessible name", () => {

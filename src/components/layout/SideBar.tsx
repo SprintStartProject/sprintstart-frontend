@@ -211,9 +211,11 @@ function SidebarContent({
     canAccessRoute(profile, item.path, canManageSelected),
   );
 
-  // The icon-only footer button has no room for a chip, so its `title` carries the chord --
-  // the same arrangement the project switcher's trigger uses.
+  // The icon-only footer button has no room for a chip, so its name carries the chord — in
+  // both attributes, because `aria-label` wins the accessible-name computation and a `title`
+  // alone would reach the mouse tooltip only.
   const settingsShortcut = navigationShortcut("/settings");
+  const settingsLabel = settingsShortcut ? `Settings (${settingsShortcut})` : "Settings";
 
   // `/insights/knowledge-requests` is deliberately absent: it has its own
   // sidebar entry, so listing it here would leave two entries active at once
@@ -387,8 +389,8 @@ function SidebarContent({
                         : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
                     }`
                   }
-                  title={settingsShortcut ? `Settings (${settingsShortcut})` : "Settings"}
-                  aria-label="Settings"
+                  title={settingsLabel}
+                  aria-label={settingsLabel}
                 >
                   <Settings className="h-[18px] w-[18px]" />
                 </NavLink>
