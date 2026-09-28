@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 import { LogOut, Menu, Settings, X } from "lucide-react";
@@ -13,6 +13,11 @@ import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledge
 import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
 import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
 import { useUnseenSkipAnswerCount } from "../../features/onboarding/hooks/useUnseenSkipAnswerCount";
+import {
+  SIDEBAR_TOGGLE_SHORTCUT,
+  navigationShortcut,
+  useShortcutListener,
+} from "../../features/shortcuts";
 import {
   AdminIcon,
   BlueprintsIcon,
@@ -206,6 +211,10 @@ function SidebarContent({
     canAccessRoute(profile, item.path, canManageSelected),
   );
 
+  // The icon-only footer button has no room for a chip, so its `title` carries the chord --
+  // the same arrangement the project switcher's trigger uses.
+  const settingsShortcut = navigationShortcut("/settings");
+
   // `/insights/knowledge-requests` is deliberately absent: it has its own
   // sidebar entry, so listing it here would leave two entries active at once
   // -- including two active pills sharing one Framer Motion `layoutId`.
@@ -306,6 +315,7 @@ function SidebarContent({
                     (item.path === "/pm-dashboard" && isPmSectionActive) ||
                     (item.path === "/chat" && isAssistantSectionActive)
                   }
+                  shortcut={navigationShortcut(item.path)}
                   indicatorLayoutId={indicatorLayoutId}
                   pointerY={pointerY}
                   hasAttentionMarker={
@@ -377,7 +387,7 @@ function SidebarContent({
                         : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
                     }`
                   }
-                  title="Settings"
+                  title={settingsShortcut ? `Settings (${settingsShortcut})` : "Settings"}
                   aria-label="Settings"
                 >
                   <Settings className="h-[18px] w-[18px]" />
@@ -456,6 +466,17 @@ export function SideBar() {
     setIsMobileSidebarOpen(false);
   };
 
+  /**
+   * Alt+S works whatever the header's button works — one definition of "toggle the sidebar"
+   * for both ways in. Today that is the drawer below `lg`; the desktop collapse (#244) will
+   * give the same chord something to do on a wide screen without this line changing.
+   */
+  const toggleMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen((isOpen) => !isOpen);
+  }, []);
+
+  useShortcutListener(SIDEBAR_TOGGLE_SHORTCUT, toggleMobileSidebar);
+
   return (
     <>
       <aside
@@ -483,7 +504,7 @@ export function SideBar() {
           type="button"
           aria-label={isMobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
           aria-expanded={isMobileSidebarOpen}
-          onClick={() => setIsMobileSidebarOpen((isOpen) => !isOpen)}
+          onClick={toggleMobileSidebar}
           className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
         >
           {isMobileSidebarOpen ? (

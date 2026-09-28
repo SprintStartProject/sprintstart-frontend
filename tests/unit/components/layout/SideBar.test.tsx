@@ -411,4 +411,113 @@ describe("SideBar", () => {
     // this test is about, and a class list is a styling decision that can change without it.
     expect(chat.querySelector("[data-layout-id]")).not.toBeNull();
   });
+
+  /**
+   * The hint comes from the shortcuts registry (`navigationShortcut`), not from a string
+   * typed at the call site — this asserts the pairing of entry and chord, which is the half
+   * of "the hint and the keypress cannot disagree" a unit test can hold down.
+   */
+  it("advertises each destination's chord on the entry itself", () => {
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    // The chip is the visual half; the `title` is the copy a screen reader gets, which is
+    // why both are asserted instead of the chip alone.
+    expect(screen.getAllByRole("link", { name: "Dashboard" })[0]).toHaveAttribute(
+      "title",
+      "Dashboard (Alt + H)",
+    );
+    // The desktop rail and the mobile drawer are two renders of one list, so compare counts.
+    expect(screen.getAllByText("Alt + H").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Alt + K").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the shortcut chip out of the link's accessible name", () => {
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    expect(screen.getAllByText("Alt + H")[0]).toHaveAttribute("aria-hidden", "true");
+    // And the name stays the label alone — a screen reader reads the chord from `title`.
+    expect(screen.getAllByRole("link", { name: "Dashboard" }).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Alt+S is the drawer's chord — the same state the header button works, reached without
+   * leaving the keyboard. Asserted through the button's own name and `aria-expanded`, so the
+   * test fails if the two ways in ever stop sharing one toggle.
+   */
+  it("gives Alt+S the same drawer the header button works", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    await user.keyboard("{Alt>}s{/Alt}");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Close sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      ),
+    );
+
+    // It toggles rather than only opening: the same chord closes the drawer again.
+    await user.keyboard("{Alt>}s{/Alt}");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      ),
+    );
+  });
+
+  it("does not answer Alt+S while a text field has the keys", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(
+      <>
+        <SideBar />
+        <input aria-label="Notes" />
+      </>,
+    );
+
+    await user.click(screen.getByRole("textbox", { name: "Notes" }));
+    await user.keyboard("{Alt>}s{/Alt}");
+
+    expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
 });

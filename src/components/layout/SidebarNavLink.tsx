@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { SidebarIcon } from "./SidebarNavIcons";
 import { slidingIndicatorSpringToken } from "../../styles/tokens";
 import { prefetchRoute } from "../../services/routePrefetch";
+import { ShortcutHint } from "../ui/ShortcutHint";
 import { useProjectContext } from "../../features/projects/useProjectContext";
 
 /**
@@ -178,6 +179,12 @@ type SidebarNavLinkProps = {
    */
   busy?: boolean;
   busyLabel?: string;
+  /**
+   * The chord that jumps here, shown on hover/focus. Comes from the shortcuts registry
+   * (`navigationShortcut`) rather than being typed at each call site, so the hint on the
+   * entry and the keypress that answers it cannot drift apart.
+   */
+  shortcut?: string;
   onNavigate?: () => void;
 };
 
@@ -214,6 +221,7 @@ export function SidebarNavLink({
   countLabel,
   busy = false,
   busyLabel,
+  shortcut,
   onNavigate,
 }: SidebarNavLinkProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -344,6 +352,10 @@ export function SidebarNavLink({
       <NavLink
         to={to}
         end={end}
+        // The chord lives in the title rather than in the link's text: the chip is
+        // `aria-hidden` (a second rendering of the same thing), and this is the copy a
+        // screen reader does get.
+        title={shortcut ? `${label} (${shortcut})` : undefined}
         onClick={onNavigate}
         // Pointerdown rather than hover: a sweep across the sidebar passes over several
         // entries in one motion, and prefetching all of them would spend requests on
@@ -526,6 +538,10 @@ export function SidebarNavLink({
                 </motion.span>
 
                 <span>{label}</span>
+
+                {shortcut && (
+                  <ShortcutHint keys={shortcut} className="border-app-border text-app-text-muted" />
+                )}
 
                 {/* One trailing slot, not two. The count takes it when there is
                                     one: a number and the active dot side by side read as

@@ -221,7 +221,9 @@ describe("ProjectSwitcher", () => {
     render(<ProjectSwitcher />);
 
     act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+      // `code` matters: the shortcuts registry matches the physical key (`KeyK`), as a real
+      // browser's KeyboardEvent always carries one — only hand-made events omit it.
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", metaKey: true }));
     });
 
     expect(screen.getByRole("dialog", { name: "Switch project" })).toBeInTheDocument();
