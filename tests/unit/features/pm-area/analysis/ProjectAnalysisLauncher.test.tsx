@@ -94,12 +94,7 @@ async function runAnalysis(
   await beforeStart?.();
   await user.click(screen.getByRole("button", { name: /Start analysis/ }));
   // Each check shows for a moment on purpose, so the whole scan takes a couple of seconds.
-  // Waited for in the dialog: the strip on the overview shows the same heading once a run is kept.
-  await within(screen.getByTestId("project-analysis-dialog")).findByText(
-    /Where the points went/,
-    {},
-    { timeout: 8000 },
-  );
+  await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
 }
 
 describe("ProjectAnalysisLauncher", () => {
@@ -245,12 +240,7 @@ describe("ProjectAnalysisLauncher", () => {
     expect(await axe(baseElement)).toHaveNoViolations();
 
     await user.click(screen.getByRole("button", { name: /Start analysis/ }));
-    // Waited for in the dialog: the strip on the overview shows the same heading once a run is kept.
-    await within(screen.getByTestId("project-analysis-dialog")).findByText(
-      /Where the points went/,
-      {},
-      { timeout: 8000 },
-    );
+    await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
     expect(await axe(baseElement)).toHaveNoViolations();
   }, 30000);
 
@@ -269,12 +259,7 @@ describe("ProjectAnalysisLauncher", () => {
     expect(await log.findByText(/Team & open items: 1 member ·/)).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
 
-    // Waited for in the dialog: the strip on the overview shows the same heading once a run is kept.
-    await within(screen.getByTestId("project-analysis-dialog")).findByText(
-      /Where the points went/,
-      {},
-      { timeout: 8000 },
-    );
+    await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
   }, 30000);
 
   it("opens on every area at once, and narrows to one on request", async () => {
@@ -312,26 +297,6 @@ describe("ProjectAnalysisLauncher", () => {
 
     expect(screen.getByText(/Last run/)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Last health score \d+ of 100/ })).toBeInTheDocument();
-  }, 20000);
-
-  it("shows where the last run's points went on the overview, and opens the results from there", async () => {
-    const user = userEvent.setup();
-    const { unmount } = renderLauncher();
-
-    await runAnalysis(user);
-    unmount();
-    vi.clearAllMocks();
-    renderLauncher();
-
-    const strip = within(screen.getByRole("region", { name: "Project analysis" }));
-    expect(strip.getByText("Where the points went")).toBeInTheDocument();
-    expect(strip.getByText(/points off 100/)).toBeInTheDocument();
-
-    // The team's skip request cost points; its chip opens the stored results, nothing re-read.
-    await user.click(strip.getByRole("button", { name: /Team/ }));
-    const dialog = within(await screen.findByTestId("project-analysis-dialog"));
-    expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
-    expect(mocks.getTeamOverview).not.toHaveBeenCalled();
   }, 20000);
 
   it("opens the last results again later, without running anything", async () => {

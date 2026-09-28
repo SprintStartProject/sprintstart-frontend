@@ -7,7 +7,6 @@ import { formatRelativeDate } from "../../knowledge-gaps/format";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { RingGauge } from "../components/charts/RingGauge";
 import { scoreVerdict } from "./findings";
-import { PointsBreakdown } from "./PointsBreakdown";
 import { ProjectAnalysisDialog } from "./ProjectAnalysisDialog";
 import {
   DEFAULT_ANALYSIS_OPTIONS,
@@ -24,9 +23,8 @@ type ProjectAnalysisLauncherProps = {
 };
 
 /**
- * The overview's way into the project analysis: one strip at the top with the last run, where its
- * points went ({@link PointsBreakdown}), and the button that starts a new one in
- * {@link ProjectAnalysisDialog}.
+ * The overview's way into the project analysis: one slim strip at the top with the last run, and
+ * the button that starts a new one in {@link ProjectAnalysisDialog}.
  *
  * It owns the analysis (see {@link useProjectAnalysis}) rather than the dialog, so a run keeps
  * going with the dialog closed and the strip can say so. The last run's results stay a click away
@@ -136,14 +134,6 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
         >
           {running ? "Analysing…" : "Analyse project"}
         </Button>
-
-        {/* The last run's score, explained area by area, right on the overview. */}
-        {lastRun && analysis.lastFindings && !running && (
-          <PointsBreakdown
-            findings={analysis.lastFindings}
-            onOpen={analysis.canOpenLast ? openLast : undefined}
-          />
-        )}
       </section>
 
       <ProjectAnalysisDialog

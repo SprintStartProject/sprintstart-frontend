@@ -446,8 +446,6 @@ export function useProjectAnalysis() {
     /** When the results on screen were produced — now, or the stored run's time. */
     resultsAt: phase === "done" ? (stored?.at ?? null) : null,
     canOpenLast,
-    /** The last finished run's findings, for the overview's breakdown; null for older runs. */
-    lastFindings: stored?.findings ?? null,
     openLast,
     previousRun,
     refreshRevision,

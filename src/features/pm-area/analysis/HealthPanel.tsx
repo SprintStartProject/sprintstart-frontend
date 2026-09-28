@@ -3,9 +3,14 @@ import { RotateCcw, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../../components/ui/Button";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
-import { SEVERITY_META, scoreGlow } from "./analysisMeta";
-import { countBySeverity, scoreVerdict, type Finding, type FindingSeverity } from "./findings";
-import { PointsLostList } from "./PointsLostList";
+import { AREA_META, AREA_ORDER, SEVERITY_META, SEVERITY_RANK, scoreGlow } from "./analysisMeta";
+import {
+  countBySeverity,
+  pointsLostByArea,
+  scoreVerdict,
+  type Finding,
+  type FindingSeverity,
+} from "./findings";
 
 /** Counts up to the score once, the way the reference's figures roll in. */
 function CountUp({ value }: { value: number }) {
@@ -49,8 +54,19 @@ export function HealthPanel({
   onRunAgain,
 }: HealthPanelProps) {
   const counts = countBySeverity(findings);
+  const lost = pointsLostByArea(findings);
+  const highest = Math.max(1, ...lost.values());
   const delta = previous ? score - previous.score : null;
   const glow = scoreGlow(score);
+
+  const areas = AREA_ORDER.filter((area) => lost.has(area))
+    .map((area) => {
+      const worst = findings
+        .filter((finding) => finding.area === area && finding.severity !== "good")
+        .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])[0];
+      return { area, points: lost.get(area) ?? 0, worst: worst.severity };
+    })
+    .sort((a, b) => b.points - a.points);
 
   return (
     <aside
@@ -110,7 +126,40 @@ export function HealthPanel({
         <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">
           Where the points went
         </p>
-        <PointsLostList findings={findings} />
+        {areas.length === 0 ? (
+          <p className="text-sm text-app-text-muted">Nothing cost a point.</p>
+        ) : (
+          <ul className="space-y-2">
+            {areas.map(({ area, points, worst }) => {
+              const Icon = AREA_META[area].icon;
+              const color = SEVERITY_META[worst].glow;
+              return (
+                <li key={area} className="grid grid-cols-[7.5rem_1fr_auto] items-center gap-2.5">
+                  <span className="flex min-w-0 items-center gap-1.5 text-xs text-app-text-muted">
+                    <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{AREA_META[area].label}</span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="block h-1.5 overflow-hidden rounded-full bg-app-progress-track"
+                  >
+                    <span
+                      className="block h-full rounded-full"
+                      style={{
+                        width: `${(points / highest) * 100}%`,
+                        background: color,
+                        boxShadow: `0 0 10px ${color}`,
+                      }}
+                    />
+                  </span>
+                  <span className="text-xs font-semibold text-app-text tabular-nums">
+                    −{points}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       <ul className="grid grid-cols-2 gap-2">
