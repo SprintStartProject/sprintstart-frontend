@@ -140,7 +140,6 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
         {/* The last run's score, explained area by area, right on the overview. */}
         {lastRun && analysis.lastFindings && !running && (
           <PointsBreakdown
-            score={lastRun.score}
             findings={analysis.lastFindings}
             onOpen={analysis.canOpenLast ? openLast : undefined}
           />
