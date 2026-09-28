@@ -92,6 +92,102 @@ describe("Field", () => {
     );
     expect(screen.getByLabelText("Manager")).toHaveAttribute("aria-invalid", "true");
   });
+
+  it("marks the label optional when the field is not required", () => {
+    render(
+      <Field label="Nickname" optional>
+        <Input />
+      </Field>,
+    );
+    const control = screen.getByLabelText("Nickname (optional)");
+    expect(control).toBeInTheDocument();
+    expect(control).toHaveAccessibleName("Nickname (optional)");
+  });
+
+  it("prefers the required mark when both props are set", () => {
+    render(
+      <Field label="Email" required optional>
+        <Input />
+      </Field>,
+    );
+    expect(screen.getByLabelText(/^Email/)).toBeInTheDocument();
+    expect(screen.queryByText("(optional)")).not.toBeInTheDocument();
+  });
+
+  it("does not mark an optional control as required", () => {
+    render(
+      <Field label="Nickname" optional>
+        <Input />
+      </Field>,
+    );
+    expect(screen.getByLabelText("Nickname (optional)")).not.toHaveAttribute("aria-required");
+  });
+
+  it("carries the field's required flag to the control as aria-required", () => {
+    const { unmount: unmountInput } = render(
+      <Field label="Name" required>
+        <Input />
+      </Field>,
+    );
+    expect(screen.getByLabelText(/^Name/)).toHaveAttribute("aria-required", "true");
+    unmountInput();
+
+    const { unmount: unmountTextarea } = render(
+      <Field label="Bio" required>
+        <Textarea />
+      </Field>,
+    );
+    expect(screen.getByLabelText(/^Bio/)).toHaveAttribute("aria-required", "true");
+    unmountTextarea();
+
+    render(
+      <Field label="Role" required>
+        <Select>
+          <option value="">None</option>
+        </Select>
+      </Field>,
+    );
+    expect(screen.getByLabelText(/^Role/)).toHaveAttribute("aria-required", "true");
+  });
+
+  it("keeps the HTML required attribute mirrored in aria-required", () => {
+    render(<Input aria-label="Search" required />);
+    expect(screen.getByLabelText("Search")).toHaveAttribute("aria-required", "true");
+  });
+
+  it("keeps the browser's own constraint validation off unless the control asks for it", () => {
+    const { rerender } = render(
+      <Field label="Name" required>
+        <Input />
+      </Field>,
+    );
+
+    // The field mark is presentation and ARIA: no native attribute, so no
+    // `:required` styling and no browser "fill out this field" popup — these
+    // forms gate their own submits with guards and inline errors.
+    const fieldOnly = screen.getByLabelText(/^Name/);
+    expect(fieldOnly).not.toHaveAttribute("required");
+    expect((fieldOnly as HTMLInputElement).required).toBe(false);
+
+    rerender(
+      <Field label="Name" required>
+        <Input required />
+      </Field>,
+    );
+
+    const controlLevel = screen.getByLabelText(/^Name/);
+    expect(controlLevel).toHaveAttribute("required");
+    expect((controlLevel as HTMLInputElement).required).toBe(true);
+  });
+
+  it("lets an explicit aria-required on the control override the field", () => {
+    render(
+      <Field label="Name" required>
+        <Input aria-required={false} />
+      </Field>,
+    );
+    expect(screen.getByLabelText(/^Name/)).not.toHaveAttribute("aria-required");
+  });
 });
 
 describe("Textarea", () => {

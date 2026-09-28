@@ -128,7 +128,7 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
     >
       {editing ? (
         <div className="space-y-3">
-          <Field label="Title (optional)" controlId={`note-title-${card.id}`}>
+          <Field label="Title" optional controlId={`note-title-${card.id}`}>
             <Input
               value={titleDraft}
               onChange={(event) => setTitleDraft(event.target.value)}

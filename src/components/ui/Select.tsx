@@ -29,6 +29,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     id,
     disabled,
     "aria-describedby": ariaDescribedBy,
+    "aria-required": ariaRequired,
     children,
     ...rest
   },
@@ -36,6 +37,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
 ) {
   const field = useContext(FieldContext);
   const isInvalid = invalid ?? field?.invalid ?? false;
+  // An explicit `aria-required` or HTML `required` on the control wins; only
+  // when neither is given does the enclosing `Field` supply it. Emitted only
+  // when true, so a plain select does not grow a stray `aria-required="false"`.
+  const isRequired = ariaRequired ?? rest.required ?? field?.required;
 
   return (
     <select
@@ -44,6 +49,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
       disabled={disabled ?? field?.disabled ?? false}
       aria-invalid={isInvalid || undefined}
       aria-describedby={ariaDescribedBy ?? field?.describedBy}
+      aria-required={isRequired || undefined}
       className={fieldClasses({
         size,
         invalid: isInvalid,
