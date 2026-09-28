@@ -55,6 +55,7 @@ function AppContent() {
   // happened to be out does not open with it already there, waiting for a mouse that never went
   // near it to leave. Reset during render rather than in an effect: it is a correction to state
   // that is already wrong for this render, not a synchronisation with anything outside React.
+  // (The pattern and its three rules are named once in `CODING_STANDARDS.md` § 3.)
   const [peekMode, setPeekMode] = useState(isFocused);
   if (peekMode !== isFocused) {
     setPeekMode(isFocused);

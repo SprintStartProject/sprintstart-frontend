@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
@@ -66,9 +66,6 @@ export function BuddyWidget() {
     markGreetingPresented,
     isOpen,
     toggleOpen,
-    draft,
-    setDraft,
-    handleSubmit,
     confirmAction,
     dismissAction,
     suggestions,
@@ -188,10 +185,61 @@ export function BuddyWidget() {
 
   useEffect(() => clearHandoffTimers, [clearHandoffTimers]);
 
+  /**
+   * Hands the conversation over to `/buddy`.
+   *
+   * Nothing has to ride along with it: the composer lives in `BuddyDraftProvider`, which sits above
+   * the router, so the page's box already holds the words this window holds — the hand-off is the
+   * same conversation on a wider surface, not a transfer. Carrying a copy through history state was
+   * a second mechanism for that, and it was what made this callback depend on the draft: every
+   * keystroke rebuilt `goToPage`, then `openFull`, then the dock.
+   */
   const goToPage = useCallback(() => {
-    // The draft rides along in history state; `useHandedOffDraft` applies it once on the page.
-    void navigate(BUDDY_PAGE, { state: { draft } });
-  }, [draft, navigate]);
+    void navigate(BUDDY_PAGE);
+  }, [navigate]);
+
+  /**
+   * The props the dock's memoised thread compares, each held in one identity.
+   *
+   * The thread — and every row in it — is memoised, which is what keeps a keystroke and every
+   * streamed token out of the conversation's re-render path (issue #236). Any of these built
+   * inline here would hand it a new prop on every render of the widget and put them all back.
+   */
+  const hasUserMessage = messages.some((message) => message.role === "USER");
+  // The greeting's one suggested next step, which only `/buddy` used to offer.
+  const lastMessageFooter = useMemo(
+    () =>
+      openerAction && !greeting.isRevealing && !hasUserMessage ? (
+        <Button
+          variant="primary"
+          size="sm"
+          className="mt-1.5"
+          icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+          onClick={() => void sendMessage(openerAction.question)}
+        >
+          {openerAction.label}
+        </Button>
+      ) : undefined,
+    [openerAction, greeting.isRevealing, hasUserMessage, sendMessage],
+  );
+  const retryOpenAction = useCallback(() => void retryOpen(), [retryOpen]);
+  const hideSuggestions = useCallback(() => setSuggestionsHidden(true), []);
+
+  /**
+   * The dock's header control, held in one identity for the same reason as the props above: the
+   * dock is memoised, and a switcher built inline here would be a fresh element on every render of
+   * the widget — a prop the memo would compare and always find changed.
+   */
+  const headerControl = useMemo(
+    () => (
+      <BuddyModeSwitcher
+        teamProjectId={teamProjectId}
+        onSwitch={(projectId) => void switchTeamProject(projectId)}
+        disabled={isTurnInFlight}
+      />
+    ),
+    [teamProjectId, switchTeamProject, isTurnInFlight],
+  );
 
   /**
    * Grows the open dock into the page — one gesture instead of a cut.
@@ -294,25 +342,11 @@ export function BuddyWidget() {
             // `isOpening` too, the way `/buddy` passes it: a dock opened while the greeting is
             // still being written showed an empty window instead of the buddy typing.
             isThinking={isThinking || isOpening || greeting.isThinking}
-            // The greeting's one suggested next step, which only `/buddy` used to offer.
-            lastMessageFooter={
-              openerAction && !greeting.isRevealing && !messages.some((m) => m.role === "USER") ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="mt-1.5"
-                  icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
-                  onClick={() => void sendMessage(openerAction.question)}
-                >
-                  {openerAction.label}
-                </Button>
-              ) : undefined
-            }
+            // Held in one identity above, with the reason written there — the thread's memo
+            // compares it.
+            lastMessageFooter={lastMessageFooter}
             isStreaming={isStreaming}
             activeTool={activeTool}
-            draft={draft}
-            setDraft={setDraft}
-            handleSubmit={handleSubmit}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             suggestions={suggestions}
@@ -323,21 +357,16 @@ export function BuddyWidget() {
             isDeciding={isDeciding}
             teamProjectId={teamProjectId}
             openError={openError}
-            onRetryOpen={() => void retryOpen()}
+            onRetryOpen={retryOpenAction}
             onClose={toggleOpen}
             onOpenFull={openFull}
             suggestionsHidden={suggestionsHidden}
-            onHideSuggestions={() => setSuggestionsHidden(true)}
+            onHideSuggestions={hideSuggestions}
             // Hire conversation ↔ team conversations, in the header beside the title. The
             // switcher only *offers* the switch; the restore audit lives in the session
-            // (`useBuddyConversation` / `BuddyProvider`).
-            headerControl={
-              <BuddyModeSwitcher
-                teamProjectId={teamProjectId}
-                onSwitch={(projectId) => void switchTeamProject(projectId)}
-                disabled={isTurnInFlight}
-              />
-            }
+            // (`useBuddyConversation` / `BuddyProvider`). Memoised above, like the props around
+            // it: the dock is a memoised component now.
+            headerControl={headerControl}
             isExpanding={handoff !== "idle"}
             isRevealing={handoff === "revealing"}
           />

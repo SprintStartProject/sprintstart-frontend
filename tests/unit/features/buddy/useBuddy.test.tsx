@@ -2,8 +2,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
-import { BuddyProviderWithStubs } from "./buddyTestHarness";
+import { BuddyProviderWithStubs, useBuddyWithDraft } from "./buddyTestHarness";
 import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
 import { delay, http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
@@ -55,7 +54,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     expect(result.current.isOpen).toBe(false);
     await waitFor(() => {
@@ -73,7 +72,7 @@ describe("useBuddy", () => {
       ),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -103,7 +102,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -159,7 +158,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.setDraft("what should I work on?");
@@ -182,7 +181,7 @@ describe("useBuddy", () => {
   it("opens a closed dock and seeds the composer", async () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
     expect(result.current.isOpen).toBe(false);
 
     act(() => {
@@ -204,7 +203,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       openAiBuddy({ draft: "> The migration runs on deploy.\n\n" });
@@ -225,7 +224,7 @@ describe("useBuddy", () => {
     it("keeps a closed dock's saved draft and puts the seed under it", async () => {
       server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
       act(() => {
         result.current.setDraft("why does the deploy");
       });
@@ -242,7 +241,7 @@ describe("useBuddy", () => {
     it("keeps an open dock's draft the same way", async () => {
       server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
       act(() => {
         result.current.toggleOpen();
         result.current.setDraft("why does the deploy");
@@ -260,7 +259,7 @@ describe("useBuddy", () => {
     it("does not stack the same seed twice", async () => {
       server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
       act(() => {
         openAiBuddy({ draft: QUOTE });
@@ -277,7 +276,7 @@ describe("useBuddy", () => {
   it("toggles open state", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -316,7 +315,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -397,7 +396,7 @@ describe("useBuddy", () => {
         }),
       );
 
-      const hook = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      const hook = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
       act(() => {
         hook.result.current.toggleOpen();
       });
@@ -514,7 +513,7 @@ describe("useBuddy", () => {
         http.post("/api/v1/onboarding/me/buddy/actions", () => HttpResponse.json(outcome)),
       );
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: Wrapper });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: Wrapper });
       act(() => {
         result.current.toggleOpen();
       });
@@ -614,7 +613,7 @@ describe("useBuddy", () => {
         http.post("/api/v1/onboarding/me/buddy/messages", () => stream(answers[answered++])),
       );
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: Wrapper });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: Wrapper });
       act(() => {
         result.current.toggleOpen();
       });
@@ -624,7 +623,7 @@ describe("useBuddy", () => {
     }
 
     /** Sends one question and waits for its turn to end. */
-    async function ask(result: { current: ReturnType<typeof useBuddy> }, text: string) {
+    async function ask(result: { current: ReturnType<typeof useBuddyWithDraft> }, text: string) {
       act(() => {
         result.current.setDraft(text);
       });
