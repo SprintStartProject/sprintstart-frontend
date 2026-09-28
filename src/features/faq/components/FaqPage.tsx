@@ -33,13 +33,16 @@ const PAGE_SUBTITLE = "What people keep asking the chat, ranked by frequency and
 
 type FaqSortOption = "count" | "recent" | "trend" | "title";
 
-/** Which questions the list shows. One at a time, like the Team list's status chips. */
-type FaqFilter = "all" | "recurring" | "rising";
+/**
+ * What the list can be narrowed to, one at a time. Nothing chosen shows every question, the same
+ * way the Knowledge gaps list starts: an "All" chip lit up by default read as a filter someone had
+ * set, and the two lists worked differently for no reason.
+ */
+type FaqFilter = "recurring" | "rising";
 
-const FAQ_FILTERS: readonly FaqFilter[] = ["all", "recurring", "rising"];
+const FAQ_FILTERS: readonly FaqFilter[] = ["recurring", "rising"];
 
 const FAQ_FILTER_LABEL: Record<FaqFilter, string> = {
-  all: "All",
   recurring: "Asked more than once",
   rising: "Picking up",
 };
@@ -48,9 +51,9 @@ const FAQ_FILTER_DOT: Partial<Record<FaqFilter, string>> = {
   rising: "bg-app-warning-solid",
 };
 
-function matchesFaqFilter(group: FAQGroup, filter: FaqFilter): boolean {
+function matchesFaqFilter(group: FAQGroup, filter: FaqFilter | null): boolean {
   switch (filter) {
-    case "all":
+    case null:
       return true;
     case "recurring":
       return group.count > 1;
@@ -114,7 +117,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
   const navigate = useNavigate();
 
   const [sortBy, setSortBy] = useState<FaqSortOption>("count");
-  const [filter, setFilter] = useState<FaqFilter>("all");
+  const [filter, setFilter] = useState<FaqFilter | null>(null);
   const [query, setQuery] = useState("");
 
   const [isRebuildDialogOpen, setRebuildDialogOpen] = useState(false);
@@ -186,9 +189,9 @@ export function FaqPage({ groupId }: { groupId?: string }) {
       allGroups.filter((group) => matchesFaqFilter(group, option)).length,
     ]),
   ) as Record<FaqFilter, number>;
-  const narrowed = filter !== "all" || normalizedQuery !== "" || sortBy !== "count";
+  const narrowed = filter !== null || normalizedQuery !== "" || sortBy !== "count";
   const resetList = () => {
-    setFilter("all");
+    setFilter(null);
     setQuery("");
     setSortBy("count");
   };
@@ -242,7 +245,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
             label="Questions tracked"
             value={hasData ? totalGroups : "—"}
             hint={hasData ? `${oneOffCount} asked only once` : "Loading"}
-            onClick={hasData ? () => setFilter("all") : undefined}
+            onClick={hasData ? () => setFilter(null) : undefined}
           />
           <PmStat
             tone="indigo"
@@ -282,7 +285,8 @@ export function FaqPage({ groupId }: { groupId?: string }) {
               <PmFilterChip
                 key={option}
                 active={filter === option}
-                onClick={() => setFilter(option)}
+                // Pressing the chip that is on turns it off again, back to every question.
+                onClick={() => setFilter((current) => (current === option ? null : option))}
                 label={FAQ_FILTER_LABEL[option]}
                 count={filterCounts[option]}
                 dotClassName={FAQ_FILTER_DOT[option]}

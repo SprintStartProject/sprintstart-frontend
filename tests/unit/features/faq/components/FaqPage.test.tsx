@@ -257,6 +257,25 @@ describe("FaqPage", () => {
     expect(screen.queryByText("Asked once only")).not.toBeInTheDocument();
   });
 
+  // Like Knowledge gaps: no "All" chip lit by default; the chip that is on turns off again.
+  it("starts with no filter chosen, and turns a chosen one off again", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const filters = within(screen.getByRole("group", { name: "Filter recurring questions" }));
+    expect(filters.queryByRole("button", { name: /^All/ })).not.toBeInTheDocument();
+    const recurring = filters.getByRole("button", { name: /Asked more than once/ });
+    expect(recurring).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(recurring);
+    expect(recurring).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("Asked once only")).not.toBeInTheDocument();
+
+    await user.click(recurring);
+    expect(recurring).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Asked once only")).toBeInTheDocument();
+  });
+
   // The same toolbar as Team and Knowledge gaps: search, one filter at a time, reset.
   it("searches the questions and resets the list in one go", async () => {
     const user = userEvent.setup();
