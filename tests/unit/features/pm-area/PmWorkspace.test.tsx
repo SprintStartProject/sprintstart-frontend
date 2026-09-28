@@ -112,10 +112,17 @@ describe("PmWorkspace", () => {
     ).toEqual(["Overview", "Team", "Onboarding", "Questions", "Knowledge gaps", "Escalations3"]);
   });
 
-  it("keeps the project analysis beside the tabs, on every section", () => {
-    renderWorkspace("/insights/faq");
+  it("shows the project analysis beside the tabs on the overview only", () => {
+    // Hidden elsewhere by a class (it stays mounted, it owns a running analysis); jsdom has no
+    // stylesheet, so the class is what can be checked.
+    const analysis = () => screen.getByRole("region", { name: "Project analysis" }).parentElement;
 
-    expect(screen.getByRole("region", { name: "Project analysis" })).toBeInTheDocument();
+    const { unmount } = renderWorkspace("/pm-dashboard");
+    expect(analysis()).not.toHaveClass("hidden");
+    unmount();
+
+    renderWorkspace("/insights/faq");
+    expect(analysis()).toHaveClass("hidden");
   });
 
   it("picks the section from the URL, old addresses included", () => {

@@ -356,8 +356,9 @@ export function PmWorkspace() {
           </EmptyState>
         ) : (
           <>
-            {/* The project analysis beside the tabs rather than on the overview only: the score
-                and a new run are one press away from every section. */}
+            {/* The project analysis beside the tabs, on the overview only. Hidden rather than
+                unmounted on the other sections: it owns the run, so leaving the overview while
+                one is going (or opening a finding elsewhere) must not throw it away. */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <SegmentedTabs
                 value={section}
@@ -366,7 +367,9 @@ export function PmWorkspace() {
                 layoutId="pm-workspace-section-pill"
                 ariaLabel="PM dashboard sections"
               />
-              <ProjectAnalysisLauncher onRefreshed={setAnalysisRevision} />
+              <div className={section === "overview" ? "contents" : "hidden"}>
+                <ProjectAnalysisLauncher onRefreshed={setAnalysisRevision} />
+              </div>
             </div>
 
             {/* `-mx-2 px-2` moves the clip edge 8px outside the column without moving the
