@@ -199,6 +199,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               <Field
                 label="New name"
                 controlId={`settings-atlassian-rename-${displayName}`}
+                required
                 disabled={isBusy}
                 className="min-w-0 flex-1"
               >
@@ -248,6 +249,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               <Field
                 label="New API token"
                 controlId={`settings-atlassian-rotate-${displayName}`}
+                required
                 disabled={isBusy}
                 className="min-w-0 flex-1"
               >
