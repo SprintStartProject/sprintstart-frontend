@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
 import { matchEggPhrase } from "../../easter-eggs/lib/eggPhrases";
 import { playEggEffect } from "../../easter-eggs/eggEffectBus";
@@ -13,7 +12,7 @@ import {
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
 import { useAuth } from "../../../context/useAuth";
-import { queryKeys } from "../../../services/queryKeys";
+import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import {
   BUDDY_ACTION_AMEND_CHECKLIST,
   BUDDY_ACTION_CLAIM_GOAL,
@@ -120,7 +119,7 @@ export function useBuddyConversation(
   const [messages, setMessages] = useState<BuddyMessageView[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const queryClient = useQueryClient();
+  const invalidateBoard = useInvalidateBoard();
   // The tool the buddy is running right now, if any -- drives "Checking your progress…"
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -596,17 +595,13 @@ export function useBuddyConversation(
       const touched = { board: false };
 
       /**
-       * Marks the board stale when this turn ran the card-placing tool, and only then.
-       *
-       * `place_card` is not confirmed and the wire reports nothing about its outcome — the
-       * `tool_use` event is the whole signal, and it cannot say whether the tool wrote a card or
-       * was refused. So the mark is applied once the turn ends, the failing paths included: a
-       * turn that wrote a card and then broke still wrote it, and a turn whose tool refused
-       * costs one refetch of an unchanged board. Refreshing a board that did not change beats
-       * missing one that did.
+       * `place_card` is the one board write that is not confirmed: its `tool_use` event is the
+       * whole signal the client gets, and it cannot say whether the tool wrote a card or was
+       * refused. So the board is marked stale when the turn ends — the failing paths included.
+       * See `useInvalidateBoard` for why the mark is what makes this visible.
        */
       const syncBoardIfTouched = () => {
-        if (touched.board) void queryClient.invalidateQueries({ queryKey: queryKeys.board.all() });
+        if (touched.board) invalidateBoard();
       };
 
       try {
@@ -721,7 +716,7 @@ export function useBuddyConversation(
         syncBoardIfTouched();
       }
     },
-    [failReply, queryClient],
+    [failReply, invalidateBoard],
   );
 
   /** Patches one proposed action in place, keyed by its message and action id. */
@@ -811,14 +806,11 @@ export function useBuddyConversation(
             outcome: result.message,
           });
 
-          // A confirmed board write changed a surface that is not on screen here: the board
-          // itself. Marking the cached board stale is what lets an open board — the dock can be
-          // floating over it — or a visit within the cache window show the change, instead of the
-          // state it was read at. `board.all()` rather than the selected project's key, because
-          // the backend re-resolves the project server-side (the caller's single onboarding
-          // project) and the client never learns which board it wrote.
+          // `board.all()`, not a project key: the backend re-resolves the project server-side
+          // (the caller's single onboarding project) and never tells the client which board —
+          // see `useInvalidateBoard`.
           if (result.ok && "action" in action && BUDDY_BOARD_ACTIONS.has(action.action)) {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.board.all() });
+            invalidateBoard();
           }
         } catch (e) {
           console.error(e);
@@ -843,7 +835,7 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, patchAction, queryClient],
+    [beginDecision, endDecision, patchAction, invalidateBoard],
   );
 
   /**

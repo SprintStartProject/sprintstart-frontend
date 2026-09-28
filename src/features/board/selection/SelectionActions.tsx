@@ -1,5 +1,4 @@
 import { useCallback, useContext, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { BookmarkPlus, Eraser, Highlighter, MessageCircle, Reply } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
@@ -8,7 +7,7 @@ import { useFocusMode } from "../../../context/useFocusMode";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { ChatContext } from "../../../context/ChatContext";
 import { boardService } from "../../../services/boardService";
-import { queryKeys } from "../../../services/queryKeys";
+import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin } from "../layout/cardOrigins";
 import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
@@ -50,7 +49,7 @@ export function SelectionActions() {
   const quoteSelection = chatContext?.quoteSelection;
   const [saving, setSaving] = useState(false);
   const toast = useToast();
-  const queryClient = useQueryClient();
+  const invalidateBoard = useInvalidateBoard(selectedProjectId);
   const navigate = useNavigate();
 
   const add = useCallback(async () => {
@@ -68,12 +67,8 @@ export function SelectionActions() {
         url: selection.origin,
         label: selection.source ?? "where you were",
       });
-      // Found anywhere in the app, so the board is almost never on screen — and where it is, its
-      // cache was read before this card existed. Marking it stale is what makes the next board
-      // read — a visit, or the open board behind this page — show it.
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.board.byProject(selectedProjectId),
-      });
+      // Found anywhere in the app, so the board is almost never on screen — see `useInvalidateBoard`.
+      invalidateBoard();
       toast.success(
         request.kind === "LINK" ? "Link saved to your board" : "Note saved to your board",
         {
@@ -87,7 +82,7 @@ export function SelectionActions() {
     } finally {
       setSaving(false);
     }
-  }, [selection, selectedProjectId, toast, navigate, clear, queryClient]);
+  }, [selection, selectedProjectId, toast, navigate, clear, invalidateBoard]);
 
   /**
    * Hands the selection to the buddy as a quote, unsent.
