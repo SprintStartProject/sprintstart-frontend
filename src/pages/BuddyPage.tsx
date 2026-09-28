@@ -17,7 +17,6 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
 import { BuddyModeSwitcher } from "../features/buddy/components/BuddyModeSwitcher";
 import { useGreetingReveal } from "../features/buddy/hooks/useGreetingReveal";
-import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { announceBuddyPageReady } from "../features/buddy/aiBuddyBus";
 import {
   NEW_CONVERSATION_CHORD,
@@ -266,9 +265,6 @@ function BuddyMentorHome() {
     },
     [isDesktop],
   );
-
-  // Whatever they were typing in the dock when they asked for more room.
-  useHandedOffDraft(setDraft);
 
   const hasUserMessage = messages.some((m) => m.role === "USER");
 

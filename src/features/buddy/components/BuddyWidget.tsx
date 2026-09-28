@@ -66,7 +66,6 @@ export function BuddyWidget() {
     markGreetingPresented,
     isOpen,
     toggleOpen,
-    draft,
     confirmAction,
     dismissAction,
     suggestions,
@@ -186,10 +185,18 @@ export function BuddyWidget() {
 
   useEffect(() => clearHandoffTimers, [clearHandoffTimers]);
 
+  /**
+   * Hands the conversation over to `/buddy`.
+   *
+   * Nothing has to ride along with it: the composer lives in `BuddyDraftProvider`, which sits above
+   * the router, so the page's box already holds the words this window holds — the hand-off is the
+   * same conversation on a wider surface, not a transfer. Carrying a copy through history state was
+   * a second mechanism for that, and it was what made this callback depend on the draft: every
+   * keystroke rebuilt `goToPage`, then `openFull`, then the dock.
+   */
   const goToPage = useCallback(() => {
-    // The draft rides along in history state; `useHandedOffDraft` applies it once on the page.
-    void navigate(BUDDY_PAGE, { state: { draft } });
-  }, [draft, navigate]);
+    void navigate(BUDDY_PAGE);
+  }, [navigate]);
 
   /**
    * The props the dock's memoised thread compares, each held in one identity.
@@ -217,6 +224,22 @@ export function BuddyWidget() {
   );
   const retryOpenAction = useCallback(() => void retryOpen(), [retryOpen]);
   const hideSuggestions = useCallback(() => setSuggestionsHidden(true), []);
+
+  /**
+   * The dock's header control, held in one identity for the same reason as the props above: the
+   * dock is memoised, and a switcher built inline here would be a fresh element on every render of
+   * the widget — a prop the memo would compare and always find changed.
+   */
+  const headerControl = useMemo(
+    () => (
+      <BuddyModeSwitcher
+        teamProjectId={teamProjectId}
+        onSwitch={(projectId) => void switchTeamProject(projectId)}
+        disabled={isTurnInFlight}
+      />
+    ),
+    [teamProjectId, switchTeamProject, isTurnInFlight],
+  );
 
   /**
    * Grows the open dock into the page — one gesture instead of a cut.
@@ -341,14 +364,9 @@ export function BuddyWidget() {
             onHideSuggestions={hideSuggestions}
             // Hire conversation ↔ team conversations, in the header beside the title. The
             // switcher only *offers* the switch; the restore audit lives in the session
-            // (`useBuddyConversation` / `BuddyProvider`).
-            headerControl={
-              <BuddyModeSwitcher
-                teamProjectId={teamProjectId}
-                onSwitch={(projectId) => void switchTeamProject(projectId)}
-                disabled={isTurnInFlight}
-              />
-            }
+            // (`useBuddyConversation` / `BuddyProvider`). Memoised above, like the props around
+            // it: the dock is a memoised component now.
+            headerControl={headerControl}
             isExpanding={handoff !== "idle"}
             isRevealing={handoff === "revealing"}
           />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion, type MotionValue } from "framer-motion";
 import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
@@ -127,7 +127,7 @@ type BuddyDockProps = Pick<
  * the full viewport, and the caller changes the route as it lands. Without that the dock
  * vanished and a page appeared, and nobody could tell it was the same conversation.
  */
-export function BuddyDock({
+function BuddyDockImpl({
   messages,
   isThinking,
   isStreaming,
@@ -411,3 +411,11 @@ export function BuddyDock({
     </motion.div>
   );
 }
+
+/**
+ * Memoised, like `BuddyThread`: every prop on this panel is either a plain value, a callback the
+ * widget holds in one identity, or a motion value — so a render of the widget that changes none of
+ * them (a resize while the dock is open, a drag across the screen) no longer re-walks the dock's
+ * whole layout. `headerControl` is held in one identity at the call site for the same reason.
+ */
+export const BuddyDock = memo(BuddyDockImpl);
