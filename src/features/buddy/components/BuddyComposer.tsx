@@ -3,16 +3,9 @@ import type { KeyboardEvent } from "react";
 import { Send } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useAutoResize } from "../../../components/ui/useAutoResize";
+import { useBuddyDraft } from "../buddyDraftContext";
 
 type BuddyComposerProps = {
-  draft: string;
-  setDraft: (value: string) => void;
-  /**
-   * Submits the box. Returns whether a turn was actually started: `false` when the caller
-   * swallowed the submission (an easter-egg phrase, an empty draft), which is what keeps the
-   * caret here instead of handing it off on a send that never happened — see `submit`.
-   */
-  handleSubmit: (event: React.FormEvent) => boolean;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
   /** Drops the keyboard hint under the box, for the dock where the room is better spent. */
@@ -56,17 +49,20 @@ type BuddyComposerProps = {
  * It draws no band of its own — no border, no background, no page padding. Each surface frames
  * it: the page's card gives it a bottom band, the dock hands it to `SidePanel`'s footer. Owning
  * the frame here is what previously put two `border-t`s across the dock.
+ *
+ * It reads the words from the shared composer (`useBuddyDraft`) rather than taking them as
+ * props — the box is the one component a keystroke is *allowed* to re-render, and reading the
+ * draft directly is what keeps that true: a surface passing `draft` down would be re-rendering
+ * for every character it forwarded. See `BuddyDraftProvider`.
  */
 export function BuddyComposer({
-  draft,
-  setDraft,
-  handleSubmit,
   placeholder = "Ask your buddy anything...",
   compact = false,
   focusOnMount = false,
   busy = false,
   gameActive = false,
 }: BuddyComposerProps) {
+  const { draft, setDraft, handleSubmit } = useBuddyDraft();
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
   // Set when *this* composer gave up the caret on a send, so the refocus

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion, type MotionValue } from "framer-motion";
 import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
@@ -6,6 +6,8 @@ import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { Button } from "../../../components/ui/Button";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
+import { useBuddyDraftActions } from "../buddyDraftContext";
+import type { BuddyMessageView } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyQuestionActions } from "./BuddyQuestionActions";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
@@ -41,9 +43,6 @@ type BuddyDockProps = Pick<
   | "isThinking"
   | "isStreaming"
   | "activeTool"
-  | "draft"
-  | "setDraft"
-  | "handleSubmit"
   | "confirmAction"
   | "dismissAction"
   | "suggestions"
@@ -133,9 +132,6 @@ export function BuddyDock({
   isThinking,
   isStreaming,
   activeTool,
-  draft,
-  setDraft,
-  handleSubmit,
   confirmAction,
   dismissAction,
   suggestions,
@@ -162,6 +158,30 @@ export function BuddyDock({
   const prefersReducedMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
   const { containerRef, onScroll } = useStickToBottom(messages);
+
+  // The chips fill the composer through the write-only half, so this window does not follow
+  // every character typed into the box — see `useBuddyDraftActions`.
+  const { setDraft } = useBuddyDraftActions();
+
+  /**
+   * The callbacks `BuddyThread` is handed, each held in one identity.
+   *
+   * The thread is memoised — that is what keeps a keystroke (or a token) from re-rendering the
+   * whole conversation — and a callback built inline here would hand it a new prop on every
+   * render of this window, which is exactly the dance the memo exists to avoid.
+   */
+  const renderReplyAction = useCallback(
+    (reply: string, message: BuddyMessageView) => (
+      <BuddyReplyActions reply={reply} message={message} />
+    ),
+    [],
+  );
+  const renderQuestionAction = useCallback(
+    (question: string) =>
+      teamProjectId === null ? <BuddyQuestionActions question={question} /> : undefined,
+    [teamProjectId],
+  );
+  const startFresh = useCallback(() => void startFreshVisit(), [startFreshVisit]);
 
   // Escape closes it, the way every other dismissible surface in the app behaves. Bound to the
   // document rather than the panel so it works while the hire is reading the page behind it.
@@ -327,9 +347,7 @@ export function BuddyDock({
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
         >
           <BuddyThread
-            renderReplyAction={(reply, message) => (
-              <BuddyReplyActions reply={reply} message={message} />
-            )}
+            renderReplyAction={renderReplyAction}
             compact
             messages={messages}
             isThinking={isThinking}
@@ -340,14 +358,12 @@ export function BuddyDock({
             dismissAction={dismissAction}
             // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
             // team-mode conversation is not one — the offer must not even render there.
-            renderQuestionAction={(question) =>
-              teamProjectId === null ? <BuddyQuestionActions question={question} /> : undefined
-            }
+            renderQuestionAction={renderQuestionAction}
             openError={openError}
             onRetryOpen={onRetryOpen}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={onDinoGameExit}
-            onStartFreshVisit={() => void startFreshVisit()}
+            onStartFreshVisit={startFresh}
           />
         </div>
 
@@ -389,15 +405,7 @@ export function BuddyDock({
                         `focusOnMount` rather than a bare `focus()`. A focused textarea with a value
                         in it starts the caret at position 0, so "Ask your buddy about this" used to
                         hand over a question the hire then typed in front of. */}
-          <BuddyComposer
-            draft={draft}
-            setDraft={setDraft}
-            handleSubmit={handleSubmit}
-            compact
-            focusOnMount
-            busy={isBusy}
-            gameActive={dinoGameActive}
-          />
+          <BuddyComposer compact focusOnMount busy={isBusy} gameActive={dinoGameActive} />
         </div>
       </motion.div>
     </motion.div>

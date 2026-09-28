@@ -340,11 +340,8 @@ describe("useBuddyConversation — team mode", () => {
     });
     await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0));
 
-    act(() => {
-      result.current.setDraft("shift Task 0");
-    });
-    act(() => {
-      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    await act(async () => {
+      await result.current.sendMessage("shift Task 0");
     });
     await waitFor(() => {
       expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
@@ -386,11 +383,8 @@ describe("useBuddyConversation — team mode", () => {
         await result.current.ensureOpened();
       });
       await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0));
-      act(() => {
-        result.current.setDraft("shift Task 0");
-      });
-      act(() => {
-        result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      await act(async () => {
+        await result.current.sendMessage("shift Task 0");
       });
       await waitFor(() => {
         expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);

@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
@@ -14,13 +15,6 @@ type BuddyConversationProps = {
   isThinking: boolean;
   /** The tool the buddy is running right now, if any — becomes "Checking your progress…". */
   activeTool: string | null;
-  draft: string;
-  setDraft: (value: string) => void;
-  /**
-   * Submits the composer. Returns whether a turn started — an egg phrase comes back `false`,
-   * because nothing was sent for it.
-   */
-  handleSubmit: (event: React.FormEvent) => boolean;
   /** Confirms a buddy-proposed action (the only path that mutates). */
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
@@ -95,9 +89,6 @@ export function BuddyConversation({
   messages,
   isThinking,
   activeTool,
-  draft,
-  setDraft,
-  handleSubmit,
   confirmAction,
   dismissAction,
   placeholder,
@@ -116,6 +107,19 @@ export function BuddyConversation({
   onDinoGameExit,
 }: BuddyConversationProps) {
   const { containerRef, onScroll } = useStickToBottom(messages);
+
+  /**
+   * The row under every reply, held in one identity for the life of this component.
+   *
+   * `BuddyThread` is memoised — that is what keeps a keystroke out of the thread — and a
+   * callback created inline would hand it a new prop on every render, defeating exactly that.
+   */
+  const renderReplyAction = useCallback(
+    (reply: string, message: BuddyMessageView) => (
+      <BuddyReplyActions reply={reply} message={message} />
+    ),
+    [],
+  );
 
   return (
     <>
@@ -161,9 +165,7 @@ export function BuddyConversation({
           )}
 
           <BuddyThread
-            renderReplyAction={(reply, message) => (
-              <BuddyReplyActions reply={reply} message={message} />
-            )}
+            renderReplyAction={renderReplyAction}
             messages={messages}
             isThinking={isThinking}
             isStreaming={isStreaming}
@@ -191,9 +193,6 @@ export function BuddyConversation({
           {aboveComposer && <div className="mb-3 min-w-0">{aboveComposer}</div>}
 
           <BuddyComposer
-            draft={draft}
-            setDraft={setDraft}
-            handleSubmit={handleSubmit}
             placeholder={placeholder}
             focusOnMount={focusComposerOnMount}
             busy={isThinking || isStreaming}

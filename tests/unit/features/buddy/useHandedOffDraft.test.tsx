@@ -2,8 +2,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { useHandedOffDraft } from "../../../../src/features/buddy/useHandedOffDraft";
+import {
+  BuddyDraftActionsContext,
+  BuddyDraftContext,
+} from "../../../../src/features/buddy/buddyDraftContext";
 
 vi.mock("../../../../src/context/useAuth", () => ({
   useAuth: () => ({
@@ -119,29 +124,44 @@ describe("useHandedOffDraft", () => {
 });
 
 describe("the dock’s hand-off control", () => {
+  /**
+   * The dock takes its words from the shared composer now (`BuddyDraftProvider`): its chips fill
+   * the box through the write-only half, and the composer inside reads the value. Standing the
+   * two contexts in for the provider is the only way to render it — and `draft` is the box's
+   * contents, which is what the hand-off is about.
+   */
+  function withDraft(node: ReactNode, draft = "") {
+    return (
+      <BuddyDraftActionsContext.Provider value={{ setDraft: vi.fn() }}>
+        <BuddyDraftContext.Provider value={{ draft, setDraft: vi.fn(), handleSubmit: vi.fn() }}>
+          {node}
+        </BuddyDraftContext.Provider>
+      </BuddyDraftActionsContext.Provider>
+    );
+  }
+
   it("is absent on the page it would open", async () => {
     // Guarded in BuddyWidget rather than here; this documents the intent that a control
     // offering the page you are already reading is not offered at all.
     const { BuddyDock } = await import("../../../../src/features/buddy/components/BuddyDock");
 
     render(
-      <BuddyDock
-        messages={[]}
-        isThinking={false}
-        isStreaming={false}
-        activeTool={null}
-        draft=""
-        setDraft={vi.fn()}
-        handleSubmit={vi.fn()}
-        confirmAction={vi.fn()}
-        dismissAction={vi.fn()}
-        suggestions={[]}
-        startFreshVisit={vi.fn()}
-        isGreeting={false}
-        isDeciding={false}
-        teamProjectId={null}
-        onClose={vi.fn()}
-      />,
+      withDraft(
+        <BuddyDock
+          messages={[]}
+          isThinking={false}
+          isStreaming={false}
+          activeTool={null}
+          confirmAction={vi.fn()}
+          dismissAction={vi.fn()}
+          suggestions={[]}
+          startFreshVisit={vi.fn()}
+          isGreeting={false}
+          isDeciding={false}
+          teamProjectId={null}
+          onClose={vi.fn()}
+        />,
+      ),
     );
 
     expect(screen.queryByLabelText("Open the full buddy page")).not.toBeInTheDocument();
@@ -153,24 +173,24 @@ describe("the dock’s hand-off control", () => {
     const user = userEvent.setup();
 
     render(
-      <BuddyDock
-        messages={[]}
-        isThinking={false}
-        isStreaming={false}
-        activeTool={null}
-        draft="half a question"
-        setDraft={vi.fn()}
-        handleSubmit={vi.fn()}
-        confirmAction={vi.fn()}
-        dismissAction={vi.fn()}
-        suggestions={[]}
-        startFreshVisit={vi.fn()}
-        isGreeting={false}
-        isDeciding={false}
-        teamProjectId={null}
-        onClose={vi.fn()}
-        onOpenFull={onOpenFull}
-      />,
+      withDraft(
+        <BuddyDock
+          messages={[]}
+          isThinking={false}
+          isStreaming={false}
+          activeTool={null}
+          confirmAction={vi.fn()}
+          dismissAction={vi.fn()}
+          suggestions={[]}
+          startFreshVisit={vi.fn()}
+          isGreeting={false}
+          isDeciding={false}
+          teamProjectId={null}
+          onClose={vi.fn()}
+          onOpenFull={onOpenFull}
+        />,
+        "half a question",
+      ),
     );
 
     await user.click(screen.getByLabelText("Open the full buddy page"));

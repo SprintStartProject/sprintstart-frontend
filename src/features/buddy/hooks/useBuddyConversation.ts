@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
-import { matchEggPhrase } from "../../easter-eggs/lib/eggPhrases";
-import { playEggEffect } from "../../easter-eggs/eggEffectBus";
 import {
   getMessages,
   streamOpenBuddy,
@@ -143,7 +141,15 @@ export function useBuddyConversation(
   // Set when the conversation could not be brought on screen at all -- distinct from a turn that
   // failed, which carries its own reason. Nothing is on screen to hang that on, so it is state.
   const [openError, setOpenError] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
+  /**
+   * Bumped whenever the conversation on screen is replaced — a fresh visit, a project switch.
+   *
+   * The composer's words are not this hook's any more (see `BuddyDraftProvider`), so the one
+   * thing this session still owes them is the news that they belonged to a thread that is gone.
+   * Told as a token rather than a call: the composer's state lives *below* this hook's provider,
+   * and a parent cannot reach into a child's setter.
+   */
+  const [draftResetToken, setDraftResetToken] = useState(0);
   /**
    * The last greeting a surface has actually put in front of the hire — either watched while it
    * streamed, or revealed by `useGreetingReveal`. Held here, not per surface, so a greeting the
@@ -489,7 +495,9 @@ export function useBuddyConversation(
     setMessages([]);
     setOpenerAction(null);
     setOpenError(null);
-    setDraft("");
+    // The box is emptied through the token: a question typed about the conversation being
+    // cleared is about a thread that no longer exists. See `draftResetToken`.
+    setDraftResetToken((token) => token + 1);
     setIsOpening(true);
     try {
       await greet();
@@ -779,6 +787,20 @@ export function useBuddyConversation(
   );
 
   /**
+   * The transcript as of the last render, for `dismissAction` to read.
+   *
+   * A dismissal has to find the *action object* (a stored proposal is declined by id at the
+   * backend, and only the object says which kind it is), but reading it from `messages` state
+   * would rebuild this callback every time a token lands — and every memoised row would then
+   * re-render for a token that belongs to one of them. A click always happens after the render
+   * that recorded it, so the ref is never behind what is on screen.
+   */
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  /**
    * Declines a proposed action — nothing changes; the conversation simply continues.
    *
    * A stored proposal is declined *at the backend* rather than only on screen, because it may
@@ -788,7 +810,7 @@ export function useBuddyConversation(
    */
   const dismissAction = useCallback(
     (messageId: string, actionId: string) => {
-      const action = messages
+      const action = messagesRef.current
         .find((m) => m.id === messageId)
         ?.actions?.find((a) => a.id === actionId);
 
@@ -840,7 +862,7 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, messages, patchAction],
+    [beginDecision, endDecision, patchAction],
   );
 
   /**
@@ -873,7 +895,8 @@ export function useBuddyConversation(
     setMessages([]);
     setOpenerAction(null);
     setOpenError(null);
-    setDraft("");
+    // Same rule as a fresh visit: the words belonged to the conversation that just went away.
+    setDraftResetToken((token) => token + 1);
     setActiveTool(null);
     setIsThinking(false);
     setIsStreaming(false);
@@ -934,35 +957,6 @@ export function useBuddyConversation(
     [isThinking, isStreaming, isOpening, isGreeting, isDeciding, selection, setTeamMode],
   );
 
-  /**
-   * Handles a composer submission: an egg phrase plays its effect and is swallowed, anything
-   * else is sent. Returns whether a turn was started — `false` means the submission went
-   * nowhere, which the composer uses to decide whether the caret should be handed off.
-   */
-  const handleSubmit = useCallback(
-    (event: React.FormEvent) => {
-      event.preventDefault();
-
-      // Easter-egg phrases are intercepted before anything is sent: the
-      // effect plays app-wide (EggEffectsLayer) and the message is swallowed
-      // silently — no reply, no request. Same contract as the AI chat.
-      const eggEffect = matchEggPhrase(draft);
-      if (eggEffect) {
-        setDraft("");
-        playEggEffect(eggEffect);
-        return false;
-      }
-
-      const text = draft;
-      if (!text.trim()) return false;
-
-      setDraft("");
-      void sendMessage(text);
-      return true;
-    },
-    [draft, sendMessage, setDraft],
-  );
-
   return {
     messages,
     isThinking,
@@ -983,10 +977,12 @@ export function useBuddyConversation(
     isDeciding,
     switchTeamProject,
 
-    draft,
-    setDraft,
+    // The composer's words live in `BuddyDraftProvider`, below this provider; this is the only
+    // thing about them the session still owns — the news that the thread they belonged to is
+    // gone. See `draftResetToken`.
+    draftResetToken,
+
     sendMessage,
-    handleSubmit,
     confirmAction,
     dismissAction,
 

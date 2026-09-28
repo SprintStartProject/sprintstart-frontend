@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { onOpenAiBuddy } from "../aiBuddyBus";
+import { useBuddyDraft } from "../buddyDraftContext";
 import { useBuddySession } from "../buddySessionContext";
 import { useBuddySuggestions } from "./useBuddySuggestions";
 
@@ -18,7 +19,11 @@ import { useBuddySuggestions } from "./useBuddySuggestions";
  */
 export function useBuddy() {
   const conversation = useBuddySession();
-  const { ensureOpened, setDraft, teamProjectId } = conversation;
+  // The composer's half lives in its own provider now — see `BuddyDraftProvider`. It is merged
+  // back in here because every surface that drives the dock wants "the buddy" as one thing, and
+  // the hand-off to `/buddy` has to read the words the hire was mid-way through typing.
+  const { draft, setDraft, handleSubmit } = useBuddyDraft();
+  const { ensureOpened, teamProjectId } = conversation;
 
   const [isOpen, setIsOpen] = useState(false);
 
@@ -68,6 +73,9 @@ export function useBuddy() {
 
   return {
     ...conversation,
+    draft,
+    setDraft,
+    handleSubmit,
     isOpen,
     toggleOpen,
     closeDock,
