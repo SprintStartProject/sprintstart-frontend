@@ -34,9 +34,10 @@ export function BuddyDraftProvider({ children }: { children: ReactNode }) {
    *
    * Told, not pulled: the session sits *above* this provider and cannot reach into its state, so
    * it bumps a token and the clearing happens on the way through. React's documented "adjust
-   * state when a prop changes" pattern — the same shape `BuddyPage` uses for its rail — rather
-   * than an effect, because an effect here would paint one frame of a draft belonging to a
-   * conversation that no longer exists, and cost a second render to fix it.
+   * state when a prop changes" pattern — the same shape `BuddyPage` uses for its rail, and named
+   * once with its rules in `CODING_STANDARDS.md` § 3 — rather than an effect, because an effect
+   * here would paint one frame of a draft belonging to a conversation that no longer exists, and
+   * cost a second render to fix it.
    */
   const [seenResetToken, setSeenResetToken] = useState(draftResetToken);
   if (seenResetToken !== draftResetToken) {
