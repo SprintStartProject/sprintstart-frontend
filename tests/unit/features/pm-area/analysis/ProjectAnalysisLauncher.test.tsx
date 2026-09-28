@@ -295,7 +295,10 @@ describe("ProjectAnalysisLauncher", () => {
     unmount();
     renderLauncher();
 
-    expect(screen.getByText(/Last run/)).toBeInTheDocument();
+    // The ring beside the tabs: the score, what it means and when, and a way back to the results.
+    expect(
+      screen.getByRole("button", { name: /Open last results: health \d+ of 100, .*last run/ }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Last health score \d+ of 100/ })).toBeInTheDocument();
   }, 20000);
 

@@ -49,6 +49,10 @@ vi.mock("../../../../src/features/onboarding-metrics/components/OnboardingMetric
 vi.mock("../../../../src/features/knowledge-request/components/KnowledgeRequestInboxPage", () => ({
   KnowledgeRequestInboxPage: () => <p>escalations section</p>,
 }));
+// The analysis beside the tabs reads the whole project; it has tests of its own.
+vi.mock("../../../../src/features/pm-area/analysis/ProjectAnalysisLauncher", () => ({
+  ProjectAnalysisLauncher: () => <section aria-label="Project analysis" />,
+}));
 vi.mock("../../../../src/features/pm-area/components/MemberPeekPanel", () => ({
   MemberPeekPanel: () => null,
 }));
@@ -106,6 +110,12 @@ describe("PmWorkspace", () => {
         .getAllByRole("button")
         .map((tab) => tab.textContent),
     ).toEqual(["Overview", "Team", "Onboarding", "Questions", "Knowledge gaps", "Escalations3"]);
+  });
+
+  it("keeps the project analysis beside the tabs, on every section", () => {
+    renderWorkspace("/insights/faq");
+
+    expect(screen.getByRole("region", { name: "Project analysis" })).toBeInTheDocument();
   });
 
   it("picks the section from the URL, old addresses included", () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   BriefcaseBusiness,
@@ -25,6 +25,7 @@ import { KnowledgeRequestInboxPage } from "../knowledge-request/components/Knowl
 import { useOpenEscalationCount } from "../knowledge-request/useOpenEscalationCount";
 import { OnboardingMetricsPage } from "../onboarding-metrics/components/OnboardingMetricsPage";
 import { useProjectContext } from "../projects/useProjectContext";
+import { ProjectAnalysisLauncher } from "./analysis/ProjectAnalysisLauncher";
 import { MemberPeekPanel } from "./components/MemberPeekPanel";
 import { PmHeaderStatus } from "./components/PmHeaderStatus";
 import { INBOX_VIEW_PARAM, TEAM_TAB_PARAM } from "./pmWorkspacePaths";
@@ -103,7 +104,7 @@ type ResolvedSection = {
   hasOwnPanel: boolean;
 };
 
-function resolveSection(pathname: string): ResolvedSection {
+function resolveSection(pathname: string, analysisRevision: number): ResolvedSection {
   const member = matchPath("/team/:userId", pathname);
   if (member?.params.userId) {
     return {
@@ -162,7 +163,7 @@ function resolveSection(pathname: string): ResolvedSection {
   return {
     section: "overview",
     viewKey: "overview",
-    content: <PmDashboardPage />,
+    content: <PmDashboardPage analysisRevision={analysisRevision} />,
     hasOwnPanel: false,
   };
 }
@@ -191,7 +192,10 @@ export function PmWorkspace() {
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjectContext();
   const openEscalations = useOpenEscalationCount(selectedProjectId, true, pathname);
 
-  const { section, viewKey, content, hasOwnPanel } = resolveSection(pathname);
+  // Bumped by every finished project analysis, for the overview cards that keep their data
+  // outside the shared query cache (the industry card) to read it again.
+  const [analysisRevision, setAnalysisRevision] = useState(0);
+  const { section, viewKey, content, hasOwnPanel } = resolveSection(pathname, analysisRevision);
   const viewCounts = usePmSectionViewCounts(section);
   const panelOpen = hasOwnPanel || searchParams.has(MEMBER_PEEK_PARAM);
   // A member's full profile is somewhere a manager reads and works, not a stop on the way to the
@@ -352,13 +356,18 @@ export function PmWorkspace() {
           </EmptyState>
         ) : (
           <>
-            <SegmentedTabs
-              value={section}
-              options={options}
-              onChange={goToSection}
-              layoutId="pm-workspace-section-pill"
-              ariaLabel="PM dashboard sections"
-            />
+            {/* The project analysis beside the tabs rather than on the overview only: the score
+                and a new run are one press away from every section. */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SegmentedTabs
+                value={section}
+                options={options}
+                onChange={goToSection}
+                layoutId="pm-workspace-section-pill"
+                ariaLabel="PM dashboard sections"
+              />
+              <ProjectAnalysisLauncher onRefreshed={setAnalysisRevision} />
+            </div>
 
             {/* `-mx-2 px-2` moves the clip edge 8px outside the column without moving the
                 content, so focus rings and borders at the column's edge (the team search box,

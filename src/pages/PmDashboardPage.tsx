@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Hand, Inbox, MessageSquareText, Rocket, SkipForward, Users } from "lucide-react";
 import { useQueries } from "@tanstack/react-query";
 import { IngestionStatusWidget } from "../features/data-ingestion/components/IngestionStatusWidget";
@@ -11,7 +11,6 @@ import {
   KnowledgeGapsCard,
   QuestionsCard,
 } from "../features/pm-area/components/overview/InsightCards";
-import { ProjectAnalysisLauncher } from "../features/pm-area/analysis/ProjectAnalysisLauncher";
 import { TeamProgressCard } from "../features/pm-area/components/overview/TeamProgressCard";
 import { TeamPulseCard } from "../features/pm-area/components/overview/TeamPulseCard";
 import { useOpenEscalationCount } from "../features/knowledge-request/useOpenEscalationCount";
@@ -35,7 +34,16 @@ import { queryKeys } from "../services/queryKeys";
  * "Waiting on you" figure says how many answers are owed, and the team card below lists the
  * people who need the manager first, each opening in the side panel where it can be acted on.
  */
-export function PmDashboardPage() {
+export function PmDashboardPage({
+  analysisRevision = 0,
+}: {
+  /**
+   * Bumped by every finished project analysis (its button sits beside the workspace's tabs). The
+   * industry card keeps its project in its own state rather than the query cache, so it is
+   * remounted to read the project again; everything else reads the cache the analysis refreshed.
+   */
+  analysisRevision?: number;
+} = {}) {
   const { selectedProjectId } = useProjectContext();
   const { openMember } = useMemberPeek();
 
@@ -82,14 +90,8 @@ export function PmDashboardPage() {
 
   const figuresReady = !rosterLoading && !rosterError;
 
-  // The industry card keeps its project in its own state rather than the query cache, so every
-  // finished analysis remounts it to read the project again. Everything else on the page reads
-  // the cache the analysis has just refreshed.
-  const [refreshRevision, setRefreshRevision] = useState(0);
-
   return (
     <section aria-label="Overview" className="space-y-5">
-      <ProjectAnalysisLauncher onRefreshed={setRefreshRevision} />
       <section aria-label="Key figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <PmStat
           icon={Users}
@@ -167,7 +169,7 @@ export function PmDashboardPage() {
           its evidence. */}
       <div className="grid items-stretch gap-5 md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)]">
         <IngestionStatusWidget />
-        <ProjectIndustryWidget key={refreshRevision} />
+        <ProjectIndustryWidget key={analysisRevision} />
       </div>
 
       {/* The long view comes last: how far the team has got, the onboarding funnel and the latest

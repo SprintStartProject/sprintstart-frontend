@@ -1,5 +1,4 @@
-import { motion, useReducedMotion } from "framer-motion";
-import { History, ScanSearch, Sparkles } from "lucide-react";
+import { ScanSearch } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
@@ -14,6 +13,14 @@ import {
   type AnalysisOptions,
 } from "./useProjectAnalysis";
 
+/** The ring in the colour of the score's verdict, the same steps as `scoreVerdict`. */
+function scoreColor(score: number): string {
+  if (score >= 85) return "text-app-success-solid";
+  if (score >= 65) return "text-app-brand";
+  if (score >= 40) return "text-app-warning-solid";
+  return "text-app-danger-solid";
+}
+
 type ProjectAnalysisLauncherProps = {
   /**
    * Told after every finished run, so cards outside the shared query cache (the industry card)
@@ -23,18 +30,18 @@ type ProjectAnalysisLauncherProps = {
 };
 
 /**
- * The overview's way into the project analysis: one slim strip at the top with the last run, and
- * the button that starts a new one in {@link ProjectAnalysisDialog}.
+ * The PM area's way into the project analysis: the last run's score as a small ring (pressing it
+ * opens those results again) and the button that starts a new one in {@link ProjectAnalysisDialog}.
+ * Sits beside the workspace's section tabs.
  *
  * It owns the analysis (see {@link useProjectAnalysis}) rather than the dialog, so a run keeps
- * going with the dialog closed and the strip can say so. The last run's results stay a click away
- * ("Open last results") — also after a reload, since they are kept in browser storage.
+ * going with the dialog closed and the button can say so. The last run's results stay a click away
+ * (the ring) — also after a reload, since they are kept in browser storage.
  */
 export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncherProps) {
   const analysis = useProjectAnalysis();
   const { selectedProject } = useProjectContext();
   const navigate = useNavigate();
-  const reduceMotion = useReducedMotion();
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<AnalysisOptions>(DEFAULT_ANALYSIS_OPTIONS);
 
@@ -58,68 +65,36 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
 
   return (
     <>
-      <section
-        aria-label="Project analysis"
-        className="relative flex flex-wrap items-center gap-x-4 gap-y-3 overflow-hidden rounded-2xl border border-app-brand-border bg-gradient-to-r from-app-brand-soft via-app-surface to-app-surface px-4 py-3"
-      >
-        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
-          {!reduceMotion && (
-            <motion.span
-              aria-hidden="true"
-              className="absolute inset-0 rounded-xl"
-              style={{
-                background:
-                  "conic-gradient(from 0deg, transparent 0deg, color-mix(in oklab, var(--brand) 45%, transparent) 90deg, transparent 180deg)",
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: running ? 1.4 : 6, repeat: Infinity, ease: "linear" }}
-            />
-          )}
-          <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <ScanSearch aria-hidden="true" className="h-4.5 w-4.5" />
-          </span>
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-app-text">Project analysis</p>
-          <p className="truncate text-xs text-app-text-muted">
-            {running
-              ? "Refreshing everything and looking for what needs you…"
-              : lastRun
-                ? `Last run ${formatRelativeDate(lastRun.at)} · health ${lastRun.score}/100, ${scoreVerdict(lastRun.score).toLowerCase()}`
-                : "Refresh everything at once and see what needs you."}
-          </p>
-        </div>
-
+      {/* Beside the section tabs, on every PM section: the last score and the way to a new run,
+          in one small group. It used to be a full-width strip at the top of the overview only. */}
+      <section aria-label="Project analysis" className="flex shrink-0 items-center gap-2">
         {lastRun && !running && (
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={analysis.canOpenLast ? openLast : undefined}
+            disabled={!analysis.canOpenLast}
+            aria-label={`${analysis.canOpenLast ? "Open last results: " : ""}health ${lastRun.score} of 100, ${scoreVerdict(lastRun.score).toLowerCase()}, last run ${formatRelativeDate(lastRun.at)}`}
+            title={`Last run ${formatRelativeDate(lastRun.at)} · health ${lastRun.score}/100, ${scoreVerdict(lastRun.score).toLowerCase()}${analysis.canOpenLast ? " — open the results" : ""}`}
+            className="rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none enabled:hover:scale-105"
+          >
             <RingGauge
               value={lastRun.score}
-              size={36}
+              size={38}
               thickness={4}
+              colorClassName={scoreColor(lastRun.score)}
               ariaLabel={`Last health score ${lastRun.score} of 100`}
             >
               <span className="text-[11px] font-bold text-app-text tabular-nums">
                 {lastRun.score}
               </span>
             </RingGauge>
-            {analysis.canOpenLast && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={openLast}
-                icon={<History className="h-4 w-4" />}
-              >
-                Open last results
-              </Button>
-            )}
-          </div>
+          </button>
         )}
 
         <Button
           variant="primary"
           size="sm"
-          icon={<Sparkles className="h-4 w-4" />}
+          icon={<ScanSearch aria-hidden="true" className="h-4 w-4" />}
           loading={running}
           onClick={() => {
             if (running) {
