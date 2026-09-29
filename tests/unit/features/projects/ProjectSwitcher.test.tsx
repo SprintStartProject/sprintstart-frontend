@@ -254,4 +254,21 @@ describe("ProjectSwitcher", () => {
 
     expect(screen.getByRole("dialog", { name: "Switch project" })).toBeInTheDocument();
   });
+
+  it("does not open over a dialog that is already up", () => {
+    // The surface listener obeys the same rule as the global layer: the switcher must not
+    // stack itself on the help dialog, where one Escape would then close both.
+    render(
+      <nav aria-label="Sidebar">
+        <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" />
+        <ProjectSwitcher />
+      </nav>,
+    );
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }));
+    });
+
+    expect(screen.queryByRole("dialog", { name: "Switch project" })).not.toBeInTheDocument();
+  });
 });

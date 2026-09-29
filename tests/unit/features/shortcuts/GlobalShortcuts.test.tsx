@@ -58,9 +58,10 @@ function Harness({
   /**
    * A stand-in overlay. `"modal"` is how `ui/Modal` and the canvas covers announce
    * themselves; `"popover"` is the buddy dock and the popup-style dialogs, which are
-   * deliberately non-modal — the difference is the whole point of the global layer's guard.
+   * deliberately non-modal; `"closed-panel"` is a `ui/SidePanel` kept mounted while closed
+   * (it carries `aria-modal` defensively, plus the `aria-hidden`/`inert` a closed panel has).
    */
-  dialog?: "modal" | "popover";
+  dialog?: "modal" | "popover" | "closed-panel";
 }) {
   return (
     <MemoryRouter initialEntries={["/board"]}>
@@ -68,6 +69,9 @@ function Harness({
       <LocationProbe />
       {dialog === "modal" && <div role="dialog" aria-modal="true" aria-label="Another dialog" />}
       {dialog === "popover" && <div role="dialog" aria-label="Another dialog" />}
+      {dialog === "closed-panel" && (
+        <div role="dialog" aria-modal="true" aria-hidden="true" inert aria-label="Closed panel" />
+      )}
       {children}
     </MemoryRouter>
   );
@@ -215,6 +219,18 @@ describe("GlobalShortcuts", () => {
     await user.keyboard("{Alt>}k{/Alt}");
 
     expect(pathname()).toBe("/knowledge-base");
+  });
+
+  it("is not blocked by a closed panel that is still mounted", async () => {
+    // `ui/SidePanel` is kept mounted while closed so its backdrop can fade, and the Board
+    // keeps one alive for the whole visit. A closed panel is not a keyboard owner — the guard
+    // checks that, instead of only that `aria-modal` exists somewhere in the document.
+    const user = userEvent.setup();
+    render(<Harness dialog="closed-panel" />);
+
+    await user.keyboard("{Alt>}h{/Alt}");
+
+    expect(pathname()).toBe("/");
   });
 
   it("consumes a denied chord instead of handing it to the browser", () => {

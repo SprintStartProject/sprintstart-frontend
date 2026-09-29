@@ -135,6 +135,14 @@ describe("isShortcutPress", () => {
     expect(
       isShortcutPress(pressFrom(window, { key: ";", code: "Semicolon", altKey: true }), settings),
     ).toBe(false);
+    // Shift has to match exactly for a chord with modifiers of its own — the shift exemption
+    // belongs to bare character chords like `?`, not to `Alt+Shift+,`.
+    expect(
+      isShortcutPress(
+        pressFrom(window, { key: ",", code: "Comma", altKey: true, shiftKey: true }),
+        settings,
+      ),
+    ).toBe(false);
   });
 
   it("routes the switcher chord through a focused text field — it always did", () => {
@@ -150,6 +158,50 @@ describe("isShortcutPress", () => {
     } finally {
       input.remove();
     }
+  });
+
+  it("treats text entry as typing — a checkbox is focusable, not a keyboard owner", () => {
+    function focusableInput(type: string): HTMLInputElement {
+      const input = document.createElement("input");
+      input.type = type;
+      document.body.append(input);
+      return input;
+    }
+
+    const board = shortcutById("nav-board");
+    const text = focusableInput("text");
+    const password = focusableInput("password");
+    const number = focusableInput("number");
+    const checkbox = focusableInput("checkbox");
+    const radio = focusableInput("radio");
+    const range = focusableInput("range");
+    const chord = { code: "KeyB", altKey: true };
+
+    try {
+      // Typing goes on in the first three.
+      for (const typing of [text, password, number]) {
+        expect(isShortcutPress(pressFrom(typing, chord), board)).toBe(false);
+      }
+
+      // The rest merely happen to be inputs: focus parked on one of them — after a click on a
+      // settings checkbox, say — must not silence the page's chords until focus moves on.
+      for (const control of [checkbox, radio, range]) {
+        expect(isShortcutPress(pressFrom(control, chord), board)).toBe(true);
+      }
+    } finally {
+      for (const input of [text, password, number, checkbox, radio, range]) input.remove();
+    }
+  });
+
+  it("answers the switcher chord by the character, so Dvorak keeps Ctrl+K", () => {
+    // The pre-registry listener matched the produced character. Dvorak puts "k" on another
+    // physical key, so a code-only chord would answer the wrong key and swallow that one; the
+    // matcher takes either spelling, exactly as `Alt+,` does.
+    const byCharacter = pressFrom(window, { key: "k", code: "KeyC", ctrlKey: true });
+    const offChord = pressFrom(window, { key: "t", code: "KeyT", ctrlKey: true });
+
+    expect(isShortcutPress(byCharacter, SWITCH_PROJECT_SHORTCUT)).toBe(true);
+    expect(isShortcutPress(offChord, SWITCH_PROJECT_SHORTCUT)).toBe(false);
   });
 
   it("matches the produced character, whatever Shift the layout needed for it", () => {

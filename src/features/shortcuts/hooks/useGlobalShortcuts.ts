@@ -4,18 +4,7 @@ import { canAccessRoute } from "../../../auth/accessPolicy";
 import { useAuth } from "../../../context/useAuth";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { SHORTCUTS, isShortcutPress } from "../shortcuts";
-
-/**
- * A modal surface owns the keyboard while it is up, so no global chord may act behind one:
- * navigating off a half-filled dialog would unmount it mid-edit, and the help would stack a
- * second overlay on the first with one Escape closing both.
- *
- * `aria-modal="true"` is the precise line. `ui/Modal` (dialogs and alert dialogs), the canvas
- * covers, the side panel and the celebration overlays all set it; the buddy dock and the
- * popover-style popups deliberately do not, because they are non-modal by design — treating
- * those as keyboard owners would freeze every chord for as long as the dock stayed open.
- */
-const MODAL_SURFACE_SELECTOR = '[aria-modal="true"]';
+import { isModalSurfaceOpen } from "../lib/modalSurface";
 
 export type GlobalShortcutsState = {
   isHelpOpen: boolean;
@@ -53,8 +42,8 @@ export function useGlobalShortcuts(): GlobalShortcutsState {
         // app owns, whether or not this profile may go where the chord points.
         event.preventDefault();
 
-        // A modal surface is up: no chord acts behind it (see MODAL_SURFACE_SELECTOR).
-        if (document.querySelector(MODAL_SURFACE_SELECTOR)) return;
+        // A modal surface is up: no chord acts behind or on top of it (see `modalSurface.ts`).
+        if (isModalSurfaceOpen()) return;
 
         if (shortcut.path) {
           if (!canAccessRoute(profile, shortcut.path, canManageSelected)) return;

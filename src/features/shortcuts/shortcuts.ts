@@ -1,5 +1,5 @@
 import type { AppRoute } from "../../auth/accessPolicy";
-import { isTypingTarget } from "../easter-eggs/lib/keyTargets";
+import { isTextEntryTarget } from "../easter-eggs/lib/keyTargets";
 
 /**
  * Every chord in the app, defined once.
@@ -159,6 +159,11 @@ const NAVIGATE_SETTINGS: ShortcutItem = {
  * `allowInInput` keeps the behaviour this chord has always had: jumping to another project
  * mid-sentence is the point of it, and a text field can never produce Ctrl/Cmd+K itself, so
  * nothing is stolen from the composer.
+ *
+ * Both spellings again, and here that restores rather than adds: the chord that predates the
+ * registry matched the produced character, so a Dvorak or Colemak keyboard answered the key
+ * it had labelled `k`. Matching only `code` would move the chord to whichever letter now sits
+ * at that position — and swallow it there.
  */
 export const SWITCH_PROJECT_SHORTCUT: ShortcutItem = {
   id: "act-switcher",
@@ -166,6 +171,7 @@ export const SWITCH_PROJECT_SHORTCUT: ShortcutItem = {
   category: "Actions",
   scope: "surface",
   code: "KeyK",
+  key: "k",
   ctrlOrMeta: true,
   allowInInput: true,
 };
@@ -274,7 +280,10 @@ const KEY_LABELS: Partial<Record<string, string>> = {
 
 /** One key of a chord, as it is printed: "H" for `KeyH`, "Esc" for `Escape`, "," for `,`. */
 function shortcutKeyLabel(shortcut: ShortcutItem): string {
-  if (shortcut.key !== undefined) return shortcut.key;
+  // A declared character is the label, letters as a cap: `Ctrl + K`, never `Ctrl + k`.
+  if (shortcut.key !== undefined) {
+    return shortcut.key.length === 1 ? shortcut.key.toUpperCase() : shortcut.key;
+  }
 
   const code = shortcut.code ?? "";
   if (KEY_LABELS[code] !== undefined) return KEY_LABELS[code];
@@ -304,9 +313,11 @@ export function shortcutChord(shortcut: ShortcutItem): string {
  * - Auto-repeat is refused: holding a navigation chord down should walk nowhere.
  * - AltGr is refused by refusing Ctrl+Alt. Windows reports AltGr as exactly that pair,
  *   so a bare `altKey` check fires on every `{`/`[`/`@` a German layout types with it.
- * - Text fields own their keys, except where a chord says otherwise (`allowInInput`).
- * - Modifiers must match exactly. Shift is the exception for character chords: producing
- *   `?` *requires* Shift on every layout that has it, so the character is the whole claim.
+ * - Text-entry fields own their keys, except where a chord says otherwise (`allowInInput`).
+ * - Modifiers must match exactly. Shift is the exception for bare character chords:
+ *   producing `?` *requires* Shift on every layout that has it, so the character is the
+ *   whole claim. A chord with modifiers of its own gets no such exemption — `Alt+Shift+,` is
+ *   not `Alt+,`.
  * - A chord may declare both a `code` and a `key`, and then either spelling answers — the
  *   character where the layout produces it, the physical key where a modifier rewrites the
  *   character instead (`Alt+,` is Option+`≤` on macOS).
@@ -314,11 +325,13 @@ export function shortcutChord(shortcut: ShortcutItem): string {
 export function isShortcutPress(event: KeyboardEvent, shortcut: ShortcutItem): boolean {
   if (event.repeat) return false;
   if (event.altKey && event.ctrlKey) return false;
-  if (!shortcut.allowInInput && isTypingTarget(event.target)) return false;
+  if (!shortcut.allowInInput && isTextEntryTarget(event.target)) return false;
 
   if ((shortcut.ctrlOrMeta === true) !== (event.ctrlKey || event.metaKey)) return false;
   if ((shortcut.altKey === true) !== event.altKey) return false;
-  if (!shortcut.key && (shortcut.shiftKey === true) !== event.shiftKey) return false;
+
+  const shiftExempt = shortcut.key !== undefined && !shortcut.altKey && !shortcut.ctrlOrMeta;
+  if (!shiftExempt && (shortcut.shiftKey === true) !== event.shiftKey) return false;
 
   const codeMatches = shortcut.code !== undefined && event.code === shortcut.code;
   const keyMatches = shortcut.key !== undefined && event.key === shortcut.key;
