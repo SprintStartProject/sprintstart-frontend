@@ -30,6 +30,8 @@ export function cardName(card: BoardCard): string {
       return content.title ?? "The task you are on";
     case "SUGGESTED_TASKS":
       return "Work worth picking up";
+    case "TASK_POOL":
+      return "Task pool";
     case "COMPETENCY_PROGRESS":
       return "What you have shown";
     case "MEMORY_RECAP":

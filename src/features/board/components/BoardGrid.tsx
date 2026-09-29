@@ -30,6 +30,7 @@ import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
 import { PathStepCard } from "./PathStepCard";
 import { PathToFirstContributionCard } from "./PathToFirstContributionCard";
 import { SuggestedTasksCard } from "./SuggestedTasksCard";
+import { TaskPoolCard } from "./TaskPoolCard";
 import { BoardCardContext } from "./boardCardControls";
 import { BoardStageBand } from "./BoardStageBand";
 import { cardAccent } from "../layout/cardAccents";
@@ -471,6 +472,8 @@ function BoardCardView({
       return <CurrentTaskCard content={card.content} onCardAdded={onCardAdded} {...props} />;
     case "SUGGESTED_TASKS":
       return <SuggestedTasksCard content={card.content} onCardAdded={onCardAdded} {...props} />;
+    case "TASK_POOL":
+      return <TaskPoolCard content={card.content} {...props} />;
     case "COMPETENCY_PROGRESS":
       return <CompetencyProgressCard content={card.content} {...props} />;
     case "MEMORY_RECAP":

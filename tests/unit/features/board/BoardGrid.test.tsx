@@ -227,7 +227,7 @@ describe("BoardGrid", () => {
     );
 
     // Vanishing when the goal is cleared would read as the board losing things.
-    expect(screen.getByText(/nothing claimed yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing grabbed yet/i)).toBeInTheDocument();
   });
 
   it("shows why each task was suggested, and never a score", () => {

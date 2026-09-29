@@ -6,6 +6,11 @@ type AskTheBuddyProps = {
   question: string;
   /** What the control says. Defaults to a plain invitation. */
   label?: string;
+  /**
+   * Spacing around the control. Defaults to the gap it needs under a card's body; a row that lays
+   * its actions out itself passes an empty string.
+   */
+  className?: string;
 };
 
 /**
@@ -14,9 +19,10 @@ type AskTheBuddyProps = {
  * One mechanism serves every surface that has one. A card can seed a question and the mentor
  * answers it with its own tools — which means a card never needs its own action machinery, and
  * anything that *would* change the hire's onboarding still arrives as a proposal the hire confirms.
- * Claiming a suggested task is the case that proves it: "I want to work on X" makes the mentor
- * propose `claim_goal`, and the confirm button is still the thing that claims it. A claim button on
- * the card would have gone around that gate.
+ *
+ * Grabbing a task is the one exception with its own button (`task-pool/GrabTaskButton`), because a
+ * hire who already knows what they want should not need a conversation to say so. It keeps a
+ * confirm step of its own, and this stays beside it for the hire who wants help choosing.
  *
  * The draft is pre-filled rather than sent, so the hire can change it before it goes — it is their
  * question, and a card that speaks for somebody is a card they stop trusting.
@@ -32,12 +38,16 @@ type AskTheBuddyProps = {
  * The one place `openAiBuddy` really is a no-op is `/buddy`, where the widget takes itself off the
  * page: nothing renders this there, and the page's own composer is the thing to use.
  */
-export function AskTheBuddy({ question, label = "Ask your buddy about this" }: AskTheBuddyProps) {
+export function AskTheBuddy({
+  question,
+  label = "Ask your buddy about this",
+  className = "mt-3",
+}: AskTheBuddyProps) {
   return (
     <button
       type="button"
       onClick={() => openAiBuddy({ draft: question })}
-      className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-app-brand-text transition hover:underline"
+      className={`${className} inline-flex items-center gap-1.5 text-xs font-medium text-app-brand-text transition hover:underline`}
     >
       <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
       {label}
