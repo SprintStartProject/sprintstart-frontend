@@ -1,12 +1,13 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { SideBar } from "../../../../src/components/layout/SideBar";
 import * as useAuthHook from "../../../../src/context/useAuth";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
 import { PermissionGroup } from "../../../../src/services/types";
 import { knowledgeRequestService } from "../../../../src/services/knowledgeRequestService";
+import { mockViewport } from "../../setup/matchMedia";
 
 // Mutable so individual tests can flip it mid-suite. Module-level mock
 // factories cannot close over `let`, hence the `vi.hoisted` shared object
@@ -522,6 +523,79 @@ describe("SideBar", () => {
     expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
       "aria-expanded",
       "false",
+    );
+  });
+
+  it("leaves Alt+S to the browser on desktop widths", () => {
+    mockViewport(true);
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    try {
+      renderWithProviders(<SideBar />);
+
+      // The drawer does not exist above `lg`, so the chord listens only below it: nothing
+      // visible would happen here, the state flip would ambush the next resize — and
+      // `fireEvent` coming back `true` says the keystroke falls through untouched, which on
+      // Firefox is the History menu rather than a swallowed no-op.
+      expect(fireEvent.keyDown(window, { code: "KeyS", altKey: true })).toBe(true);
+      expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+    } finally {
+      mockViewport(false);
+    }
+  });
+
+  it("closes the drawer when the route changes without a link click", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    function RouteChanger() {
+      const navigate = useNavigate();
+
+      return (
+        <button type="button" onClick={() => void navigate("/board")}>
+          Go to board
+        </button>
+      );
+    }
+
+    renderWithProviders(
+      <>
+        <SideBar />
+        <RouteChanger />
+      </>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Close sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      ),
+    );
+
+    // A chord moves the route without `onNavigate` ever running — the drawer must not be
+    // left standing open, with its overlay, over the new page.
+    await user.click(screen.getByRole("button", { name: "Go to board" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      ),
     );
   });
 });

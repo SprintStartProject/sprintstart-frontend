@@ -1,4 +1,4 @@
-import { useCallback, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 import { LogOut, Menu, Settings, X } from "lucide-react";
@@ -18,6 +18,7 @@ import {
   navigationShortcut,
   useShortcutListener,
 } from "../../features/shortcuts";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import {
   AdminIcon,
   BlueprintsIcon,
@@ -468,16 +469,30 @@ export function SideBar() {
     setIsMobileSidebarOpen(false);
   };
 
+  // A chord can change the route without any link being clicked (Alt+H — nothing runs
+  // `onNavigate` then), and the drawer would still be standing open over the new page.
+  // Deferred to a microtask so this is not a synchronous setState inside the effect body,
+  // which `react-hooks/set-state-in-effect` rejects.
+  useEffect(() => {
+    void Promise.resolve().then(() => setIsMobileSidebarOpen(false));
+  }, [pathname]);
+
   /**
    * Alt+S works whatever the header's button works — one definition of "toggle the sidebar"
    * for both ways in. Today that is the drawer below `lg`; the desktop collapse (#244) will
    * give the same chord something to do on a wide screen without this line changing.
+   *
+   * Which is exactly why it only listens below `lg`: on a wide screen the drawer is not on
+   * screen, so the chord would flip state nobody can see — and leave it flipped, opening the
+   * drawer uninvited the next time the window narrows. Worse, `Alt+S` is Firefox's History
+   * menu on Windows, and swallowing it for a no-op takes the browser's own chord too.
    */
   const toggleMobileSidebar = useCallback(() => {
     setIsMobileSidebarOpen((isOpen) => !isOpen);
   }, []);
+  const isDesktopLayout = useMediaQuery("(min-width: 1024px)");
 
-  useShortcutListener(SIDEBAR_TOGGLE_SHORTCUT, toggleMobileSidebar);
+  useShortcutListener(SIDEBAR_TOGGLE_SHORTCUT, toggleMobileSidebar, !isDesktopLayout);
 
   return (
     <>
