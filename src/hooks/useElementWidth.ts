@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useState } from "react";
+import { useCallback, useState, type RefCallback } from "react";
 
 /**
  * The content-box width of an element, kept current as it resizes.
@@ -7,15 +7,14 @@ import { useCallback, useLayoutEffect, useState } from "react";
  * to *render* rather than how to style it — where the window's width is the wrong question
  * because a sidebar, a rail or the page gutter decide how much of it the element gets.
  *
- * Returns a callback ref and the width. The first measurement is taken before paint, so a
- * component that picks its content from the width does not flash the wrong form first. `0`
- * until the element is attached (and in jsdom, which has no layout).
+ * Returns a callback ref and the width. The ref measures the moment the element is attached,
+ * which is during commit and so before paint: a component that picks its content from the
+ * width does not flash the wrong form first. `0` until then (and in jsdom, which has no layout).
  */
-export function useElementWidth<T extends HTMLElement>(): [(element: T | null) => void, number] {
-  const [element, setElement] = useState<T | null>(null);
+export function useElementWidth<T extends HTMLElement>(): [RefCallback<T>, number] {
   const [width, setWidth] = useState(0);
 
-  useLayoutEffect(() => {
+  const ref = useCallback<RefCallback<T>>((element) => {
     if (!element) return;
 
     setWidth(element.clientWidth);
@@ -26,9 +25,7 @@ export function useElementWidth<T extends HTMLElement>(): [(element: T | null) =
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, [element]);
-
-  const ref = useCallback((next: T | null) => setElement(next), []);
+  }, []);
 
   return [ref, width];
 }
