@@ -571,7 +571,9 @@ export function SidebarNavLink({
                     tooltip's text, for everyone else. */}
                 <span className={collapsed ? "sr-only" : undefined}>{label}</span>
 
-                {shortcut && (
+                {/* Not on the folded rail: there is no room beside the icon, and the chord stays
+                    in the link's `title` and in the shortcuts modal. */}
+                {shortcut && !collapsed && (
                   <ShortcutHint keys={shortcut} className="border-app-border text-app-text-muted" />
                 )}
 
@@ -604,7 +606,8 @@ export function SidebarNavLink({
                         ? "absolute -top-2 -right-2.5 flex items-center"
                         : "ml-auto flex items-center"
                     }
-                    title={countLabel?.(count)}
+                    // Open, the link's own `title` (name and chord) must not be shadowed by it.
+                    title={collapsed ? countLabel?.(count) : undefined}
                   >
                     {/* The same amber as the icon beside it, and the same
                                             amber on the active row as off it. This is the

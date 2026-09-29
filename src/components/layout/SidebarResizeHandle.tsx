@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from "react";
 import {
   SIDEBAR_COLLAPSED_WIDTH,
   SIDEBAR_DEFAULT_WIDTH,
@@ -63,6 +63,10 @@ export function SidebarResizeHandle({
     raw: number;
     collapsed: boolean;
   } | null>(null);
+
+  // Unmounted mid-drag (focus mode swapping the shell, a route change, HMR), `endDrag` never runs,
+  // and the mark would hold the sidebar's easing off for the rest of the visit.
+  useEffect(() => () => setDragging(false), []);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -159,8 +163,8 @@ export function SidebarResizeHandle({
       tabIndex={0}
       title={
         collapsed
-          ? "Drag to expand, double-click to reset"
-          : "Drag to resize, double-click to reset"
+          ? "Drag to expand, double-click to reset, Enter to expand"
+          : "Drag to resize, double-click to reset, Enter to collapse"
       }
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

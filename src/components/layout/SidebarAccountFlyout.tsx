@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
+import { useFocusMode } from "../../context/useFocusMode";
 
 /** Long enough to cross the gap from the icon to the card without it closing in between. */
 const CLOSE_DELAY_MS = 200;
@@ -54,12 +55,15 @@ export function SidebarAccountFlyout({ trigger, label, children }: SidebarAccoun
 
   useEffect(() => cancelClose, []);
 
-  // Going somewhere from it (Settings) is done with it. Adjusted while rendering rather than in
-  // an effect, so the card never shows open on the new page for a frame.
+  // Going somewhere from it (Settings) is done with it, and so is focus mode sliding the sidebar
+  // away: portalled outside the sidebar, the card would stay behind, floating beside nothing.
+  // Adjusted while rendering rather than in an effect, so it never shows for a frame too long.
   const { pathname } = useLocation();
-  const [openedAt, setOpenedAt] = useState(pathname);
-  if (openedAt !== pathname) {
-    setOpenedAt(pathname);
+  const { isFocused } = useFocusMode();
+  const context = `${pathname}|${isFocused}`;
+  const [openedIn, setOpenedIn] = useState(context);
+  if (openedIn !== context) {
+    setOpenedIn(context);
     setMode("closed");
   }
 

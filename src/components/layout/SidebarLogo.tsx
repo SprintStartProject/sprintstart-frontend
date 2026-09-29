@@ -107,6 +107,15 @@ export function SidebarLogo({ className = "", sidebarToggle }: SidebarLogoProps)
   const [hintAt, setHintAt] = useState<{ x: number; y: number; side: "right" | "below" } | null>(
     null,
   );
+  // The badge moves whenever the sidebar folds or unfolds -- by a click here, Alt+S or the resize
+  // edge -- so a tooltip measured before would point at where it was. Cleared while rendering,
+  // so it never shows at the old spot for a frame; it comes back on the next hover.
+  const collapsed = sidebarToggle?.collapsed ?? false;
+  const [hintFor, setHintFor] = useState(collapsed);
+  if (hintFor !== collapsed) {
+    setHintFor(collapsed);
+    setHintAt(null);
+  }
 
   // The gravity easter egg: five clicks drop the badge off its shelf.
   // Reduced motion skips the animation entirely (pure motion has no honest

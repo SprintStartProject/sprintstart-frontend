@@ -456,6 +456,19 @@ describe("SideBar", () => {
       expect(card).toHaveAttribute("inert");
     });
 
+    it("leaves the shortcut chips off the folded rail, where they have no room", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+      expect(within(desktop()).getAllByText("Alt + H").length).toBeGreaterThan(0);
+
+      await user.click(logo());
+
+      expect(within(desktop()).queryByText("Alt + H")).not.toBeInTheDocument();
+      // Still named with its chord, as the link's own title.
+      expect(within(desktop()).getByTitle("Dashboard (Alt + H)")).toBeInTheDocument();
+    });
+
     it("shows an entry's name as a tooltip when it gets keyboard focus while folded", async () => {
       const user = userEvent.setup();
       signIn();
