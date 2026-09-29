@@ -1,10 +1,12 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
-import { BuddyProviderWithStubs } from "./buddyTestHarness";
+import { BuddyProviderWithStubs, useBuddyWithDraft } from "./buddyTestHarness";
 import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
+import { queryKeys } from "../../../../src/services/queryKeys";
 
 /**
  * A greeting that opens the visit and writes nothing.
@@ -52,7 +54,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     expect(result.current.isOpen).toBe(false);
     await waitFor(() => {
@@ -70,7 +72,7 @@ describe("useBuddy", () => {
       ),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -100,7 +102,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -156,7 +158,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.setDraft("what should I work on?");
@@ -179,7 +181,7 @@ describe("useBuddy", () => {
   it("opens a closed dock and seeds the composer", async () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
     expect(result.current.isOpen).toBe(false);
 
     act(() => {
@@ -201,7 +203,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       openAiBuddy({ draft: "> The migration runs on deploy.\n\n" });
@@ -222,7 +224,7 @@ describe("useBuddy", () => {
     it("keeps a closed dock's saved draft and puts the seed under it", async () => {
       server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
       act(() => {
         result.current.setDraft("why does the deploy");
       });
@@ -239,7 +241,7 @@ describe("useBuddy", () => {
     it("keeps an open dock's draft the same way", async () => {
       server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
       act(() => {
         result.current.toggleOpen();
         result.current.setDraft("why does the deploy");
@@ -257,7 +259,7 @@ describe("useBuddy", () => {
     it("does not stack the same seed twice", async () => {
       server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
       act(() => {
         openAiBuddy({ draft: QUOTE });
@@ -274,7 +276,7 @@ describe("useBuddy", () => {
   it("toggles open state", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -313,7 +315,7 @@ describe("useBuddy", () => {
       }),
     );
 
-    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
 
     act(() => {
       result.current.toggleOpen();
@@ -394,7 +396,7 @@ describe("useBuddy", () => {
         }),
       );
 
-      const hook = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+      const hook = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
       act(() => {
         hook.result.current.toggleOpen();
       });
@@ -453,6 +455,252 @@ describe("useBuddy", () => {
 
       expect(calls()).toBe(1);
       expect(result.current.messages[1].actions?.[0].status).toBe("resolved");
+    });
+  });
+
+  /**
+   * The board a confirmed action writes to is a cache entry nobody here is looking at: the dock
+   * can float over the board page, and a visit within `staleTime` serves the board as it was read.
+   * These pin which confirms mark it stale — and which correctly do not.
+   */
+  describe("board synchronisation", () => {
+    /** A client already holding this hire's board, and a wrapper that puts it under the session. */
+    function boardContext() {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      client.setQueryData(queryKeys.board.byProject("p1"), {
+        boardId: "b1",
+        projectId: "p1",
+        cards: [],
+      });
+
+      function Wrapper({ children }: { children: ReactNode }) {
+        return (
+          <QueryClientProvider client={client}>
+            <BuddyProviderWithStubs>{children}</BuddyProviderWithStubs>
+          </QueryClientProvider>
+        );
+      }
+
+      return { client, Wrapper };
+    }
+
+    const boardIsStale = (client: QueryClient) =>
+      client.getQueryState(queryKeys.board.byProject("p1"))?.isInvalidated ?? false;
+
+    function stream(events: string[]) {
+      const encoder = new TextEncoder();
+      return new HttpResponse(
+        new ReadableStream({
+          start(controller) {
+            for (const event of events) controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+            controller.close();
+          },
+        }),
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    }
+
+    /** Opens the session, sends a question whose reply proposes `proposalEvent`, and confirms it. */
+    async function confirmProposal(
+      proposalEvent: string,
+      outcome: { ok: boolean; message: string },
+    ) {
+      const { client, Wrapper } = boardContext();
+      server.use(
+        http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+        http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
+        http.post("/api/v1/onboarding/me/buddy/messages", () => stream([proposalEvent])),
+        http.post("/api/v1/onboarding/me/buddy/actions", () => HttpResponse.json(outcome)),
+      );
+
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: Wrapper });
+      act(() => {
+        result.current.toggleOpen();
+      });
+      await waitFor(() => expect(result.current.messages).toHaveLength(0));
+      act(() => {
+        result.current.setDraft("how do I start?");
+      });
+      act(() => {
+        result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+      await waitFor(() => expect(result.current.messages[1]?.actions?.[0]).toBeDefined());
+
+      act(() => {
+        result.current.confirmAction(
+          result.current.messages[1].id,
+          result.current.messages[1].actions![0],
+        );
+      });
+      await waitFor(() => expect(result.current.messages[1].actions?.[0].status).toBe("resolved"));
+
+      return { client };
+    }
+
+    const PLACE_CHECKLIST =
+      '{"type":"action_proposal","action":"place_checklist","label":"Keep this as a checklist",' +
+      '"checklist_title":"Getting started","checklist_items":["Run it locally","Open a PR"]}';
+
+    /**
+     * Every confirmed action that writes to the board, by its wire name: the five board-write
+     * handles plus `claim_goal`, which writes twice — the claim, and the CURRENT_TASK card it
+     * pins ("it's on your board too"). A table beats six near-identical tests drifting apart one
+     * rename at a time.
+     */
+    const BOARD_WRITING_PROPOSALS: [string, string][] = [
+      ["place_checklist", PLACE_CHECKLIST],
+      [
+        "amend_checklist",
+        '{"type":"action_proposal","action":"amend_checklist","label":"Add that step",' +
+          '"card_id":"c-1","checklist_title":"Getting started",' +
+          '"checklist_items":["Run it locally","Open a PR","Ping the PM"]}',
+      ],
+      [
+        "tick_checklist_items",
+        '{"type":"action_proposal","action":"tick_checklist_items","label":"Tick those off",' +
+          '"card_id":"c-1","checklist_items":["Run it locally"]}',
+      ],
+      [
+        "reword_checklist_item",
+        '{"type":"action_proposal","action":"reword_checklist_item","label":"Reword that step",' +
+          '"card_id":"c-1","line_before":"Run it locally","line_after":"Run the app locally"}',
+      ],
+      [
+        "place_note",
+        '{"type":"action_proposal","action":"place_note","label":"Keep this as a note",' +
+          '"note_text":"Deploys need the VPN."}',
+      ],
+      [
+        "claim_goal",
+        '{"type":"action_proposal","action":"claim_goal","label":"Work toward this task","task_id":"t-1"}',
+      ],
+    ];
+
+    it.each(BOARD_WRITING_PROPOSALS)(
+      "marks the board stale when a confirmed %s wrote a card",
+      async (_action, proposal) => {
+        const { client } = await confirmProposal(proposal, { ok: true, message: "Done." });
+
+        expect(boardIsStale(client)).toBe(true);
+      },
+    );
+
+    it("leaves the board alone when the action changed nothing", async () => {
+      const { client } = await confirmProposal(PLACE_CHECKLIST, {
+        ok: false,
+        message: "I couldn't keep that just now.",
+      });
+
+      expect(boardIsStale(client)).toBe(false);
+    });
+
+    it("leaves the board alone for an action that never touches it", async () => {
+      const { client } = await confirmProposal(
+        '{"type":"action_proposal","action":"request_attestation","label":"Ask them to confirm this","title":"the auth fix","attester_id":"u-9"}',
+        { ok: true, message: "Asked them to confirm it." },
+      );
+
+      expect(boardIsStale(client)).toBe(false);
+    });
+
+    /** Opens the session; each question asked answers with the next entry of `answers`. */
+    async function openSession(answers: string[][]) {
+      const { client, Wrapper } = boardContext();
+      let answered = 0;
+      server.use(
+        http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+        http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()),
+        http.post("/api/v1/onboarding/me/buddy/messages", () => stream(answers[answered++])),
+      );
+
+      const { result } = renderHook(() => useBuddyWithDraft(), { wrapper: Wrapper });
+      act(() => {
+        result.current.toggleOpen();
+      });
+      await waitFor(() => expect(result.current.messages).toHaveLength(0));
+
+      return { client, result };
+    }
+
+    /** Sends one question and waits for its turn to end. */
+    async function ask(result: { current: ReturnType<typeof useBuddyWithDraft> }, text: string) {
+      act(() => {
+        result.current.setDraft(text);
+      });
+      act(() => {
+        result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      });
+      await waitFor(() => expect(result.current.isThinking).toBe(false));
+    }
+
+    const PLACE_CARD_TURN = [
+      '{"type":"tool_use","name":"place_card"}',
+      '{"type":"token","content":"It is on your board."}',
+      '{"type":"done"}',
+    ];
+    const METRICS_TURN = [
+      '{"type":"tool_use","name":"get_my_metrics"}',
+      '{"type":"token","content":"You are on track."}',
+      '{"type":"done"}',
+    ];
+
+    /**
+     * `place_card` is the one board write that is not confirmed — it applies the moment the
+     * mentor runs it — so its `tool_use` event during the turn is the whole signal the client
+     * gets that the board may have moved.
+     */
+    it("marks the board stale when the turn placed a card on it", async () => {
+      const { client, result } = await openSession([PLACE_CARD_TURN]);
+
+      await ask(result, "put the PR review task on my board");
+
+      await waitFor(() => expect(boardIsStale(client)).toBe(true));
+    });
+
+    it("leaves the board alone when the turn ran other tools", async () => {
+      const { client, result } = await openSession([METRICS_TURN, PLACE_CARD_TURN]);
+      const invalidations = vi.spyOn(client, "invalidateQueries");
+
+      await ask(result, "how am I doing?");
+      await ask(result, "put the PR review task on my board");
+
+      // Waiting for the *second* turn's sync closes the window: whatever the board-silent first
+      // turn was going to do has happened by now, so a single invalidation proves the metrics
+      // read marked nothing on its own.
+      await waitFor(() => expect(boardIsStale(client)).toBe(true));
+      expect(invalidations).toHaveBeenCalledTimes(1);
+    });
+
+    /** A reply that delivers its events and then drops — the failure lands after `place_card` ran. */
+    function streamThenBreak(events: string[]) {
+      const encoder = new TextEncoder();
+      return new HttpResponse(
+        new ReadableStream({
+          async start(controller) {
+            for (const event of events) controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+            await delay(20);
+            controller.error(new Error("connection lost"));
+          },
+        }),
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    }
+
+    /**
+     * The turn can fail after the tool already ran — the card is on the board either way, so the
+     * sync must not wait for a clean finish. This is the "failing paths included" claim, pinned.
+     */
+    it("still marks the board stale when the turn broke after placing a card", async () => {
+      const { client, result } = await openSession([]);
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/messages", () =>
+          streamThenBreak(['{"type":"tool_use","name":"place_card"}']),
+        ),
+      );
+
+      await ask(result, "put the PR review task on my board");
+
+      await waitFor(() => expect(boardIsStale(client)).toBe(true));
     });
   });
 });

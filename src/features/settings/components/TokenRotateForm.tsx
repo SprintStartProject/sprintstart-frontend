@@ -84,6 +84,7 @@ export function TokenRotateForm({ name, onClose, onSaved }: TokenRotateFormProps
         <Field
           label="New GitHub PAT"
           controlId="settings-rotate-token-value"
+          required
           disabled={isSaving}
           className="min-w-0 flex-1"
         >

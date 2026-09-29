@@ -76,6 +76,23 @@ export const BUDDY_ACTION_TICK_CHECKLIST = "tick_checklist_items";
 export const BUDDY_ACTION_REWORD_CHECKLIST = "reword_checklist_item";
 
 /**
+ * The backend's `place_note` action: an explanation the mentor offered to keep as a note.
+ *
+ * Named like the checklist actions above because the same reader needs it: the confirm path has
+ * to recognise which actions write to the board (see `BUDDY_BOARD_ACTIONS` in `useBuddyConversation`).
+ */
+export const BUDDY_ACTION_PLACE_NOTE = "place_note";
+
+/**
+ * The backend's `claim_goal` action: the hire starting to work toward a task.
+ *
+ * Confirming this writes twice — the goal claim itself, and the CURRENT_TASK card pinned onto
+ * the board ("It's on your board too") — which is why the board-syncing set includes it despite
+ * its not being one of the board tools.
+ */
+export const BUDDY_ACTION_CLAIM_GOAL = "claim_goal";
+
+/**
  * An action proposed in hire mode: the buddy offers to do something *for this hire*, and the
  * confirm echoes the offer's own payload back verbatim. What gets written is what was shown on
  * the button — never something the client derived.

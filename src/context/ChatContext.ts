@@ -54,6 +54,14 @@ export type ChatContextValue = {
    */
   streamingChatId: string | null;
 
+  /**
+   * How the most recent turn ended, per chat. `null` while a turn is running
+   * or before the first one. Exists so waiting UI (the dino easter egg) can
+   * say "Stopped" / "Reply failed" instead of claiming a reply is ready when
+   * the user pressed Stop or the stream errored.
+   */
+  lastTurnOutcome: ChatTurnOutcome | null;
+
   selectedCitation: SelectedCitation | null;
   setSelectedCitation: (value: SelectedCitation | null) => void;
 
@@ -168,6 +176,15 @@ export type ChatContextValue = {
    * cleaning up associated state and drafts.
    */
   deleteChat: (chatId: string) => Promise<void>;
+};
+
+/**
+ * Outcome of a finished chat turn, keyed by the chat it belongs to so a
+ * background chat's result never leaks into the one on screen.
+ */
+export type ChatTurnOutcome = {
+  chatId: string;
+  kind: "done" | "stopped" | "failed";
 };
 
 export const ChatContext = createContext<ChatContextValue | undefined>(undefined);

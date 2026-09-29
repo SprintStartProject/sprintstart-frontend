@@ -53,7 +53,7 @@ describe("BuddyActionProposals", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Not now/ }));
 
-    expect(onDismiss).toHaveBeenCalledWith("m1", "a1");
+    expect(onDismiss).toHaveBeenCalledWith("m1", expect.objectContaining({ id: "a1" }));
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
@@ -551,7 +551,7 @@ describe("BuddyActionProposals", () => {
       );
       // Declining is still available: a proposal you cannot verify still needs an answer.
       await userEvent.click(screen.getByRole("button", { name: /Not now/ }));
-      expect(onDismiss).toHaveBeenCalledWith("m1", "s1");
+      expect(onDismiss).toHaveBeenCalledWith("m1", expect.objectContaining({ id: "s1" }));
       expect(onConfirm).not.toHaveBeenCalled();
     });
 
@@ -633,8 +633,12 @@ describe("BuddyActionProposals", () => {
 
       await userEvent.click(screen.getByRole("button", { name: /Not now/ }));
 
-      expect(onDismiss).toHaveBeenCalledWith("m1", "s1");
-      expect(onDismiss.mock.calls[0][1]).not.toBe("prop-9");
+      // The card hands over the whole action, as it does for a confirm — nothing here names the
+      // stored proposal; the session reads `proposalId` off the object and declines it there.
+      expect(onDismiss).toHaveBeenCalledWith(
+        "m1",
+        expect.objectContaining({ proposalId: "prop-9" }),
+      );
     });
 
     it("hides the buttons once the outcome is known, whatever it was", () => {

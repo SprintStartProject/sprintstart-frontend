@@ -17,6 +17,7 @@ export default defineConfig([
     "public/keycloak-theme/**",
     "public/keycloakify-dev-resources/**",
     "storybook-static/**",
+    ".worktrees/**",
   ]),
 
   {

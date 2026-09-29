@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { BuddyComposer } from "../../../../src/features/buddy/components/BuddyComposer";
+import { BuddyDraftContext } from "../../../../src/features/buddy/buddyDraftContext";
 
 /**
  * A question handed to the composer from outside has to be sendable with Enter.
@@ -19,15 +20,20 @@ describe("BuddyComposer", () => {
         <button type="button" onClick={() => setDraft("Where am I on my path?")}>
           chip
         </button>
-        <BuddyComposer
-          draft={draft}
-          setDraft={setDraft}
-          handleSubmit={(event) => {
-            event.preventDefault();
-            onSend(draft);
-            setDraft("");
+        <BuddyDraftContext.Provider
+          value={{
+            draft,
+            setDraft,
+            handleSubmit: (event) => {
+              event.preventDefault();
+              onSend(draft);
+              setDraft("");
+              return true;
+            },
           }}
-        />
+        >
+          <BuddyComposer />
+        </BuddyDraftContext.Provider>
       </>
     );
   }

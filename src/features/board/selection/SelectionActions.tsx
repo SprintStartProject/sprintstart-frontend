@@ -7,6 +7,7 @@ import { useFocusMode } from "../../../context/useFocusMode";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { ChatContext } from "../../../context/ChatContext";
 import { boardService } from "../../../services/boardService";
+import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin } from "../layout/cardOrigins";
 import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
@@ -48,6 +49,7 @@ export function SelectionActions() {
   const quoteSelection = chatContext?.quoteSelection;
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const invalidateBoard = useInvalidateBoard(selectedProjectId);
   const navigate = useNavigate();
 
   const add = useCallback(async () => {
@@ -65,6 +67,8 @@ export function SelectionActions() {
         url: selection.origin,
         label: selection.source ?? "where you were",
       });
+      // Found anywhere in the app, so the board is almost never on screen — see `useInvalidateBoard`.
+      invalidateBoard();
       toast.success(
         request.kind === "LINK" ? "Link saved to your board" : "Note saved to your board",
         {
@@ -78,7 +82,7 @@ export function SelectionActions() {
     } finally {
       setSaving(false);
     }
-  }, [selection, selectedProjectId, toast, navigate, clear]);
+  }, [selection, selectedProjectId, toast, navigate, clear, invalidateBoard]);
 
   /**
    * Hands the selection to the buddy as a quote, unsent.
