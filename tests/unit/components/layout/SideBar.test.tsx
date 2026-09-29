@@ -428,6 +428,28 @@ describe("SideBar", () => {
       expect(within(desktop()).getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
     });
 
+    it("folds the footer into one icon that slides the full card out", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+
+      await user.click(within(desktop()).getByRole("button", { name: "Collapse sidebar" }));
+
+      const trigger = within(desktop()).getByRole("button", { name: "Account and project" });
+      const card = document.getElementById(trigger.getAttribute("aria-controls")!)!;
+      expect(card).toHaveAttribute("inert");
+
+      await user.click(trigger);
+      expect(trigger).toHaveAttribute("aria-expanded", "true");
+      expect(card).not.toHaveAttribute("inert");
+      expect(within(card).getByRole("button", { name: "Logout" })).toBeInTheDocument();
+      expect(within(card).getByRole("link", { name: "Settings" })).toBeInTheDocument();
+
+      await user.keyboard("{Escape}");
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      expect(card).toHaveAttribute("inert");
+    });
+
     it("shows an entry's name as a tooltip when it gets keyboard focus while folded", async () => {
       const user = userEvent.setup();
       signIn();

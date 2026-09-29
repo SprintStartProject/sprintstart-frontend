@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useState } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
-import { ChevronsLeft, LogOut, Menu, Settings, X } from "lucide-react";
+import { LogOut, Menu, Settings, X } from "lucide-react";
 import { UserAvatar } from "../common/UserAvatar";
 import { useAuth } from "../../context/useAuth";
 import { canAccessRoute, isOnboardingAccessible, type AppRoute } from "../../auth/accessPolicy";
@@ -30,6 +30,8 @@ import {
 import { SidebarLogo } from "./SidebarLogo";
 import { SidebarNavLink } from "./SidebarNavLink";
 import { SidebarResizeHandle } from "./SidebarResizeHandle";
+import { SidebarAccountFlyout } from "./SidebarAccountFlyout";
+import { SidebarToggleIcon } from "./SidebarToggleIcon";
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH_VAR, useSidebarLayout } from "./useSidebarLayout";
 import { hoverSpringToken } from "../../styles/tokens";
 
@@ -60,8 +62,6 @@ type SidebarContentProps = {
   unseenSkipAnswerCount?: number;
   /** Folded to icons -- the desktop sidebar only; the mobile drawer is always full width. */
   collapsed?: boolean;
-  /** Folds or unfolds the desktop sidebar. Without it there is no toggle (the mobile drawer). */
-  onToggleCollapsed?: () => void;
 };
 
 /**
@@ -174,7 +174,6 @@ function SidebarContent({
   openEscalationCount = 0,
   unseenSkipAnswerCount = 0,
   collapsed = false,
-  onToggleCollapsed,
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
@@ -264,11 +263,80 @@ function SidebarContent({
     .flatMap((section) => section.items.map((item) => item.path))
     .join("|")}`;
 
+  /** The footer card, the same in the open sidebar and in the folded rail's flyout. */
+  const footerCard = (
+    <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+      {profile && (
+        <div className="flex items-center justify-between gap-2 py-[2px]">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
+              <UserAvatar
+                size={32}
+                profileIcon={profile.profileIcon}
+                fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
+                seed={profile.id}
+              />
+            </div>
+
+            <div className="flex flex-col overflow-hidden">
+              <span className="truncate text-sm font-semibold text-app-text">
+                {profile.username}
+              </span>
+
+              <span className="truncate text-[10px] font-medium tracking-wider text-app-text-muted uppercase">
+                {profile.permissionGroup.replace("_", " ")}
+              </span>
+            </div>
+          </div>
+          <motion.div
+            whileHover={{ scale: 1.18 }}
+            whileTap={{ scale: 0.92 }}
+            transition={hoverSpringToken}
+            className="shrink-0"
+          >
+            <NavLink
+              to="/settings"
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                `flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+                  isActive
+                    ? "bg-app-brand-soft text-app-brand"
+                    : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+                }`
+              }
+              title="Settings"
+              aria-label="Settings"
+            >
+              <Settings className="h-[18px] w-[18px]" />
+            </NavLink>
+          </motion.div>
+        </div>
+      )}
+
+      <ProjectSwitcher className="w-full" />
+
+      <motion.button
+        type="button"
+        onClick={() => {
+          void logout();
+        }}
+        disabled={status === "loading"}
+        whileHover={status === "loading" ? undefined : { scale: 1.02 }}
+        whileTap={status === "loading" ? undefined : { scale: 0.98 }}
+        transition={hoverSpringToken}
+        className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <LogOut aria-hidden="true" className="h-[16px] w-[16px]" />
+        Logout
+      </motion.button>
+    </div>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-app-bg text-app-text">
       <div
         className={`flex shrink-0 items-center gap-3 py-[24px] ${
-          collapsed ? "flex-col px-0" : "px-[24px]"
+          collapsed ? "justify-center px-0" : "px-[24px]"
         }`}
       >
         <SidebarLogo />
@@ -280,30 +348,6 @@ function SidebarContent({
         >
           SprintStart
         </h1>
-
-        {onToggleCollapsed && (
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-expanded={!collapsed}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={`group/fold flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-              collapsed ? "" : "ml-auto"
-            }`}
-          >
-            {/* One chevron pair that turns round with the sidebar, and leans the way it would go
-                on hover: points left while open (fold in), right while folded (pull out). */}
-            <ChevronsLeft
-              aria-hidden="true"
-              className={`h-[18px] w-[18px] transition-transform duration-300 ease-out motion-reduce:transition-none ${
-                collapsed
-                  ? "rotate-180 group-hover/fold:translate-x-0.5"
-                  : "group-hover/fold:-translate-x-0.5"
-              }`}
-            />
-          </button>
-        )}
       </div>
 
       <nav
@@ -394,84 +438,31 @@ function SidebarContent({
 
       {/* Floating glass card instead of a full-bleed bar. The 12px outer
                 gutter plus 12px inner padding lines its content up with the
-                24px inset used by the nav items above. */}
-      <div className={`shrink-0 pt-[8px] pb-[16px] ${collapsed ? "px-[8px]" : "px-[12px]"}`}>
-        <div
-          className={`space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl ${
-            collapsed ? "p-[6px]" : "p-[12px]"
-          }`}
-        >
-          {profile && (
-            <div
-              className={`flex items-center gap-2 py-[2px] ${
-                collapsed ? "flex-col" : "justify-between"
-              }`}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
-                  <UserAvatar
-                    size={32}
-                    profileIcon={profile.profileIcon}
-                    fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
-                    seed={profile.id}
-                  />
-                </div>
-
-                <div className={collapsed ? "sr-only" : "flex flex-col overflow-hidden"}>
-                  <span className="truncate text-sm font-semibold text-app-text">
-                    {profile.username}
-                  </span>
-
-                  <span className="truncate text-[10px] font-medium tracking-wider text-app-text-muted uppercase">
-                    {profile.permissionGroup.replace("_", " ")}
-                  </span>
-                </div>
-              </div>
-              <motion.div
-                whileHover={{ scale: 1.18 }}
-                whileTap={{ scale: 0.92 }}
-                transition={hoverSpringToken}
-                className="shrink-0"
-              >
-                <NavLink
-                  to="/settings"
-                  onClick={onNavigate}
-                  className={({ isActive }) =>
-                    `flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
-                      isActive
-                        ? "bg-app-brand-soft text-app-brand"
-                        : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                    }`
-                  }
-                  title="Settings"
-                  aria-label="Settings"
-                >
-                  <Settings className="h-[18px] w-[18px]" />
-                </NavLink>
-              </motion.div>
-            </div>
-          )}
-
-          <ProjectSwitcher className="w-full" compact={collapsed} />
-
-          <motion.button
-            type="button"
-            onClick={() => {
-              void logout();
-            }}
-            disabled={status === "loading"}
-            whileHover={status === "loading" ? undefined : { scale: 1.02 }}
-            whileTap={status === "loading" ? undefined : { scale: 0.98 }}
-            transition={hoverSpringToken}
-            aria-label={collapsed ? "Logout" : undefined}
-            title={collapsed ? "Logout" : undefined}
-            className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                24px inset used by the nav items above. Folded, the card slides
+                out from the avatar instead of being squeezed into the rail. */}
+      {collapsed ? (
+        <div className="flex shrink-0 justify-center pt-[8px] pb-[16px]">
+          <SidebarAccountFlyout
+            label="Account and project"
+            trigger={
+              profile ? (
+                <UserAvatar
+                  size={32}
+                  profileIcon={profile.profileIcon}
+                  fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
+                  seed={profile.id}
+                />
+              ) : (
+                <Settings aria-hidden="true" className="h-[18px] w-[18px] text-app-text-muted" />
+              )
+            }
           >
-            <LogOut aria-hidden="true" className="h-[16px] w-[16px]" />
-            {!collapsed && "Logout"}
-          </motion.button>
+            {footerCard}
+          </SidebarAccountFlyout>
         </div>
-      </div>
+      ) : (
+        <div className="shrink-0 px-[12px] pt-[8px] pb-[16px]">{footerCard}</div>
+      )}
     </div>
   );
 }
@@ -553,8 +544,19 @@ export function SideBar() {
           openEscalationCount={openEscalationCount}
           unseenSkipAnswerCount={unseenSkipAnswerCount}
           collapsed={sidebarLayout.collapsed}
-          onToggleCollapsed={sidebarLayout.toggleCollapsed}
         />
+        {/* On the edge at the logo's height, so it sits in the same place open and folded and
+            only travels with the edge itself. Above the resize grip, which it overlaps. */}
+        <button
+          type="button"
+          onClick={sidebarLayout.toggleCollapsed}
+          aria-label={sidebarLayout.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!sidebarLayout.collapsed}
+          title={sidebarLayout.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="group/toggle absolute top-[32px] -right-[14px] z-30 flex h-7 w-7 items-center justify-center rounded-full border border-app-border bg-app-bg text-app-text-muted shadow-[0_4px_12px_-6px_rgba(0,0,0,0.4)] transition-colors hover:border-app-brand-border hover:text-app-brand focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        >
+          <SidebarToggleIcon collapsed={sidebarLayout.collapsed} className="h-4 w-4" />
+        </button>
         {/* Also on the folded rail: its edge pulls the sidebar open again. */}
         <SidebarResizeHandle
           width={sidebarLayout.width}
