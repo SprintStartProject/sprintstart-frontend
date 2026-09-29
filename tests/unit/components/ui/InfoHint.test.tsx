@@ -89,4 +89,33 @@ describe("InfoHint", () => {
     expect(tooltip.className).toContain("opacity-0");
     expect(tooltip.className).toContain("pointer-events-none");
   });
+
+  it("stays open when its own text is clicked", async () => {
+    const user = userEvent.setup();
+    render(<InfoHint text="Fills in the blanks." />);
+
+    const trigger = screen.getByRole("button");
+    const tooltip = screen.getByRole("tooltip");
+
+    // Open it the touch way, then press the text to read or select it: focus moving from the
+    // trigger onto the tooltip must not read as "left the hint".
+    await user.click(trigger);
+    expect(tooltip.className).toContain("opacity-100");
+
+    await user.click(tooltip);
+    expect(tooltip.className).toContain("opacity-100");
+  });
+
+  it("dismisses on Escape even when the trigger was only hovered", async () => {
+    const user = userEvent.setup();
+    render(<InfoHint text="Fills in the blanks." />);
+
+    await user.hover(screen.getByRole("button"));
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.className).toContain("opacity-100");
+
+    // Focus is elsewhere — nothing on the trigger itself can hear this Escape.
+    await user.keyboard("{Escape}");
+    expect(tooltip.className).toContain("opacity-0");
+  });
 });

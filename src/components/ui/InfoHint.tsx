@@ -33,15 +33,19 @@ type InfoHintProps = {
  * tooltip is wired up with `aria-describedby` so it is always in the accessibility tree, and it
  * follows WCAG 2.1 SC 1.4.13 (Content on Hover or Focus): the pointer can move from the trigger
  * onto the open tooltip without it disappearing — the open tooltip accepts pointer events, and
- * the hover handlers live on the wrapper that spans the visual gap — and Escape closes it.
+ * the hover handlers live on the wrapper that spans the visual gap — pressing the tooltip text
+ * keeps it open (focus moves onto the tooltip itself, still inside the wrapper), and Escape
+ * closes it from anywhere while it is open.
  *
  * Visibility model — `open` shows the tooltip, `pinned` makes it outlive hover and focus:
- * - hover in and keyboard focus open it; hover out and blur close it while unpinned;
+ * - hover in and keyboard focus open it; hover out and blur close it while unpinned — a blur
+ *   whose new focus target is inside the hint (trigger onto the tooltip text) is not a leave;
  * - a click toggles the pin, which is the touch story: one tap opens the tooltip and keeps it
  *   open, the next tap (or a tap anywhere outside) closes it. Touch devices have no Escape key
  *   and a tap on inert background does not blur the trigger, so `onBlur` alone would leave the
  *   tooltip stuck open;
- * - Escape closes and unpins.
+ * - Escape closes and unpins, wherever focus is: the outside-tap and Escape listeners both live
+ *   on the document while the tooltip is open.
  *
  * Kept CSS-driven (no framer-motion) on purpose, so it never inherits SlidingTabPanel's
  * `initial={false}` and pops instead of fading.
@@ -57,9 +61,10 @@ export function InfoHint({
   const tooltipId = useId();
   const wrapperRef = useRef<HTMLSpanElement>(null);
 
-  // A tap anywhere outside closes and unpins. Bound only while open, and a native document
-  // listener rather than blur, because mobile Safari does not blur the button when the tap lands
-  // on inert content.
+  // A tap anywhere outside closes and unpins, and Escape dismisses from wherever focus is —
+  // after a hover-only open the trigger has no focus, so a handler on the button would never
+  // hear the key. Both listeners are native and bound only while open; `blur` alone cannot
+  // dismiss, because mobile Safari does not blur the button when the tap lands on inert content.
   useEffect(() => {
     if (!open) return;
     function handlePointerDown(event: PointerEvent) {
@@ -67,15 +72,39 @@ export function InfoHint({
       setPinned(false);
       setOpen(false);
     }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setPinned(false);
+      setOpen(false);
+    }
     document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [open]);
 
   // The gap between the trigger and the bubble is transparent padding inside the positioned
   // wrapper (`pt-2`/`pb-2`), so the pointer can travel the whole way from the trigger onto the
   // tooltip without leaving the hover area (SC 1.4.13) — while the bubble still sits 8px clear.
+  //
+  // The width cap differs per placement. `top-end` anchors its right edge to a trigger ~24px
+  // inside the card's padding, so on 320–375px phones the default `85vw` cap still overflows
+  // the clipping card on the left (measured: 17/11/9px at 320/360/375). Capping by the card's
+  // width budget — viewport minus page gutters minus card padding, with 16px slack — keeps a
+  // constant 16px of clearance at every phone width; the cap never binds above ~400px.
+  //
+  // The one remaining artefact, measured at 320px: the narrower bubble wraps to ~163px tall and
+  // trims ~6px of its own top border and padding band against the card's top edge — the text
+  // stays whole (`textClippedBy: 0`). That viewport cannot fit this copy both horizontally and
+  // vertically at once (a 6-line bubble needs ~284px of width; the card offers 256px), and the
+  // text winning is the point of the placement. 360px and up measure clean on all four edges;
+  // a portal-based tooltip is the fix if the shell trim ever matters.
   const placementClasses =
-    placement === "top-end" ? "bottom-full right-0 pb-2" : "top-5 left-0 pt-2";
+    placement === "top-end"
+      ? "bottom-full right-0 pb-2 max-w-[min(22rem,calc(100vw_-_5rem))]"
+      : "top-5 left-0 pt-2 max-w-[min(22rem,85vw)]";
 
   return (
     <span
@@ -85,26 +114,23 @@ export function InfoHint({
       onPointerLeave={() => {
         if (!pinned) setOpen(false);
       }}
+      onBlur={(event) => {
+        // Focus moving within the hint — trigger onto the tooltip text, which is focusable for
+        // exactly this reason — is not leaving it. Only an exit to somewhere else closes.
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        setPinned(false);
+        setOpen(false);
+      }}
     >
       <button
         type="button"
         aria-label={label}
         aria-describedby={tooltipId}
         onFocus={() => setOpen(true)}
-        onBlur={() => {
-          setPinned(false);
-          setOpen(false);
-        }}
         onClick={() => {
           const next = !pinned;
           setPinned(next);
           setOpen(next);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            setPinned(false);
-            setOpen(false);
-          }
         }}
         className="inline-flex h-5 w-5 items-center justify-center rounded-full text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
       >
@@ -113,7 +139,10 @@ export function InfoHint({
       <span
         id={tooltipId}
         role="tooltip"
-        className={`absolute ${placementClasses} z-50 w-80 max-w-[min(22rem,85vw)] transition-all duration-150 ${
+        // Focusable so a press on the text keeps focus inside the hint — otherwise it would
+        // drop to the body and the wrapper would read the resulting blur as a leave.
+        tabIndex={-1}
+        className={`absolute ${placementClasses} z-50 w-80 transition-all duration-150 ${
           open
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-1 opacity-0"
