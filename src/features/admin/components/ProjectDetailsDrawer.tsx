@@ -331,14 +331,19 @@ export function ProjectDetailsDrawer({
               )}
 
               <div className="space-y-4">
-                <Field label="Name" controlId={nameInputId} disabled={isSaving}>
+                <Field label="Name" controlId={nameInputId} required disabled={isSaving}>
                   <Input
                     value={draftProject.name}
                     onChange={(event) => updateDraftField("name", event.target.value)}
                   />
                 </Field>
 
-                <Field label="Description" controlId={descriptionInputId} disabled={isSaving}>
+                <Field
+                  label="Description"
+                  controlId={descriptionInputId}
+                  optional
+                  disabled={isSaving}
+                >
                   <Textarea
                     value={draftProject.description}
                     onChange={(event) => updateDraftField("description", event.target.value)}

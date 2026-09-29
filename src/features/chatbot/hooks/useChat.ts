@@ -125,6 +125,7 @@ export function useChat() {
     streamingMessageId,
     thinkingState,
     streamingChatId,
+    lastTurnOutcome,
     selectedCitation,
     setSelectedCitation,
     newRequest,
@@ -491,6 +492,9 @@ export function useChat() {
     thinkingState: isActiveChatStreaming ? thinkingState : null,
 
     streamingMessageId: isActiveChatStreaming ? streamingMessageId : null,
+
+    // Only this chat's verdict; another chat's Stop must not relabel this one.
+    turnOutcome: lastTurnOutcome && lastTurnOutcome.chatId === chatId ? lastTurnOutcome.kind : null,
 
     selectedCitation,
     setSelectedCitation,

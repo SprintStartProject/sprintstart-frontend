@@ -124,4 +124,11 @@ describe("parseOrgMetadata", () => {
     // login is the primary key — an object without it must be rejected.
     expect(parseOrgMetadata(JSON.stringify({ members: [] }))).toBeNull();
   });
+
+  it("trims a padded login and rejects a blank one", () => {
+    // The repository facet compares the login against a trimmed owner half, so a
+    // padded login would silently never match its own repositories.
+    expect(parseOrgMetadata(JSON.stringify({ login: "  org \n", members: [] }))?.login).toBe("org");
+    expect(parseOrgMetadata(JSON.stringify({ login: "   ", members: [] }))).toBeNull();
+  });
 });

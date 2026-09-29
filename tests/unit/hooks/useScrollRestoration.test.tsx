@@ -47,4 +47,62 @@ describe("useScrollRestoration", () => {
 
     await waitFor(() => expect(scrollHost?.scrollTop).toBe(700));
   });
+
+  it("does not reset scroll to 0 when search params change on the same pathname", async () => {
+    const { useSearchParams } = await import("react-router-dom");
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const { screen } = await import("@testing-library/react");
+
+    function SearchParamsPage() {
+      useScrollRestoration();
+      const [searchParams, setSearchParams] = useSearchParams();
+      return (
+        <main
+          {...{ [SCROLL_CONTAINER_ATTRIBUTE]: "" }}
+          ref={(node) => {
+            if (!node) return;
+            node.scrollTo = (xOrOptions?: ScrollToOptions | number, y?: number) => {
+              const target = typeof xOrOptions === "number" ? (y ?? 0) : (xOrOptions?.top ?? 0);
+              node.scrollTop = target;
+            };
+          }}
+        >
+          <span data-testid="artifact-param">{searchParams.get("artifact") ?? ""}</span>
+          <button
+            data-testid="open-btn"
+            onClick={() => setSearchParams({ artifact: "art-1" }, { replace: true })}
+          >
+            Open
+          </button>
+          <button data-testid="close-btn" onClick={() => setSearchParams({}, { replace: true })}>
+            Close
+          </button>
+        </main>
+      );
+    }
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/knowledge-base"]}>
+        <SearchParamsPage />
+      </MemoryRouter>,
+    );
+
+    const scrollHost = container.querySelector("main")!;
+    // Simulate user scrolled down
+    scrollHost.scrollTop = 500;
+
+    // User opens artifact
+    const openBtn = screen.getByTestId("open-btn");
+    await userEvent.click(openBtn);
+
+    expect(screen.getByTestId("artifact-param")).toHaveTextContent("art-1");
+    expect(scrollHost.scrollTop).toBe(500);
+
+    // User closes artifact
+    const closeBtn = screen.getByTestId("close-btn");
+    await userEvent.click(closeBtn);
+
+    expect(screen.getByTestId("artifact-param")).toHaveTextContent("");
+    expect(scrollHost.scrollTop).toBe(500);
+  });
 });

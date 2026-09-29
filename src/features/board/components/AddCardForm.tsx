@@ -117,7 +117,7 @@ export function AddCardForm({ kind, onAdd, onClose }: AddCardFormProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-3">
           {kind === "NOTE" && (
-            <Field label="Title (optional)" controlId={`${fieldId}-title`}>
+            <Field label="Title" optional controlId={`${fieldId}-title`}>
               <Input
                 value={noteTitle}
                 onChange={(event) => setNoteTitle(event.target.value)}
@@ -155,7 +155,7 @@ export function AddCardForm({ kind, onAdd, onClose }: AddCardFormProps) {
       </div>
 
       {kind === "LINK" && (
-        <Field label="What to call it (optional)" controlId={`${fieldId}-label`}>
+        <Field label="What to call it" optional controlId={`${fieldId}-label`}>
           <Input value={label} onChange={(event) => setLabel(event.target.value)} />
         </Field>
       )}

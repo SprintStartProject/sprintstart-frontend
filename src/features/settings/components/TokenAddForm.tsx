@@ -110,7 +110,7 @@ export function TokenAddForm({ onClose, onSaved, embedded = false }: TokenAddFor
       )}
 
       <div className="space-y-3">
-        <Field label="Token name" controlId="settings-add-token-name" disabled={isSaving}>
+        <Field label="Token name" controlId="settings-add-token-name" required disabled={isSaving}>
           <Input
             ref={nameInputRef}
             data-testid="settings-add-token-name"
@@ -125,6 +125,7 @@ export function TokenAddForm({ onClose, onSaved, embedded = false }: TokenAddFor
         <Field
           label="Token (ghp_...)"
           controlId="settings-add-token-value"
+          required
           hint="The token value is stored encrypted and cannot be retrieved after saving."
           disabled={isSaving}
         >

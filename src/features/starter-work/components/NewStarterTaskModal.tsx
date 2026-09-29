@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Field } from "../../../components/ui/Field";
+import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
+import { Textarea } from "../../../components/ui/Textarea";
 import type { CreateStarterWorkTaskInput } from "../types";
 import { capturePoolFlightRect, type PoolFlightRect } from "./poolFlight";
 
@@ -10,9 +13,6 @@ type NewStarterTaskModalProps = {
   onCreate: (input: CreateStarterWorkTaskInput, origin?: PoolFlightRect) => Promise<boolean>;
   onClose: () => void;
 };
-
-const inputClasses =
-  "w-full rounded-lg border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none";
 
 /**
  * A PM hand-authoring a starter task, with no AI mining.
@@ -87,70 +87,41 @@ export function NewStarterTaskModal({ isSaving, onCreate, onClose }: NewStarterT
         onSubmit={(event) => void handleSubmit(event)}
         className="space-y-4"
       >
-        <div>
-          <label htmlFor="new-task-title" className="mb-1 block text-xs font-medium text-app-text">
-            Title
-          </label>
-          <input
-            id="new-task-title"
+        <Field label="Title" required>
+          <Input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="e.g. Add a dark-mode toggle to the settings page"
-            className={inputClasses}
           />
-        </div>
+        </Field>
 
-        <div>
-          <label
-            htmlFor="new-task-summary"
-            className="mb-1 block text-xs font-medium text-app-text"
-          >
-            What it involves
-          </label>
-          <textarea
-            id="new-task-summary"
-            rows={3}
+        <Field label="What it involves" optional>
+          <Textarea
             value={summary}
             onChange={(event) => setSummary(event.target.value)}
-            className={inputClasses}
+            minRows={3}
           />
-        </div>
+        </Field>
 
-        <div>
-          <label
-            htmlFor="new-task-source-url"
-            className="mb-1 block text-xs font-medium text-app-text"
-          >
-            Link <span className="text-app-text-subtle">(optional)</span>
-          </label>
-          <input
-            id="new-task-source-url"
+        <Field label="Link" optional>
+          <Input
             value={sourceUrl}
             onChange={(event) => setSourceUrl(event.target.value)}
             placeholder="https://github.com/org/repo/issues/123"
-            className={inputClasses}
           />
-        </div>
+        </Field>
 
-        <div>
-          <label
-            htmlFor="new-task-competency-keys"
-            className="mb-1 block text-xs font-medium text-app-text"
-          >
-            Prerequisite competencies <span className="text-app-text-subtle">(optional)</span>
-          </label>
-          <input
-            id="new-task-competency-keys"
+        <Field
+          label="Prerequisite competencies"
+          optional
+          hint="Competency identifiers, comma-separated. Each becomes a prerequisite edge into the task; any that isn't in the graph is quietly skipped."
+        >
+          <Input
             value={competencyKeysRaw}
             onChange={(event) => setCompetencyKeysRaw(event.target.value)}
             placeholder="react, typescript"
-            className={inputClasses}
           />
-          <p className="mt-1 text-xs text-app-text-subtle">
-            Competency identifiers, comma-separated. Each becomes a prerequisite edge into the task;
-            any that isn&apos;t in the graph is quietly skipped.
-          </p>
-        </div>
+        </Field>
       </form>
     </Modal>
   );

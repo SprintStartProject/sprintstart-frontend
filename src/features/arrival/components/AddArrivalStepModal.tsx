@@ -267,7 +267,7 @@ export function AddArrivalStepModal({
 
           {phase === "details" && kind === "custom" && (
             <div className="space-y-3">
-              <Field label="What needs to be done">
+              <Field label="What needs to be done" required>
                 <Input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
@@ -277,7 +277,8 @@ export function AddArrivalStepModal({
 
               <Field
                 label="How to do it"
-                hint="Optional. Anything they need to know before starting."
+                optional
+                hint="Anything they need to know before starting."
               >
                 <Textarea
                   value={description}
@@ -287,7 +288,7 @@ export function AddArrivalStepModal({
                 />
               </Field>
 
-              <Field label="Where to do it" hint="Optional link.">
+              <Field label="Where to do it" optional hint="Link to tool or docs.">
                 <Input
                   value={href}
                   onChange={(event) => setHref(event.target.value)}

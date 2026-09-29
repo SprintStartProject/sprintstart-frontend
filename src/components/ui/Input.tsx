@@ -64,6 +64,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     id,
     disabled,
     "aria-describedby": ariaDescribedBy,
+    "aria-required": ariaRequired,
     ...rest
   },
   ref,
@@ -74,6 +75,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const resolvedId = id ?? field?.controlId;
   const resolvedDescribedBy = ariaDescribedBy ?? field?.describedBy;
   const isDisabled = disabled ?? field?.disabled ?? false;
+  // An explicit `aria-required` or HTML `required` on the control wins; only
+  // when neither is given does the enclosing `Field` supply it. Emitted only
+  // when true, so a plain input does not grow a stray `aria-required="false"`.
+  const isRequired = ariaRequired ?? rest.required ?? field?.required;
 
   const control = (
     <input
@@ -82,6 +87,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       disabled={isDisabled}
       aria-invalid={isInvalid || undefined}
       aria-describedby={resolvedDescribedBy}
+      aria-required={isRequired || undefined}
       className={fieldClasses({
         size,
         invalid: isInvalid,
