@@ -516,6 +516,20 @@ describe("SideBar", () => {
       expect(sidebarWidth()).toBe("302px");
     });
 
+    it("folds and unfolds from the logo, but not on the egg's quick repeat clicks", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+      const logo = () => desktop().querySelector<HTMLElement>("[data-drop-phase]")!;
+
+      await user.click(logo());
+      expect(sidebarWidth()).toBe("76px");
+
+      // Straight after: counts towards the gravity egg, leaves the sidebar folded.
+      await user.click(logo());
+      expect(sidebarWidth()).toBe("76px");
+    });
+
     it("leaves the mobile drawer as it was", async () => {
       const user = userEvent.setup();
       signIn();

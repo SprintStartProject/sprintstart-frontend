@@ -62,6 +62,8 @@ type SidebarContentProps = {
   unseenSkipAnswerCount?: number;
   /** Folded to icons -- the desktop sidebar only; the mobile drawer is always full width. */
   collapsed?: boolean;
+  /** Lets the logo fold and unfold the desktop sidebar. Left out on the mobile drawer. */
+  onToggleCollapsed?: () => void;
 };
 
 /**
@@ -174,6 +176,7 @@ function SidebarContent({
   openEscalationCount = 0,
   unseenSkipAnswerCount = 0,
   collapsed = false,
+  onToggleCollapsed,
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
@@ -339,7 +342,9 @@ function SidebarContent({
           collapsed ? "justify-center px-0" : "px-[24px]"
         }`}
       >
-        <SidebarLogo />
+        <SidebarLogo
+          sidebarToggle={onToggleCollapsed ? { collapsed, onToggle: onToggleCollapsed } : undefined}
+        />
 
         <h1
           className={
@@ -544,6 +549,7 @@ export function SideBar() {
           openEscalationCount={openEscalationCount}
           unseenSkipAnswerCount={unseenSkipAnswerCount}
           collapsed={sidebarLayout.collapsed}
+          onToggleCollapsed={sidebarLayout.toggleCollapsed}
         />
         {/* On the edge at the logo's height, so it sits in the same place open and folded and
             only travels with the edge itself. Above the resize grip, which it overlaps. */}
