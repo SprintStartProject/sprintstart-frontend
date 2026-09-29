@@ -48,11 +48,11 @@ function lastDraft(): string {
 describe("the current-task card when the issue behind it was closed", () => {
   beforeEach(() => vi.mocked(openAiBuddy).mockReset());
 
-  it("shows the warning and points at the good-next-tasks card", () => {
+  it("shows the warning and points at the task pool card", () => {
     render(<CurrentTaskCard content={currentTaskContent({ closedAtSource: true })} card={card} />);
 
     expect(screen.getByText(/this issue was closed where it lives/i)).toBeInTheDocument();
-    expect(screen.getByText(/good next tasks/i)).toBeInTheDocument();
+    expect(screen.getByText(/task pool/i)).toBeInTheDocument();
   });
 
   it("keeps the card and the task on screen rather than falling back to the empty state", () => {
@@ -60,13 +60,13 @@ describe("the current-task card when the issue behind it was closed", () => {
 
     expect(screen.getByText("What you're working on")).toBeInTheDocument();
     expect(screen.getByText("Fix the flaky login test")).toBeInTheDocument();
-    expect(screen.queryByText(/nothing claimed yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/nothing grabbed yet/i)).not.toBeInTheDocument();
   });
 
   it("seeds the buddy composer with a question about picking a different task", () => {
     render(<CurrentTaskCard content={currentTaskContent({ closedAtSource: true })} card={card} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /help me pick another one/i }));
+    fireEvent.click(screen.getByRole("button", { name: /help me choose/i }));
 
     expect(lastDraft()).toContain("Fix the flaky login test");
     expect(lastDraft()).toContain("closed");
@@ -95,6 +95,10 @@ describe("the current-task card when the issue behind it was closed", () => {
       />,
     );
 
-    expect(screen.getByText(/nothing claimed yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing grabbed yet/i)).toBeInTheDocument();
+    // Both ways in: the pool card, and asking the buddy to help pick.
+    expect(screen.getByText(/task pool/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /help me choose/i }));
+    expect(lastDraft()).toMatch(/good task for me/i);
   });
 });

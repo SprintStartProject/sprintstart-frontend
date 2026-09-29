@@ -31,6 +31,9 @@ type CurrentTaskCardProps = {
  * looking current: the task block is kept but muted, a warning stripe above it says what happened
  * and where to go next, and the buddy question is repointed at picking a new one. Silently
  * dropping the card would leave the hire still thinking this is their goal.
+ *
+ * Picking a task by hand happens on the "Task pool" card, which this one points at whenever there
+ * is something to pick; the buddy is offered beside it, never instead of it.
  */
 export function CurrentTaskCard({
   content,
@@ -69,8 +72,8 @@ export function CurrentTaskCard({
             <p className="flex items-start gap-2 rounded-xl bg-app-warning-bg/40 p-3 text-xs text-app-warning-text">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>
-                This issue was closed where it lives. Pick a new task from the &quot;Good next
-                tasks&quot; card.
+                This issue was closed where it lives. Grab a new one from the &quot;Task pool&quot;
+                card, or ask your buddy which would fit.
               </span>
             </p>
           )}
@@ -98,8 +101,8 @@ export function CurrentTaskCard({
         </div>
       ) : (
         <EmptyState size="sm">
-          Nothing claimed yet. Ask your buddy what would be a good one to pick up — they can suggest
-          tasks that fit what you&apos;ve already shown.
+          Nothing grabbed yet. Pick one from the &quot;Task pool&quot; card — or ask your buddy, who
+          can suggest tasks that fit what you&apos;ve already shown.
         </EmptyState>
       )}
 
@@ -135,7 +138,7 @@ export function CurrentTaskCard({
               ? `How do I get started on "${content.title ?? "my task"}"? A short checklist of first steps would help.`
               : "What would be a good task for me to pick up?"
         }
-        label={closed ? "Help me pick another one" : undefined}
+        label={closed || !hasTask ? "Help me choose" : undefined}
       />
     </BoardCardFrame>
   );

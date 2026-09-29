@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   AlertCircle,
-  Bot,
   Check,
   FolderPlus,
   LayoutDashboard,
+  LayoutList,
   ListTree,
   Maximize2,
   Milestone,
@@ -42,6 +41,7 @@ import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
 import { readPathWindowShown, writePathWindowShown } from "../features/board/layout/pathWindowFold";
+import { readTaskPoolShown, writeTaskPoolShown } from "../features/board/layout/taskPoolShown";
 import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
 import {
   ALL_SECTIONS,
@@ -313,6 +313,32 @@ export function BoardPage() {
     });
   }, [showPathWindow, toast]);
 
+  // The task pool card, on or off — a switch like the path strip rather than a dismissal. See
+  // `layout/taskPoolShown.ts` for why this one card does not get the sticky server-side removal.
+  const [isTaskPoolShown, setIsTaskPoolShown] = useState(true);
+  const [taskPoolReadFor, setTaskPoolReadFor] = useState<string | null>(null);
+
+  if (storedFor !== taskPoolReadFor) {
+    setTaskPoolReadFor(storedFor);
+    setIsTaskPoolShown(readTaskPoolShown(boardId));
+  }
+
+  const showTaskPool = useCallback(
+    (shown: boolean) => {
+      setIsTaskPoolShown(shown);
+      writeTaskPoolShown(boardId, shown);
+    },
+    [boardId],
+  );
+
+  const removeTaskPool = useCallback(() => {
+    showTaskPool(false);
+    toast.info("Task pool hidden", {
+      description: "You can put it back from the switches on the right.",
+      action: { label: "Undo", onClick: () => showTaskPool(true) },
+    });
+  }, [showTaskPool, toast]);
+
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [pinsReadFor, setPinsReadFor] = useState<string | null>(null);
 
@@ -436,6 +462,11 @@ export function BoardPage() {
   }
 
   function handleDismiss(cardId: string) {
+    if (board?.cards.find((card) => card.id === cardId)?.content.kind === "TASK_POOL") {
+      removeTaskPool();
+      return;
+    }
+
     setPendingRemovals((current) => new Set(current).add(cardId));
 
     const timer = window.setTimeout(() => {
@@ -474,9 +505,19 @@ export function BoardPage() {
    * would be worse than no rail at all — the counts are about the board, and the view is about the
    * hire's attention.
    */
+  // Whether the backend put a pool card on this board at all. The rail switch only exists for a
+  // board that has one: a switch that toggles nothing visible reads as broken.
+  const hasTaskPool = board?.cards.some((card) => card.content.kind === "TASK_POOL") ?? false;
+
   const allCards = useMemo(
-    () => board?.cards.filter((card) => card !== pathCard && !pendingRemovals.has(card.id)) ?? [],
-    [board, pathCard, pendingRemovals],
+    () =>
+      board?.cards.filter(
+        (card) =>
+          card !== pathCard &&
+          !pendingRemovals.has(card.id) &&
+          (isTaskPoolShown || card.content.kind !== "TASK_POOL"),
+      ) ?? [],
+    [board, pathCard, pendingRemovals, isTaskPoolShown],
   );
 
   const {
@@ -1119,6 +1160,23 @@ export function BoardPage() {
                 <Milestone className="h-4 w-4" aria-hidden="true" />
               </Button>
 
+              {/* The task pool, on or off — the same kind of switch as the path strip above, and
+                  for the same reason: the card's own X only hides it, so the way back has to live
+                  somewhere the card is not. */}
+              {hasTaskPool && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => showTaskPool(!isTaskPoolShown)}
+                  aria-pressed={isTaskPoolShown}
+                  title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                  aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                >
+                  <LayoutList className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              )}
+
               {/* Which cards, by where they came from. It sits below the switches that change the
                   board's shape because it changes neither the board nor its shape — it only
                   narrows what is drawn, and it is the one control here that is undone by pressing
@@ -1337,17 +1395,6 @@ export function BoardPage() {
             </div>
           </div>
         ) : null}
-
-        {/* The board is curated by the mentor, so it should always be one click from them. */}
-        <p className="text-sm text-app-text-muted">
-          <Link
-            to="/buddy"
-            className="inline-flex items-center gap-1.5 font-medium text-app-brand-text hover:underline"
-          >
-            <Bot className="h-4 w-4" aria-hidden="true" />
-            Ask your buddy about any of this
-          </Link>
-        </p>
       </main>
 
       <BoardChainPanel
