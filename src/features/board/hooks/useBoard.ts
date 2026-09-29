@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../../../services/apiClient";
 import { boardService } from "../../../services/boardService";
 import { queryKeys } from "../../../services/queryKeys";
-import type { AuthoredCardRequest, Board, BoardCard } from "../types";
+import type { AuthoredCardRequest, Board, BoardCard, BoardUndoNotice } from "../types";
 
 /** The board query's loader, shared with route prefetch so the two never drift apart. */
 export function loadBoard(projectId: string): Promise<Board> {
@@ -24,6 +25,18 @@ type UseBoardResult = {
   addCard: (request: AuthoredCardRequest) => Promise<boolean>;
   /** Replaces what one of their cards says — ticking a checklist item included. */
   editCard: (cardId: string, request: AuthoredCardRequest) => Promise<boolean>;
+  /**
+   * Puts a card back to what it said before its most recent edit — the hire's or the buddy's.
+   *
+   * Resolves what the server made of it: `"restored"` (an undo that landed, and can itself be
+   * undone), `"stale"` (the card was edited again since the board last read it — the board is being
+   * re-read, and saying so beats silently doing nothing), or `"failed"` (surfaced as `writeError`).
+   */
+  restorePrevious: (cardId: string, replacedAt: string) => Promise<"restored" | "stale" | "failed">;
+  /** The card whose undo is in flight, so its own strip can show it is working. */
+  restoringId: string | null;
+  /** What just happened to an undo, keyed to the card it happened on. */
+  undoNotice: BoardUndoNotice | null;
   /** Puts the cards in this order, showing it immediately and confirming with the server. */
   reorder: (cardIds: string[]) => Promise<void>;
   /** Set when the last write did not go through, so the page can say so and keep what was there. */
@@ -70,6 +83,8 @@ export function useBoard(projectId: string): UseBoardResult {
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [dismissError, setDismissError] = useState(false);
   const [writeError, setWriteError] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [undoNotice, setUndoNotice] = useState<BoardUndoNotice | null>(null);
 
   const dismiss = useCallback(
     async (cardId: string) => {
@@ -139,6 +154,45 @@ export function useBoard(projectId: string): UseBoardResult {
     [queryClient, queryKey],
   );
 
+  const restorePrevious = useCallback(
+    async (cardId: string, replacedAt: string): Promise<"restored" | "stale" | "failed"> => {
+      setRestoringId(cardId);
+      setUndoNotice(null);
+      try {
+        // The server's own answer, like `editCard`: the restore swaps the card's content for its
+        // previous version and that previous version becomes the new undo, so putting the response
+        // in place is what keeps "an undo can be undone" true without any local bookkeeping.
+        const updated = await boardService.restorePrevious(cardId, replacedAt);
+        await queryClient.cancelQueries({ queryKey });
+        queryClient.setQueryData(queryKey, (prev: Board | null | undefined) =>
+          prev
+            ? {
+                ...prev,
+                cards: prev.cards.map((card: BoardCard) => (card.id === cardId ? updated : card)),
+              }
+            : prev,
+        );
+        setUndoNotice({ cardId, kind: "restored" });
+        return "restored";
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          // The card moved on since this board read it — another edit replaced the one the hire
+          // was undoing. Re-read rather than retry: what the card says now is the truth, and the
+          // only undo still on offer is the newest edit's. The refusal stays on the card so the
+          // press has a receipt that outlives a toast.
+          setUndoNotice({ cardId, kind: "stale" });
+          await refetch();
+          return "stale";
+        }
+        setWriteError(true);
+        return "failed";
+      } finally {
+        setRestoringId(null);
+      }
+    },
+    [queryClient, queryKey, refetch],
+  );
+
   const reorder = useCallback(
     async (cardIds: string[]) => {
       setWriteError(false);
@@ -181,6 +235,9 @@ export function useBoard(projectId: string): UseBoardResult {
     dismissError,
     addCard,
     editCard,
+    restorePrevious,
+    restoringId,
+    undoNotice,
     reorder,
     writeError,
   };

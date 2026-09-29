@@ -57,7 +57,7 @@ import {
   type CardSize,
   type CardSizes,
 } from "../layout/cardSizes";
-import type { AuthoredCardRequest, Board, BoardCard } from "../types";
+import type { AuthoredCardRequest, Board, BoardCard, BoardUndoNotice } from "../types";
 
 /** Two columns from Tailwind's `lg` up; one below it. The only width this grid branches on. */
 const TWO_COLUMN_QUERY = "(min-width: 1024px)";
@@ -340,6 +340,21 @@ type BoardGridProps = {
   onDismiss?: (cardId: string) => void;
   dismissingId?: string | null;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  /**
+   * Puts a card back to what it said before its most recent edit.
+   *
+   * The record of that edit lives on the card itself, not in a toast — a change the hire never saw
+   * is exactly what an undo exists to prevent, so the affordance cannot be something that expires
+   * with a timeout.
+   */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** The card whose undo is in flight, so its own strip can show it is working. */
+  restoringId?: string | null;
+  /**
+   * What just happened to an undo, keyed to the card it happened on: a stale press's refusal, or
+   * the fact that a restore landed.
+   */
+  undoNotice?: BoardUndoNotice | null;
   /** Applies a whole new order. Absent when the board is not arrangeable. */
   onReorder?: (cardIds: string[]) => void;
   /**
@@ -448,13 +463,25 @@ type SharedProps = {
  * renders something visible rather than nothing: a card that silently disappears because the client
  * is a version behind is indistinguishable from the mentor never having placed it.
  */
+type BoardCardViewProps = SharedProps & {
+  onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice: "restored" | "stale" | null;
+};
+
 function BoardCardView({
   card,
   onEdit,
+  onRestorePrevious,
+  restoring,
+  undoNotice,
   origin,
   onCardAdded,
   ...shared
-}: SharedProps & { onEdit?: (cardId: string, request: AuthoredCardRequest) => void }) {
+}: BoardCardViewProps) {
   // Only the authored kinds take an origin — all three of them now, since a checklist minted from
   // a task is as found as a note taken from a paragraph. It is unpacked here rather than spread
   // with the rest: a live card was never found anywhere, and handing it a prop it ignores invites
@@ -480,11 +507,40 @@ function BoardCardView({
     case "PATH_STEP":
       return <PathStepCard content={card.content} {...props} />;
     case "NOTE":
-      return <NoteCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
+      return (
+        <NoteCard
+          content={card.content}
+          onEdit={onEdit}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     case "LINK":
-      return <LinkCard content={card.content} origin={origin} {...props} />;
+      return (
+        <LinkCard
+          content={card.content}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     case "CHECKLIST":
-      return <ChecklistCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
+      return (
+        <ChecklistCard
+          content={card.content}
+          onEdit={onEdit}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     default:
       return (
         <section className="rounded-2xl border border-dashed border-app-border p-4">
@@ -526,6 +582,9 @@ export function BoardGrid({
   onDismiss,
   dismissingId = null,
   onEdit,
+  onRestorePrevious,
+  restoringId = null,
+  undoNotice = null,
   onReorder,
   boardOrder,
   isArranging = false,
@@ -1040,6 +1099,9 @@ export function BoardGrid({
         onDismiss={onDismiss}
         dismissing={dismissingId === card.id}
         onEdit={onEdit}
+        onRestorePrevious={onRestorePrevious}
+        restoring={restoringId === card.id}
+        undoNotice={undoNotice?.cardId === card.id ? undoNotice.kind : null}
         registerElement={registerElement}
         onDragStart={() => {
           lastMoveAt.current = 0;
@@ -1403,6 +1465,11 @@ type BoardCardCellProps = {
   onDismiss?: (cardId: string) => void;
   dismissing: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice: "restored" | "stale" | null;
   registerElement: (id: string, element: HTMLDivElement | null) => void;
   onDragStart: () => void;
   onDrag: () => void;
@@ -1457,6 +1524,9 @@ function BoardCardCell({
   onDismiss,
   dismissing,
   onEdit,
+  onRestorePrevious,
+  restoring,
+  undoNotice,
   registerElement,
   onDragStart,
   onDrag,
@@ -1849,6 +1919,9 @@ function BoardCardCell({
               onDismiss={onDismiss}
               dismissing={dismissing}
               onEdit={onEdit}
+              onRestorePrevious={onRestorePrevious}
+              restoring={restoring}
+              undoNotice={undoNotice}
               origin={origin}
               onCardAdded={onCardAdded}
             />

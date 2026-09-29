@@ -20,8 +20,9 @@ import { Button } from "../../../components/ui/Button";
 import { Collapsible } from "../../../components/ui/Collapsible";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { cardName } from "../layout/cardNames";
+import { CardEditHistory } from "./CardEditHistory";
 import { useBoardCardControls } from "./boardCardControls";
-import type { BoardCard } from "../types";
+import type { BoardCard, BoardCardLastChange, BoardCardPrevious } from "../types";
 
 type BoardCardFrameProps = {
   /**
@@ -44,7 +45,17 @@ type BoardCardFrameProps = {
    * It is here so a card can be found by shape before it is read; the colour comes from the bloom.
    */
   icon: LucideIcon;
-  card: Pick<BoardCard, "id" | "owner" | "placedAt">;
+  card: Pick<BoardCard, "id" | "owner" | "placedAt"> & {
+    /**
+     * The version the latest edit replaced, when there is one to go back to — authored cards only.
+     *
+     * Optional so the live-card components keep handing over exactly what they always did: a live
+     * card holds no stored content and can never carry a previous version.
+     */
+    previous?: BoardCardPrevious | null;
+    /** The card's latest change, for the strip's wording. Same story as `previous`. */
+    lastChange?: BoardCardLastChange | null;
+  };
   /** Optional one-line note under the title, e.g. what the card is counting. */
   subtitle?: string;
   /**
@@ -57,6 +68,15 @@ type BoardCardFrameProps = {
   controlLabel?: string;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
+  /**
+   * Puts this card back to what it said before its most recent edit. Absent on a board that cannot
+   * write.
+   */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring?: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice?: "restored" | "stale" | null;
   /** A kind-specific control in the header, e.g. "edit this note". */
   action?: ReactNode;
   children: ReactNode;
@@ -70,6 +90,11 @@ type BoardCardFrameProps = {
  * they know they wrote it. Claiming the buddy added something it didn't would be attribution the
  * hire cannot check, and attribution they cannot check is attribution they cannot trust — which
  * would undermine the label everywhere it *is* true.
+ *
+ * A card that was edited carries the record of that edit too — what it replaced, who replaced it
+ * and when, with the way back — rendered by {@link CardEditHistory}. Like the `placedAt` line it is
+ * data on the card rather than a toast: the edit the hire never saw is the one an undo exists for,
+ * and a record that expires while they are away is one they cannot check.
  *
  * The remove control says "Remove", not "Hide": the buddy will not put it back, and a word that
  * suggested otherwise would misdescribe a decision as a gesture. Folding is the opposite and says
@@ -114,6 +139,9 @@ export function BoardCardFrame({
   controlLabel,
   onDismiss,
   dismissing = false,
+  onRestorePrevious,
+  restoring = false,
+  undoNotice = null,
   action,
   children,
 }: BoardCardFrameProps) {
@@ -428,6 +456,21 @@ export function BoardCardFrame({
             </span>
           </div>
         </header>
+
+        {/* The card's own record of its latest edit, when there is one to go back to. Outside the
+            `Collapsible` on purpose: the fact a card was edited is like the blocked line — true
+            whether or not the card is folded, and the way back should not need unfolding first. */}
+        {card.previous && onRestorePrevious && (
+          <CardEditHistory
+            cardId={card.id}
+            previous={card.previous}
+            lastChange={card.lastChange}
+            controlLabel={label}
+            onRestore={onRestorePrevious}
+            restoring={restoring}
+            notice={undoNotice}
+          />
+        )}
 
         <Collapsible open={open}>
           <div className="relative [[data-arranging]_&]:pointer-events-none [[data-arranging]_&]:select-none">

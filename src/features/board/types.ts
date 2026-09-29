@@ -37,6 +37,41 @@ export type AuthoredCardKind = "NOTE" | "LINK" | "CHECKLIST";
  */
 export type BoardCardOwner = "AI" | "HIRE";
 
+/**
+ * Who changed a card.
+ *
+ * Not the owner, which answers who *may* change it: the buddy rewriting a hire's note changes the
+ * words, not the owner, and a board that cannot say which is a board where the hire finds different
+ * text under their own card and has no way to tell how it got there.
+ */
+export type BoardActor = "HIRE" | "BUDDY";
+
+/** What the most recent change to a card was. Only the latest one is kept — never a history. */
+export type BoardCardChange = "CREATED" | "EDITED" | "TICKED" | "DISMISSED" | "MOVED";
+
+/** The most recent change to one card: what it was, whose, and when. */
+export type BoardCardLastChange = {
+  change: BoardCardChange;
+  by: BoardActor;
+  at: string;
+};
+
+/**
+ * What a card said before its most recent content edit, and the edit that replaced it.
+ *
+ * Depth one, whole content — the next edit overwrites it, so there is never more than one version
+ * to go back to. Restoring goes through the card's own edit path, which makes an undo an edit
+ * itself and lets it be undone in turn.
+ */
+export type BoardCardPrevious = {
+  content: BoardCardContent;
+  replacedBy: BoardActor;
+  replacedAt: string;
+};
+
+/** Where an undo stands: the card it happened on, and how it ended. */
+export type BoardUndoNotice = { cardId: string; kind: "restored" | "stale" };
+
 /** The moments a path card reports, in the order they normally happen. */
 export type BoardMomentKey =
   "JOINED" | "TASK_CLAIMED" | "WORK_SUBMITTED" | "FIRST_RESPONSE" | "WORK_ACCEPTED";
@@ -364,6 +399,22 @@ export type BoardCard = {
    */
   placedAt: string | null;
   content: BoardCardContent;
+  /**
+   * The most recent change to this card, whoever made it; null — or absent, on a client meeting an
+   * older backend — for a card nobody has touched since the board seeded it.
+   *
+   * Recorded for hire and buddy alike, which is what lets the client say who did what without ever
+   * labelling a hire's own change as the buddy's.
+   */
+  lastChange?: BoardCardLastChange | null;
+  /**
+   * The version this card's most recent content edit replaced, or null/absent when there is none
+   * to go back to. Live cards never carry one — only the authored kinds hold stored content.
+   *
+   * The hire's own words, not a label saying something changed: somebody who finds different text
+   * on their card needs to be able to read what was there, and to put it back in one action.
+   */
+  previous?: BoardCardPrevious | null;
 };
 
 export type Board = {

@@ -1,10 +1,16 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBoard } from "../../../../src/features/board/hooks/useBoard";
+import { ApiError } from "../../../../src/services/apiClient";
 import type { Board, BoardCard } from "../../../../src/features/board/types";
 
 vi.mock("../../../../src/services/boardService", () => ({
-  boardService: { fetchBoard: vi.fn(), dismissCard: vi.fn(), editCard: vi.fn() },
+  boardService: {
+    fetchBoard: vi.fn(),
+    dismissCard: vi.fn(),
+    editCard: vi.fn(),
+    restorePrevious: vi.fn(),
+  },
 }));
 
 import { boardService } from "../../../../src/services/boardService";
@@ -42,6 +48,7 @@ describe("useBoard", () => {
     vi.mocked(boardService.fetchBoard).mockReset();
     vi.mocked(boardService.dismissCard).mockReset();
     vi.mocked(boardService.editCard).mockReset();
+    vi.mocked(boardService.restorePrevious).mockReset();
   });
 
   it("does not ask for a board when there is no project", async () => {
@@ -174,6 +181,129 @@ describe("useBoard", () => {
     expect(result.current.board?.cards[0].content).toEqual({
       kind: "NOTE",
       text: "saved",
+    });
+  });
+});
+
+/**
+ * The undo, at the hook level.
+ *
+ * It must put the server's answer in place without re-reading — a re-read is what unmounts the card
+ * being worked on — and it must tell a stale press (the card moved on since this read, nothing was
+ * undone) apart from a failed one (the write did not happen at all).
+ */
+describe("undoing the latest edit", () => {
+  beforeEach(() => {
+    vi.mocked(boardService.fetchBoard).mockReset();
+    vi.mocked(boardService.restorePrevious).mockReset();
+  });
+
+  const edited = (): BoardCard => ({
+    id: "c1",
+    kind: "NOTE",
+    owner: "HIRE",
+    position: 0,
+    placedAt: null,
+    content: { kind: "NOTE", text: "deploys are on Fridays" },
+    lastChange: { change: "EDITED", by: "BUDDY", at: "2026-09-29T10:15:30.123Z" },
+    previous: {
+      content: { kind: "NOTE", text: "deploys are on Thursdays" },
+      replacedBy: "BUDDY",
+      replacedAt: "2026-09-29T10:15:30.123Z",
+    },
+  });
+
+  const restored = (): BoardCard => ({
+    id: "c1",
+    kind: "NOTE",
+    owner: "HIRE",
+    position: 0,
+    placedAt: null,
+    content: { kind: "NOTE", text: "deploys are on Thursdays" },
+    lastChange: { change: "EDITED", by: "HIRE", at: "2026-09-29T12:00:00.000Z" },
+    previous: {
+      content: { kind: "NOTE", text: "deploys are on Fridays" },
+      replacedBy: "HIRE",
+      replacedAt: "2026-09-29T12:00:00.000Z",
+    },
+  });
+
+  const boardWith = (card: BoardCard): Board => ({
+    boardId: "b1",
+    projectId: "p1",
+    cards: [card],
+  });
+
+  it("puts the restored card in place, echoing the moment it was told to undo", async () => {
+    vi.mocked(boardService.fetchBoard).mockResolvedValue(boardWith(edited()));
+    vi.mocked(boardService.restorePrevious).mockResolvedValue(restored());
+
+    const { result } = renderHook(() => useBoard("p1"));
+    await waitFor(() => expect(result.current.board?.cards).toHaveLength(1));
+
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.restorePrevious("c1", "2026-09-29T10:15:30.123Z");
+    });
+
+    expect(outcome).toBe("restored");
+    expect(boardService.restorePrevious).toHaveBeenCalledWith("c1", "2026-09-29T10:15:30.123Z");
+    // The server's own answer, in place. One read: the first one.
+    expect(result.current.board?.cards[0].content).toEqual({
+      kind: "NOTE",
+      text: "deploys are on Thursdays",
+    });
+    // The content it replaced is the new previous version, so the undo can be undone.
+    expect(result.current.board?.cards[0].previous?.content).toEqual({
+      kind: "NOTE",
+      text: "deploys are on Fridays",
+    });
+    expect(boardService.fetchBoard).toHaveBeenCalledTimes(1);
+    expect(result.current.undoNotice).toEqual({ cardId: "c1", kind: "restored" });
+    expect(result.current.restoringId).toBeNull();
+  });
+
+  it("re-reads and says so when the edit was already replaced (409)", async () => {
+    vi.mocked(boardService.fetchBoard)
+      .mockResolvedValueOnce(boardWith(edited()))
+      .mockResolvedValueOnce(boardWith(restored()));
+    vi.mocked(boardService.restorePrevious).mockRejectedValue(
+      new ApiError(409, "That card has changed since — nothing was undone"),
+    );
+
+    const { result } = renderHook(() => useBoard("p1"));
+    await waitFor(() => expect(result.current.board?.cards).toHaveLength(1));
+
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.restorePrevious("c1", "2026-09-29T10:15:30.123Z");
+    });
+
+    expect(outcome).toBe("stale");
+    // The card on screen is the truth again, and the refusal rides on the card, not a toast.
+    expect(boardService.fetchBoard).toHaveBeenCalledTimes(2);
+    expect(result.current.undoNotice).toEqual({ cardId: "c1", kind: "stale" });
+    expect(result.current.writeError).toBe(false);
+  });
+
+  it("keeps the card and raises the write error when the undo itself fails", async () => {
+    vi.mocked(boardService.fetchBoard).mockResolvedValue(boardWith(edited()));
+    vi.mocked(boardService.restorePrevious).mockRejectedValue(new Error("nope"));
+
+    const { result } = renderHook(() => useBoard("p1"));
+    await waitFor(() => expect(result.current.board?.cards).toHaveLength(1));
+
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.restorePrevious("c1", "2026-09-29T10:15:30.123Z");
+    });
+
+    expect(outcome).toBe("failed");
+    expect(result.current.writeError).toBe(true);
+    expect(result.current.undoNotice).toBeNull();
+    expect(result.current.board?.cards[0].content).toEqual({
+      kind: "NOTE",
+      text: "deploys are on Fridays",
     });
   });
 });

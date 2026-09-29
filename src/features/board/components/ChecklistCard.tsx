@@ -17,10 +17,16 @@ import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } 
 
 type ChecklistCardProps = {
   content: ChecklistContent;
-  card: Pick<BoardCard, "id" | "owner" | "placedAt">;
+  card: Pick<BoardCard, "id" | "owner" | "placedAt" | "previous" | "lastChange">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  /** Puts the card back to what it said before its latest edit. See `BoardCardFrame`. */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring?: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice?: "restored" | "stale" | null;
   /**
    * Where this list came from, when it was made out of something — a task, most often.
    *
@@ -73,6 +79,9 @@ export function ChecklistCard({
   onDismiss,
   dismissing,
   onEdit,
+  onRestorePrevious,
+  restoring,
+  undoNotice,
   origin,
 }: ChecklistCardProps) {
   // A checklist's lines are written by the generator and read back from the server, so a highlight
@@ -150,6 +159,9 @@ export function ChecklistCard({
       subtitle={content.items.length > 0 ? `${done}/${content.items.length} done` : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
+      onRestorePrevious={onRestorePrevious}
+      restoring={restoring}
+      undoNotice={undoNotice}
     >
       {content.items.length === 0 ? (
         <EmptyState size="sm">Nothing on it yet.</EmptyState>

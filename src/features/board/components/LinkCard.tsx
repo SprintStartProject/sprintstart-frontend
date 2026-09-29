@@ -8,9 +8,15 @@ import type { BoardCard, LinkContent } from "../types";
 
 type LinkCardProps = {
   content: LinkContent;
-  card: Pick<BoardCard, "id" | "owner" | "placedAt">;
+  card: Pick<BoardCard, "id" | "owner" | "placedAt" | "previous" | "lastChange">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
+  /** Puts the card back to what it said before its latest edit. See `BoardCardFrame`. */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring?: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice?: "restored" | "stale" | null;
   /**
    * Where the hire was when they kept this link — which is not where the link goes.
    *
@@ -31,7 +37,16 @@ type LinkCardProps = {
  * No inline editing: a link is its address, and changing that makes it a different link. Remove and
  * add is the honest gesture, and it is one click more than an edit form nobody would find.
  */
-export function LinkCard({ content, card, onDismiss, dismissing, origin }: LinkCardProps) {
+export function LinkCard({
+  content,
+  card,
+  onDismiss,
+  dismissing,
+  onRestorePrevious,
+  restoring,
+  undoNotice,
+  origin,
+}: LinkCardProps) {
   return (
     <BoardCardFrame
       icon={Link2}
@@ -39,6 +54,9 @@ export function LinkCard({ content, card, onDismiss, dismissing, origin }: LinkC
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
+      onRestorePrevious={onRestorePrevious}
+      restoring={restoring}
+      undoNotice={undoNotice}
     >
       <a
         href={content.url}
