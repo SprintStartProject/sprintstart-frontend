@@ -18,9 +18,11 @@ import { SelectionActions } from "./features/board/selection/SelectionActions";
 import { CardMarksProvider } from "./features/board/marks/CardMarksProvider";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
+import { EggEffectsLayer } from "./features/easter-eggs/components/EggEffectsLayer";
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
+import { GlobalShortcuts } from "./features/shortcuts";
 
 function AppContent() {
   const { status } = useAuth();
@@ -54,6 +56,7 @@ function AppContent() {
   // happened to be out does not open with it already there, waiting for a mouse that never went
   // near it to leave. Reset during render rather than in an effect: it is a correction to state
   // that is already wrong for this render, not a synchronisation with anything outside React.
+  // (The pattern and its three rules are named once in `CODING_STANDARDS.md` § 3.)
   const [peekMode, setPeekMode] = useState(isFocused);
   if (peekMode !== isFocused) {
     setPeekMode(isFocused);
@@ -107,7 +110,15 @@ function AppContent() {
         {/* `data-moment-stage`: the area the page-scoped moments (the
           onboarding launch and landing) cover, instead of the whole
           screen — see momentStage.ts in the moments feature. */}
-        <main data-moment-stage className="relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0">
+        <main
+          data-moment-stage
+          className={`relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0 ${
+            // The sidebar is `fixed` from `lg` up (see SideBar), so it is out of
+            // flow and the page has to leave its width free itself. In focus mode
+            // it slides away over the content, so the margin goes with it.
+            signedIn && !isFocused ? "lg:ml-[var(--app-sidebar-width)]" : ""
+          }`}
+        >
           <AppRouter />
         </main>
 
@@ -118,6 +129,12 @@ function AppContent() {
           nobody on the login screen has a session for. It takes itself off `/buddy`,
           where the page already is the buddy. */}
         {showBuddyDock && <BuddyWidget />}
+
+        {/* The keyboard, app-wide: the destination chords and `?` open a listener here rather
+          than per page, because a shortcut that only works on the page you are already on is
+          not a shortcut. Signed-in only — the login screen has nothing to jump between, and
+          the help lists destinations a signed-out visitor has no access to. */}
+        {signedIn && <GlobalShortcuts />}
 
         {/* Offers to keep whatever the hire has highlighted, from any page. Mounted here for the
           same reason the buddy is: what is worth keeping is almost never found on the board.
@@ -139,6 +156,12 @@ function AppContent() {
           sits on top of the login screen, and off unless turned on in
           Settings (see AppearanceSection). */}
         {signedIn && showRocketPet && <RocketPet />}
+
+        {/* Whole-window egg effects (barrel roll, matrix rain), rendered
+          once for the whole app. Any chat surface fires them through the
+          bus (playEggEffect); this is where they actually draw. Not gated
+          on signedIn: a fired effect must always have its renderer. */}
+        <EggEffectsLayer />
       </div>
     </BuddyProvider>
   );

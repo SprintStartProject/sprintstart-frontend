@@ -12,6 +12,8 @@ import {
   type ProjectContextValue,
 } from "../../../../src/features/projects/ProjectContext";
 import { BuddyProvider } from "../../../../src/features/buddy/BuddyProvider";
+import { useBuddyDraft } from "../../../../src/features/buddy/buddyDraftContext";
+import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
 import type { UserProfile } from "../../../../src/services/types";
 
 /**
@@ -107,4 +109,16 @@ export function BuddyProviderWithStubs({ children }: { children: ReactNode }) {
       <BuddyProvider>{children}</BuddyProvider>
     </BuddyTestProviders>
   );
+}
+
+/**
+ * The dock-driving hook plus the composer's half, as one object — for tests only.
+ *
+ * In the app the two are deliberately separate: `useBuddy()` is what the widget calls, and it
+ * must not read the draft, or every keystroke would re-render the dock (issue #236). A test that
+ * drives the session *through the composer* — "put these words in the box, then submit them" —
+ * needs both halves inside one render, and no production surface does, so the pair lives here.
+ */
+export function useBuddyWithDraft() {
+  return { ...useBuddy(), ...useBuddyDraft() };
 }

@@ -148,3 +148,34 @@ describe("SidebarNavLink attention marker", () => {
     expect(screen.queryByText("Needs attention")).toBeNull();
   });
 });
+
+/**
+ * The chip is a second rendering of a chord the registry already owns, which is why it is
+ * `aria-hidden` and the link's own `title` carries the copy a screen reader hears — once.
+ */
+describe("SidebarNavLink shortcut hint", () => {
+  it("shows the chord on an entry that has one", () => {
+    render(<Harness shortcut="Alt + H" />);
+
+    expect(screen.getByText("Alt + H")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Escalation Inbox" })).toHaveAttribute(
+      "title",
+      "Escalation Inbox (Alt + H)",
+    );
+  });
+
+  it("keeps the chip out of the accessible name", () => {
+    render(<Harness shortcut="Alt + H" />);
+
+    expect(screen.getByText("Alt + H")).toHaveAttribute("aria-hidden", "true");
+    // A name that still matches the label alone: the chord is not read a second time.
+    expect(screen.getByRole("link", { name: "Escalation Inbox" })).toBeInTheDocument();
+  });
+
+  it("shows nothing, and promises nothing, on an entry without a chord", () => {
+    render(<Harness />);
+
+    expect(screen.queryByText(/Alt \+/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Escalation Inbox" })).not.toHaveAttribute("title");
+  });
+});

@@ -4,6 +4,7 @@ import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
 import { extractChecklist, toChecklistRequest } from "../../board/generation/checklistFromMarkdown";
+import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import { useProjectContext } from "../../projects/useProjectContext";
 
 type SaveReplyToBoardProps = {
@@ -29,6 +30,7 @@ type SaveReplyToBoardProps = {
 export function SaveReplyToBoard({ content }: SaveReplyToBoardProps) {
   const { selectedProjectId } = useProjectContext();
   const toast = useToast();
+  const invalidateBoard = useInvalidateBoard(selectedProjectId);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -42,6 +44,8 @@ export function SaveReplyToBoard({ content }: SaveReplyToBoardProps) {
     setSaving(true);
     try {
       await boardService.addCard(selectedProjectId, toChecklistRequest(checklist));
+      // The board this list joined may be cached right behind this dock — see `useInvalidateBoard`.
+      invalidateBoard();
       setSaved(true);
       toast.success("Kept on your board", {
         description: `"${checklist.title}" — ${checklist.items.length} things to tick off.`,

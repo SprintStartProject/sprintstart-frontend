@@ -89,7 +89,7 @@ export function WizardDetailsStep({
         />
       </Field>
 
-      <Field label="Description" controlId={descriptionInputId}>
+      <Field label="Description" controlId={descriptionInputId} optional>
         <Textarea
           value={description}
           onChange={(event) => onDescriptionChange(event.target.value)}
@@ -102,7 +102,8 @@ export function WizardDetailsStep({
       <Field
         label="Industry"
         controlId={industryInputId}
-        hint="Optional. Leave empty and set or evaluate it later from the project's admin drawer."
+        optional
+        hint="Leave empty and set or evaluate it later from the project's admin drawer."
       >
         <Input
           value={industry}

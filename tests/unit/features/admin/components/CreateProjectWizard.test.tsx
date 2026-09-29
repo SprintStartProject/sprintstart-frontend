@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CreateProjectWizard } from "../../../../../src/features/admin/components/CreateProjectWizard";
@@ -254,10 +254,10 @@ describe("CreateProjectWizard", () => {
     await screen.findByText(/Team token - me@example.com/i);
 
     await user.type(
-      screen.getByLabelText("Confluence base URL"),
+      screen.getByLabelText(/^Confluence base URL/),
       "https://acme.atlassian.net/wiki",
     );
-    await user.type(screen.getByLabelText("Space ID"), "123456");
+    await user.type(screen.getByLabelText(/^Space ID/), "123456");
     await user.click(screen.getByRole("button", { name: /add to list/i }));
   }
 
@@ -384,7 +384,7 @@ describe("CreateProjectWizard", () => {
     await settleModalFocus();
 
     await user.type(screen.getByLabelText(/^Name/), "Apollo");
-    await user.type(screen.getByLabelText("Industry"), "Fintech");
+    await user.type(screen.getByLabelText(/^Industry/), "Fintech");
 
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
@@ -424,7 +424,7 @@ describe("CreateProjectWizard", () => {
     expect(await screen.findByText("Not set")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Go to Details" }));
-    await user.type(screen.getByLabelText("Industry"), "Fintech");
+    await user.type(screen.getByLabelText(/^Industry/), "Fintech");
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
@@ -675,12 +675,12 @@ describe("CreateProjectWizard", () => {
     await screen.findByText(/Team token - me@example.com/i);
 
     await user.type(
-      screen.getByLabelText("Confluence base URL"),
+      screen.getByLabelText(/^Confluence base URL/),
       "https://acme.atlassian.net/wiki",
     );
     // "DOCS" is what Confluence's own UI shows, so it is the obvious thing to
     // paste — and the backend would only reject it at provisioning time.
-    await user.type(screen.getByLabelText("Space ID"), "DOCS");
+    await user.type(screen.getByLabelText(/^Space ID/), "DOCS");
 
     expect(screen.getByRole("button", { name: /add to list/i })).toBeDisabled();
   });
@@ -765,6 +765,81 @@ describe("CreateProjectWizard", () => {
     await waitFor(() =>
       expect(screen.getByLabelText("Access token")).toHaveTextContent("fresh-pat"),
     );
+  });
+
+  it("returns focus to the trigger after a token is added inline by keyboard", async () => {
+    vi.mocked(getGithubPatNames).mockResolvedValueOnce([]).mockResolvedValue(["fresh-pat"]);
+    const user = userEvent.setup();
+    renderWizard({ tokenNames: [] });
+
+    await goToSources(user);
+    await openGithubDetail(user);
+
+    screen.getByRole("button", { name: /add github token/i }).focus();
+    await user.keyboard("{Enter}");
+    await user.type(screen.getByTestId("settings-add-token-name"), "fresh-pat");
+    await user.type(screen.getByTestId("settings-add-token-value"), "ghp_secret123{Enter}");
+
+    // Focus lands back on the trigger instead of dropping to <body>, where the
+    // next Tab would escape the wizard onto the page behind it.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /add github token/i })).toHaveFocus(),
+    );
+  });
+
+  describe("on desktop, where the token form opens in a companion beside the wizard", () => {
+    beforeEach(() => {
+      vi.spyOn(window, "matchMedia").mockImplementation(
+        (query: string) =>
+          ({
+            matches: query === "(min-width: 1280px)",
+            media: query,
+            onchange: null,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+          }) as MediaQueryList,
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("keeps Tab inside the companion and returns focus to the trigger after saving", async () => {
+      vi.mocked(getGithubPatNames).mockResolvedValueOnce([]).mockResolvedValue(["fresh-pat"]);
+      const user = userEvent.setup();
+      renderWizard({ tokenNames: [] });
+
+      await goToSources(user);
+      await openGithubDetail(user);
+
+      const trigger = screen.getByRole("button", { name: /add github token/i });
+      trigger.focus();
+      await user.keyboard("{Enter}");
+
+      const companion = await screen.findByRole("dialog", { name: "New GitHub token" });
+      await settleModalFocus();
+      expect(screen.getByTestId("settings-add-token-name")).toHaveFocus();
+
+      // Tabbing past the last control wraps within the companion.
+      const submit = screen.getByTestId("settings-add-token-submit");
+      await user.type(screen.getByTestId("settings-add-token-name"), "fresh-pat");
+      await user.type(screen.getByTestId("settings-add-token-value"), "ghp_secret123");
+      submit.focus();
+      await user.tab();
+      expect(companion).toContainElement(document.activeElement as HTMLElement);
+
+      submit.focus();
+      await user.keyboard("{Enter}");
+
+      await waitFor(() =>
+        expect(vi.mocked(addGithubPat)).toHaveBeenCalledWith("fresh-pat", "ghp_secret123"),
+      );
+      await waitFor(() => expect(trigger).toHaveFocus());
+    });
   });
 
   it("adds a Jira credential inline and selects the new one", async () => {

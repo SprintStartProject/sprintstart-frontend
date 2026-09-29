@@ -17,6 +17,7 @@ type DetailsSideDrawerProps = {
   contentClassName?: string;
   headerClassName?: string;
   closeAriaLabel?: string;
+  lockScroll?: boolean;
 };
 
 export function DetailsSideDrawer({
@@ -35,6 +36,7 @@ export function DetailsSideDrawer({
   contentClassName = "mx-3 px-3 pb-8 pt-4 sm:mx-5 sm:px-4 sm:pb-10 sm:pt-5 lg:px-5 lg:pt-6",
   headerClassName = "mx-3 px-3 pb-4 pt-4 sm:mx-5 sm:px-4 sm:pb-5 sm:pt-5 lg:px-5 lg:pt-6",
   closeAriaLabel = "Close details",
+  lockScroll = true,
 }: DetailsSideDrawerProps) {
   return (
     <SidePanel
@@ -52,6 +54,7 @@ export function DetailsSideDrawer({
       contentClassName={contentClassName}
       headerClassName={headerClassName}
       closeAriaLabel={closeAriaLabel}
+      lockScroll={lockScroll}
     >
       {children}
     </SidePanel>

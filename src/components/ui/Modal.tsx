@@ -159,7 +159,11 @@ export function Modal({
             ref={dialogRef}
             data-testid={testId}
             role={role}
-            aria-modal="true"
+            // Only while open: during the exit animation AnimatePresence keeps the node in
+            // the DOM for the length of the fade, and `aria-modal` left on it would keep
+            // global chords dead for exactly that window — a dropped keypress right after
+            // Escape.
+            aria-modal={isOpen ? "true" : undefined}
             // A sideways flick inside a dialog is a flick inside a dialog. Without this it reached
             // the page underneath, where it switches tabs behind the open overlay.
             {...{ [SWIPE_IGNORE_ATTRIBUTE]: "" }}

@@ -76,7 +76,7 @@ export function ConfluenceConnectStep({
         </div>
       )}
 
-      <Field label="Confluence base URL" controlId="confluence-base-url" disabled={isBusy}>
+      <Field label="Confluence base URL" controlId="confluence-base-url" required disabled={isBusy}>
         <Input
           data-testid="confluence-base-url"
           type="url"
@@ -90,6 +90,7 @@ export function ConfluenceConnectStep({
       <Field
         label="Space ID"
         controlId="confluence-space-id"
+        required
         disabled={isBusy}
         hint="Numeric ID of the space in Confluence Cloud."
       >

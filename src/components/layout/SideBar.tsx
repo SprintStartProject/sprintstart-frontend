@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 import { LogOut, Menu, Settings, X } from "lucide-react";
@@ -13,6 +13,12 @@ import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledge
 import { usePmAttentionCount } from "../../features/team-management/usePmAttentionCount";
 import { useKnownOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
 import { useUnseenSkipAnswerCount } from "../../features/onboarding/hooks/useUnseenSkipAnswerCount";
+import {
+  SIDEBAR_TOGGLE_SHORTCUT,
+  navigationShortcut,
+  useShortcutListener,
+} from "../../features/shortcuts";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import {
   AdminIcon,
   BlueprintsIcon,
@@ -228,6 +234,12 @@ function SidebarContent({
     canAccessRoute(profile, item.path, canManageSelected),
   );
 
+  // The icon-only footer button has no room for a chip, so its name carries the chord — in
+  // both attributes, because `aria-label` wins the accessible-name computation and a `title`
+  // alone would reach the mouse tooltip only.
+  const settingsShortcut = navigationShortcut("/settings");
+  const settingsLabel = settingsShortcut ? `Settings (${settingsShortcut})` : "Settings";
+
   /**
    * The buddy is the other half of the chat's page, not a page of its own: one header, one
    * switch, two conversations. So the entry that leads there lights up for both — without it
@@ -326,6 +338,7 @@ function SidebarContent({
                     (item.path === "/pm-dashboard" && isPmSectionActive) ||
                     (item.path === "/chat" && isAssistantSectionActive)
                   }
+                  shortcut={navigationShortcut(item.path)}
                   indicatorLayoutId={indicatorLayoutId}
                   pointerY={pointerY}
                   hasAttentionMarker={
@@ -397,8 +410,8 @@ function SidebarContent({
                         : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
                     }`
                   }
-                  title="Settings"
-                  aria-label="Settings"
+                  title={settingsLabel}
+                  aria-label={settingsLabel}
                 >
                   <Settings className="h-[18px] w-[18px]" />
                 </NavLink>
@@ -480,11 +493,36 @@ export function SideBar() {
     setIsMobileSidebarOpen(false);
   };
 
+  // A chord can change the route without any link being clicked (Alt+H — nothing runs
+  // `onNavigate` then), and the drawer would still be standing open over the new page.
+  // Deferred to a microtask so this is not a synchronous setState inside the effect body,
+  // which `react-hooks/set-state-in-effect` rejects.
+  useEffect(() => {
+    void Promise.resolve().then(() => setIsMobileSidebarOpen(false));
+  }, [pathname]);
+
+  /**
+   * Alt+S works whatever the header's button works — one definition of "toggle the sidebar"
+   * for both ways in. Today that is the drawer below `lg`; the desktop collapse (#244) will
+   * give the same chord something to do on a wide screen without this line changing.
+   *
+   * Which is exactly why it only listens below `lg`: on a wide screen the drawer is not on
+   * screen, so the chord would flip state nobody can see — and leave it flipped, opening the
+   * drawer uninvited the next time the window narrows. Worse, `Alt+S` is Firefox's History
+   * menu on Windows, and swallowing it for a no-op takes the browser's own chord too.
+   */
+  const toggleMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen((isOpen) => !isOpen);
+  }, []);
+  const isDesktopLayout = useMediaQuery("(min-width: 1024px)");
+
+  useShortcutListener(SIDEBAR_TOGGLE_SHORTCUT, toggleMobileSidebar, !isDesktopLayout);
+
   return (
     <>
       <aside
         aria-label="Desktop Sidebar"
-        className="sticky top-0 hidden h-screen w-[286px] shrink-0 flex-col border-r border-app-border bg-app-bg lg:flex"
+        className="fixed top-0 bottom-0 left-0 hidden w-[var(--app-sidebar-width)] flex-col border-r border-app-border bg-app-bg lg:flex"
       >
         <SidebarContent
           aria-label="Desktop Navigation"
@@ -507,7 +545,7 @@ export function SideBar() {
           type="button"
           aria-label={isMobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
           aria-expanded={isMobileSidebarOpen}
-          onClick={() => setIsMobileSidebarOpen((isOpen) => !isOpen)}
+          onClick={toggleMobileSidebar}
           className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
         >
           {isMobileSidebarOpen ? (
@@ -534,7 +572,7 @@ export function SideBar() {
         className={[
           // The cubic-bezier is the iOS sheet curve: fast out of the
           // gate, long soft settle — reads as gliding, not snapping.
-          "fixed top-0 bottom-0 left-0 z-[60] flex w-[286px] flex-col border-r border-app-border bg-app-bg transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden",
+          "fixed top-0 bottom-0 left-0 z-[60] flex w-[var(--app-sidebar-width)] flex-col border-r border-app-border bg-app-bg transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden",
           isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >

@@ -41,6 +41,8 @@ import {
 } from "./GithubRepositorySyncSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
+import { DinoGame } from "../../chatbot/components/DinoGame.tsx";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame.ts";
 
 type SourceDetailsPanelProps = {
   source: DataSource;
@@ -117,6 +119,12 @@ export function SourceDetailsPanel({
   const isConfluence = source.sourceSystem === "CONFLUENCE";
   const isUpdating = updateState === "loading";
   const isRefreshing = refreshState === "loading";
+  const isSyncing = source.statusView.state === "syncing" || isUpdating;
+  const syncFailed = source.statusView.state === "attention";
+  const dinoUnlocked = useDinoUnlocked();
+  const [dinoActive, closeDino] = useSpaceOpensDino(isSyncing, dinoUnlocked, {
+    keepActiveUntilExit: true,
+  });
   // Update is available for a GitHub repo (needs owner/name), a Jira instance
   // (needs its URL), or a Confluence space (needs its ID).
   const canUpdate =
@@ -388,16 +396,45 @@ export function SourceDetailsPanel({
       }
     >
       <DrawerCard label="Ingestion" icon={Database} index={0}>
-        {source.statusView.state === "syncing" && (
+        {isSyncing && (
           <div className="mb-3 rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-3">
-            <p className="flex items-center gap-2 text-sm font-medium text-app-brand-text">
-              {/* The sentence beside it already says what is happening, so the
-                  glyph stays silent rather than announcing a second time. */}
-              <Spinner size="sm" silent />
-              {source.statusView.label === "Indexing"
-                ? "Indexing artifacts into the knowledge base…"
-                : "Syncing the latest changes…"}
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-sm font-medium text-app-brand-text">
+                {/* The sentence beside it already says what is happening, so the
+                    glyph stays silent rather than announcing a second time. */}
+                <Spinner size="sm" silent />
+                {source.statusView.label === "Indexing"
+                  ? "Indexing artifacts into the knowledge base…"
+                  : "Syncing the latest changes…"}
+              </p>
+              {dinoUnlocked && !dinoActive && (
+                <span className="hidden items-center gap-1 text-xs font-normal text-app-brand-text/80 sm:inline-flex">
+                  Press{" "}
+                  <kbd className="rounded border border-app-brand-border bg-app-surface px-1.5 py-0.5 font-mono text-[10px] shadow-2xs">
+                    Space
+                  </kbd>{" "}
+                  to pass the time 🦖
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {dinoActive && (
+          <div className="mb-3">
+            <DinoGame
+              onExit={closeDino}
+              // The badge may only claim the state the source actually reached,
+              // and only once nothing is in flight: an update request still
+              // pending (isUpdating) counts as syncing even while the status
+              // reads "connected". A failed run (attention) is reported as
+              // such; a disabled or stale source announces nothing.
+              replyReady={
+                dinoActive && !isSyncing && (source.statusView.state === "connected" || syncFailed)
+              }
+              completionLabel={syncFailed ? "Sync failed" : "Sync complete"}
+              completionTone={syncFailed ? "danger" : "success"}
+            />
           </div>
         )}
 

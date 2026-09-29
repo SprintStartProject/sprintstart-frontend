@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
 import {
   getMessages,
   streamOpenBuddy,
@@ -9,6 +10,15 @@ import {
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
 import { useAuth } from "../../../context/useAuth";
+import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
+import {
+  BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_CLAIM_GOAL,
+  BUDDY_ACTION_PLACE_CHECKLIST,
+  BUDDY_ACTION_PLACE_NOTE,
+  BUDDY_ACTION_REWORD_CHECKLIST,
+  BUDDY_ACTION_TICK_CHECKLIST,
+} from "../types";
 import type { ActionPatch, BuddyMessageView, ProposedAction } from "../types";
 
 /**
@@ -40,6 +50,29 @@ const PROPOSAL_GONE = "This proposal is no longer available.";
 function isNotFound(e: unknown): boolean {
   return e instanceof Error && "status" in e && (e as { status: number }).status === 404;
 }
+
+/**
+ * The hire-confirmed buddy actions that write to the board, by their wire names: the five
+ * `BuddyBoardWriteActions` handles (placing, amending, ticking and rewording a checklist, and
+ * the note), plus `claim_goal`, which pins the claimed task as the board's CURRENT_TASK card —
+ * its own outcome line says so ("It's on your board too"). Every other confirm changes something
+ * else — a task claim, an attestation request, a flag, a username — and needs no board sync.
+ */
+const BUDDY_BOARD_ACTIONS = new Set<string>([
+  BUDDY_ACTION_PLACE_CHECKLIST,
+  BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_TICK_CHECKLIST,
+  BUDDY_ACTION_REWORD_CHECKLIST,
+  BUDDY_ACTION_PLACE_NOTE,
+  BUDDY_ACTION_CLAIM_GOAL,
+]);
+
+/**
+ * The mid-answer tool that puts a card on the board. `place_card` is deliberately not a confirmed
+ * action — it applies the moment the mentor runs it — so a turn that ran it is the only signal
+ * the client ever gets that the board moved. Acted on by `sendMessage` when the turn ends.
+ */
+const BUDDY_BOARD_TOOLS = new Set<string>(["place_card"]);
 
 /**
  * Where "is the buddy in team mode" lives between reloads — scoped to the signed-in user, the
@@ -84,9 +117,48 @@ export function useBuddyConversation(
   const [messages, setMessages] = useState<BuddyMessageView[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const invalidateBoard = useInvalidateBoard();
   // The tool the buddy is running right now, if any -- drives "Checking your progress…"
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
+
+  // Dino waiting-game: unlocked users may press Space while the buddy thinks
+  // to play the runner until the answer arrives — the same deal the AI chat
+  // offers. Closing is handled inside the hook: on exit, when the turn ends,
+  // or when the cogwheel unlock flag flips off.
+  const dinoUnlocked = useDinoUnlocked();
+  // How many surfaces currently show this thread (the open dock, the mounted `/buddy` page).
+  // The session lives app-wide in BuddyProvider, so arming on `isThinking` alone let Space open
+  // a game inside a minimised dock nobody could see — and with `keepActiveUntilExit` that
+  // invisible game held the shared slot for good. Surfaces register via `useDinoSurface`.
+  const [dinoSurfaceCount, setDinoSurfaceCount] = useState(0);
+  const dinoSurfaceVisible = dinoSurfaceCount > 0;
+  const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(
+    isThinking && dinoSurfaceVisible,
+    dinoUnlocked,
+    {
+      // Parity with the chat and the drawer: the game outlives the turn it was armed for
+      // and stays open until the player leaves it — the reply's arrival only flips its
+      // completion badge. Without this the first token unmounted the game mid-run.
+      keepActiveUntilExit: true,
+    },
+  );
+
+  // The last visible surface went away (dock minimised, page left): the game it hosted is gone
+  // from screen, so it must not keep running — or keep the shared slot — behind it.
+  useEffect(() => {
+    if (!dinoSurfaceVisible) closeDinoGame();
+  }, [dinoSurfaceVisible, closeDinoGame]);
+
+  /**
+   * Declares that a surface showing this thread is on screen. Returns the matching release;
+   * meant to be called from an effect (see `useDinoSurface`).
+   */
+  const registerDinoSurface = useCallback(() => {
+    setDinoSurfaceCount((count) => count + 1);
+    return () => setDinoSurfaceCount((count) => count - 1);
+  }, []);
+
   // The one suggested next step the opening greeting invites, until the hire acts or asks.
   const [openerAction, setOpenerAction] = useState<BuddyOpeningAction | null>(null);
   // True while a surface is opening the conversation, so it can show a loading state rather
@@ -102,7 +174,15 @@ export function useBuddyConversation(
   // Set when the conversation could not be brought on screen at all -- distinct from a turn that
   // failed, which carries its own reason. Nothing is on screen to hang that on, so it is state.
   const [openError, setOpenError] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
+  /**
+   * Bumped whenever the conversation on screen is replaced — a fresh visit, a project switch.
+   *
+   * The composer's words are not this hook's any more (see `BuddyDraftProvider`), so the one
+   * thing this session still owes them is the news that they belonged to a thread that is gone.
+   * Told as a token rather than a call: the composer's state lives *below* this hook's provider,
+   * and a parent cannot reach into a child's setter.
+   */
+  const [draftResetToken, setDraftResetToken] = useState(0);
   /**
    * The last greeting a surface has actually put in front of the hire — either watched while it
    * streamed, or revealed by `useGreetingReveal`. Held here, not per surface, so a greeting the
@@ -121,8 +201,15 @@ export function useBuddyConversation(
   const { profile } = useAuth();
   const userId = profile?.id ?? null;
   const userIdRef = useRef<string | null>(null);
+  // Declared before the effect that resets it: the target binding must not outlive the user whose
+  // thread created it.
+  const teamTargetRef = useRef<string | null>(null);
   useEffect(() => {
     userIdRef.current = userId;
+    // A signed-in-user change drops the old user's project binding here, not just the visible
+    // mode: a stale target would make the adopt effect compare the next user's selection against
+    // it and overwrite their restored preference with a bogus exit.
+    teamTargetRef.current = null;
     // Re-read on every subject change: a logout or an account switch must not inherit the
     // previous user's preference. Nothing persisted while there is no user to own it.
     // Deferred to a microtask so the setState never runs synchronously in the effect body.
@@ -137,7 +224,6 @@ export function useBuddyConversation(
    * target while a switch is pending. `null` means team mode is on but has not adopted a
    * project yet (a restored preference waiting for the list to vouch).
    */
-  const teamTargetRef = useRef<string | null>(null);
 
   const setTeamMode = useCallback((value: boolean) => {
     setIsTeamMode(value);
@@ -426,14 +512,25 @@ export function useBuddyConversation(
     // second open. The backend replays the greeting it has just written rather than composing
     // another, so the hire would read the identical words twice.
     // `pendingDecisionsRef` is read alongside the state: a decision and this click can land
-    // in one frame, before the "deciding" state has re-rendered.
-    if (greetingRef.current || isDeciding || pendingDecisionsRef.current > 0) return;
+    // in one frame, before the "deciding" state has re-rendered. A live reply is also a
+    // reason to refuse: clearing mid-stream would silently drop the tokens, citations and
+    // proposed actions still on their way.
+    if (
+      greetingRef.current ||
+      isDeciding ||
+      isThinking ||
+      isStreaming ||
+      pendingDecisionsRef.current > 0
+    )
+      return;
     greetingRef.current = true;
 
     setMessages([]);
     setOpenerAction(null);
     setOpenError(null);
-    setDraft("");
+    // The box is emptied through the token: a question typed about the conversation being
+    // cleared is about a thread that no longer exists. See `draftResetToken`.
+    setDraftResetToken((token) => token + 1);
     setIsOpening(true);
     try {
       await greet();
@@ -443,7 +540,7 @@ export function useBuddyConversation(
       greetingRef.current = false;
       setIsOpening(false);
     }
-  }, [greet, isDeciding]);
+  }, [greet, isDeciding, isThinking, isStreaming]);
 
   /**
    * Marks the turn a reply was streaming into as failed, so the thread says so.
@@ -501,12 +598,27 @@ export function useBuddyConversation(
       // Once the hire says anything, the opener's one-click suggestion has served its purpose.
       setOpenerAction(null);
 
+      // Whether this turn ran a tool that puts a card on the board. A property rather than a
+      // `let`, so the reads below see the writes made in the stream callbacks — see `greet`.
+      const touched = { board: false };
+
+      /**
+       * `place_card` is the one board write that is not confirmed: its `tool_use` event is the
+       * whole signal the client gets, and it cannot say whether the tool wrote a card or was
+       * refused. So the board is marked stale when the turn ends — the failing paths included.
+       * See `useInvalidateBoard` for why the mark is what makes this visible.
+       */
+      const syncBoardIfTouched = () => {
+        if (touched.board) invalidateBoard();
+      };
+
       try {
         await streamMessage(
           text,
           {
             onToolUse: (name) => {
               setActiveTool(name);
+              if (BUDDY_BOARD_TOOLS.has(name)) touched.board = true;
             },
 
             onToken: (token) => {
@@ -599,15 +711,20 @@ export function useBuddyConversation(
           // Read at call time: a turn speaks to whichever conversation is current when it starts.
           teamProjectIdRef.current ?? undefined,
         );
+
+        // The turn is over — the first moment a card placed mid-answer is certainly on the board.
+        syncBoardIfTouched();
       } catch (e) {
         console.error(e);
         setIsStreaming(false);
         setIsThinking(false);
         setActiveTool(null);
         failReply(assistantId);
+        // Same reason as above: a turn that placed a card and then broke still wrote it.
+        syncBoardIfTouched();
       }
     },
-    [failReply],
+    [failReply, invalidateBoard],
   );
 
   /** Patches one proposed action in place, keyed by its message and action id. */
@@ -696,6 +813,13 @@ export function useBuddyConversation(
             ok: result.ok,
             outcome: result.message,
           });
+
+          // `board.all()`, not a project key: the backend re-resolves the project server-side
+          // (the caller's single onboarding project) and never tells the client which board —
+          // see `useInvalidateBoard`.
+          if (result.ok && "action" in action && BUDDY_BOARD_ACTIONS.has(action.action)) {
+            invalidateBoard();
+          }
         } catch (e) {
           console.error(e);
           // A settled proposal does NOT come back 404 — the backend answers 200 with ok: false
@@ -719,11 +843,16 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, patchAction],
+    [beginDecision, endDecision, patchAction, invalidateBoard],
   );
 
   /**
    * Declines a proposed action — nothing changes; the conversation simply continues.
+   *
+   * The action itself arrives from the card that drew it, the way `confirmAction`'s does. It used
+   * to arrive as an id and be looked up in the transcript, which is what forced a
+   * `messagesRef` to keep this callback's identity stable — the callback now depends on nothing
+   * that a token can change, and the lookup (and its staleness question) is gone with it.
    *
    * A stored proposal is declined *at the backend* rather than only on screen, because it may
    * also be sitting in another tab waiting to be confirmed: dismissal closes that door too, and
@@ -731,13 +860,12 @@ export function useBuddyConversation(
    * backend — declining is purely local, as it has always been.
    */
   const dismissAction = useCallback(
-    (messageId: string, actionId: string) => {
-      const action = messages
-        .find((m) => m.id === messageId)
-        ?.actions?.find((a) => a.id === actionId);
+    (messageId: string, action: ProposedAction) => {
+      const actionId = action.id;
 
-      // Unknown action: nothing to decline at the backend, but still worth putting away here.
-      if (!action || !("proposalId" in action)) {
+      // A hire offer, or one that arrived without its details: nothing to decline at the backend,
+      // but still worth putting away here.
+      if (!("proposalId" in action)) {
         patchAction(messageId, actionId, { status: "dismissed" });
         return;
       }
@@ -784,7 +912,7 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, messages, patchAction],
+    [beginDecision, endDecision, patchAction],
   );
 
   /**
@@ -817,7 +945,8 @@ export function useBuddyConversation(
     setMessages([]);
     setOpenerAction(null);
     setOpenError(null);
-    setDraft("");
+    // Same rule as a fresh visit: the words belonged to the conversation that just went away.
+    setDraftResetToken((token) => token + 1);
     setActiveTool(null);
     setIsThinking(false);
     setIsStreaming(false);
@@ -825,9 +954,21 @@ export function useBuddyConversation(
     // The latch is per conversation: releasing it is what lets `ensureOpened` read and greet
     // the one being switched to, exactly as it did the first time.
     loadedRef.current = false;
+    // A game left open from the previous conversation would keep claiming "Reply ready" for a
+    // thread that has just been cleared.
+    closeDinoGame();
 
     void ensureOpened();
-  }, [teamProjectId, isThinking, isStreaming, isOpening, isGreeting, isDeciding, ensureOpened]);
+  }, [
+    teamProjectId,
+    isThinking,
+    isStreaming,
+    isOpening,
+    isGreeting,
+    isDeciding,
+    ensureOpened,
+    closeDinoGame,
+  ]);
 
   /**
    * Points the buddy at a managed project (`null` returns to the hire's own onboarding). The
@@ -866,19 +1007,6 @@ export function useBuddyConversation(
     [isThinking, isStreaming, isOpening, isGreeting, isDeciding, selection, setTeamMode],
   );
 
-  const handleSubmit = useCallback(
-    (event: React.FormEvent) => {
-      event.preventDefault();
-
-      const text = draft;
-      if (!text.trim()) return;
-
-      setDraft("");
-      void sendMessage(text);
-    },
-    [draft, sendMessage],
-  );
-
   return {
     messages,
     isThinking,
@@ -899,12 +1027,19 @@ export function useBuddyConversation(
     isDeciding,
     switchTeamProject,
 
-    draft,
-    setDraft,
+    // The composer's words live in `BuddyDraftProvider`, below this provider; this is the only
+    // thing about them the session still owns — the news that the thread they belonged to is
+    // gone. See `draftResetToken`.
+    draftResetToken,
+
     sendMessage,
-    handleSubmit,
     confirmAction,
     dismissAction,
+
+    dinoGameActive,
+    closeDinoGame,
+    dinoUnlocked,
+    registerDinoSurface,
 
     ensureOpened,
     retryOpen,
