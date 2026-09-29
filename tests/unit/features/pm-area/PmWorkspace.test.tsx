@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -122,6 +122,32 @@ describe("PmWorkspace", () => {
     unmount();
 
     renderWorkspace("/insights/faq");
+    expect(analysis()).toHaveClass("hidden");
+  });
+
+  it("brings the project analysis back only once the overview has had time to slide in", () => {
+    // Shown at once it wrapped under the tabs while Team's views were still folding away, then
+    // jumped up beside them.
+    const analysis = () => screen.getByRole("region", { name: "Project analysis" }).parentElement;
+    renderWorkspace("/team-management");
+    expect(analysis()).toHaveClass("hidden");
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(sectionTabs().getByRole("button", { name: "Overview" }));
+      expect(screen.getByTestId("location")).toHaveTextContent("/pm-dashboard");
+      expect(analysis()).toHaveClass("hidden");
+
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+      expect(analysis()).not.toHaveClass("hidden");
+    } finally {
+      vi.useRealTimers();
+    }
+
+    // Leaving hides it again straight away.
+    fireEvent.click(sectionTabs().getByRole("button", { name: /Team/ }));
     expect(analysis()).toHaveClass("hidden");
   });
 

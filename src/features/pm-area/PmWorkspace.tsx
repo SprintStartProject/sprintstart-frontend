@@ -10,11 +10,12 @@ import {
   ShieldAlert,
   Users,
 } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { matchPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { SegmentedTabs, type SegmentedTabOption } from "../../components/ui/SegmentedTabs";
-import { SlidingTabPanel } from "../../components/ui/SlidingTabPanel";
+import { SLIDING_PANEL_SECONDS, SlidingTabPanel } from "../../components/ui/SlidingTabPanel";
 import { useSwipeableTabs } from "../../hooks/useHorizontalWheelNavigation";
 import { PmDashboardPage } from "../../pages/PmDashboardPage";
 import { TeamManagementPage } from "../../pages/TeamManagementPage";
@@ -74,6 +75,19 @@ const SWIPE_STOPS: readonly SwipeStop[] = [
 ];
 
 const SWIPE_STOP_IDS = SWIPE_STOPS.map((stop) => stop.id);
+
+/**
+ * How long the project analysis waits before it comes back when the overview is entered from
+ * another section, in milliseconds.
+ *
+ * Shown at once, it arrived before everything else and in the wrong place: the outgoing section
+ * still takes `SLIDING_PANEL_EXIT_MS` to slide out, and a tab with views of its own (Team,
+ * Escalations) is still folding them back in — so the bar was too wide for the analysis to fit
+ * beside it, and it wrapped under the tabs for a moment before jumping up next to them. By this
+ * point the views have folded away (their spring has all but settled) and the overview is sliding
+ * in, so the analysis fades in with it, in its place.
+ */
+const LAUNCHER_REVEAL_DELAY_MS = 250;
 
 function currentStopId(section: PmSection, searchParams: URLSearchParams): string {
   const stop = SWIPE_STOPS.find(
@@ -203,6 +217,23 @@ export function PmWorkspace() {
   // sideways flick while scrolling the path used to throw them back into the roster. The tab bar
   // and the "Team" button still leave it.
   const onMemberProfile = viewKey.startsWith("team/");
+
+  // The project analysis beside the tabs belongs to the overview. Leaving it hides the analysis
+  // at once; coming back shows it only after `LAUNCHER_REVEAL_DELAY_MS` (see there). Opening the
+  // overview directly shows it straight away — there is nothing to wait for.
+  const prefersReducedMotion = useReducedMotion();
+  const onOverview = section === "overview";
+  const [launcherShown, setLauncherShown] = useState(onOverview);
+  // Derived during render, like `SlidingTabPanel`'s direction, so it is gone on the very render
+  // that leaves the overview rather than one frame later.
+  // Without motion nothing slides or folds, so there is nothing to wait for either.
+  if (!onOverview && launcherShown) setLauncherShown(false);
+  if (onOverview && !launcherShown && prefersReducedMotion) setLauncherShown(true);
+  useEffect(() => {
+    if (!onOverview || launcherShown || prefersReducedMotion) return;
+    const reveal = window.setTimeout(() => setLauncherShown(true), LAUNCHER_REVEAL_DELAY_MS);
+    return () => window.clearTimeout(reveal);
+  }, [onOverview, launcherShown, prefersReducedMotion]);
 
   const goToSection = useCallback(
     (next: PmSection) => {
@@ -367,9 +398,14 @@ export function PmWorkspace() {
                 layoutId="pm-workspace-section-pill"
                 ariaLabel="PM dashboard sections"
               />
-              <div className={section === "overview" ? "contents" : "hidden"}>
+              <motion.div
+                className={launcherShown ? "flex" : "hidden"}
+                initial={false}
+                animate={{ opacity: launcherShown ? 1 : 0 }}
+                transition={{ duration: prefersReducedMotion ? 0 : SLIDING_PANEL_SECONDS }}
+              >
                 <ProjectAnalysisLauncher onRefreshed={setAnalysisRevision} />
-              </div>
+              </motion.div>
             </div>
 
             {/* `-mx-2 px-2` moves the clip edge 8px outside the column without moving the
