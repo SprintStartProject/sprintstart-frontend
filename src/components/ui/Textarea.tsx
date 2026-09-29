@@ -66,12 +66,17 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     disabled,
     value,
     "aria-describedby": ariaDescribedBy,
+    "aria-required": ariaRequired,
     ...rest
   },
   forwardedRef,
 ) {
   const field = useContext(FieldContext);
   const isInvalid = invalid ?? field?.invalid ?? false;
+  // An explicit `aria-required` or HTML `required` on the control wins; only
+  // when neither is given does the enclosing `Field` supply it. Emitted only
+  // when true, so a plain textarea does not grow a stray `aria-required="false"`.
+  const isRequired = ariaRequired ?? rest.required ?? field?.required;
 
   const innerRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -107,6 +112,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
       disabled={disabled ?? field?.disabled ?? false}
       aria-invalid={isInvalid || undefined}
       aria-describedby={ariaDescribedBy ?? field?.describedBy}
+      aria-required={isRequired || undefined}
       className={textareaClasses({
         invalid: isInvalid,
         className: `${autoResize ? "resize-none overflow-hidden" : "resize-y"} ${className}`.trim(),

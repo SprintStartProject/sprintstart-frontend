@@ -119,6 +119,11 @@ export const handlers = [
   http.get("/api/v1/github/pat", () => HttpResponse.json([])),
   http.get("/api/v1/atlassian/credentials", () => HttpResponse.json([])),
 
+  // AI status for the visible page: the AI answered and knows none of them. Tests about the
+  // chip override this.
+  http.get("/api/v1/projects/:projectId/artifacts/ai-status", () =>
+    HttpResponse.json({ aiAvailable: true, items: [] }),
+  ),
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
       items: [],
@@ -651,4 +656,8 @@ export const handlers = [
   http.get("/api/v1/connectors/confluence/sources", () =>
     HttpResponse.json({ connectorId: "confluence", sources: [] }),
   ),
+  // Every surface that opens the buddy dock asks for its suggestion chips. A default empty list
+  // keeps that request handled for the many tests that open the dock without being about the
+  // chips; `useBuddySuggestions`' own suite mocks the service directly and never sees this.
+  http.get("/api/v1/onboarding/me/buddy/suggestions", () => HttpResponse.json([])),
 ];

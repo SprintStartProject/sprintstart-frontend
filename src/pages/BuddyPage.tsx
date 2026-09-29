@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Inbox, Sparkles, Users } from "lucide-react";
 import { Button } from "../components/ui/Button";
@@ -12,11 +12,11 @@ import {
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
+import { useBuddyDraftActions } from "../features/buddy/buddyDraftContext";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useBuddySuggestions } from "../features/buddy/hooks/useBuddySuggestions";
 import { BuddyModeSwitcher } from "../features/buddy/components/BuddyModeSwitcher";
 import { useGreetingReveal } from "../features/buddy/hooks/useGreetingReveal";
-import { useHandedOffDraft } from "../features/buddy/useHandedOffDraft";
 import { announceBuddyPageReady } from "../features/buddy/aiBuddyBus";
 import {
   NEW_CONVERSATION_CHORD,
@@ -168,15 +168,15 @@ function BuddyMentorHome() {
     isOpening,
     activeTool,
     openerAction,
-    draft,
-    setDraft,
     sendMessage,
-    handleSubmit,
     confirmAction,
     dismissAction,
     actionDrafts,
     setActionDraft,
     openError,
+    dinoGameActive,
+    closeDinoGame,
+    registerDinoSurface,
     ensureOpened,
     retryOpen,
     startFreshVisit,
@@ -187,6 +187,16 @@ function BuddyMentorHome() {
     isGreeting,
     isDeciding,
   } = useBuddySession();
+
+  // The page fills the composer (the chips, the hand-off from the dock) but never reads it — so
+  // it takes the write-only half, which never changes, rather than the per-keystroke value. That
+  // is what keeps a character typed into the box from re-rendering this page at all. See
+  // `BuddyDraftProvider`.
+  const { setDraft } = useBuddyDraftActions();
+
+  // The page shows the thread, so Space may open the dino game here; leaving the page releases
+  // it (and closes a game still running) — see `registerDinoSurface`.
+  useEffect(() => registerDinoSurface(), [registerDinoSurface]);
 
   // A greeting written while the hire was somewhere else still gets the buddy thinking and
   // writing it, the first time it is on screen — the same as in the dock.
@@ -258,9 +268,6 @@ function BuddyMentorHome() {
     [isDesktop],
   );
 
-  // Whatever they were typing in the dock when they asked for more room.
-  useHandedOffDraft(setDraft);
-
   const hasUserMessage = messages.some((m) => m.role === "USER");
 
   /**
@@ -296,6 +303,64 @@ function BuddyMentorHome() {
   // Memoised so the listener is bound once rather than torn down and rebuilt on every token
   // that arrives while the buddy is answering.
   const startFresh = useCallback(() => void startFreshVisit(), [startFreshVisit]);
+
+  /**
+   * The props the transcript's memo compares, each held in one identity.
+   *
+   * `BuddyThread` and its rows are memoised — that is what keeps a keystroke, and each streamed
+   * token, from re-rendering every reply in the conversation — and any of these built inline
+   * would hand the thread a new prop on every render of this page, which is exactly the dance
+   * the memo exists to avoid. Each one's dependencies are what it is actually made of.
+   */
+  const renderQuestionAction = useCallback(
+    (question: string) => (isHireMode ? <BuddyQuestionActions question={question} /> : undefined),
+    [isHireMode],
+  );
+  const retryOpenAction = useCallback(() => void retryOpen(), [retryOpen]);
+  // Escalating hangs off the hire's own question now, not off the buddy's answer — see
+  // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered where a
+  // messenger offers a quick reply: right under the message that suggested it. It sends on one
+  // click, unlike the chips, because accepting something the mentor just offered is not composing
+  // a question of your own.
+  const lastMessageFooter = useMemo(
+    () =>
+      !hasUserMessage && openerAction && !greeting.isRevealing ? (
+        <Button
+          variant="primary"
+          size="sm"
+          className="mt-1.5"
+          icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+          onClick={() => void sendMessage(openerAction.question)}
+        >
+          {openerAction.label}
+        </Button>
+      ) : undefined,
+    [hasUserMessage, openerAction, greeting.isRevealing, sendMessage],
+  );
+
+  /**
+   * The suggestion row above the composer, held in one identity — the conversation below it is
+   * memoised now, and an element built inline in the render would be the one prop that always
+   * changed.
+   *
+   * The chips *fill* the composer instead of sending, which is why they sit on top of it. The
+   * hire presses send: the words stay theirs, and they can edit the question first — which is how
+   * somebody learns they are allowed to. The list is the backend's, built from the tools it
+   * actually mounts for this hire, so the chips and the mentor cannot disagree about whether this
+   * role has pull requests. Hire-only, matching the fetch gate: a team-mode conversation would
+   * otherwise show the heading over an empty list, since there is nothing team-scoped to load.
+   */
+  const aboveComposer = useMemo(
+    () =>
+      isHireMode && !hasUserMessage ? (
+        <BuddySuggestionChips
+          suggestions={suggestions}
+          onPick={setDraft}
+          heading="Not sure where to start?"
+        />
+      ) : undefined,
+    [isHireMode, hasUserMessage, suggestions, setDraft],
+  );
 
   // The keyboard half of the control in the visit divider. Gated the same way that control is:
   // a visit nobody has spoken in is already the fresh one, and re-opening it would only replay
@@ -367,39 +432,22 @@ function BuddyMentorHome() {
       <BuddyConversation
         messages={greeting.messages}
         isThinking={isThinking || isOpening || greeting.isThinking}
+        isStreaming={isStreaming}
         activeTool={activeTool}
-        draft={draft}
-        setDraft={setDraft}
-        handleSubmit={handleSubmit}
         confirmAction={confirmAction}
         dismissAction={dismissAction}
         actionDrafts={actionDrafts}
         setActionDraft={setActionDraft}
-        // Escalating hangs off the hire's own question now, not off the buddy's answer — see
-        // `BuddyQuestionActions`. What is left here is the greeting's own next step, offered
-        // where a messenger offers a quick reply: right under the message that suggested it. It
-        // sends on one click, unlike the chips, because accepting something the mentor just
-        // offered is not composing a question of your own.
-        lastMessageFooter={
-          !hasUserMessage && openerAction && !greeting.isRevealing ? (
-            <Button
-              variant="primary"
-              size="sm"
-              className="mt-1.5"
-              icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
-              onClick={() => void sendMessage(openerAction.question)}
-            >
-              {openerAction.label}
-            </Button>
-          ) : undefined
-        }
+        dinoGameActive={dinoGameActive}
+        onDinoGameExit={closeDinoGame}
+        // Both held in one identity above, with the reasons written there — the thread's memo
+        // compares them.
+        lastMessageFooter={lastMessageFooter}
         // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
         // team-mode conversation is not one — the offer must not even render there.
-        renderQuestionAction={(question) =>
-          isHireMode ? <BuddyQuestionActions question={question} /> : undefined
-        }
+        renderQuestionAction={renderQuestionAction}
         openError={openError}
-        onRetryOpen={() => void retryOpen()}
+        onRetryOpen={retryOpenAction}
         onStartFreshVisit={canStartFresh ? startFresh : undefined}
         // This page is the one that binds it — see `useNewConversationShortcut` above.
         freshVisitShortcut={NEW_CONVERSATION_CHORD}
@@ -410,22 +458,9 @@ function BuddyMentorHome() {
         // the transcript is shorter than the viewport, which is exactly the first few turns this
         // control exists for.
         hasFloatingControl={(isHireMode && replies.hasAny && !rail.open) || hasUserMessage}
-        aboveComposer={
-          // The chips *fill* the composer instead of sending, which is why they sit on top of
-          // it. The hire presses send: the words stay theirs, and they can edit the question
-          // first — which is how somebody learns they are allowed to. The list is the
-          // backend's, built from the tools it actually mounts for this hire, so the chips and
-          // the mentor cannot disagree about whether this role has pull requests.
-          // Hire-only, matching the fetch gate above: a team-mode conversation would otherwise
-          // show the heading over an empty list, since there is nothing team-scoped to load.
-          isHireMode && !hasUserMessage ? (
-            <BuddySuggestionChips
-              suggestions={suggestions}
-              onPick={setDraft}
-              heading="Not sure where to start?"
-            />
-          ) : undefined
-        }
+        // Built above, in one identity — the conversation is memoised, and the chips' own reasons
+        // are written where they are built.
+        aboveComposer={aboveComposer}
         focusComposerOnMount
       />
     </BuddyPageShell>

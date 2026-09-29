@@ -178,12 +178,16 @@ describe("matchesRepository", () => {
       ),
     ).toBe(false);
     // Repo-scoped artifacts with unusable metadata have no repository to match.
+    // The malformed blob makes the parser warn — silence it here like the parse
+    // tests do, so the real warnings stay visible in the output.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(
       matchesRepository(
         { sourceSystem: "GITHUB", artifactType: "FILE", metadata: "{not json" },
         new Set(["owner/repo"]),
       ),
     ).toBe(false);
+    expect(warn).toHaveBeenCalled();
   });
 
   it("matches owner halves case-insensitively", () => {

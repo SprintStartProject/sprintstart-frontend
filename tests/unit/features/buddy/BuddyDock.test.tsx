@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { BuddyDock } from "../../../../src/features/buddy/components/BuddyDock";
+import {
+  BuddyDraftActionsContext,
+  BuddyDraftContext,
+} from "../../../../src/features/buddy/buddyDraftContext";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 import type { BuddySuggestion } from "../../../../src/services/buddyService";
 
@@ -42,25 +46,29 @@ function renderDock(
   } = {},
 ) {
   return render(
-    <BuddyDock
-      messages={messages}
-      isThinking={isThinking}
-      isStreaming={isStreaming}
-      activeTool={null}
-      draft=""
-      setDraft={setDraft}
-      handleSubmit={vi.fn()}
-      confirmAction={vi.fn()}
-      dismissAction={vi.fn()}
-      actionDrafts={{}}
-      setActionDraft={vi.fn()}
-      suggestions={suggestions}
-      startFreshVisit={startFreshVisit}
-      isGreeting={false}
-      isDeciding={false}
-      teamProjectId={null}
-      onClose={vi.fn()}
-    />,
+    // The words come from the shared composer now (`BuddyDraftProvider`): the chips fill the box
+    // through the write-only half, and the box inside reads the value. The dock's own props no
+    // longer carry either.
+    <BuddyDraftActionsContext.Provider value={{ setDraft }}>
+      <BuddyDraftContext.Provider value={{ draft: "", setDraft, handleSubmit: vi.fn() }}>
+        <BuddyDock
+          messages={messages}
+          isThinking={isThinking}
+          isStreaming={isStreaming}
+          activeTool={null}
+          confirmAction={vi.fn()}
+          dismissAction={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+          suggestions={suggestions}
+          startFreshVisit={startFreshVisit}
+          isGreeting={false}
+          isDeciding={false}
+          teamProjectId={null}
+          onClose={vi.fn()}
+        />
+      </BuddyDraftContext.Provider>
+    </BuddyDraftActionsContext.Provider>,
   );
 }
 

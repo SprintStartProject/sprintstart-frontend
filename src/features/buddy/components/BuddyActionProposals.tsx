@@ -22,7 +22,7 @@ type BuddyActionProposalsProps = {
   /** Records one, so it outlives whichever surface is on screen. */
   setActionDraft: (key: string, text: string) => void;
   onConfirm: (messageId: string, action: ProposedAction) => void;
-  onDismiss: (messageId: string, actionId: string) => void;
+  onDismiss: (messageId: string, action: ProposedAction) => void;
 };
 
 type BuddyProposalCardProps = {
@@ -31,7 +31,7 @@ type BuddyProposalCardProps = {
   actionDrafts: ActionDrafts;
   setActionDraft: (key: string, text: string) => void;
   onConfirm: (messageId: string, action: ProposedAction) => void;
-  onDismiss: (messageId: string, actionId: string) => void;
+  onDismiss: (messageId: string, action: ProposedAction) => void;
 };
 
 /**
@@ -295,7 +295,7 @@ function BuddyProposalCard({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => onDismiss(messageId, action.id)}
+                onClick={() => onDismiss(messageId, action)}
                 disabled={isConfirming}
                 className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-60"
               >
@@ -353,7 +353,7 @@ function BuddyProposalCard({
             </button>
             <button
               type="button"
-              onClick={() => onDismiss(messageId, action.id)}
+              onClick={() => onDismiss(messageId, action)}
               disabled={isConfirming}
               className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-60"
             >

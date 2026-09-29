@@ -2,7 +2,21 @@ import { CheckCircle2, CircleDashed, Loader2, Sparkles, TriangleAlert } from "lu
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DinoGame } from "../../../chatbot/components/DinoGame";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../../easter-eggs/hooks/useDinoWaitingGame";
 import type { GenerationPhaseProgress } from "../../generation/OnboardingJourneyContext";
+
+/**
+ * The phases as they stand once the generation has finished.
+ *
+ * The screen can outlive the run (it stays up while the dino game is still open), and the stage
+ * events it was showing may never have reported their last phase as done -- so a finished path
+ * would otherwise sit under "Path ready" with a phase still spinning. Failed phases stay failed.
+ */
+function settle(phases: GenerationPhaseProgress[]): GenerationPhaseProgress[] {
+  return phases.map((phase) =>
+    phase.state === "working" || phase.state === "waiting" ? { ...phase, state: "done" } : phase,
+  );
+}
 
 function elapsed(startedAt: number, now: number): string {
   const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
@@ -20,56 +34,51 @@ function elapsed(startedAt: number, now: number): string {
 export function GenerationScreen({
   phases,
   startedAt,
+  isRunning,
+  isCompleted = false,
+  onGameActiveChange,
 }: {
   phases: GenerationPhaseProgress[];
   startedAt: number;
+  /**
+   * The generation request is still in flight (`generation.status === "running"`). The only
+   * source of "still generating": the phases are built incrementally from stage events and can
+   * all read done/idle while the path is still being persisted or between two phases.
+   */
+  isRunning: boolean;
+  /** The generation finished with a path: every phase reads as done and the clock stops. */
+  isCompleted?: boolean;
+  /** Reports the dino game opening/closing, so the page can keep this screen up while it is played. */
+  onGameActiveChange?: (active: boolean) => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
-  const [gameActive, setGameActive] = useState(false);
-  const [dinoUnlocked, setDinoUnlocked] = useState(
-    () => typeof localStorage !== "undefined" && localStorage.getItem("dinoUnlocked") === "true",
-  );
+  const dinoUnlocked = useDinoUnlocked();
+
+  // From the run's status, never from the phases: they are presentational only, and reading them
+  // here let an open game claim "Path ready" (and the clock stop) before the run had finished.
+  const isGenerating = isRunning && !isCompleted;
+  const shownPhases = isCompleted ? settle(phases) : phases;
+
+  const [gameActive, closeGame] = useSpaceOpensDino(isGenerating, dinoUnlocked, {
+    keepActiveUntilExit: true,
+  });
 
   useEffect(() => {
+    onGameActiveChange?.(gameActive);
+  }, [gameActive, onGameActiveChange]);
+
+  // The elapsed clock only runs while something is still being assembled; a finished run must not
+  // keep counting up behind the game.
+  useEffect(() => {
+    if (!isGenerating) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [isGenerating]);
 
-  // Easter egg: Space starts the runner while the path is being generated.
-  useEffect(() => {
-    const syncUnlock = () => {
-      const unlocked = localStorage.getItem("dinoUnlocked") === "true";
-      setDinoUnlocked(unlocked);
-      if (!unlocked) setGameActive(false);
-    };
-    window.addEventListener("dinoUnlockChanged", syncUnlock);
-    window.addEventListener("storage", syncUnlock);
-    return () => {
-      window.removeEventListener("dinoUnlockChanged", syncUnlock);
-      window.removeEventListener("storage", syncUnlock);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (gameActive || !dinoUnlocked) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== "Space") return;
-      const active = document.activeElement;
-      if (
-        active instanceof HTMLElement &&
-        (active.tagName === "TEXTAREA" || active.tagName === "INPUT" || active.isContentEditable)
-      ) {
-        return;
-      }
-      event.preventDefault();
-      setGameActive(true);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [gameActive, dinoUnlocked]);
-
-  const done = phases.filter((phase) => phase.state === "done" || phase.state === "failed").length;
-  const total = phases.length;
+  const done = shownPhases.filter(
+    (phase) => phase.state === "done" || phase.state === "failed",
+  ).length;
+  const total = shownPhases.length;
   const percentage = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
@@ -107,7 +116,9 @@ export function GenerationScreen({
             <span className="font-semibold text-app-text">
               {total > 0 ? `${done} of ${total} phases assembled` : "Starting up…"}
             </span>
-            <span className="text-app-text-subtle tabular-nums">{elapsed(startedAt, now)}</span>
+            <span className="text-app-text-subtle tabular-nums" data-testid="generation-elapsed">
+              {elapsed(startedAt, now)}
+            </span>
           </div>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-app-border-muted">
             <div
@@ -120,9 +131,11 @@ export function GenerationScreen({
 
           {total > 0 ? (
             <ul className="mt-5 grid gap-2 sm:grid-cols-2">
-              {phases.map((phase) => (
+              {shownPhases.map((phase) => (
                 <li
                   key={phase.name}
+                  data-testid="generation-phase"
+                  data-state={phase.state}
                   className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors duration-500 ${
                     phase.state === "done"
                       ? "border-app-success-border bg-app-success-bg/40"
@@ -162,9 +175,23 @@ export function GenerationScreen({
           ) : null}
         </div>
 
+        {dinoUnlocked && !gameActive && isGenerating && (
+          <p className="mt-4 text-center text-xs text-app-text-subtle">
+            Press{" "}
+            <kbd className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-app-text shadow-2xs">
+              Space
+            </kbd>{" "}
+            to pass the time 🦖
+          </p>
+        )}
+
         {gameActive ? (
           <div className="mt-6">
-            <DinoGame onExit={() => setGameActive(false)} />
+            <DinoGame
+              onExit={closeGame}
+              replyReady={!isGenerating && gameActive}
+              completionLabel="Path ready"
+            />
           </div>
         ) : null}
       </div>

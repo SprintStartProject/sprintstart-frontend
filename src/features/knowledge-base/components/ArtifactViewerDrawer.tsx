@@ -39,6 +39,7 @@ import {
 import { getArtifactRepository } from "../githubMetadata";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { RepositoryBadge } from "./RepositoryBadge";
+import { SourceLinkBadge } from "./SourceLinkBadge";
 import { useToast } from "../../../context/useToast";
 import { Button } from "../../../components/ui/Button";
 import { ApiError } from "../../../services/apiClient";
@@ -64,6 +65,8 @@ interface ArtifactViewerDrawerProps {
   /** Called after a successful deletion so the parent can clear the selection
    *  and re-fetch the artifact list. */
   onDelete: (artifactId: string) => void;
+  /** Whether to lock background scrolling while the drawer is open. Defaults to true. */
+  lockScroll?: boolean;
 }
 
 type ViewMode = "raw" | "summary";
@@ -848,6 +851,7 @@ export function ArtifactViewerDrawer({
   highlightLines,
   canDelete,
   onDelete,
+  lockScroll = true,
 }: ArtifactViewerDrawerProps) {
   const { profile } = useAuth();
   const [state, dispatch] = useReducer(drawerReducer, initialState);
@@ -1085,10 +1089,10 @@ export function ArtifactViewerDrawer({
    * @remarks The delete endpoint expects the `UploadedArtifact`'s UUID, not
    * the ingestion `Artifact`'s UUID. The displayed artifact is usually the
    * ingestion mirror (its `id` is the ingestion UUID); the corresponding
-   * `UploadedArtifact` id is carried in `artifact.sourceId`, which
-   * `getUnifiedArtifacts` enriches via title-matching against the uploads
-   * list. When `sourceId` is missing (e.g. ingestion mirror without a
-   * matching upload), deletion is refused with a user-facing error.
+   * `UploadedArtifact` id is carried in `artifact.sourceId`, which the backend
+   * fills in from the upload row. When `sourceId` is missing (e.g. ingestion
+   * mirror without a matching upload), deletion is refused with a user-facing
+   * error.
    */
   const handleDelete = async () => {
     if (!artifact) return;
@@ -1259,24 +1263,38 @@ export function ArtifactViewerDrawer({
   // GitHub repo artifacts show their `owner/repository` in the header's badge
   // row; other kinds have no repository to name, so the badge stays unset.
   const repository = artifact ? getArtifactRepository(artifact) : null;
+  const hasSourceLink = Boolean(artifact?.sourceUrl?.trim()) && artifact?.sourceSystem !== "UPLOAD";
 
-  const repositoryBadge = repository ? (
-    <RepositoryBadge repository={repository} testId="artifact-drawer-repo-badge" />
-  ) : undefined;
+  const headerBadge =
+    repository || hasSourceLink ? (
+      <>
+        {repository && (
+          <RepositoryBadge repository={repository} testId="artifact-drawer-repo-badge" />
+        )}
+        {hasSourceLink && artifact?.sourceUrl && (
+          <SourceLinkBadge
+            sourceUrl={artifact.sourceUrl}
+            sourceSystem={artifact.sourceSystem}
+            testId="artifact-drawer-source-link"
+          />
+        )}
+      </>
+    ) : undefined;
 
   return (
     <SidePanel
       isOpen={!!artifact}
       onClose={onClose}
       title={titleContent}
-      badge={repositoryBadge}
+      badge={headerBadge}
       actions={actionsContent}
-      widthClassName="w-full max-w-[720px] md:w-[60%] lg:w-[70%]"
+      widthClassName="w-full max-w-5xl"
       zIndexClassName="z-50 md:z-30"
       panelClassName="border-l border-app-border shadow-2xl"
       panelBackgroundClassName="bg-app-surface"
       headerClassName="p-4 bg-app-bg"
       contentClassName="p-6"
+      lockScroll={lockScroll}
     >
       {error && viewMode === "raw" ? (
         <div className="rounded-2xl border border-app-danger-border bg-app-danger-bg p-4 text-app-danger-text">

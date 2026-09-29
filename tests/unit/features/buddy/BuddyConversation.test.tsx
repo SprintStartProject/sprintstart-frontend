@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { BuddyConversation } from "../../../../src/features/buddy/components/BuddyConversation";
+import { BuddyDraftContext } from "../../../../src/features/buddy/buddyDraftContext";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 
 /**
@@ -36,20 +37,21 @@ function renderConversation(overrides: {
   onRetryOpen?: () => void;
 }) {
   return render(
-    <BuddyConversation
-      messages={overrides.messages ?? []}
-      isThinking={overrides.isThinking ?? false}
-      activeTool={overrides.activeTool ?? null}
-      draft=""
-      setDraft={vi.fn()}
-      handleSubmit={vi.fn()}
-      confirmAction={vi.fn()}
-      dismissAction={vi.fn()}
-      actionDrafts={{}}
-      setActionDraft={vi.fn()}
-      openError={overrides.openError ?? null}
-      onRetryOpen={overrides.onRetryOpen}
-    />,
+    // The composer inside reads the shared draft from its own provider now — see
+    // `BuddyDraftProvider`. The conversation itself never touches it.
+    <BuddyDraftContext.Provider value={{ draft: "", setDraft: vi.fn(), handleSubmit: vi.fn() }}>
+      <BuddyConversation
+        messages={overrides.messages ?? []}
+        isThinking={overrides.isThinking ?? false}
+        activeTool={overrides.activeTool ?? null}
+        confirmAction={vi.fn()}
+        dismissAction={vi.fn()}
+        actionDrafts={{}}
+        setActionDraft={vi.fn()}
+        openError={overrides.openError ?? null}
+        onRetryOpen={overrides.onRetryOpen}
+      />
+    </BuddyDraftContext.Provider>,
   );
 }
 

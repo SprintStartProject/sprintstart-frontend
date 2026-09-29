@@ -50,15 +50,17 @@ vi.mock("../../../../../src/components/ui/SidePanel", () => ({
     actions,
     badge,
     children,
+    lockScroll,
   }: {
     isOpen: boolean;
     title: React.ReactNode;
     actions: React.ReactNode;
     badge?: React.ReactNode;
     children: React.ReactNode;
+    lockScroll?: boolean;
   }) =>
     isOpen ? (
-      <div data-testid="side-panel">
+      <div data-testid="side-panel" data-lock-scroll={lockScroll !== false}>
         <div data-testid="panel-header">{title}</div>
         {badge && <div data-testid="panel-badge">{badge}</div>}
         <div data-testid="panel-actions">{actions}</div>
@@ -171,6 +173,96 @@ describe("ArtifactViewerDrawer", () => {
       );
 
       expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("external source link", () => {
+    it("shows the source link alongside the repository badge for a GitHub artifact with repo metadata and sourceUrl", () => {
+      const sourceUrl = "https://github.com/sprintstart/sprintstart-backend/blob/main/README.md";
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "GITHUB",
+          sourceUrl,
+          metadata: JSON.stringify({
+            repositoryId: "r1",
+            repositoryFullName: "sprintstart/sprintstart-backend",
+          }),
+        }),
+      );
+
+      expect(screen.getByTestId("artifact-drawer-repo-badge")).toHaveTextContent(
+        "sprintstart/sprintstart-backend",
+      );
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveTextContent("Open in GitHub");
+      expect(link).toHaveAttribute("href", sourceUrl);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      expect(link).toHaveAttribute("title", sourceUrl);
+    });
+
+    it("shows the source link in place of the repository badge for a Jira artifact", () => {
+      const sourceUrl = "https://team.atlassian.net/browse/PROJ-123";
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "JIRA",
+          sourceUrl,
+        }),
+      );
+
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveTextContent("Open in Jira");
+      expect(link).toHaveAttribute("href", sourceUrl);
+    });
+
+    it("shows the source link for a Confluence artifact", () => {
+      const sourceUrl = "https://team.atlassian.net/wiki/spaces/DEV/pages/456";
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "CONFLUENCE",
+          sourceUrl,
+        }),
+      );
+
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveTextContent("Open in Confluence");
+      expect(link).toHaveAttribute("href", sourceUrl);
+    });
+
+    it("shows no source link for an uploaded artifact even if sourceUrl is present", () => {
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "UPLOAD",
+          sourceUrl: "https://example.com/uploads/doc.pdf",
+        }),
+      );
+
+      expect(screen.queryByTestId("artifact-drawer-source-link")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("panel-badge")).not.toBeInTheDocument();
+    });
+
+    it("shows no source link when sourceUrl is null or whitespace", () => {
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "GITHUB",
+          sourceUrl: null,
+        }),
+      );
+      expect(screen.queryByTestId("artifact-drawer-source-link")).not.toBeInTheDocument();
+
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "GITHUB",
+          sourceUrl: "   ",
+        }),
+      );
+      expect(screen.queryByTestId("artifact-drawer-source-link")).not.toBeInTheDocument();
     });
   });
 
@@ -998,5 +1090,11 @@ describe("ArtifactViewerDrawer", () => {
     expect(selected.removeAllRanges).toHaveBeenCalledTimes(1);
 
     vi.restoreAllMocks();
+  });
+
+  it("enables background scroll locking by default on the rendered SidePanel", () => {
+    renderDrawer();
+    const panel = screen.getByTestId("side-panel");
+    expect(panel).toHaveAttribute("data-lock-scroll", "true");
   });
 });

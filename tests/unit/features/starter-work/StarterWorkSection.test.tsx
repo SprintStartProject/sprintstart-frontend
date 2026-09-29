@@ -301,7 +301,7 @@ describe("StarterWorkSection", () => {
 
     await openAddMenu(user);
     await user.click(await screen.findByTestId("add-starter-task"));
-    await user.type(screen.getByLabelText("Title"), "Add a dark-mode toggle");
+    await user.type(screen.getByLabelText(/^Title/), "Add a dark-mode toggle");
     await user.click(screen.getByTestId("create-starter-task"));
 
     await waitFor(() =>

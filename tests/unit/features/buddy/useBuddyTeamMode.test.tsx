@@ -367,11 +367,8 @@ describe("useBuddyConversation — team mode", () => {
     });
     await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0));
 
-    act(() => {
-      result.current.setDraft("shift Task 0");
-    });
-    act(() => {
-      result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+    await act(async () => {
+      await result.current.sendMessage("shift Task 0");
     });
     await waitFor(() => {
       expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
@@ -413,11 +410,8 @@ describe("useBuddyConversation — team mode", () => {
         await result.current.ensureOpened();
       });
       await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(0));
-      act(() => {
-        result.current.setDraft("shift Task 0");
-      });
-      act(() => {
-        result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+      await act(async () => {
+        await result.current.sendMessage("shift Task 0");
       });
       await waitFor(() => {
         expect(result.current.messages.some((m) => m.actions?.length)).toBe(true);
@@ -508,7 +502,7 @@ describe("useBuddyConversation — team mode", () => {
       const { result, message, action } = await openTeamWithProposal();
 
       act(() => {
-        result.current.dismissAction(message.id, action.id);
+        result.current.dismissAction(message.id, action);
       });
 
       // "Dismissed — nothing changed" would be a lie over a change that already happened; the
@@ -536,7 +530,7 @@ describe("useBuddyConversation — team mode", () => {
       const { result, message, action } = await openTeamWithProposal();
 
       act(() => {
-        result.current.dismissAction(message.id, action.id);
+        result.current.dismissAction(message.id, action);
       });
       await waitFor(() => {
         expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
@@ -546,7 +540,7 @@ describe("useBuddyConversation — team mode", () => {
 
       failDismiss = false;
       act(() => {
-        result.current.dismissAction(message.id, action.id);
+        result.current.dismissAction(message.id, action);
       });
       await waitFor(() => {
         expect(result.current.messages.find((m) => m.id === message.id)?.actions?.[0].status).toBe(
@@ -575,7 +569,7 @@ describe("useBuddyConversation — team mode", () => {
       // exactly the race a disable-on-render alone cannot catch.
       act(() => {
         result.current.confirmAction(message.id, action);
-        result.current.dismissAction(message.id, action.id);
+        result.current.dismissAction(message.id, action);
       });
 
       await waitFor(() => {

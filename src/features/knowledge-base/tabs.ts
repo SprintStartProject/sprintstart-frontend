@@ -1,4 +1,11 @@
-import type { Artifact, ArtifactType, SourceSystem } from "./types";
+import type { Artifact, ArtifactSort, ArtifactType, SourceSystem, UploadFormat } from "./types";
+
+/**
+ * Upload file formats the knowledge base classifies an upload into. Declared
+ * beside the artifact types they filter on, and re-exported from `./types` so
+ * the facet's labels and its values stay next to each other.
+ */
+export type { UploadFormat } from "./types";
 
 /**
  * Human-readable display names for the artifact sources (connectors).
@@ -80,8 +87,6 @@ export const KNOWLEDGE_TAB_ORDER: readonly KnowledgeTab[] = KNOWLEDGE_TABS.map((
  * for uploads, so this facet is offered only while `UPLOAD` is part of the
  * source selection (see `useKnowledgeBase`).
  */
-export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
-
 /** Human-readable display names for the file-format facet. */
 export const FORMAT_LABELS: Record<UploadFormat, string> = {
   PDF: "PDFs",
@@ -92,6 +97,19 @@ export const FORMAT_LABELS: Record<UploadFormat, string> = {
 
 /** Standard order for the file-format facet. */
 export const DEFAULT_FORMAT_ORDER: UploadFormat[] = ["PDF", "MARKDOWN", "IMAGE", "OTHER"];
+
+/** The list order used when the URL names none — and the one the backend applies unasked. */
+export const DEFAULT_ARTIFACT_SORT: ArtifactSort = "ADDED_DESC";
+
+/** Display names for the sort control, phrased as what the reader sees first. */
+export const SORT_LABELS: Record<ArtifactSort, string> = {
+  ADDED_DESC: "Newest added",
+  CHANGED_DESC: "Recently changed",
+  TITLE_ASC: "Title A–Z",
+};
+
+/** Order of the options in the sort control. */
+export const ARTIFACT_SORT_ORDER: ArtifactSort[] = ["ADDED_DESC", "CHANGED_DESC", "TITLE_ASC"];
 
 /** Whether an artifact came from a direct upload rather than a connector. */
 export function isUpload(artifact: Artifact): boolean {
@@ -121,6 +139,12 @@ function isPdfArtifact(artifact: Artifact): boolean {
   );
 }
 
+/**
+ * `language` is the backend's display name from the file extension at ingestion
+ * (`"Markdown"`), sent since the language facet; compared lowercased so it
+ * classifies a Markdown upload even when its title carries no extension. Other
+ * languages (`"Kotlin"`, `"Plain Text"`) are no Markdown signal and fall to Other.
+ */
 function isMarkdownArtifact(artifact: Artifact): boolean {
   const title = artifact.title?.toLowerCase() ?? "";
   const sourceId = artifact.sourceId.toLowerCase();
