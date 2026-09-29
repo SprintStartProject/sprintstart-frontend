@@ -30,6 +30,32 @@ export function canJoinMultipleProjects(permissionGroup: string | undefined): bo
   return isManagerEligible(permissionGroup);
 }
 
+/** A person an assignment would move, with the projects they would leave. */
+export type MovedUser = {
+  user: AdminUser;
+  leaving: ProjectSummary[];
+};
+
+/**
+ * Of the users about to be assigned to `targetProjectId`, those who would leave
+ * other projects. Unknown ids are skipped, so a stale selection cannot break it.
+ */
+export function getMovedUsers(
+  users: AdminUser[],
+  userIds: Iterable<string>,
+  targetProjectId: string,
+): MovedUser[] {
+  const usersById = new Map(users.map((user) => [user.id, user]));
+
+  return [...userIds].flatMap((userId) => {
+    const user = usersById.get(userId);
+    if (!user) return [];
+
+    const leaving = getProjectsLeftOnMove(user, targetProjectId);
+    return leaving.length > 0 ? [{ user, leaving }] : [];
+  });
+}
+
 /**
  * The projects a user is removed from when assigned to `targetProjectId`.
  *

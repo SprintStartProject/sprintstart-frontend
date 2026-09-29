@@ -647,6 +647,7 @@ export function AdminPage() {
           onOpenSourceDetails={openSourceDetails}
           onProjectUpdated={handleProjectUpdated}
           onProjectDeleted={handleProjectDeleted}
+          onMembershipsMoved={() => void refreshAdminData()}
         />
       )}
 

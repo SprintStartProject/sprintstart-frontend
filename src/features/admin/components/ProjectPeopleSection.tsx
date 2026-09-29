@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Search, Shield, ShieldCheck, UserMinus, UserPlus, Undo2, Users } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Search,
+  Shield,
+  ShieldCheck,
+  UserMinus,
+  UserPlus,
+  Undo2,
+  Users,
+} from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -13,10 +22,12 @@ import {
   stageToggleRemoveUser,
   type PeopleDraft,
 } from "../peopleDraft";
-import { isManagerEligible } from "../projectMove";
+import { getProjectsLeftOnMove, isManagerEligible } from "../projectMove";
 import type { AdminUser, ProjectUser } from "../types";
 
 type ProjectPeopleSectionProps = {
+  /** The project being edited; decides who a staged addition would move. */
+  projectId: string;
   members: ProjectUser[];
   manager: ProjectManager | null;
   availableUsers: AdminUser[];
@@ -39,6 +50,8 @@ type PersonRow = {
   isManagerEligible: boolean;
   isPendingAdd: boolean;
   isPendingRemove: boolean;
+  /** Names of the projects a staged person would be removed from on save. */
+  movedFrom: string[];
 };
 
 function getDisplayName(user: {
@@ -68,6 +81,7 @@ function matchesSearch(value: string, search: string) {
  * so this component never writes to the backend itself.
  */
 export function ProjectPeopleSection({
+  projectId,
   members,
   manager,
   availableUsers,
@@ -100,6 +114,7 @@ export function ProjectPeopleSection({
       isManagerEligible: isManagerEligible(...member.roles),
       isPendingAdd: false,
       isPendingRemove: activeDraft.removedUserIds.has(member.id),
+      movedFrom: [],
     }));
 
     const staged: PersonRow[] = [...activeDraft.addedUserIds].flatMap((userId) => {
@@ -116,6 +131,7 @@ export function ProjectPeopleSection({
           isManagerEligible: isManagerEligible(user.permissionGroup),
           isPendingAdd: true,
           isPendingRemove: false,
+          movedFrom: getProjectsLeftOnMove(user, projectId).map((project) => project.name),
         },
       ];
     });
@@ -141,6 +157,7 @@ export function ProjectPeopleSection({
           isManagerEligible: true,
           isPendingAdd: false,
           isPendingRemove: false,
+          movedFrom: [],
         });
       }
     }
@@ -158,6 +175,7 @@ export function ProjectPeopleSection({
     activeDraft.removedUserIds,
     availableUsersById,
     effectiveManagerId,
+    projectId,
   ]);
 
   const visibleRows = useMemo(
@@ -270,6 +288,13 @@ export function ProjectPeopleSection({
                 <span className="block truncate text-xs text-app-text-muted">
                   {row.secondaryLabel}
                 </span>
+
+                {row.movedFrom.length > 0 && (
+                  <span className="mt-1 flex items-start gap-1 text-xs font-medium text-app-warning-text">
+                    <ArrowRightLeft className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span>Will be moved from {row.movedFrom.join(", ")}</span>
+                  </span>
+                )}
               </span>
 
               <span className="flex shrink-0 items-center gap-1">

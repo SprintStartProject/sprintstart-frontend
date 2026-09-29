@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canJoinMultipleProjects,
+  getMovedUsers,
   getProjectsLeftOnMove,
   isManagerEligible,
 } from "../../../../src/features/admin/projectMove";
@@ -94,5 +95,26 @@ describe("getProjectsLeftOnMove", () => {
       [],
     );
     expect(getProjectsLeftOnMove(buildUser({ permissionGroup: "Admin" }), "b")).toEqual([]);
+  });
+});
+
+describe("getMovedUsers", () => {
+  const regular = buildUser({ id: "regular" });
+  const manager = buildUser({ id: "manager", permissionGroup: "Project Manager" });
+  const fresh = buildUser({ id: "fresh", projects: [], projectIds: [] });
+  const users = [regular, manager, fresh];
+
+  it("keeps only the users who would leave another project", () => {
+    expect(getMovedUsers(users, ["regular", "manager", "fresh"], "project-b")).toEqual([
+      { user: regular, leaving: [{ id: "project-a", name: "Project A" }] },
+    ]);
+  });
+
+  it("ignores ids that match no known user", () => {
+    expect(getMovedUsers(users, ["unknown"], "project-b")).toEqual([]);
+  });
+
+  it("does not count a user who is already in the target project", () => {
+    expect(getMovedUsers(users, ["regular"], "project-a")).toEqual([]);
   });
 });

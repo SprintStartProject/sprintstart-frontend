@@ -10,7 +10,12 @@ import { SaveButton } from "../../../components/ui/SaveButton";
 import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
 import { ProjectIndustryPanel } from "../../projects/industry/ProjectIndustryPanel";
-import { getProjectEditFormState, getProjectSourcesCount, getProjectUsersCount } from "../data";
+import {
+  getDisplayName,
+  getProjectEditFormState,
+  getProjectSourcesCount,
+  getProjectUsersCount,
+} from "../data";
 import {
   applyPeopleChanges,
   buildPeopleSnapshotKey,
@@ -19,6 +24,7 @@ import {
   resolvePeopleDraft,
   type PeopleDraft,
 } from "../peopleDraft";
+import { getMovedUsers } from "../projectMove";
 import type {
   AdminProjectDetails,
   AdminUser,
@@ -41,6 +47,12 @@ type ProjectDetailsDrawerProps = {
   onOpenSourceDetails?: (projectId: string, sourceId: string) => void;
   onProjectUpdated?: (updatedProject: AdminProjectDetails) => void;
   onProjectDeleted?: (projectId: string) => void;
+  /**
+   * Called after a save that removed people from other projects. Those projects'
+   * member lists are held elsewhere on the page and are stale by then, so the
+   * parent is expected to reload them.
+   */
+  onMembershipsMoved?: () => void;
 };
 
 const EMPTY_PROJECT_USERS: ProjectUser[] = [];
@@ -68,6 +80,7 @@ export function ProjectDetailsDrawer({
   onOpenSourceDetails,
   onProjectUpdated,
   onProjectDeleted,
+  onMembershipsMoved,
 }: ProjectDetailsDrawerProps) {
   const nameInputId = useId();
   const descriptionInputId = useId();
@@ -80,6 +93,7 @@ export function ProjectDetailsDrawer({
   const [saveErrorMessage, setSaveErrorMessage] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const toast = useToast();
 
   const [draftProject, setDraftProject] = useState<ProjectEditFormState>(() =>
@@ -137,6 +151,9 @@ export function ProjectDetailsDrawer({
   const pendingChangeCount = peopleChangeCount + (hasDetailsChanges ? 1 : 0);
   const hasPendingChanges = pendingChangeCount > 0;
 
+  // Staged additions that would take a regular user out of another project.
+  const movedUsers = getMovedUsers(availableUsers, activePeopleDraft.addedUserIds, project.id);
+
   const isLoadingDetails = isOpen && !projectDetails && !detailsError;
   const hasDetailsError = Boolean(detailsError);
 
@@ -167,12 +184,22 @@ export function ProjectDetailsDrawer({
     onProjectUpdated?.(updatedProject);
   };
 
-  const saveChanges = async () => {
+  const requestSave = () => {
     if (hasDetailsChanges && !draftProject.name.trim()) {
       setSaveErrorMessage("Project name is required.");
       return;
     }
 
+    if (movedUsers.length > 0) {
+      setIsMoveDialogOpen(true);
+      return;
+    }
+
+    void saveChanges();
+  };
+
+  const saveChanges = async () => {
+    setIsMoveDialogOpen(false);
     setIsSaving(true);
     setSaveErrorMessage("");
 
@@ -194,6 +221,8 @@ export function ProjectDetailsDrawer({
       applyProjectUpdate(updatedProject);
       resetDrafts(updatedProject);
       toast.success("Project saved");
+
+      if (movedUsers.length > 0) onMembershipsMoved?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't save the project changes.");
     } finally {
@@ -292,11 +321,7 @@ export function ProjectDetailsDrawer({
                   Discard
                 </Button>
 
-                <SaveButton
-                  dirty={hasPendingChanges}
-                  saving={isSaving}
-                  onClick={() => void saveChanges()}
-                />
+                <SaveButton dirty={hasPendingChanges} saving={isSaving} onClick={requestSave} />
               </div>
             </div>
           ) : undefined
@@ -371,6 +396,7 @@ export function ProjectDetailsDrawer({
 
             <DrawerCard index={2}>
               <ProjectPeopleSection
+                projectId={project.id}
                 members={visibleUsers}
                 manager={projectDetails?.manager ?? null}
                 availableUsers={availableUsers}
@@ -414,6 +440,31 @@ export function ProjectDetailsDrawer({
           </div>
         )}
       </DetailsSideDrawer>
+
+      <AlertDialog
+        isOpen={isMoveDialogOpen}
+        variant="danger"
+        title={movedUsers.length === 1 ? "Move 1 person?" : `Move ${movedUsers.length} people?`}
+        description={
+          <>
+            <span className="block">
+              These people are in other projects and will be removed from them. Their project roles
+              and onboarding progress are reset.
+            </span>
+            <ul className="mt-3 list-disc space-y-1 pl-5">
+              {movedUsers.map(({ user, leaving }) => (
+                <li key={user.id}>
+                  <span className="font-semibold text-app-text">{getDisplayName(user)}</span> (from{" "}
+                  {leaving.map((left) => left.name).join(", ")})
+                </li>
+              ))}
+            </ul>
+          </>
+        }
+        confirmLabel="Move and save"
+        onClose={() => setIsMoveDialogOpen(false)}
+        onConfirm={() => void saveChanges()}
+      />
 
       <AlertDialog
         isOpen={isDeleteDialogOpen}
