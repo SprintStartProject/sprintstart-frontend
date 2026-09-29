@@ -12,6 +12,7 @@ import { scoreVerdict, type Finding } from "./findings";
 import { HealthPanel } from "./HealthPanel";
 import { ScanPanel } from "./ScanPanel";
 import type {
+  AnalysisComparison,
   AnalysisLogEntry,
   AnalysisOptions,
   AnalysisPhase,
@@ -28,10 +29,11 @@ type ProjectAnalysisDialogProps = {
   log: readonly AnalysisLogEntry[];
   runStartedAt: number | null;
   findings: readonly Finding[];
+  /** `null` while nothing is finished, and for a finished run in which a check could not run. */
   score: number | null;
   /** When the results on screen were produced. */
   resultsAt: string | null;
-  previousRun: AnalysisRunSummary | null;
+  previousRun: AnalysisComparison | null;
   lastRun: AnalysisRunSummary | null;
   projectName?: string;
   canEvaluateIndustry: boolean;
@@ -95,6 +97,7 @@ function OptionRow({
 function Results({
   findings,
   score,
+  tasks,
   resultsAt,
   previousRun,
   projectName,
@@ -102,10 +105,18 @@ function Results({
   onRunAgain,
 }: Pick<
   ProjectAnalysisDialogProps,
-  "findings" | "resultsAt" | "previousRun" | "projectName" | "onOpenFinding" | "onRunAgain"
-> & { score: number }) {
+  | "findings"
+  | "score"
+  | "tasks"
+  | "resultsAt"
+  | "previousRun"
+  | "projectName"
+  | "onOpenFinding"
+  | "onRunAgain"
+>) {
   // Nothing chosen shows everything at once; an area narrows it.
   const [selected, setSelected] = useState<MapSelection>(null);
+  const failed = tasks.filter((task) => task.status === "failed");
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -116,14 +127,17 @@ function Results({
           onSelect={setSelected}
           onOpenFinding={onOpenFinding}
           score={score}
-          scoreAccent={scoreGlow(score)}
+          failedAreas={failed.map((task) => task.id)}
+          scoreAccent={score === null ? "var(--warning-text)" : scoreGlow(score)}
           caption={
             <>
               {projectName && (
                 <span className="text-sm font-semibold text-app-text">{projectName}</span>
               )}
               <span className="text-xs text-app-text-muted">
-                Health · {scoreVerdict(score).toLowerCase()}
+                {score === null
+                  ? `Incomplete · ${failed.length} ${failed.length === 1 ? "check" : "checks"} could not run`
+                  : `Health · ${scoreVerdict(score).toLowerCase()}`}
               </span>
             </>
           }
@@ -131,9 +145,10 @@ function Results({
       </div>
       <HealthPanel
         score={score}
+        failedTasks={failed}
         findings={findings}
         analysedAt={resultsAt}
-        previous={previousRun ? { at: previousRun.at, score: previousRun.score } : null}
+        previous={previousRun}
         onRunAgain={onRunAgain}
       />
     </div>
@@ -170,7 +185,8 @@ export function ProjectAnalysisDialog({
   onOpenFinding,
 }: ProjectAnalysisDialogProps) {
   const running = phase === "running";
-  const done = phase === "done" && score !== null;
+  // Finished, with or without a score: an incomplete run still has results to show.
+  const done = phase === "done";
   const footer = done ? undefined : running ? (
     <Button variant="secondary" onClick={onClose}>
       Keep running in the background
@@ -198,7 +214,9 @@ export function ProjectAnalysisDialog({
       title="Project analysis"
       description={
         done
-          ? "Everything refreshed at once. Pick an area to see what it found, and open any card to act on it."
+          ? score === null
+            ? "Some checks could not run, so there is no score this time. Pick an area to see what the others found."
+            : "Everything refreshed at once. Pick an area to see what it found, and open any card to act on it."
           : running
             ? "Refreshing every part of the project at once…"
             : "Refresh everything the dashboard shows in one go, then see what needs you."
@@ -218,6 +236,7 @@ export function ProjectAnalysisDialog({
             <Results
               findings={findings}
               score={score}
+              tasks={tasks}
               resultsAt={resultsAt}
               previousRun={previousRun}
               projectName={projectName}
@@ -279,7 +298,8 @@ export function ProjectAnalysisDialog({
                 </div>
                 {lastRun && (
                   <p className="text-xs text-app-text-subtle">
-                    Last run {formatRelativeDate(lastRun.at)} · {lastRun.score}/100
+                    Last run {formatRelativeDate(lastRun.at)} ·{" "}
+                    {lastRun.score === null ? "incomplete, no score" : `${lastRun.score}/100`}
                   </p>
                 )}
               </div>

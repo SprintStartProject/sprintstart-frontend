@@ -7,7 +7,7 @@ import { ProjectAnalysisLauncher } from "../../../../../src/features/pm-area/ana
 
 const mocks = vi.hoisted(() => ({
   industryCustom: false,
-  getTeamOverview: vi.fn(),
+  getTeamOverviewOrThrow: vi.fn(),
   getUserOnboardingFeedback: vi.fn(),
   fetchProjectMetrics: vi.fn(),
   fetchAttention: vi.fn(),
@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../../src/services/teamManagementService", () => ({
-  getTeamOverview: mocks.getTeamOverview,
+  getTeamOverviewOrThrow: mocks.getTeamOverviewOrThrow,
   getUserOnboardingFeedback: mocks.getUserOnboardingFeedback,
 }));
 vi.mock("../../../../../src/services/onboardingMetricsService", () => ({
@@ -97,11 +97,23 @@ async function runAnalysis(
   await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
 }
 
+/** Like `runAnalysis`, for a run in which a check fails: its results have no points breakdown. */
+async function runIncompleteAnalysis(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /Analyse project/ }));
+  await user.click(screen.getByRole("button", { name: /Start analysis/ }));
+  await screen.findByText(/Could not run/, {}, { timeout: 8000 });
+}
+
+function storedRun() {
+  const raw = window.localStorage.getItem("sprintstart.pm-analysis.pm-1.p1");
+  return raw ? (JSON.parse(raw) as { score: number | null }) : null;
+}
+
 describe("ProjectAnalysisLauncher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    mocks.getTeamOverview.mockResolvedValue([
+    mocks.getTeamOverviewOrThrow.mockResolvedValue([
       {
         userId: "u1",
         firstname: "Ada",
@@ -315,7 +327,7 @@ describe("ProjectAnalysisLauncher", () => {
 
     const dialog = within(await screen.findByTestId("project-analysis-dialog"));
     expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
-    expect(mocks.getTeamOverview).not.toHaveBeenCalled();
+    expect(mocks.getTeamOverviewOrThrow).not.toHaveBeenCalled();
   }, 20000);
 
   it("shows every finding in one list, with no filter bar on top", async () => {
@@ -342,4 +354,141 @@ describe("ProjectAnalysisLauncher", () => {
 
     await waitFor(() => expect(onRefreshed).toHaveBeenLastCalledWith(1));
   }, 20000);
+
+  describe("when a check cannot run", () => {
+    it("gives no score instead of counting the failed check as clean", async () => {
+      mocks.listOpen.mockRejectedValue(new Error("Backend unavailable"));
+      const user = userEvent.setup();
+      renderLauncher();
+
+      await runIncompleteAnalysis(user);
+
+      const dialog = within(screen.getByTestId("project-analysis-dialog"));
+      const health = within(dialog.getByRole("complementary", { name: "Project health" }));
+      expect(health.getByText("Incomplete")).toBeInTheDocument();
+      expect(health.queryByText("/ 100")).not.toBeInTheDocument();
+      expect(health.queryByText(/Where the points went/)).not.toBeInTheDocument();
+      // Which check failed, and why.
+      expect(health.getByText("Escalation inbox")).toBeInTheDocument();
+      expect(health.getByText("Backend unavailable")).toBeInTheDocument();
+      // On the map, the area says it was not checked — not a green "nothing here".
+      const areas = within(dialog.getByRole("navigation", { name: "Areas" }));
+      expect(
+        within(areas.getByRole("button", { name: /Escalations/ })).getByLabelText(
+          "Could not be checked",
+        ),
+      ).toBeInTheDocument();
+      // The checks that did run still say what they found.
+      expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
+      expect(storedRun()?.score).toBeNull();
+    }, 20000);
+
+    it("does not score 100 when every read fails", async () => {
+      const down = new Error("Backend unavailable");
+      mocks.getTeamOverviewOrThrow.mockRejectedValue(down);
+      mocks.fetchProjectMetrics.mockRejectedValue(down);
+      mocks.listOpen.mockRejectedValue(down);
+      mocks.fetchFAQGroups.mockRejectedValue(down);
+      mocks.refreshKnowledgeGaps.mockRejectedValue(down);
+      mocks.fetchIngestionSources.mockRejectedValue(down);
+      mocks.getAccessibleProject.mockRejectedValue(down);
+      const user = userEvent.setup();
+      renderLauncher();
+
+      await runIncompleteAnalysis(user);
+
+      const dialog = within(screen.getByTestId("project-analysis-dialog"));
+      expect(dialog.queryByText("In great shape")).not.toBeInTheDocument();
+      const health = within(dialog.getByRole("complementary", { name: "Project health" }));
+      expect(health.getByText(/7 checks could not run/)).toBeInTheDocument();
+      expect(storedRun()?.score).toBeNull();
+    }, 20000);
+
+    it("marks the team check failed instead of reporting on made-up members", async () => {
+      mocks.getTeamOverviewOrThrow.mockRejectedValue(new Error("Team overview unavailable"));
+      const user = userEvent.setup();
+      renderLauncher();
+
+      await runIncompleteAnalysis(user);
+
+      const dialog = within(screen.getByTestId("project-analysis-dialog"));
+      const health = within(dialog.getByRole("complementary", { name: "Project health" }));
+      expect(health.getByText("Team & open items")).toBeInTheDocument();
+      expect(dialog.queryByText("1 skip request waiting for your answer")).not.toBeInTheDocument();
+    }, 20000);
+
+    it("marks the team check failed when a member's feedback cannot be read", async () => {
+      mocks.getTeamOverviewOrThrow.mockResolvedValue([
+        {
+          userId: "u1",
+          firstname: "Ada",
+          lastname: "Lovelace",
+          projects: [],
+          roles: [],
+          skills: [],
+          progressPercentage: 0.5,
+          currentPhase: { id: "p", title: "Setup" },
+          currentStep: null,
+          hasFeedback: true,
+        },
+      ]);
+      mocks.getUserOnboardingFeedback.mockRejectedValue(new Error("Forbidden"));
+      const user = userEvent.setup();
+      renderLauncher();
+
+      await runIncompleteAnalysis(user);
+
+      const health = within(screen.getByRole("complementary", { name: "Project health" }));
+      expect(health.getByText("Feedback of 1 member could not be read")).toBeInTheDocument();
+    }, 20000);
+
+    it("says so on the ring beside the tabs, not a score", async () => {
+      mocks.listOpen.mockRejectedValue(new Error("Backend unavailable"));
+      const user = userEvent.setup();
+      const { unmount } = renderLauncher();
+
+      await runIncompleteAnalysis(user);
+      unmount();
+      renderLauncher();
+
+      expect(
+        screen.getByRole("button", {
+          name: /Open last results: last run .* incomplete, 1 check could not run, no health score/,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("img", { name: "Last run incomplete, no health score" }),
+      ).toBeInTheDocument();
+    }, 20000);
+
+    it("compares the next complete run with the last complete one, not the incomplete one", async () => {
+      const user = userEvent.setup();
+      renderLauncher();
+
+      // Complete, then incomplete, then complete again with the same answers.
+      await runAnalysis(user);
+      await user.click(screen.getByRole("button", { name: /Run again/ }));
+      mocks.listOpen.mockRejectedValueOnce(new Error("Backend unavailable"));
+      await user.click(screen.getByRole("button", { name: /Start analysis/ }));
+      await screen.findByText(/Could not run/, {}, { timeout: 8000 });
+      // No comparison on the incomplete run.
+      expect(screen.queryByText(/since the run|Same as the run/)).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /Run again/ }));
+      await user.click(screen.getByRole("button", { name: /Start analysis/ }));
+      await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
+
+      expect(screen.getByText(/Same as the run/)).toBeInTheDocument();
+    }, 40000);
+
+    it("has no a11y violations on incomplete results", async () => {
+      mocks.listOpen.mockRejectedValue(new Error("Backend unavailable"));
+      const user = userEvent.setup();
+      const { baseElement } = renderLauncher();
+
+      await runIncompleteAnalysis(user);
+
+      expect(await axe(baseElement)).toHaveNoViolations();
+    }, 30000);
+  });
 });

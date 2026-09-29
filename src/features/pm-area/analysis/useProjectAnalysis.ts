@@ -8,7 +8,7 @@ import { onboardingMetricsService } from "../../../services/onboardingMetricsSer
 import { projectService } from "../../../services/projectService";
 import { queryKeys } from "../../../services/queryKeys";
 import {
-  getTeamOverview,
+  getTeamOverviewOrThrow,
   getUserOnboardingFeedback,
   type OnboardingFeedback,
 } from "../../../services/teamManagementService";
@@ -98,9 +98,34 @@ export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = {
 /** One finished analysis, as remembered for the next one to compare against. */
 export type AnalysisRunSummary = {
   at: string;
-  score: number;
+  /** `null` when the run was incomplete — see `failedChecks`. */
+  score: number | null;
   counts: Record<FindingSeverity, number>;
+  /** How many checks could not run. Anything above 0 means the run has no score. */
+  failedChecks: number;
 };
+
+/** The complete run the results compare against: the one before, or the last one with a score. */
+export type AnalysisComparison = { at: string; score: number };
+
+function summarise(record: StoredAnalysis): AnalysisRunSummary {
+  return {
+    at: record.at,
+    score: record.score ?? null,
+    counts: record.counts,
+    failedChecks: record.tasks?.filter((task) => task.status === "failed").length ?? 0,
+  };
+}
+
+/**
+ * What a new run compares against: the stored run if it has a score, else the one that one was
+ * compared against. An incomplete run is never a baseline — its score would not mean anything.
+ */
+function comparisonFor(record: StoredAnalysis | null): AnalysisComparison | null {
+  if (!record) return null;
+  if (typeof record.score === "number") return { at: record.at, score: record.score };
+  return record.previous ?? null;
+}
 
 export type AnalysisPhase = "idle" | "running" | "done";
 
@@ -166,11 +191,9 @@ export function useProjectAnalysis() {
   const [score, setScore] = useState<number | null>(null);
   const storageKey = projectId ? lastAnalysisKey(viewerId, projectId) : null;
   const [stored, writeStored] = useStoredRecord<StoredAnalysis>(storageKey);
-  const lastRun: AnalysisRunSummary | null = stored
-    ? { at: stored.at, score: stored.score, counts: stored.counts }
-    : null;
-  /** The run before the current one — what the results compare against. */
-  const [previousRun, setPreviousRun] = useState<AnalysisRunSummary | null>(null);
+  const lastRun: AnalysisRunSummary | null = stored ? summarise(stored) : null;
+  /** The complete run before the current one — what the results compare against. */
+  const [previousRun, setPreviousRun] = useState<AnalysisComparison | null>(null);
   /**
    * Bumped whenever a run finishes, for the cards that keep their data outside the shared query
    * cache (the industry card) to read it again. Everything else refreshes through the cache.
@@ -199,8 +222,10 @@ export function useProjectAnalysis() {
       setPhase("running");
       setFindings([]);
       setScore(null);
-      const before = readRecord<StoredAnalysis>(lastAnalysisKey(viewerId, projectId));
-      setPreviousRun(before ? { at: before.at, score: before.score, counts: before.counts } : null);
+      const before = comparisonFor(
+        readRecord<StoredAnalysis>(lastAnalysisKey(viewerId, projectId)),
+      );
+      setPreviousRun(before);
       // This run's tasks as they progress, kept here as well as in state so the stored record can
       // be written from them once everything has settled.
       let runTasks: AnalysisTask[] = TASKS.map((task) => ({ ...task, status: "pending" }));
@@ -253,8 +278,10 @@ export function useProjectAnalysis() {
 
       const [team, onboarding, escalations, faq, gaps, sources, industry] = await Promise.all([
         check("team", async () => {
+          // Never the forgiving `getTeamOverview`: its mock fallback would turn a failed read into
+          // findings about people who do not exist.
           const roster = await fresh(queryKeys.teamOverview.filtered(projectId), () =>
-            getTeamOverview(undefined, undefined, [projectId]),
+            getTeamOverviewOrThrow([projectId]),
           );
           const flagged = roster.filter((member) => member.hasFeedback);
           const feedback = await Promise.allSettled(
@@ -264,6 +291,11 @@ export function useProjectAnalysis() {
               ),
             ),
           );
+          // A member whose feedback could not be read is not a member with nothing unread.
+          const unreadable = feedback.filter((result) => result.status === "rejected").length;
+          if (unreadable > 0) {
+            throw new Error(`Feedback of ${count(unreadable, "member")} could not be read`);
+          }
           const feedbackByUser: Record<string, OnboardingFeedback[]> = {};
           feedback.forEach((result, index) => {
             if (result.status === "fulfilled") feedbackByUser[flagged[index].userId] = result.value;
@@ -377,15 +409,19 @@ export function useProjectAnalysis() {
         sources,
         industry,
       });
-      const nextScore = healthScore(result);
       const finishedTasks = runTasks;
+      // A check that could not run made no findings, and the score only subtracts for findings —
+      // so scoring anyway would read "could not look" as "nothing wrong", and the more checks
+      // failed the better it would look. An incomplete run gets no score at all.
+      const complete = finishedTasks.every((task) => task.status !== "failed");
+      const nextScore = complete ? healthScore(result) : null;
       const record: StoredAnalysis = {
         at: new Date().toISOString(),
         score: nextScore,
         counts: countBySeverity(result),
         findings: result,
         tasks: finishedTasks,
-        previous: before ? { at: before.at, score: before.score } : null,
+        previous: before,
       };
 
       writeStored(record);
@@ -405,7 +441,7 @@ export function useProjectAnalysis() {
     if (!stored?.findings) return;
     runRef.current += 1;
     setFindings(stored.findings);
-    setScore(stored.score);
+    setScore(stored.score ?? null);
     setTasks(
       TASKS.map((task) => {
         const saved = stored.tasks?.find((candidate) => candidate.id === task.id);
@@ -416,15 +452,7 @@ export function useProjectAnalysis() {
         };
       }),
     );
-    setPreviousRun(
-      stored.previous
-        ? {
-            at: stored.previous.at,
-            score: stored.previous.score,
-            counts: { critical: 0, warning: 0, info: 0, good: 0 },
-          }
-        : null,
-    );
+    setPreviousRun(stored.previous ?? null);
     setPhase("done");
   }, [stored]);
 

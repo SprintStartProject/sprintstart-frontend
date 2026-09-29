@@ -20,12 +20,16 @@ export type StoredTask = { id: Finding["area"]; label: string; status: string; n
 /** One finished analysis, complete enough to show its results again. */
 export type StoredAnalysis = {
   at: string;
-  score: number;
+  /**
+   * `null` when a check could not run: a failed check makes no findings, so a score would count
+   * it as clean. Which checks failed is in `tasks`.
+   */
+  score: number | null;
   counts: Record<FindingSeverity, number>;
   /** Missing on runs stored before results were kept — those can only show their score. */
   findings?: Finding[];
   tasks?: StoredTask[];
-  /** The run before this one, for the "since the last run" comparison. */
+  /** The last complete run before this one, for the "since the last run" comparison. */
   previous?: { at: string; score: number } | null;
 };
 

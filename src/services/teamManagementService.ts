@@ -78,62 +78,94 @@ function toTeamOverviewProjects(user: BackendTeamOverviewUser): TeamOverviewUser
   return user.project?.id ? [{ id: user.project.id, name: user.project.name ?? "" }] : [];
 }
 
+/** The team overview as the backend has it, without the unread-feedback flag. Throws on failure. */
+async function readTeamOverviewUsers(
+  roleId?: string,
+  sortBy?: string,
+  projectIds?: string[],
+): Promise<TeamOverviewUser[]> {
+  const params = new URLSearchParams();
+  if (roleId && roleId !== "all") params.append("roleIds", roleId);
+  projectIds?.forEach((projectId) => params.append("projectIds", projectId));
+  if (sortBy) params.append("sortBy", sortBy);
+  params.append("size", "100");
+
+  const query = params.toString();
+  const url = `/api/v1/onboarding/team-overview${query ? `?${query}` : ""}`;
+
+  const response = await apiClient.fetch<{
+    content: BackendTeamOverviewUser[];
+  }>(url);
+
+  return response.content.map((user) => ({
+    ...user,
+    projects: toTeamOverviewProjects(user),
+    roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
+      ...role,
+      id: role.id || role.roleId || "",
+    })),
+  }));
+}
+
+/** Sets `hasFeedback` on every member with at least one feedback item nobody has read. */
+function withUnreadFeedbackFlag(
+  users: TeamOverviewUser[],
+  feedback: OnboardingFeedback[],
+): TeamOverviewUser[] {
+  const usersWithUnreadFeedback = new Set(
+    feedback
+      .filter((item) => item.read !== true && !item.readAt)
+      .map((item) => item.userId)
+      .filter((userId): userId is string => Boolean(userId)),
+  );
+
+  return users.map((user) => ({
+    ...user,
+    hasFeedback: usersWithUnreadFeedback.has(user.userId),
+  }));
+}
+
 /**
- * Skill levels for the *currently authenticated* user.
+ * The team overview, each member flagged when they have unread feedback.
  *
- * Mirrors {@link getUserSkillLevels} but reads `/api/v1/me/skills`, which is
- * open to the USER role — the admin endpoint behind `getUserSkillLevels`
- * would 403 for a regular user looking at their own dashboard. The raw
- * assessments only carry skill IDs, so names and roles are joined in from
- * the skill and project-role lists.
+ * Forgiving on purpose, for the screens that list the team: if the feedback list cannot be read
+ * the members come without the flag, and if the overview itself cannot be read this falls back to
+ * mock users. Anything that draws conclusions from the answer — a count, a finding — must use
+ * {@link getTeamOverviewOrThrow} instead, which never invents members.
  */
 export async function getTeamOverview(
   roleId?: string,
   sortBy?: string,
   projectIds?: string[],
 ): Promise<TeamOverviewUser[]> {
+  let users: TeamOverviewUser[];
   try {
-    const params = new URLSearchParams();
-    if (roleId && roleId !== "all") params.append("roleIds", roleId);
-    projectIds?.forEach((projectId) => params.append("projectIds", projectId));
-    if (sortBy) params.append("sortBy", sortBy);
-    params.append("size", "100");
-
-    const query = params.toString();
-    const url = `/api/v1/onboarding/team-overview${query ? `?${query}` : ""}`;
-
-    const response = await apiClient.fetch<{
-      content: BackendTeamOverviewUser[];
-    }>(url);
-
-    const users = response.content.map((user) => ({
-      ...user,
-      projects: toTeamOverviewProjects(user),
-      roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
-        ...role,
-        id: role.id || role.roleId || "",
-      })),
-    }));
-
-    try {
-      const feedback = await getAllOnboardingFeedback();
-      const usersWithUnreadFeedback = new Set(
-        feedback
-          .filter((item) => item.read !== true && !item.readAt)
-          .map((item) => item.userId)
-          .filter((userId): userId is string => Boolean(userId)),
-      );
-
-      return users.map((user) => ({
-        ...user,
-        hasFeedback: usersWithUnreadFeedback.has(user.userId),
-      }));
-    } catch {
-      return users;
-    }
+    users = await readTeamOverviewUsers(roleId, sortBy, projectIds);
   } catch {
     return mockUsers;
   }
+
+  try {
+    return withUnreadFeedbackFlag(users, await getAllOnboardingFeedback());
+  } catch {
+    return users;
+  }
+}
+
+/**
+ * {@link getTeamOverview} without the fallbacks: the same members and the same unread-feedback
+ * flag, but it throws when the overview or the feedback list cannot be read.
+ *
+ * For the project analysis, which turns the answer into findings and a score: made-up members
+ * would become findings about people who do not exist, and a missing feedback list would read as
+ * "nothing unread". A failure has to reach the caller, so the check is marked as not run.
+ */
+export async function getTeamOverviewOrThrow(projectIds: string[]): Promise<TeamOverviewUser[]> {
+  const [users, feedback] = await Promise.all([
+    readTeamOverviewUsers(undefined, undefined, projectIds),
+    getAllOnboardingFeedback(),
+  ]);
+  return withUnreadFeedbackFlag(users, feedback);
 }
 
 export async function getTeamMember(userId: string): Promise<TeamOverviewUser | undefined> {

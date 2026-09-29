@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, CircleAlert } from "lucide-react";
 import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AREA_META, AREA_ORDER, SEVERITY_META, SEVERITY_RANK } from "./analysisMeta";
 import type { Finding, FindingArea } from "./findings";
@@ -21,12 +21,17 @@ type AnalysisMapProps = {
   selected: MapSelection;
   onSelect: (selection: MapSelection) => void;
   onOpenFinding: (to: string) => void;
-  /** The health score, lit round the ring in the core. */
-  score: number;
+  /** The health score, lit round the ring in the core; `null` for an incomplete run. */
+  score: number | null;
   /** The colour the ring's arc ends in. */
   scoreAccent: string;
   /** Words under the ring. */
   caption: ReactNode;
+  /**
+   * The areas whose check could not run. They have no findings, and that must not read as
+   * "nothing here": their cards say they were not checked.
+   */
+  failedAreas?: readonly FindingArea[];
 };
 
 const bySeverity = (a: Finding, b: Finding) =>
@@ -118,6 +123,7 @@ function AreaCard({
   label,
   count,
   worst,
+  failed,
   selected,
   onClick,
 }: {
@@ -128,6 +134,8 @@ function AreaCard({
   label: string;
   count: number;
   worst: Finding["severity"] | null;
+  /** The area's check could not run. */
+  failed: boolean;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -154,7 +162,12 @@ function AreaCard({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-base leading-tight font-bold text-app-text tabular-nums">
-          {count > 0 ? (
+          {failed ? (
+            <CircleAlert
+              aria-label="Could not be checked"
+              className="h-4 w-4 text-app-warning-text"
+            />
+          ) : count > 0 ? (
             count
           ) : (
             <CheckCircle2 aria-label="Nothing here" className="h-4 w-4 text-app-success-text" />
@@ -199,6 +212,7 @@ export function AnalysisMap({
   score,
   scoreAccent,
   caption,
+  failedAreas = [],
 }: AnalysisMapProps) {
   const reduceMotion = useReducedMotion();
   const uid = useId().replace(/:/g, "");
@@ -371,10 +385,14 @@ export function AnalysisMap({
         <div className="hidden lg:block">
           <div className="sticky top-0 flex flex-col items-center gap-3 pt-6 text-center">
             <div data-anchor="core">
-              <NeonRing value={score} size={180} accent={scoreAccent}>
-                <span className="text-4xl leading-none font-bold text-app-text">{score}</span>
+              {/* An incomplete run has no score: the ring stays dark rather than lit to a number
+                  that would count the checks that could not run as clean. */}
+              <NeonRing value={score ?? 0} size={180} accent={scoreAccent}>
+                <span className="text-4xl leading-none font-bold text-app-text">
+                  {score ?? "—"}
+                </span>
                 <span className="mt-1 text-[11px] font-medium tracking-wider text-app-text-muted uppercase">
-                  of 100
+                  {score === null ? "no score" : "of 100"}
                 </span>
               </NeonRing>
             </div>
@@ -396,6 +414,7 @@ export function AnalysisMap({
                 label={meta.label}
                 count={count}
                 worst={worst}
+                failed={failedAreas.includes(area)}
                 selected={selected === area}
                 // Choosing the area already shown lets go of it, back to every area at once.
                 onClick={() => onSelect(selected === area ? null : area)}
@@ -415,7 +434,12 @@ export function AnalysisMap({
             </h3>
           </div>
 
-          {shown.length === 0 ? (
+          {shown.length === 0 && selected !== null && failedAreas.includes(selected) ? (
+            <p className="flex items-center gap-2 rounded-xl border border-dashed border-app-warning-border px-4 py-6 text-sm text-app-text-muted">
+              <CircleAlert aria-hidden="true" className="h-4 w-4 text-app-warning-text" />
+              This check could not run, so there is nothing to report from it — not nothing wrong.
+            </p>
+          ) : shown.length === 0 ? (
             <p className="flex items-center gap-2 rounded-xl border border-dashed border-app-border-muted px-4 py-6 text-sm text-app-text-muted">
               <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-app-success-text" />
               {`Nothing${selected === null ? "" : ` in ${heading.toLowerCase()}`} to report.`}

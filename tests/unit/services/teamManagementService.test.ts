@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getTeamOverview,
+  getTeamOverviewOrThrow,
   getTeamMember,
   getPmAttentionCount,
   getProjectRoles,
@@ -106,6 +107,59 @@ describe("teamManagementService", () => {
       );
 
       await expect(getPmAttentionCount("proj1")).rejects.toThrow();
+    });
+  });
+
+  describe("getTeamOverviewOrThrow", () => {
+    const member = (userId: string) => ({
+      userId,
+      firstname: userId,
+      lastname: "",
+      roles: [],
+      progressPercentage: 0,
+      currentStep: null,
+    });
+
+    it("flags the members with unread feedback, like getTeamOverview", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () =>
+          HttpResponse.json({ content: [member("u1"), member("u2")] }),
+        ),
+        http.get("/api/v1/admin/onboarding/feedback", () =>
+          HttpResponse.json([{ id: "f1", userId: "u2", message: "unclear", read: false }]),
+        ),
+      );
+
+      const overview = await getTeamOverviewOrThrow(["proj1"]);
+      expect(overview.map((user) => [user.userId, user.hasFeedback])).toEqual([
+        ["u1", false],
+        ["u2", true],
+      ]);
+    });
+
+    it("fails instead of returning mock members when the overview is unavailable", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () => new HttpResponse(null, { status: 500 })),
+        http.get("/api/v1/admin/onboarding/feedback", () => HttpResponse.json([])),
+      );
+
+      await expect(getTeamOverviewOrThrow(["proj1"])).rejects.toThrow();
+      // The forgiving variant still falls back, for the screens that only list the team.
+      await expect(getTeamOverview(undefined, undefined, ["proj1"])).resolves.not.toHaveLength(0);
+    });
+
+    it("fails instead of reading 'nothing unread' when the feedback list is unavailable", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () =>
+          HttpResponse.json({ content: [member("u1")] }),
+        ),
+        http.get(
+          "/api/v1/admin/onboarding/feedback",
+          () => new HttpResponse(null, { status: 500 }),
+        ),
+      );
+
+      await expect(getTeamOverviewOrThrow(["proj1"])).rejects.toThrow();
     });
   });
 

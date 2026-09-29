@@ -1,4 +1,4 @@
-import { ScanSearch } from "lucide-react";
+import { CircleAlert, ScanSearch } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
@@ -52,6 +52,14 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
 
   const running = analysis.phase === "running";
   const lastRun = analysis.lastRun;
+  // What the ring stands for, in words: its accessible name and its tooltip.
+  const lastRunSummary = !lastRun
+    ? ""
+    : lastRun.score === null
+      ? `last run ${formatRelativeDate(lastRun.at)} incomplete, ${lastRun.failedChecks} ${
+          lastRun.failedChecks === 1 ? "check" : "checks"
+        } could not run, no health score`
+      : `health ${lastRun.score} of 100, ${scoreVerdict(lastRun.score).toLowerCase()}, last run ${formatRelativeDate(lastRun.at)}`;
 
   const start = () => {
     setIsOpen(true);
@@ -65,29 +73,43 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
 
   return (
     <>
-      {/* Beside the section tabs, on every PM section: the last score and the way to a new run,
-          in one small group. It used to be a full-width strip at the top of the overview only. */}
+      {/* Beside the section tabs, on the overview: the last score and the way to a new run, in
+          one small group. It used to be a full-width strip at the top of the overview. */}
       <section aria-label="Project analysis" className="flex shrink-0 items-center gap-2">
         {lastRun && !running && (
           <button
             type="button"
             onClick={analysis.canOpenLast ? openLast : undefined}
             disabled={!analysis.canOpenLast}
-            aria-label={`${analysis.canOpenLast ? "Open last results: " : ""}health ${lastRun.score} of 100, ${scoreVerdict(lastRun.score).toLowerCase()}, last run ${formatRelativeDate(lastRun.at)}`}
-            title={`Last run ${formatRelativeDate(lastRun.at)} · health ${lastRun.score}/100, ${scoreVerdict(lastRun.score).toLowerCase()}${analysis.canOpenLast ? " — open the results" : ""}`}
+            aria-label={`${analysis.canOpenLast ? "Open last results: " : ""}${lastRunSummary}`}
+            title={`${lastRunSummary}${analysis.canOpenLast ? " — open the results" : ""}`}
             className="rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none enabled:hover:scale-105"
           >
-            <RingGauge
-              value={lastRun.score}
-              size={38}
-              thickness={4}
-              colorClassName={scoreColor(lastRun.score)}
-              ariaLabel={`Last health score ${lastRun.score} of 100`}
-            >
-              <span className="text-[11px] font-bold text-app-text tabular-nums">
-                {lastRun.score}
-              </span>
-            </RingGauge>
+            {lastRun.score === null ? (
+              // No score to light the ring to: an empty ring with a warning mark, not a number
+              // that would count the checks that could not run as clean.
+              <RingGauge
+                value={0}
+                size={38}
+                thickness={4}
+                colorClassName="text-app-warning-solid"
+                ariaLabel="Last run incomplete, no health score"
+              >
+                <CircleAlert aria-hidden="true" className="h-4 w-4 text-app-warning-text" />
+              </RingGauge>
+            ) : (
+              <RingGauge
+                value={lastRun.score}
+                size={38}
+                thickness={4}
+                colorClassName={scoreColor(lastRun.score)}
+                ariaLabel={`Last health score ${lastRun.score} of 100`}
+              >
+                <span className="text-[11px] font-bold text-app-text tabular-nums">
+                  {lastRun.score}
+                </span>
+              </RingGauge>
+            )}
           </button>
         )}
 
