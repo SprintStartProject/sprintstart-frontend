@@ -6,6 +6,16 @@ type InfoHintProps = {
   text: string;
   /** Accessible label for the trigger. Defaults to "More information". */
   label?: string;
+  /**
+   * Where the tooltip opens relative to the trigger.
+   *
+   * - `"bottom-start"` (default) — below the trigger, growing to the right. The right choice in
+   *   open sections, and the untouched behaviour for existing callers.
+   * - `"top-end"` — above the trigger, right-aligned to it. For headers inside cards that clip
+   *   overflow (`SpotlightCard` is `overflow-hidden`): a tooltip below would be cut off by a
+   *   short card's bottom edge, and one growing rightwards by a narrow card's right edge.
+   */
+  placement?: "bottom-start" | "top-end";
   className?: string;
 };
 
@@ -18,9 +28,19 @@ type InfoHintProps = {
  * hover and on focus, and dismisses on Escape. Kept CSS-driven (no framer-motion) on purpose, so it
  * never inherits SlidingTabPanel's `initial={false}` and pops instead of fading.
  */
-export function InfoHint({ text, label = "More information", className = "" }: InfoHintProps) {
+export function InfoHint({
+  text,
+  label = "More information",
+  placement = "bottom-start",
+  className = "",
+}: InfoHintProps) {
   const [open, setOpen] = useState(false);
   const tooltipId = useId();
+
+  // `top-end` anchors the tooltip's bottom-right corner to the trigger's top-right, so it stays
+  // inside a clipping card both when the card is short (opens upward, never off the bottom edge)
+  // and when it is narrow (grows leftwards across the card, never past its right edge).
+  const placementClasses = placement === "top-end" ? "bottom-full right-0 mb-2" : "top-7 left-0";
 
   return (
     <span className={`relative inline-flex ${className}`}>
@@ -42,7 +62,7 @@ export function InfoHint({ text, label = "More information", className = "" }: I
       <span
         id={tooltipId}
         role="tooltip"
-        className={`pointer-events-none absolute top-7 left-0 z-50 w-80 max-w-[min(22rem,85vw)] rounded-xl border border-app-border/70 bg-app-surface/95 p-3 text-xs leading-relaxed font-normal text-app-text-muted shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-150 ${
+        className={`pointer-events-none absolute ${placementClasses} z-50 w-80 max-w-[min(22rem,85vw)] rounded-xl border border-app-border/70 bg-app-surface/95 p-3 text-xs leading-relaxed font-normal text-app-text-muted shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-150 ${
           open ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
         }`}
       >
