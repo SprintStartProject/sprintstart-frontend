@@ -1,3 +1,4 @@
+import { memo, useCallback } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { BuddyComposer } from "./BuddyComposer";
@@ -14,17 +15,12 @@ type BuddyConversationProps = {
   isThinking: boolean;
   /** The tool the buddy is running right now, if any — becomes "Checking your progress…". */
   activeTool: string | null;
-  draft: string;
-  setDraft: (value: string) => void;
-  handleSubmit: (event: React.FormEvent) => void;
   /** Confirms a buddy-proposed action (the only path that mutates). */
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
-  dismissAction: (messageId: string, actionId: string) => void;
+  dismissAction: (messageId: string, action: ProposedAction) => void;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
-  /** Rendered above the first message: what came back from the hire's PM. */
-  before?: ReactNode;
   /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
   lastMessageFooter?: ReactNode;
   /** Rendered under each of the hire's own questions, handed that question's text. */
@@ -50,6 +46,21 @@ type BuddyConversationProps = {
   hasFloatingControl?: boolean;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
+  /**
+   * Whether the buddy's reply is actively streaming in.
+   *
+   * Read by the composer's focus dance only: together with `isThinking` this is
+   * "the buddy is still writing", and the caret returns to the box when that
+   * ends. Kept separate from `isThinking` because they are genuinely different
+   * states — the thinking dots stop at the first token while the answer keeps
+   * arriving — and folding streaming into `isThinking` would change what the
+   * thread draws.
+   */
+  isStreaming?: boolean;
+  /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
 };
 
 /**
@@ -72,17 +83,13 @@ type BuddyConversationProps = {
  * It scrolls down, never sideways — `overflow-x-hidden` plus the `min-w-0` chain running down
  * to `BuddyMarkdown`, where wide blocks get their own scrollers.
  */
-export function BuddyConversation({
+function BuddyConversationImpl({
   messages,
   isThinking,
   activeTool,
-  draft,
-  setDraft,
-  handleSubmit,
   confirmAction,
   dismissAction,
   placeholder,
-  before,
   lastMessageFooter,
   renderQuestionAction,
   aboveComposer,
@@ -92,8 +99,24 @@ export function BuddyConversation({
   freshVisitShortcut,
   hasFloatingControl = false,
   focusComposerOnMount = false,
+  isStreaming = false,
+  dinoGameActive = false,
+  onDinoGameExit,
 }: BuddyConversationProps) {
   const { containerRef, onScroll } = useStickToBottom(messages);
+
+  /**
+   * The row under every reply, held in one identity for the life of this component.
+   *
+   * `BuddyThread` is memoised — that is what keeps a keystroke out of the thread — and a
+   * callback created inline would hand it a new prop on every render, defeating exactly that.
+   */
+  const renderReplyAction = useCallback(
+    (reply: string, message: BuddyMessageView) => (
+      <BuddyReplyActions reply={reply} message={message} />
+    ),
+    [],
+  );
 
   return (
     <>
@@ -139,20 +162,20 @@ export function BuddyConversation({
           )}
 
           <BuddyThread
-            renderReplyAction={(reply, message) => (
-              <BuddyReplyActions reply={reply} message={message} />
-            )}
+            renderReplyAction={renderReplyAction}
             messages={messages}
             isThinking={isThinking}
+            isStreaming={isStreaming}
             activeTool={activeTool}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
             showNames
-            before={before}
             lastMessageFooter={lastMessageFooter}
             renderQuestionAction={renderQuestionAction}
             openError={openError}
             onRetryOpen={onRetryOpen}
+            dinoGameActive={dinoGameActive}
+            onDinoGameExit={onDinoGameExit}
             onStartFreshVisit={onStartFreshVisit}
             freshVisitShortcut={freshVisitShortcut}
           />
@@ -166,14 +189,25 @@ export function BuddyConversation({
           {aboveComposer && <div className="mb-3 min-w-0">{aboveComposer}</div>}
 
           <BuddyComposer
-            draft={draft}
-            setDraft={setDraft}
-            handleSubmit={handleSubmit}
             placeholder={placeholder}
             focusOnMount={focusComposerOnMount}
+            busy={isThinking || isStreaming}
+            gameActive={dinoGameActive}
           />
         </div>
       </div>
     </>
   );
 }
+
+/**
+ * Memoised, and its props are the contract: everything in that list is a plain value, an element
+ * or callback the page holds in one identity (see the `useMemo`/`useCallback`s above its render),
+ * or a motion value. A fresh inline element added to it later — a `footer={`…`}` built in the
+ * page's render — is silently the one prop that always changed, and the memo stops paying.
+ *
+ * The thread *inside* this carries the per-message boundary; this one is about the page's own
+ * re-renders (the rail opening, a toast landing, a visit divider moving) not walking the whole
+ * conversation.
+ */
+export const BuddyConversation = memo(BuddyConversationImpl);

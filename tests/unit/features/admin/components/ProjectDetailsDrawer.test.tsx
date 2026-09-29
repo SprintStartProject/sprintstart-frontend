@@ -218,14 +218,14 @@ describe("ProjectDetailsDrawer", () => {
       const user = userEvent.setup();
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
 
       // There is no edit mode to enter first.
       expect(screen.queryByRole("button", { name: /Edit Project/i })).not.toBeInTheDocument();
-      expect(screen.getByLabelText("Description")).toBeEnabled();
+      expect(screen.getByLabelText(/^Description/)).toBeEnabled();
 
-      await user.clear(screen.getByLabelText("Name"));
-      await user.type(screen.getByLabelText("Name"), "Beta");
+      await user.clear(screen.getByLabelText(/^Name/));
+      await user.type(screen.getByLabelText(/^Name/), "Beta");
 
       expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
     });
@@ -241,9 +241,9 @@ describe("ProjectDetailsDrawer", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
 
-      await user.type(screen.getByLabelText("Description"), "!");
+      await user.type(screen.getByLabelText(/^Description/), "!");
       await user.click(screen.getByRole("button", { name: /Remove Jane Doe from project/ }));
 
       expect(screen.getByText("2 unsaved changes")).toBeInTheDocument();
@@ -256,10 +256,10 @@ describe("ProjectDetailsDrawer", () => {
 
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
 
-      await user.clear(screen.getByLabelText("Name"));
-      await user.type(screen.getByLabelText("Name"), "Beta");
+      await user.clear(screen.getByLabelText(/^Name/));
+      await user.type(screen.getByLabelText(/^Name/), "Beta");
       await user.click(screen.getByRole("button", { name: /Remove Jane Doe from project/ }));
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
@@ -276,9 +276,9 @@ describe("ProjectDetailsDrawer", () => {
       const user = userEvent.setup();
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
 
-      await user.clear(screen.getByLabelText("Name"));
+      await user.clear(screen.getByLabelText(/^Name/));
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(screen.getByText("Project name is required.")).toBeInTheDocument();
@@ -289,21 +289,21 @@ describe("ProjectDetailsDrawer", () => {
       const user = userEvent.setup();
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
 
-      await user.clear(screen.getByLabelText("Name"));
-      await user.type(screen.getByLabelText("Name"), "Beta");
+      await user.clear(screen.getByLabelText(/^Name/));
+      await user.type(screen.getByLabelText(/^Name/), "Beta");
       await user.click(screen.getByRole("button", { name: /Remove Jane Doe from project/ }));
       await user.click(screen.getByRole("button", { name: "Discard" }));
 
-      expect(screen.getByLabelText("Name")).toHaveValue("Alpha");
+      expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha");
       expect(screen.queryByText(/unsaved change/)).not.toBeInTheDocument();
     });
 
     it("shows no footer while nothing is staged", async () => {
       render(<ProjectDetailsDrawer project={projectOverview} isOpen={true} onClose={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
 
       expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
     });
@@ -351,7 +351,7 @@ describe("ProjectDetailsDrawer", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
       expect(screen.queryByTestId("edit-industry-button")).not.toBeInTheDocument();
       expect(screen.queryByTestId("reevaluate-industry-button")).not.toBeInTheDocument();
     });
@@ -422,7 +422,7 @@ describe("ProjectDetailsDrawer", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
 
       await user.click(screen.getByTestId("reevaluate-industry-button"));
 
@@ -457,16 +457,16 @@ describe("ProjectDetailsDrawer", () => {
         />,
       );
 
-      await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("Alpha"));
-      await user.clear(screen.getByLabelText("Name"));
-      await user.type(screen.getByLabelText("Name"), "Renamed draft");
+      await waitFor(() => expect(screen.getByLabelText(/^Name/)).toHaveValue("Alpha"));
+      await user.clear(screen.getByLabelText(/^Name/));
+      await user.type(screen.getByLabelText(/^Name/), "Renamed draft");
 
       await user.click(screen.getByTestId("reevaluate-industry-button"));
 
       await waitFor(() =>
         expect(screen.getByTestId("project-industry-value")).toHaveTextContent("Fintech"),
       );
-      expect(screen.getByLabelText("Name")).toHaveValue("Renamed draft");
+      expect(screen.getByLabelText(/^Name/)).toHaveValue("Renamed draft");
     });
   });
 

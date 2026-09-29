@@ -122,7 +122,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
         className="space-y-4"
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="First Name" controlId="firstName">
+          <Field label="First Name" controlId="firstName" required>
             <Input
               type="text"
               value={firstName}
@@ -130,7 +130,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
               required
             />
           </Field>
-          <Field label="Last Name" controlId="lastName">
+          <Field label="Last Name" controlId="lastName" required>
             <Input
               type="text"
               value={lastName}
@@ -140,7 +140,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
           </Field>
         </div>
 
-        <Field label="Email Address" controlId="email">
+        <Field label="Email Address" controlId="email" required>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </Field>
 

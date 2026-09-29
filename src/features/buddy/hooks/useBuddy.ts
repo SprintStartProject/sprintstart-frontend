@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { onOpenAiBuddy } from "../aiBuddyBus";
+import { useBuddyDraftActions } from "../buddyDraftContext";
 import { useBuddySession } from "../buddySessionContext";
 import { useBuddySuggestions } from "./useBuddySuggestions";
 
@@ -15,10 +16,17 @@ import { useBuddySuggestions } from "./useBuddySuggestions";
  * it already there — see the effect below for why that read must never be a bare open. Other
  * surfaces can open the dock and seed a draft via the aiBuddyBus (e.g. "Draft with AI" on the
  * human-buddy card).
+ *
+ * **The composer's half is deliberately not part of this hook** — no draft, no submit. This hook
+ * is what the widget calls, and the widget mounts on every page; reading the draft here put every
+ * keystroke back into the dock's render path (issue #236). Surfaces that need it take
+ * `useBuddyDraft()` (the value — read by the composer alone) or `useBuddyDraftActions()` (the
+ * write-only half, which is what the seeding effect below uses, and why it can stay).
  */
 export function useBuddy() {
   const conversation = useBuddySession();
-  const { ensureOpened, setDraft, teamProjectId } = conversation;
+  const { setDraft } = useBuddyDraftActions();
+  const { ensureOpened, teamProjectId } = conversation;
 
   const [isOpen, setIsOpen] = useState(false);
 

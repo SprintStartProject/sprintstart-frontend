@@ -2,7 +2,7 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { keycloakify } from "keycloakify/vite-plugin";
 /// <reference types="vitest" />
-import { defineConfig } from "vitest/config";
+import { defineConfig, configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -39,6 +39,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./tests/unit/setup/vitest.setup.ts",
+    exclude: [...configDefaults.exclude, "**/.worktrees/**"],
     // An axe scan of a full page takes seconds, and the a11y suite runs many of them in
     // parallel. The default 5s bounds machine load rather than the code under test, so a
     // busy runner fails whichever file happens to be scheduled last.

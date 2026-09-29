@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useToast } from "../../context/useToast";
+import { BuddyDraftProvider } from "./BuddyDraftProvider";
 import { BuddySessionContext } from "./buddySessionContext";
 import { useBuddyConversation } from "./hooks/useBuddyConversation";
 import { useProjectContext } from "../projects/useProjectContext";
@@ -52,5 +53,12 @@ export function BuddyProvider({ children }: { children: ReactNode }) {
       ),
   );
 
-  return <BuddySessionContext.Provider value={session}>{children}</BuddySessionContext.Provider>;
+  // The composer's words get a provider of their own, under the session's — one keystroke then
+  // costs one render of one box instead of a render of every reader of the conversation. See
+  // `BuddyDraftProvider` for what the split is worth and why it sits below rather than inside.
+  return (
+    <BuddySessionContext.Provider value={session}>
+      <BuddyDraftProvider>{children}</BuddyDraftProvider>
+    </BuddySessionContext.Provider>
+  );
 }

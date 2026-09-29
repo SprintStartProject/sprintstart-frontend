@@ -126,6 +126,7 @@ export function AtlassianCredentialAddForm({
         <Field
           label="Atlassian account email"
           controlId="settings-atlassian-add-email"
+          required
           disabled={isSaving}
         >
           <Input
@@ -140,7 +141,12 @@ export function AtlassianCredentialAddForm({
           />
         </Field>
 
-        <Field label="Credential name" controlId="settings-atlassian-add-name" disabled={isSaving}>
+        <Field
+          label="Credential name"
+          controlId="settings-atlassian-add-name"
+          required
+          disabled={isSaving}
+        >
           <Input
             ref={nameInputRef}
             data-testid="settings-atlassian-add-name"
@@ -155,6 +161,7 @@ export function AtlassianCredentialAddForm({
         <Field
           label="API token"
           controlId="settings-atlassian-add-token"
+          required
           disabled={isSaving}
           hint="The token is stored encrypted and cannot be retrieved after saving."
         >
