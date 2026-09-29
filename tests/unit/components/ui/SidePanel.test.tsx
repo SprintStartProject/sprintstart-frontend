@@ -68,9 +68,13 @@ describe("SidePanel", () => {
     const dialog = screen.getByRole("dialog", { hidden: true });
     expect(dialog).toHaveAttribute("aria-hidden", "true");
     expect(dialog).toHaveAttribute("inert");
+    // And it is not announced as a modal: the Board keeps a closed panel mounted for the
+    // whole visit, and `aria-modal` left on it tells the shortcuts layer an overlay owns the
+    // keyboard — every chord on the page would go silent.
+    expect(dialog).not.toHaveAttribute("aria-modal");
   });
 
-  it("shows the dialog (aria-hidden=false, no inert) when open", async () => {
+  it("shows the dialog (aria-modal, aria-hidden=false, no inert) when open", async () => {
     const user = userEvent.setup();
     render(<SidePanelHarness />);
     const dialog = screen.getByRole("dialog", { hidden: true });
@@ -78,6 +82,7 @@ describe("SidePanel", () => {
     await user.click(screen.getByRole("button", { name: "Open" }));
 
     await waitFor(() => {
+      expect(dialog).toHaveAttribute("aria-modal", "true");
       expect(dialog).toHaveAttribute("aria-hidden", "false");
       expect(dialog).not.toHaveAttribute("inert");
     });
