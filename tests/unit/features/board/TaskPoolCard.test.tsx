@@ -1,5 +1,8 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ApiError } from "../../../../src/services/apiClient";
 
 import { TaskPoolCard } from "../../../../src/features/board/components/TaskPoolCard";
 import type {
@@ -130,6 +133,48 @@ describe("the task pool card", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: /is this a good fit/i })[1]);
     expect(lastDraft()).toContain("Document the release flow");
+  });
+
+  it("moves focus to the confirm, and back when it is cancelled", () => {
+    render(<TaskPoolCard content={content()} card={card} />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /grab this/i })[0]);
+    const confirm = screen.getByRole("button", { name: /yes, grab it/i });
+    expect(confirm).toHaveFocus();
+    // The question is what a screen reader hears with the button, not a silent change nearby.
+    expect(confirm).toHaveAccessibleDescription(/make this your task/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    expect(screen.getAllByRole("button", { name: /grab this/i })[0]).toHaveFocus();
+  });
+
+  it("names the task it replaces from the pool itself", () => {
+    // No current-task card in any cache here — the pool alone knows what the hire is on.
+    render(<TaskPoolCard content={content({ currentTaskId: "t2" })} card={card} />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /grab this/i })[0]);
+
+    expect(screen.getByText(/swap/i)).toHaveTextContent(
+      'Swap "Document the release flow" for this?',
+    );
+  });
+
+  it("re-reads the board when the task turns out not to be open anymore", async () => {
+    vi.mocked(myStarterWorkService.claim).mockRejectedValue(new ApiError(409, "not live"));
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    render(<TaskPoolCard content={content()} card={card} />, { wrapper });
+
+    fireEvent.click(screen.getAllByRole("button", { name: /grab this/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /yes, grab it/i }));
+
+    // The backend just checked the task against its source, so the pool card is known to be stale.
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["board", "p1"] }));
+    // And the hire is handed back the button they started from.
+    expect(screen.getAllByRole("button", { name: /grab this/i })[0]).toHaveFocus();
   });
 
   it("says so when the pool is empty, and still offers the buddy", () => {

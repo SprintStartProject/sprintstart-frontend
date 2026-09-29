@@ -505,6 +505,10 @@ export function BoardPage() {
    * would be worse than no rail at all — the counts are about the board, and the view is about the
    * hire's attention.
    */
+  // Whether the backend put a pool card on this board at all. The rail switch only exists for a
+  // board that has one: a switch that toggles nothing visible reads as broken.
+  const hasTaskPool = board?.cards.some((card) => card.content.kind === "TASK_POOL") ?? false;
+
   const allCards = useMemo(
     () =>
       board?.cards.filter(
@@ -1155,18 +1159,19 @@ export function BoardPage() {
               {/* The task pool, on or off — the same kind of switch as the path strip above, and
                   for the same reason: the card's own X only hides it, so the way back has to live
                   somewhere the card is not. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => showTaskPool(!isTaskPoolShown)}
-                disabled={!board}
-                aria-pressed={isTaskPoolShown}
-                title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-                aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-              >
-                <LayoutList className="h-4 w-4" aria-hidden="true" />
-              </Button>
+              {hasTaskPool && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => showTaskPool(!isTaskPoolShown)}
+                  aria-pressed={isTaskPoolShown}
+                  title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                  aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                >
+                  <LayoutList className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              )}
 
               {/* Which cards, by where they came from. It sits below the switches that change the
                   board's shape because it changes neither the board nor its shape — it only

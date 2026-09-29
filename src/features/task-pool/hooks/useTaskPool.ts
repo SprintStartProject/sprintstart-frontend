@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { myStarterWorkService } from "../../../services/myStarterWorkService";
 import { queryKeys } from "../../../services/queryKeys";
+import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import type { Board, CurrentTaskContent } from "../../board/types";
 
 /**
@@ -22,13 +23,15 @@ export function useCurrentTask(projectId: string): CurrentTaskContent | null {
 /**
  * Grabs a pool task as the hire's current task.
  *
- * Re-reads the board afterwards: the current-task card now says something else (or has just been
- * pinned), and the pool card's "you're on this" marker has moved.
+ * Re-reads this project's board afterwards, whatever happened. On success the current-task card
+ * says something else (or has just been pinned) and the pool's "you're on this" marker has moved.
+ * On a 409 the backend has just checked the task against its source and found it no longer live —
+ * so the pool card is known to be stale, and the task should leave it under the toast that says so.
  */
 export function useGrabTask(projectId: string) {
-  const queryClient = useQueryClient();
+  const invalidateBoard = useInvalidateBoard(projectId);
   return useMutation({
     mutationFn: (taskId: string) => myStarterWorkService.claim(projectId, taskId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.board.all() }),
+    onSettled: invalidateBoard,
   });
 }

@@ -1,17 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
-import {
-  ChevronDown,
-  ExternalLink,
-  LayoutList,
-  MessageCircle,
-  Search,
-  UserCheck,
-} from "lucide-react";
+import { ChevronDown, ExternalLink, LayoutList, Search, UserCheck } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
-import { openAiBuddy } from "../../buddy/aiBuddyBus";
 import { GrabTaskButton } from "../../task-pool/components/GrabTaskButton";
 import type { TaskType } from "../../starter-work/types";
 import { BoardCardFrame } from "./BoardCardFrame";
@@ -49,6 +41,11 @@ const TYPE_LABELS: Record<TaskType, string> = {
  */
 export function TaskPoolCard({ content, card, onDismiss, dismissing }: TaskPoolCardProps) {
   const { tasks, currentTaskId } = content;
+  // Handed to every grab button, so "Swap … for this?" names the same task the pool marks — even
+  // when the current-task card is not on the board to read it from. A current task that is no
+  // longer in the live pool leaves it to the button to read the card instead.
+  const currentTitle =
+    currentTaskId === null ? null : tasks.find((task) => task.taskId === currentTaskId)?.title;
   const [query, setQuery] = useState("");
   const [type, setType] = useState<TaskType | "ALL">("ALL");
   const [hideTaken, setHideTaken] = useState(false);
@@ -122,6 +119,7 @@ export function TaskPoolCard({ content, card, onDismiss, dismissing }: TaskPoolC
                   key={task.taskId}
                   task={task}
                   isCurrent={task.taskId === currentTaskId}
+                  currentTitle={currentTitle}
                 />
               ))}
             </ol>
@@ -137,7 +135,14 @@ export function TaskPoolCard({ content, card, onDismiss, dismissing }: TaskPoolC
   );
 }
 
-function PoolTaskRow({ task, isCurrent }: { task: BoardPoolTask; isCurrent: boolean }) {
+type PoolTaskRowProps = {
+  task: BoardPoolTask;
+  isCurrent: boolean;
+  /** See `GrabTaskButton.currentTitle` — undefined means "not known here". */
+  currentTitle: string | null | undefined;
+};
+
+function PoolTaskRow({ task, isCurrent, currentTitle }: PoolTaskRowProps) {
   const [expanded, setExpanded] = useState(false);
   const hasMore = Boolean(task.summary || task.rationale) || task.reasons.length > 1;
 
@@ -187,8 +192,9 @@ function PoolTaskRow({ task, isCurrent }: { task: BoardPoolTask; isCurrent: bool
 
       {task.reasons.length > 0 && (
         <ul className="mt-1.5 space-y-0.5">
-          {(expanded ? task.reasons : task.reasons.slice(0, 1)).map((reason) => (
-            <li key={reason} className="text-xs text-app-text-muted">
+          {(expanded ? task.reasons : task.reasons.slice(0, 1)).map((reason, index) => (
+            // By position, not by text: the backend does not promise two reasons never read alike.
+            <li key={`${task.taskId}-${index}`} className="text-xs text-app-text-muted">
               · {reason}
             </li>
           ))}
@@ -208,19 +214,17 @@ function PoolTaskRow({ task, isCurrent }: { task: BoardPoolTask; isCurrent: bool
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <GrabTaskButton taskId={task.taskId} title={task.title} isCurrent={isCurrent} />
-        <button
-          type="button"
-          onClick={() =>
-            openAiBuddy({
-              draft: `Is "${task.title}" a good fit for me? What would I need to know before I start?`,
-            })
-          }
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-app-brand-text transition hover:underline"
-        >
-          <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
-          Is this a good fit?
-        </button>
+        <GrabTaskButton
+          taskId={task.taskId}
+          title={task.title}
+          isCurrent={isCurrent}
+          currentTitle={currentTitle}
+        />
+        <AskTheBuddy
+          question={`Is "${task.title}" a good fit for me? What would I need to know before I start?`}
+          label="Is this a good fit?"
+          className=""
+        />
         {hasMore && (
           <button
             type="button"

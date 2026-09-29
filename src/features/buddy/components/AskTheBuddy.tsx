@@ -6,6 +6,11 @@ type AskTheBuddyProps = {
   question: string;
   /** What the control says. Defaults to a plain invitation. */
   label?: string;
+  /**
+   * Spacing around the control. Defaults to the gap it needs under a card's body; a row that lays
+   * its actions out itself passes an empty string.
+   */
+  className?: string;
 };
 
 /**
@@ -33,12 +38,16 @@ type AskTheBuddyProps = {
  * The one place `openAiBuddy` really is a no-op is `/buddy`, where the widget takes itself off the
  * page: nothing renders this there, and the page's own composer is the thing to use.
  */
-export function AskTheBuddy({ question, label = "Ask your buddy about this" }: AskTheBuddyProps) {
+export function AskTheBuddy({
+  question,
+  label = "Ask your buddy about this",
+  className = "mt-3",
+}: AskTheBuddyProps) {
   return (
     <button
       type="button"
       onClick={() => openAiBuddy({ draft: question })}
-      className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-app-brand-text transition hover:underline"
+      className={`${className} inline-flex items-center gap-1.5 text-xs font-medium text-app-brand-text transition hover:underline`}
     >
       <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
       {label}
