@@ -12,7 +12,7 @@ import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardMark } from "../marks/cardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";
-import type { AuthoredCardRequest, BoardCard, NoteContent } from "../types";
+import type { AuthoredCardRequest, BoardCard, BoardUndoNotice, NoteContent } from "../types";
 
 type NoteCardProps = {
   content: NoteContent;
@@ -24,8 +24,10 @@ type NoteCardProps = {
   onRestorePrevious?: (cardId: string, replacedAt: string) => void;
   /** True while this card's own undo is in flight. */
   restoring?: boolean;
+  /** True while a write of this card is still on its way — see `CardEditHistory`'s `paused`. */
+  saving?: boolean;
   /** What just happened to this card's undo, when anything did. */
-  undoNotice?: "restored" | "stale" | null;
+  undoNotice?: BoardUndoNotice | null;
   /** Where this note was made from, when it was made from something. See `layout/cardOrigins.ts`. */
   origin?: CardOrigin | null;
 };
@@ -71,6 +73,7 @@ export function NoteCard({
   onEdit,
   onRestorePrevious,
   restoring,
+  saving,
   undoNotice,
   origin,
 }: NoteCardProps) {
@@ -130,6 +133,7 @@ export function NoteCard({
       dismissing={dismissing}
       onRestorePrevious={onRestorePrevious}
       restoring={restoring}
+      paused={editing || Boolean(saving)}
       undoNotice={undoNotice}
       action={
         onEdit && !editing ? (

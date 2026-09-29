@@ -22,7 +22,7 @@ import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { cardName } from "../layout/cardNames";
 import { CardEditHistory } from "./CardEditHistory";
 import { useBoardCardControls } from "./boardCardControls";
-import type { BoardCard, BoardCardLastChange, BoardCardPrevious } from "../types";
+import type { BoardCard, BoardCardLastChange, BoardCardPrevious, BoardUndoNotice } from "../types";
 
 type BoardCardFrameProps = {
   /**
@@ -75,8 +75,13 @@ type BoardCardFrameProps = {
   onRestorePrevious?: (cardId: string, replacedAt: string) => void;
   /** True while this card's own undo is in flight. */
   restoring?: boolean;
+  /**
+   * True while the card is being changed by hand — its editor is open, or a write of its own is
+   * still on its way. The strip's undo stands down then; see `CardEditHistory`.
+   */
+  paused?: boolean;
   /** What just happened to this card's undo, when anything did. */
-  undoNotice?: "restored" | "stale" | null;
+  undoNotice?: BoardUndoNotice | null;
   /** A kind-specific control in the header, e.g. "edit this note". */
   action?: ReactNode;
   children: ReactNode;
@@ -141,6 +146,7 @@ export function BoardCardFrame({
   dismissing = false,
   onRestorePrevious,
   restoring = false,
+  paused = false,
   undoNotice = null,
   action,
   children,
@@ -468,6 +474,7 @@ export function BoardCardFrame({
             controlLabel={label}
             onRestore={onRestorePrevious}
             restoring={restoring}
+            paused={paused}
             notice={undoNotice}
           />
         )}

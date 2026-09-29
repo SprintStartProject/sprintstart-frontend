@@ -13,7 +13,13 @@ import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutChecklist } from "../generation/cardQuestion";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";
-import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
+import type {
+  AuthoredCardRequest,
+  BoardCard,
+  BoardUndoNotice,
+  ChecklistContent,
+  ChecklistItem,
+} from "../types";
 
 type ChecklistCardProps = {
   content: ChecklistContent;
@@ -25,8 +31,10 @@ type ChecklistCardProps = {
   onRestorePrevious?: (cardId: string, replacedAt: string) => void;
   /** True while this card's own undo is in flight. */
   restoring?: boolean;
+  /** True while a write of this card is still on its way — see `CardEditHistory`'s `paused`. */
+  saving?: boolean;
   /** What just happened to this card's undo, when anything did. */
-  undoNotice?: "restored" | "stale" | null;
+  undoNotice?: BoardUndoNotice | null;
   /**
    * Where this list came from, when it was made out of something — a task, most often.
    *
@@ -81,6 +89,7 @@ export function ChecklistCard({
   onEdit,
   onRestorePrevious,
   restoring,
+  saving,
   undoNotice,
   origin,
 }: ChecklistCardProps) {
@@ -161,6 +170,7 @@ export function ChecklistCard({
       dismissing={dismissing}
       onRestorePrevious={onRestorePrevious}
       restoring={restoring}
+      paused={Boolean(saving)}
       undoNotice={undoNotice}
     >
       {content.items.length === 0 ? (

@@ -9,6 +9,7 @@ import type {
   BoardCardContent,
   BoardCardLastChange,
   BoardCardPrevious,
+  BoardUndoNotice,
 } from "../types";
 
 type CardEditHistoryProps = {
@@ -23,26 +24,49 @@ type CardEditHistoryProps = {
   onRestore: (cardId: string, replacedAt: string) => void;
   /** True while this card's own undo is in flight. */
   restoring: boolean;
+  /**
+   * True while this card is being changed by hand: its editor is open, or a write of its own is in
+   * flight. Undo stands down then — a press followed by a save would put the draft back over the
+   * restored text, silently, and through no mistake of the hire's.
+   */
+  paused?: boolean;
   /** What just happened to this card's undo, when anything did. */
-  notice?: "restored" | "stale" | null;
+  notice?: BoardUndoNotice | null;
 };
 
 /**
- * What the strip says happened, per author and per kind of edit.
+ * Everything the strip says about an edit's author, per author: the visible sentence per kind of
+ * change, the possessive the undo's accessible name ends on, and the disclosure's heading.
  *
- * Partial on purpose: an author this client has never met — a newer backend's actor — falls through
- * to plain words instead of taking the card down with an undefined lookup, the same way an unknown
- * card kind renders its visible fallback rather than crashing the board.
+ * One map with one fallback, so a wire value this client has never met comes through all three at
+ * once. Partial on purpose: an author a newer backend adds falls through to plain words instead of
+ * taking the card down with an undefined lookup — and the fallback covers the two places a sighted
+ * hire never reads, because "who did this" mislabelled only for the people hearing it is the exact
+ * mislabelling this strip exists to prevent.
  */
-const ACTOR_WORDS: Partial<Record<BoardActor, Record<"EDITED" | "TICKED", string>>> = {
-  HIRE: { EDITED: "You edited this", TICKED: "You changed the ticks" },
-  BUDDY: { EDITED: "Your buddy rewrote this", TICKED: "Your buddy changed the ticks" },
+const ACTOR_WORDS: Partial<
+  Record<BoardActor, { edited: string; ticked: string; possessive: string; heading: string }>
+> = {
+  HIRE: {
+    edited: "You edited this",
+    ticked: "You changed the ticks",
+    possessive: "your own edit",
+    heading: "Before your edit",
+  },
+  BUDDY: {
+    edited: "Your buddy rewrote this",
+    ticked: "Your buddy changed the ticks",
+    possessive: "your buddy's edit",
+    heading: "Before your buddy's edit",
+  },
 };
 
 /** The words for an edit whose author this client has no name for. */
-const UNKNOWN_EDIT_WORDS: Record<"EDITED" | "TICKED", string> = {
-  EDITED: "This card was edited",
-  TICKED: "The ticks changed",
+const UNKNOWN_ACTOR_WORDS = {
+  edited: "This card was edited",
+  ticked: "The ticks changed",
+  possessive: "an edit",
+  heading: "Before the edit",
 };
 
 /**
@@ -85,6 +109,7 @@ export function CardEditHistory({
   controlLabel,
   onRestore,
   restoring,
+  paused = false,
   notice = null,
 }: CardEditHistoryProps) {
   const [showing, setShowing] = useState(false);
@@ -93,11 +118,16 @@ export function CardEditHistory({
   // card's latest change but not this version's, and these words are about this version.
   const kind =
     lastChange?.change === "TICKED" && lastChange.at === previous.replacedAt ? "TICKED" : "EDITED";
-  const words = ACTOR_WORDS[previous.replacedBy]?.[kind] ?? UNKNOWN_EDIT_WORDS[kind];
+  const actor = ACTOR_WORDS[previous.replacedBy] ?? UNKNOWN_ACTOR_WORDS;
+  const words = kind === "TICKED" ? actor.ticked : actor.edited;
   const at = new Date(previous.replacedAt);
   const readableStamp = !Number.isNaN(at.getTime());
-  const who = previous.replacedBy === "BUDDY" ? "your buddy's edit" : "your own edit";
   const previousPanelId = `card-edit-history-previous-${cardId}`;
+  // A refusal is about one version of a card. While the card still shows that version the line is
+  // news; a change that arrives afterwards retires it rather than leaving it above newer content.
+  const refused =
+    notice?.kind === "stale" &&
+    (notice.forReplacedAt === null || notice.forReplacedAt === previous.replacedAt);
 
   return (
     <div
@@ -131,16 +161,21 @@ export function CardEditHistory({
           variant="ghost"
           size="sm"
           loading={restoring}
+          disabled={paused}
           onClick={() => onRestore(cardId, previous.replacedAt)}
           icon={<Undo2 className="h-3.5 w-3.5" aria-hidden="true" />}
-          aria-label={`Undo — put the ${controlLabel} back to what it said before ${who}`}
+          aria-label={
+            paused
+              ? `Undo — put the ${controlLabel} back to what it said before ${actor.possessive} (paused while this card is being changed)`
+              : `Undo — put the ${controlLabel} back to what it said before ${actor.possessive}`
+          }
           data-testid="card-edit-history-undo"
         >
           Undo
         </Button>
       </div>
 
-      {notice === "stale" && (
+      {refused && (
         <p className="mt-1.5 text-xs text-app-warning-text" data-testid="card-edit-history-stale">
           That edit was already replaced — this is the card as it is now.
         </p>
@@ -149,7 +184,9 @@ export function CardEditHistory({
       {/* The press has no other visible receipt — the card's text changing is the receipt for the
           eye, and this is the same fact for a screen reader. */}
       <span role="status" className="sr-only">
-        {notice === "restored" ? `Restored — the ${controlLabel} says what it said before.` : ""}
+        {notice?.kind === "restored"
+          ? `Restored — the ${controlLabel} says what it said before.`
+          : ""}
       </span>
 
       {/* Kept in the DOM while closed — hidden, not absent — so the disclosure's `aria-controls`
@@ -162,9 +199,7 @@ export function CardEditHistory({
       >
         {showing && (
           <>
-            <p className="text-xs font-medium text-app-text-muted">
-              {previous.replacedBy === "BUDDY" ? "Before your buddy's edit" : "Before your edit"}
-            </p>
+            <p className="text-xs font-medium text-app-text-muted">{actor.heading}</p>
             <div className="mt-1">
               <PreviousContent content={previous.content} cardId={cardId} />
             </div>

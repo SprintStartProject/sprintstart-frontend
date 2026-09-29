@@ -260,8 +260,12 @@ describe("undoing the latest edit", () => {
       text: "deploys are on Fridays",
     });
     expect(boardService.fetchBoard).toHaveBeenCalledTimes(1);
-    expect(result.current.undoNotice).toEqual({ cardId: "c1", kind: "restored" });
-    expect(result.current.restoringId).toBeNull();
+    expect(result.current.undoNotices.get("c1")).toEqual({
+      cardId: "c1",
+      kind: "restored",
+      forReplacedAt: null,
+    });
+    expect(result.current.restoringIds.size).toBe(0);
   });
 
   it("re-reads and says so when the edit was already replaced (409)", async () => {
@@ -283,7 +287,13 @@ describe("undoing the latest edit", () => {
     expect(outcome).toBe("stale");
     // The card on screen is the truth again, and the refusal rides on the card, not a toast.
     expect(boardService.fetchBoard).toHaveBeenCalledTimes(2);
-    expect(result.current.undoNotice).toEqual({ cardId: "c1", kind: "stale" });
+    // Bound to the version the card showed when the refusal was raised, so a later change is what
+    // retires the line — not luck.
+    expect(result.current.undoNotices.get("c1")).toEqual({
+      cardId: "c1",
+      kind: "stale",
+      forReplacedAt: "2026-09-29T12:00:00.000Z",
+    });
     expect(result.current.writeError).toBe(false);
   });
 
@@ -301,7 +311,7 @@ describe("undoing the latest edit", () => {
 
     expect(outcome).toBe("failed");
     expect(result.current.writeError).toBe(true);
-    expect(result.current.undoNotice).toBeNull();
+    expect(result.current.undoNotices.size).toBe(0);
     expect(result.current.board?.cards[0].content).toEqual({
       kind: "NOTE",
       text: "deploys are on Fridays",
@@ -321,13 +331,97 @@ describe("undoing the latest edit", () => {
     await act(async () => {
       await result.current.restorePrevious("c1", "2026-09-29T10:15:30.123Z");
     });
-    expect(result.current.undoNotice).toEqual({ cardId: "c1", kind: "stale" });
+    expect(result.current.undoNotices.get("c1")).toEqual({
+      cardId: "c1",
+      kind: "stale",
+      forReplacedAt: "2026-09-29T10:15:30.123Z",
+    });
 
     await act(async () => {
       await result.current.editCard("c1", { kind: "NOTE", text: "deploys are on Fridays" });
     });
 
     // The notice described the card as it was; the edit just made it describe nothing.
-    expect(result.current.undoNotice).toBeNull();
+    expect(result.current.undoNotices.size).toBe(0);
+  });
+
+  it("marks the card as saving while its write is on the way", async () => {
+    vi.mocked(boardService.fetchBoard).mockResolvedValue(boardWith(edited()));
+    let settle!: (card: BoardCard) => void;
+    vi.mocked(boardService.editCard).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() => useBoard("p1"));
+    await waitFor(() => expect(result.current.board?.cards).toHaveLength(1));
+
+    let write: Promise<boolean> | undefined;
+    act(() => {
+      write = result.current.editCard("c1", { kind: "NOTE", text: "deploys are on Fridays" });
+    });
+    await waitFor(() => expect(result.current.savingIds.has("c1")).toBe(true));
+
+    await act(async () => {
+      settle(edited());
+      await write;
+    });
+
+    // Written, and the strip's undo is live again.
+    expect(result.current.savingIds.size).toBe(0);
+  });
+
+  it("does not close another card's undo when one finishes", async () => {
+    const two = (): Board => ({
+      boardId: "b1",
+      projectId: "p1",
+      cards: [edited(), { ...edited(), id: "c2" }],
+    });
+    vi.mocked(boardService.fetchBoard).mockResolvedValue(two());
+    let settleA!: (card: BoardCard) => void;
+    let settleB!: (card: BoardCard) => void;
+    vi.mocked(boardService.restorePrevious)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            settleA = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            settleB = resolve;
+          }),
+      );
+
+    const { result } = renderHook(() => useBoard("p1"));
+    await waitFor(() => expect(result.current.board?.cards).toHaveLength(2));
+
+    let first: Promise<"restored" | "stale" | "failed"> | undefined;
+    let second: Promise<"restored" | "stale" | "failed"> | undefined;
+    act(() => {
+      first = result.current.restorePrevious("c1", "2026-09-29T10:15:30.123Z");
+    });
+    act(() => {
+      second = result.current.restorePrevious("c2", "2026-09-29T10:15:30.123Z");
+    });
+    await waitFor(() => expect(result.current.restoringIds.size).toBe(2));
+
+    await act(async () => {
+      settleA({ ...edited(), id: "c1" });
+      await first;
+    });
+
+    // c2's undo is still out, so its button must still be closed: an answer for one card is not an
+    // answer for another, and a re-enabled button would send a second press into a false refusal.
+    expect(result.current.restoringIds.has("c2")).toBe(true);
+
+    await act(async () => {
+      settleB({ ...edited(), id: "c2" });
+      await second;
+    });
+    expect(result.current.restoringIds.size).toBe(0);
   });
 });

@@ -68,9 +68,19 @@ export type BoardCardPrevious = {
   replacedBy: BoardActor;
   replacedAt: string;
 };
-
-/** Where an undo stands: the card it happened on, and how it ended. */
-export type BoardUndoNotice = { cardId: string; kind: "restored" | "stale" };
+/**
+ * What just happened to one card's undo.
+ *
+ * `forReplacedAt` is the card's `previous.replacedAt` at the moment a refusal was raised, so the
+ * line can retire itself the moment the card moves on again: without it, a notice raised for one
+ * failed press would sit above a strip whose undo is already about a newer edit entirely. `null`
+ * when the re-read could not say which version the refusal was about.
+ */
+export type BoardUndoNotice = {
+  cardId: string;
+  kind: "restored" | "stale";
+  forReplacedAt: string | null;
+};
 
 /** The moments a path card reports, in the order they normally happen. */
 export type BoardMomentKey =

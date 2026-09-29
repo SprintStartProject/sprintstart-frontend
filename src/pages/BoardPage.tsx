@@ -196,8 +196,9 @@ export function BoardPage() {
     addCard,
     editCard,
     restorePrevious,
-    restoringId,
-    undoNotice,
+    restoringIds,
+    savingIds,
+    undoNotices,
     reorder,
     writeError,
   } = useBoard(selectedProjectId);
@@ -1303,8 +1304,9 @@ export function BoardPage() {
                   onRestorePrevious={(cardId, replacedAt) =>
                     void restorePrevious(cardId, replacedAt)
                   }
-                  restoringId={restoringId}
-                  undoNotice={undoNotice}
+                  restoringIds={restoringIds}
+                  savingIds={savingIds}
+                  undoNotices={undoNotices}
                   // A checklist broken out of a task is a *new* card, which only a re-read can
                   // show. Without this the write lands and the board keeps drawing what it read
                   // before the press.

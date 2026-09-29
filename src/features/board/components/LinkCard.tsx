@@ -4,7 +4,7 @@ import { CardOriginLink } from "./CardOriginLink";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutLink } from "../generation/cardQuestion";
 import type { CardOrigin } from "../layout/cardOrigins";
-import type { BoardCard, LinkContent } from "../types";
+import type { BoardCard, BoardUndoNotice, LinkContent } from "../types";
 
 type LinkCardProps = {
   content: LinkContent;
@@ -15,8 +15,10 @@ type LinkCardProps = {
   onRestorePrevious?: (cardId: string, replacedAt: string) => void;
   /** True while this card's own undo is in flight. */
   restoring?: boolean;
+  /** True while a write of this card is still on its way — see `CardEditHistory`'s `paused`. */
+  saving?: boolean;
   /** What just happened to this card's undo, when anything did. */
-  undoNotice?: "restored" | "stale" | null;
+  undoNotice?: BoardUndoNotice | null;
   /**
    * Where the hire was when they kept this link — which is not where the link goes.
    *
@@ -44,6 +46,7 @@ export function LinkCard({
   dismissing,
   onRestorePrevious,
   restoring,
+  saving,
   undoNotice,
   origin,
 }: LinkCardProps) {
@@ -56,6 +59,7 @@ export function LinkCard({
       dismissing={dismissing}
       onRestorePrevious={onRestorePrevious}
       restoring={restoring}
+      paused={Boolean(saving)}
       undoNotice={undoNotice}
     >
       <a

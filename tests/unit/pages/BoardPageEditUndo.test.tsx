@@ -127,6 +127,19 @@ describe("undoing a card edit", () => {
     );
   });
 
+  it("stands the undo down while the note is being edited", async () => {
+    renderBoard();
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "deploys are on Fridays" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit this note" }));
+
+    // The draft is the editor's now: an undo underneath it would be written over by the next Save,
+    // silently, so the press is not offered while the card is being worked on.
+    expect(screen.getByRole("button", { name: /undo — put the note back/i })).toBeDisabled();
+  });
+
   it("says a stale undo plainly on the card, and shows the card as it is now", async () => {
     vi.mocked(boardService.restorePrevious).mockRejectedValue(
       new ApiError(409, "That card has changed since — nothing was undone"),

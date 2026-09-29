@@ -19,7 +19,10 @@ function renderStrip(
     previous?: Partial<BoardCardPrevious>;
     lastChange?: BoardCardLastChange | null;
     restoring?: boolean;
+    paused?: boolean;
     notice?: "restored" | "stale" | null;
+    /** The version a stale refusal was raised against; `null` is "the re-read could not say". */
+    staleFor?: string | null;
   } = {},
 ) {
   const onRestore = vi.fn();
@@ -31,7 +34,12 @@ function renderStrip(
       controlLabel="note"
       onRestore={onRestore}
       restoring={over.restoring ?? false}
-      notice={over.notice ?? null}
+      paused={over.paused ?? false}
+      notice={
+        over.notice
+          ? { cardId: "c1", kind: over.notice, forReplacedAt: over.staleFor ?? null }
+          : null
+      }
     />,
   );
   return { onRestore };
@@ -168,11 +176,46 @@ describe("the record of a card's latest edit", () => {
   });
 
   it("says something true when the wire carries an author it has never met", () => {
-    // A newer backend's actor must not take the card down with it — the strip falls back to plain
-    // words rather than indexing a name it does not know.
+    // A newer backend's actor must not take the card down with it — and the fallback has to reach
+    // the parts only assistive tech reads, or the mislabelling has simply moved out of sight.
     renderStrip({ previous: { replacedBy: "SYSTEM" as unknown as BoardActor } });
 
     expect(screen.getByText(/this card was edited/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /undo — put the note back to what it said before an edit/i,
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show what it said before" }));
+
+    expect(screen.getByText("Before the edit")).toBeInTheDocument();
+    expect(screen.queryByText(/your edit/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps a refusal while the card still shows the version it was about", () => {
+    renderStrip({ notice: "stale", staleFor: TWO_HOURS_IN });
+
+    expect(screen.getByText(/that edit was already replaced/i)).toBeInTheDocument();
+  });
+
+  it("lets a refusal go once the card has moved on under it", () => {
+    // The line was news about one version; the strip above it is already about a newer one.
+    renderStrip({ notice: "stale", staleFor: "2026-09-29T11:45:00.000Z" });
+
+    expect(screen.queryByText(/that edit was already replaced/i)).not.toBeInTheDocument();
+  });
+
+  it("stands the undo down while the card is being changed", () => {
+    const { onRestore } = renderStrip({ paused: true });
+
+    const undo = screen.getByRole("button", {
+      name: /undo — put the note back to what it said before your buddy's edit \(paused/i,
+    });
+    expect(undo).toBeDisabled();
+
+    fireEvent.click(undo);
+    expect(onRestore).not.toHaveBeenCalled();
   });
 
   it("does not put an unreadable stamp on the card as an invalid date", () => {

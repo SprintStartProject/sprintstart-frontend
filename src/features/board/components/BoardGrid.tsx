@@ -348,13 +348,15 @@ type BoardGridProps = {
    * with a timeout.
    */
   onRestorePrevious?: (cardId: string, replacedAt: string) => void;
-  /** The card whose undo is in flight, so its own strip can show it is working. */
-  restoringId?: string | null;
+  /** The cards with an undo in flight, so their own strips can say they are working. */
+  restoringIds?: ReadonlySet<string>;
+  /** The cards being written to right now — an edit, or a tick, still on its way. */
+  savingIds?: ReadonlySet<string>;
   /**
    * What just happened to an undo, keyed to the card it happened on: a stale press's refusal, or
    * the fact that a restore landed.
    */
-  undoNotice?: BoardUndoNotice | null;
+  undoNotices?: ReadonlyMap<string, BoardUndoNotice>;
   /** Applies a whole new order. Absent when the board is not arrangeable. */
   onReorder?: (cardIds: string[]) => void;
   /**
@@ -468,8 +470,10 @@ type BoardCardViewProps = SharedProps & {
   onRestorePrevious?: (cardId: string, replacedAt: string) => void;
   /** True while this card's own undo is in flight. */
   restoring: boolean;
+  /** True while this card is being written to — an edit, or a tick, still on its way. */
+  saving: boolean;
   /** What just happened to this card's undo, when anything did. */
-  undoNotice: "restored" | "stale" | null;
+  undoNotice: BoardUndoNotice | null;
 };
 
 function BoardCardView({
@@ -477,6 +481,7 @@ function BoardCardView({
   onEdit,
   onRestorePrevious,
   restoring,
+  saving,
   undoNotice,
   origin,
   onCardAdded,
@@ -513,6 +518,7 @@ function BoardCardView({
           onEdit={onEdit}
           onRestorePrevious={onRestorePrevious}
           restoring={restoring}
+          saving={saving}
           undoNotice={undoNotice}
           origin={origin}
           {...props}
@@ -524,6 +530,7 @@ function BoardCardView({
           content={card.content}
           onRestorePrevious={onRestorePrevious}
           restoring={restoring}
+          saving={saving}
           undoNotice={undoNotice}
           origin={origin}
           {...props}
@@ -536,6 +543,7 @@ function BoardCardView({
           onEdit={onEdit}
           onRestorePrevious={onRestorePrevious}
           restoring={restoring}
+          saving={saving}
           undoNotice={undoNotice}
           origin={origin}
           {...props}
@@ -577,14 +585,19 @@ function BoardCardView({
  * board some people cannot arrange at all. Both send the whole resulting order, because that is
  * what the board now looks like.
  */
+/** Stand-ins for a board rendered without undo state — one with no writes to report. */
+const NO_IDS: ReadonlySet<string> = new Set();
+const NO_NOTICES: ReadonlyMap<string, BoardUndoNotice> = new Map();
+
 export function BoardGrid({
   board,
   onDismiss,
   dismissingId = null,
   onEdit,
   onRestorePrevious,
-  restoringId = null,
-  undoNotice = null,
+  restoringIds = NO_IDS,
+  savingIds = NO_IDS,
+  undoNotices = NO_NOTICES,
   onReorder,
   boardOrder,
   isArranging = false,
@@ -1100,8 +1113,9 @@ export function BoardGrid({
         dismissing={dismissingId === card.id}
         onEdit={onEdit}
         onRestorePrevious={onRestorePrevious}
-        restoring={restoringId === card.id}
-        undoNotice={undoNotice?.cardId === card.id ? undoNotice.kind : null}
+        restoring={restoringIds.has(card.id)}
+        saving={savingIds.has(card.id)}
+        undoNotice={undoNotices.get(card.id) ?? null}
         registerElement={registerElement}
         onDragStart={() => {
           lastMoveAt.current = 0;
@@ -1468,8 +1482,10 @@ type BoardCardCellProps = {
   onRestorePrevious?: (cardId: string, replacedAt: string) => void;
   /** True while this card's own undo is in flight. */
   restoring: boolean;
+  /** True while this card is being written to — an edit, or a tick, still on its way. */
+  saving: boolean;
   /** What just happened to this card's undo, when anything did. */
-  undoNotice: "restored" | "stale" | null;
+  undoNotice: BoardUndoNotice | null;
   registerElement: (id: string, element: HTMLDivElement | null) => void;
   onDragStart: () => void;
   onDrag: () => void;
@@ -1526,6 +1542,7 @@ function BoardCardCell({
   onEdit,
   onRestorePrevious,
   restoring,
+  saving,
   undoNotice,
   registerElement,
   onDragStart,
@@ -1921,6 +1938,7 @@ function BoardCardCell({
               onEdit={onEdit}
               onRestorePrevious={onRestorePrevious}
               restoring={restoring}
+              saving={saving}
               undoNotice={undoNotice}
               origin={origin}
               onCardAdded={onCardAdded}

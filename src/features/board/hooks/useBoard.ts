@@ -33,10 +33,12 @@ type UseBoardResult = {
    * re-read, and saying so beats silently doing nothing), or `"failed"` (surfaced as `writeError`).
    */
   restorePrevious: (cardId: string, replacedAt: string) => Promise<"restored" | "stale" | "failed">;
-  /** The card whose undo is in flight, so its own strip can show it is working. */
-  restoringId: string | null;
+  /** The cards with an undo in flight, so their own strips can say they are working. */
+  restoringIds: ReadonlySet<string>;
+  /** The cards being written to right now — a save, or a tick, still on its way. */
+  savingIds: ReadonlySet<string>;
   /** What just happened to an undo, keyed to the card it happened on. */
-  undoNotice: BoardUndoNotice | null;
+  undoNotices: ReadonlyMap<string, BoardUndoNotice>;
   /** Puts the cards in this order, showing it immediately and confirming with the server. */
   reorder: (cardIds: string[]) => Promise<void>;
   /** Set when the last write did not go through, so the page can say so and keep what was there. */
@@ -83,8 +85,12 @@ export function useBoard(projectId: string): UseBoardResult {
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [dismissError, setDismissError] = useState(false);
   const [writeError, setWriteError] = useState(false);
-  const [restoringId, setRestoringId] = useState<string | null>(null);
-  const [undoNotice, setUndoNotice] = useState<BoardUndoNotice | null>(null);
+  // Per card, not one slot: two cards can be written to, or undone, in the same breath, and a
+  // single slot would let the first request's answer re-enable the second card's button while its
+  // own request is still out — a second press then races the first write and loses to it.
+  const [restoringIds, setRestoringIds] = useState<ReadonlySet<string>>(new Set());
+  const [savingIds, setSavingIds] = useState<ReadonlySet<string>>(new Set());
+  const [undoNotices, setUndoNotices] = useState<ReadonlyMap<string, BoardUndoNotice>>(new Map());
 
   /**
    * Drops an undo notice about a card that has since changed again.
@@ -93,7 +99,12 @@ export function useBoard(projectId: string): UseBoardResult {
    * or is gone — it describes a state nobody is looking at anymore.
    */
   const clearNoticeFor = useCallback((cardId: string) => {
-    setUndoNotice((notice) => (notice?.cardId === cardId ? null : notice));
+    setUndoNotices((current) => {
+      if (!current.has(cardId)) return current;
+      const next = new Map(current);
+      next.delete(cardId);
+      return next;
+    });
   }, []);
 
   const dismiss = useCallback(
@@ -140,6 +151,10 @@ export function useBoard(projectId: string): UseBoardResult {
   const editCard = useCallback(
     async (cardId: string, request: AuthoredCardRequest) => {
       setWriteError(false);
+      // The card is being written, so its strip's undo stands down until this lands: a press that
+      // slips in mid-write (a tick, then an undo) leaves which of the two survives to whichever
+      // request the server happened to receive second.
+      setSavingIds((current) => withCard(current, cardId, true));
       try {
         // The server's own answer, not the request that was sent: an edit comes back with whatever
         // the server made of it — trimmed text, minted ids for new checklist lines — and showing the
@@ -164,6 +179,8 @@ export function useBoard(projectId: string): UseBoardResult {
       } catch {
         setWriteError(true);
         return false;
+      } finally {
+        setSavingIds((current) => withCard(current, cardId, false));
       }
     },
     [clearNoticeFor, queryClient, queryKey],
@@ -171,8 +188,10 @@ export function useBoard(projectId: string): UseBoardResult {
 
   const restorePrevious = useCallback(
     async (cardId: string, replacedAt: string): Promise<"restored" | "stale" | "failed"> => {
-      setRestoringId(cardId);
-      setUndoNotice(null);
+      // This card's flag, and this card's notice only: another card's undo may be in flight, and
+      // its button has to stay disabled, and its line on screen, until its own request answers.
+      setRestoringIds((current) => withCard(current, cardId, true));
+      clearNoticeFor(cardId);
       try {
         // The server's own answer, like `editCard`: the restore swaps the card's content for its
         // previous version and that previous version becomes the new undo, so putting the response
@@ -187,25 +206,35 @@ export function useBoard(projectId: string): UseBoardResult {
               }
             : prev,
         );
-        setUndoNotice({ cardId, kind: "restored" });
+        setUndoNotices((current) =>
+          new Map(current).set(cardId, { cardId, kind: "restored", forReplacedAt: null }),
+        );
         return "restored";
       } catch (error) {
         if (error instanceof ApiError && error.status === 409) {
           // The card moved on since this board read it — another edit replaced the one the hire
           // was undoing. Re-read rather than retry: what the card says now is the truth, and the
           // only undo still on offer is the newest edit's. The refusal stays on the card so the
-          // press has a receipt that outlives a toast.
-          setUndoNotice({ cardId, kind: "stale" });
-          await refetch();
+          // press has a receipt that outlives a toast — bound to the version the card showed when
+          // it was raised, so a later change retires it instead of leaving it above a newer edit.
+          const fresh = await refetch();
+          const freshCard = fresh.data?.cards.find((card) => card.id === cardId);
+          setUndoNotices((current) =>
+            new Map(current).set(cardId, {
+              cardId,
+              kind: "stale",
+              forReplacedAt: freshCard?.previous?.replacedAt ?? null,
+            }),
+          );
           return "stale";
         }
         setWriteError(true);
         return "failed";
       } finally {
-        setRestoringId(null);
+        setRestoringIds((current) => withCard(current, cardId, false));
       }
     },
-    [queryClient, queryKey, refetch],
+    [clearNoticeFor, queryClient, queryKey, refetch],
   );
 
   const reorder = useCallback(
@@ -251,11 +280,21 @@ export function useBoard(projectId: string): UseBoardResult {
     addCard,
     editCard,
     restorePrevious,
-    restoringId,
-    undoNotice,
+    restoringIds,
+    savingIds,
+    undoNotices,
     reorder,
     writeError,
   };
+}
+
+/** The same set with a card added, or without it — the same object when nothing would change. */
+function withCard(set: ReadonlySet<string>, cardId: string, present: boolean): ReadonlySet<string> {
+  if (set.has(cardId) === present) return set;
+  const next = new Set(set);
+  if (present) next.add(cardId);
+  else next.delete(cardId);
+  return next;
 }
 
 /** Where a card sits in a pending order; anything unlisted keeps to the end, in its own order. */
