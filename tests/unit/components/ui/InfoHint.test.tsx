@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { InfoHint } from "../../../../src/components/ui/InfoHint";
@@ -8,7 +8,8 @@ describe("InfoHint", () => {
     render(<InfoHint text="Fills in the blanks." label="What this does" />);
 
     const tooltip = screen.getByRole("tooltip");
-    expect(tooltip.className).toContain("top-7");
+    expect(tooltip.className).toContain("top-5");
+    expect(tooltip.className).toContain("pt-2");
     expect(tooltip.className).toContain("left-0");
     expect(screen.getByRole("button", { name: "What this does" })).toHaveAccessibleDescription(
       "Fills in the blanks.",
@@ -21,7 +22,8 @@ describe("InfoHint", () => {
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip.className).toContain("bottom-full");
     expect(tooltip.className).toContain("right-0");
-    expect(tooltip.className).not.toContain("top-7");
+    expect(tooltip.className).toContain("pb-2");
+    expect(tooltip.className).not.toContain("top-5");
   });
 
   it("shows on keyboard focus and dismisses on Escape", async () => {
@@ -36,5 +38,55 @@ describe("InfoHint", () => {
 
     await user.keyboard("{Escape}");
     expect(tooltip.className).toContain("opacity-0");
+  });
+
+  it("toggles on click, so a touch screen can open and dismiss it", async () => {
+    const user = userEvent.setup();
+    render(<InfoHint text="Fills in the blanks." />);
+
+    const trigger = screen.getByRole("button");
+    const tooltip = screen.getByRole("tooltip");
+
+    await user.click(trigger);
+    expect(tooltip.className).toContain("opacity-100");
+
+    await user.click(trigger);
+    expect(tooltip.className).toContain("opacity-0");
+  });
+
+  it("closes when the pointer goes down outside of it", async () => {
+    const user = userEvent.setup();
+    render(<InfoHint text="Fills in the blanks." />);
+
+    await user.click(screen.getByRole("button"));
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.className).toContain("opacity-100");
+
+    // A tap on inert background does not blur the trigger, so blur alone cannot dismiss it.
+    fireEvent.pointerDown(document.body);
+    expect(tooltip.className).toContain("opacity-0");
+  });
+
+  it("stays open when the pointer moves from the trigger onto the tooltip", async () => {
+    const user = userEvent.setup();
+    render(<InfoHint text="Fills in the blanks." />);
+
+    const trigger = screen.getByRole("button");
+    const tooltip = screen.getByRole("tooltip");
+
+    // Closed, the invisible bubble is inert so it never blocks what surrounds the trigger.
+    expect(tooltip.className).toContain("pointer-events-none");
+
+    await user.hover(trigger);
+    expect(tooltip.className).toContain("opacity-100");
+    expect(tooltip.className).toContain("pointer-events-auto");
+
+    // SC 1.4.13: content revealed on hover must itself be hoverable.
+    await user.hover(tooltip);
+    expect(tooltip.className).toContain("opacity-100");
+
+    await user.unhover(tooltip);
+    expect(tooltip.className).toContain("opacity-0");
+    expect(tooltip.className).toContain("pointer-events-none");
   });
 });

@@ -36,6 +36,11 @@ describe("MemberGapsPanel", () => {
     const trigger = screen.getByRole("button", { name: "What is a knowledge gap?" });
     const tooltip = screen.getByRole("tooltip");
 
+    // `top-end` is deliberate: this header sits inside a SpotlightCard (`overflow-hidden`), so
+    // the tooltip opens above the trigger and right-aligned to stay inside the card.
+    expect(tooltip.className).toContain("bottom-full");
+    expect(tooltip.className).toContain("right-0");
+
     // The explainer stays reachable without hovering: the tooltip is in the accessibility tree
     // and wired to the trigger through aria-describedby.
     expect(trigger).toHaveAccessibleDescription(/missing material the project expects/);
