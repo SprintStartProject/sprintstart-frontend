@@ -431,6 +431,7 @@ describe("BuddyActionProposals", () => {
               label: "Rearrange your board",
               cardIds: ["c-2", "c-1"],
               cardNames: ["Runbook", "Getting started"],
+              preview: "Put these first on your board, in this order.",
             }),
           ]}
           onConfirm={vi.fn()}
@@ -487,6 +488,55 @@ describe("BuddyActionProposals", () => {
       expect(screen.getByText("The list would read:")).toBeInTheDocument();
       expect(screen.getByText(/Open a PR/)).toBeInTheDocument();
       expect(screen.getByText(/Lines that would go/)).toBeInTheDocument();
+    });
+
+    /**
+     * Fail closed, as stored proposals do: a clean-up whose card names did not arrive would be a
+     * button that removes cards nobody was shown.
+     */
+    it("refuses to confirm a clean-up that arrived without its card names", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "dismiss_cards",
+              label: "Remove these from your board",
+              cardIds: ["c-1", "c-2"],
+              preview: "Take 2 cards off your board.",
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("buddy-proposal-unsupported")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Remove these from your board/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("refuses to confirm a checklist edit whose preview of removed lines is missing", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "edit_checklist",
+              label: "Update this list",
+              cardId: "c-1",
+              checklistItems: ["Run it locally"],
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("buddy-proposal-unsupported")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Update this list/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Not now/ })).toBeInTheDocument();
     });
 
     it("confirms with the proposal as it was offered", async () => {

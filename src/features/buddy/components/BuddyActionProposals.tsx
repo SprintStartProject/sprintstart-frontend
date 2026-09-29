@@ -7,6 +7,7 @@ import {
   BUDDY_ACTION_REWORD_CHECKLIST,
   BUDDY_ACTION_TICK_CHECKLIST,
 } from "../types";
+import { lacksBoardEditDetails } from "../boardEditProposals";
 import { BuddyBoardEditDetails } from "./BuddyBoardEditDetails";
 import { BuddyOrientationCard } from "./BuddyOrientationCard";
 
@@ -101,8 +102,11 @@ export function BuddyActionProposals({
         const isStored = "proposalId" in action;
         // Fail closed: a proposal whose risk did not survive the stream (or that arrived
         // without its description) is not confirmable — an approval card for a project
-        // mutation must never guess how loudly to warn, nor confirm what it cannot show.
-        const isUnsupported = isStored && (action.risk === null || !action.preview);
+        // mutation must never guess how loudly to warn, nor confirm what it cannot show. A
+        // hire's board edit follows the same rule: no confirm for a change it cannot show.
+        const isUnsupported = isStored
+          ? action.risk === null || !action.preview
+          : lacksBoardEditDetails(action);
         const previewId = `buddy-proposal-preview-${action.id}`;
 
         return (
