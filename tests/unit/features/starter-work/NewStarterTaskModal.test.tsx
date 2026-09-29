@@ -22,7 +22,7 @@ describe("NewStarterTaskModal", () => {
     const user = userEvent.setup();
     const { onCreate } = renderModal();
 
-    await user.type(screen.getByLabelText("Title"), "Add dark mode");
+    await user.type(screen.getByLabelText(/^Title/), "Add dark mode");
     await user.click(screen.getByTestId("create-starter-task"));
 
     expect(onCreate).toHaveBeenCalledWith(
@@ -41,7 +41,7 @@ describe("NewStarterTaskModal", () => {
     const user = userEvent.setup();
     const { onCreate } = renderModal();
 
-    await user.type(screen.getByLabelText("Title"), "Add dark mode");
+    await user.type(screen.getByLabelText(/^Title/), "Add dark mode");
     await user.type(screen.getByLabelText(/Prerequisite competencies/i), "react,  typescript  css");
     await user.click(screen.getByTestId("create-starter-task"));
 
@@ -55,7 +55,7 @@ describe("NewStarterTaskModal", () => {
     const user = userEvent.setup();
     const { onClose } = renderModal({ onCreate: vi.fn().mockResolvedValue(true) });
 
-    await user.type(screen.getByLabelText("Title"), "Add dark mode");
+    await user.type(screen.getByLabelText(/^Title/), "Add dark mode");
     await user.click(screen.getByTestId("create-starter-task"));
 
     expect(onClose).toHaveBeenCalled();
@@ -65,7 +65,7 @@ describe("NewStarterTaskModal", () => {
     const user = userEvent.setup();
     const { onClose } = renderModal({ onCreate: vi.fn().mockResolvedValue(false) });
 
-    await user.type(screen.getByLabelText("Title"), "Add dark mode");
+    await user.type(screen.getByLabelText(/^Title/), "Add dark mode");
     await user.click(screen.getByTestId("create-starter-task"));
 
     expect(onClose).not.toHaveBeenCalled();

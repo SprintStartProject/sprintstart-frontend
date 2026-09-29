@@ -1,12 +1,13 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { SideBar } from "../../../../src/components/layout/SideBar";
 import * as useAuthHook from "../../../../src/context/useAuth";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
 import { PermissionGroup } from "../../../../src/services/types";
 import { knowledgeRequestService } from "../../../../src/services/knowledgeRequestService";
+import { mockViewport } from "../../setup/matchMedia";
 
 // Mutable so individual tests can flip it mid-suite. Module-level mock
 // factories cannot close over `let`, hence the `vi.hoisted` shared object
@@ -563,5 +564,191 @@ describe("SideBar", () => {
     // Asserted through the active pill rather than the entry's classes: the highlight is what
     // this test is about, and a class list is a styling decision that can change without it.
     expect(chat.querySelector("[data-layout-id]")).not.toBeNull();
+  });
+
+  /**
+   * The hint comes from the shortcuts registry (`navigationShortcut`), not from a string
+   * typed at the call site — this asserts the pairing of entry and chord, which is the half
+   * of "the hint and the keypress cannot disagree" a unit test can hold down.
+   */
+  it("advertises each destination's chord on the entry itself", () => {
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    // The chip is the visual half; the `title` is the copy a screen reader gets, which is
+    // why both are asserted instead of the chip alone.
+    expect(screen.getAllByRole("link", { name: "Dashboard" })[0]).toHaveAttribute(
+      "title",
+      "Dashboard (Alt + H)",
+    );
+    // The desktop rail and the mobile drawer are two renders of one list, so compare counts.
+    expect(screen.getAllByText("Alt + H").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Alt + K").length).toBeGreaterThan(0);
+
+    // The settings button is icon-only — no room for a chip — so its chord rides in the
+    // accessible name, and `aria-label` is what makes that name, not the `title`.
+    expect(screen.getAllByRole("link", { name: "Settings (Alt + ,)" }).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the shortcut chip out of the link's accessible name", () => {
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    expect(screen.getAllByText("Alt + H")[0]).toHaveAttribute("aria-hidden", "true");
+    // And the name stays the label alone — a screen reader reads the chord from `title`.
+    expect(screen.getAllByRole("link", { name: "Dashboard" }).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Alt+S is the drawer's chord — the same state the header button works, reached without
+   * leaving the keyboard. Asserted through the button's own name and `aria-expanded`, so the
+   * test fails if the two ways in ever stop sharing one toggle.
+   */
+  it("gives Alt+S the same drawer the header button works", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+
+    expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    await user.keyboard("{Alt>}s{/Alt}");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Close sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      ),
+    );
+
+    // It toggles rather than only opening: the same chord closes the drawer again.
+    await user.keyboard("{Alt>}s{/Alt}");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      ),
+    );
+  });
+
+  it("does not answer Alt+S while a text field has the keys", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(
+      <>
+        <SideBar />
+        <input aria-label="Notes" />
+      </>,
+    );
+
+    await user.click(screen.getByRole("textbox", { name: "Notes" }));
+    await user.keyboard("{Alt>}s{/Alt}");
+
+    expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("leaves Alt+S to the browser on desktop widths", () => {
+    mockViewport(true);
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    try {
+      renderWithProviders(<SideBar />);
+
+      // The drawer does not exist above `lg`, so the chord listens only below it: nothing
+      // visible would happen here, the state flip would ambush the next resize — and
+      // `fireEvent` coming back `true` says the keystroke falls through untouched, which on
+      // Firefox is the History menu rather than a swallowed no-op.
+      expect(fireEvent.keyDown(window, { code: "KeyS", altKey: true })).toBe(true);
+      expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+    } finally {
+      mockViewport(false);
+    }
+  });
+
+  it("closes the drawer when the route changes without a link click", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    function RouteChanger() {
+      const navigate = useNavigate();
+
+      return (
+        <button type="button" onClick={() => void navigate("/board")}>
+          Go to board
+        </button>
+      );
+    }
+
+    renderWithProviders(
+      <>
+        <SideBar />
+        <RouteChanger />
+      </>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Close sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      ),
+    );
+
+    // A chord moves the route without `onNavigate` ever running — the drawer must not be
+    // left standing open, with its overlay, over the new page.
+    await user.click(screen.getByRole("button", { name: "Go to board" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      ),
+    );
   });
 });

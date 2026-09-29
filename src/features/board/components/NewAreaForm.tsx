@@ -50,6 +50,7 @@ export function NewAreaForm({ onCreate, onClose }: NewAreaFormProps) {
           <Field
             label="Name this area"
             controlId="new-area-name"
+            required
             hint="A part of the board you can open on its own — Paperwork, Week two, Before my first release."
           >
             <Input

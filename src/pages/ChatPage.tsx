@@ -31,6 +31,7 @@ import {
   RAIL_TOGGLE_CLEARANCE,
 } from "../components/layout/ConversationRail.tsx";
 import { useNewConversationShortcut } from "../hooks/useNewConversationShortcut.ts";
+import { FOCUS_COMPOSER_SHORTCUT, useShortcutListener } from "../features/shortcuts";
 import { surfaceFromPathname } from "../components/common/assistantSurfaces.ts";
 
 import "katex/dist/katex.min.css";
@@ -268,23 +269,12 @@ export function ChatPage() {
     }
   }, [gameActive, bottomRef]);
 
-  // E9: "/" focuses the composer (like Slack/GitHub) when the user isn't
-  // already typing in a field. Escape blurs it to return to the page.
-  useEffect(() => {
-    const isTypingTarget = (el: Element | null) =>
-      el instanceof HTMLElement &&
-      (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable);
+  // E9: "/" focuses the composer (like Slack/GitHub) when the user isn't already typing in a
+  // field. The chord and the typing guard are the shortcuts registry's now, so the help
+  // dialog, the sidebar hints and this listener all read one definition of it.
+  const focusComposer = useCallback(() => textareaRef.current?.focus(), [textareaRef]);
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "/" && !isTypingTarget(document.activeElement)) {
-        e.preventDefault();
-        textareaRef.current?.focus();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [textareaRef]);
+  useShortcutListener(FOCUS_COMPOSER_SHORTCUT, focusComposer);
 
   const fillSuggestion = useCallback(
     (text: string) => {

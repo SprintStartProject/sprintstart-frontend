@@ -22,6 +22,7 @@ import { EggEffectsLayer } from "./features/easter-eggs/components/EggEffectsLay
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
+import { GlobalShortcuts } from "./features/shortcuts";
 
 function AppContent() {
   const { status } = useAuth();
@@ -132,6 +133,12 @@ function AppContent() {
           nobody on the login screen has a session for. It takes itself off `/buddy`,
           where the page already is the buddy. */}
         {showBuddyDock && <BuddyWidget />}
+
+        {/* The keyboard, app-wide: the destination chords and `?` open a listener here rather
+          than per page, because a shortcut that only works on the page you are already on is
+          not a shortcut. Signed-in only — the login screen has nothing to jump between, and
+          the help lists destinations a signed-out visitor has no access to. */}
+        {signedIn && <GlobalShortcuts />}
 
         {/* Offers to keep whatever the hire has highlighted, from any page. Mounted here for the
           same reason the buddy is: what is worth keeping is almost never found on the board.
