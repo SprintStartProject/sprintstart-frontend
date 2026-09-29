@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, useNavigate } from "react-router-dom";
@@ -391,6 +391,172 @@ describe("SideBar", () => {
     });
   });
 
+  describe("desktop sidebar size", () => {
+    const signIn = () =>
+      vi.mocked(useAuthHook.useAuth).mockReturnValue({
+        status: "authenticated",
+        profile: mockProfile,
+        login: vi.fn(),
+        logout: vi.fn(),
+        refetchProfile: vi.fn(),
+      });
+    const desktop = () => screen.getByRole("complementary", { name: "Desktop Sidebar" });
+    // The width lives in a CSS variable on the root, which the page's margin reads as well.
+    const sidebarWidth = () =>
+      document.documentElement.style.getPropertyValue("--app-sidebar-desktop-width");
+    // Closed, the drawer is `inert` and hidden from the accessibility tree, so no role query finds it.
+    const mobile = () => document.querySelector<HTMLElement>('aside[aria-label="Mobile Sidebar"]')!;
+    // The logo folds and unfolds it; the resize edge's Enter is the keyboard's way.
+    const logo = () => desktop().querySelector<HTMLElement>("[data-drop-phase]")!;
+
+    it("folds to icons, keeps every entry named, and remembers it", async () => {
+      const user = userEvent.setup();
+      signIn();
+      const { unmount } = renderWithProviders(<SideBar />);
+
+      await user.click(logo());
+
+      expect(sidebarWidth()).toBe("76px");
+      // Icon only, but still a link with its name.
+      expect(within(desktop()).getByRole("link", { name: /Dashboard/ })).toBeInTheDocument();
+      // The edge stays, to pull it open again.
+      expect(within(desktop()).getByRole("separator")).toHaveAttribute(
+        "aria-valuetext",
+        "Collapsed",
+      );
+
+      unmount();
+      renderWithProviders(<SideBar />);
+      expect(sidebarWidth()).toBe("76px");
+      expect(within(desktop()).getByRole("separator")).toHaveAttribute(
+        "aria-valuetext",
+        "Collapsed",
+      );
+    });
+
+    it("folds the footer into one icon that slides the full card out", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+
+      await user.click(logo());
+
+      const trigger = within(desktop()).getByRole("button", { name: "Account and project" });
+      const card = document.getElementById(trigger.getAttribute("aria-controls")!)!;
+      expect(card).toHaveAttribute("inert");
+
+      await user.click(trigger);
+      expect(trigger).toHaveAttribute("aria-expanded", "true");
+      expect(card).not.toHaveAttribute("inert");
+      expect(within(card).getByRole("button", { name: "Logout" })).toBeInTheDocument();
+      expect(within(card).getByRole("link", { name: /^Settings/ })).toBeInTheDocument();
+
+      await user.keyboard("{Escape}");
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      expect(card).toHaveAttribute("inert");
+    });
+
+    it("leaves the shortcut chips off the folded rail, where they have no room", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+      expect(within(desktop()).getAllByText("Alt + H").length).toBeGreaterThan(0);
+
+      await user.click(logo());
+
+      expect(within(desktop()).queryByText("Alt + H")).not.toBeInTheDocument();
+      // Still named with its chord, as the link's own title.
+      expect(within(desktop()).getByTitle("Dashboard (Alt + H)")).toBeInTheDocument();
+    });
+
+    it("shows an entry's name as a tooltip when it gets keyboard focus while folded", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+
+      await user.click(logo());
+      within(desktop())
+        .getByRole("link", { name: /Dashboard/ })
+        .focus();
+
+      // Rendered into the page body so the nav cannot clip it.
+      await waitFor(() =>
+        expect(
+          [...document.body.children].some(
+            (child) => child.textContent === "Dashboard" && child.classList.contains("fixed"),
+          ),
+        ).toBe(true),
+      );
+    });
+
+    it("resizes from the keyboard within its limits, and remembers the width", async () => {
+      const user = userEvent.setup();
+      signIn();
+      const { unmount } = renderWithProviders(<SideBar />);
+
+      const handle = within(desktop()).getByRole("separator", { name: "Resize sidebar" });
+      expect(handle).toHaveAttribute("aria-valuenow", "286");
+
+      handle.focus();
+      await user.keyboard("{ArrowRight}{ArrowRight}");
+      expect(sidebarWidth()).toBe("318px");
+
+      await user.keyboard("{End}{ArrowRight}");
+      expect(sidebarWidth()).toBe("400px");
+
+      await user.keyboard("{Home}{ArrowLeft}");
+      expect(sidebarWidth()).toBe("240px");
+
+      unmount();
+      renderWithProviders(<SideBar />);
+      expect(within(desktop()).getByRole("separator")).toHaveAttribute("aria-valuenow", "240");
+    });
+
+    it("opens again from its edge while folded, at the width it had", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+
+      const handle = within(desktop()).getByRole("separator", { name: "Resize sidebar" });
+      handle.focus();
+      await user.keyboard("{ArrowRight}{Enter}");
+      expect(sidebarWidth()).toBe("76px");
+
+      await user.keyboard("{ArrowLeft}");
+      expect(sidebarWidth()).toBe("76px");
+
+      await user.keyboard("{ArrowRight}");
+      expect(sidebarWidth()).toBe("302px");
+      expect(handle).toHaveAttribute("aria-valuetext", "302 pixels");
+
+      await user.keyboard("{Enter}{Enter}");
+      expect(sidebarWidth()).toBe("302px");
+    });
+
+    it("folds and unfolds from the logo, but not on the egg's quick repeat clicks", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+      await user.click(logo());
+      expect(sidebarWidth()).toBe("76px");
+
+      // Straight after: counts towards the gravity egg, leaves the sidebar folded.
+      await user.click(logo());
+      expect(sidebarWidth()).toBe("76px");
+    });
+
+    it("leaves the mobile drawer as it was", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+
+      await user.click(logo());
+
+      expect(mobile()).toHaveClass("w-[var(--app-sidebar-width)]");
+      expect(mobile().querySelector('[role="separator"]')).toBeNull();
+    });
+  });
+
   /**
    * The buddy is the other half of the chat's page, not a page of its own — one header, one
    * switch, two conversations. Before this the sidebar highlighted nothing at all on `/buddy`,
@@ -526,8 +692,9 @@ describe("SideBar", () => {
     );
   });
 
-  it("leaves Alt+S to the browser on desktop widths", () => {
+  it("folds and unfolds the desktop sidebar with Alt+S on desktop widths, not the drawer", async () => {
     mockViewport(true);
+    const user = userEvent.setup();
     vi.mocked(useAuthHook.useAuth).mockReturnValue({
       status: "authenticated",
       profile: mockProfile,
@@ -535,19 +702,22 @@ describe("SideBar", () => {
       logout: vi.fn(),
       refetchProfile: vi.fn(),
     });
+    const width = () =>
+      document.documentElement.style.getPropertyValue("--app-sidebar-desktop-width");
 
     try {
       renderWithProviders(<SideBar />);
 
-      // The drawer does not exist above `lg`, so the chord listens only below it: nothing
-      // visible would happen here, the state flip would ambush the next resize — and
-      // `fireEvent` coming back `true` says the keystroke falls through untouched, which on
-      // Firefox is the History menu rather than a swallowed no-op.
-      expect(fireEvent.keyDown(window, { code: "KeyS", altKey: true })).toBe(true);
+      await user.keyboard("{Alt>}s{/Alt}");
+      expect(width()).toBe("76px");
+      // The drawer is not on screen above `lg`, so its state must not flip behind the scenes.
       expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
         "aria-expanded",
         "false",
       );
+
+      await user.keyboard("{Alt>}s{/Alt}");
+      expect(width()).toBe("286px");
     } finally {
       mockViewport(false);
     }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
@@ -72,5 +72,29 @@ describe("SideBar Accessibility", () => {
       "aria-expanded",
       "true",
     );
+  });
+
+  it("has no axe violations folded to icons either", async () => {
+    const user = userEvent.setup();
+    window.localStorage.clear();
+    const { baseElement } = render(
+      <MemoryRouter>
+        <main>
+          <SideBar />
+        </main>
+      </MemoryRouter>,
+    );
+
+    // The logo folds it: decoration for assistive technology, the resize edge is their way.
+    await user.click(
+      screen
+        .getByRole("complementary", { name: "Desktop Sidebar" })
+        .querySelector<HTMLElement>("[data-drop-phase]")!,
+    );
+
+    expect(
+      within(screen.getByRole("complementary", { name: "Desktop Sidebar" })).getByRole("separator"),
+    ).toHaveAttribute("aria-valuetext", "Collapsed");
+    expect(await axe(baseElement)).toHaveNoViolations();
   });
 });
