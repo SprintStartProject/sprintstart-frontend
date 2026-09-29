@@ -234,8 +234,8 @@ export function SidebarLogo({ className = "", sidebarToggle }: SidebarLogoProps)
       // does answer clicks (that is the whole egg), and it is the only hint
       // anybody gets that the badge is worth touching. It is not a home link
       // on any surface, so it promises no navigation. In the desktop sidebar it
-      // also folds and unfolds it (`sidebarToggle`) -- a mouse shortcut beside
-      // the edge's toggle button, which is the keyboard's way to the same thing.
+      // also folds and unfolds it (`sidebarToggle`); from the keyboard the same
+      // is Enter on the sidebar's resize edge.
       style={{ width: BADGE_SIZE, height: BADGE_SIZE }}
       className={`relative flex shrink-0 cursor-pointer items-center justify-center rounded-[12px] bg-app-brand shadow-lg select-none ${className}`}
     >
@@ -290,8 +290,8 @@ export function SidebarLogo({ className = "", sidebarToggle }: SidebarLogoProps)
       {hintAt &&
         sidebarToggle &&
         createPortal(
-          // Hidden from assistive technology: the edge's toggle button already says this, and
-          // the badge itself is not reachable without a pointer.
+          // Hidden from assistive technology: the badge is not reachable without a pointer, and
+          // the resize edge (Enter folds and unfolds) is their way to the same thing.
           <span
             aria-hidden="true"
             style={{ left: hintAt.x, top: hintAt.y }}

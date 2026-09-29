@@ -31,7 +31,6 @@ import { SidebarLogo } from "./SidebarLogo";
 import { SidebarNavLink } from "./SidebarNavLink";
 import { SidebarResizeHandle } from "./SidebarResizeHandle";
 import { SidebarAccountFlyout } from "./SidebarAccountFlyout";
-import { SidebarToggleIcon } from "./SidebarToggleIcon";
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH_VAR, useSidebarLayout } from "./useSidebarLayout";
 import { hoverSpringToken } from "../../styles/tokens";
 
@@ -551,18 +550,6 @@ export function SideBar() {
           collapsed={sidebarLayout.collapsed}
           onToggleCollapsed={sidebarLayout.toggleCollapsed}
         />
-        {/* On the edge at the logo's height, so it sits in the same place open and folded and
-            only travels with the edge itself. Above the resize grip, which it overlaps. */}
-        <button
-          type="button"
-          onClick={sidebarLayout.toggleCollapsed}
-          aria-label={sidebarLayout.collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-expanded={!sidebarLayout.collapsed}
-          title={sidebarLayout.collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="group/toggle absolute top-[32px] -right-[14px] z-30 flex h-7 w-7 items-center justify-center rounded-full border border-app-border bg-app-bg text-app-text-muted shadow-[0_4px_12px_-6px_rgba(0,0,0,0.4)] transition-colors hover:border-app-brand-border hover:text-app-brand focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-        >
-          <SidebarToggleIcon collapsed={sidebarLayout.collapsed} className="h-4 w-4" />
-        </button>
         {/* Also on the folded rail: its edge pulls the sidebar open again. */}
         <SidebarResizeHandle
           width={sidebarLayout.width}

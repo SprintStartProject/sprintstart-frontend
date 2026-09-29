@@ -405,13 +405,15 @@ describe("SideBar", () => {
       document.documentElement.style.getPropertyValue("--app-sidebar-desktop-width");
     // Closed, the drawer is `inert` and hidden from the accessibility tree, so no role query finds it.
     const mobile = () => document.querySelector<HTMLElement>('aside[aria-label="Mobile Sidebar"]')!;
+    // The logo folds and unfolds it; the resize edge's Enter is the keyboard's way.
+    const logo = () => desktop().querySelector<HTMLElement>("[data-drop-phase]")!;
 
     it("folds to icons, keeps every entry named, and remembers it", async () => {
       const user = userEvent.setup();
       signIn();
       const { unmount } = renderWithProviders(<SideBar />);
 
-      await user.click(within(desktop()).getByRole("button", { name: "Collapse sidebar" }));
+      await user.click(logo());
 
       expect(sidebarWidth()).toBe("76px");
       // Icon only, but still a link with its name.
@@ -425,7 +427,10 @@ describe("SideBar", () => {
       unmount();
       renderWithProviders(<SideBar />);
       expect(sidebarWidth()).toBe("76px");
-      expect(within(desktop()).getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
+      expect(within(desktop()).getByRole("separator")).toHaveAttribute(
+        "aria-valuetext",
+        "Collapsed",
+      );
     });
 
     it("folds the footer into one icon that slides the full card out", async () => {
@@ -433,7 +438,7 @@ describe("SideBar", () => {
       signIn();
       renderWithProviders(<SideBar />);
 
-      await user.click(within(desktop()).getByRole("button", { name: "Collapse sidebar" }));
+      await user.click(logo());
 
       const trigger = within(desktop()).getByRole("button", { name: "Account and project" });
       const card = document.getElementById(trigger.getAttribute("aria-controls")!)!;
@@ -455,7 +460,7 @@ describe("SideBar", () => {
       signIn();
       renderWithProviders(<SideBar />);
 
-      await user.click(within(desktop()).getByRole("button", { name: "Collapse sidebar" }));
+      await user.click(logo());
       within(desktop())
         .getByRole("link", { name: /Dashboard/ })
         .focus();
@@ -508,9 +513,7 @@ describe("SideBar", () => {
 
       await user.keyboard("{ArrowRight}");
       expect(sidebarWidth()).toBe("302px");
-      expect(
-        within(desktop()).getByRole("button", { name: "Collapse sidebar" }),
-      ).toBeInTheDocument();
+      expect(handle).toHaveAttribute("aria-valuetext", "302 pixels");
 
       await user.keyboard("{Enter}{Enter}");
       expect(sidebarWidth()).toBe("302px");
@@ -520,8 +523,6 @@ describe("SideBar", () => {
       const user = userEvent.setup();
       signIn();
       renderWithProviders(<SideBar />);
-      const logo = () => desktop().querySelector<HTMLElement>("[data-drop-phase]")!;
-
       await user.click(logo());
       expect(sidebarWidth()).toBe("76px");
 
@@ -535,10 +536,9 @@ describe("SideBar", () => {
       signIn();
       renderWithProviders(<SideBar />);
 
-      await user.click(within(desktop()).getByRole("button", { name: "Collapse sidebar" }));
+      await user.click(logo());
 
       expect(mobile()).toHaveClass("w-[var(--app-sidebar-width)]");
-      expect(mobile().querySelector('[aria-label="Collapse sidebar"]')).toBeNull();
       expect(mobile().querySelector('[role="separator"]')).toBeNull();
     });
   });

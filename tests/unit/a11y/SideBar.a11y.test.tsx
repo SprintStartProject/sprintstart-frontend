@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
@@ -85,12 +85,16 @@ describe("SideBar Accessibility", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
-
-    expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
+    // The logo folds it: decoration for assistive technology, the resize edge is their way.
+    await user.click(
+      screen
+        .getByRole("complementary", { name: "Desktop Sidebar" })
+        .querySelector<HTMLElement>("[data-drop-phase]")!,
     );
+
+    expect(
+      within(screen.getByRole("complementary", { name: "Desktop Sidebar" })).getByRole("separator"),
+    ).toHaveAttribute("aria-valuetext", "Collapsed");
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 });
