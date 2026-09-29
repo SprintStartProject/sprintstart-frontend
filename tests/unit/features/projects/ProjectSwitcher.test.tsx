@@ -221,9 +221,54 @@ describe("ProjectSwitcher", () => {
     render(<ProjectSwitcher />);
 
     act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+      // `code` matters: the shortcuts registry matches the physical key (`KeyK`), as a real
+      // browser's KeyboardEvent always carries one — only hand-made events omit it.
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", metaKey: true }));
     });
 
     expect(screen.getByRole("dialog", { name: "Switch project" })).toBeInTheDocument();
+  });
+
+  it("answers Cmd/Ctrl+K while a text field has focus", () => {
+    // The chord came out of a hand-rolled window listener that never asked where the
+    // keystroke landed, so this is behaviour the registry must not quietly narrow: switching
+    // project mid-sentence is the whole point, and Ctrl/Cmd+K is not a character a text field
+    // could produce for itself.
+    render(
+      <nav aria-label="Sidebar">
+        <input aria-label="Message" />
+        <ProjectSwitcher />
+      </nav>,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Message" });
+    input.focus();
+
+    act(() => {
+      // Dispatched at the input and left to bubble, the way a real keypress reaches a window
+      // listener — `window.dispatchEvent` would have `target === window` and test nothing.
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true, bubbles: true }),
+      );
+    });
+
+    expect(screen.getByRole("dialog", { name: "Switch project" })).toBeInTheDocument();
+  });
+
+  it("does not open over a dialog that is already up", () => {
+    // The surface listener obeys the same rule as the global layer: the switcher must not
+    // stack itself on the help dialog, where one Escape would then close both.
+    render(
+      <nav aria-label="Sidebar">
+        <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" />
+        <ProjectSwitcher />
+      </nav>,
+    );
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }));
+    });
+
+    expect(screen.queryByRole("dialog", { name: "Switch project" })).not.toBeInTheDocument();
   });
 });

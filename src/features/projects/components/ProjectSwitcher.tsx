@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronsUpDown, FolderKanban, ShieldCheck } from "lucide-react";
 import { useProjectContext } from "../useProjectContext";
 import { ProjectSwitcherModal } from "./ProjectSwitcherModal";
 import { Badge } from "../../../components/ui/Badge";
 import { ShortcutHint } from "../../../components/ui/ShortcutHint";
+import { SWITCH_PROJECT_SHORTCUT, shortcutChord, useShortcutListener } from "../../shortcuts";
 import { monogramLetters, monogramTint } from "../projectMonogram";
 import { hoverSpringToken } from "../../../styles/tokens";
 
-const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-const SWITCHER_CHORD = IS_MAC ? "⌘ + K" : "Ctrl + K";
+// The one spelling of the chord: the registry defines it, the hint below and the listener
+// both read it from there.
+const SWITCHER_CHORD = shortcutChord(SWITCH_PROJECT_SHORTCUT);
 
 type ProjectSwitcherProps = {
   className?: string;
@@ -35,27 +37,16 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
 
   const [isOpen, setIsOpen] = useState(false);
 
-  // Cmd/Ctrl+K opens the switcher from anywhere.
-  useEffect(() => {
-    if (!isSwitcherEnabled) return;
+  /**
+   * Cmd/Ctrl+K opens the switcher from anywhere. The chord, and what counts as a press,
+   * come from the shortcuts registry — the hint on the trigger below and this listener
+   * read one definition. The gate stays this component's own: with the switcher disabled
+   * there is nothing to open. A bare `new Event("keydown")` from a browser extension has
+   * no `code`, so the registry's matcher refuses it rather than throwing on it.
+   */
+  const openSwitcher = useCallback(() => setIsOpen(true), []);
 
-    const handleShortcut = (event: KeyboardEvent) => {
-      // Synthetic "keydown" events (e.g. from browser extensions dispatching a
-      // bare `new Event("keydown")` on window) have an undefined `key`. Bail
-      // before calling a method on it — real KeyboardEvents always have a
-      // string `key`, so this never affects the Cmd/Ctrl+K shortcut.
-      if (typeof event.key !== "string") return;
-      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) {
-        return;
-      }
-
-      event.preventDefault();
-      setIsOpen(true);
-    };
-
-    window.addEventListener("keydown", handleShortcut);
-    return () => window.removeEventListener("keydown", handleShortcut);
-  }, [isSwitcherEnabled]);
+  useShortcutListener(SWITCH_PROJECT_SHORTCUT, openSwitcher, isSwitcherEnabled);
 
   if (!isSwitcherEnabled) {
     return null;
@@ -74,9 +65,11 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         type="button"
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        aria-label={`Switch project. Current project: ${triggerLabel}`}
+        // The chord belongs in the label, not only in `title`: `aria-label` wins the
+        // accessible-name computation, so a title alone would leave screen readers without it.
+        aria-label={`Switch project (${SWITCHER_CHORD}). Current project: ${triggerLabel}`}
         title={`Switch project (${SWITCHER_CHORD})`}
-        onClick={() => setIsOpen(true)}
+        onClick={openSwitcher}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         transition={hoverSpringToken}
