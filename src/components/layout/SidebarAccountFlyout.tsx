@@ -26,7 +26,14 @@ type SidebarAccountFlyoutProps = {
  * same CSS variable the sidebar does: the nav and footer clip anything past their edge.
  */
 export function SidebarAccountFlyout({ trigger, label, children }: SidebarAccountFlyoutProps) {
-  const [open, setOpen] = useState(false);
+  /**
+   * Opened by hover it follows the pointer and closes when it leaves; opened by a click (or
+   * clicked while hovered open) it stays until Escape, a click elsewhere or a second click.
+   * Without the difference, hovering the icon and then clicking it -- the natural thing to do
+   * with a mouse -- closed the card the hover had just opened.
+   */
+  const [mode, setMode] = useState<"closed" | "hover" | "pinned">("closed");
+  const open = mode !== "closed";
   const panelId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -35,11 +42,14 @@ export function SidebarAccountFlyout({ trigger, label, children }: SidebarAccoun
   const cancelClose = () => window.clearTimeout(closeTimer.current);
   const openNow = () => {
     cancelClose();
-    setOpen(true);
+    setMode((current) => (current === "pinned" ? current : "hover"));
   };
   const closeSoon = () => {
     cancelClose();
-    closeTimer.current = window.setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
+    closeTimer.current = window.setTimeout(
+      () => setMode((current) => (current === "pinned" ? current : "closed")),
+      CLOSE_DELAY_MS,
+    );
   };
 
   useEffect(() => cancelClose, []);
@@ -50,7 +60,7 @@ export function SidebarAccountFlyout({ trigger, label, children }: SidebarAccoun
   const [openedAt, setOpenedAt] = useState(pathname);
   if (openedAt !== pathname) {
     setOpenedAt(pathname);
-    setOpen(false);
+    setMode("closed");
   }
 
   // Escape and a click anywhere else close it, as for any popover.
@@ -59,13 +69,13 @@ export function SidebarAccountFlyout({ trigger, label, children }: SidebarAccoun
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       const focusWasInside = panelRef.current?.contains(document.activeElement) ?? false;
-      setOpen(false);
+      setMode("closed");
       if (focusWasInside) triggerRef.current?.focus();
     };
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
-      setOpen(false);
+      setMode("closed");
     };
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("pointerdown", onPointerDown);
@@ -89,8 +99,8 @@ export function SidebarAccountFlyout({ trigger, label, children }: SidebarAccoun
         onPointerLeave={(event) => event.pointerType === "mouse" && closeSoon()}
         onClick={(event) => {
           cancelClose();
-          const opening = !open;
-          setOpen(opening);
+          const opening = mode !== "pinned";
+          setMode(opening ? "pinned" : "closed");
           // From the keyboard, into the card: portalled to the end of the page, it is not next
           // in the tab order.
           if (opening && event.detail === 0) {
@@ -122,7 +132,7 @@ export function SidebarAccountFlyout({ trigger, label, children }: SidebarAccoun
           onBlur={(event) => {
             const next = event.relatedTarget as Node | null;
             if (next && !panelRef.current?.contains(next) && !triggerRef.current?.contains(next)) {
-              setOpen(false);
+              setMode("closed");
             }
           }}
           // Slides out of the rail from its bottom-left corner, the way the footer card would

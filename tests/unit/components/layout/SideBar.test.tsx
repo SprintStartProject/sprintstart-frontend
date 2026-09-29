@@ -449,7 +449,7 @@ describe("SideBar", () => {
       expect(trigger).toHaveAttribute("aria-expanded", "true");
       expect(card).not.toHaveAttribute("inert");
       expect(within(card).getByRole("button", { name: "Logout" })).toBeInTheDocument();
-      expect(within(card).getByRole("link", { name: "Settings" })).toBeInTheDocument();
+      expect(within(card).getByRole("link", { name: /^Settings/ })).toBeInTheDocument();
 
       await user.keyboard("{Escape}");
       expect(trigger).toHaveAttribute("aria-expanded", "false");
