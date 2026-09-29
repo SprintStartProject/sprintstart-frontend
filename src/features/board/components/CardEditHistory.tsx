@@ -27,10 +27,22 @@ type CardEditHistoryProps = {
   notice?: "restored" | "stale" | null;
 };
 
-/** What the strip says happened, per author and per kind of edit. */
-const ACTOR_WORDS: Record<BoardActor, Record<"EDITED" | "TICKED", string>> = {
+/**
+ * What the strip says happened, per author and per kind of edit.
+ *
+ * Partial on purpose: an author this client has never met — a newer backend's actor — falls through
+ * to plain words instead of taking the card down with an undefined lookup, the same way an unknown
+ * card kind renders its visible fallback rather than crashing the board.
+ */
+const ACTOR_WORDS: Partial<Record<BoardActor, Record<"EDITED" | "TICKED", string>>> = {
   HIRE: { EDITED: "You edited this", TICKED: "You changed the ticks" },
   BUDDY: { EDITED: "Your buddy rewrote this", TICKED: "Your buddy changed the ticks" },
+};
+
+/** The words for an edit whose author this client has no name for. */
+const UNKNOWN_EDIT_WORDS: Record<"EDITED" | "TICKED", string> = {
+  EDITED: "This card was edited",
+  TICKED: "The ticks changed",
 };
 
 /**
@@ -41,6 +53,9 @@ const ACTOR_WORDS: Record<BoardActor, Record<"EDITED" | "TICKED", string>> = {
  * easier to read than the date, so it becomes one.
  */
 function whenPhrase(at: Date): string {
+  // A stamp this client cannot read still gets words: the one thing this line must never do is talk
+  // about the page — "Invalid Date" — instead of about the edit.
+  if (Number.isNaN(at.getTime())) return "at an unknown time";
   const minutes = Math.floor((Date.now() - at.getTime()) / 60_000);
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes} min ago`;
@@ -78,9 +93,11 @@ export function CardEditHistory({
   // card's latest change but not this version's, and these words are about this version.
   const kind =
     lastChange?.change === "TICKED" && lastChange.at === previous.replacedAt ? "TICKED" : "EDITED";
-  const words = ACTOR_WORDS[previous.replacedBy][kind];
+  const words = ACTOR_WORDS[previous.replacedBy]?.[kind] ?? UNKNOWN_EDIT_WORDS[kind];
   const at = new Date(previous.replacedAt);
+  const readableStamp = !Number.isNaN(at.getTime());
   const who = previous.replacedBy === "BUDDY" ? "your buddy's edit" : "your own edit";
+  const previousPanelId = `card-edit-history-previous-${cardId}`;
 
   return (
     <div
@@ -95,13 +112,15 @@ export function CardEditHistory({
         )}
 
         <span className="min-w-0 flex-1">
-          {words} · <span title={at.toLocaleString()}>{whenPhrase(at)}</span>
+          {words} ·{" "}
+          <span title={readableStamp ? at.toLocaleString() : undefined}>{whenPhrase(at)}</span>
         </span>
 
         <Button
           variant="ghost"
           size="sm"
           aria-expanded={showing}
+          aria-controls={previousPanelId}
           onClick={() => setShowing((current) => !current)}
           data-testid="card-edit-history-toggle"
         >
@@ -133,19 +152,25 @@ export function CardEditHistory({
         {notice === "restored" ? `Restored — the ${controlLabel} says what it said before.` : ""}
       </span>
 
-      {showing && (
-        <div
-          data-testid="card-edit-history-previous"
-          className="mt-2 rounded-lg border border-app-border-muted bg-app-surface px-2.5 py-2"
-        >
-          <p className="text-xs font-medium text-app-text-muted">
-            {previous.replacedBy === "BUDDY" ? "Before your buddy's edit" : "Before your edit"}
-          </p>
-          <div className="mt-1">
-            <PreviousContent content={previous.content} cardId={cardId} />
-          </div>
-        </div>
-      )}
+      {/* Kept in the DOM while closed — hidden, not absent — so the disclosure's `aria-controls`
+          always points at something real; the words themselves render only while it is open. */}
+      <div
+        id={previousPanelId}
+        hidden={!showing}
+        data-testid="card-edit-history-previous"
+        className="mt-2 rounded-lg border border-app-border-muted bg-app-surface px-2.5 py-2"
+      >
+        {showing && (
+          <>
+            <p className="text-xs font-medium text-app-text-muted">
+              {previous.replacedBy === "BUDDY" ? "Before your buddy's edit" : "Before your edit"}
+            </p>
+            <div className="mt-1">
+              <PreviousContent content={previous.content} cardId={cardId} />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

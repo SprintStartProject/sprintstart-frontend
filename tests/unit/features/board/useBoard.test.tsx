@@ -196,6 +196,7 @@ describe("undoing the latest edit", () => {
   beforeEach(() => {
     vi.mocked(boardService.fetchBoard).mockReset();
     vi.mocked(boardService.restorePrevious).mockReset();
+    vi.mocked(boardService.editCard).mockReset();
   });
 
   const edited = (): BoardCard => ({
@@ -305,5 +306,28 @@ describe("undoing the latest edit", () => {
       kind: "NOTE",
       text: "deploys are on Fridays",
     });
+  });
+
+  it("drops the stale notice once that card is edited again", async () => {
+    vi.mocked(boardService.fetchBoard).mockResolvedValue(boardWith(edited()));
+    vi.mocked(boardService.restorePrevious).mockRejectedValue(
+      new ApiError(409, "That card has changed since — nothing was undone"),
+    );
+    vi.mocked(boardService.editCard).mockResolvedValue(edited());
+
+    const { result } = renderHook(() => useBoard("p1"));
+    await waitFor(() => expect(result.current.board?.cards).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.restorePrevious("c1", "2026-09-29T10:15:30.123Z");
+    });
+    expect(result.current.undoNotice).toEqual({ cardId: "c1", kind: "stale" });
+
+    await act(async () => {
+      await result.current.editCard("c1", { kind: "NOTE", text: "deploys are on Fridays" });
+    });
+
+    // The notice described the card as it was; the edit just made it describe nothing.
+    expect(result.current.undoNotice).toBeNull();
   });
 });

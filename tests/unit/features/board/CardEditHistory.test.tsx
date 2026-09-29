@@ -1,7 +1,11 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { CardEditHistory } from "../../../../src/features/board/components/CardEditHistory";
-import type { BoardCardLastChange, BoardCardPrevious } from "../../../../src/features/board/types";
+import type {
+  BoardActor,
+  BoardCardLastChange,
+  BoardCardPrevious,
+} from "../../../../src/features/board/types";
 
 const snapshot = (over: Partial<BoardCardPrevious> = {}): BoardCardPrevious => ({
   content: { kind: "NOTE", text: "deploys are on Wednesdays" },
@@ -81,15 +85,22 @@ describe("the record of a card's latest edit", () => {
     expect(screen.getByText(/your buddy rewrote this/i)).toBeInTheDocument();
   });
 
-  it("shows the previous words only when asked, and says it is expanded", () => {
+  it("shows the previous words only when asked, and says what it discloses", () => {
     renderStrip();
 
-    expect(screen.queryByText("deploys are on Wednesdays")).not.toBeInTheDocument();
     const toggle = screen.getByRole("button", { name: "Show what it said before" });
+    const panel = screen.getByTestId("card-edit-history-previous");
+
+    // The panel stays in the DOM while closed — hidden, not absent — so the reference the
+    // disclosure points at always resolves for the assistive tech reading it.
     expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", panel.id);
+    expect(panel).toHaveAttribute("hidden");
+    expect(screen.queryByText("deploys are on Wednesdays")).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
 
+    expect(panel).not.toHaveAttribute("hidden");
     expect(screen.getByText("deploys are on Wednesdays")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hide what it said before" })).toHaveAttribute(
       "aria-expanded",
@@ -154,5 +165,20 @@ describe("the record of a card's latest edit", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       /restored — the note says what it said before/i,
     );
+  });
+
+  it("says something true when the wire carries an author it has never met", () => {
+    // A newer backend's actor must not take the card down with it — the strip falls back to plain
+    // words rather than indexing a name it does not know.
+    renderStrip({ previous: { replacedBy: "SYSTEM" as unknown as BoardActor } });
+
+    expect(screen.getByText(/this card was edited/i)).toBeInTheDocument();
+  });
+
+  it("does not put an unreadable stamp on the card as an invalid date", () => {
+    renderStrip({ previous: { replacedAt: "not-a-date" } });
+
+    expect(screen.getByText(/at an unknown time/)).toBeInTheDocument();
+    expect(screen.queryByText(/invalid date/i)).not.toBeInTheDocument();
   });
 });

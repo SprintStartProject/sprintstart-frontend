@@ -86,12 +86,24 @@ export function useBoard(projectId: string): UseBoardResult {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [undoNotice, setUndoNotice] = useState<BoardUndoNotice | null>(null);
 
+  /**
+   * Drops an undo notice about a card that has since changed again.
+   *
+   * A notice is a statement about the card as it is right now; once the card has a newer edit —
+   * or is gone — it describes a state nobody is looking at anymore.
+   */
+  const clearNoticeFor = useCallback((cardId: string) => {
+    setUndoNotice((notice) => (notice?.cardId === cardId ? null : notice));
+  }, []);
+
   const dismiss = useCallback(
     async (cardId: string) => {
       setDismissingId(cardId);
       setDismissError(false);
       try {
         await boardService.dismissCard(cardId);
+        // The card is gone: a notice about its undo has nothing left to describe.
+        clearNoticeFor(cardId);
         await refetch();
       } catch {
         // A card that looks gone but is not is worse than one that visibly refused to go,
@@ -101,7 +113,7 @@ export function useBoard(projectId: string): UseBoardResult {
         setDismissingId(null);
       }
     },
-    [refetch],
+    [clearNoticeFor, refetch],
   );
 
   const write = useCallback(
@@ -134,6 +146,9 @@ export function useBoard(projectId: string): UseBoardResult {
         // request instead would put a card on screen that differs from the stored one in small ways
         // nobody would think to look for.
         const updated = await boardService.editCard(cardId, request);
+        // The card itself has a newer change now, so a notice about an earlier failed undo of it
+        // would sit beside fresh content it no longer describes.
+        clearNoticeFor(cardId);
         // A focus/manual refresh may already be returning the pre-edit board. Cancel it before
         // committing the server-confirmed card so its older answer cannot overwrite this one.
         await queryClient.cancelQueries({ queryKey });
@@ -151,7 +166,7 @@ export function useBoard(projectId: string): UseBoardResult {
         return false;
       }
     },
-    [queryClient, queryKey],
+    [clearNoticeFor, queryClient, queryKey],
   );
 
   const restorePrevious = useCallback(
