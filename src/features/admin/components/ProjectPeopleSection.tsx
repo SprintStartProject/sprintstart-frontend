@@ -13,6 +13,7 @@ import {
   stageToggleRemoveUser,
   type PeopleDraft,
 } from "../peopleDraft";
+import { isManagerEligible } from "../projectMove";
 import type { AdminUser, ProjectUser } from "../types";
 
 type ProjectPeopleSectionProps = {
@@ -39,24 +40,6 @@ type PersonRow = {
   isPendingAdd: boolean;
   isPendingRemove: boolean;
 };
-
-// Both spellings the two data sources use for the manager-granting roles: members
-// carry raw `GlobalUserRole` codes, while `AdminUser` exposes the humanized
-// permission-group label.
-const MANAGER_ELIGIBLE_ROLES = new Set(["PM", "ADMIN", "PROJECT MANAGER", "PROJECT_MANAGER"]);
-
-/**
- * Whether any of the given role signals grants project-manager eligibility.
- *
- * The backend only accepts a manager who already holds the global PM (or ADMIN)
- * role and rejects anyone else with a bare 400, so the UI enforces the same rule
- * up front instead of letting the assignment fail with an opaque "Bad request".
- */
-function isManagerEligible(...roleSignals: Array<string | undefined>): boolean {
-  return roleSignals.some(
-    (signal) => signal !== undefined && MANAGER_ELIGIBLE_ROLES.has(signal.trim().toUpperCase()),
-  );
-}
 
 function getDisplayName(user: {
   firstName?: string;
