@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   AlertCircle,
-  Bot,
   Check,
   FolderPlus,
   LayoutDashboard,
@@ -1333,17 +1331,6 @@ export function BoardPage() {
             </div>
           </div>
         ) : null}
-
-        {/* The board is curated by the mentor, so it should always be one click from them. */}
-        <p className="text-sm text-app-text-muted">
-          <Link
-            to="/buddy"
-            className="inline-flex items-center gap-1.5 font-medium text-app-brand-text hover:underline"
-          >
-            <Bot className="h-4 w-4" aria-hidden="true" />
-            Ask your buddy about any of this
-          </Link>
-        </p>
       </main>
 
       <BoardChainPanel
