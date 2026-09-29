@@ -257,10 +257,15 @@ describe("BuddyActionProposals", () => {
       expect(onConfirm).not.toHaveBeenCalled();
 
       // A disabled button is not a reason anyone can read. The message is `Field`'s `error` —
-      // announced, with the control marked invalid and described by it — and it appears in
-      // response to the hire's own clearing, not on a field they have not touched.
+      // announced, with the control marked invalid and described by it. On the path the backend
+      // actually produces, it appears in response to the hire's own clearing; a flag that arrived
+      // with no question at all would show it from the first render — which is right, because a
+      // disabled confirm still has to say why.
       expect(screen.getByRole("alert")).toHaveTextContent("Write a question before sending.");
       expect(field).toHaveAttribute("aria-invalid", "true");
+      // Mandatory, and marked as such: the asterisk is the visual half, `aria-required` is what is
+      // read out.
+      expect(field).toHaveAttribute("aria-required", "true");
 
       // It goes the moment there is a question again.
       await userEvent.type(field, "Who signs off?");
@@ -371,8 +376,32 @@ describe("BuddyActionProposals", () => {
       );
 
       expect(screen.getByText("Could not send that just now.")).toBeInTheDocument();
+      // ...and it does not wear a checkmark: the sentence and the mark have to agree, and the
+      // shape is what carries that — colour alone never does (AGENTS §7).
+      const reason = screen.getByText("Could not send that just now.");
+      const mark = reason.querySelector("svg");
+      // An alert mark, not a check — and asserted by name because lucide renamed the icon
+      // (`AlertCircle` is an alias of `CircleAlert`); the shape is what carries the meaning.
+      expect(mark?.getAttribute("class")).toContain("alert");
+      expect(mark?.getAttribute("class")).not.toContain("check");
       // ...frozen on its way out, the way it is on the way in.
       expect(screen.getByLabelText(/sends to your PM/i)).toBeDisabled();
+    });
+
+    it("drops the stale refusal once the retry failed on the wire", () => {
+      // A retry's transport error keeps the refusal's residue — the patch merges `ok`/`outcome`
+      // instead of replacing them — and adds its own note below. Both at once would read as two
+      // failures for one press, so the note is what stays.
+      render(
+        <Proposals
+          actions={[flag({ status: "error", ok: false, outcome: "Could not send that just now." })]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByText("Could not send that just now.")).not.toBeInTheDocument();
+      expect(screen.getByText(/Couldn't reach the server/)).toBeInTheDocument();
     });
 
     it("cannot retry a refusal with an empty field — a blank flag is not a question", async () => {

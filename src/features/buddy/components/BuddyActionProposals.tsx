@@ -1,4 +1,4 @@
-import { Check, Info, Loader2, TriangleAlert, Users, X } from "lucide-react";
+import { AlertCircle, Check, Info, Loader2, TriangleAlert, Users, X } from "lucide-react";
 import { Field } from "../../../components/ui/Field";
 import { Textarea } from "../../../components/ui/Textarea";
 import { actionDraftKey } from "../actionDrafts";
@@ -150,20 +150,27 @@ function BuddyProposalCard({
   const isSettled = action.status === "resolved" && (action.ok === true || isStored);
 
   // Kept above the card while a retry is on its way, not just when the refusal arrives: pressing
-  // the button again must not blank out the sentence explaining why it did not work.
+  // the button again must not blank out the sentence explaining why it did not work. The one state
+  // that drops it is a transport error *after* such a retry — the card's own note below is the
+  // newer story, and two messages about one press read as two failures.
   const outcomeLine =
-    action.status === "resolved" || wasRefused ? (
+    action.status === "resolved" || (wasRefused && action.status !== "error") ? (
       <p
         className={`flex min-w-0 items-start gap-1.5 text-sm break-words ${
           action.ok ? "text-app-text" : "text-app-text-muted"
         }`}
       >
-        <Check
-          className={`mt-0.5 h-4 w-4 shrink-0 ${
-            action.ok ? "text-app-success-solid" : "text-app-text-disabled"
-          }`}
-          aria-hidden="true"
-        />
+        {action.ok ? (
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-app-success-solid" aria-hidden="true" />
+        ) : (
+          /* Not a checkmark: an offer that kept its card for a retry must not wear the mark of
+             something that went through. Icon and sentence say the same thing — the shape carries
+             the meaning, not the colour alone (AGENTS §7). */
+          <AlertCircle
+            className="mt-0.5 h-4 w-4 shrink-0 text-app-warning-text"
+            aria-hidden="true"
+          />
+        )}
         {action.outcome}
       </p>
     ) : null;
@@ -319,6 +326,7 @@ function BuddyProposalCard({
             label="Sends to your PM"
             hint="Edit it if it is not quite right — this exact text is what they will read."
             error={hasQuestion ? undefined : "Write a question before sending."}
+            required
             disabled={isConfirming}
           >
             <Textarea
