@@ -195,6 +195,10 @@ export function BoardPage() {
     dismissError,
     addCard,
     editCard,
+    restorePrevious,
+    restoringIds,
+    savingIds,
+    undoNotices,
     reorder,
     writeError,
   } = useBoard(selectedProjectId);
@@ -1355,6 +1359,12 @@ export function BoardPage() {
                   onDismiss={handleDismiss}
                   dismissingId={dismissingId}
                   onEdit={(cardId, request) => void editCard(cardId, request)}
+                  onRestorePrevious={(cardId, replacedAt) =>
+                    void restorePrevious(cardId, replacedAt)
+                  }
+                  restoringIds={restoringIds}
+                  savingIds={savingIds}
+                  undoNotices={undoNotices}
                   // A checklist broken out of a task is a *new* card, which only a re-read can
                   // show. Without this the write lands and the board keeps drawing what it read
                   // before the press.
