@@ -28,7 +28,7 @@ export function WidgetMetrics({
   metrics: WidgetMetric[];
 }) {
   return (
-    <ul className="flex flex-1 flex-col justify-center gap-3">
+    <ul className="flex flex-1 flex-col justify-center gap-2.5">
       {metrics.map((metric) => (
         <li key={metric.label} className="flex items-start gap-3">
           <span
@@ -50,7 +50,7 @@ export function WidgetMetrics({
                 <span className="text-sm font-medium text-app-text-muted">{metric.suffix}</span>
               ) : null}
             </p>
-            <p className="mt-0.5 truncate text-xs text-app-text-muted">{metric.hint}</p>
+            <p className="truncate text-xs text-app-text-muted">{metric.hint}</p>
           </div>
         </li>
       ))}

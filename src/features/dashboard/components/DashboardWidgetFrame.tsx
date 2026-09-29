@@ -30,14 +30,14 @@ export type DashboardWidgetFrameProps = {
   isEditing: boolean;
   isDragging: boolean;
   /**
-   * Whether the board is running as a single column (below `sm`).
+   * Whether the board is running as a single column.
    *
    * The placed size still decides the cell, but on one column every card is the full width of
    * the page whatever it was given — so the *rendered* form is chosen for the column that is
    * actually there rather than for the one the user picked on a desktop. See
    * {@link dashboardRenderSize}.
    */
-  isNarrow: boolean;
+  isSingleColumn: boolean;
   onRemove: (id: DashboardWidgetId) => void;
   onResize: (id: DashboardWidgetId, size: DashboardWidgetSize) => void;
   onMoveBy: (id: DashboardWidgetId, offset: number) => void;
@@ -72,7 +72,7 @@ export function DashboardWidgetFrame({
   total,
   isEditing,
   isDragging,
-  isNarrow,
+  isSingleColumn,
   onRemove,
   onResize,
   onMoveBy,
@@ -93,7 +93,7 @@ export function DashboardWidgetFrame({
   // 36px button at, and the card has already said it can be moved by the time you reach it.
   const isWiggling = isEditing && !reduceMotion && !isPointerOver && !isDragging;
 
-  const renderSize = dashboardRenderSize(definition, size, isNarrow);
+  const renderSize = dashboardRenderSize(definition, size, isSingleColumn);
 
   return (
     <motion.div

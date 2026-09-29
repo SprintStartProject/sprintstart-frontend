@@ -10,8 +10,14 @@ import type { DashboardWidgetSize } from "../layout/types";
 import { WidgetMetrics, type WidgetMetric } from "./WidgetMetrics";
 import { WidgetShell } from "./WidgetShell";
 
-/** Sources listed before the column would run past the bottom of a fixed-height cell. */
-const VISIBLE_SOURCE_COUNT = 3;
+/**
+ * Sources listed before the column would run past the bottom of a fixed-height cell.
+ *
+ * Fewer at `medium`: there the list is half a half-row card, each source takes two lines, and
+ * three of them plus "and N more" measured ~40px taller than the cell — the last line sat on
+ * the card's bottom edge. The wide card keeps a source to one line, so it has room for three.
+ */
+const VISIBLE_SOURCE_COUNT: Record<DashboardWidgetSize, number> = { small: 0, medium: 2, wide: 3 };
 
 /**
  * One row per connected repository, scoped to the selected project — the same granularity
@@ -61,6 +67,10 @@ function SourceRow({ source, inline = false }: { source: DataSource; inline?: bo
     <li className="flex items-start gap-3">
       <source.icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-app-text-muted" />
 
+      {/* The wide card keeps each source to one line at every width: stacked, three sources and
+          their "and N more" were taller than the two-column form of the card and the last line
+          was cut off. Where the list only gets half the card, the artifact count steps aside
+          instead so the name keeps its room. */}
       <div className={`min-w-0 flex-1 ${inline ? "flex items-center justify-between gap-4" : ""}`}>
         <p className="truncate text-sm font-medium text-app-text">{source.name}</p>
 
@@ -72,7 +82,9 @@ function SourceRow({ source, inline = false }: { source: DataSource; inline?: bo
             {source.statusView.label}
           </Badge>
 
-          <span className="text-xs text-app-text-muted tabular-nums">
+          <span
+            className={`text-xs text-app-text-muted tabular-nums ${inline ? "hidden @3xl:inline" : ""}`}
+          >
             {formatNumber(source.totalArtifactCount)} artifacts
           </span>
 
@@ -154,7 +166,9 @@ export function IngestionWidget({ size }: { size: DashboardWidgetSize }) {
   const metrics = metricsFor(sources);
 
   // Whatever is broken is what the reader came for, so it goes to the top of the list.
-  const listed = [...sources].sort((a, b) => b.errors - a.errors).slice(0, VISIBLE_SOURCE_COUNT);
+  const listed = [...sources]
+    .sort((a, b) => b.errors - a.errors)
+    .slice(0, VISIBLE_SOURCE_COUNT[size]);
   const hidden = sources.length - listed.length;
 
   return (
@@ -177,8 +191,8 @@ export function IngestionWidget({ size }: { size: DashboardWidgetSize }) {
         // own line: that is the width the name and the state needed to stop fighting for a
         // line, and a divider so the two halves stay two halves.
         <div
-          className={`grid flex-1 grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 ${
-            size === "wide" ? "lg:grid-cols-3" : ""
+          className={`grid flex-1 grid-cols-1 gap-x-8 gap-y-5 @min-[24rem]:grid-cols-2 ${
+            size === "wide" ? "@3xl:grid-cols-3" : ""
           }`}
         >
           <WidgetMetrics icon={Database} metrics={metrics} />
@@ -186,7 +200,10 @@ export function IngestionWidget({ size }: { size: DashboardWidgetSize }) {
           <div
             className={
               size === "wide"
-                ? "border-t border-app-border-muted pt-5 lg:col-span-2 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8"
+                ? // Beside the figures from two columns up, not only from three: the wide card is
+                  // only ever rendered on a board of two columns or more, where a divider along
+                  // the *top* of the second column read as a stray line.
+                  "border-t border-app-border-muted pt-5 @min-[24rem]:border-t-0 @min-[24rem]:border-l @min-[24rem]:pt-0 @min-[24rem]:pl-8 @3xl:col-span-2"
                 : ""
             }
           >

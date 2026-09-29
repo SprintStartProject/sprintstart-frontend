@@ -34,25 +34,29 @@ export function RecentChatsWidget() {
   const recentChats = (chat?.sortedChats ?? []).slice(0, PREVIEW_COUNT);
 
   return (
-    <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
+    <div className="group @container relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"
       />
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
             <MessagesSquare className="h-3.5 w-3.5" />
           </span>
-          <span className="text-sm font-semibold text-app-text">Your conversations</span>
+          <span className="truncate text-sm font-semibold text-app-text">Your conversations</span>
         </div>
 
         <Link
           to="/chat"
           className="flex shrink-0 items-center gap-1 rounded-lg text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          // Named here because the words beside the arrow step aside on a narrow card.
+          aria-label="Open chat"
         >
-          Open chat
+          {/* Same container-width rule as `WidgetShell`: in a quarter-row card the label beside
+              the title ran the link to within a few pixels of the card's edge. */}
+          <span className="hidden @min-[17rem]:inline">Open chat</span>
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>

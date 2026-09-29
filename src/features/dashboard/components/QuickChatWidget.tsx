@@ -63,7 +63,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
 
   return (
     <div
-      className={`relative flex h-full flex-col justify-center rounded-2xl ${isWide ? "px-6 py-4" : "p-6"}`}
+      className={`@container relative flex h-full flex-col justify-center rounded-2xl ${isWide ? "px-6 py-4" : "p-6"}`}
     >
       {/* The clip lives on this layer rather than on the card itself, so
           the glow blobs stay inside the rounded edge while the content
@@ -81,7 +81,11 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
       </div>
 
       <div
-        className={`relative flex flex-col gap-5 ${isWide ? "lg:flex-row lg:items-center" : ""}`}
+        // The wide form is always a row. It only renders on a board of two columns or more (see
+        // `dashboardRenderSize`), where its cell is the 136px band -- and stacked, the bot, the
+        // input and the suggestions need twice that. It used to switch on the *window* (`lg`),
+        // so a band narrower than the window implied was stacked into a box it could not fit.
+        className={`relative flex gap-5 ${isWide ? "flex-row items-center" : "flex-col"}`}
       >
         {/* Stacked and centred rather than a row: at this size the bot
             is the subject of the widget, not a bullet point in front of
@@ -89,7 +93,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
             baseline off-centre. */}
         <div
           className={`flex flex-col items-center text-center ${
-            isWide ? "lg:w-56 lg:shrink-0" : ""
+            isWide ? "w-36 shrink-0 @3xl:w-56" : ""
           }`}
         >
           {/* The same assistant as in the chat, idle timer and all —
@@ -149,7 +153,18 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
             </div>
           </form>
 
-          <div className={`mt-3 flex flex-wrap gap-2 ${isWide ? "" : "justify-center"}`}>
+          {/* One line in the band, however many suggestions fit on it: wrapping to a second line
+              is what pushed the band's content past its bottom edge. The rest stay reachable --
+              the row scrolls sideways, and tabbing to a chip scrolls it into view. */}
+          <div
+            className={`flex gap-2 ${
+              isWide
+                ? // `pt-1` instead of the margin: a scroller clips upwards too, and the chips lift
+                  // 2px on hover.
+                  "mt-2 [scrollbar-width:none] flex-nowrap overflow-x-auto pt-1 [&::-webkit-scrollbar]:hidden"
+                : "mt-3 flex-wrap justify-center"
+            }`}
+          >
             {suggestions.map((suggestion, index) => (
               <motion.button
                 key={suggestion}
@@ -162,7 +177,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
                 }}
                 whileHover={{ y: -2 }}
                 onClick={() => openInChat(suggestion)}
-                className="rounded-full border border-app-border-muted bg-app-surface-muted px-3 py-1.5 text-xs text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text"
+                className="shrink-0 rounded-full border border-app-border-muted bg-app-surface-muted px-3 py-1.5 text-xs whitespace-nowrap text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text"
               >
                 {suggestion}
               </motion.button>

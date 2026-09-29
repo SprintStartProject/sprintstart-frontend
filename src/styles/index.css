@@ -435,9 +435,15 @@ body {
   }
 }
 
+/* Fluid from `lg` up rather than a flat 10rem. The page beside the sidebar is the window minus
+   286px, and two fixed 160px gutters took another 320px of it: at 1024px that left ~420px of
+   page, at 1280px ~660px, which is what squeezed the dashboard's quarter-row cards to ~150px and
+   pushed their content out of the frame. This grows with the window instead — 2rem at 1024px,
+   ~3.2rem at 1280px, ~4.1rem at 1440px, ~6.8rem at 1920px — and caps at the old 10rem on very
+   wide screens, where the calm margin was the point. */
 @media (min-width: 1024px) {
   :root {
-    --app-page-gutter: 10rem;
+    --app-page-gutter: clamp(2rem, 9vw - 4rem, 10rem);
     --app-page-block-gutter: 2.5rem;
   }
 }
