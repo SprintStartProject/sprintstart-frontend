@@ -416,7 +416,11 @@ describe("SideBar", () => {
       expect(sidebarWidth()).toBe("76px");
       // Icon only, but still a link with its name.
       expect(within(desktop()).getByRole("link", { name: /Dashboard/ })).toBeInTheDocument();
-      expect(within(desktop()).queryByRole("separator")).not.toBeInTheDocument();
+      // The edge stays, to pull it open again.
+      expect(within(desktop()).getByRole("separator")).toHaveAttribute(
+        "aria-valuetext",
+        "Collapsed",
+      );
 
       unmount();
       renderWithProviders(<SideBar />);
@@ -465,6 +469,29 @@ describe("SideBar", () => {
       unmount();
       renderWithProviders(<SideBar />);
       expect(within(desktop()).getByRole("separator")).toHaveAttribute("aria-valuenow", "240");
+    });
+
+    it("opens again from its edge while folded, at the width it had", async () => {
+      const user = userEvent.setup();
+      signIn();
+      renderWithProviders(<SideBar />);
+
+      const handle = within(desktop()).getByRole("separator", { name: "Resize sidebar" });
+      handle.focus();
+      await user.keyboard("{ArrowRight}{Enter}");
+      expect(sidebarWidth()).toBe("76px");
+
+      await user.keyboard("{ArrowLeft}");
+      expect(sidebarWidth()).toBe("76px");
+
+      await user.keyboard("{ArrowRight}");
+      expect(sidebarWidth()).toBe("302px");
+      expect(
+        within(desktop()).getByRole("button", { name: "Collapse sidebar" }),
+      ).toBeInTheDocument();
+
+      await user.keyboard("{Enter}{Enter}");
+      expect(sidebarWidth()).toBe("302px");
     });
 
     it("leaves the mobile drawer as it was", async () => {

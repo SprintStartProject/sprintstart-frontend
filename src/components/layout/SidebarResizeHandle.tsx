@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent, type PointerEvent } from "react";
 import {
+  SIDEBAR_COLLAPSED_WIDTH,
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_WIDTH_VAR,
   SIDEBAR_MAX_WIDTH,
@@ -10,11 +11,19 @@ import {
 
 /** Dragged this far past the minimum, the sidebar folds to icons instead of stopping there. */
 const COLLAPSE_OVERSHOOT_PX = 80;
+/**
+ * Where the edge switches between folded and open, in both directions: pulled left of it the
+ * sidebar folds, pulled right of it (out of the folded rail) the sidebar opens again.
+ */
+const COLLAPSE_THRESHOLD = SIDEBAR_MIN_WIDTH - COLLAPSE_OVERSHOOT_PX;
 
 type SidebarResizeHandleProps = {
+  /** The open width -- kept while folded, for when it opens again. */
   width: number;
+  collapsed: boolean;
   onResize: (width: number) => void;
   onCollapse: () => void;
+  onExpand: () => void;
 };
 
 /** Marks a drag on the root element, where `app-sidebar-eases` holds its transition off meanwhile. */
@@ -26,7 +35,11 @@ function setDragging(dragging: boolean) {
 /**
  * The desktop sidebar's right edge, as something to drag: wider or narrower within
  * {@link SIDEBAR_MIN_WIDTH} and {@link SIDEBAR_MAX_WIDTH}, folded to icons when pulled well past
- * the minimum, back to the default on a double click.
+ * the minimum, back to the default on a double click. Folded, the same edge pulls it open again,
+ * so neither direction needs the toggle button.
+ *
+ * Folding and opening happen as the pointer crosses {@link COLLAPSE_THRESHOLD}, not on release:
+ * the rail snaps shut or open under the pointer, so what is let go of is what stays.
  *
  * While dragging it writes the width straight into the sidebar's CSS variable (which the page's
  * margin reads too) and only hands the result back on release: a state update per pointer move
@@ -34,16 +47,29 @@ function setDragging(dragging: boolean) {
  * the mouse.
  *
  * A `separator` with a value, so it is reachable and usable from the keyboard too: the arrow
- * keys move the edge, Home and End jump to the limits, Enter folds the sidebar to icons.
+ * keys move the edge, Home and End jump to the limits, Enter folds the sidebar to icons or opens
+ * it again. Folded, the right arrow and End open it.
  */
-export function SidebarResizeHandle({ width, onResize, onCollapse }: SidebarResizeHandleProps) {
-  const drag = useRef<{ startX: number; startWidth: number; raw: number } | null>(null);
+export function SidebarResizeHandle({
+  width,
+  collapsed,
+  onResize,
+  onCollapse,
+  onExpand,
+}: SidebarResizeHandleProps) {
+  const drag = useRef<{
+    startX: number;
+    startWidth: number;
+    raw: number;
+    collapsed: boolean;
+  } | null>(null);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { startX: event.clientX, startWidth: width, raw: width };
+    const startWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : width;
+    drag.current = { startX: event.clientX, startWidth, raw: startWidth, collapsed };
     setDragging(true);
   };
 
@@ -51,6 +77,22 @@ export function SidebarResizeHandle({ width, onResize, onCollapse }: SidebarResi
     const current = drag.current;
     if (!current) return;
     current.raw = current.startWidth + event.clientX - current.startX;
+    const folds = current.raw < COLLAPSE_THRESHOLD;
+
+    if (folds !== current.collapsed) {
+      // One state update per crossing, not per move: the sidebar has to swap between its folded
+      // and open layout, which the CSS variable alone cannot do.
+      current.collapsed = folds;
+      if (folds) {
+        onCollapse();
+      } else {
+        // Opens at the width under the pointer, not at the one it had before it folded.
+        onResize(current.raw);
+        onExpand();
+      }
+    }
+    // Folded, the sidebar writes the rail's width itself.
+    if (folds) return;
     document.documentElement.style.setProperty(
       SIDEBAR_WIDTH_VAR,
       `${clampSidebarWidth(current.raw)}px`,
@@ -65,16 +107,27 @@ export function SidebarResizeHandle({ width, onResize, onCollapse }: SidebarResi
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setDragging(false);
-    // The sidebar writes the variable again from its state on the next render.
-    if (current.raw < SIDEBAR_MIN_WIDTH - COLLAPSE_OVERSHOOT_PX) {
-      // Keeps the width it had, for when it is opened again.
-      onCollapse();
-    } else {
-      onResize(current.raw);
-    }
+    // Folded or opened already while crossing the threshold; an open edge still has to hand its
+    // final width back. The sidebar writes the variable again from its state on the next render.
+    if (!current.collapsed) onResize(current.raw);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (collapsed) onExpand();
+      else onCollapse();
+      return;
+    }
+    if (collapsed) {
+      // Folded there is no width to move; growing it means opening it, at the width it had.
+      if (event.key === "ArrowRight" || event.key === "End") {
+        event.preventDefault();
+        onExpand();
+      }
+      return;
+    }
+
     const next =
       event.key === "ArrowLeft"
         ? width - SIDEBAR_WIDTH_STEP
@@ -86,11 +139,6 @@ export function SidebarResizeHandle({ width, onResize, onCollapse }: SidebarResi
               ? SIDEBAR_MAX_WIDTH
               : null;
 
-    if (event.key === "Enter") {
-      event.preventDefault();
-      onCollapse();
-      return;
-    }
     if (next === null) return;
     event.preventDefault();
     onResize(next);
@@ -104,16 +152,24 @@ export function SidebarResizeHandle({ width, onResize, onCollapse }: SidebarResi
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize sidebar"
-      aria-valuenow={width}
-      aria-valuemin={SIDEBAR_MIN_WIDTH}
+      aria-valuenow={collapsed ? SIDEBAR_COLLAPSED_WIDTH : width}
+      aria-valuemin={collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_MIN_WIDTH}
       aria-valuemax={SIDEBAR_MAX_WIDTH}
+      aria-valuetext={collapsed ? "Collapsed" : `${width} pixels`}
       tabIndex={0}
-      title="Drag to resize, double-click to reset"
+      title={
+        collapsed
+          ? "Drag to expand, double-click to reset"
+          : "Drag to resize, double-click to reset"
+      }
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
-      onDoubleClick={() => onResize(SIDEBAR_DEFAULT_WIDTH)}
+      onDoubleClick={() => {
+        onResize(SIDEBAR_DEFAULT_WIDTH);
+        if (collapsed) onExpand();
+      }}
       onKeyDown={onKeyDown}
       // A wide, invisible grip centred on the border; the line itself only shows on hover, focus
       // or drag.

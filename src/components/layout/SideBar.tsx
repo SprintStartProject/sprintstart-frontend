@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useState } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
-import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, X } from "lucide-react";
+import { ChevronsLeft, LogOut, Menu, Settings, X } from "lucide-react";
 import { UserAvatar } from "../common/UserAvatar";
 import { useAuth } from "../../context/useAuth";
 import { canAccessRoute, isOnboardingAccessible, type AppRoute } from "../../auth/accessPolicy";
@@ -288,15 +288,20 @@ function SidebarContent({
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-expanded={!collapsed}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+            className={`group/fold flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
               collapsed ? "" : "ml-auto"
             }`}
           >
-            {collapsed ? (
-              <PanelLeftOpen aria-hidden="true" className="h-[18px] w-[18px]" />
-            ) : (
-              <PanelLeftClose aria-hidden="true" className="h-[18px] w-[18px]" />
-            )}
+            {/* One chevron pair that turns round with the sidebar, and leans the way it would go
+                on hover: points left while open (fold in), right while folded (pull out). */}
+            <ChevronsLeft
+              aria-hidden="true"
+              className={`h-[18px] w-[18px] transition-transform duration-300 ease-out motion-reduce:transition-none ${
+                collapsed
+                  ? "rotate-180 group-hover/fold:translate-x-0.5"
+                  : "group-hover/fold:-translate-x-0.5"
+              }`}
+            />
           </button>
         )}
       </div>
@@ -550,13 +555,14 @@ export function SideBar() {
           collapsed={sidebarLayout.collapsed}
           onToggleCollapsed={sidebarLayout.toggleCollapsed}
         />
-        {!sidebarLayout.collapsed && (
-          <SidebarResizeHandle
-            width={sidebarLayout.width}
-            onResize={sidebarLayout.setWidth}
-            onCollapse={() => sidebarLayout.setCollapsed(true)}
-          />
-        )}
+        {/* Also on the folded rail: its edge pulls the sidebar open again. */}
+        <SidebarResizeHandle
+          width={sidebarLayout.width}
+          collapsed={sidebarLayout.collapsed}
+          onResize={sidebarLayout.setWidth}
+          onCollapse={() => sidebarLayout.setCollapsed(true)}
+          onExpand={() => sidebarLayout.setCollapsed(false)}
+        />
       </aside>
 
       <header className="fixed top-0 right-0 left-0 z-40 flex h-[64px] items-center justify-between border-b border-app-border bg-app-bg px-[16px] lg:hidden">
