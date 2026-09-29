@@ -506,10 +506,8 @@ describe("CreateProjectWizard", () => {
 
       await toReview(user, ["Max", "Lena"]);
 
-      expect(await screen.findByRole("note")).toHaveTextContent(
-        "1 person is in another project and is moved here.",
-      );
-      expect(screen.getByText(/moved from Alpha/)).toBeInTheDocument();
+      expect(await screen.findByRole("note")).toHaveTextContent(/moved from their current project/);
+      expect(screen.getByText(/from Alpha/)).toBeInTheDocument();
     });
 
     it("shows no note when nobody would be moved", async () => {

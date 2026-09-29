@@ -49,13 +49,27 @@ function sourceTitle(source: DraftSource): string {
 }
 
 function PersonChip({ person, suffix }: { person: ReviewPerson; suffix?: string }) {
+  const movedFrom = person.movedFrom?.join(", ");
+
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface py-0.5 pr-3 pl-0.5 text-xs text-app-text">
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border py-0.5 pr-3 pl-0.5 text-xs text-app-text ${
+        movedFrom
+          ? "border-app-warning-border bg-app-warning-bg"
+          : "border-app-border bg-app-surface"
+      }`}
+    >
       <UserAvatar profileIcon={person.profileIcon} fallbackName={person.name} size={20} />
       <span className="truncate">
         {person.name}
         {suffix && <span className="text-app-text-muted"> · {suffix}</span>}
       </span>
+      {movedFrom && (
+        <span className="inline-flex items-center gap-1 font-medium text-app-warning-text">
+          <ArrowRightLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
+          from {movedFrom}
+        </span>
+      )}
     </span>
   );
 }
@@ -156,37 +170,20 @@ export function WizardReviewStep({
         {memberCount === 0 ? (
           <span className="text-app-text-muted">No members</span>
         ) : (
-          <div className="space-y-3">
-            {movedMembers.length > 0 && (
-              <div
-                role="note"
-                className="flex items-start gap-2 rounded-xl border border-app-warning-border bg-app-warning-bg px-3 py-2.5 text-xs text-app-warning-text"
-              >
-                <ArrowRightLeft className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <p className="leading-relaxed">
-                  {movedMembers.length === 1
-                    ? "1 person is in another project and is moved here."
-                    : `${movedMembers.length} people are in other projects and are moved here.`}{" "}
-                  They are removed from their current project, and their project roles and
-                  onboarding progress are reset.
-                </p>
-              </div>
-            )}
-
+          <div className="space-y-2.5">
             <div className="flex flex-wrap gap-1.5">
               {manager && <PersonChip person={manager} suffix="Manager" />}
               {members.map((member) => (
-                <PersonChip
-                  key={member.id}
-                  person={member}
-                  suffix={
-                    member.movedFrom?.length
-                      ? `moved from ${member.movedFrom.join(", ")}`
-                      : undefined
-                  }
-                />
+                <PersonChip key={member.id} person={member} />
               ))}
             </div>
+
+            {movedMembers.length > 0 && (
+              <p role="note" className="text-xs text-app-text-muted">
+                People marked with an arrow are moved from their current project. Their roles and
+                onboarding progress are reset.
+              </p>
+            )}
           </div>
         )}
       </ReviewBlock>
