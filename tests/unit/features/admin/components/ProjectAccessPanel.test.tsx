@@ -103,6 +103,46 @@ describe("ProjectAccessPanel", () => {
     });
   });
 
+  it("skips the assignment when confirmAssign resolves false", async () => {
+    const user = userEvent.setup();
+    const confirmAssign = vi.fn().mockResolvedValue(false);
+    render(
+      <ProjectAccessPanel
+        assignedProjects={assignedProjects}
+        availableProjects={availableProjects}
+        {...defaultCallbacks}
+        confirmAssign={confirmAssign}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Add project/i }));
+    await user.click(screen.getByText("Beta"));
+
+    await waitFor(() => {
+      expect(confirmAssign).toHaveBeenCalledWith("proj-2");
+    });
+    expect(defaultCallbacks.onAssignProject).not.toHaveBeenCalled();
+  });
+
+  it("assigns the project when confirmAssign resolves true", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProjectAccessPanel
+        assignedProjects={assignedProjects}
+        availableProjects={availableProjects}
+        {...defaultCallbacks}
+        confirmAssign={vi.fn().mockResolvedValue(true)}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Add project/i }));
+    await user.click(screen.getByText("Beta"));
+
+    await waitFor(() => {
+      expect(defaultCallbacks.onAssignProject).toHaveBeenCalledWith("proj-2");
+    });
+  });
+
   it("removes an assigned project via the remove button", async () => {
     const user = userEvent.setup();
     render(

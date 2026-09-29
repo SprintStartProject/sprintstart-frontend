@@ -630,6 +630,7 @@ export function AdminPage() {
           onOpenProjectDetails={openProjectDetailsFromUserDrawer}
           onUserUpdated={handleUserUpdated}
           onRequestDelete={requestUserDelete}
+          onMembershipsMoved={() => void refreshAdminData()}
         />
       )}
 
