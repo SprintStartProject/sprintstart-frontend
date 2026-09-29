@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, useNavigate } from "react-router-dom";
@@ -679,8 +679,9 @@ describe("SideBar", () => {
     );
   });
 
-  it("leaves Alt+S to the browser on desktop widths", () => {
+  it("folds and unfolds the desktop sidebar with Alt+S on desktop widths, not the drawer", async () => {
     mockViewport(true);
+    const user = userEvent.setup();
     vi.mocked(useAuthHook.useAuth).mockReturnValue({
       status: "authenticated",
       profile: mockProfile,
@@ -688,19 +689,22 @@ describe("SideBar", () => {
       logout: vi.fn(),
       refetchProfile: vi.fn(),
     });
+    const width = () =>
+      document.documentElement.style.getPropertyValue("--app-sidebar-desktop-width");
 
     try {
       renderWithProviders(<SideBar />);
 
-      // The drawer does not exist above `lg`, so the chord listens only below it: nothing
-      // visible would happen here, the state flip would ambush the next resize — and
-      // `fireEvent` coming back `true` says the keystroke falls through untouched, which on
-      // Firefox is the History menu rather than a swallowed no-op.
-      expect(fireEvent.keyDown(window, { code: "KeyS", altKey: true })).toBe(true);
+      await user.keyboard("{Alt>}s{/Alt}");
+      expect(width()).toBe("76px");
+      // The drawer is not on screen above `lg`, so its state must not flip behind the scenes.
       expect(screen.getByRole("button", { name: "Open sidebar" })).toHaveAttribute(
         "aria-expanded",
         "false",
       );
+
+      await user.keyboard("{Alt>}s{/Alt}");
+      expect(width()).toBe("286px");
     } finally {
       mockViewport(false);
     }

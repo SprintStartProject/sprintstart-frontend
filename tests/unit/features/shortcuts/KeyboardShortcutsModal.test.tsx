@@ -118,7 +118,6 @@ describe("KeyboardShortcutsModal", () => {
     renderModal();
 
     expect(within(rowFor("Jump to the message box")).getByText(/in Chat/)).toBeInTheDocument();
-    expect(within(rowFor("Toggle sidebar")).getByText(/small screens/)).toBeInTheDocument();
   });
 
   it("documents the chords the surfaces answer, not only the global ones", () => {

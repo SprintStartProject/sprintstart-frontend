@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion, type TargetAndTransition, type Variants } from "framer-motion";
 import { useRepeatClicks } from "../../features/easter-eggs/hooks/useRepeatClicks";
+import { SIDEBAR_TOGGLE_SHORTCUT, shortcutChord } from "../../features/shortcuts";
+import { ShortcutHint } from "../ui/ShortcutHint";
 import { hoverSpringToken, logoHopSpringToken } from "../../styles/tokens";
 
 const BADGE_SIZE = 44;
@@ -295,11 +297,15 @@ export function SidebarLogo({ className = "", sidebarToggle }: SidebarLogoProps)
           <span
             aria-hidden="true"
             style={{ left: hintAt.x, top: hintAt.y }}
-            className={`pointer-events-none fixed z-[70] rounded-lg border border-app-border bg-app-surface px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-app-text shadow-lg ${
+            className={`pointer-events-none fixed z-[70] flex items-center gap-2 rounded-lg border border-app-border bg-app-surface px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-app-text shadow-lg ${
               hintAt.side === "right" ? "-translate-y-1/2" : ""
             }`}
           >
             {sidebarToggle.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            <ShortcutHint
+              keys={shortcutChord(SIDEBAR_TOGGLE_SHORTCUT)}
+              className="border-app-border text-app-text-muted"
+            />
           </span>,
           document.body,
         )}

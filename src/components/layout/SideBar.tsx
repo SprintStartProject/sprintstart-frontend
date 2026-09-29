@@ -555,21 +555,22 @@ export function SideBar() {
   }, [pathname]);
 
   /**
-   * Alt+S works whatever the header's button works — one definition of "toggle the sidebar"
-   * for both ways in. Today that is the drawer below `lg`; the desktop collapse (#244) will
-   * give the same chord something to do on a wide screen without this line changing.
+   * Alt+S toggles whichever sidebar is on screen: below `lg` the drawer, as the header's
+   * button does; from `lg` up the desktop sidebar's fold to icons, as its logo does (#244).
    *
-   * Which is exactly why it only listens below `lg`: on a wide screen the drawer is not on
-   * screen, so the chord would flip state nobody can see — and leave it flipped, opening the
-   * drawer uninvited the next time the window narrows. Worse, `Alt+S` is Firefox's History
-   * menu on Windows, and swallowing it for a no-op takes the browser's own chord too.
+   * Never the drawer on a wide screen: it is not on screen there, so the chord would flip
+   * state nobody can see -- and leave it flipped, opening the drawer uninvited the next time
+   * the window narrows.
    */
   const toggleMobileSidebar = useCallback(() => {
     setIsMobileSidebarOpen((isOpen) => !isOpen);
   }, []);
   const isDesktopLayout = useMediaQuery("(min-width: 1024px)");
 
-  useShortcutListener(SIDEBAR_TOGGLE_SHORTCUT, toggleMobileSidebar, !isDesktopLayout);
+  useShortcutListener(
+    SIDEBAR_TOGGLE_SHORTCUT,
+    isDesktopLayout ? sidebarLayout.toggleCollapsed : toggleMobileSidebar,
+  );
 
   return (
     <>
