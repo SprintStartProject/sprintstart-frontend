@@ -76,7 +76,7 @@ const createdProject: AdminProjectDetails = {
   industryCustom: false,
 };
 
-function adminUser(id: string, firstName: string): AdminUser {
+function adminUser(id: string, firstName: string, overrides: Partial<AdminUser> = {}): AdminUser {
   return {
     id,
     authId: `auth-${id}`,
@@ -91,6 +91,7 @@ function adminUser(id: string, firstName: string): AdminUser {
     enabled: true,
     profileIcon: "",
     hasCompletedOnboarding: true,
+    ...overrides,
   };
 }
 
@@ -483,6 +484,71 @@ describe("CreateProjectWizard", () => {
       }),
     );
     expect(projectService.assignUsersToProject).toHaveBeenCalledTimes(1);
+  });
+
+  describe("members who are in another project", () => {
+    const inAlpha = { projects: [{ id: "proj-alpha", name: "Alpha" }], projectIds: ["proj-alpha"] };
+
+    async function toReview(user: ReturnType<typeof userEvent.setup>, pickedNames: string[]) {
+      await goToMembers(user);
+      for (const first of pickedNames) {
+        await user.click(
+          screen.getByRole("checkbox", { name: `Add ${first} Mustermann to the project` }),
+        );
+      }
+      await user.click(screen.getByRole("button", { name: /continue/i }));
+      await user.click(screen.getByRole("button", { name: /continue/i }));
+    }
+
+    it("flags them on the review step with the project they leave", async () => {
+      const user = userEvent.setup();
+      renderWizard({ users: [adminUser("u1", "Max", inAlpha), adminUser("u2", "Lena")] });
+
+      await toReview(user, ["Max", "Lena"]);
+
+      expect(await screen.findByRole("note")).toHaveTextContent(
+        "1 person is in another project and is moved here.",
+      );
+      expect(screen.getByText(/moved from Alpha/)).toBeInTheDocument();
+    });
+
+    it("shows no note when nobody would be moved", async () => {
+      const user = userEvent.setup();
+      renderWizard({
+        users: [
+          adminUser("u1", "Max", { ...inAlpha, permissionGroup: "Project Manager" }),
+          adminUser("u2", "Lena"),
+        ],
+      });
+
+      await toReview(user, ["Max", "Lena"]);
+
+      expect(await screen.findByText(/created in one step/)).toBeInTheDocument();
+      expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    });
+
+    it("tells the page to reload once the move happened", async () => {
+      const user = userEvent.setup();
+      const onMembershipsMoved = vi.fn();
+      renderWizard({ users: [adminUser("u1", "Max", inAlpha)], onMembershipsMoved });
+
+      await toReview(user, ["Max"]);
+      await user.click(screen.getByRole("button", { name: /^create project$/i }));
+
+      await waitFor(() => expect(onMembershipsMoved).toHaveBeenCalledTimes(1));
+    });
+
+    it("does not ask for a reload when only free people were assigned", async () => {
+      const user = userEvent.setup();
+      const onMembershipsMoved = vi.fn();
+      renderWizard({ users: [adminUser("u1", "Max")], onMembershipsMoved });
+
+      await toReview(user, ["Max"]);
+      await user.click(screen.getByRole("button", { name: /^create project$/i }));
+
+      await waitFor(() => expect(projectService.assignUsersToProject).toHaveBeenCalled());
+      expect(onMembershipsMoved).not.toHaveBeenCalled();
+    });
   });
 
   it("does not assign anyone when no member was picked", async () => {

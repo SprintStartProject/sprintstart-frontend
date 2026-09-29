@@ -1,4 +1,4 @@
-import { GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
+import { ArrowRightLeft, GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
 import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
@@ -9,6 +9,11 @@ export type ReviewPerson = {
   id: string;
   name: string;
   profileIcon?: string | null;
+  /**
+   * Names of the projects this person would be removed from when the project is
+   * created. Only set for a regular user who is in other projects already.
+   */
+  movedFrom?: string[];
 };
 
 type WizardReviewStepProps = {
@@ -103,6 +108,7 @@ export function WizardReviewStep({
   onEditSources,
 }: WizardReviewStepProps) {
   const memberCount = members.length + (manager ? 1 : 0);
+  const movedMembers = members.filter((member) => member.movedFrom?.length);
 
   return (
     <div className="space-y-4">
@@ -150,11 +156,37 @@ export function WizardReviewStep({
         {memberCount === 0 ? (
           <span className="text-app-text-muted">No members</span>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {manager && <PersonChip person={manager} suffix="Manager" />}
-            {members.map((member) => (
-              <PersonChip key={member.id} person={member} />
-            ))}
+          <div className="space-y-3">
+            {movedMembers.length > 0 && (
+              <div
+                role="note"
+                className="flex items-start gap-2 rounded-xl border border-app-warning-border bg-app-warning-bg px-3 py-2.5 text-xs text-app-warning-text"
+              >
+                <ArrowRightLeft className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <p className="leading-relaxed">
+                  {movedMembers.length === 1
+                    ? "1 person is in another project and is moved here."
+                    : `${movedMembers.length} people are in other projects and are moved here.`}{" "}
+                  They are removed from their current project, and their project roles and
+                  onboarding progress are reset.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-1.5">
+              {manager && <PersonChip person={manager} suffix="Manager" />}
+              {members.map((member) => (
+                <PersonChip
+                  key={member.id}
+                  person={member}
+                  suffix={
+                    member.movedFrom?.length
+                      ? `moved from ${member.movedFrom.join(", ")}`
+                      : undefined
+                  }
+                />
+              ))}
+            </div>
           </div>
         )}
       </ReviewBlock>

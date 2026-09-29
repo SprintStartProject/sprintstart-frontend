@@ -699,6 +699,7 @@ export function AdminPage() {
         existingProjectNames={projects.map((project) => project.name)}
         onClose={() => setIsCreateWizardOpen(false)}
         onProjectCreated={handleProjectCreated}
+        onMembershipsMoved={() => void refreshAdminData()}
       />
     </div>
   );
