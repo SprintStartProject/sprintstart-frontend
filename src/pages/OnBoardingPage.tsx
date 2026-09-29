@@ -796,26 +796,37 @@ export function OnBoardingPage() {
             <GenerationIssueSummary issues={generationIssues} />
             {/* Retrying a phase that was skipped for lack of material changes nothing, so when that
                 is all there is, the button says so rather than inviting the same answer. */}
-            <p className="mt-5 text-xs text-app-text-subtle">
-              {retryCouldHelp(generationIssues)
-                ? "Trying again re-runs assembly for every phase."
-                : "Another run will produce the same result until the project has more material."}
-            </p>
+            {canManageSelected && (
+              <p className="mt-5 text-xs text-app-text-subtle">
+                {retryCouldHelp(generationIssues)
+                  ? "Trying again re-runs assembly for every phase."
+                  : "Another run will produce the same result until the project has more material."}
+              </p>
+            )}
           </div>
         ) : null}
-        <Button
-          className="mt-6"
-          variant={
-            generationIssues.length === 0 || retryCouldHelp(generationIssues)
-              ? "primary"
-              : "secondary"
-          }
-          onClick={requestGeneration}
-          icon={<RefreshCw className="h-4 w-4" />}
-          disabled={!selectedProjectId}
-        >
-          Try generation again
-        </Button>
+        {/* Building an existing path again replaces it, which is the project manager's call: the
+            backend refuses it to members, so they are pointed at the PM instead of a button that
+            can only fail. */}
+        {canManageSelected ? (
+          <Button
+            className="mt-6"
+            variant={
+              generationIssues.length === 0 || retryCouldHelp(generationIssues)
+                ? "primary"
+                : "secondary"
+            }
+            onClick={requestGeneration}
+            icon={<RefreshCw className="h-4 w-4" />}
+            disabled={!selectedProjectId}
+          >
+            Try generation again
+          </Button>
+        ) : (
+          <p className="mt-6 max-w-lg text-sm text-app-text-muted">
+            Your project manager can rebuild your path from your page in the team area.
+          </p>
+        )}
       </CenteredState>
     );
   }

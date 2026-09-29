@@ -18,6 +18,7 @@ const { projectContextState } = vi.hoisted(() => ({
     selectedProjectId: "proj1",
     isLoading: false,
     isSwitcherEnabled: true,
+    canManageSelected: false,
   },
 }));
 
@@ -73,6 +74,7 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
           : null,
         isLoading: projectContextState.isLoading,
         isSwitcherEnabled: projectContextState.isSwitcherEnabled,
+        canManageSelected: projectContextState.canManageSelected,
       }),
   };
 });
@@ -162,6 +164,7 @@ describe("OnBoardingPage", () => {
     projectContextState.selectedProjectId = "proj1";
     projectContextState.isLoading = false;
     projectContextState.isSwitcherEnabled = true;
+    projectContextState.canManageSelected = false;
   });
 
   it("renders loading state initially", () => {
@@ -423,7 +426,8 @@ describe("OnBoardingPage", () => {
     expect(screen.getByTitle("Role-specific tasks — Could not be reached")).toBeInTheDocument();
   });
 
-  it("offers regeneration when every generated phase is hidden", async () => {
+  it("offers the project's manager regeneration when every generated phase is hidden", async () => {
+    projectContextState.canManageSelected = true;
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
         HttpResponse.json({
@@ -484,7 +488,33 @@ describe("OnBoardingPage", () => {
     expect(screen.getByTitle("Architecture — Took too long")).toBeInTheDocument();
   });
 
+  it("points a member at their PM instead of rebuilding a path whose phases are all hidden", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [],
+          generationIssues: [{ phaseId: "phase1", title: "Role-specific tasks", status: "EMPTY" }],
+        }),
+      ),
+    );
+
+    render(
+      <MemoryRouter>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("No onboarding phases were generated")).toBeInTheDocument();
+    // Replacing an existing path is the PM's call; the backend refuses it to members.
+    expect(screen.queryByRole("button", { name: "Try generation again" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Your project manager can rebuild your path/)).toBeInTheDocument();
+  });
+
   it("warns that every phase timed out and offers regeneration", async () => {
+    projectContextState.canManageSelected = true;
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
         HttpResponse.json({
