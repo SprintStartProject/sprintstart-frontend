@@ -454,6 +454,16 @@ body {
   padding-right: var(--app-page-gutter);
 }
 
+/* A page that parks a tool rail in its right-hand gutter (the board). The rail is ~58px from the
+   window's edge; the fluid gutter is only 2rem at 1024px, so without this the rail sat on top of
+   the cards. At least 5rem on that side, the gutter itself once it is wider. Unlayered like
+   `.app-page-frame`, which a Tailwind padding utility could not override. */
+@media (min-width: 1024px) {
+  .app-page-frame.app-page-frame--rail {
+    padding-right: max(5rem, var(--app-page-gutter));
+  }
+}
+
 /* When a page opens a rail on its left, collapse the left gutter so the rail
    opens *into* the empty gutter space instead of pushing the content right and
    leaving a gap between the app sidebar and the page. Put it on the content

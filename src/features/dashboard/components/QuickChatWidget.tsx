@@ -41,8 +41,8 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
   // (`row-span-3`, 136px), and a second line of chips does not fit in it: the row wraps, the
   // card cannot grow, and the chips are clipped at the bottom edge.
   //
-  // Four fitted on one line only on a wide monitor. Subtract the sidebar and the page's 10rem
-  // gutters and a laptop had barely a chip's width of slack, so anything that moved the layout
+  // Four fitted on one line only on a wide monitor. Subtract the sidebar and the page gutters
+  // and a laptop had barely a chip's width of slack, so anything that moved the layout
   // by a few pixels — a scrollbar appearing, a slightly longer suggestion — tipped it over.
   // Three leaves real room instead of relying on nothing ever changing.
   const suggestions = isWide ? SUGGESTIONS.slice(0, 3) : SUGGESTIONS.slice(0, 2);

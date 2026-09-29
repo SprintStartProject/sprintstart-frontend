@@ -931,11 +931,15 @@ export function BoardPage() {
   /**
    * The gutters the page draws in.
    *
-   * Focus mode trades the 10rem page gutter for a margin wide enough to keep the tool rail off the
+   * Outside focus mode it is the page gutter, widened on the right from `lg` up to clear the tool
+   * rail parked there (`app-page-frame--rail`): the gutter is fluid now, and at 1024px it is only
+   * 2rem. Focus mode trades the page gutter for a margin wide enough to keep the tool rail off the
    * cards and no wider — the whole reason somebody expands the board is that the gutters were space
    * they were not using, and giving them back at the same width would be the button doing nothing.
    */
-  const frameClass = isFocused ? "px-4 sm:px-6 lg:pr-20 lg:pl-6" : "app-page-frame";
+  const frameClass = isFocused
+    ? "px-4 sm:px-6 lg:pr-20 lg:pl-6"
+    : "app-page-frame app-page-frame--rail";
 
   return (
     <div className="min-h-screen">
@@ -1013,8 +1017,8 @@ export function BoardPage() {
         {pathCard?.content.kind === "PATH_TO_FIRST_CONTRIBUTION" && (
           <BoardPathNotes content={pathCard.content} />
         )}
-        {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
-            space: the board is a column of cards and the margin is where a hand rests. So the
+        {/* The page keeps a margin either side from `lg` up (at least 5rem on the right here, see
+            `frameClass`), and on this page it is dead space: the board is a column of cards and the margin is where a hand rests. So the
             offers live there — always in reach, never in the way, and out of the row above the
             board where they were competing with the controls that decide what is *shown*.
             Absolute rather than a column of its own, so nothing about the board's own width or its
@@ -1218,8 +1222,8 @@ export function BoardPage() {
               </div>
             </div>
 
-            {/* Over the board rather than in the rail: the rail is 10rem of page margin, which is
-                room for a few glyphs and not for a form. */}
+            {/* Over the board rather than in the rail: the rail is page margin, which is room for a
+                few glyphs and not for a form. */}
             {addingKind && (
               <AddCardForm kind={addingKind} onAdd={addCard} onClose={() => setAddingKind(null)} />
             )}
