@@ -18,6 +18,10 @@ export function isManagerEligible(...roleSignals: Array<string | undefined>): bo
   );
 }
 
+// Kept apart from the manager-eligible set: it is a separate backend rule that
+// only happens to name the same roles today.
+const MULTI_PROJECT_ROLES = new Set(["PM", "ADMIN", "PROJECT MANAGER", "PROJECT_MANAGER"]);
+
 /**
  * Whether a person with this app role may belong to several projects at once.
  *
@@ -27,7 +31,9 @@ export function isManagerEligible(...roleSignals: Array<string | undefined>): bo
  * `AdminUser.permissionGroup`, not `AdminUser.roles` (those are project roles).
  */
 export function canJoinMultipleProjects(permissionGroup: string | undefined): boolean {
-  return isManagerEligible(permissionGroup);
+  return (
+    permissionGroup !== undefined && MULTI_PROJECT_ROLES.has(permissionGroup.trim().toUpperCase())
+  );
 }
 
 /** A person an assignment would move, with the projects they would leave. */

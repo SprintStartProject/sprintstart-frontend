@@ -88,10 +88,10 @@ function ReviewBlock({
   return (
     <section className="overflow-hidden rounded-2xl border border-app-border">
       <header className="flex items-center justify-between border-b border-app-border bg-app-surface-muted px-4 py-2.5">
-        <h4 className="text-sm font-semibold text-app-text">
+        <h3 className="text-sm font-semibold text-app-text">
           {title}
           {count !== undefined && <span className="text-app-text-muted"> · {count}</span>}
-        </h4>
+        </h3>
         <button
           type="button"
           onClick={onEdit}
@@ -180,8 +180,8 @@ export function WizardReviewStep({
 
             {movedMembers.length > 0 && (
               <p role="note" className="text-xs text-app-text-muted">
-                People marked with an arrow are moved from their current project. Their roles and
-                onboarding progress are reset.
+                People marked with an arrow are moved out of their current projects. Their project
+                roles and onboarding progress are reset.
               </p>
             )}
           </div>

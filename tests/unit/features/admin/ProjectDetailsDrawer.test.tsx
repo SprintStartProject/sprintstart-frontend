@@ -59,7 +59,11 @@ describe("ProjectDetailsDrawer", () => {
   });
 
   describe("staging a person from another project", () => {
-    async function stageJane(availableUser: AdminUser, onMembershipsMoved = vi.fn()) {
+    async function stageJane(
+      availableUser: AdminUser,
+      onMembershipsMoved = vi.fn(),
+      onClose = vi.fn(),
+    ) {
       projectServiceMock.getProjectById.mockResolvedValue({
         ...projectOverview,
         users: [
@@ -83,7 +87,7 @@ describe("ProjectDetailsDrawer", () => {
           project={projectOverview}
           availableUsers={[availableUser]}
           isOpen
-          onClose={vi.fn()}
+          onClose={onClose}
           onMembershipsMoved={onMembershipsMoved}
         />,
       );
@@ -134,6 +138,21 @@ describe("ProjectDetailsDrawer", () => {
       });
       expect(projectServiceMock.assignUsersToProject).not.toHaveBeenCalled();
       expect(onMembershipsMoved).not.toHaveBeenCalled();
+    });
+
+    it("closes only the move dialog on Escape and keeps the drawer open", async () => {
+      const onClose = vi.fn();
+      const { user } = await stageJane(buildAdminUser({}), vi.fn(), onClose);
+
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+      await screen.findByRole("alertdialog");
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => {
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      });
+      expect(onClose).not.toHaveBeenCalled();
+      expect(projectServiceMock.assignUsersToProject).not.toHaveBeenCalled();
     });
 
     it("neither marks nor warns for a project manager", async () => {
