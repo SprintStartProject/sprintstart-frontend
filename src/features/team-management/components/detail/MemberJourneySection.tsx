@@ -8,7 +8,16 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { Button } from "../../../../components/ui/Button";
 import { SegmentedTabs } from "../../../../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../../../../components/ui/SlidingTabPanel";
@@ -16,7 +25,6 @@ import { useSwipeableTabs } from "../../../../hooks/useHorizontalWheelNavigation
 import { useToast } from "../../../../context/useToast";
 import { onboardingGraphService } from "../../../../services/onboardingGraphService";
 import { useAuth } from "../../../../context/useAuth";
-import { isSkipPending } from "../../../onboarding/journey";
 import { computeRanks } from "../../../onboarding/graph/layout";
 import {
   memberJourneyViewKey,
@@ -37,7 +45,6 @@ import {
   formatMinutes,
   itemState,
   orderedPhaseItems,
-  pathProgress,
   skipRequestOf,
   phaseItems,
   phaseProgress,
@@ -59,7 +66,17 @@ const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
 
 type StepTaskCount = { total: number; done: number };
 
+/** What the rest of the profile can ask of the path section. */
+export type MemberJourneyHandle = {
+  /**
+   * Scrolls the path into view, showing `phaseId` in whichever view is open: selected in the
+   * list, opened in the graph. Without a phase it only scrolls.
+   */
+  showPhase: (phaseId?: string) => void;
+};
+
 type Props = {
+  ref?: Ref<MemberJourneyHandle>;
   userId: string;
   memberName: string;
   path: OnboardingPathEndpoint | null;
@@ -100,6 +117,7 @@ function actualMinutesOf(item: PhaseItem): number | null {
  * blueprint is untouched.
  */
 export function MemberJourneySection({
+  ref,
   userId,
   memberName,
   path,
@@ -157,6 +175,24 @@ export function MemberJourneySection({
     onChange: setViewMode,
     enabled: phases.length > 0,
   });
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      showPhase: (phaseId) => {
+        if (phaseId) {
+          setSelectedPhaseId(phaseId);
+          setSelectedItemId(null);
+          if (viewMode === "graph") setGraphPhaseId(phaseId);
+        }
+        document
+          .getElementById("member-journey-title")
+          ?.closest("section")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    }),
+    [viewMode],
+  );
 
   const phase =
     phases.find((candidate) => candidate.id === selectedPhaseId) ??
@@ -336,14 +372,6 @@ export function MemberJourneySection({
     [onPathChanged, userId],
   );
 
-  const overall = path ? pathProgress(path) : null;
-  const allSteps = phases.flatMap((candidate) => candidate.steps);
-  const skipped = allSteps.filter((step) => step.status === "SKIPPED").length;
-  // `accepted` is null while the PM has not answered yet.
-  const pendingSkips = allSteps.filter(
-    (step) => isSkipPending(step.skip) && step.status !== "SKIPPED",
-  ).length;
-
   const questionTools = (target: OnboardingPhaseEndpoint) => (
     <>
       <Button
@@ -364,8 +392,10 @@ export function MemberJourneySection({
     <section
       ref={swipeRef}
       aria-labelledby="member-journey-title"
-      className="space-y-5 rounded-3xl border border-app-border bg-app-surface/60 p-4 shadow-sm sm:p-6"
+      className="scroll-mt-6 space-y-5 rounded-3xl border border-app-border bg-app-surface/60 p-4 shadow-sm sm:p-6"
     >
+      {/* The path's figures (items, phases, skips) are the profile's summary card's job now
+          (`MemberSummary`), right above this section; repeating them here was the clutter. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 id="member-journey-title" className="text-xl font-semibold text-app-text">
@@ -376,18 +406,6 @@ export function MemberJourneySection({
             graph.
           </p>
         </div>
-        {overall ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Metric label="Items done" value={`${overall.completed}/${overall.total}`} />
-            <Metric label="Phases" value={`${overall.phasesDone}/${phases.length}`} />
-            <Metric label="Steps finished" value={String(overall.stepsDone)} />
-            <Metric
-              label={pendingSkips > 0 ? "Skip requests" : "Skipped"}
-              value={String(pendingSkips > 0 ? pendingSkips : skipped)}
-              warning={pendingSkips > 0}
-            />
-          </div>
-        ) : null}
       </div>
 
       {!path || phases.length === 0 || !phase ? (
@@ -568,31 +586,6 @@ export function MemberJourneySection({
         </>
       )}
     </section>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  warning = false,
-}: {
-  label: string;
-  value: string;
-  warning?: boolean;
-}) {
-  return (
-    <div
-      className={`min-w-24 rounded-2xl border px-3 py-2 ${
-        warning ? "border-app-warning-border bg-app-warning-bg" : "border-app-border bg-app-surface"
-      }`}
-    >
-      <p className="text-[11px] text-app-text-muted">{label}</p>
-      <p
-        className={`mt-0.5 text-sm font-semibold tabular-nums ${warning ? "text-app-warning-text" : "text-app-text"}`}
-      >
-        {value}
-      </p>
-    </div>
   );
 }
 
