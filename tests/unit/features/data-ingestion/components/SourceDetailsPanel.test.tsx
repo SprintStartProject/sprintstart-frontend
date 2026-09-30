@@ -510,7 +510,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },
@@ -530,7 +530,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },
@@ -551,7 +551,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },
@@ -613,7 +613,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },
@@ -642,7 +642,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },

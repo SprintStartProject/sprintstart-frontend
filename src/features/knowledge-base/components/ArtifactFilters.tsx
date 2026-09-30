@@ -15,6 +15,7 @@ import {
   Ticket,
   Upload,
 } from "lucide-react";
+import { BitbucketIcon } from "../../../components/icons/BitbucketIcon";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select.tsx";
@@ -124,6 +125,7 @@ const SOURCE_ICONS: Record<SourceSystem, ReactNode> = {
   GITHUB: <GitBranch className={ICON_CLASS} aria-hidden="true" />,
   JIRA: <Ticket className={ICON_CLASS} aria-hidden="true" />,
   CONFLUENCE: <BookOpen className={ICON_CLASS} aria-hidden="true" />,
+  BITBUCKET: <BitbucketIcon className={ICON_CLASS} aria-hidden="true" />,
   UPLOAD: <Upload className={ICON_CLASS} aria-hidden="true" />,
 };
 

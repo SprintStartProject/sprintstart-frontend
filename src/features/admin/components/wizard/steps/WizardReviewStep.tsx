@@ -1,5 +1,6 @@
 import { GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
+import { BitbucketIcon } from "../../../../../components/icons/BitbucketIcon";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
 import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
 import type { DraftSource, DraftSourceType } from "../../../projectSourcesDraft";
@@ -30,6 +31,7 @@ const typeIcons: Record<DraftSourceType, ComponentType<{ className?: string }>> 
   JIRA: Ticket,
   UPLOAD: FileText,
   CONFLUENCE: BookOpen,
+  BITBUCKET: BitbucketIcon,
 };
 
 const typeLabels: Record<DraftSourceType, string> = {
@@ -37,6 +39,7 @@ const typeLabels: Record<DraftSourceType, string> = {
   JIRA: "Jira",
   UPLOAD: "Upload",
   CONFLUENCE: "Confluence",
+  BITBUCKET: "Bitbucket",
 };
 
 function sourceTitle(source: DraftSource): string {

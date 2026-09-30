@@ -25,7 +25,7 @@ import type { DiscoverySelection } from "../data-ingestion/components/GithubRepo
 
 export type DraftSourceStatus = "pending" | "connecting" | "connected" | "failed";
 
-export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
+export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE" | "BITBUCKET";
 
 /** Fields every staged source carries regardless of its type. */
 type DraftSourceBase = {

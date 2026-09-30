@@ -568,6 +568,7 @@ const DETAIL_SUBTITLE: Record<SourceSystem, string> = {
   JIRA: "Point to your Jira instance and pick a credential, then add it to the list.",
   UPLOAD: "Files are staged now and uploaded right after the project is created.",
   CONFLUENCE: "Point to your Confluence space and pick a credential, then add it to the list.",
+  BITBUCKET: "Pick a credential and a workspace, then choose the repositories to index.",
 };
 
 /**

@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "../../components/icons/types.ts";
 
-export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
+export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE" | "BITBUCKET";
 
 export type BackendProjectSourceStatus =
   | "CONNECTED"
@@ -255,7 +256,7 @@ export type SourceStatusPresentation = {
 export type SourceMeta = {
   name: string;
   type: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   description: string;
 };
 
@@ -285,7 +286,7 @@ export type SourceDetailsSource = {
 };
 
 export type DataSource = SourceDetailsSource & {
-  icon: LucideIcon;
+  icon: IconComponent;
   statusLabel: string;
   ingestionStatus: SourceStatus;
   ingestionStatusLabel: string;

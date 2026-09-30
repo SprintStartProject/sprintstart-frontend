@@ -21,10 +21,17 @@ import type {
   SourceStatusPresentation,
   SourceSystem,
 } from "./types.ts";
+import { BitbucketIcon } from "../../components/icons/BitbucketIcon.tsx";
 import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
 import type { ConfluenceConnectionDto } from "../../services/sources/confluenceService.ts";
 
-export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
+export const SOURCE_SYSTEMS: SourceSystem[] = [
+  "GITHUB",
+  "JIRA",
+  "UPLOAD",
+  "CONFLUENCE",
+  "BITBUCKET",
+];
 
 export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
   GITHUB: {
@@ -50,6 +57,13 @@ export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
     type: "Confluence",
     icon: BookOpen,
     description: "Indexes pages, hierarchical documents and spaces from Confluence Cloud.",
+  },
+  BITBUCKET: {
+    name: "Bitbucket Repository",
+    type: "Bitbucket",
+    icon: BitbucketIcon,
+    description:
+      "Indexes pull requests, README files and source files from Bitbucket Cloud repositories.",
   },
 };
 

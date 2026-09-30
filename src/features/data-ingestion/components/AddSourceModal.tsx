@@ -36,6 +36,11 @@ import type { SourceSystem } from "../types.ts";
 import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
 
+// Bitbucket shows up in the type grid as "Soon" until its add-source flow exists.
+const AVAILABLE_SOURCE_TYPES: SourceSystem[] = SOURCE_SYSTEMS.filter(
+  (system) => system !== "BITBUCKET",
+);
+
 type AddSourceModalProps = {
   projectId: string | null;
   projectName?: string;
@@ -230,6 +235,9 @@ export function AddSourceModal({
   };
 
   const handleSelectAddType = (type: SourceSystem) => {
+    // A "Soon" type (not yet wired) is inert until its phase lands.
+    if (!AVAILABLE_SOURCE_TYPES.includes(type)) return;
+
     setAddType(type);
     setAddStep("detail");
   };
@@ -558,7 +566,7 @@ export function AddSourceModal({
               key={addFlowKey}
               step={addStep}
               selectedType={addType}
-              availableTypes={SOURCE_SYSTEMS}
+              availableTypes={AVAILABLE_SOURCE_TYPES}
               onSelectType={handleSelectAddType}
               onBack={backToTypeGrid}
               isBusy={isSubmitting}

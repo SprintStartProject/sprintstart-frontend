@@ -8,7 +8,7 @@ export type ArtifactType = "COMMIT" | "FILE" | "ISSUE" | "PULL_REQUEST" | "PAGE"
  * Origin source of the artifact data.
  * Used to route API calls (e.g., Github vs internal Uploads).
  */
-export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
+export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE" | "BITBUCKET";
 
 /**
  * Core business entity representing any indexed piece of knowledge.
