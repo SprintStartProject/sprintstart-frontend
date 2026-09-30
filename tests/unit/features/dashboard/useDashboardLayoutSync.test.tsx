@@ -12,6 +12,8 @@ vi.mock("../../../../src/services/dashboardLayoutService", () => ({
 import { dashboardLayoutService } from "../../../../src/services/dashboardLayoutService";
 import {
   LAYOUT_VERSION,
+  markLayoutSynced,
+  readLayoutSynced,
   readStoredLayout,
   storeLayout,
 } from "../../../../src/features/dashboard/layout/storage";
@@ -81,6 +83,34 @@ describe("useDashboardLayoutSync", () => {
 
     await waitFor(() => expect(service.saveLayout).toHaveBeenCalledWith(LAYOUT_VERSION, LOCAL));
     expect(onPulled).not.toHaveBeenCalled();
+    await waitFor(() => expect(readLayoutSynced("user-1")).toBe(true));
+  });
+
+  it("drops a stale copy instead of bringing back a layout that was reset on another device", async () => {
+    // This browser synced the layout earlier; since then the user reset it somewhere else.
+    storeLayout("user-1", LOCAL);
+    markLayoutSynced("user-1");
+    service.fetchLayout.mockResolvedValue(nothingStored());
+    const onPulled = vi.fn();
+
+    renderHook(() => useDashboardLayoutSync("user-1", onPulled));
+
+    await waitFor(() => expect(onPulled).toHaveBeenCalledTimes(1));
+    expect(readStoredLayout("user-1", DASHBOARD_WIDGET_IDS)).toBeNull();
+    expect(service.saveLayout).not.toHaveBeenCalled();
+  });
+
+  it("does not treat a failed migration as synced, so the next visit tries again", async () => {
+    storeLayout("user-1", LOCAL);
+    service.fetchLayout.mockResolvedValue(nothingStored());
+    service.saveLayout.mockRejectedValue(new Error("offline"));
+
+    renderHook(() => useDashboardLayoutSync("user-1", vi.fn()));
+
+    await waitFor(() => expect(service.saveLayout).toHaveBeenCalled());
+    await act(async () => {});
+    expect(readLayoutSynced("user-1")).toBe(false);
+    expect(readStoredLayout("user-1", DASHBOARD_WIDGET_IDS)).toEqual(LOCAL);
   });
 
   it("does nothing for a user with a layout nowhere", async () => {
@@ -107,6 +137,33 @@ describe("useDashboardLayoutSync", () => {
 
     await waitFor(() => expect(service.saveLayout).toHaveBeenCalledWith(LAYOUT_VERSION, LOCAL));
     expect(onPulled).not.toHaveBeenCalled();
+  });
+
+  it("still sends a change made while the held one is being sent", async () => {
+    let answer: (value: DashboardLayoutWire) => void = () => {};
+    service.fetchLayout.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    let finishFlush: () => void = () => {};
+    service.saveLayout.mockReturnValueOnce(new Promise<void>((resolve) => (finishFlush = resolve)));
+
+    const { result } = renderHook(() => useDashboardLayoutSync("user-1", vi.fn()));
+
+    act(() => result.current.push(LOCAL));
+    await act(() => {
+      answer(nothingStored());
+      return Promise.resolve();
+    });
+    await waitFor(() => expect(service.saveLayout).toHaveBeenCalledWith(LAYOUT_VERSION, LOCAL));
+
+    // The held change is still on its way when the next one is made.
+    act(() => result.current.push(SERVER));
+    await act(() => {
+      finishFlush();
+      return Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(service.saveLayout).toHaveBeenLastCalledWith(LAYOUT_VERSION, SERVER),
+    );
   });
 
   it("debounces changes into one request with the latest layout", async () => {

@@ -2,7 +2,14 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { dashboardLayoutService } from "../../../services/dashboardLayoutService";
 import { DASHBOARD_WIDGET_IDS } from "./catalog";
-import { LAYOUT_VERSION, readStoredLayout, storeLayout } from "./storage";
+import {
+  clearStoredLayout,
+  LAYOUT_VERSION,
+  markLayoutSynced,
+  readLayoutSynced,
+  readStoredLayout,
+  storeLayout,
+} from "./storage";
 import type { DashboardLayout } from "./types";
 
 /**
@@ -30,8 +37,11 @@ export type DashboardLayoutSync = {
  *
  * - The server has a layout → it wins and is written into local storage, and `onPulled` asks the
  *   dashboard to read it again. It is the one that followed the user here.
- * - The server has none and this browser does → the browser's copy is sent up. That is the
- *   migration for everybody who arranged their dashboard before this existed.
+ * - The server has none and this browser has one it never synced → the browser's copy is sent
+ *   up. That is the migration for everybody who arranged their dashboard before this existed.
+ * - The server has none and this browser's copy *was* synced before → the user reset it on
+ *   another device. The stale copy here is dropped instead of uploaded, or a reset would only
+ *   hold on the device it was made on.
  * - Neither has one → nothing happens; the default is derived, not stored.
  *
  * A change made before that first read has settled is not lost and not overwritten: it is held,
@@ -61,25 +71,46 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
         const server = await dashboardLayoutService.fetchLayout(LAYOUT_VERSION);
         if (!active) return;
 
+        // Settled before anything below is awaited: a change made while the held one is being
+        // sent goes through the debounce like any other, instead of landing in `pending` after
+        // it has already been read and being thrown away with it.
         const waiting = pending.current;
+        pending.current = null;
+        pulledFor.current = userId;
+
         if (waiting?.kind === "reset") {
           await dashboardLayoutService.resetLayout();
+          markLayoutSynced(userId);
         } else if (waiting?.kind === "layout") {
           await dashboardLayoutService.saveLayout(LAYOUT_VERSION, waiting.layout);
+          markLayoutSynced(userId);
         } else if (server.updatedAt !== null) {
           // Not checked here: `readStoredLayout` checks every item on the way out, the same as for
           // anything else in storage, and drops widgets and sizes this version does not know.
           storeLayout(userId, server.items as DashboardLayout);
+          markLayoutSynced(userId);
           onPulled();
         } else {
           const local = readStoredLayout(userId, DASHBOARD_WIDGET_IDS);
-          if (local) await dashboardLayoutService.saveLayout(LAYOUT_VERSION, local);
+
+          if (local && readLayoutSynced(userId)) {
+            clearStoredLayout(userId);
+            onPulled();
+          } else if (local) {
+            await dashboardLayoutService.saveLayout(LAYOUT_VERSION, local);
+            // Only once it is up there: marked before, a failed upload would read as a reset on
+            // the next visit and drop the very layout the migration exists to keep.
+            markLayoutSynced(userId);
+          } else {
+            markLayoutSynced(userId);
+          }
         }
       } catch {
         // Offline, or the endpoint is not deployed yet: the dashboard keeps working from local
         // storage exactly as it did before any of this existed.
       } finally {
-        if (active) {
+        // A failed read settles too, so later changes are not held forever.
+        if (active && pulledFor.current !== userId) {
           pulledFor.current = userId;
           pending.current = null;
         }
@@ -93,13 +124,20 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
 
   useEffect(() => {
     return () => {
-      // Leaving the page inside the quiet window would otherwise drop the last change.
+      // Leaving the page inside the quiet window would otherwise drop the last change. Sent with
+      // whatever token is current: harmless while signing out reloads the app, but a user switch
+      // without a reload would send the previous user's layout under the new user's token.
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
 
       const last = queued.current;
       queued.current = null;
-      if (last) void dashboardLayoutService.saveLayout(LAYOUT_VERSION, last).catch(() => {});
+      if (last) {
+        void dashboardLayoutService
+          .saveLayout(LAYOUT_VERSION, last)
+          .then(() => markLayoutSynced(userId))
+          .catch(() => {});
+      }
     };
   }, [userId]);
 
@@ -117,7 +155,10 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
       timer.current = setTimeout(() => {
         timer.current = null;
         queued.current = null;
-        void dashboardLayoutService.saveLayout(LAYOUT_VERSION, layout).catch(() => {});
+        void dashboardLayoutService
+          .saveLayout(LAYOUT_VERSION, layout)
+          .then(() => markLayoutSynced(userId))
+          .catch(() => {});
       }, QUIET_MS);
     },
     [userId],
@@ -135,7 +176,10 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
       return;
     }
 
-    void dashboardLayoutService.resetLayout().catch(() => {});
+    void dashboardLayoutService
+      .resetLayout()
+      .then(() => markLayoutSynced(userId))
+      .catch(() => {});
   }, [userId]);
 
   return { push, reset };
