@@ -443,6 +443,129 @@ describe("DataIngestionPage", () => {
     });
   });
 
+  const bitbucketStatusRow = (overrides: Record<string, unknown> = {}) => ({
+    sourceSystem: "BITBUCKET",
+    sourceId: "acme/widgets",
+    displayName: "acme/widgets",
+    repositoryId: "bb-repo-uuid",
+    owner: "acme",
+    name: "widgets",
+    sourceUrl: "https://bitbucket.org/acme/widgets",
+    connectionStatus: "CONNECTED",
+    enabled: true,
+    lastRunTime: "2026-09-28T10:00:00Z",
+    ingestedCount: 9,
+    updatedCount: 1,
+    deletedCount: 0,
+    failedCount: 0,
+    failedItems: [],
+    artifactCount: 77,
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: "2026-09-28T10:00:00Z",
+    ...overrides,
+  });
+
+  it("builds a Bitbucket source card from the connector-neutral status row", async () => {
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+    });
+    mockGetIngestionSourceStatuses.mockResolvedValue([bitbucketStatusRow()]);
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    expect((await screen.findAllByText("acme/widgets")).length).toBeGreaterThan(0);
+    // The workspace is the card's subtitle and the row's artifact total drives the count.
+    expect(screen.getAllByText("acme").length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByText("77").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("does not double a Bitbucket repository that is also exposed as a project source", async () => {
+    // `project.sources` carries Bitbucket entries too. The card is built from the
+    // status row alone, so the project source must not add a fallback card.
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [
+        { id: "acme/widgets", name: "acme/widgets", type: "BITBUCKET", status: "CONNECTED" },
+      ],
+      users: [],
+    });
+    mockGetIngestionSourceStatuses.mockResolvedValue([bitbucketStatusRow()]);
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    const connectedSourcesKpi = await screen.findByRole("button", {
+      name: /connected sources/i,
+    });
+    expect(within(connectedSourcesKpi).getByText("1")).toBeInTheDocument();
+  });
+
+  it("filters the run history to a Bitbucket repository via repositoryId", async () => {
+    mockGetIngestionSourceStatuses.mockResolvedValue([
+      {
+        sourceSystem: "GITHUB",
+        sourceId: "octocat/hello-world",
+        displayName: "octocat/hello-world",
+        repositoryId: "repo-uuid",
+        owner: "octocat",
+        name: "hello-world",
+        sourceUrl: "https://github.com/octocat/hello-world",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-01T00:00:00Z",
+        ingestedCount: 1,
+        updatedCount: 0,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 10,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: null,
+        lastPullRequestsSyncAt: null,
+      },
+      bitbucketStatusRow(),
+    ]);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Filter runs by source" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("combobox", { name: "Filter runs by source" }));
+    await user.click(await screen.findByRole("option", { name: "acme/widgets" }));
+
+    // A Bitbucket repository is scoped by its connection id, not by sourceRef.
+    await waitFor(() => {
+      expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ repositoryId: "bb-repo-uuid", sourceRef: undefined, page: 1 }),
+      );
+    });
+  });
+
   /*
     The knowledge-gap detail page's "Update data source" button links here from a gap, and a gap
     knows itself by component — `owner/repo` — not by the project-source id these cards select

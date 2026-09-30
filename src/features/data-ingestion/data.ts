@@ -201,6 +201,78 @@ export function createJiraSourceFromInstance(
 }
 
 /**
+ * Maps a BITBUCKET status row from `/api/v1/ingestion-sources/status` into a
+ * {@link DataSource}, the Bitbucket counterpart to
+ * {@link createJiraSourceFromInstance}.
+ *
+ * The status row is authoritative for health, counters, total artifact count
+ * and last-sync time. `sourceId`/`displayName` are `"workspace/slug"`, `owner`
+ * is the workspace and `name` the slug. Bitbucket only reports a pull-request
+ * sync time; commits and issues are never synced, so those stay null.
+ * `githubRepository` is always null; identity lives in `bitbucketRepository`.
+ */
+export function createBitbucketSourceFromInstance(
+  status: SourceInstanceIngestionStatus,
+  connectorEnabled?: boolean,
+): DataSource {
+  const meta = SOURCE_META.BITBUCKET;
+  const backendStatus: BackendProjectSourceStatus =
+    status.enabled === false ? "DISABLED" : status.connectionStatus;
+  const hasErrors = status.failedCount > 0;
+  const hasNeverSynced = status.lastRunTime === null;
+  const [fallbackWorkspace = "", fallbackSlug = ""] = status.sourceId.split("/");
+
+  return {
+    sourceId: status.repositoryId ?? status.sourceId,
+    sourceSystem: "BITBUCKET",
+    name: status.displayName,
+    type: meta.type,
+    icon: meta.icon,
+    status: getSourceStatusFromBackend(backendStatus),
+    backendStatus,
+    statusLabel: getBackendSourceStatusLabel(backendStatus),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
+    ingestionStatusLabel:
+      !hasNeverSynced && !hasErrors
+        ? "Synced"
+        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
+    statusView: deriveSourceStatus({
+      backendStatus,
+      hasErrors,
+      hasNeverSynced,
+      connectorEnabled,
+    }),
+    artifacts: status.artifactCount,
+    lastSync: formatDateTime(status.lastRunTime),
+    nextSync: "Not available",
+    errors: status.failedCount,
+    description: meta.description,
+    lastRunAt: status.lastRunTime,
+    latestIngestedCount: status.ingestedCount,
+    latestUpdatedCount: status.updatedCount,
+    deletedCount: status.deletedCount,
+    totalArtifactCount: status.artifactCount,
+    runIds: [],
+    sharesSourceSystem: false,
+    failedItems: status.failedItems,
+    githubRepository: null,
+    jiraInstance: null,
+    confluenceSpace: null,
+    bitbucketRepository: {
+      repositoryId: status.repositoryId,
+      workspace: status.owner ?? fallbackWorkspace,
+      slug: status.name ?? fallbackSlug,
+      fullName: status.sourceId,
+      url: status.sourceUrl,
+      enabled: status.enabled,
+    },
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: status.lastPullRequestsSyncAt,
+  };
+}
+
+/**
  * Maps an UPLOAD status row from `/api/v1/ingestion-sources/status` into the
  * full {@link DataSource} model rendered on the ingestion page.
  */
@@ -712,7 +784,8 @@ export function formatInstanceDomain(instanceUrl: string): string {
  * reference — most visibly for Jira, whose `sourceId` is the instance URL.
  *
  * Keyed by the same value the run carries in `sourceId`: GitHub `"owner/name"`
- * (the repository's full name) and Jira the instance URL. Runs whose source is
+ * and Bitbucket `"workspace/slug"` (the repository's full name) and Jira the
+ * instance URL. Runs whose source is
  * no longer connected won't be in the map and fall back to the raw reference.
  */
 export function buildRunSourceLabels(sources: DataSource[]): Map<string, string> {
@@ -725,6 +798,10 @@ export function buildRunSourceLabels(sources: DataSource[]): Map<string, string>
 
     if (source.githubRepository?.fullName) {
       labels.set(source.githubRepository.fullName, source.name);
+    }
+
+    if (source.bitbucketRepository?.fullName) {
+      labels.set(source.bitbucketRepository.fullName, source.name);
     }
 
     if (source.confluenceSpace) {

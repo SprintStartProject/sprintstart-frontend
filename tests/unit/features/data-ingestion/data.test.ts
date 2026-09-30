@@ -4,6 +4,7 @@ import {
   SOURCE_META,
   INGESTION_RUN_LIMIT,
   DETAILS_RUN_LIMIT,
+  createBitbucketSourceFromInstance,
   createJiraSourceFromInstance,
   createConfluenceSourceFromConnection,
   createConfluenceSourceFromInstance,
@@ -541,6 +542,151 @@ describe("data-ingestion data helpers", () => {
 
       expect(source.confluenceSpace?.spaceName).toBe("Docs Space");
       expect(source.confluenceSpace?.credentialName).toBe("team-cred");
+    });
+  });
+
+  describe("createBitbucketSourceFromInstance", () => {
+    const status = (
+      overrides: Partial<SourceInstanceIngestionStatus> = {},
+    ): SourceInstanceIngestionStatus => ({
+      sourceSystem: "BITBUCKET",
+      sourceId: "acme/widgets",
+      displayName: "acme/widgets",
+      repositoryId: "repo-uuid-1",
+      owner: "acme",
+      name: "widgets",
+      sourceUrl: "https://bitbucket.org/acme/widgets",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-09-28T10:00:00Z",
+      ingestedCount: 12,
+      updatedCount: 2,
+      deletedCount: 1,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 64,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: null,
+      lastPullRequestsSyncAt: "2026-09-28T10:00:00Z",
+      ...overrides,
+    });
+
+    it("carries the repository identity in bitbucketRepository, not githubRepository", () => {
+      const source = createBitbucketSourceFromInstance(status());
+
+      expect(source.sourceSystem).toBe("BITBUCKET");
+      expect(source.type).toBe("Bitbucket");
+      expect(source.name).toBe("acme/widgets");
+      expect(source.githubRepository).toBeNull();
+      expect(source.bitbucketRepository).toEqual({
+        repositoryId: "repo-uuid-1",
+        workspace: "acme",
+        slug: "widgets",
+        fullName: "acme/widgets",
+        url: "https://bitbucket.org/acme/widgets",
+        enabled: true,
+      });
+    });
+
+    it("keys the card by the repository id, falling back to workspace/slug", () => {
+      expect(createBitbucketSourceFromInstance(status()).sourceId).toBe("repo-uuid-1");
+      expect(createBitbucketSourceFromInstance(status({ repositoryId: null })).sourceId).toBe(
+        "acme/widgets",
+      );
+    });
+
+    it("derives workspace and slug from the source id when the row carries no owner or name", () => {
+      const source = createBitbucketSourceFromInstance(status({ owner: null, name: null }));
+
+      expect(source.bitbucketRepository).toMatchObject({ workspace: "acme", slug: "widgets" });
+    });
+
+    it("takes counters and the artifact total from the status row", () => {
+      const source = createBitbucketSourceFromInstance(status());
+
+      expect(source.artifacts).toBe(64);
+      expect(source.totalArtifactCount).toBe(64);
+      expect(source.latestIngestedCount).toBe(12);
+      expect(source.latestUpdatedCount).toBe(2);
+      expect(source.deletedCount).toBe(1);
+      expect(source.errors).toBe(0);
+    });
+
+    it("only reports the pull-request sync time", () => {
+      const source = createBitbucketSourceFromInstance(status());
+
+      expect(source.lastPullRequestsSyncAt).toBe("2026-09-28T10:00:00Z");
+      expect(source.lastCommitsSyncAt).toBeNull();
+      expect(source.lastIssuesSyncAt).toBeNull();
+    });
+
+    const cases: ConnectionStatus[] = ["CONNECTED", "UPDATING", "OUT_OF_DATE", "FAILED"];
+
+    for (const connectionStatus of cases) {
+      it(`carries the ${connectionStatus} connection status`, () => {
+        const source = createBitbucketSourceFromInstance(status({ connectionStatus }));
+
+        expect(source.backendStatus).toBe(connectionStatus);
+      });
+    }
+
+    it("shows the syncing state while the repository is updating", () => {
+      const source = createBitbucketSourceFromInstance(status({ connectionStatus: "UPDATING" }));
+
+      expect(source.statusView.state).toBe("syncing");
+    });
+
+    it("overrides the status with DISABLED when the source is disabled", () => {
+      const source = createBitbucketSourceFromInstance(status({ enabled: false }));
+
+      expect(source.backendStatus).toBe("DISABLED");
+      expect(source.statusView.state).toBe("disabled");
+      expect(source.bitbucketRepository?.enabled).toBe(false);
+    });
+
+    it("reports never-synced when the status row has no last run", () => {
+      const source = createBitbucketSourceFromInstance(status({ lastRunTime: null }));
+
+      expect(source.statusView.state).toBe("attention");
+      expect(source.lastRunAt).toBeNull();
+    });
+
+    it("shows a synced badge after a clean sync", () => {
+      expect(createBitbucketSourceFromInstance(status()).ingestionStatusLabel).toBe("Synced");
+    });
+
+    it("surfaces a disabled Bitbucket connector", () => {
+      const source = createBitbucketSourceFromInstance(status(), false);
+
+      expect(source.ingestionStatusLabel).toBe("Synced");
+      expect(source.statusView.state).toBe("disabled");
+    });
+
+    it("resolves runs by workspace/slug to the card name", () => {
+      const source = createBitbucketSourceFromInstance(status());
+      const labels = buildRunSourceLabels([source]);
+      const run: IngestionRun = {
+        runId: "run-1",
+        sourceSystem: "BITBUCKET",
+        sourceId: "acme/widgets",
+        owner: "acme",
+        name: "widgets",
+        repositoryId: "repo-uuid-1",
+        startedAt: "2026-09-28T10:00:00Z",
+        finishedAt: "2026-09-28T10:05:00Z",
+        ingestedCount: 12,
+        updatedCount: 2,
+        deletedCount: 1,
+        failedCount: 0,
+        status: "COMPLETED",
+        failedItems: [],
+        failureReason: null,
+        aiSyncStatus: "SUCCEEDED",
+        aiSyncFailureReason: null,
+      };
+
+      expect(labels.get("acme/widgets")).toBe("acme/widgets");
+      expect(getRunSourceLabel(run, labels)).toBe("acme/widgets");
     });
   });
 });

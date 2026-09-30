@@ -98,14 +98,19 @@ export type IngestionRun = {
 export type SourceInstanceIngestionStatus = {
   sourceSystem: SourceSystem;
   /**
-   * Stable, connector-neutral key: GitHub `"owner/name"`, Jira the instance URL.
+   * Stable, connector-neutral key: GitHub `"owner/name"`, Bitbucket
+   * `"workspace/slug"`, Jira the instance URL.
    */
   sourceId: string;
-  /** Display name: GitHub `"owner/name"`, Jira the instance's display name. */
+  /**
+   * Display name: GitHub `"owner/name"`, Bitbucket `"workspace/slug"`, Jira the
+   * instance's display name.
+   */
   displayName: string;
   /**
-   * GitHub-only repository identity. Null for connector-neutral rows such as
-   * Jira, which are identified by {@link sourceId} (the instance URL) instead.
+   * Repository connection id (GitHub and Bitbucket). Null for connector-neutral
+   * rows such as Jira, which are identified by {@link sourceId} (the instance
+   * URL) instead.
    */
   repositoryId: string | null;
   owner: string | null;
@@ -172,6 +177,20 @@ export type GithubRepositoryReference = {
 
 export type GithubRepositoryDetails = GithubRepositoryReference & {
   repositoryId: string | null;
+  fullName: string;
+  url: string;
+  enabled: boolean | null;
+};
+
+/**
+ * Bitbucket-specific identity for a source card. A repository is addressed as
+ * `workspace/slug`; `repositoryId` is the connection's UUID, used to update the
+ * repository and to link or unlink it from a project.
+ */
+export type BitbucketRepositoryDetails = {
+  repositoryId: string | null;
+  workspace: string;
+  slug: string;
   fullName: string;
   url: string;
   enabled: boolean | null;
@@ -281,6 +300,8 @@ export type SourceDetailsSource = {
   jiraInstance?: JiraInstanceSourceDetails | null;
   /** Confluence space identity; null/absent for non-Confluence sources. */
   confluenceSpace?: ConfluenceSpaceSourceDetails | null;
+  /** Bitbucket repository identity; null/absent for non-Bitbucket sources. */
+  bitbucketRepository?: BitbucketRepositoryDetails | null;
   description?: string;
   nextSync?: string;
 };

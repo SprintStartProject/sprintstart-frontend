@@ -29,6 +29,7 @@ import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import {
   buildRunSourceLabels,
+  createBitbucketSourceFromInstance,
   createConfluenceSourceFromConnection,
   createConfluenceSourceFromInstance,
   createJiraSourceFromInstance,
@@ -145,8 +146,8 @@ const DEFAULT_RUN_FILTER: RunFilterState = {
 
 /**
  * A source offered in the run-history filter. `value` is the GitHub repository
- * id, Jira instance URL, or Confluence space id; `sourceSystem` decides which
- * query param it maps to (repositoryId vs. sourceRef).
+ * id (also used for Bitbucket and Confluence), or Jira instance URL;
+ * `sourceSystem` decides which query param it maps to (repositoryId vs. sourceRef).
  */
 type RunSourceFilterOption = {
   value: string;
@@ -161,7 +162,8 @@ function toSourceSystem(value: string): SourceSystem | null {
     normalized === "GITHUB" ||
     normalized === "JIRA" ||
     normalized === "UPLOAD" ||
-    normalized === "CONFLUENCE"
+    normalized === "CONFLUENCE" ||
+    normalized === "BITBUCKET"
   ) {
     return normalized;
   }
@@ -268,8 +270,11 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return [];
 
-    // Jira and Confluence cards are built solely from the connector-neutral status rows.
-    if (sourceSystem === "JIRA" || sourceSystem === "CONFLUENCE") return [];
+    // Jira, Confluence and Bitbucket cards are built solely from the connector-neutral
+    // status rows; a project source of these types must not add a second, fallback card.
+    if (sourceSystem === "JIRA" || sourceSystem === "CONFLUENCE" || sourceSystem === "BITBUCKET") {
+      return [];
+    }
     // Skip UPLOAD only when an authoritative status row already exists so the card
     // does not vanish when artifact count is 0 or when run status fallback is needed.
     if (sourceSystem === "UPLOAD" && sourceInstances.some((s) => s.sourceSystem === "UPLOAD")) {
@@ -634,11 +639,14 @@ export function DataIngestionPage() {
         page,
         size: RUN_PAGE_SIZE,
         projectId: selectedProjectId || undefined,
-        // GitHub and Confluence scope by repositoryId (filtering on backend sourceInstanceId UUID);
-        // Jira scopes by the run's sourceInstanceRef via sourceRef (instance URL).
+        // GitHub, Bitbucket and Confluence scope by repositoryId (filtering on backend
+        // sourceInstanceId UUID); Jira scopes by the run's sourceInstanceRef via
+        // sourceRef (instance URL).
         repositoryId:
           hasSource &&
-          (runFilter.sourceSystem === "GITHUB" || runFilter.sourceSystem === "CONFLUENCE")
+          (runFilter.sourceSystem === "GITHUB" ||
+            runFilter.sourceSystem === "BITBUCKET" ||
+            runFilter.sourceSystem === "CONFLUENCE")
             ? runFilter.sourceValue
             : undefined,
         sourceRef:
@@ -820,11 +828,25 @@ export function DataIngestionPage() {
       );
     });
 
+    // Bitbucket cards come from the status rows alone, like Jira: every field the
+    // card and drawer show is on the row.
+    const bitbucketSources = sourceInstances
+      .filter((status) => status.sourceSystem === "BITBUCKET")
+      .map((status) =>
+        createBitbucketSourceFromInstance(status, connectorEnabledById.get("bitbucket")),
+      );
+
     const uploadSources = sourceInstances
       .filter((status) => status.sourceSystem === "UPLOAD")
       .map((status) => createUploadSourceFromInstance(status));
 
-    return [...githubAndUpload, ...jiraSources, ...confluenceSources, ...uploadSources];
+    return [
+      ...githubAndUpload,
+      ...bitbucketSources,
+      ...jiraSources,
+      ...confluenceSources,
+      ...uploadSources,
+    ];
   }, [
     confluenceConnections,
     connectorEnabledById,
@@ -926,7 +948,7 @@ export function DataIngestionPage() {
   const runSourceLabels = useMemo(() => buildRunSourceLabels(sources), [sources]);
 
   // Sources offered in the run filter, from the project's connected sources: a
-  // GitHub repo filters by its repositoryId, a Jira instance by its URL
+  // GitHub or Bitbucket repo filters by its repositoryId, a Jira instance by its URL
   // (sourceId), which the query maps to sourceRef.
   const runSourceOptions = useMemo<RunSourceFilterOption[]>(
     () =>
@@ -937,6 +959,16 @@ export function DataIngestionPage() {
               value: source.githubRepository.repositoryId,
               label: source.name,
               sourceSystem: "GITHUB",
+            },
+          ];
+        }
+
+        if (source.bitbucketRepository?.repositoryId) {
+          return [
+            {
+              value: source.bitbucketRepository.repositoryId,
+              label: source.name,
+              sourceSystem: "BITBUCKET",
             },
           ];
         }
