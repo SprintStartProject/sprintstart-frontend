@@ -150,6 +150,28 @@ export const boardService = {
   },
 
   /**
+   * Puts a card back to what it said before its most recent edit — the hire's or the buddy's.
+   *
+   * Restoring is itself an edit: the content being replaced becomes the new previous version, so an
+   * undo can be undone the same way, and the card records the hire as its author.
+   *
+   * @param cardId The authored card to restore.
+   * @param replacedAt The edit the hire saw and is undoing, echoed back exactly as
+   *   `previous.replacedAt` carried it. The server refuses with 409 when it is no longer the card's
+   *   latest edit — another tab, or a change older than this board read, replaced it in the
+   *   meantime — so a stale press can never throw away a change the hire never saw.
+   * @returns The card as it now reads, the same shape the board's cards carry.
+   * @throws ApiError 404 when it is not a card of theirs; 409 when there is nothing to restore, the
+   *   card is off their board, or it has been edited again since `replacedAt`.
+   */
+  async restorePrevious(cardId: string, replacedAt: string): Promise<BoardCard> {
+    return await apiClient.fetch<BoardCard>(
+      `${BASE}/me/board/cards/${encodeURIComponent(cardId)}/restore-previous`,
+      { method: "POST", body: JSON.stringify({ replacedAt }) },
+    );
+  },
+
+  /**
    * Sets the order of the hire's cards.
    *
    * Sends the whole order rather than one move: a drag is a statement about the board, and

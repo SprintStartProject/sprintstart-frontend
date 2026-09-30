@@ -192,9 +192,8 @@ export const NEW_CONVERSATION_SHORTCUT: ShortcutItem = {
 };
 
 /**
- * Alt+S works the drawer the mobile header's button works. There is no desktop collapse to
- * toggle yet (#244); until then the chord is a no-op on a wide screen rather than a second
- * behaviour, because inventing one here would only have to be undone there.
+ * Alt+S toggles the sidebar that is on screen: the drawer on a small screen, the fold to
+ * icons on a wide one (#244). `SideBar` answers it.
  */
 export const SIDEBAR_TOGGLE_SHORTCUT: ShortcutItem = {
   id: "act-sidebar",
@@ -203,7 +202,6 @@ export const SIDEBAR_TOGGLE_SHORTCUT: ShortcutItem = {
   scope: "surface",
   code: "KeyS",
   altKey: true,
-  note: "small screens",
 };
 
 /**

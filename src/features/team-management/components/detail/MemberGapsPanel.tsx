@@ -1,4 +1,5 @@
 import { Badge } from "../../../../components/ui/Badge";
+import { InfoHint } from "../../../../components/ui/InfoHint";
 import type { KnowledgeGap } from "../../../knowledge-gaps/types";
 import type { UserSkillLevel } from "../../../../services/teamManagementService";
 import { GraduationCap, SearchX } from "lucide-react";
@@ -18,6 +19,15 @@ const LEVEL_DOTS: Record<string, number> = {
   EXPERT: 4,
 };
 
+/**
+ * The member's skill assessment plus their skill and knowledge gaps, rendered as the two cards
+ * beside the journey on the member detail page. Read-only apart from opening a knowledge gap,
+ * which hands off to the knowledge-gaps detail view via `onOpenKnowledgeGap`.
+ *
+ * The "Knowledge gaps" explainer is an `InfoHint` in its `"top-end"` placement: the enclosing
+ * `SpotlightCard` clips overflow, so the tooltip has to open upward and right-aligned to stay
+ * inside the card when the lists are short or the viewport is narrow.
+ */
 export function MemberGapsPanel({
   skillLevels,
   skillGaps,
@@ -145,7 +155,14 @@ function KnowledgeGapsSection({
     <div>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-app-text">Knowledge gaps</p>
-        <GapCountBadge count={knowledgeGaps.length} />
+        <div className="flex items-center gap-2">
+          <GapCountBadge count={knowledgeGaps.length} />
+          <InfoHint
+            placement="top-end"
+            label="What is a knowledge gap?"
+            text="A knowledge gap is a component whose documentation is missing material the project expects — for example runbooks or ADRs. The gaps are detected from the project's ingested documentation and refresh when new material is ingested."
+          />
+        </div>
       </div>
 
       <div className="mt-2 space-y-2">
