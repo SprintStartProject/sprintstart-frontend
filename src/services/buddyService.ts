@@ -140,6 +140,8 @@ interface BuddyStreamChunk {
   phase_id?: string;
   onboarding_task_id?: string;
   answer?: string;
+  /** `answer_question` confirm payload: the options a multiple-choice answer stands for. */
+  option_ids?: string[];
   description?: string;
   /** `request_skip` confirm payload: the reason that goes to the PM. */
   reason?: string;
@@ -206,6 +208,7 @@ export async function performAction(
     phaseId?: string;
     onboardingTaskId?: string;
     answer?: string;
+    optionIds?: string[];
     description?: string;
     reason?: string;
     waitsOnIds?: string[];
@@ -237,6 +240,7 @@ export async function performAction(
       phaseId: extras.phaseId,
       onboardingTaskId: extras.onboardingTaskId,
       answer: extras.answer,
+      optionIds: extras.optionIds,
       description: extras.description,
       reason: extras.reason,
       waitsOnIds: extras.waitsOnIds,
@@ -496,6 +500,7 @@ export async function streamMessage(
               phaseId: event.phase_id,
               onboardingTaskId: event.onboarding_task_id,
               answer: event.answer,
+              optionIds: event.option_ids,
               description: event.description,
               reason: event.reason,
               waitsOnIds: event.waits_on_ids,

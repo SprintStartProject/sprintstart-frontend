@@ -166,6 +166,12 @@ export type HireActionProposal = {
   phaseId?: string;
   onboardingTaskId?: string;
   answer?: string;
+  /**
+   * The options a multiple-choice `answer` stands for, as the backend resolved them when it
+   * proposed. Echoed back so the confirm can check the button still means what it says — the
+   * backend refuses it if the question changed in between.
+   */
+  optionIds?: string[];
   description?: string;
   /**
    * The reason `request_skip` sends to the PM. Shown in full under the button, because it goes out
@@ -361,6 +367,7 @@ export type BuddyStreamHandlers = {
     phaseId?: string;
     onboardingTaskId?: string;
     answer?: string;
+    optionIds?: string[];
     description?: string;
     reason?: string;
     waitsOnIds?: string[];
