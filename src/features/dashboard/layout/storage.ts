@@ -18,14 +18,15 @@ import type { DashboardLayout, DashboardWidgetId } from "./types";
  * trade for a preference: rebuilding a dashboard costs a minute, and a half-migrated one
  * would be a puzzle.
  */
-const LAYOUT_VERSION = 2;
+export const LAYOUT_VERSION = 2;
 
 /**
  * Keyed per user, because two people share a browser more often than a dashboard.
  *
- * Local storage rather than the backend: there is no endpoint for a per-user layout, and a
- * preference that follows the machine is closer to right than one that does not exist.
- * Moving it server-side later means replacing these two functions.
+ * Local storage, and no longer only local storage: `useDashboardLayoutSync.ts` sends the layout to
+ * `PUT /users/me/dashboard/layout` after every change and reads it back on arrival, so the
+ * arrangement follows the user to another machine. This is still where the client writes first and
+ * reads from, which keeps every gesture instant and a failed request free.
  */
 function storageKey(userId: string): string {
   return `sprintstart:dashboard-layout:${userId}`;
