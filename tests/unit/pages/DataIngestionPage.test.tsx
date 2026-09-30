@@ -1187,6 +1187,171 @@ describe("DataIngestionPage", () => {
     });
   });
 
+  describe("Bitbucket source actions", () => {
+    beforeEach(() => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([bitbucketStatusRow()]);
+    });
+
+    async function openBitbucketDrawer() {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/data-ingestion?sourceId=bb-repo-uuid"]}>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      const panel = await screen.findByRole("dialog");
+      expect(within(panel).getByText("Workspace")).toBeInTheDocument();
+
+      return { user, panel };
+    }
+
+    it("updates the repository through its connection id", async () => {
+      const updated: string[] = [];
+      server.use(
+        http.post("/api/v1/bitbucket/connections/:repositoryId/update", ({ params }) => {
+          updated.push(String(params.repositoryId));
+          return HttpResponse.json({ transactionId: "tx-1" }, { status: 202 });
+        }),
+      );
+
+      const { user, panel } = await openBitbucketDrawer();
+      await user.click(within(panel).getByRole("button", { name: /update repo/i }));
+
+      await waitFor(() => expect(updated).toEqual(["bb-repo-uuid"]));
+    });
+
+    it("disables the repository through the connector endpoint by workspace/slug", async () => {
+      const patches: unknown[] = [];
+      server.use(
+        http.patch(
+          "/api/v1/connectors/:connectorId/sources/status",
+          async ({ params, request }) => {
+            patches.push({ connectorId: params.connectorId, body: await request.json() });
+            return HttpResponse.json({});
+          },
+        ),
+      );
+
+      const { user, panel } = await openBitbucketDrawer();
+      await user.click(
+        within(panel).getByRole("switch", { name: /toggle ingestion for acme\/widgets/i }),
+      );
+
+      await waitFor(() => {
+        expect(patches).toEqual([
+          {
+            connectorId: "bitbucket",
+            body: { sources: [{ sourceId: "acme/widgets", enabled: false }] },
+          },
+        ]);
+      });
+    });
+
+    it("removes the repository from the selected project", async () => {
+      const removed: unknown[] = [];
+      server.use(
+        http.delete(
+          "/api/v1/bitbucket/connections/:repositoryId/projects/:projectId",
+          ({ params }) => {
+            removed.push({ repositoryId: params.repositoryId, projectId: params.projectId });
+            return HttpResponse.json({ repositoryId: params.repositoryId, projectIds: [] });
+          },
+        ),
+      );
+
+      const { user, panel } = await openBitbucketDrawer();
+      await user.click(within(panel).getByRole("button", { name: /remove from project/i }));
+      await user.click(await screen.findByRole("button", { name: /^remove$/i }));
+
+      await waitFor(() => {
+        expect(removed).toEqual([{ repositoryId: "bb-repo-uuid", projectId: "proj1" }]);
+      });
+    });
+
+    it("loads and saves the repository's own sync schedule by workspace and slug", async () => {
+      const saved: unknown[] = [];
+      server.use(
+        http.get("/api/v1/bitbucket/config/:workspace/:slug", () =>
+          HttpResponse.json({
+            id: "cfg-1",
+            workspace: "acme",
+            slug: "widgets",
+            autoUpdate: true,
+            spec: { type: "INTERVAL", everyMinutes: 30 },
+            schedule: "every 30m",
+            nextSyncAt: null,
+          }),
+        ),
+        http.put("/api/v1/bitbucket/config/:workspace/:slug", async ({ params, request }) => {
+          saved.push({ params, body: await request.json() });
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+
+      const { user, panel } = await openBitbucketDrawer();
+      const minutes = await within(panel).findByLabelText("Minutes");
+      await waitFor(() => expect(minutes).toHaveValue(30));
+
+      await user.clear(minutes);
+      await user.type(minutes, "45");
+      await user.click(within(panel).getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(saved).toEqual([
+          {
+            params: { workspace: "acme", slug: "widgets" },
+            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 45 } },
+          },
+        ]);
+      });
+    });
+
+    it("applies the global sync schedule to every Bitbucket repository", async () => {
+      const configured: unknown[] = [];
+      server.use(
+        http.put("/api/v1/bitbucket/config", async ({ request }) => {
+          configured.push(await request.json());
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await user.click(await screen.findByRole("button", { name: /manage sync settings/i }));
+
+      expect(await screen.findByText("Bitbucket Sync Settings")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("tablist", { name: /sync settings connector/i }),
+      ).not.toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("switch", { name: /toggle global bitbucket auto update/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /apply globally/i }));
+
+      await waitFor(() => {
+        expect(configured).toEqual([
+          { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } },
+        ]);
+      });
+      expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
+    });
+  });
+
   it("opens the connectors modal from Manage connectors", async () => {
     const user = userEvent.setup();
     render(

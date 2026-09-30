@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { BitbucketIcon } from "../../../components/icons/BitbucketIcon";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useToast } from "../../../context/useToast";
@@ -56,6 +57,15 @@ type SourceDetailsPanelProps = {
     repository: NonNullable<DataSource["githubRepository"]>,
     request: ConfigureGithubRepositoryRequest,
   ) => Promise<void>;
+  /** Loads the sync schedule of a Bitbucket repository (by workspace and slug). */
+  onLoadBitbucketConfig?: (
+    repository: NonNullable<DataSource["bitbucketRepository"]>,
+  ) => Promise<SyncScheduleConfig>;
+  /** Saves the sync schedule of a Bitbucket repository (by workspace and slug). */
+  onSaveBitbucketConfig?: (
+    repository: NonNullable<DataSource["bitbucketRepository"]>,
+    request: ConfigureGithubRepositoryRequest,
+  ) => Promise<void>;
   /** Loads the sync schedule of a Jira instance (by URL) for the schedule form. */
   onLoadJiraConfig?: (instanceUrl: string) => Promise<GetJiraInstanceConfigResponse>;
   /** Saves the sync schedule of a Jira instance (by URL). */
@@ -73,6 +83,11 @@ type SourceDetailsPanelProps = {
   /** Enables/disables the source in the connector (allow/deny for ingestion). */
   onSetSourceEnabled?: (
     repository: NonNullable<DataSource["githubRepository"]>,
+    enabled: boolean,
+  ) => Promise<void>;
+  /** Enables/disables a Bitbucket repository as an ingestion source (by `workspace/slug`). */
+  onSetBitbucketSourceEnabled?: (
+    repository: NonNullable<DataSource["bitbucketRepository"]>,
     enabled: boolean,
   ) => Promise<void>;
   /** Enables/disables a Jira instance as an ingestion source (by instance URL). */
@@ -96,11 +111,14 @@ export function SourceDetailsPanel({
   canManageSyncSettings = false,
   onLoadRepositoryConfig,
   onSaveRepositoryConfig,
+  onLoadBitbucketConfig,
+  onSaveBitbucketConfig,
   onLoadJiraConfig,
   onSaveJiraConfig,
   onLoadConfluenceConfig,
   onSaveConfluenceConfig,
   onSetSourceEnabled,
+  onSetBitbucketSourceEnabled,
   onSetJiraSourceEnabled,
   onUnlinkSource,
   onClose,
@@ -113,8 +131,10 @@ export function SourceDetailsPanel({
   const toast = useToast();
   const Icon = SOURCE_META[source.sourceSystem].icon;
   const repository = source.githubRepository;
+  const bitbucket = source.bitbucketRepository ?? null;
   const jira = source.jiraInstance ?? null;
   const confluence = source.confluenceSpace ?? null;
+  const isBitbucket = source.sourceSystem === "BITBUCKET";
   const isJira = source.sourceSystem === "JIRA";
   const isConfluence = source.sourceSystem === "CONFLUENCE";
   const isUpdating = updateState === "loading";
@@ -125,11 +145,13 @@ export function SourceDetailsPanel({
   const [dinoActive, closeDino] = useSpaceOpensDino(isSyncing, dinoUnlocked, {
     keepActiveUntilExit: true,
   });
-  // Update is available for a GitHub repo (needs owner/name), a Jira instance
-  // (needs its URL), or a Confluence space (needs its ID).
+  // Update is available for a GitHub repo (needs owner/name), a Bitbucket repo
+  // (needs its connection id), a Jira instance (needs its URL), or a Confluence
+  // space (needs its ID).
   const canUpdate =
     onUpdateSource !== undefined &&
     ((source.sourceSystem === "GITHUB" && repository !== null) ||
+      (isBitbucket && Boolean(bitbucket?.repositoryId)) ||
       (isJira && jira !== null) ||
       (isConfluence && Boolean(confluence?.connectionId)));
   // GitHub and Jira start an asynchronous run, so "Update started" is the whole
@@ -143,6 +165,17 @@ export function SourceDetailsPanel({
     repository !== null &&
     onLoadRepositoryConfig !== undefined &&
     onSaveRepositoryConfig !== undefined;
+  const canManageBitbucketConfig =
+    canManageSyncSettings &&
+    isBitbucket &&
+    bitbucket !== null &&
+    onLoadBitbucketConfig !== undefined &&
+    onSaveBitbucketConfig !== undefined;
+  const canToggleBitbucketEnabled =
+    canManageSyncSettings &&
+    isBitbucket &&
+    bitbucket !== null &&
+    onSetBitbucketSourceEnabled !== undefined;
   const canManageJiraConfig =
     canManageSyncSettings &&
     isJira &&
@@ -168,13 +201,14 @@ export function SourceDetailsPanel({
   const isTogglingEnabled = enabledState === "loading";
   // Authorization is presence-based — the parent only passes onUnlinkSource when
   // the caller may manage the project's sources. GitHub needs the connection's
-  // repositoryId; Jira is identified by its instance URL, Confluence by its
-  // connection id.
+  // repositoryId, as does Bitbucket; Jira is identified by its instance URL,
+  // Confluence by its connection id.
   const canUnlinkSource =
     onUnlinkSource !== undefined &&
     ((source.sourceSystem === "GITHUB" &&
       repository !== null &&
       repository.repositoryId !== null) ||
+      (isBitbucket && Boolean(bitbucket?.repositoryId)) ||
       (isJira && jira !== null) ||
       (isConfluence && Boolean(confluence?.connectionId)));
   const isUnlinking = unlinkState === "loading";
@@ -215,6 +249,26 @@ export function SourceDetailsPanel({
       }
     },
     [onSetSourceEnabled, repository, toast],
+  );
+
+  const handleToggleBitbucketEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (!bitbucket || !onSetBitbucketSourceEnabled) return;
+
+      setEnabledState("loading");
+
+      try {
+        await onSetBitbucketSourceEnabled(bitbucket, enabled);
+        setEnabledState("success");
+        toast.success(enabled ? "Source enabled" : "Source disabled", {
+          description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
+        });
+      } catch (error) {
+        setEnabledState("error");
+        toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
+      }
+    },
+    [bitbucket, onSetBitbucketSourceEnabled, toast],
   );
 
   const handleToggleJiraEnabled = useCallback(
@@ -362,6 +416,8 @@ export function SourceDetailsPanel({
             icon={
               isJira ? (
                 <Ticket className="h-4 w-4" />
+              ) : isBitbucket ? (
+                <BitbucketIcon className="h-4 w-4" />
               ) : isConfluence ? (
                 <BookOpen className="h-4 w-4" />
               ) : (
@@ -373,9 +429,11 @@ export function SourceDetailsPanel({
                 ? undefined
                 : isJira
                   ? "Instance updates need the Jira instance URL."
-                  : isConfluence
-                    ? "Space updates need the Confluence space ID."
-                    : "Repository updates need GitHub owner and repository name."
+                  : isBitbucket
+                    ? "Repository updates need the Bitbucket connection."
+                    : isConfluence
+                      ? "Space updates need the Confluence space ID."
+                      : "Repository updates need GitHub owner and repository name."
             }
           >
             {isJira ? "Update instance" : isConfluence ? "Update space" : "Update repo"}
@@ -500,6 +558,45 @@ export function SourceDetailsPanel({
         </DrawerCard>
       )}
 
+      {isBitbucket && (
+        <DrawerCard label="Repository" icon={BitbucketIcon} index={1} className="mt-4 sm:mt-5">
+          <dl className="-my-1">
+            <InfoRow label="Full name" value={bitbucket?.fullName ?? source.name} />
+            <InfoRow label="Workspace" value={bitbucket?.workspace} />
+            <InfoRow label="Slug" value={bitbucket?.slug} />
+            <InfoLinkRow label="URL" value={bitbucket?.url} />
+            <InfoRow
+              label="Repository ID"
+              value={bitbucket?.repositoryId ?? source.sourceId}
+              mono
+            />
+            {canToggleBitbucketEnabled && bitbucket ? (
+              <div className="flex items-center gap-3 border-t border-app-border py-2.5">
+                <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
+                <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="text-[13px] font-semibold text-app-text">
+                    Include in ingestion
+                    <span className="ml-1 font-normal text-app-text-subtle">
+                      · sync this repository into the knowledge base
+                    </span>
+                  </span>
+                  <AccountEnabledToggle
+                    enabled={bitbucket.enabled !== false}
+                    disabled={isTogglingEnabled}
+                    ariaLabel={`Toggle ingestion for ${bitbucket.fullName}`}
+                    onChange={(next) => {
+                      void handleToggleBitbucketEnabled(next);
+                    }}
+                  />
+                </dd>
+              </div>
+            ) : (
+              <InfoRow label="Source" value={formatEnabled(bitbucket?.enabled)} />
+            )}
+          </dl>
+        </DrawerCard>
+      )}
+
       {source.sourceSystem === "GITHUB" && (
         <DrawerCard label="Repository" icon={GitBranch} index={1} className="mt-4 sm:mt-5">
           <dl className="-my-1">
@@ -543,6 +640,11 @@ export function SourceDetailsPanel({
           <dl className="-my-1">
             {isJira ? (
               <InfoRow label="Issues" value={formatDateTime(source.lastIssuesSyncAt)} />
+            ) : isBitbucket ? (
+              <InfoRow
+                label="Pull requests"
+                value={formatDateTime(source.lastPullRequestsSyncAt)}
+              />
             ) : (
               <>
                 <InfoRow label="Commits" value={formatDateTime(source.lastCommitsSyncAt)} />
@@ -563,6 +665,21 @@ export function SourceDetailsPanel({
             loadKey={repository.fullName}
             loadConfig={loadRepositoryConfig}
             onSave={saveRepositoryConfig}
+          />
+        </DrawerCard>
+      )}
+
+      {canManageBitbucketConfig && bitbucket && onLoadBitbucketConfig && onSaveBitbucketConfig && (
+        <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
+          {/* Same control as GitHub: the Bitbucket repository schedule shares the
+                identical schedule contract, only the load/save endpoints differ. */}
+          <GithubRepositorySyncSettings
+            loadKey={bitbucket.fullName}
+            loadConfig={() => onLoadBitbucketConfig(bitbucket)}
+            onSave={(request) => onSaveBitbucketConfig(bitbucket, request)}
+            autoUpdateOnText="Due checks update this Bitbucket repository."
+            autoUpdateOffText="Due checks only mark this Bitbucket repository out of date."
+            toggleAriaLabel="Toggle Bitbucket repository auto update"
           />
         </DrawerCard>
       )}

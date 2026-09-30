@@ -88,6 +88,25 @@ const confluenceSource: DataSource = {
   },
 };
 
+const bitbucketRepository = {
+  repositoryId: "bb-repo-1",
+  workspace: "acme",
+  slug: "widgets",
+  fullName: "acme/widgets",
+  url: "https://bitbucket.org/acme/widgets",
+  enabled: true,
+};
+
+const bitbucketSource: DataSource = {
+  ...mockSource,
+  sourceId: "bb-repo-1",
+  sourceSystem: "BITBUCKET",
+  name: "acme/widgets",
+  type: "Bitbucket",
+  githubRepository: null,
+  bitbucketRepository,
+};
+
 describe("SourceDetailsPanel", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -446,6 +465,213 @@ describe("SourceDetailsPanel", () => {
     );
 
     expect(screen.queryByRole("button", { name: /Remove from project/ })).not.toBeInTheDocument();
+  });
+
+  it("renders the Bitbucket repository section with workspace, slug and link", () => {
+    render(<SourceDetailsPanel source={bitbucketSource} onClose={vi.fn()} />);
+
+    expect(screen.getByText("Repository")).toBeInTheDocument();
+    expect(screen.getByText("Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Slug")).toBeInTheDocument();
+    expect(screen.getByText("widgets")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /bitbucket\.org\/acme\/widgets/ })).toHaveAttribute(
+      "href",
+      "https://bitbucket.org/acme/widgets",
+    );
+    expect(screen.getByText("bb-repo-1")).toBeInTheDocument();
+    // The GitHub-only "Owner" row does not appear.
+    expect(screen.queryByText("Owner")).not.toBeInTheDocument();
+  });
+
+  it('updates a Bitbucket repository via the "Update repo" button', async () => {
+    const user = userEvent.setup();
+    const onUpdateSource = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={bitbucketSource}
+        onUpdateSource={onUpdateSource}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Update repo/ }));
+
+    expect(onUpdateSource).toHaveBeenCalledWith(bitbucketSource);
+  });
+
+  it("disables the Bitbucket update when the connection id is unknown", () => {
+    render(
+      <SourceDetailsPanel
+        source={{
+          ...bitbucketSource,
+          bitbucketRepository: { ...bitbucketRepository, repositoryId: null },
+        }}
+        onUpdateSource={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Update repo/ })).toBeDisabled();
+  });
+
+  it("toggles a Bitbucket repository's ingestion via onSetBitbucketSourceEnabled", async () => {
+    const user = userEvent.setup();
+    const onSetBitbucketSourceEnabled = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={bitbucketSource}
+        canManageSyncSettings
+        onSetBitbucketSourceEnabled={onSetBitbucketSourceEnabled}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("switch", { name: /Toggle ingestion for acme\/widgets/ }));
+
+    expect(onSetBitbucketSourceEnabled).toHaveBeenCalledWith(bitbucketRepository, false);
+  });
+
+  it("shows a read-only source state without the toggle handler", () => {
+    render(
+      <SourceDetailsPanel
+        source={{
+          ...bitbucketSource,
+          bitbucketRepository: { ...bitbucketRepository, enabled: false },
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.getByText("Disabled")).toBeInTheDocument();
+  });
+
+  it("renders the Bitbucket sync schedule and loads it for the repository", async () => {
+    const onLoadBitbucketConfig = vi.fn().mockResolvedValue({
+      autoUpdate: true,
+      spec: { type: "INTERVAL", everyMinutes: 30 },
+      nextSyncAt: null,
+    });
+
+    render(
+      <SourceDetailsPanel
+        source={bitbucketSource}
+        canManageSyncSettings
+        onLoadBitbucketConfig={onLoadBitbucketConfig}
+        onSaveBitbucketConfig={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Sync Schedule")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(onLoadBitbucketConfig).toHaveBeenCalledWith(bitbucketRepository);
+    });
+  });
+
+  it("saves the Bitbucket sync schedule via onSaveBitbucketConfig", async () => {
+    const user = userEvent.setup();
+    const onLoadBitbucketConfig = vi.fn().mockResolvedValue({
+      autoUpdate: true,
+      spec: { type: "INTERVAL", everyMinutes: 30 },
+      nextSyncAt: null,
+    });
+    const onSaveBitbucketConfig = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={bitbucketSource}
+        canManageSyncSettings
+        onLoadBitbucketConfig={onLoadBitbucketConfig}
+        onSaveBitbucketConfig={onSaveBitbucketConfig}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(onLoadBitbucketConfig).toHaveBeenCalled());
+
+    const minutes = screen.getByLabelText("Minutes");
+    await user.clear(minutes);
+    await user.type(minutes, "45");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(onSaveBitbucketConfig).toHaveBeenCalledWith(
+        bitbucketRepository,
+        expect.objectContaining({
+          autoUpdate: true,
+          schedule: { type: "INTERVAL", everyMinutes: 45 },
+        }),
+      );
+    });
+  });
+
+  it("hides the Bitbucket schedule without the sync-settings permission", () => {
+    render(
+      <SourceDetailsPanel
+        source={bitbucketSource}
+        onLoadBitbucketConfig={vi.fn().mockResolvedValue({})}
+        onSaveBitbucketConfig={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("Sync Schedule")).not.toBeInTheDocument();
+  });
+
+  it("unlinks a Bitbucket repository after confirming the dialog", async () => {
+    const user = userEvent.setup();
+    const onUnlinkSource = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <SourceDetailsPanel
+        source={bitbucketSource}
+        onUnlinkSource={onUnlinkSource}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Remove from project/ }));
+
+    // Bitbucket sources are repositories, so the copy says so.
+    expect(
+      screen.getByRole("alertdialog", { name: /Remove repository from project/ }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Remove$/ }));
+
+    expect(onUnlinkSource).toHaveBeenCalledWith(bitbucketSource);
+  });
+
+  it("hides the remove-from-project action when the Bitbucket repository has no id", () => {
+    render(
+      <SourceDetailsPanel
+        source={{
+          ...bitbucketSource,
+          bitbucketRepository: { ...bitbucketRepository, repositoryId: null },
+        }}
+        onUnlinkSource={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /Remove from project/ })).not.toBeInTheDocument();
+  });
+
+  it("shows only the pull-request sync time for Bitbucket", () => {
+    render(
+      <SourceDetailsPanel
+        source={{ ...bitbucketSource, lastPullRequestsSyncAt: "2026-07-05T10:00:00Z" }}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Last Synced")).toBeInTheDocument();
+    expect(screen.getByText("Pull requests")).toBeInTheDocument();
+    expect(screen.queryByText("Commits")).not.toBeInTheDocument();
+    expect(screen.queryByText("Issues")).not.toBeInTheDocument();
   });
 
   it("renders failed items from the source", () => {
