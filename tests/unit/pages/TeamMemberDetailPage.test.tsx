@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -6,6 +6,11 @@ import { TeamMemberDetailPage } from "../../../src/pages/TeamMemberDetailPage";
 import type { TeamOverviewUser, ProjectRole } from "../../../src/features/team-management/types";
 import type { KnowledgeGap } from "../../../src/features/knowledge-gaps/types";
 import { knowledgeGapService } from "../../../src/services/knowledgeGapService";
+import { onboardingService } from "../../../src/services/onboardingService";
+
+vi.mock("../../../src/services/onboardingService", () => ({
+  onboardingService: { rebuildMemberPath: vi.fn() },
+}));
 
 vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: { id: "pm1", firstName: "PM", lastName: "User" } }),
@@ -335,6 +340,39 @@ describe("TeamMemberDetailPage", () => {
   // The knowledge-gaps overview is the project's full component roster now, but
   // this panel is headed "Knowledge gaps" -- listing repositories that are
   // missing nothing would overstate what the member has to answer for.
+  it("lets the PM rebuild the member's path after confirming", async () => {
+    vi.mocked(onboardingService.rebuildMemberPath).mockImplementation(
+      (_projectId, _userId, handlers) => {
+        handlers.onDone();
+        return Promise.resolve();
+      },
+    );
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <TeamMemberDetailPage />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Rebuild path/ }));
+    expect(onboardingService.rebuildMemberPath).not.toHaveBeenCalled();
+
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Rebuild path" }),
+    );
+
+    await waitFor(() => {
+      expect(onboardingService.rebuildMemberPath).toHaveBeenCalledWith(
+        "proj1",
+        "user1",
+        expect.any(Object),
+        expect.any(AbortSignal),
+      );
+    });
+    // The finished rebuild is read back, so the journey shows the new path.
+    await waitFor(() => expect(mockGetUserOnboardingPath).toHaveBeenCalledTimes(2));
+  });
+
   it("keeps covered components out of the member's gaps panel", async () => {
     const gap = (component: string, severity: KnowledgeGap["severity"]): KnowledgeGap => ({
       id: component,
