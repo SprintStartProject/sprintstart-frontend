@@ -1,4 +1,4 @@
-import { ArrowLeft, Hand } from "lucide-react";
+import { ArrowLeft, Hand, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../context/useToast";
@@ -56,12 +56,30 @@ import {
   type MemberJourneyHandle,
 } from "../features/team-management/components/detail/MemberJourneySection";
 import { AlertDialog } from "../components/ui/AlertDialog";
+import { onboardingService } from "../services/onboardingService";
 import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
 } from "../features/team-management/components/detail/PhaseCheckAdminModal";
 import { StepDetailsPanel } from "../features/team-management/components/detail/StepDetailsPanel";
 import { useProjectContext } from "../features/projects/useProjectContext";
+
+/** A rebuild failure, in the PM's words rather than the member's. */
+function describeRebuildError(message: string, reason?: string): string {
+  if (reason === "not-enough-knowledge") {
+    return "The project's knowledge base does not cover any phase yet. The current path is unchanged.";
+  }
+  if (/no active blueprint/i.test(message)) {
+    return "This project has no published onboarding blueprint yet. Publish one, then try again.";
+  }
+  if (/multiple active blueprints/i.test(message)) {
+    return "This project has more than one published onboarding blueprint. Archive all but one, then try again.";
+  }
+  if (/status: 403/.test(message)) {
+    return "Only the project's manager can rebuild paths, and only for members of the project.";
+  }
+  return `${message || "The generation failed."} The current path is unchanged.`;
+}
 
 function BackToTeam({ onBack }: { onBack: () => void }) {
   return (
@@ -203,6 +221,13 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const [loadError, setLoadError] = useState("");
   const toast = useToast();
   const { data: roster } = useTeamRoster();
+  // Rebuilding a member's path is the PM's call alone (members can only build their first one),
+  // so the control lives here rather than on the member's onboarding page.
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
+  const [rebuildingUserId, setRebuildingUserId] = useState<string | null>(null);
+  // Leaving the page only stops watching; the generation carries on on the backend.
+  const rebuildWatch = useRef<AbortController | null>(null);
+  useEffect(() => () => rebuildWatch.current?.abort(), []);
 
   useEffect(() => {
     // A response for the member (or project) this page has since moved away from is dropped: it
@@ -640,6 +665,60 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
     }
   }
 
+  function handleRebuildPath() {
+    if (!user || !selectedProjectId || rebuildingUserId) return;
+    const memberId = user.userId;
+    const firstName = user.firstname;
+    const controller = new AbortController();
+    rebuildWatch.current?.abort();
+    rebuildWatch.current = controller;
+    setConfirmRebuild(false);
+    setRebuildingUserId(memberId);
+    toast.info(`Rebuilding ${firstName}'s onboarding path`, {
+      description: "This runs in the background and takes a few minutes.",
+    });
+
+    const finish = () => {
+      if (rebuildWatch.current === controller) rebuildWatch.current = null;
+      setRebuildingUserId((current) => (current === memberId ? null : current));
+    };
+
+    void onboardingService
+      .rebuildMemberPath(
+        selectedProjectId,
+        memberId,
+        {
+          onPath: () => {},
+          onDone: () => {
+            finish();
+            if (shownUserId.current !== memberId) return;
+            toast.success(`${firstName}'s onboarding path was rebuilt`);
+            void Promise.all([refreshOnboardingPath(), refreshMember()]);
+          },
+          onError: (message, reason) => {
+            finish();
+            toast.error(`${firstName}'s path could not be rebuilt`, {
+              description: describeRebuildError(message, reason),
+            });
+          },
+          onInterrupted: () => {
+            finish();
+            toast.info("Lost track of the rebuild", {
+              description: "It keeps running on the server. Reload the page in a few minutes.",
+            });
+          },
+        },
+        controller.signal,
+      )
+      .catch((error: unknown) => {
+        finish();
+        if (controller.signal.aborted) return;
+        toast.error(`${firstName}'s path could not be rebuilt`, {
+          description: error instanceof Error ? error.message : undefined,
+        });
+      });
+  }
+
   // Always to the roster, not back through history: the button says "Team", and history could
   // just as well lead to the overview or to the previous member.
   function goBack() {
@@ -729,7 +808,24 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   return (
     <>
       <section aria-label={`${user.firstname} ${user.lastname}`}>
-        <BackToTeam onBack={goBack} />
+        <div className="flex items-start justify-between gap-3">
+          <BackToTeam onBack={goBack} />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setConfirmRebuild(true)}
+            icon={<RefreshCw className="h-4 w-4" />}
+            loading={rebuildingUserId === user.userId}
+            disabled={!selectedProjectId || rebuildingUserId !== null}
+            title={`Rebuild ${user.firstname}'s onboarding path with AI`}
+          >
+            {rebuildingUserId === user.userId
+              ? "Rebuilding…"
+              : onboardingPath
+                ? "Rebuild path"
+                : "Build path"}
+          </Button>
+        </div>
         <div className="mb-5">
           <MemberHero
             member={user}
@@ -835,6 +931,15 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           onClose={() => setCheckModal(null)}
         />
       )}
+      <AlertDialog
+        isOpen={confirmRebuild}
+        title={`Rebuild ${user.firstname}'s onboarding path?`}
+        description={`The path is put together again from the project's current blueprint and knowledge base. ${user.firstname}'s progress on the current path is replaced.`}
+        confirmLabel="Rebuild path"
+        variant="danger"
+        onClose={() => setConfirmRebuild(false)}
+        onConfirm={handleRebuildPath}
+      />
       <AlertDialog
         isOpen={graphStepToDelete !== null}
         title="Delete this step?"
