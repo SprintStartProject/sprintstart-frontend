@@ -169,6 +169,14 @@ export function Modal({
             {...{ [SWIPE_IGNORE_ATTRIBUTE]: "" }}
             aria-labelledby={titleId}
             aria-describedby={description ? descriptionId : undefined}
+            // Claims Escape for the dialog. A drawer underneath closes on Escape from its own
+            // document listener but skips keys that are already `defaultPrevented`, so without
+            // this one keypress dismissed the dialog and the drawer with it. React runs this
+            // before any document listener, and an inner control that stops the event (a
+            // dropdown closing itself) still keeps it from reaching the dialog.
+            onKeyDown={(event) => {
+              if (event.key === "Escape") event.preventDefault();
+            }}
             tabIndex={-1}
             variants={dialogVariants}
             initial="hidden"

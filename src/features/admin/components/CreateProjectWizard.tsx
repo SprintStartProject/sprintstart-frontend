@@ -31,6 +31,7 @@ import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCreden
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
 import { getDisplayName } from "../data";
+import { getMovedUsers } from "../projectMove";
 import type { AdminUser } from "../types";
 import { WizardDetailsStep } from "./wizard/steps/WizardDetailsStep";
 import { WizardMembersStep } from "./wizard/steps/WizardMembersStep";
@@ -62,6 +63,12 @@ type CreateProjectWizardProps = {
   onClose: () => void;
   /** Fired once the project exists, before any source finished connecting. */
   onProjectCreated: (project: AdminProjectDetails) => void;
+  /**
+   * Fired after members were assigned who were removed from other projects by
+   * it. Those projects' member lists are held elsewhere on the page and are
+   * stale by then, so the parent is expected to reload them.
+   */
+  onMembershipsMoved?: () => void;
 };
 
 /** The four editable steps plus the terminal provisioning screen. */
@@ -98,6 +105,7 @@ export function CreateProjectWizard({
   existingProjectNames = [],
   onClose,
   onProjectCreated,
+  onMembershipsMoved,
 }: CreateProjectWizardProps) {
   const [phase, setPhase] = useState<WizardPhase>("details");
 
@@ -357,18 +365,29 @@ export function CreateProjectWizard({
     return { id: candidate.id, name: fullName || candidate.username };
   }, [users, managerCandidates, managerId]);
 
-  // Members shown on Review, excluding the manager (rendered separately there).
-  const reviewMembers = useMemo<ReviewPerson[]>(
-    () =>
-      users
-        .filter((user) => selectedUserIds.has(user.id) && user.id !== managerId)
-        .map((user) => ({
-          id: user.id,
-          name: getDisplayName(user),
-          profileIcon: user.profileIcon,
-        })),
-    [users, selectedUserIds, managerId],
+  // Picked members who are in other projects already and would be moved. The
+  // project does not exist yet, so no membership can match it: an empty target id
+  // makes every current project of a regular user count as one they leave.
+  const movedUsers = useMemo(
+    () => getMovedUsers(users, selectedUserIds, ""),
+    [users, selectedUserIds],
   );
+
+  // Members shown on Review, excluding the manager (rendered separately there).
+  const reviewMembers = useMemo<ReviewPerson[]>(() => {
+    const leavingByUserId = new Map(
+      movedUsers.map(({ user, leaving }) => [user.id, leaving.map((project) => project.name)]),
+    );
+
+    return users
+      .filter((user) => selectedUserIds.has(user.id) && user.id !== managerId)
+      .map((user) => ({
+        id: user.id,
+        name: getDisplayName(user),
+        profileIcon: user.profileIcon,
+        movedFrom: leavingByUserId.get(user.id),
+      }));
+  }, [users, selectedUserIds, managerId, movedUsers]);
 
   const memberCount = selectedUserIds.size + (managerId && !selectedUserIds.has(managerId) ? 1 : 0);
 
@@ -525,6 +544,8 @@ export function CreateProjectWizard({
       members = await projectService.assignUsersToProject(project.id, {
         userIds: [...selectedUserIds],
       });
+
+      if (movedUsers.length > 0) onMembershipsMoved?.();
     }
 
     // Setting the manager returns the full, backend-authoritative details

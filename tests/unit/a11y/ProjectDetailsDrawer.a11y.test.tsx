@@ -1,9 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { ProjectDetailsDrawer } from "../../../src/features/admin/components/ProjectDetailsDrawer";
-import type { ProjectOverview } from "../../../src/features/admin/types";
+import type { AdminUser, ProjectOverview } from "../../../src/features/admin/types";
 
 vi.mock("../../../src/services/projectService", () => ({
   projectService: {
@@ -56,6 +57,53 @@ describe("ProjectDetailsDrawer Accessibility", () => {
       expect(screen.getByText("SprintStart")).toBeInTheDocument();
     });
 
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("should not have any a11y violations with a staged move and its confirmation", async () => {
+    const actor = userEvent.setup();
+    const movingUser: AdminUser = {
+      id: "u2",
+      username: "jsmith",
+      email: "jane@example.com",
+      firstName: "Jane",
+      lastName: "Smith",
+      roles: [],
+      permissionGroup: "User",
+      projects: [{ id: "p-other", name: "Other Project" }],
+      projectIds: ["p-other"],
+      enabled: true,
+      profileIcon: "",
+      hasCompletedOnboarding: false,
+    };
+
+    const { baseElement } = render(
+      <MemoryRouter>
+        <ProjectDetailsDrawer
+          project={project}
+          availableUsers={[movingUser]}
+          isOpen={true}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Alice Smith");
+    // The search field can be re-created while the details settle, which drops
+    // typed text, so type until the value sticks.
+    await waitFor(async () => {
+      const search = screen.getByLabelText("Search or add people");
+      await actor.clear(search);
+      await actor.type(search, "jane");
+      expect(search).toHaveValue("jane");
+    });
+    await actor.click(await screen.findByText("Jane Smith"));
+
+    expect(screen.getByText("Will be moved from Other Project")).toBeInTheDocument();
+    expect(await axe(baseElement)).toHaveNoViolations();
+
+    await actor.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Jane Smith");
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 });
