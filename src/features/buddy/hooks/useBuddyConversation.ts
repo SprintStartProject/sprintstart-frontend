@@ -728,6 +728,11 @@ export function useBuddyConversation(
           },
           // Read at call time: a turn speaks to whichever conversation is current when it starts.
           teamProjectIdRef.current ?? undefined,
+          // The page the dock is floating over, for the buddy's app guide. Read from the window at
+          // send time rather than through `useLocation`, which would re-render the one app-wide
+          // conversation on every navigation to learn something only a send needs. The pathname
+          // is all the guide matches on, so the query string stays on this side.
+          window.location.pathname,
         );
 
         // The turn is over — the first moment a card placed mid-answer is certainly on the board.
