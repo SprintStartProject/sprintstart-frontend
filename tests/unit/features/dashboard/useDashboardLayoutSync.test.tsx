@@ -113,6 +113,51 @@ describe("useDashboardLayoutSync", () => {
     expect(readStoredLayout("user-1", DASHBOARD_WIDGET_IDS)).toEqual(LOCAL);
   });
 
+  it("uploads a change whose PUT failed instead of reading it as a reset elsewhere", async () => {
+    // Nothing anywhere, and the first read settles — this browser is now in sync with the server.
+    service.fetchLayout.mockResolvedValue(nothingStored());
+    const first = renderHook(() => useDashboardLayoutSync("user-1", vi.fn()));
+    await waitFor(() => expect(readLayoutSynced("user-1")).toBe(true));
+
+    // The user arranges the dashboard (the dashboard writes storage itself), and the PUT fails.
+    service.saveLayout.mockRejectedValue(new Error("offline"));
+    storeLayout("user-1", LOCAL);
+    act(() => first.result.current.push(LOCAL));
+    await waitFor(() => expect(service.saveLayout).toHaveBeenCalledWith(LAYOUT_VERSION, LOCAL));
+    first.unmount();
+
+    // Next visit: the server is still empty.
+    service.saveLayout.mockReset();
+    service.saveLayout.mockResolvedValue(undefined);
+    const onPulled = vi.fn();
+    renderHook(() => useDashboardLayoutSync("user-1", onPulled));
+
+    await waitFor(() => expect(service.saveLayout).toHaveBeenCalledWith(LAYOUT_VERSION, LOCAL));
+    expect(readStoredLayout("user-1", DASHBOARD_WIDGET_IDS)).toEqual(LOCAL);
+    expect(onPulled).not.toHaveBeenCalled();
+  });
+
+  it("does not vouch for a change made while an earlier PUT was on its way", async () => {
+    service.fetchLayout.mockResolvedValue(nothingStored());
+    const { result } = renderHook(() => useDashboardLayoutSync("user-1", vi.fn()));
+    await waitFor(() => expect(readLayoutSynced("user-1")).toBe(true));
+
+    let finishFirst: () => void = () => {};
+    service.saveLayout.mockReturnValueOnce(new Promise<void>((resolve) => (finishFirst = resolve)));
+
+    act(() => result.current.push(LOCAL));
+    await waitFor(() => expect(service.saveLayout).toHaveBeenCalledWith(LAYOUT_VERSION, LOCAL));
+
+    // A newer change while the first PUT is still in flight; then the first one answers.
+    act(() => result.current.push(SERVER));
+    await act(() => {
+      finishFirst();
+      return Promise.resolve();
+    });
+
+    expect(readLayoutSynced("user-1")).toBe(false);
+  });
+
   it("does nothing for a user with a layout nowhere", async () => {
     service.fetchLayout.mockResolvedValue(nothingStored());
 

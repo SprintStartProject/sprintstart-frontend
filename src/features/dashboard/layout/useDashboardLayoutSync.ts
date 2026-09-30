@@ -6,6 +6,7 @@ import {
   clearStoredLayout,
   LAYOUT_VERSION,
   markLayoutSynced,
+  markLayoutUnsynced,
   readLayoutSynced,
   readStoredLayout,
   storeLayout,
@@ -37,11 +38,12 @@ export type DashboardLayoutSync = {
  *
  * - The server has a layout → it wins and is written into local storage, and `onPulled` asks the
  *   dashboard to read it again. It is the one that followed the user here.
- * - The server has none and this browser has one it never synced → the browser's copy is sent
- *   up. That is the migration for everybody who arranged their dashboard before this existed.
- * - The server has none and this browser's copy *was* synced before → the user reset it on
- *   another device. The stale copy here is dropped instead of uploaded, or a reset would only
- *   hold on the device it was made on.
+ * - The server has none and this browser's copy is not in sync with it → the browser's copy is
+ *   sent up. That is the migration for everybody who arranged their dashboard before this
+ *   existed, and equally a change whose upload failed last time.
+ * - The server has none and this browser's copy *was* in sync → the user reset it on another
+ *   device. The stale copy here is dropped instead of uploaded, or a reset would only hold on the
+ *   device it was made on. See `readLayoutSynced` for what "in sync" means.
  * - Neither has one → nothing happens; the default is derived, not stored.
  *
  * A change made before that first read has settled is not lost and not overwritten: it is held,
@@ -58,6 +60,19 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The layout waiting in `timer`, so leaving the page can still send it. */
   const queued = useRef<DashboardLayout | null>(null);
+  /**
+   * Counts local changes. A request marks the layout as in sync only if no change was made while it
+   * was on its way — otherwise it would vouch for a newer local layout it never carried.
+   */
+  const revision = useRef(0);
+
+  /** Marks the layout as in sync, unless something changed locally since `sentAt`. */
+  const confirmSynced = useCallback(
+    (sentAt: number) => {
+      if (revision.current === sentAt) markLayoutSynced(userId);
+    },
+    [userId],
+  );
 
   useEffect(() => {
     if (!userId) return;
@@ -77,13 +92,14 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
         const waiting = pending.current;
         pending.current = null;
         pulledFor.current = userId;
+        const sentAt = revision.current;
 
         if (waiting?.kind === "reset") {
           await dashboardLayoutService.resetLayout();
-          markLayoutSynced(userId);
+          confirmSynced(sentAt);
         } else if (waiting?.kind === "layout") {
           await dashboardLayoutService.saveLayout(LAYOUT_VERSION, waiting.layout);
-          markLayoutSynced(userId);
+          confirmSynced(sentAt);
         } else if (server.updatedAt !== null) {
           // Not checked here: `readStoredLayout` checks every item on the way out, the same as for
           // anything else in storage, and drops widgets and sizes this version does not know.
@@ -99,8 +115,8 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
           } else if (local) {
             await dashboardLayoutService.saveLayout(LAYOUT_VERSION, local);
             // Only once it is up there: marked before, a failed upload would read as a reset on
-            // the next visit and drop the very layout the migration exists to keep.
-            markLayoutSynced(userId);
+            // the next visit and drop the very layout it exists to keep.
+            confirmSynced(sentAt);
           } else {
             markLayoutSynced(userId);
           }
@@ -120,7 +136,7 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
     return () => {
       active = false;
     };
-  }, [userId, onPulled]);
+  }, [userId, onPulled, confirmSynced]);
 
   useEffect(() => {
     return () => {
@@ -132,18 +148,19 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
 
       const last = queued.current;
       queued.current = null;
-      if (last) {
-        void dashboardLayoutService
-          .saveLayout(LAYOUT_VERSION, last)
-          .then(() => markLayoutSynced(userId))
-          .catch(() => {});
-      }
+      // Deliberately never marked as in sync: by the time this answers, the next mount may already
+      // have changed the layout again, and "not in sync" only ever costs an upload of what the
+      // server already has.
+      if (last) void dashboardLayoutService.saveLayout(LAYOUT_VERSION, last).catch(() => {});
     };
   }, [userId]);
 
   const push = useCallback(
     (layout: DashboardLayout) => {
       if (!userId) return;
+
+      revision.current += 1;
+      markLayoutUnsynced(userId);
 
       if (pulledFor.current !== userId) {
         pending.current = { kind: "layout", layout };
@@ -155,17 +172,21 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
       timer.current = setTimeout(() => {
         timer.current = null;
         queued.current = null;
+        const sentAt = revision.current;
         void dashboardLayoutService
           .saveLayout(LAYOUT_VERSION, layout)
-          .then(() => markLayoutSynced(userId))
+          .then(() => confirmSynced(sentAt))
           .catch(() => {});
       }, QUIET_MS);
     },
-    [userId],
+    [userId, confirmSynced],
   );
 
   const reset = useCallback(() => {
     if (!userId) return;
+
+    revision.current += 1;
+    markLayoutUnsynced(userId);
 
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -176,11 +197,12 @@ export function useDashboardLayoutSync(userId: string, onPulled: () => void): Da
       return;
     }
 
+    const sentAt = revision.current;
     void dashboardLayoutService
       .resetLayout()
-      .then(() => markLayoutSynced(userId))
+      .then(() => confirmSynced(sentAt))
       .catch(() => {});
-  }, [userId]);
+  }, [userId, confirmSynced]);
 
   return { push, reset };
 }

@@ -99,14 +99,16 @@ export function clearStoredLayout(userId: string): void {
 }
 
 /**
- * Whether this browser has exchanged this user's layout with the server at least once.
+ * Whether this browser's copy of the layout is exactly what the server had at the last exchange.
  *
- * What lets the sync tell "never synced" from "reset somewhere else" when the server has nothing:
- * a local layout that was never synced is the one to migrate up, while one that was is a stale
- * copy of a layout the user has since reset on another device, and must not bring it back.
+ * What lets the sync tell a change that never made it up from a reset somewhere else, when the
+ * server has nothing: a local layout that is not in sync — never uploaded, or changed since and the
+ * upload failed — is the newer statement and is sent up; one that is in sync is a stale copy of a
+ * layout the user has since reset on another device, and must not bring it back.
  *
- * Its own key rather than a field on the layout, because it outlives the layout: a reset on this
- * device clears the layout but not the fact that this browser knows the server.
+ * So it is cleared on every local change and set only after a request confirmed that both sides
+ * agree. Its own key rather than a field on the layout, because it has to describe "no layout" too:
+ * after a reset, nothing here and nothing there is in sync.
  */
 function syncedKey(userId: string): string {
   return `sprintstart:dashboard-layout-synced:${userId}`;
@@ -127,6 +129,16 @@ export function markLayoutSynced(userId: string): void {
 
   try {
     window.localStorage.setItem(syncedKey(userId), "true");
+  } catch {
+    // See storeLayout.
+  }
+}
+
+export function markLayoutUnsynced(userId: string): void {
+  if (!userId) return;
+
+  try {
+    window.localStorage.removeItem(syncedKey(userId));
   } catch {
     // See storeLayout.
   }
