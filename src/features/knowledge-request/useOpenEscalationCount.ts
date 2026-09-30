@@ -10,14 +10,11 @@ import { queryKeys } from "../../services/queryKeys";
 /**
  * How many escalated questions are still waiting on a person for this project.
  *
- * A count rather than the boolean dot `usePmAttentionFlag` shows, and that is a
- * deliberate departure from the reasoning there ("a count would have to stay
- * accurate to be trustworthy"). It is warranted here because the number is the
- * endpoint's own answer rather than something derived from a page-sized read —
- * but *only* if it keeps up with the page it points at, which is what the
- * subscription below is for: the PM who empties the queue is looking at this
- * badge while they do it, and a stale "5" beside a list of two is exactly the
- * untrustworthy count that reasoning warns about.
+ * The number is the endpoint's own answer, and it is only trustworthy if it
+ * keeps up with the page it points at, which is what the subscription below is
+ * for: the PM who empties the queue is looking at this badge while they do it,
+ * and a stale "5" beside a list of two is exactly the untrustworthy count a
+ * badge must not show.
  *
  * Counted through its own endpoint, not `listOpen(...).length`. The full read
  * resolves every asker's name and onboarding position, and this is asked on
@@ -35,7 +32,24 @@ export function useOpenEscalationCount(
   enabled: boolean,
   refreshKey?: string,
 ): number {
+  return useKnownOpenEscalationCount(projectId, enabled, refreshKey) ?? 0;
+}
+
+/**
+ * The same count, but `null` while it is loading or after the read failed, instead of 0.
+ *
+ * For a caller that adds it into a bigger number: there, a failed read counted as zero would
+ * quietly shrink the total. Returns 0 (a known nothing) while disabled or with no project -- the
+ * caller cannot open the inbox, so there is nothing of it to count. Shares the cache entry with
+ * {@link useOpenEscalationCount}, so both together still make one request.
+ */
+export function useKnownOpenEscalationCount(
+  projectId: string | null | undefined,
+  enabled: boolean,
+  refreshKey?: string,
+): number | null {
   const queryClient = useQueryClient();
+  const isActive = enabled && Boolean(projectId);
 
   // Re-subscribed on a project switch so the closure always invalidates the
   // project actually on screen. What used to be a local nonce bumped on this
@@ -49,10 +63,12 @@ export function useOpenEscalationCount(
     });
   }, [queryClient, projectId]);
 
-  return useRateLimitedRead(
+  const count = useRateLimitedRead<number | null>(
     queryKeys.knowledgeRequest.openCount(projectId ?? ""),
     () => knowledgeRequestService.countOpen(projectId as string),
-    0,
-    { enabled: enabled && Boolean(projectId), refreshKey },
+    null,
+    { enabled: isActive, refreshKey },
   );
+
+  return isActive ? count : 0;
 }

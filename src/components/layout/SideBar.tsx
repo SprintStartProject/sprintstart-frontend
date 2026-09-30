@@ -10,8 +10,8 @@ import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
 import { useOnboardingJourney } from "../../features/onboarding/generation/OnboardingJourneyContext";
 import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledgeGaps";
-import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
-import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
+import { usePmAttentionCount } from "../../features/team-management/usePmAttentionCount";
+import { useKnownOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
 import { useUnseenSkipAnswerCount } from "../../features/onboarding/hooks/useUnseenSkipAnswerCount";
 import {
   SIDEBAR_TOGGLE_SHORTCUT,
@@ -27,7 +27,6 @@ import {
   DashboardIcon,
   DataIngestionIcon,
   HireSetupIcon,
-  InboxIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
@@ -59,10 +58,11 @@ type SidebarContentProps = {
    */
   hasPmAttentionItems?: boolean;
   /**
-   * How many escalated questions are waiting on a person. Passed in for the
-   * same reason as the flag above: this component is mounted twice at once.
+   * The number on the PM Dashboard entry and what it stands for, or `null` while any part of it
+   * is still loading or failed to load -- see {@link pmDashboardBadge}. Passed in for the same
+   * reason as the flag above: this component is mounted twice at once.
    */
-  openEscalationCount?: number;
+  pmBadge?: PmDashboardBadge | null;
   /** Skip requests the project manager answered that the member has not looked at yet. */
   unseenSkipAnswerCount?: number;
   /** Folded to icons -- the desktop sidebar only; the mobile drawer is always full width. */
@@ -72,21 +72,52 @@ type SidebarContentProps = {
 };
 
 /**
- * The escalation inbox's route, named because three things have to agree on it:
- * the nav entry, the access check that decides whether to read the count, and
- * the entry the count is handed to.
+ * The escalation inbox's route. It has no entry of its own any more -- it is a section of the PM
+ * dashboard -- but the access check that decides whether to read the open count is still the
+ * inbox's own, and the count now rides on the PM dashboard's entry.
  */
 const ESCALATION_INBOX_PATH = "/insights/knowledge-requests" as const;
 
+type PmDashboardBadge = {
+  count: number;
+  /** What the number counts, for a screen reader: the total and its parts. */
+  label: string;
+};
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
 /**
- * What the number on the inbox entry counts, for a screen reader.
+ * The number on the PM Dashboard entry: pending skip requests, unread onboarding feedback and
+ * open escalations, added up.
  *
- * Handed only to that entry rather than to every one of them: the wording is
- * this entry's, and a future counted entry inheriting it would quietly announce
- * its own total as escalations.
+ * `null` unless every part is known. A part still loading or whose read failed would otherwise
+ * count as nothing and quietly shrink the total -- a smaller number that looks just as sure of
+ * itself as the right one. Escalations are part of it because the entry already carried their
+ * count, and a second number beside the first would have to explain which is which.
+ *
+ * Handed only to the PM dashboard entry: a future counted entry inheriting the label would
+ * announce its own total as skip requests and feedback.
  */
-const describeOpenEscalations = (open: number) =>
-  `${open} open ${open === 1 ? "escalation" : "escalations"}`;
+function pmDashboardBadge(
+  attention: { pendingSkips: number; unreadFeedback: number } | null,
+  openEscalations: number | null,
+): PmDashboardBadge | null {
+  if (attention === null || openEscalations === null) return null;
+
+  const count = attention.pendingSkips + attention.unreadFeedback + openEscalations;
+  const parts = [
+    attention.pendingSkips > 0 &&
+      plural(attention.pendingSkips, "pending skip request", "pending skip requests"),
+    attention.unreadFeedback > 0 &&
+      plural(attention.unreadFeedback, "unread feedback", "unread feedback items"),
+    openEscalations > 0 && plural(openEscalations, "open escalation", "open escalations"),
+  ].filter(Boolean);
+
+  return {
+    count,
+    label: `${plural(count, "item needs", "items need")} your attention: ${parts.join(", ")}`,
+  };
+}
 
 const navItems: SidebarNavItem[] = [
   {
@@ -146,15 +177,6 @@ const projectManagerNavItems: SidebarNavItem[] = [
     path: "/hire-setup",
     icon: HireSetupIcon,
   },
-  // The escalation inbox, surfaced as its own entry while it is being evaluated
-  // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`
-  // already hides it from hires: the route is PM/HR/ADMIN-only, and for a PM it
-  // additionally requires managing the selected project.
-  {
-    label: "Escalation Inbox",
-    path: ESCALATION_INBOX_PATH,
-    icon: InboxIcon,
-  },
 ];
 
 const adminNavItems: SidebarNavItem[] = [
@@ -178,7 +200,7 @@ function SidebarContent({
   onNavigate,
   "aria-label": ariaLabel = "Primary Navigation",
   hasPmAttentionItems = false,
-  openEscalationCount = 0,
+  pmBadge = null,
   unseenSkipAnswerCount = 0,
   collapsed = false,
   onToggleCollapsed,
@@ -227,9 +249,6 @@ function SidebarContent({
   const settingsShortcut = navigationShortcut("/settings");
   const settingsLabel = settingsShortcut ? `Settings (${settingsShortcut})` : "Settings";
 
-  // `/insights/knowledge-requests` is deliberately absent: it has its own
-  // sidebar entry, so listing it here would leave two entries active at once
-  // -- including two active pills sharing one Framer Motion `layoutId`.
   /**
    * The buddy is the other half of the chat's page, not a page of its own: one header, one
    * switch, two conversations. So the entry that leads there lights up for both — without it
@@ -250,7 +269,8 @@ function SidebarContent({
     location.pathname.startsWith("/team/") ||
     location.pathname.startsWith("/insights/faq") ||
     location.pathname.startsWith("/insights/knowledge-gaps") ||
-    location.pathname.startsWith("/insights/onboarding");
+    location.pathname.startsWith("/insights/onboarding") ||
+    location.pathname.startsWith(ESCALATION_INBOX_PATH);
 
   const sections: SidebarSection[] = [
     { items: visibleNavItems },
@@ -436,13 +456,13 @@ function SidebarContent({
                       ? "A component has been assigned to you"
                       : item.path === "/onboarding"
                         ? "Your project manager answered a skip request"
-                        : "Open skip requests or unread feedback"
+                        : "Open skip requests, unread feedback or escalations"
                   }
-                  count={item.path === ESCALATION_INBOX_PATH ? openEscalationCount : 0}
+                  count={item.path === "/pm-dashboard" ? (pmBadge?.count ?? 0) : 0}
                   busy={item.path === "/onboarding" && generation.status === "running"}
                   busyLabel="Your onboarding path is being built"
                   countLabel={
-                    item.path === ESCALATION_INBOX_PATH ? describeOpenEscalations : undefined
+                    item.path === "/pm-dashboard" && pmBadge ? () => pmBadge.label : undefined
                   }
                   onNavigate={onNavigate}
                   collapsed={collapsed}
@@ -502,23 +522,27 @@ export function SideBar() {
   // hook rate-limits that so quick navigation cannot hammer the backend.
   // Gated on access so a regular member never pays for a request they could
   // not act on anyway.
-  const hasPmAttentionItems = usePmAttentionFlag(
+  const pmAttention = usePmAttentionCount(
     selectedProjectId,
     canAccessRoute(profile, "/pm-dashboard", canManageSelected),
     pathname,
   );
 
-  // Its own read, not a second use of the flag above: that one counts pending
-  // skip requests and unread feedback off the team overview, and knows nothing
-  // about escalations. Gated on the inbox route rather than the dashboard --
-  // for a PM it additionally requires managing the selected project, so a PM
-  // who is only a member of it neither pays for the request nor sees a badge
-  // for an entry their sidebar does not show.
-  const openEscalationCount = useOpenEscalationCount(
+  // Its own read: escalations are not onboarding items and have their own count endpoint. Gated
+  // on the inbox route rather than the dashboard -- for a PM it additionally requires managing
+  // the selected project, so a PM who is only a member of it neither pays for the request nor
+  // sees it counted. `null` while loading or failed, 0 when there is nothing of it to count.
+  const openEscalations = useKnownOpenEscalationCount(
     selectedProjectId,
     canAccessRoute(profile, ESCALATION_INBOX_PATH, canManageSelected),
     pathname,
   );
+
+  const pmBadge = pmDashboardBadge(pmAttention, openEscalations);
+  // While part of the number is unknown the entry shows no number, only the marker -- and only if
+  // a part that is known has something in it. Better "something is waiting" than a wrong count.
+  const hasPmAttentionItems =
+    pmBadge === null && ((pmAttention?.total ?? 0) > 0 || (openEscalations ?? 0) > 0);
 
   // Owned here for the same reason: read once, handed to both sidebars.
   const { availability } = useOnboardingJourney();
@@ -584,7 +608,7 @@ export function SideBar() {
         <SidebarContent
           aria-label="Desktop Navigation"
           hasPmAttentionItems={hasPmAttentionItems}
-          openEscalationCount={openEscalationCount}
+          pmBadge={pmBadge}
           unseenSkipAnswerCount={unseenSkipAnswerCount}
           collapsed={sidebarLayout.collapsed}
           onToggleCollapsed={sidebarLayout.toggleCollapsed}
@@ -647,7 +671,7 @@ export function SideBar() {
           aria-label="Mobile Navigation"
           onNavigate={closeMobileSidebar}
           hasPmAttentionItems={hasPmAttentionItems}
-          openEscalationCount={openEscalationCount}
+          pmBadge={pmBadge}
           unseenSkipAnswerCount={unseenSkipAnswerCount}
         />
       </aside>
