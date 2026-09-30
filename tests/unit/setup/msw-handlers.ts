@@ -93,6 +93,23 @@ export const handlers = [
     ]),
   ),
 
+  // Nobody has arranged their dashboard yet: the default layout. Tests that care about a stored
+  // layout override this handler.
+  http.get("/api/v1/users/me/dashboard/layout", ({ request }) =>
+    HttpResponse.json({
+      version: Number(new URL(request.url).searchParams.get("version")),
+      items: [],
+      updatedAt: null,
+    }),
+  ),
+
+  http.put("/api/v1/users/me/dashboard/layout", async ({ request }) => {
+    const body = (await request.json()) as { version: number; items: unknown[] };
+    return HttpResponse.json({ ...body, updatedAt: new Date().toISOString() });
+  }),
+
+  http.delete("/api/v1/users/me/dashboard/layout", () => new HttpResponse(null, { status: 204 })),
+
   http.get("/api/v1/users/me/projects", () =>
     HttpResponse.json([{ id: "project-1", name: "SprintStart Project" }]),
   ),
