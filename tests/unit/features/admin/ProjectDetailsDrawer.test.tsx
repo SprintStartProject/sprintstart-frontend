@@ -145,7 +145,10 @@ describe("ProjectDetailsDrawer", () => {
       const { user } = await stageJane(buildAdminUser({}), vi.fn(), onClose);
 
       await user.click(screen.getByRole("button", { name: "Save changes" }));
-      await screen.findByRole("alertdialog");
+      const dialog = await screen.findByRole("alertdialog");
+      // Escape goes to whatever holds focus, and the dialog pulls focus in on the next
+      // animation frame, so wait for that before pressing it.
+      await waitFor(() => expect(dialog).toContainElement(document.activeElement as HTMLElement));
       await user.keyboard("{Escape}");
 
       await waitFor(() => {
