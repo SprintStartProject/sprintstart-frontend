@@ -93,6 +93,18 @@ export const BUDDY_ACTION_PLACE_NOTE = "place_note";
 export const BUDDY_ACTION_CLAIM_GOAL = "claim_goal";
 
 /**
+ * The backend's board edits (`BuddyBoardEditActions`): the buddy reaching past adding, into what
+ * the hire already has. Each one proposes; the confirm is what writes, and the card afterwards
+ * says the buddy made the change.
+ */
+export const BUDDY_ACTION_PLACE_LINK = "place_link";
+export const BUDDY_ACTION_EDIT_NOTE = "edit_note";
+export const BUDDY_ACTION_EDIT_LINK = "edit_link";
+export const BUDDY_ACTION_EDIT_CHECKLIST = "edit_checklist";
+export const BUDDY_ACTION_DISMISS_CARDS = "dismiss_cards";
+export const BUDDY_ACTION_REORDER_CARDS = "reorder_cards";
+
+/**
  * An action proposed in hire mode: the buddy offers to do something *for this hire*, and the
  * confirm echoes the offer's own payload back verbatim. What gets written is what was shown on
  * the button — never something the client derived.
@@ -194,6 +206,21 @@ export type HireActionProposal = {
    */
   lineBefore?: string;
   lineAfter?: string;
+  /** `place_link` / `edit_link`: where the link would point, and what it would be called. */
+  linkUrl?: string;
+  linkLabel?: string;
+  /** `dismiss_cards` / `reorder_cards`: the cards, in order — echoed back on confirm. */
+  cardIds?: string[];
+  /**
+   * The same cards as the board names them, resolved server-side from `cardIds`. Display only and
+   * never sent back: the confirm acts on the ids, and these are what the hire reads before agreeing.
+   */
+  cardNames?: string[];
+  /**
+   * The board edits: what confirming would change, as one sentence the backend composed — including
+   * every line an `edit_checklist` would remove, which the new list alone would not show.
+   */
+  preview?: string;
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -344,6 +371,11 @@ export type BuddyStreamHandlers = {
     noteText?: string;
     lineBefore?: string;
     lineAfter?: string;
+    linkUrl?: string;
+    linkLabel?: string;
+    cardIds?: string[];
+    cardNames?: string[];
+    preview?: string;
   }) => void;
   /**
    * The buddy has proposed a *team-mode* change, stored server-side. Confirm goes by

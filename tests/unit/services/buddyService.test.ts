@@ -452,6 +452,61 @@ describe("buddyService", () => {
         }),
       );
     });
+
+    it("maps the board edit payloads, card names and preview", async () => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              'data: {"type":"action_proposal","action":"dismiss_cards","label":"Remove these from your board","card_ids":["c-1","c-2"],"card_names":["Old note","current task"],"preview":"Take 2 cards off your board."}\n\n',
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
+              'data: {"type":"action_proposal","action":"edit_link","label":"Update this link","card_id":"c-3","link_url":"https://wiki/runbook","link_label":"Runbook"}\n\n',
+            ),
+          );
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/messages",
+          () =>
+            new HttpResponse(stream, {
+              headers: { "Content-Type": "text/event-stream" },
+            }),
+        ),
+      );
+
+      const onActionProposal = vi.fn();
+      await streamMessage("clean up my board", {
+        onToken: vi.fn(),
+        onCitation: vi.fn(),
+        onDone: vi.fn(),
+        onActionProposal,
+      });
+
+      expect(onActionProposal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "dismiss_cards",
+          cardIds: ["c-1", "c-2"],
+          cardNames: ["Old note", "current task"],
+          preview: "Take 2 cards off your board.",
+        }),
+      );
+      expect(onActionProposal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "edit_link",
+          cardId: "c-3",
+          linkUrl: "https://wiki/runbook",
+          linkLabel: "Runbook",
+        }),
+      );
+    });
   });
 
   describe("performAction", () => {
@@ -510,6 +565,16 @@ describe("buddyService", () => {
         competencyKey: "kotlin",
         level: "intermediate",
       });
+
+      await performAction("place_link", { linkUrl: "https://wiki/runbook", linkLabel: "Runbook" });
+      expect(capturedBody).toMatchObject({
+        action: "place_link",
+        linkUrl: "https://wiki/runbook",
+        linkLabel: "Runbook",
+      });
+
+      await performAction("reorder_cards", { cardIds: ["c-2", "c-1"] });
+      expect(capturedBody).toMatchObject({ action: "reorder_cards", cardIds: ["c-2", "c-1"] });
     });
   });
 
