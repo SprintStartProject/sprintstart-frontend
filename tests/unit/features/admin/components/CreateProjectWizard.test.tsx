@@ -506,7 +506,9 @@ describe("CreateProjectWizard", () => {
 
       await toReview(user, ["Max", "Lena"]);
 
-      expect(await screen.findByRole("note")).toHaveTextContent(/moved out of their current projects/);
+      expect(await screen.findByRole("note")).toHaveTextContent(
+        /moved out of their current projects/,
+      );
       expect(screen.getByText(/from Alpha/)).toBeInTheDocument();
     });
 
