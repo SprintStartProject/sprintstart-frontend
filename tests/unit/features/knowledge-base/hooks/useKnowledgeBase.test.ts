@@ -264,7 +264,11 @@ function mockArtifactQuery(artifacts: Artifact[]) {
       }));
 
       const repoCandidates = artifacts.filter(
-        (a) => matchesAllExcept(a, "repositories") && a.sourceSystem === "GITHUB",
+        (a) =>
+          matchesAllExcept(a, "repositories") &&
+          // This stands in for the backend's facet: it lists the repositories of both git
+          // providers, so the real backend has to do the same for Bitbucket.
+          (a.sourceSystem === "GITHUB" || a.sourceSystem === "BITBUCKET"),
       );
       const distinctRepos = new Set<string>();
       for (const a of repoCandidates) {
@@ -588,6 +592,52 @@ describe("useKnowledgeBase", () => {
           (option) => option.value === "sprintstart/sprintstart-frontend",
         )?.count,
       ).toBe(3);
+    });
+  });
+
+  it("offers the repository facet while Bitbucket is selected", async () => {
+    const bitbucketMetadata = (slug: string) =>
+      JSON.stringify({ repositoryId: "bb-1", workspace: "acme", slug });
+    const result = await renderWith([
+      {
+        ...makeArtifact("bb-1", "Widgets PR", "PULL_REQUEST", bitbucketMetadata("widgets")),
+        sourceSystem: "BITBUCKET",
+      },
+      {
+        ...makeArtifact("bb-2", "Widgets file", "FILE", bitbucketMetadata("widgets")),
+        sourceSystem: "BITBUCKET",
+      },
+      {
+        ...makeArtifact("bb-3", "Gadgets file", "FILE", bitbucketMetadata("gadgets")),
+        sourceSystem: "BITBUCKET",
+      },
+    ]);
+
+    expect(result.current.repositoryOptions).toHaveLength(0);
+
+    act(() => {
+      result.current.toggleSource("BITBUCKET");
+    });
+
+    await waitFor(() => {
+      expect(result.current.repositoryOptions.map((option) => option.value)).toEqual([
+        "acme/gadgets",
+        "acme/widgets",
+      ]);
+      expect(
+        result.current.repositoryOptions.find((option) => option.value === "acme/widgets")?.count,
+      ).toBe(2);
+    });
+
+    act(() => {
+      result.current.toggleRepository("acme/widgets");
+    });
+
+    await waitFor(() => {
+      expect(result.current.artifacts.map((artifact) => artifact.id).sort()).toEqual([
+        "bb-1",
+        "bb-2",
+      ]);
     });
   });
 

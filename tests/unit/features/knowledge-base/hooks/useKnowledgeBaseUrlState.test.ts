@@ -58,6 +58,15 @@ describe("parseKnowledgeBaseSearch", () => {
     expect(state.format).toBe("PDF");
   });
 
+  it("keeps repositories while Bitbucket is selected, with or without GitHub", () => {
+    expect([...parse("?sources=BITBUCKET&repos=acme/widgets").repositories]).toEqual([
+      "acme/widgets",
+    ]);
+    expect([...parse("?sources=GITHUB,BITBUCKET&repos=acme/widgets").repositories]).toEqual([
+      "acme/widgets",
+    ]);
+  });
+
   it("ignores a format without Uploads and repositories without GitHub", () => {
     const state = parse("?sources=JIRA&format=PDF&repos=acme/api");
     expect(state.format).toBeNull();
@@ -184,6 +193,18 @@ describe("useKnowledgeBaseUrlState", () => {
     act(() => result.current.api.toggleSource("UPLOAD"));
     expect(result.current.location.search).toBe("?sources=GITHUB&repos=acme/api");
     act(() => result.current.api.toggleSource("GITHUB"));
+    expect(result.current.location.search).toBe("");
+  });
+
+  it("keeps the repositories until neither git provider is left selected", () => {
+    const { result } = renderUrlState(["/kb?sources=GITHUB,BITBUCKET&repos=acme/widgets"], {
+      projectId: "p1",
+    });
+
+    act(() => result.current.api.toggleSource("GITHUB"));
+    expect(result.current.location.search).toBe("?sources=BITBUCKET&repos=acme/widgets");
+
+    act(() => result.current.api.toggleSource("BITBUCKET"));
     expect(result.current.location.search).toBe("");
   });
 

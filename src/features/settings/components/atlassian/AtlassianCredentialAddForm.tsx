@@ -28,7 +28,7 @@ const ADD_FALLBACK = "Failed to add Atlassian credential.";
 
 /**
  * Inline form for storing an Atlassian account email and API token for the
- * authenticated user, shared by the Jira and Confluence connectors. The login
+ * authenticated user, shared by the Jira, Confluence and Bitbucket connectors. The login
  * email is only a convenience default because the Atlassian account may use a
  * different address.
  */

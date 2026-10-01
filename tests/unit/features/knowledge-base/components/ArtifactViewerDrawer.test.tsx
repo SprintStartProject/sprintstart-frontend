@@ -447,6 +447,28 @@ describe("ArtifactViewerDrawer", () => {
       expect(await screen.findByText("PR Description")).toBeInTheDocument();
     });
 
+    it("renders a Bitbucket pull request as markdown from its /pull-requests/ link alone", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Bitbucket PR\n- Reworked the widgets",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Rework widgets",
+          artifactType: "FILE",
+          sourceSystem: "BITBUCKET",
+          sourceUrl: "https://bitbucket.org/acme/widgets/pull-requests/12",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("Bitbucket PR")).toBeInTheDocument();
+    });
+
     it("renders Jira / GitHub issues as markdown even if artifactType is FILE", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
       vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({

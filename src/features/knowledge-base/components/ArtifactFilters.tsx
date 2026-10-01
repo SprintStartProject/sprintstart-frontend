@@ -67,10 +67,10 @@ export interface ArtifactFiltersProps {
    */
   formatOptions: FacetOption<UploadFormat>[];
   /**
-   * Repositories behind the project's GitHub artifacts, with counts. Empty
-   * unless GitHub is part of the source selection — the facet describes GitHub
-   * only, so the section disappears with it and the hook owns that rule rather
-   * than the toolbar re-deriving it.
+   * Repositories behind the project's GitHub and Bitbucket artifacts, with
+   * counts. Empty unless one of them is part of the source selection — the facet
+   * describes the git providers only, so the section disappears with them and the
+   * hook owns that rule rather than the toolbar re-deriving it.
    */
   repositoryOptions: FacetOption<string>[];
   selectedSources: ReadonlySet<SourceSystem>;

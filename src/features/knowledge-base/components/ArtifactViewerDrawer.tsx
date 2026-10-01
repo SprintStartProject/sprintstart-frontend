@@ -206,6 +206,7 @@ const shouldRenderAsMarkdown = (
     title.startsWith("issue #") ||
     title.startsWith("jira #") ||
     sourceUrl.includes("/pull/") ||
+    sourceUrl.includes("/pull-requests/") ||
     sourceUrl.includes("/issues/") ||
     sourceUrl.includes("/browse/");
 

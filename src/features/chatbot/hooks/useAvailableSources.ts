@@ -10,7 +10,7 @@ const ALWAYS_AVAILABLE: readonly SourceSystem[] = ["UPLOAD"];
 
 /**
  * Maps a backend connector id onto the source system the chat filters by. Connector ids are
- * lowercase (`github`, `jira`, `confluence`); the filter values are the uppercase enum constants.
+ * lowercase (`github`, `jira`, `confluence`, `bitbucket`); the filter values are the uppercase enum constants.
  */
 function toSourceSystem(connectorId: string): SourceSystem | null {
   const candidate = connectorId.toUpperCase();
