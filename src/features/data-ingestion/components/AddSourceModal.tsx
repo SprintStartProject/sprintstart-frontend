@@ -705,7 +705,7 @@ export function AddSourceModal({
                       setSources((current) => setDraftSourceOwner(current, sourceId, ownerUserId))
                   : undefined
               }
-              emptyMessage="No sources yet. Add a GitHub repo, Jira instance, or files to start."
+              emptyMessage="No sources yet. Add a GitHub repo, Jira instance, Confluence space, Notion page, or files to start."
             />
 
             <Button

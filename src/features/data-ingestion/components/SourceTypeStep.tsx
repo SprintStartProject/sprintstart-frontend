@@ -7,9 +7,9 @@ import type { SourceSystem } from "../types.ts";
  * wizard. Each card carries its own description so the differences between the
  * options -- the actual decision being made here -- are visible. Which
  * connectors count as available depends on the context (`availableTypes`): both
- * wizards now wire GitHub, Jira, Upload and Confluence, but any connector left
- * out of `availableTypes` still renders with a "Soon" badge instead of being
- * hidden.
+ * wizards wire GitHub, Jira, Upload, Confluence and Notion, and any connector
+ * left out of `availableTypes` still renders with a "Soon" badge instead of
+ * being hidden.
  */
 export function SourceTypeStep({
   selectedType,
