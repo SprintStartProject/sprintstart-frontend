@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Key, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { centralSpringToken } from "../../../styles/tokens";
 import { TokenDeleteConfirm } from "./TokenDeleteConfirm";
 import { TokenRotateForm } from "./TokenRotateForm";
@@ -35,9 +36,7 @@ export function TokenRow({ name, onSaved }: TokenRowProps) {
       className="border-b border-app-border last:border-b-0"
     >
       <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:gap-4 sm:px-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-app-border bg-app-surface-muted">
-          <Key className="h-4 w-4 text-app-text-muted" aria-hidden />
-        </div>
+        <IconTile icon={Key} size="lg" tone="neutral" />
 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold break-words text-app-text">{name}</p>
