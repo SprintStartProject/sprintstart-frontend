@@ -19,6 +19,7 @@ import {
   GithubRepositoryDiscovery,
   type DiscoverySelection,
 } from "../../../../data-ingestion/components/GithubRepositoryDiscovery";
+import { BitbucketRepositoryDiscovery } from "../../../../data-ingestion/components/BitbucketRepositoryDiscovery";
 import { JiraConnectStep } from "../../../../data-ingestion/components/JiraConnectStep";
 import { ConfluenceConnectStep } from "../../../../data-ingestion/components/ConfluenceConnectStep";
 import { SourceTypeStep } from "../../../../data-ingestion/components/SourceTypeStep";
@@ -55,6 +56,28 @@ type GithubDetailProps = {
    */
   projectId?: string | null;
   projectName?: string;
+};
+
+/** Bitbucket detail is fully controlled so the footer's "Add to list" can read it. */
+type BitbucketDetailProps = {
+  credentialName: string;
+  credentials: AtlassianCredentialDto[];
+  credentialsLoaded: boolean;
+  credentialsLoading: boolean;
+  credentialsError: string | null;
+  /** Prefill for the inline "add credential" form's account-email field. */
+  defaultUserEmail: string | null;
+  onCredentialNameChange: (value: string) => void;
+  /** Must be stable (a state setter) — the picker only re-reports on change. */
+  onSelectionChange: (selection: DiscoverySelection[]) => void;
+  /** Adds the new credential to the list, selects it, and reconciles with the server. */
+  onCredentialSaved: (credential: AtlassianCredentialDto) => Promise<void>;
+  /**
+   * Scopes discovery to an existing project so repositories already connected to
+   * it are flagged and cannot be staged twice. `null`/omitted (the create-project
+   * wizard, where no project exists yet) discovers without that scope.
+   */
+  projectId?: string | null;
 };
 
 /** Jira detail — a staged form; nothing connects until provisioning. */
@@ -119,6 +142,12 @@ type AddSourceFlowProps = {
   onBack: () => void;
   isBusy?: boolean;
   github: GithubDetailProps;
+  /**
+   * The Bitbucket detail's state. Omitted by a flow that does not offer
+   * Bitbucket; selecting the type there renders nothing rather than falling
+   * through to another connector's screen.
+   */
+  bitbucket?: BitbucketDetailProps;
   jira: JiraDetailProps;
   upload: UploadDetailProps;
   confluence: ConfluenceDetailProps;
@@ -428,6 +457,53 @@ function GithubDetail({
   );
 }
 
+/** Bitbucket detail with an "add credential" trigger above the discovery. */
+function BitbucketDetail({
+  isBusy,
+  bitbucket,
+  onCompanionOpenChange,
+}: {
+  isBusy: boolean;
+  bitbucket: BitbucketDetailProps;
+  onCompanionOpenChange?: (open: boolean) => void;
+}) {
+  // Only hint "nothing stored" once the list has loaded, so the chip does not
+  // flash while credentials are still being fetched.
+  const missingCredential = bitbucket.credentialsLoaded && bitbucket.credentials.length === 0;
+
+  return (
+    <div className="space-y-4">
+      <CredentialSlot
+        buttonLabel="Add Atlassian credential"
+        panelTitle="New Atlassian credential"
+        onCompanionOpenChange={onCompanionOpenChange}
+        missingLabel={missingCredential ? "No credential yet" : undefined}
+        renderForm={(close, embedded) => (
+          <AtlassianCredentialAddForm
+            defaultUserEmail={bitbucket.defaultUserEmail}
+            onClose={close}
+            onSaved={bitbucket.onCredentialSaved}
+            embedded={embedded}
+          />
+        )}
+      />
+
+      <BitbucketRepositoryDiscovery
+        credentials={bitbucket.credentials}
+        credentialsLoaded={bitbucket.credentialsLoaded}
+        credentialsLoading={bitbucket.credentialsLoading}
+        credentialsError={bitbucket.credentialsError}
+        credentialName={bitbucket.credentialName}
+        onCredentialNameChange={bitbucket.onCredentialNameChange}
+        projectId={bitbucket.projectId ?? null}
+        onSelectionChange={bitbucket.onSelectionChange}
+        isConnecting={isBusy}
+        suppressMissingCredentialNotice
+      />
+    </div>
+  );
+}
+
 /** Jira detail with an "add credential" trigger above the form. */
 function JiraDetail({
   isBusy,
@@ -624,6 +700,7 @@ export function AddSourceFlow({
   onBack,
   isBusy = false,
   github,
+  bitbucket,
   jira,
   upload,
   confluence,
@@ -632,7 +709,15 @@ export function AddSourceFlow({
   const prefersReducedMotion = useReducedMotion();
 
   const detail =
-    selectedType === "JIRA" ? (
+    selectedType === "BITBUCKET" ? (
+      bitbucket ? (
+        <BitbucketDetail
+          isBusy={isBusy}
+          bitbucket={bitbucket}
+          onCompanionOpenChange={onCompanionOpenChange}
+        />
+      ) : null
+    ) : selectedType === "JIRA" ? (
       <JiraDetail isBusy={isBusy} jira={jira} onCompanionOpenChange={onCompanionOpenChange} />
     ) : selectedType === "UPLOAD" ? (
       <UploadDetail

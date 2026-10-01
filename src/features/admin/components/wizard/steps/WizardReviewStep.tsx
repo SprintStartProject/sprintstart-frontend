@@ -43,7 +43,10 @@ const typeLabels: Record<DraftSourceType, string> = {
 };
 
 function sourceTitle(source: DraftSource): string {
-  return source.type === "GITHUB" ? `${source.owner}/${source.name}` : source.displayName;
+  if (source.type === "GITHUB") return `${source.owner}/${source.name}`;
+  if (source.type === "BITBUCKET") return `${source.workspace}/${source.slug}`;
+
+  return source.displayName;
 }
 
 function PersonChip({ person, suffix }: { person: ReviewPerson; suffix?: string }) {

@@ -11,6 +11,7 @@ import {
   addDraftSource,
   connectDraftSources,
   connectOutcomeDescription,
+  createBitbucketDraftFromDiscovery,
   createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
@@ -35,11 +36,6 @@ import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
-
-// Bitbucket shows up in the type grid as "Soon" until its add-source flow exists.
-const AVAILABLE_SOURCE_TYPES: SourceSystem[] = SOURCE_SYSTEMS.filter(
-  (system) => system !== "BITBUCKET",
-);
 
 type AddSourceModalProps = {
   projectId: string | null;
@@ -149,6 +145,10 @@ export function AddSourceModal({
   } = useGithubTokens();
   const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
 
+  // Bitbucket detail state.
+  const [bitbucketSelection, setBitbucketSelection] = useState<DiscoverySelection[]>([]);
+  const [bitbucketCredentialName, setBitbucketCredentialName] = useState("");
+
   // Jira detail state.
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
@@ -164,8 +164,9 @@ export function AddSourceModal({
 
   const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
   const isConfluenceDetail = isAddingSource && addStep === "detail" && addType === "CONFLUENCE";
-  // Jira and Confluence share the same Atlassian credential store, so one
-  // instance of the hook backs both detail screens' pickers.
+  const isBitbucketDetail = isAddingSource && addStep === "detail" && addType === "BITBUCKET";
+  // Jira, Confluence and Bitbucket share the same Atlassian credential store, so
+  // one instance of the hook backs all three detail screens' pickers.
   const {
     credentials: jiraCredentials,
     loaded: jiraCredentialsLoaded,
@@ -173,7 +174,7 @@ export function AddSourceModal({
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
     addCredentialLocally,
-  } = useAtlassianCredentials(isJiraDetail || isConfluenceDetail);
+  } = useAtlassianCredentials(isJiraDetail || isConfluenceDetail || isBitbucketDetail);
 
   // Adopt the first token as soon as the list arrives (and heal a stale
   // selection) so discovery is usable on the first open.
@@ -188,7 +189,7 @@ export function AddSourceModal({
   }, [effectiveTokenNames]);
 
   // Adopt the first stored Atlassian credential once the list arrives, keeping
-  // a still-valid choice — shared by the Jira and Confluence pickers.
+  // a still-valid choice — shared by the Jira, Confluence and Bitbucket pickers.
   useEffect(() => {
     if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
 
@@ -205,11 +206,18 @@ export function AddSourceModal({
           ? current
           : jiraCredentials[0].displayName;
       });
+      setBitbucketCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
     });
   }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
 
   const resetSourceDraftFields = () => {
     setGithubSelection([]);
+    setBitbucketSelection([]);
     setJiraDisplayName("");
     setJiraUrl("");
     setJiraCredentialName("");
@@ -235,9 +243,6 @@ export function AddSourceModal({
   };
 
   const handleSelectAddType = (type: SourceSystem) => {
-    // A "Soon" type (not yet wired) is inert until its phase lands.
-    if (!AVAILABLE_SOURCE_TYPES.includes(type)) return;
-
     setAddType(type);
     setAddStep("detail");
   };
@@ -268,6 +273,12 @@ export function AddSourceModal({
     await reloadJiraCredentials();
   };
 
+  const handleBitbucketCredentialSaved = async (credential: AtlassianCredentialDto) => {
+    addCredentialLocally(credential);
+    setBitbucketCredentialName(credential.displayName);
+    await reloadJiraCredentials();
+  };
+
   const selectedJiraCredential = jiraCredentials.find(
     (credential) => credential.displayName === jiraCredentialName,
   );
@@ -279,21 +290,23 @@ export function AddSourceModal({
   const canAddSource =
     addType === "GITHUB"
       ? githubSelection.length > 0
-      : addType === "JIRA"
-        ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
-        : addType === "UPLOAD"
-          ? uploadFiles.length > 0
-          : addType === "CONFLUENCE"
-            ? Boolean(
-                confluenceBaseUrl.trim() &&
-                isValidConfluenceSpaceId(confluenceSpaceId) &&
-                selectedConfluenceCredential,
-              )
-            : false;
+      : addType === "BITBUCKET"
+        ? bitbucketSelection.length > 0 && Boolean(bitbucketCredentialName)
+        : addType === "JIRA"
+          ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
+          : addType === "UPLOAD"
+            ? uploadFiles.length > 0
+            : addType === "CONFLUENCE"
+              ? Boolean(
+                  confluenceBaseUrl.trim() &&
+                  isValidConfluenceSpaceId(confluenceSpaceId) &&
+                  selectedConfluenceCredential,
+                )
+              : false;
 
   /**
    * The draft(s) captured on the current detail screen — several at once for the
-   * GitHub multi-select, one for Jira/Upload/Confluence. Empty when the detail isn't
+   * GitHub and Bitbucket multi-selects, one for Jira/Upload/Confluence. Empty when the detail isn't
    * complete enough to stage.
    */
   const buildDetailDrafts = (): DraftSource[] => {
@@ -302,6 +315,12 @@ export function AddSourceModal({
     if (addType === "GITHUB") {
       return githubSelection.map((selection) =>
         createDraftSourceFromDiscovery(selection, githubTokenName),
+      );
+    }
+
+    if (addType === "BITBUCKET") {
+      return bitbucketSelection.map((selection) =>
+        createBitbucketDraftFromDiscovery(selection, bitbucketCredentialName),
       );
     }
 
@@ -566,7 +585,7 @@ export function AddSourceModal({
               key={addFlowKey}
               step={addStep}
               selectedType={addType}
-              availableTypes={AVAILABLE_SOURCE_TYPES}
+              availableTypes={SOURCE_SYSTEMS}
               onSelectType={handleSelectAddType}
               onBack={backToTypeGrid}
               isBusy={isSubmitting}
@@ -579,6 +598,18 @@ export function AddSourceModal({
                 onTokenSaved: handleTokenSaved,
                 projectId,
                 projectName,
+              }}
+              bitbucket={{
+                credentialName: bitbucketCredentialName,
+                credentials: jiraCredentials,
+                credentialsLoaded: jiraCredentialsLoaded,
+                credentialsLoading: jiraCredentialsLoading,
+                credentialsError: jiraCredentialsError,
+                defaultUserEmail: null,
+                onCredentialNameChange: setBitbucketCredentialName,
+                onSelectionChange: setBitbucketSelection,
+                onCredentialSaved: handleBitbucketCredentialSaved,
+                projectId,
               }}
               jira={{
                 displayName: jiraDisplayName,
