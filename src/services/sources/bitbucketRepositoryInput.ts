@@ -4,6 +4,11 @@
  * The Bitbucket counterpart of `githubRepositoryInput.ts`: the connect flows let
  * the user paste a URL into the workspace field instead of filling workspace and
  * slug separately. A Bitbucket repository is addressed as `workspace/slug`.
+ *
+ * Bitbucket workspace ids and repository slugs are always lowercase, while the
+ * backend matches connections by exact coordinates. Every parser here lowercases
+ * what it returns, so `Acme/Widgets` resolves to the existing `acme/widgets`
+ * connection instead of becoming a second one.
  */
 
 export type BitbucketRepositoryReference = {
@@ -13,7 +18,8 @@ export type BitbucketRepositoryReference = {
 
 /**
  * Strips the host part of a browser URL, an HTTPS clone URL (which may carry a
- * `user@`) or an SSH remote, and the leading slashes, leaving the path segments.
+ * `user@`) or an SSH remote, and the leading slashes, leaving the lowercased
+ * path segments.
  */
 function toPathSegments(value: string): string[] {
   return value
@@ -23,7 +29,8 @@ function toPathSegments(value: string): string[] {
     .replace(/^git@bitbucket\.org:/i, "")
     .replace(/^\/+/, "")
     .split("/")
-    .filter((segment) => segment.length > 0);
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.toLowerCase());
 }
 
 /**
@@ -80,8 +87,8 @@ export function parseBitbucketRepositoryInput(
 
   if (trimmedWorkspaceInput && trimmedSlugInput) {
     return {
-      workspace: trimmedWorkspaceInput,
-      slug: trimmedSlugInput,
+      workspace: trimmedWorkspaceInput.toLowerCase(),
+      slug: trimmedSlugInput.toLowerCase(),
     };
   }
 

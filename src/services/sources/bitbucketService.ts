@@ -127,8 +127,9 @@ function repositoryPath({ workspace, slug }: BitbucketRepositoryReference): stri
  * backend handles the actual ingestion asynchronously.
  *
  * @returns The backend transaction identifier for the accepted connection job.
- * @throws ApiError — 404 when the named credential does not exist. An
- *   unreachable repository currently surfaces as a 500 with no dedicated handler.
+ * @throws ApiError — 404 when the named credential does not exist, or when the
+ *   repository does not exist or the credential cannot read it; 403 when the
+ *   caller cannot access the project.
  */
 export async function connectBitbucketRepository(
   request: ConnectBitbucketRepositoryRequest,

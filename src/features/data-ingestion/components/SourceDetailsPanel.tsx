@@ -678,7 +678,7 @@ export function SourceDetailsPanel({
             loadConfig={() => onLoadBitbucketConfig(bitbucket)}
             onSave={(request) => onSaveBitbucketConfig(bitbucket, request)}
             autoUpdateOnText="Due checks update this Bitbucket repository."
-            autoUpdateOffText="Due checks only mark this Bitbucket repository out of date."
+            autoUpdateOffText="Due checks skip this Bitbucket repository. It only updates when started manually."
             toggleAriaLabel="Toggle Bitbucket repository auto update"
           />
         </DrawerCard>

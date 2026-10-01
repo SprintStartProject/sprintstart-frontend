@@ -517,9 +517,10 @@ async function connectOneDraftSource(
         projectId,
       });
     } catch (error) {
-      // The backend has no handler for a repository Bitbucket cannot find, so
-      // that case (and any other server fault) arrives as a bare 500. Say what
-      // the likely cause is instead of showing the status text.
+      // A repository Bitbucket cannot find arrives as a 404 whose message names
+      // it. A failed Bitbucket call during the check (a rejected token, an
+      // outage) arrives as a bare 500, so say what the likely cause is instead
+      // of showing the status text.
       if (error instanceof ApiError && error.status >= 500) {
         throw new Error(
           `Couldn't connect ${source.workspace}/${source.slug}. Check that the repository exists and that the selected credential can read it.`,

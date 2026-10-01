@@ -48,7 +48,7 @@ describe("BitbucketRepositoryDiscovery Accessibility", () => {
             {
               workspace: "acme",
               slug: "widgets",
-              name: "Widgets",
+              name: "Widget Shop",
               isPrivate: true,
               url: "https://bitbucket.org/acme/widgets",
               alreadyConnected: false,
@@ -72,7 +72,7 @@ describe("BitbucketRepositoryDiscovery Accessibility", () => {
 
     await user.type(screen.getByLabelText("Workspace or bitbucket.org URL"), "acme");
     await user.click(screen.getByRole("button", { name: "Discover" }));
-    await screen.findByText("Widgets (widgets)");
+    await screen.findByText("Widget Shop (widgets)");
 
     expect(await axe(container)).toHaveNoViolations();
   });

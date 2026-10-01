@@ -58,10 +58,14 @@ const BITBUCKET_DISCOVERY_ADAPTER: RepositoryDiscoveryAdapter = {
     return {
       repositories: result.repositories.map((repository) => ({
         name: repository.slug,
+        // The slug only adds information when it is more than the lowercased
+        // display name ("Widget Shop (widget-shop)", but just "Widgets").
         label:
           repository.name === repository.slug
             ? undefined
-            : `${repository.name} (${repository.slug})`,
+            : repository.name.toLowerCase() === repository.slug.toLowerCase()
+              ? repository.name
+              : `${repository.name} (${repository.slug})`,
         isPrivate: repository.isPrivate,
         url: repository.url,
         alreadyConnected: repository.alreadyConnected,

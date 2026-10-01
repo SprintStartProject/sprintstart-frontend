@@ -120,19 +120,25 @@ const DEFAULT_GLOBAL_BITBUCKET_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
 type SyncSettingsProvider = "github" | "bitbucket" | "jira" | "confluence";
 
 /**
- * Wording for the global sync-settings modal, per connector. `one` and `many`
+ * Wording for the global sync-settings modal, per connector. `autoUpdateOff`
+ * overrides the default "only mark out of date" line for a connector whose
+ * scheduler does nothing at all while auto update is off. `one` and `many`
  * name the connector's sources so the copy reads naturally in both the
  * "overwrites every connected …" and the "updates all connected …" sentences.
  */
 const SYNC_SETTINGS_COPY: Record<
   SyncSettingsProvider,
-  { label: string; one: string; many: string }
+  { label: string; one: string; many: string; autoUpdateOff?: string }
 > = {
   github: { label: "GitHub", one: "GitHub repository", many: "GitHub repositories" },
   bitbucket: {
     label: "Bitbucket",
     one: "Bitbucket repository",
     many: "Bitbucket repositories",
+    // The Bitbucket scheduler skips a repository with auto update off instead of
+    // marking it out of date.
+    autoUpdateOff:
+      "Due checks skip connected Bitbucket repositories. They only update when started manually.",
   },
   jira: { label: "Jira", one: "Jira instance", many: "Jira instances" },
   confluence: { label: "Confluence", one: "Confluence space", many: "Confluence spaces" },
@@ -1815,7 +1821,10 @@ export function DataIngestionPage() {
           showNextSync={false}
           disclaimer={`Applying global settings overwrites the sync settings of every connected ${syncSettingsCopy.one}.`}
           autoUpdateOnText={`Due checks update all connected ${syncSettingsCopy.many}.`}
-          autoUpdateOffText={`Due checks only mark connected ${syncSettingsCopy.many} out of date.`}
+          autoUpdateOffText={
+            syncSettingsCopy.autoUpdateOff ??
+            `Due checks only mark connected ${syncSettingsCopy.many} out of date.`
+          }
           toggleAriaLabel={`Toggle global ${syncSettingsCopy.label} auto update`}
           saveLabel="Apply globally"
         />

@@ -84,4 +84,18 @@ describe("parseBitbucketRepositoryInput", () => {
     expect(parseBitbucketRepositoryInput("acme", "")).toBeNull();
     expect(parseBitbucketRepositoryInput("", "widgets")).toBeNull();
   });
+
+  // The backend matches connections by exact coordinates, and Bitbucket ids are
+  // lowercase, so a capitalized entry must not address a second connection.
+  it("lowercases the workspace and slug", () => {
+    expect(parseBitbucketRepositoryInput("Acme", "Widgets")).toEqual({
+      workspace: "acme",
+      slug: "widgets",
+    });
+    expect(parseBitbucketRepositoryReference("https://bitbucket.org/Acme/Widgets.git")).toEqual({
+      workspace: "acme",
+      slug: "widgets",
+    });
+    expect(parseBitbucketWorkspaceInput("bitbucket.org/ACME")).toBe("acme");
+  });
 });

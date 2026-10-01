@@ -553,7 +553,7 @@ describe("AddSourceModal Bitbucket", () => {
   async function discoverAcme(user: ReturnType<typeof userEvent.setup>) {
     await user.type(screen.getByLabelText(WORKSPACE_LABEL), "acme");
     await user.click(screen.getByRole("button", { name: "Discover" }));
-    await screen.findByText("Widgets (widgets)");
+    await screen.findByText("Widgets");
   }
 
   const rowOf = (text: string) => screen.getByText(text).closest("label") as HTMLElement;
@@ -608,7 +608,7 @@ describe("AddSourceModal Bitbucket", () => {
       workspace: "acme",
       query: { credentialName: "default", page: "0", pageSize: "20" },
     });
-    expect(within(rowOf("Widgets (widgets)")).getByText("Private")).toBeInTheDocument();
+    expect(within(rowOf("Widgets")).getByText("Private")).toBeInTheDocument();
     expect(within(rowOf("gadgets")).getByText("Public")).toBeInTheDocument();
   });
 
@@ -632,7 +632,7 @@ describe("AddSourceModal Bitbucket", () => {
     expect(screen.getByRole("button", { name: /add to list/i })).toBeDisabled();
 
     await discoverAcme(user);
-    await user.click(within(rowOf("Widgets (widgets)")).getByRole("checkbox"));
+    await user.click(within(rowOf("Widgets")).getByRole("checkbox"));
 
     expect(screen.getByRole("button", { name: /add to list/i })).toBeEnabled();
   });
@@ -652,7 +652,7 @@ describe("AddSourceModal Bitbucket", () => {
     await openBitbucketDetail(user);
     await discoverAcme(user);
 
-    await user.click(within(rowOf("Widgets (widgets)")).getByRole("checkbox"));
+    await user.click(within(rowOf("Widgets")).getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: /add to list/i }));
 
     // Back on the staged list, titled workspace/slug with the credential as detail.
@@ -767,7 +767,7 @@ describe("AddSourceModal Bitbucket", () => {
     await openBitbucketDetail(user);
     await discoverAcme(user);
 
-    await user.click(within(rowOf("Widgets (widgets)")).getByRole("checkbox"));
+    await user.click(within(rowOf("Widgets")).getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: /connect now/i }));
 
     expect(await screen.findByRole("button", { name: /retry/i })).toBeInTheDocument();
