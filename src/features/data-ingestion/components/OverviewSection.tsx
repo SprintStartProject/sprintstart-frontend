@@ -1,7 +1,9 @@
 import {
+  Activity,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  ChartColumn,
   Database,
   GitBranch,
   Loader2,
@@ -9,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useMemo } from "react";
+import { Badge } from "../../../components/ui/Badge";
 import { IconTile } from "../../../components/ui/IconTile";
 import {
   buildRunSourceLabels,
@@ -121,10 +124,15 @@ export function OverviewSection({
           content can never expand the grid past its container. */}
       <div className="mt-3.5 grid gap-3.5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-          <h3 className="text-sm font-bold text-app-text">Artifacts by source</h3>
-          <p className="mt-0.5 text-xs text-app-text-subtle">
-            How many ingested artifacts each source contributes
-          </p>
+          <div className="flex items-start gap-3">
+            <IconTile icon={ChartColumn} size="md" tone="brand" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-app-text">Artifacts by source</h3>
+              <p className="mt-0.5 text-xs text-app-text-subtle">
+                How many ingested artifacts each source contributes
+              </p>
+            </div>
+          </div>
 
           {bySource.length > 0 ? (
             <>
@@ -171,8 +179,13 @@ export function OverviewSection({
         </div>
 
         <div className="rounded-2xl border border-app-border bg-app-surface p-5">
-          <h3 className="text-sm font-bold text-app-text">Recent activity</h3>
-          <p className="mt-0.5 text-xs text-app-text-subtle">Latest ingestion runs</p>
+          <div className="flex items-start gap-3">
+            <IconTile icon={Activity} size="md" tone="brand" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-app-text">Recent activity</h3>
+              <p className="mt-0.5 text-xs text-app-text-subtle">Latest ingestion runs</p>
+            </div>
+          </div>
 
           {recentRuns.length > 0 ? (
             <ul className="mt-3">
@@ -265,19 +278,11 @@ function ActivityRow({ run, sourceLabel }: { run: IngestionRun; sourceLabel: str
 
   // Failed/partial runs use the danger palette so the label stays red on red;
   // the warning palette pairs amber-yellow text with a red-looking background.
-  const toneClass =
-    tone === "success"
-      ? "bg-app-success-bg text-app-success-text"
-      : tone === "running"
-        ? "bg-app-brand-soft text-app-brand-text"
-        : "bg-app-danger-bg text-app-danger-text";
+  const badgeVariant = tone === "success" ? "success" : tone === "running" ? "brand" : "danger";
 
   return (
     <li className="flex items-center gap-3 border-t border-app-border py-2 first:border-t-0">
-      <IconTile
-        size="sm"
-        tone={tone === "success" ? "success" : tone === "running" ? "brand" : "danger"}
-      >
+      <IconTile size="sm" tone={badgeVariant}>
         {tone === "success" ? (
           <CheckCircle2 size={15} />
         ) : tone === "running" ? (
@@ -294,11 +299,7 @@ function ActivityRow({ run, sourceLabel }: { run: IngestionRun; sourceLabel: str
       </div>
 
       <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] leading-none font-semibold ${toneClass}`}
-        >
-          {label}
-        </span>
+        <Badge variant={badgeVariant}>{label}</Badge>
         <span className="text-[11.5px] text-app-text-subtle">{formatDateTime(run.startedAt)}</span>
       </div>
     </li>

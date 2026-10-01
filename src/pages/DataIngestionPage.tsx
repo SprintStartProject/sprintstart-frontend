@@ -421,27 +421,18 @@ function resolveRequestedSourceId(sources: DataSource[], requested: string): str
   return byComponent?.sourceId ?? null;
 }
 
-const STATUS_BADGE_TONE = {
-  success: "border-app-success-border bg-app-success-bg text-app-success-text",
-  brand: "border-app-brand-border bg-app-brand-soft text-app-brand-text",
-  warning: "border-app-warning-border bg-app-warning-bg text-app-warning-text",
-  neutral: "border-app-border bg-app-neutral-bg text-app-neutral-text",
-} as const;
-
-/** Small count badge summarising how many sources are in a given status. */
+/** Count badge in a section heading; the Sources and Runs headings share this size. */
 function StatusBadge({
   tone,
   children,
 }: {
-  tone: keyof typeof STATUS_BADGE_TONE;
+  tone: "success" | "brand" | "warning" | "neutral";
   children: ReactNode;
 }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold tabular-nums ${STATUS_BADGE_TONE[tone]}`}
-    >
+    <Badge variant={tone} className="tabular-nums">
       {children}
-    </span>
+    </Badge>
   );
 }
 
@@ -1555,9 +1546,9 @@ export function DataIngestionPage() {
                       <div className="flex items-center gap-3">
                         <h2 className="text-lg font-semibold tracking-tight text-app-text">Runs</h2>
                         {runPageMeta ? (
-                          <Badge variant="neutral" size="sm" className="tabular-nums">
+                          <StatusBadge tone="neutral">
                             {runPageMeta.totalElements} total
-                          </Badge>
+                          </StatusBadge>
                         ) : null}
                       </div>
 

@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { ExternalLink, Folder, FolderKanban, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { Input } from "../../../components/ui/Input";
 import { useToast } from "../../../context/useToast";
 import type { ProjectSummary } from "../types";
@@ -223,11 +224,14 @@ export function ProjectAccessPanel({
   return (
     <div className="rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
-            Projects
-          </p>
-          <p className="mt-1 text-sm text-app-text-muted">Changes are saved immediately.</p>
+        <div className="flex items-start gap-2.5">
+          <IconTile icon={FolderKanban} size="md" tone="brand" />
+          <div>
+            <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+              Projects
+            </p>
+            <p className="mt-1 text-sm text-app-text-muted">Changes are saved immediately.</p>
+          </div>
         </div>
 
         <div className="relative" ref={pickerAnchorRef}>
