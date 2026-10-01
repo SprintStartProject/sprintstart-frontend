@@ -57,6 +57,10 @@ export const queryKeys = {
     // auth-independent tests for no real protection.
     mine: () => ["atlassian-credentials"] as const,
   },
+  notionCredentials: {
+    // Not scoped by user id, for the same reason as `atlassianCredentials.mine`.
+    mine: () => ["notion-credentials"] as const,
+  },
   knowledgeGaps: {
     mine: (projectId: string) => ["knowledge-gaps", "mine", projectId] as const,
     overview: (projectId: string) => ["knowledge-gaps", "overview", projectId] as const,
