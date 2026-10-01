@@ -25,6 +25,7 @@ import { ConnectorList } from "../features/connectors/components/ConnectorList.t
 import { ConnectorsLoadingState } from "../features/connectors/components/ConnectorsLoadingState.tsx";
 import { toConnectorListItems } from "../features/connectors/data.ts";
 import { useConfluenceSync } from "../features/connectors/components/useConfluenceSync.ts";
+import { useNotionSync } from "../features/connectors/components/useNotionSync.ts";
 import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import {
@@ -32,6 +33,8 @@ import {
   createConfluenceSourceFromConnection,
   createConfluenceSourceFromInstance,
   createJiraSourceFromInstance,
+  createNotionSourceFromConnection,
+  createNotionSourceFromInstance,
   createUploadSourceFromInstance,
   deriveSourceStatus,
   formatDateTime,
@@ -85,6 +88,7 @@ import {
   confluenceService,
   type ConfluenceConnectionDto,
 } from "../services/sources/confluenceService.ts";
+import { notionService, type NotionConnectionDto } from "../services/sources/notionService.ts";
 import { projectService, type ProjectSource } from "../services/projectService.ts";
 import { parseGithubRepositoryReference } from "../services/sources/githubRepositoryInput.ts";
 
@@ -269,8 +273,11 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return [];
 
-    // Jira and Confluence cards are built solely from the connector-neutral status rows.
-    if (sourceSystem === "JIRA" || sourceSystem === "CONFLUENCE") return [];
+    // Jira, Confluence and Notion cards are built from their own connection lists and the
+    // connector-neutral status rows, never from the project-source fallback.
+    if (sourceSystem === "JIRA" || sourceSystem === "CONFLUENCE" || sourceSystem === "NOTION") {
+      return [];
+    }
     // Skip UPLOAD only when an authoritative status row already exists so the card
     // does not vanish when artifact count is 0 or when run status fallback is needed.
     if (sourceSystem === "UPLOAD" && sourceInstances.some((s) => s.sourceSystem === "UPLOAD")) {
@@ -470,6 +477,9 @@ export function DataIngestionPage() {
   // `projectSources`/`sourceInstances` and are loaded separately here.
   const [jiraInstances, setJiraInstances] = useState<JiraInstanceDto[]>([]);
   const [confluenceConnections, setConfluenceConnections] = useState<ConfluenceConnectionDto[]>([]);
+  // One connection per connected Notion page. Their status rows carry the page URL as
+  // `sourceId`, so the connection supplies the id every action needs.
+  const [notionConnections, setNotionConnections] = useState<NotionConnectionDto[]>([]);
   const [projectDataVersion, setProjectDataVersion] = useState(0);
   const [sourceStatusErrorMessage, setSourceStatusErrorMessage] = useState<string | null>(null);
   const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] = useState<string | null>(null);
@@ -507,6 +517,7 @@ export function DataIngestionPage() {
     useProjectContext();
 
   const { syncConnection: syncConfluenceConnection } = useConfluenceSync(selectedProjectId);
+  const { syncConnection: syncNotionConnection } = useNotionSync(selectedProjectId);
 
   const requestedProjectId = searchParams.get("projectId") ?? "";
   const requestedSourceId = searchParams.get("sourceId") ?? "";
@@ -565,6 +576,7 @@ export function DataIngestionPage() {
         setSourceInstances([]);
         setJiraInstances([]);
         setConfluenceConnections([]);
+        setNotionConnections([]);
       }
       setProjectSourcesErrorMessage(null);
       setSourceStatusErrorMessage(null);
@@ -578,12 +590,13 @@ export function DataIngestionPage() {
         setIsProjectDataLoading(true);
       }
 
-      const [projectResult, sourceStatusResult, jiraResult, confluenceResult] =
+      const [projectResult, sourceStatusResult, jiraResult, confluenceResult, notionResult] =
         await Promise.allSettled([
           projectService.getAccessibleProject(selectedProjectId),
           getIngestionSourceStatuses(selectedProjectId),
           getJiraInstances(selectedProjectId),
           confluenceService.listConnections(selectedProjectId),
+          notionService.listConnections(selectedProjectId),
         ]);
 
       if (!isMounted) return;
@@ -608,13 +621,14 @@ export function DataIngestionPage() {
         );
       }
 
-      // Jira and Confluence degrade quietly: a load failure (e.g. an HR user without
+      // Jira, Confluence and Notion degrade quietly: a load failure (e.g. an HR user without
       // the PM/ADMIN role the endpoint requires) must not blank the page or
       // surface an error banner.
       setJiraInstances(jiraResult.status === "fulfilled" ? jiraResult.value : []);
       setConfluenceConnections(
         confluenceResult.status === "fulfilled" ? confluenceResult.value : [],
       );
+      setNotionConnections(notionResult.status === "fulfilled" ? notionResult.value : []);
 
       setIsProjectDataLoading(false);
     });
@@ -635,11 +649,14 @@ export function DataIngestionPage() {
         page,
         size: RUN_PAGE_SIZE,
         projectId: selectedProjectId || undefined,
-        // GitHub and Confluence scope by repositoryId (filtering on backend sourceInstanceId UUID);
+        // GitHub, Confluence and Notion scope by repositoryId (filtering on backend
+        // sourceInstanceId UUID, which is the connection id for the latter two);
         // Jira scopes by the run's sourceInstanceRef via sourceRef (instance URL).
         repositoryId:
           hasSource &&
-          (runFilter.sourceSystem === "GITHUB" || runFilter.sourceSystem === "CONFLUENCE")
+          (runFilter.sourceSystem === "GITHUB" ||
+            runFilter.sourceSystem === "CONFLUENCE" ||
+            runFilter.sourceSystem === "NOTION")
             ? runFilter.sourceValue
             : undefined,
         sourceRef:
@@ -729,6 +746,12 @@ export function DataIngestionPage() {
       setConfluenceConnections(await confluenceService.listConnections(selectedProjectId));
     } catch {
       // Keep the last-known Confluence connections on a failed in-place refresh.
+    }
+
+    try {
+      setNotionConnections(await notionService.listConnections(selectedProjectId));
+    } catch {
+      // Keep the last-known Notion connections on a failed in-place refresh.
     }
   }, [selectedProjectId]);
 
@@ -821,15 +844,33 @@ export function DataIngestionPage() {
       );
     });
 
+    // A Notion status row is keyed by the page URL, so each connection finds its row there.
+    const notionSources = notionConnections.map((conn) => {
+      const status = sourceInstances.find(
+        (s) => s.sourceSystem === "NOTION" && s.sourceId === conn.pageUrl,
+      );
+
+      return status
+        ? createNotionSourceFromInstance(status, conn, connectorEnabledById.get("notion"))
+        : createNotionSourceFromConnection(conn, runs, connectorEnabledById.get("notion"));
+    });
+
     const uploadSources = sourceInstances
       .filter((status) => status.sourceSystem === "UPLOAD")
       .map((status) => createUploadSourceFromInstance(status));
 
-    return [...githubAndUpload, ...jiraSources, ...confluenceSources, ...uploadSources];
+    return [
+      ...githubAndUpload,
+      ...jiraSources,
+      ...confluenceSources,
+      ...notionSources,
+      ...uploadSources,
+    ];
   }, [
     confluenceConnections,
     connectorEnabledById,
     jiraInstances,
+    notionConnections,
     projectSources,
     runs,
     sourceInstances,
@@ -958,6 +999,16 @@ export function DataIngestionPage() {
               value: source.confluenceSpace.connectionId,
               label: source.name,
               sourceSystem: "CONFLUENCE",
+            },
+          ];
+        }
+
+        if (source.sourceSystem === "NOTION" && source.notionPage?.connectionId) {
+          return [
+            {
+              value: source.notionPage.connectionId,
+              label: source.name,
+              sourceSystem: "NOTION",
             },
           ];
         }
@@ -1132,6 +1183,15 @@ export function DataIngestionPage() {
         return;
       }
 
+      if (source.sourceSystem === "NOTION") {
+        const connectionId = source.notionPage?.connectionId;
+        if (!connectionId) {
+          throw new Error("Notion connection ID is not available for this source.");
+        }
+        await syncNotionConnection(connectionId, () => refreshAfterUpdate());
+        return;
+      }
+
       if (source.sourceSystem !== "GITHUB" || !source.githubRepository) {
         throw new Error("Repository details are not available for this source.");
       }
@@ -1139,7 +1199,7 @@ export function DataIngestionPage() {
       await updateGithubRepository(source.githubRepository);
       refreshAfterUpdate();
     },
-    [refreshAfterUpdate, syncConfluenceConnection],
+    [refreshAfterUpdate, syncConfluenceConnection, syncNotionConnection],
   );
 
   const handleSaveGlobalGithubConfig = useCallback(
@@ -1320,6 +1380,25 @@ export function DataIngestionPage() {
     [refreshSourceDetails],
   );
 
+  // A Notion page is gated through the generic connector endpoint like Jira, keyed by the
+  // page URL (the `sourceId` of its status row). The connector rejects a patch without the
+  // project, because a page belongs to exactly one.
+  const handleSetNotionSourceEnabled = useCallback(
+    async (pageUrl: string, enabled: boolean) => {
+      if (!selectedProjectId) {
+        throw new Error("Select a project to change this source.");
+      }
+
+      await connectorService.patchConnectorSources(
+        "notion",
+        [{ sourceId: pageUrl, enabled }],
+        selectedProjectId,
+      );
+      await refreshSourceDetails();
+    },
+    [refreshSourceDetails, selectedProjectId],
+  );
+
   // Removes a source's link to the selected project (the DELETE counterpart to
   // linking it via the Add Source flow), keyed per connector: a repository id
   // for GitHub, the instance URL for Jira, the connection id for Confluence. The
@@ -1347,6 +1426,20 @@ export function DataIngestionPage() {
         }
 
         await confluenceService.deleteConnection(selectedProjectId, connectionId);
+
+        setSelectedSourceId(null);
+        await refreshSourceDetails();
+        return;
+      }
+
+      if (source.sourceSystem === "NOTION") {
+        const connectionId = source.notionPage?.connectionId;
+
+        if (!connectionId || !selectedProjectId) {
+          throw new Error("This source cannot be removed from the project.");
+        }
+
+        await notionService.deleteConnection(selectedProjectId, connectionId);
 
         setSelectedSourceId(null);
         await refreshSourceDetails();
@@ -1612,6 +1705,7 @@ export function DataIngestionPage() {
             onSaveConfluenceConfig={handleSaveConfluenceConfig}
             onSetSourceEnabled={handleSetSourceEnabled}
             onSetJiraSourceEnabled={handleSetJiraSourceEnabled}
+            onSetNotionSourceEnabled={handleSetNotionSourceEnabled}
             onUnlinkSource={canIngestIntoSelectedProject ? handleUnlinkSource : undefined}
             onClose={closeSourceDetails}
           />

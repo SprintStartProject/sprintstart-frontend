@@ -1064,6 +1064,255 @@ describe("DataIngestionPage", () => {
     });
   });
 
+  describe("Notion pages", () => {
+    const notionConnection = {
+      id: "conn-1",
+      projectId: "proj1",
+      pageId: "page-1",
+      pageTitle: "Sprint Planning",
+      pageUrl: "https://www.notion.so/Sprint-Planning-page1",
+      credentialName: "wiki",
+      sourceEnabled: true,
+      autoUpdate: false,
+      scheduleSpec: null,
+      nextSyncAt: null,
+      lastEditedTime: null,
+      contentHash: null,
+      lastSyncedAt: null,
+      createdAt: "2026-07-01T00:00:00Z",
+      updatedAt: "2026-07-01T00:00:00Z",
+      version: 1,
+    };
+
+    // The status row is keyed by the page URL, not by the connection id.
+    const notionStatusRow = {
+      sourceSystem: "NOTION",
+      sourceId: "https://www.notion.so/Sprint-Planning-page1",
+      displayName: "Sprint Planning",
+      repositoryId: null,
+      owner: null,
+      name: null,
+      sourceUrl: "https://www.notion.so/Sprint-Planning-page1",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-07-01T00:00:00Z",
+      ingestedCount: 1,
+      updatedCount: 0,
+      deletedCount: 0,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 77,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: null,
+      lastPullRequestsSyncAt: null,
+    };
+
+    beforeEach(() => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [],
+        users: [],
+      });
+      server.use(
+        http.get("/api/v1/notion/projects/:projectId/connections", () =>
+          HttpResponse.json([notionConnection]),
+        ),
+      );
+    });
+
+    it("builds a Notion card from the connection and its status row", async () => {
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow]);
+
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      expect((await screen.findAllByText("Sprint Planning")).length).toBeGreaterThan(0);
+      await waitFor(() => expect(screen.getAllByText("77").length).toBeGreaterThan(0));
+    });
+
+    it("shows the card from the connection alone while no status row exists yet", async () => {
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      expect((await screen.findAllByText("Sprint Planning")).length).toBeGreaterThan(0);
+    });
+
+    it("does not build a card from a Notion project source without a connection", async () => {
+      server.use(
+        http.get("/api/v1/notion/projects/:projectId/connections", () => HttpResponse.json([])),
+      );
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [{ id: "n1", name: "Orphan Page", type: "NOTION", status: "CONNECTED" }],
+        users: [],
+      });
+
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => expect(mockGetAccessibleProject).toHaveBeenCalled());
+      expect(screen.queryByText("Orphan Page")).not.toBeInTheDocument();
+    });
+
+    it("keeps working when the Notion connections cannot be read", async () => {
+      server.use(
+        http.get("/api/v1/notion/projects/:projectId/connections", () =>
+          HttpResponse.json({ message: "forbidden" }, { status: 403 }),
+        ),
+      );
+
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByRole("group", { name: /filter sections/i })).toBeInTheDocument();
+      expect(screen.queryByText("Sprint Planning")).not.toBeInTheDocument();
+    });
+
+    it("filters the run history to a Notion page via its connection id", async () => {
+      // A GitHub repository (project source) and a Notion page together offer two options.
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [{ id: "src1", name: "octocat/hello-world", type: "GITHUB", status: "CONNECTED" }],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([
+        {
+          ...notionStatusRow,
+          sourceSystem: "GITHUB",
+          sourceId: "octocat/hello-world",
+          displayName: "octocat/hello-world",
+          repositoryId: "repo-uuid",
+          owner: "octocat",
+          name: "hello-world",
+        },
+        notionStatusRow,
+      ]);
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() =>
+        expect(screen.getByRole("combobox", { name: "Filter runs by source" })).toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("combobox", { name: "Filter runs by source" }));
+      await user.click(await screen.findByRole("option", { name: "Sprint Planning" }));
+
+      await waitFor(() =>
+        expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+          expect.objectContaining({ repositoryId: "conn-1", sourceRef: undefined, page: 1 }),
+        ),
+      );
+    });
+
+    it("syncs the page through its connection from the details drawer", async () => {
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow]);
+      let syncedConnection = "";
+      server.use(
+        http.post(
+          "/api/v1/notion/projects/:projectId/connections/:connectionId/update",
+          ({ params }) => {
+            syncedConnection = String(params.connectionId);
+            return HttpResponse.json({
+              runId: "run-1",
+              connectionId: params.connectionId,
+              outcome: "UPDATED",
+            });
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/data-ingestion?sourceId=conn-1"]}>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      const panel = await screen.findByRole("dialog");
+      await user.click(within(panel).getByRole("button", { name: /update page/i }));
+
+      await waitFor(() => expect(syncedConnection).toBe("conn-1"));
+    });
+
+    it("removes the page connection from the project", async () => {
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow]);
+      let deleted = "";
+      server.use(
+        http.delete(
+          "/api/v1/notion/projects/:projectId/connections/:connectionId",
+          ({ params }) => {
+            deleted = `${String(params.projectId)}/${String(params.connectionId)}`;
+            return new HttpResponse(null, { status: 204 });
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/data-ingestion?sourceId=conn-1"]}>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      const panel = await screen.findByRole("dialog");
+      await user.click(within(panel).getByRole("button", { name: /remove from project/i }));
+      const confirm = await screen.findByRole("alertdialog");
+      await user.click(within(confirm).getByRole("button", { name: /^remove$/i }));
+
+      await waitFor(() => expect(deleted).toBe("proj1/conn-1"));
+    });
+
+    it("enables and disables the page through the notion connector, scoped to the project", async () => {
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow]);
+      let patch: { url: string; body: unknown } | null = null;
+      server.use(
+        http.patch("/api/v1/connectors/notion/sources/status", async ({ request }) => {
+          patch = { url: request.url, body: await request.json() };
+          return HttpResponse.json({ connectorId: "notion", sources: [] });
+        }),
+      );
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/data-ingestion?sourceId=conn-1"]}>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      const panel = await screen.findByRole("dialog");
+      await user.click(
+        within(panel).getByRole("switch", { name: /toggle ingestion for sprint planning/i }),
+      );
+
+      await waitFor(() => expect(patch).not.toBeNull());
+      expect(patch!.url).toContain("projectId=proj1");
+      expect(patch!.body).toEqual({
+        sources: [{ sourceId: "https://www.notion.so/Sprint-Planning-page1", enabled: false }],
+      });
+    });
+  });
+
   it("opens the connectors modal from Manage connectors", async () => {
     const user = userEvent.setup();
     render(

@@ -201,6 +201,17 @@ export type ConfluenceSpaceSourceDetails = {
   credentialName?: string;
 };
 
+/**
+ * Notion-specific identity for a source card. One connection is one page.
+ */
+export type NotionPageSourceDetails = {
+  connectionId: string;
+  pageId: string;
+  pageUrl: string;
+  credentialName: string;
+  lastSyncedAt?: string | null;
+};
+
 export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
 
 /**
@@ -280,6 +291,8 @@ export type SourceDetailsSource = {
   jiraInstance?: JiraInstanceSourceDetails | null;
   /** Confluence space identity; null/absent for non-Confluence sources. */
   confluenceSpace?: ConfluenceSpaceSourceDetails | null;
+  /** Notion page identity; null/absent for non-Notion sources. */
+  notionPage?: NotionPageSourceDetails | null;
   description?: string;
   nextSync?: string;
 };

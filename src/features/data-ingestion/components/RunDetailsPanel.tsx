@@ -193,6 +193,12 @@ function buildOriginRow(run: IngestionRun): { label: string; value: string } | n
     return run.sourceId ? { label: "Space", value: run.sourceId } : null;
   }
 
+  if (run.sourceSystem === "NOTION") {
+    // The backend does not document what a Notion run stores as its source id, so only a
+    // URL is shown; anything else would read as an opaque id.
+    return run.sourceId?.startsWith("http") ? { label: "Page", value: run.sourceId } : null;
+  }
+
   return null;
 }
 

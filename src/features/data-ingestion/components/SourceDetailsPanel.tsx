@@ -5,6 +5,7 @@ import {
   Clock3,
   Database,
   GitBranch,
+  NotebookText,
   RefreshCw,
   Ticket,
   Unlink,
@@ -77,6 +78,8 @@ type SourceDetailsPanelProps = {
   ) => Promise<void>;
   /** Enables/disables a Jira instance as an ingestion source (by instance URL). */
   onSetJiraSourceEnabled?: (instanceUrl: string, enabled: boolean) => Promise<void>;
+  /** Enables/disables a Notion page as an ingestion source (by page URL). */
+  onSetNotionSourceEnabled?: (pageUrl: string, enabled: boolean) => Promise<void>;
   /**
    * Removes the repository's link to the current project. Only passed when the
    * caller is allowed to manage the project's sources; its presence gates the
@@ -102,6 +105,7 @@ export function SourceDetailsPanel({
   onSaveConfluenceConfig,
   onSetSourceEnabled,
   onSetJiraSourceEnabled,
+  onSetNotionSourceEnabled,
   onUnlinkSource,
   onClose,
 }: SourceDetailsPanelProps) {
@@ -115,8 +119,10 @@ export function SourceDetailsPanel({
   const repository = source.githubRepository;
   const jira = source.jiraInstance ?? null;
   const confluence = source.confluenceSpace ?? null;
+  const notion = source.notionPage ?? null;
   const isJira = source.sourceSystem === "JIRA";
   const isConfluence = source.sourceSystem === "CONFLUENCE";
+  const isNotion = source.sourceSystem === "NOTION";
   const isUpdating = updateState === "loading";
   const isRefreshing = refreshState === "loading";
   const isSyncing = source.statusView.state === "syncing" || isUpdating;
@@ -126,17 +132,19 @@ export function SourceDetailsPanel({
     keepActiveUntilExit: true,
   });
   // Update is available for a GitHub repo (needs owner/name), a Jira instance
-  // (needs its URL), or a Confluence space (needs its ID).
+  // (needs its URL), a Confluence space (needs its ID) or a Notion page (needs its
+  // connection id).
   const canUpdate =
     onUpdateSource !== undefined &&
     ((source.sourceSystem === "GITHUB" && repository !== null) ||
       (isJira && jira !== null) ||
-      (isConfluence && Boolean(confluence?.connectionId)));
+      (isConfluence && Boolean(confluence?.connectionId)) ||
+      (isNotion && Boolean(notion?.connectionId)));
   // GitHub and Jira start an asynchronous run, so "Update started" is the whole
-  // story here. Confluence ingests synchronously and its caller already reports
-  // the outcome (completed, partial or failed) — a second toast from here would
-  // duplicate it and, on a failed run, contradict it.
-  const reportsUpdateItself = isConfluence;
+  // story here. Confluence and Notion ingest synchronously and their caller already
+  // reports the outcome — a second toast from here would duplicate it and, on a
+  // failed run, contradict it.
+  const reportsUpdateItself = isConfluence || isNotion;
   const canManageRepositoryConfig =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -162,9 +170,12 @@ export function SourceDetailsPanel({
     onSetSourceEnabled !== undefined;
   const canToggleJiraEnabled =
     canManageSyncSettings && isJira && jira !== null && onSetJiraSourceEnabled !== undefined;
-  // Jira has no per-source `enabled` field on the card; a disabled instance is
+  const canToggleNotionEnabled =
+    canManageSyncSettings && isNotion && notion !== null && onSetNotionSourceEnabled !== undefined;
+  // Jira and Notion have no per-source `enabled` field on the card; a disabled one is
   // exactly the one the status endpoint collapses to DISABLED.
   const jiraEnabled = source.backendStatus !== "DISABLED";
+  const notionEnabled = source.backendStatus !== "DISABLED";
   const isTogglingEnabled = enabledState === "loading";
   // Authorization is presence-based — the parent only passes onUnlinkSource when
   // the caller may manage the project's sources. GitHub needs the connection's
@@ -176,12 +187,19 @@ export function SourceDetailsPanel({
       repository !== null &&
       repository.repositoryId !== null) ||
       (isJira && jira !== null) ||
-      (isConfluence && Boolean(confluence?.connectionId)));
+      (isConfluence && Boolean(confluence?.connectionId)) ||
+      (isNotion && Boolean(notion?.connectionId)));
   const isUnlinking = unlinkState === "loading";
   // Noun for the unlink copy: GitHub sources are repositories, Jira sources are
   // instances, Confluence sources are spaces. Keeps each connector's wording
   // accurate.
-  const removableNoun = isJira ? "instance" : isConfluence ? "space" : "repository";
+  const removableNoun = isJira
+    ? "instance"
+    : isConfluence
+      ? "space"
+      : isNotion
+        ? "page"
+        : "repository";
   // What removal actually costs, per connector. A GitHub repository and a Jira
   // instance are shared between projects and only lose the project association,
   // so re-linking restores the source as it was. A Confluence connection belongs
@@ -189,7 +207,9 @@ export function SourceDetailsPanel({
   // pages already ingested stay, but the space has to be set up again.
   const removalHint = isConfluence
     ? "The pages it already ingested are kept. Connecting the space again sets it up from scratch."
-    : `The ${removableNoun} and its artifacts are kept. You can re-link it later.`;
+    : isNotion
+      ? "What it already ingested stays in the knowledge base. Connecting the page again sets it up from scratch."
+      : `The ${removableNoun} and its artifacts are kept. You can re-link it later.`;
   // GitHub exposes one timestamp per resource type; Jira refreshes issue data
   // (including comments and change history) as one combined resource.
   const hasResourceSyncTimes =
@@ -235,6 +255,26 @@ export function SourceDetailsPanel({
       }
     },
     [jira, onSetJiraSourceEnabled, toast],
+  );
+
+  const handleToggleNotionEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (!notion || !onSetNotionSourceEnabled) return;
+
+      setEnabledState("loading");
+
+      try {
+        await onSetNotionSourceEnabled(notion.pageUrl, enabled);
+        setEnabledState("success");
+        toast.success(enabled ? "Source enabled" : "Source disabled", {
+          description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
+        });
+      } catch (error) {
+        setEnabledState("error");
+        toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
+      }
+    },
+    [notion, onSetNotionSourceEnabled, toast],
   );
 
   const loadRepositoryConfig = useCallback(async () => {
@@ -364,6 +404,8 @@ export function SourceDetailsPanel({
                 <Ticket className="h-4 w-4" />
               ) : isConfluence ? (
                 <BookOpen className="h-4 w-4" />
+              ) : isNotion ? (
+                <NotebookText className="h-4 w-4" />
               ) : (
                 <GitBranch className="h-4 w-4" />
               )
@@ -375,10 +417,18 @@ export function SourceDetailsPanel({
                   ? "Instance updates need the Jira instance URL."
                   : isConfluence
                     ? "Space updates need the Confluence space ID."
-                    : "Repository updates need GitHub owner and repository name."
+                    : isNotion
+                      ? "Page updates need the Notion connection."
+                      : "Repository updates need GitHub owner and repository name."
             }
           >
-            {isJira ? "Update instance" : isConfluence ? "Update space" : "Update repo"}
+            {isJira
+              ? "Update instance"
+              : isConfluence
+                ? "Update space"
+                : isNotion
+                  ? "Update page"
+                  : "Update repo"}
           </Button>
 
           <Button
@@ -495,6 +545,40 @@ export function SourceDetailsPanel({
             <InfoRow label="Space ID" value={confluence?.spaceId ?? source.sourceId} mono />
             {confluence?.credentialName && (
               <InfoRow label="Credential" value={confluence.credentialName} />
+            )}
+          </dl>
+        </DrawerCard>
+      )}
+
+      {isNotion && (
+        <DrawerCard label="Page" icon={Icon} index={1} className="mt-4 sm:mt-5">
+          <dl className="-my-1">
+            <InfoRow label="Title" value={source.name} />
+            <InfoLinkRow label="Notion" value={notion?.pageUrl} text="Open in Notion" />
+            {notion?.credentialName && <InfoRow label="Credential" value={notion.credentialName} />}
+            <InfoRow label="Last synced" value={formatDateTime(notion?.lastSyncedAt)} />
+            {canToggleNotionEnabled && notion ? (
+              <div className="flex items-center gap-3 border-t border-app-border py-2.5">
+                <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
+                <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="text-[13px] font-semibold text-app-text">
+                    Include in ingestion
+                    <span className="ml-1 font-normal text-app-text-subtle">
+                      · sync this page into the knowledge base
+                    </span>
+                  </span>
+                  <AccountEnabledToggle
+                    enabled={notionEnabled}
+                    disabled={isTogglingEnabled}
+                    ariaLabel={`Toggle ingestion for ${source.name}`}
+                    onChange={(next) => {
+                      void handleToggleNotionEnabled(next);
+                    }}
+                  />
+                </dd>
+              </div>
+            ) : (
+              <InfoRow label="Source" value={notionEnabled ? "Enabled" : "Disabled"} />
             )}
           </dl>
         </DrawerCard>
@@ -712,7 +796,16 @@ function InfoRow({
   );
 }
 
-function InfoLinkRow({ label, value }: { label: string; value?: string }) {
+function InfoLinkRow({
+  label,
+  value,
+  text,
+}: {
+  label: string;
+  value?: string;
+  /** Link text shown instead of the URL itself. */
+  text?: string;
+}) {
   return (
     <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
       <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
@@ -724,7 +817,7 @@ function InfoLinkRow({ label, value }: { label: string; value?: string }) {
             rel="noreferrer"
             className="font-mono text-xs text-app-brand-text underline decoration-app-brand-border underline-offset-4 hover:text-app-brand"
           >
-            {value}
+            {text ?? value}
           </a>
         ) : (
           <span className="text-app-text">Not available</span>

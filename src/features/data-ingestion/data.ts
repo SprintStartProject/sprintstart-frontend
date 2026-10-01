@@ -24,6 +24,7 @@ import type {
 } from "./types.ts";
 import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
 import type { ConfluenceConnectionDto } from "../../services/sources/confluenceService.ts";
+import type { NotionConnectionDto } from "../../services/sources/notionService.ts";
 
 export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE", "NOTION"];
 
@@ -390,6 +391,147 @@ export function createConfluenceSourceFromConnection(
   };
 }
 
+/**
+ * Maps a NOTION status row from `/api/v1/ingestion-sources/status` into the
+ * full {@link DataSource} model. The row's `sourceId` is the page URL, not the
+ * connection id, so the page matches the two up and passes the connection in
+ * for the card's identity (the connection id, which every action needs), the
+ * schedule and the enabled flag.
+ */
+export function createNotionSourceFromInstance(
+  status: SourceInstanceIngestionStatus,
+  connection: NotionConnectionDto,
+  connectorEnabled?: boolean,
+): DataSource {
+  const meta = SOURCE_META.NOTION;
+  const backendStatus: BackendProjectSourceStatus =
+    status.enabled === false || connection.sourceEnabled === false
+      ? "DISABLED"
+      : status.connectionStatus;
+  const hasErrors = status.failedCount > 0;
+  const hasNeverSynced = status.lastRunTime === null;
+
+  return {
+    sourceId: connection.id,
+    sourceSystem: "NOTION",
+    name: status.displayName || connection.pageTitle,
+    type: meta.type,
+    icon: meta.icon,
+    status: getSourceStatusFromBackend(backendStatus),
+    backendStatus,
+    statusLabel: getBackendSourceStatusLabel(backendStatus),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
+    ingestionStatusLabel:
+      !hasNeverSynced && !hasErrors
+        ? "Synced"
+        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
+    statusView: deriveSourceStatus({
+      backendStatus,
+      hasErrors,
+      hasNeverSynced,
+      connectorEnabled,
+    }),
+    artifacts: status.artifactCount,
+    lastSync: formatDateTime(status.lastRunTime),
+    nextSync: connection.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
+    errors: status.failedCount,
+    description: meta.description,
+    lastRunAt: status.lastRunTime,
+    latestIngestedCount: status.ingestedCount,
+    latestUpdatedCount: status.updatedCount,
+    deletedCount: status.deletedCount,
+    totalArtifactCount: status.artifactCount,
+    runIds: [],
+    sharesSourceSystem: false,
+    failedItems: status.failedItems,
+    githubRepository: null,
+    jiraInstance: null,
+    confluenceSpace: null,
+    notionPage: toNotionPageDetails(connection),
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: null,
+  };
+}
+
+function toNotionPageDetails(connection: NotionConnectionDto) {
+  return {
+    connectionId: connection.id,
+    pageId: connection.pageId,
+    pageUrl: connection.pageUrl,
+    credentialName: connection.credentialName,
+    lastSyncedAt: connection.lastSyncedAt,
+  };
+}
+
+/**
+ * Creates a DataSource from a {@link NotionConnectionDto} alone, for a page
+ * whose status row has not arrived yet (a freshly connected page, or a failed
+ * status read). Counters come from the newest matching run; a run belongs to a
+ * page through its `repositoryId`, which carries the connection id.
+ */
+export function createNotionSourceFromConnection(
+  connection: NotionConnectionDto,
+  runs: IngestionRun[] = [],
+  connectorEnabled?: boolean,
+): DataSource {
+  const meta = SOURCE_META.NOTION;
+  const latestRun = runs.find(
+    (r) =>
+      r.sourceSystem === "NOTION" &&
+      (r.repositoryId === connection.id || r.sourceId === connection.pageUrl),
+  );
+
+  const hasNeverSynced = !latestRun && !connection.lastSyncedAt;
+  const hasErrors = (latestRun?.failedCount ?? 0) > 0;
+  const backendStatus: BackendProjectSourceStatus =
+    connection.sourceEnabled === false ? "DISABLED" : "CONNECTED";
+
+  return {
+    sourceId: connection.id,
+    sourceSystem: "NOTION",
+    name: connection.pageTitle,
+    type: meta.type,
+    icon: meta.icon,
+    status: getSourceStatusFromBackend(backendStatus),
+    backendStatus,
+    statusLabel: getBackendSourceStatusLabel(backendStatus),
+    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, latestRun?.status ?? null),
+    ingestionStatusLabel:
+      !hasNeverSynced && !hasErrors
+        ? "Synced"
+        : getSourceStatusLabel(hasNeverSynced, hasErrors, latestRun?.status ?? null),
+    statusView: deriveSourceStatus({
+      backendStatus,
+      hasErrors,
+      hasNeverSynced,
+      connectorEnabled,
+    }),
+    artifacts: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
+    lastSync: formatDateTime(
+      latestRun?.finishedAt ?? latestRun?.startedAt ?? connection.lastSyncedAt,
+    ),
+    nextSync: connection.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
+    errors: latestRun?.failedCount ?? 0,
+    description: meta.description,
+    lastRunAt: latestRun?.startedAt ?? null,
+    latestIngestedCount: latestRun?.ingestedCount ?? 0,
+    latestUpdatedCount: latestRun?.updatedCount ?? 0,
+    deletedCount: latestRun?.deletedCount ?? 0,
+    totalArtifactCount: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
+    runIds: latestRun ? [latestRun.runId] : [],
+    sharesSourceSystem: false,
+    failedItems: latestRun?.failedItems ?? [],
+    githubRepository: null,
+    jiraInstance: null,
+    confluenceSpace: null,
+    notionPage: toNotionPageDetails(connection),
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: null,
+  };
+}
+
 export function getSourceStatus(
   hasNeverSynced: boolean,
   hasErrors: boolean,
@@ -729,6 +871,13 @@ export function buildRunSourceLabels(sources: DataSource[]): Map<string, string>
       }
       if (spaceKey) labels.set(spaceKey, source.name);
       if (spaceId) labels.set(spaceId, source.name);
+    }
+
+    if (source.notionPage) {
+      const { connectionId, pageId, pageUrl } = source.notionPage;
+      labels.set(connectionId, source.name);
+      labels.set(pageId, source.name);
+      labels.set(pageUrl, source.name);
     }
   });
 
