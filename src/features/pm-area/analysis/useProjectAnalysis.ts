@@ -5,6 +5,10 @@ import { insightsService } from "../../../services/faqService";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
+import {
+  projectAnalysisService,
+  type ProjectAnalysisRun,
+} from "../../../services/projectAnalysisService";
 import { projectService } from "../../../services/projectService";
 import { queryKeys } from "../../../services/queryKeys";
 import {
@@ -14,13 +18,8 @@ import {
 } from "../../../services/teamManagementService";
 import { fetchIngestionSources } from "../../data-ingestion/ingestionSources";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { isUnread } from "../useMemberOpenItems";
-import {
-  lastAnalysisKey,
-  readRecord,
-  useStoredRecord,
-  type StoredAnalysis,
-} from "./analysisStorage";
 import {
   buildFindings,
   countBySeverity,
@@ -89,9 +88,15 @@ export type AnalysisOptions = {
   regroupQuestions: boolean;
 };
 
+/**
+ * All off. Each refresh costs an AI call per run — the gaps rescan one per repository — and the
+ * backend already redoes the gaps and the industry on its own after every import, so by default
+ * an analysis only reads. The launcher turns the gaps rescan on when the gaps are behind the
+ * newest import (see `gapScanState`).
+ */
 export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = {
-  rescanGaps: true,
-  reevaluateIndustry: true,
+  rescanGaps: false,
+  reevaluateIndustry: false,
   regroupQuestions: false,
 };
 
@@ -108,23 +113,22 @@ export type AnalysisRunSummary = {
 /** The complete run the results compare against: the one before, or the last one with a score. */
 export type AnalysisComparison = { at: string; score: number };
 
-function summarise(record: StoredAnalysis): AnalysisRunSummary {
+function summarise(run: ProjectAnalysisRun): AnalysisRunSummary {
   return {
-    at: record.at,
-    score: record.score ?? null,
-    counts: record.counts,
-    failedChecks: record.tasks?.filter((task) => task.status === "failed").length ?? 0,
+    at: run.at,
+    score: run.score,
+    counts: run.counts,
+    failedChecks: run.failedChecks,
   };
 }
 
 /**
- * What a new run compares against: the stored run if it has a score, else the one that one was
- * compared against. An incomplete run is never a baseline — its score would not mean anything.
+ * What a run compares against: the newest complete run of [runs] (newest first). An incomplete
+ * run is never a baseline — its score would not mean anything.
  */
-function comparisonFor(record: StoredAnalysis | null): AnalysisComparison | null {
-  if (!record) return null;
-  if (typeof record.score === "number") return { at: record.at, score: record.score };
-  return record.previous ?? null;
+function comparisonFor(runs: readonly ProjectAnalysisRun[]): AnalysisComparison | null {
+  const complete = runs.find((run) => run.score !== null);
+  return complete && complete.score !== null ? { at: complete.at, score: complete.score } : null;
 }
 
 export type AnalysisPhase = "idle" | "running" | "done";
@@ -168,9 +172,9 @@ function errorNote(error: unknown): string {
  * private copy that could disagree with them. The AI refreshes are opt-in per run (see
  * {@link AnalysisOptions}); the industry is never re-evaluated over one a person set by hand.
  *
- * The last finished run is kept per viewer and project in browser storage (see
- * `analysisStorage`): its results can be opened again later, and the next run can say whether
- * things got better.
+ * Every finished run is kept per project on the backend (see `projectAnalysisService`): the last
+ * one's results can be opened again later, on any device and by any PM of the project, and the
+ * next run can say whether things got better since the last complete one.
  */
 export function useProjectAnalysis() {
   const queryClient = useQueryClient();
@@ -189,8 +193,12 @@ export function useProjectAnalysis() {
   );
   const [findings, setFindings] = useState<Finding[]>([]);
   const [score, setScore] = useState<number | null>(null);
-  const storageKey = projectId ? lastAnalysisKey(viewerId, projectId) : null;
-  const [stored, writeStored] = useStoredRecord<StoredAnalysis>(storageKey);
+  const { data: runs } = useQueryFetch(
+    queryKeys.projectAnalysis.runs(projectId),
+    () => projectAnalysisService.listRuns(projectId),
+    { enabled: Boolean(projectId) },
+  );
+  const stored = runs?.[0] ?? null;
   const lastRun: AnalysisRunSummary | null = stored ? summarise(stored) : null;
   /** The complete run before the current one — what the results compare against. */
   const [previousRun, setPreviousRun] = useState<AnalysisComparison | null>(null);
@@ -222,9 +230,19 @@ export function useProjectAnalysis() {
       setPhase("running");
       setFindings([]);
       setScore(null);
-      const before = comparisonFor(
-        readRecord<StoredAnalysis>(lastAnalysisKey(viewerId, projectId)),
-      );
+      const runsKey = queryKeys.projectAnalysis.runs(projectId);
+      // The history as it stands before this run. Not being able to read it costs the comparison,
+      // never the run.
+      const history =
+        queryClient.getQueryData<ProjectAnalysisRun[]>(runsKey) ??
+        (await queryClient
+          .fetchQuery({
+            queryKey: runsKey,
+            queryFn: () => projectAnalysisService.listRuns(projectId),
+          })
+          .catch(() => []));
+      if (!current()) return;
+      const before = comparisonFor(history);
       setPreviousRun(before);
       // This run's tasks as they progress, kept here as well as in state so the stored record can
       // be written from them once everything has settled.
@@ -415,36 +433,55 @@ export function useProjectAnalysis() {
       // failed the better it would look. An incomplete run gets no score at all.
       const complete = finishedTasks.every((task) => task.status !== "failed");
       const nextScore = complete ? healthScore(result) : null;
-      const record: StoredAnalysis = {
+      const storedTasks = finishedTasks.map(({ id, label, status, note }) => ({
+        id,
+        label,
+        status,
+        ...(note !== undefined ? { note } : {}),
+      }));
+      // What the backend will keep, in the same shape — used as is when it cannot be reached, so
+      // the results can still be reopened in this session.
+      const local: ProjectAnalysisRun = {
+        id: `local-${runId}`,
         at: new Date().toISOString(),
         score: nextScore,
         counts: countBySeverity(result),
+        failedChecks: finishedTasks.filter((task) => task.status === "failed").length,
         findings: result,
-        tasks: finishedTasks,
-        previous: before,
+        tasks: storedTasks,
       };
+      const saved = await projectAnalysisService
+        .saveRun(projectId, { score: nextScore, findings: result, tasks: storedTasks })
+        .catch((error: unknown) => {
+          console.warn(
+            "The project analysis could not be stored; it is kept for this session only",
+            error,
+          );
+          return local;
+        });
+      if (!current()) return;
+      queryClient.setQueryData<ProjectAnalysisRun[]>(runsKey, (old) => [saved, ...(old ?? [])]);
 
-      writeStored(record);
       setFindings(result);
       setScore(nextScore);
       setPhase("done");
       setRefreshRevision((revision) => revision + 1);
     },
-    [canEvaluateIndustry, projectId, queryClient, viewerId, writeStored],
+    [canEvaluateIndustry, projectId, queryClient],
   );
 
-  /** Whether the last run's results (not only its score) are there to be shown again. */
-  const canOpenLast = Boolean(stored?.findings);
+  /** Whether the last run's results are there to be shown again. */
+  const canOpenLast = stored !== null;
 
   /** Shows the last finished run's results again, as they were — nothing is re-read. */
   const openLast = useCallback(() => {
-    if (!stored?.findings) return;
+    if (!stored) return;
     runRef.current += 1;
     setFindings(stored.findings);
-    setScore(stored.score ?? null);
+    setScore(stored.score);
     setTasks(
       TASKS.map((task) => {
-        const saved = stored.tasks?.find((candidate) => candidate.id === task.id);
+        const saved = stored.tasks.find((candidate) => candidate.id === task.id);
         return {
           ...task,
           status: (saved?.status as AnalysisTaskStatus | undefined) ?? "done",
@@ -452,9 +489,9 @@ export function useProjectAnalysis() {
         };
       }),
     );
-    setPreviousRun(stored.previous ?? null);
+    setPreviousRun(comparisonFor(runs?.slice(1) ?? []));
     setPhase("done");
-  }, [stored]);
+  }, [stored, runs]);
 
   const reset = useCallback(() => {
     runRef.current += 1;

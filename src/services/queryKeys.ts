@@ -106,6 +106,11 @@ export const queryKeys = {
   ingestion: {
     sourceStatuses: (projectId: string) => ["ingestion", "source-statuses", projectId] as const,
   },
+  projectAnalysis: {
+    // The PM area's analysis history, newest first. Per project, not per viewer: every PM of a
+    // project shares it.
+    runs: (projectId: string) => ["project-analysis", "runs", projectId] as const,
+  },
   knowledgeRequest: {
     open: (projectId: string) => ["knowledge-request", "open", projectId] as const,
     answers: (projectId: string) => ["knowledge-request", "answers", projectId] as const,

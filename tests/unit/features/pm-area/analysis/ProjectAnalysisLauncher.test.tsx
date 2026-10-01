@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { ProjectAnalysisLauncher } from "../../../../../src/features/pm-area/analysis/ProjectAnalysisLauncher";
+import { countBySeverity } from "../../../../../src/features/pm-area/analysis/findings";
+import type {
+  ProjectAnalysisRun,
+  SaveProjectAnalysisRun,
+} from "../../../../../src/services/projectAnalysisService";
 
 const mocks = vi.hoisted(() => ({
   industryCustom: false,
@@ -19,6 +24,10 @@ const mocks = vi.hoisted(() => ({
   fetchIngestionSources: vi.fn(),
   getAccessibleProject: vi.fn(),
   evaluateProjectIndustry: vi.fn(),
+  /** The backend's analysis history for the project, newest first. */
+  runs: [] as ProjectAnalysisRun[],
+  listRuns: vi.fn(),
+  saveRun: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/teamManagementService", () => ({
@@ -54,6 +63,9 @@ vi.mock("../../../../../src/services/projectService", () => ({
     getAccessibleProject: mocks.getAccessibleProject,
     evaluateProjectIndustry: mocks.evaluateProjectIndustry,
   },
+}));
+vi.mock("../../../../../src/services/projectAnalysisService", () => ({
+  projectAnalysisService: { listRuns: mocks.listRuns, saveRun: mocks.saveRun },
 }));
 vi.mock("../../../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: { id: "pm-1", permissionGroup: "PM" } }),
@@ -105,14 +117,26 @@ async function runIncompleteAnalysis(user: ReturnType<typeof userEvent.setup>) {
 }
 
 function storedRun() {
-  const raw = window.localStorage.getItem("sprintstart.pm-analysis.pm-1.p1");
-  return raw ? (JSON.parse(raw) as { score: number | null }) : null;
+  return mocks.runs[0] ?? null;
 }
 
 describe("ProjectAnalysisLauncher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.localStorage.clear();
+    mocks.runs = [];
+    // An in-memory backend: what was stored is what the next mount reads.
+    mocks.listRuns.mockImplementation(() => Promise.resolve([...mocks.runs]));
+    mocks.saveRun.mockImplementation((_projectId: string, run: SaveProjectAnalysisRun) => {
+      const saved: ProjectAnalysisRun = {
+        ...run,
+        id: `run-${mocks.runs.length + 1}`,
+        at: new Date().toISOString(),
+        counts: countBySeverity(run.findings),
+        failedChecks: run.tasks.filter((task) => task.status === "failed").length,
+      };
+      mocks.runs = [saved, ...mocks.runs];
+      return Promise.resolve(saved);
+    });
     mocks.getTeamOverviewOrThrow.mockResolvedValue([
       {
         userId: "u1",
@@ -175,7 +199,7 @@ describe("ProjectAnalysisLauncher", () => {
     mocks.industryCustom = false;
   });
 
-  it("refreshes everything at once and lists what it found", async () => {
+  it("reads everything at once without asking the AI, and lists what it found", async () => {
     const user = userEvent.setup();
     renderLauncher();
 
@@ -183,21 +207,86 @@ describe("ProjectAnalysisLauncher", () => {
 
     const dialog = within(screen.getByTestId("project-analysis-dialog"));
     expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
-    expect(mocks.refreshKnowledgeGaps).toHaveBeenCalledWith("p1");
-    expect(mocks.evaluateProjectIndustry).toHaveBeenCalledWith("p1");
+    // The gaps and the industry update on their own after every import, so no AI call by default.
+    expect(mocks.refreshKnowledgeGaps).not.toHaveBeenCalled();
+    expect(mocks.evaluateProjectIndustry).not.toHaveBeenCalled();
     // Destructive, so off unless asked for.
     expect(mocks.refreshFAQGroups).not.toHaveBeenCalled();
+    // Kept on the backend, for every PM of the project.
+    expect(mocks.saveRun).toHaveBeenCalledWith(
+      "p1",
+      expect.objectContaining({ score: expect.any(Number) as number }),
+    );
     // The score says what it is out of, and what it means.
     const health = within(dialog.getByRole("complementary", { name: "Project health" }));
     expect(health.getByText("/ 100")).toBeInTheDocument();
     expect(health.getByText(/means nothing is open/)).toBeInTheDocument();
   }, 20000);
 
+  it("rescans the gaps and re-evaluates the industry only when asked to", async () => {
+    const user = userEvent.setup();
+    renderLauncher();
+
+    await runAnalysis(user, async () => {
+      await user.click(screen.getByLabelText(/Rescan knowledge gaps/));
+      await user.click(screen.getByLabelText(/Re-evaluate the industry/));
+    });
+
+    expect(mocks.refreshKnowledgeGaps).toHaveBeenCalledWith("p1");
+    expect(mocks.evaluateProjectIndustry).toHaveBeenCalledWith("p1");
+  }, 20000);
+
+  it("suggests a gaps rescan when an import is newer than the last scan", async () => {
+    mocks.fetchKnowledgeGaps.mockResolvedValue({
+      gaps: [],
+      refreshedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    });
+    mocks.fetchIngestionSources.mockResolvedValue([
+      { name: "api", errors: 0, lastRunAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() },
+    ]);
+    const user = userEvent.setup();
+    renderLauncher();
+
+    // The launcher reads the gaps and sources before the button is pressed.
+    await waitFor(() => expect(mocks.fetchIngestionSources).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.fetchKnowledgeGaps).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: /Analyse project/ }));
+
+    expect(await screen.findByLabelText(/Rescan knowledge gaps/)).toBeChecked();
+    expect(screen.getByText(/New data since the last scan/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Re-evaluate the industry/)).not.toBeChecked();
+  }, 20000);
+
+  it("does not suggest a gaps rescan when the gaps are newer than every import", async () => {
+    mocks.fetchKnowledgeGaps.mockResolvedValue({
+      gaps: [],
+      refreshedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    });
+    mocks.fetchIngestionSources.mockResolvedValue([
+      {
+        name: "api",
+        errors: 0,
+        lastRunAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      },
+    ]);
+    const user = userEvent.setup();
+    renderLauncher();
+
+    await waitFor(() => expect(mocks.fetchIngestionSources).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.fetchKnowledgeGaps).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: /Analyse project/ }));
+
+    expect(await screen.findByLabelText(/Rescan knowledge gaps/)).not.toBeChecked();
+    expect(screen.getByText(/Up to date — scanned/)).toBeInTheDocument();
+  }, 20000);
+
   it("asks what to refresh again before running again", async () => {
     const user = userEvent.setup();
     renderLauncher();
 
-    await runAnalysis(user);
+    await runAnalysis(user, async () => {
+      await user.click(screen.getByLabelText(/Rescan knowledge gaps/));
+    });
     expect(mocks.refreshKnowledgeGaps).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: /Run again/ }));
@@ -213,7 +302,9 @@ describe("ProjectAnalysisLauncher", () => {
     const user = userEvent.setup();
     renderLauncher();
 
-    await runAnalysis(user);
+    await runAnalysis(user, async () => {
+      await user.click(screen.getByLabelText(/Re-evaluate the industry/));
+    });
 
     expect(mocks.evaluateProjectIndustry).not.toHaveBeenCalled();
   }, 20000);
@@ -264,9 +355,7 @@ describe("ProjectAnalysisLauncher", () => {
     await user.click(screen.getByRole("button", { name: /Start analysis/ }));
 
     const now = within(await screen.findByRole("region", { name: "Now checking" }));
-    expect(
-      await now.findByText("Asking the AI to rescan every component's documentation"),
-    ).toBeInTheDocument();
+    expect(await now.findByText("Reading the documentation gaps")).toBeInTheDocument();
     const log = within(screen.getByRole("region", { name: "Log" }));
     expect(await log.findByText(/Team & open items: 1 member ·/)).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
@@ -309,7 +398,9 @@ describe("ProjectAnalysisLauncher", () => {
 
     // The ring beside the tabs: the score, what it means and when, and a way back to the results.
     expect(
-      screen.getByRole("button", { name: /Open last results: health \d+ of 100, .*last run/ }),
+      await screen.findByRole("button", {
+        name: /Open last results: health \d+ of 100, .*last run/,
+      }),
     ).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Last health score \d+ of 100/ })).toBeInTheDocument();
   }, 20000);
@@ -323,7 +414,7 @@ describe("ProjectAnalysisLauncher", () => {
     vi.clearAllMocks();
     renderLauncher();
 
-    await user.click(screen.getByRole("button", { name: /Open last results/ }));
+    await user.click(await screen.findByRole("button", { name: /Open last results/ }));
 
     const dialog = within(await screen.findByTestId("project-analysis-dialog"));
     expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
@@ -389,7 +480,7 @@ describe("ProjectAnalysisLauncher", () => {
       mocks.fetchProjectMetrics.mockRejectedValue(down);
       mocks.listOpen.mockRejectedValue(down);
       mocks.fetchFAQGroups.mockRejectedValue(down);
-      mocks.refreshKnowledgeGaps.mockRejectedValue(down);
+      mocks.fetchKnowledgeGaps.mockRejectedValue(down);
       mocks.fetchIngestionSources.mockRejectedValue(down);
       mocks.getAccessibleProject.mockRejectedValue(down);
       const user = userEvent.setup();
@@ -452,13 +543,34 @@ describe("ProjectAnalysisLauncher", () => {
       renderLauncher();
 
       expect(
-        screen.getByRole("button", {
+        await screen.findByRole("button", {
           name: /Open last results: last run .* incomplete, 1 check could not run, no health score/,
         }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("img", { name: "Last run incomplete, no health score" }),
       ).toBeInTheDocument();
+    }, 20000);
+
+    it("keeps an incomplete run without a score on the backend", async () => {
+      mocks.listOpen.mockRejectedValue(new Error("Backend unavailable"));
+      const user = userEvent.setup();
+      renderLauncher();
+
+      await runIncompleteAnalysis(user);
+
+      expect(mocks.saveRun).toHaveBeenCalledWith("p1", expect.objectContaining({ score: null }));
+    }, 20000);
+
+    it("still shows the results when the history cannot be stored", async () => {
+      mocks.saveRun.mockRejectedValue(new Error("Backend unavailable"));
+      const user = userEvent.setup();
+      renderLauncher();
+
+      await runAnalysis(user);
+
+      const dialog = within(screen.getByTestId("project-analysis-dialog"));
+      expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
     }, 20000);
 
     it("compares the next complete run with the last complete one, not the incomplete one", async () => {

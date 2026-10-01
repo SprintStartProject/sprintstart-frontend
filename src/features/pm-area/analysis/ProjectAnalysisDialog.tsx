@@ -6,6 +6,7 @@ import { Checkbox } from "../../../components/ui/Checkbox";
 import { Modal } from "../../../components/ui/Modal";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
 import { AnalysisMap, type MapSelection } from "./AnalysisMap";
+import type { GapScanState } from "./analysisFreshness";
 import { AnalysisOrbit } from "./AnalysisOrbit";
 import { scoreGlow } from "./analysisMeta";
 import { scoreVerdict, type Finding } from "./findings";
@@ -37,6 +38,8 @@ type ProjectAnalysisDialogProps = {
   lastRun: AnalysisRunSummary | null;
   projectName?: string;
   canEvaluateIndustry: boolean;
+  /** Whether the gaps already reflect the newest import — what the rescan option says about itself. */
+  gapScan: GapScanState;
   options: AnalysisOptions;
   onOptionsChange: (options: AnalysisOptions) => void;
   onStart: () => void;
@@ -48,6 +51,27 @@ type ProjectAnalysisDialogProps = {
   /** Opens where a finding can be acted on; the dialog closes first. */
   onOpenFinding: (to: string) => void;
 };
+
+/**
+ * What the gaps rescan would achieve right now, in a sentence. Usually nothing: the backend rescans
+ * after every import on its own, so the option says when that already happened.
+ */
+function gapScanDescription(state: GapScanState): string {
+  switch (state.kind) {
+    case "refreshing":
+      return "A rescan after the latest import is already running.";
+    case "current":
+      return state.scannedAt
+        ? `Up to date — scanned ${formatRelativeDate(state.scannedAt)}, after the latest import.`
+        : "Up to date — rescans on its own after every import.";
+    case "behind":
+      return state.scannedAt
+        ? `New data since the last scan (${formatRelativeDate(state.scannedAt)}) — worth a rescan.`
+        : "Never scanned yet — worth a rescan.";
+    case "unknown":
+      return "Rescans on its own after every import — only needed if the gaps look out of date.";
+  }
+}
 
 /** The frosted panel the reference sets its readouts on. */
 const glassClassName =
@@ -178,6 +202,7 @@ export function ProjectAnalysisDialog({
   lastRun,
   projectName,
   canEvaluateIndustry,
+  gapScan,
   options,
   onOptionsChange,
   onStart,
@@ -264,14 +289,16 @@ export function ProjectAnalysisDialog({
               <div className={`${glassClassName} space-y-4`}>
                 <p className="text-sm text-app-text-muted">
                   Team, onboarding, escalations, questions, gaps, data sources and industry are all
-                  read again. These three ask the AI to redo work first:
+                  read again. The options below also ask the AI to redo work, which takes longer and
+                  costs per run — the gaps and the industry already update on their own after every
+                  import:
                 </p>
                 <div className="space-y-2">
                   <OptionRow
                     checked={options.rescanGaps}
                     onChange={(checked) => onOptionsChange({ ...options, rescanGaps: checked })}
                     title="Rescan knowledge gaps"
-                    description="Checks every component's documentation again."
+                    description={gapScanDescription(gapScan)}
                   />
                   <OptionRow
                     checked={options.reevaluateIndustry && canEvaluateIndustry}
@@ -282,7 +309,7 @@ export function ProjectAnalysisDialog({
                     title="Re-evaluate the industry"
                     description={
                       canEvaluateIndustry
-                        ? "Never over one you set by hand."
+                        ? "Updates on its own after every import. Never over one you set by hand."
                         : "Only the project's manager or an admin can."
                     }
                   />
