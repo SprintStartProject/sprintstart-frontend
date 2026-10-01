@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useMemo } from "react";
+import { IconTile } from "../../../components/ui/IconTile";
 import {
   buildRunSourceLabels,
   formatDateTime,
@@ -273,7 +274,10 @@ function ActivityRow({ run, sourceLabel }: { run: IngestionRun; sourceLabel: str
 
   return (
     <li className="flex items-center gap-3 border-t border-app-border py-2 first:border-t-0">
-      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>
+      <IconTile
+        size="sm"
+        tone={tone === "success" ? "success" : tone === "running" ? "brand" : "danger"}
+      >
         {tone === "success" ? (
           <CheckCircle2 size={15} />
         ) : tone === "running" ? (
@@ -281,7 +285,7 @@ function ActivityRow({ run, sourceLabel }: { run: IngestionRun; sourceLabel: str
         ) : (
           <AlertTriangle size={15} />
         )}
-      </span>
+      </IconTile>
       <div className="min-w-0">
         <p className="truncate text-[13px] font-semibold text-app-text">{sourceLabel}</p>
         <p className="text-[11.5px] text-app-text-subtle">

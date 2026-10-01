@@ -16,6 +16,7 @@ import {
 } from "../data.ts";
 import type { DataSource } from "../types.ts";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
+import { IconTile } from "../../../components/ui/IconTile";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 
@@ -88,9 +89,9 @@ export function SourceList({
             }`}
           >
             <div className="flex gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft text-app-text-muted sm:h-14 sm:w-14">
+              <IconTile size="xl" tone="neutral" className="sm:h-14 sm:w-14 sm:rounded-2xl">
                 <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
-              </div>
+              </IconTile>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
