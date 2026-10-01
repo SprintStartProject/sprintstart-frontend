@@ -28,12 +28,19 @@ describe("useAvailableSources", () => {
       connector("github"),
       connector("jira"),
       connector("confluence"),
+      connector("notion"),
     ]);
 
     const { result } = renderHook(() => useAvailableSources());
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect([...result.current.sources].sort()).toEqual(["CONFLUENCE", "GITHUB", "JIRA", "UPLOAD"]);
+    expect([...result.current.sources].sort()).toEqual([
+      "CONFLUENCE",
+      "GITHUB",
+      "JIRA",
+      "NOTION",
+      "UPLOAD",
+    ]);
   });
 
   it("leaves out a disabled connector and any id the chat has no filter for", async () => {
