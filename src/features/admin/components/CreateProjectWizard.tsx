@@ -14,6 +14,7 @@ import {
   addDraftSource,
   connectDraftSources,
   connectOutcomeDescription,
+  createBitbucketDraftFromDiscovery,
   createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
@@ -75,8 +76,14 @@ const STEP_INDEX: Record<Exclude<WizardPhase, "provisioning">, number> = {
   review: 3,
 };
 
-// All four connectors can now be staged from the add-source sub-flow.
-const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
+// All five connectors can now be staged from the add-source sub-flow.
+const AVAILABLE_SOURCE_TYPES: SourceSystem[] = [
+  "GITHUB",
+  "JIRA",
+  "UPLOAD",
+  "CONFLUENCE",
+  "BITBUCKET",
+];
 
 /**
  * Transactional create-project wizard: everything is drafted locally across the
@@ -141,6 +148,9 @@ export function CreateProjectWizard({
   } = useGithubTokens();
   const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
 
+  const [bitbucketSelection, setBitbucketSelection] = useState<DiscoverySelection[]>([]);
+  const [bitbucketCredentialName, setBitbucketCredentialName] = useState("");
+
   const [jiraDisplayName, setJiraDisplayName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraCredentialName, setJiraCredentialName] = useState("");
@@ -190,8 +200,9 @@ export function CreateProjectWizard({
 
   const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
   const isConfluenceDetail = isAddingSource && addStep === "detail" && addType === "CONFLUENCE";
-  // Jira and Confluence share the same Atlassian credential store, so one
-  // instance of the hook backs both detail screens' pickers.
+  const isBitbucketDetail = isAddingSource && addStep === "detail" && addType === "BITBUCKET";
+  // Jira, Confluence and Bitbucket share the same Atlassian credential store, so
+  // one instance of the hook backs all three detail screens' pickers.
   const {
     credentials: jiraCredentials,
     loaded: jiraCredentialsLoaded,
@@ -199,7 +210,7 @@ export function CreateProjectWizard({
     isRefreshing: jiraCredentialsLoading,
     reload: reloadJiraCredentials,
     addCredentialLocally,
-  } = useAtlassianCredentials(isOpen && (isJiraDetail || isConfluenceDetail));
+  } = useAtlassianCredentials(isOpen && (isJiraDetail || isConfluenceDetail || isBitbucketDetail));
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -213,10 +224,10 @@ export function CreateProjectWizard({
     });
   }, [effectiveTokenNames]);
 
-  // Same adoption pattern for the Jira and Confluence credential pickers:
-  // select the first stored credential once the list arrives, keeping a
-  // still-valid choice. Both fields share the list, so a credential just added
-  // from either detail screen is adopted here too.
+  // Same adoption pattern for the Jira, Confluence and Bitbucket credential
+  // pickers: select the first stored credential once the list arrives, keeping a
+  // still-valid choice. All fields share the list, so a credential just added
+  // from any detail screen is adopted here too.
   useEffect(() => {
     if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
 
@@ -228,6 +239,12 @@ export function CreateProjectWizard({
           : jiraCredentials[0].displayName;
       });
       setConfluenceCredentialName((current) => {
+        if (jiraCredentials.length === 0) return "";
+        return current && jiraCredentials.some((credential) => credential.displayName === current)
+          ? current
+          : jiraCredentials[0].displayName;
+      });
+      setBitbucketCredentialName((current) => {
         if (jiraCredentials.length === 0) return "";
         return current && jiraCredentials.some((credential) => credential.displayName === current)
           ? current
@@ -259,6 +276,11 @@ export function CreateProjectWizard({
     void Promise.resolve().then(loadManagerCandidates);
   }, [isOpen, loadManagerCandidates]);
 
+  const resetBitbucketDraftFields = () => {
+    setBitbucketSelection([]);
+    setBitbucketCredentialName("");
+  };
+
   const resetConfluenceDraftFields = () => {
     setConfluenceBaseUrl("");
     setConfluenceSpaceId("");
@@ -280,6 +302,7 @@ export function CreateProjectWizard({
     setAddStep("type");
     setAddType("GITHUB");
     setGithubSelection([]);
+    resetBitbucketDraftFields();
     resetJiraDraftFields();
     resetConfluenceDraftFields();
     setUploadFiles([]);
@@ -294,6 +317,7 @@ export function CreateProjectWizard({
 
   const resetSourceDraftFields = () => {
     setGithubSelection([]);
+    resetBitbucketDraftFields();
     resetJiraDraftFields();
     resetConfluenceDraftFields();
     setUploadFiles([]);
@@ -432,6 +456,12 @@ export function CreateProjectWizard({
     await reloadJiraCredentials();
   };
 
+  const handleBitbucketCredentialSaved = async (credential: AtlassianCredentialDto) => {
+    addCredentialLocally(credential);
+    setBitbucketCredentialName(credential.displayName);
+    await reloadJiraCredentials();
+  };
+
   const handleConfluenceCredentialSaved = async (credential: AtlassianCredentialDto) => {
     addCredentialLocally(credential);
     setConfluenceCredentialName(credential.displayName);
@@ -449,17 +479,19 @@ export function CreateProjectWizard({
   const canAddSource =
     addType === "GITHUB"
       ? githubSelection.length > 0
-      : addType === "JIRA"
-        ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
-        : addType === "UPLOAD"
-          ? uploadFiles.length > 0
-          : addType === "CONFLUENCE"
-            ? Boolean(
-                confluenceBaseUrl.trim() &&
-                isValidConfluenceSpaceId(confluenceSpaceId) &&
-                selectedConfluenceCredential,
-              )
-            : false;
+      : addType === "BITBUCKET"
+        ? bitbucketSelection.length > 0 && Boolean(bitbucketCredentialName)
+        : addType === "JIRA"
+          ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
+          : addType === "UPLOAD"
+            ? uploadFiles.length > 0
+            : addType === "CONFLUENCE"
+              ? Boolean(
+                  confluenceBaseUrl.trim() &&
+                  isValidConfluenceSpaceId(confluenceSpaceId) &&
+                  selectedConfluenceCredential,
+                )
+              : false;
 
   const commitAddSource = () => {
     if (!canAddSource) return;
@@ -469,6 +501,17 @@ export function CreateProjectWizard({
         githubSelection.reduce(
           (accumulated, selection) =>
             addDraftSource(accumulated, createDraftSourceFromDiscovery(selection, githubTokenName)),
+          current,
+        ),
+      );
+    } else if (addType === "BITBUCKET") {
+      setSources((current) =>
+        bitbucketSelection.reduce(
+          (accumulated, selection) =>
+            addDraftSource(
+              accumulated,
+              createBitbucketDraftFromDiscovery(selection, bitbucketCredentialName),
+            ),
           current,
         ),
       );
@@ -843,6 +886,17 @@ export function CreateProjectWizard({
                   onTokenNameChange: setGithubTokenName,
                   onSelectionChange: setGithubSelection,
                   onTokenSaved: handleTokenSaved,
+                }}
+                bitbucket={{
+                  credentialName: bitbucketCredentialName,
+                  credentials: jiraCredentials,
+                  credentialsLoaded: jiraCredentialsLoaded,
+                  credentialsLoading: jiraCredentialsLoading,
+                  credentialsError: jiraCredentialsError,
+                  defaultUserEmail: null,
+                  onCredentialNameChange: setBitbucketCredentialName,
+                  onSelectionChange: setBitbucketSelection,
+                  onCredentialSaved: handleBitbucketCredentialSaved,
                 }}
                 jira={{
                   displayName: jiraDisplayName,

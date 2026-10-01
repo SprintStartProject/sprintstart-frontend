@@ -24,6 +24,12 @@ vi.mock("../../../../../src/services/sources/githubService", () => ({
   addGithubPat: vi.fn(),
 }));
 
+vi.mock("../../../../../src/services/sources/bitbucketService", () => ({
+  discoverBitbucketRepositories: vi.fn(),
+  connectBitbucketRepository: vi.fn(),
+  addBitbucketRepositoryToProject: vi.fn(),
+}));
+
 vi.mock("../../../../../src/services/ingestionService", () => ({
   getIngestionSourceStatuses: vi.fn(),
 }));
@@ -55,6 +61,11 @@ import {
   discoverRepositories,
   getGithubPatNames,
 } from "../../../../../src/services/sources/githubService";
+import {
+  addBitbucketRepositoryToProject,
+  connectBitbucketRepository,
+  discoverBitbucketRepositories,
+} from "../../../../../src/services/sources/bitbucketService";
 import { connectJiraInstance } from "../../../../../src/services/sources/jiraService";
 import {
   addAtlassianCredential,
@@ -200,6 +211,34 @@ describe("CreateProjectWizard", () => {
       resolvedOwnerType: "org",
     });
     vi.mocked(getIngestionSourceStatuses).mockResolvedValue([]);
+    vi.mocked(connectBitbucketRepository).mockResolvedValue({ transactionId: "bb-tx" });
+    vi.mocked(addBitbucketRepositoryToProject).mockResolvedValue({
+      repositoryId: "bb-42",
+      projectIds: ["proj-new"],
+    });
+    vi.mocked(discoverBitbucketRepositories).mockResolvedValue({
+      repositories: [
+        {
+          workspace: "acme",
+          slug: "widgets",
+          name: "widgets",
+          isPrivate: false,
+          url: "https://bitbucket.org/acme/widgets",
+          alreadyConnected: false,
+          isEnabled: null,
+        },
+        {
+          workspace: "acme",
+          slug: "gadgets",
+          name: "gadgets",
+          isPrivate: true,
+          url: "https://bitbucket.org/acme/gadgets",
+          alreadyConnected: false,
+          isEnabled: null,
+        },
+      ],
+      hasMore: false,
+    });
     vi.mocked(getGithubPatNames).mockResolvedValue(["team-pat"]);
     vi.mocked(addGithubPat).mockResolvedValue(undefined);
     vi.mocked(addAtlassianCredential).mockResolvedValue(undefined);
@@ -260,6 +299,198 @@ describe("CreateProjectWizard", () => {
     await user.type(screen.getByLabelText(/^Space ID/), "123456");
     await user.click(screen.getByRole("button", { name: /add to list/i }));
   }
+
+  /** From the sources step, open the add-source flow and pick the Bitbucket type. */
+  async function openBitbucketDetail(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes pull requests, readme/i }));
+
+    // The stored credential is shared with Jira and Confluence and adopted automatically.
+    await screen.findByText(/Team token - me@example.com/i);
+  }
+
+  /** Discovers the `acme` workspace and ticks the given repositories. */
+  async function discoverBitbucket(user: ReturnType<typeof userEvent.setup>, ...slugs: string[]) {
+    await user.type(screen.getByLabelText("Workspace or bitbucket.org URL"), "acme");
+    await user.click(screen.getByRole("button", { name: /discover/i }));
+
+    for (const slug of slugs) {
+      await user.click(await screen.findByRole("checkbox", { name: new RegExp(slug, "i") }));
+    }
+  }
+
+  /** Stages `widgets` as a Bitbucket source and returns to the sources list. */
+  async function stageBitbucketWidgets(user: ReturnType<typeof userEvent.setup>) {
+    await openBitbucketDetail(user);
+    await discoverBitbucket(user, "widgets");
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+  }
+
+  it("offers Bitbucket as a connectable type in the add-source grid", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+
+    expect(screen.getByRole("button", { name: /bitbucket/i })).not.toHaveTextContent(/soon/i);
+  });
+
+  it("stages Bitbucket repositories and connects them against the new project on Create", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+
+    await openBitbucketDetail(user);
+    await discoverBitbucket(user, "widgets", "gadgets");
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+
+    // Back on the sources list, both are staged under workspace/slug.
+    expect(screen.getByText("acme/widgets")).toBeInTheDocument();
+    expect(screen.getByText("acme/gadgets")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() => expect(vi.mocked(connectBitbucketRepository)).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(connectBitbucketRepository)).toHaveBeenCalledWith({
+      workspace: "acme",
+      slug: "widgets",
+      credentialName: "Team token",
+      projectId: "proj-new",
+    });
+    expect(vi.mocked(connectGithubRepository)).not.toHaveBeenCalled();
+  });
+
+  it("shows the staged Bitbucket repository on the review step", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+    await stageBitbucketWidgets(user);
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(screen.getByText("acme/widgets")).toBeInTheDocument();
+    expect(screen.getByText("Bitbucket")).toBeInTheDocument();
+  });
+
+  it("connects a mixed batch of a GitHub repo and a Bitbucket repo", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+    // Same owner/name on both providers: they are two different sources.
+    await stageWidgets(user);
+    await stageBitbucketWidgets(user);
+
+    expect(screen.getAllByText("acme/widgets")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() => expect(vi.mocked(connectBitbucketRepository)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(connectGithubRepository)).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: "acme", name: "widgets", projectId: "proj-new" }),
+    );
+    expect(vi.mocked(connectBitbucketRepository)).toHaveBeenCalledWith(
+      expect.objectContaining({ workspace: "acme", slug: "widgets", projectId: "proj-new" }),
+    );
+  });
+
+  it("links an already-ingested Bitbucket repository instead of re-ingesting it", async () => {
+    vi.mocked(discoverBitbucketRepositories).mockResolvedValue({
+      repositories: [
+        {
+          workspace: "acme",
+          slug: "linked",
+          name: "linked",
+          isPrivate: false,
+          url: "https://bitbucket.org/acme/linked",
+          alreadyConnected: true,
+          isEnabled: true,
+        },
+      ],
+      hasMore: false,
+    });
+    vi.mocked(getIngestionSourceStatuses).mockResolvedValue([
+      {
+        ...statusRow("acme/linked", "bb-42"),
+        sourceSystem: "BITBUCKET",
+      },
+    ]);
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+
+    await openBitbucketDetail(user);
+    await user.type(screen.getByLabelText("Workspace or bitbucket.org URL"), "acme");
+    await user.click(screen.getByRole("button", { name: /discover/i }));
+    const linkedCheckbox = await screen.findByRole("checkbox", { name: /linked/i });
+    await waitFor(() => expect(linkedCheckbox).toBeEnabled());
+    await user.click(linkedCheckbox);
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+
+    expect(screen.getByText(/Already ingested, will be linked/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(addBitbucketRepositoryToProject)).toHaveBeenCalledWith("bb-42", "proj-new"),
+    );
+    expect(vi.mocked(connectBitbucketRepository)).not.toHaveBeenCalled();
+  });
+
+  it("keeps the project and offers a retry when a Bitbucket repository fails to connect", async () => {
+    vi.mocked(connectBitbucketRepository).mockRejectedValueOnce(new Error("no access"));
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+    await stageBitbucketWidgets(user);
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    expect(await screen.findByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(screen.getByText("no access")).toBeInTheDocument();
+    expect(vi.mocked(projectService.createProject)).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds an Atlassian credential inline while staging a Bitbucket repository and selects the new one", async () => {
+    vi.mocked(getMyAtlassianCredentials)
+      .mockResolvedValueOnce([]) // initial load: none stored
+      .mockResolvedValue([{ userEmail: "new@example.com", displayName: "Fresh cred" }]);
+    const user = userEvent.setup();
+    renderWizard();
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes pull requests, readme/i }));
+
+    await user.click(screen.getByRole("button", { name: /add atlassian credential/i }));
+    await user.type(screen.getByTestId("settings-atlassian-add-email"), "new@example.com");
+    await user.type(screen.getByTestId("settings-atlassian-add-name"), "Fresh cred");
+    await user.type(screen.getByTestId("settings-atlassian-add-token"), "bitbucket-token");
+    await user.click(screen.getByTestId("settings-atlassian-add-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(addAtlassianCredential)).toHaveBeenCalledWith({
+        userEmail: "new@example.com",
+        tokenName: "Fresh cred",
+        authToken: "bitbucket-token",
+      }),
+    );
+    // The refreshed credential is adopted and drives discovery.
+    await screen.findByText(/Fresh cred - new@example.com/i);
+    expect(screen.getByLabelText("Credential")).toHaveTextContent("Fresh cred");
+
+    await user.type(screen.getByLabelText("Workspace or bitbucket.org URL"), "acme");
+    await user.click(screen.getByRole("button", { name: /discover/i }));
+    await screen.findByRole("checkbox", { name: /widgets/i });
+    expect(vi.mocked(discoverBitbucketRepositories)).toHaveBeenCalledWith(
+      "acme",
+      "Fresh cred",
+      0,
+      20,
+    );
+  });
 
   it("keeps details on a blank name and explains why instead of a dead button", async () => {
     const user = userEvent.setup();
