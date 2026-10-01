@@ -172,9 +172,12 @@ export function RepositoryDiscovery({
   const [ownerInput, setOwnerInput] = useState("");
   const [filter, setFilter] = useState("");
 
-  // The owner that actually produced the current results, used at connect time
-  // (discovered repos carry only their name, not their owner).
+  // The owner and credential that actually produced the current results. The
+  // owner is used at connect time (discovered repos carry only their name, not
+  // their owner); both are what "Load more" continues with, so editing the
+  // inputs afterwards cannot mix another owner's pages into these results.
   const [resolvedOwner, setResolvedOwner] = useState("");
+  const [resolvedCredential, setResolvedCredential] = useState("");
   const [repositories, setRepositories] = useState<DiscoveredRepositoryItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
@@ -191,7 +194,22 @@ export function RepositoryDiscovery({
   >("idle");
   const [discoverError, setDiscoverError] = useState<string | null>(null);
 
-  const isBusy = discoverState === "loading" || isConnecting;
+  const isDiscovering = discoverState === "loading" || discoverState === "loadingMore";
+  const isBusy = isDiscovering || isConnecting;
+
+  // Results belong to the credential that produced them: it is also what the
+  // parent connects with. Switching it drops the results and the selection, so a
+  // fresh discovery is needed before anything can be paged or connected.
+  if (resolvedCredential && resolvedCredential !== credentialName.trim()) {
+    setResolvedOwner("");
+    setResolvedCredential("");
+    setRepositories([]);
+    setSelected(new Set());
+    setPage(0);
+    setHasMore(false);
+    setFilter("");
+    setDiscoverState("idle");
+  }
 
   // Discovery only reports *that* a repo is already a source, not its id or which
   // projects it belongs to. The per-repo status endpoint supplies both, so an
@@ -236,34 +254,45 @@ export function RepositoryDiscovery({
 
   const runDiscovery = useCallback(
     async (nextPage: number) => {
-      // The single field accepts an owner handle, a bare "owner/name", or a full
-      // URL to either. When it carries a repository name we still discover the
-      // owner but isolate that one repository in the results; a bare owner lists
-      // all of them.
-      const parsedInput = adapter.parseInput(ownerInput);
-
-      if (!parsedInput) {
-        setDiscoverState("error");
-        setDiscoverError(adapter.invalidInputMessage);
-        return;
-      }
-
-      const { owner, name: repositoryName } = parsedInput;
-
-      if (!credentialName.trim()) {
-        setDiscoverState("error");
-        setDiscoverError(adapter.credentialRequiredMessage);
-        return;
-      }
-
       const loadingMore = nextPage > 0;
+      let owner = resolvedOwner;
+      let credential = resolvedCredential;
+      let repositoryName: string | null = null;
+
+      // "Load more" continues the discovery that produced the current results; it
+      // never re-reads the editable fields. Only a fresh discovery does that.
+      if (!loadingMore) {
+        // The single field accepts an owner handle, a bare "owner/name", or a
+        // full URL to either. When it carries a repository name we still
+        // discover the owner but isolate that one repository in the results; a
+        // bare owner lists all of them.
+        const parsedInput = adapter.parseInput(ownerInput);
+
+        if (!parsedInput) {
+          setDiscoverState("error");
+          setDiscoverError(adapter.invalidInputMessage);
+          return;
+        }
+
+        owner = parsedInput.owner;
+        repositoryName = parsedInput.name;
+        credential = credentialName.trim();
+
+        if (!credential) {
+          setDiscoverState("error");
+          setDiscoverError(adapter.credentialRequiredMessage);
+          return;
+        }
+      }
+
       setDiscoverState(loadingMore ? "loadingMore" : "loading");
       setDiscoverError(null);
 
       try {
-        const result = await adapter.discover(owner, credentialName.trim(), nextPage, PAGE_SIZE);
+        const result = await adapter.discover(owner, credential, nextPage, PAGE_SIZE);
 
         setResolvedOwner(owner);
+        setResolvedCredential(credential);
         setHasMore(result.hasMore);
         setPage(nextPage);
         setRepositories((current) =>
@@ -288,7 +317,14 @@ export function RepositoryDiscovery({
         );
       }
     },
-    [adapter, credentialName, loadConnectedRepositories, ownerInput],
+    [
+      adapter,
+      credentialName,
+      loadConnectedRepositories,
+      ownerInput,
+      resolvedCredential,
+      resolvedOwner,
+    ],
   );
 
   const filteredRepositories = useMemo(() => {
@@ -605,7 +641,7 @@ export function RepositoryDiscovery({
               <button
                 type="button"
                 onClick={() => void runDiscovery(page + 1)}
-                disabled={discoverState === "loadingMore"}
+                disabled={isBusy}
                 className="inline-flex items-center gap-2 rounded-xl border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text transition hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {discoverState === "loadingMore" ? (

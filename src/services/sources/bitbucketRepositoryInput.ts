@@ -19,11 +19,13 @@ export type BitbucketRepositoryReference = {
 /**
  * Strips the host part of a browser URL, an HTTPS clone URL (which may carry a
  * `user@`) or an SSH remote, and the leading slashes, leaving the lowercased
- * path segments.
+ * path segments. A query string or fragment (`?foo=bar`, `#readme`) is dropped
+ * first so it never ends up inside the last segment.
  */
 function toPathSegments(value: string): string[] {
   return value
     .trim()
+    .replace(/[?#].*$/, "")
     .replace(/^(?:https?|ssh):\/\/(?:[^@/]+@)?bitbucket\.org\//i, "")
     .replace(/^bitbucket\.org\//i, "")
     .replace(/^git@bitbucket\.org:/i, "")

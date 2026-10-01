@@ -98,4 +98,23 @@ describe("parseBitbucketRepositoryInput", () => {
     });
     expect(parseBitbucketWorkspaceInput("bitbucket.org/ACME")).toBe("acme");
   });
+
+  // A pasted browser URL often carries a query string or a fragment; neither may
+  // end up in the slug, or discovery filters by a name that matches nothing.
+  it("ignores a query string and a fragment", () => {
+    expect(parseBitbucketRepositoryReference("https://bitbucket.org/acme/widgets?foo=bar")).toEqual(
+      {
+        workspace: "acme",
+        slug: "widgets",
+      },
+    );
+    expect(
+      parseBitbucketRepositoryReference("https://bitbucket.org/acme/widgets/src/main#readme"),
+    ).toEqual({ workspace: "acme", slug: "widgets" });
+    expect(parseBitbucketWorkspaceInput("https://bitbucket.org/acme?tab=repos")).toBe("acme");
+    expect(parseBitbucketRepositoryReference("git@bitbucket.org:acme/widgets.git")).toEqual({
+      workspace: "acme",
+      slug: "widgets",
+    });
+  });
 });

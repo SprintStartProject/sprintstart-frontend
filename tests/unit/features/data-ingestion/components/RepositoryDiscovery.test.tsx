@@ -63,7 +63,7 @@ function renderDiscovery(
 ) {
   const onSelectionChange = vi.fn<(selection: DiscoverySelection[]) => void>();
 
-  render(
+  const tree = (overrides: Partial<Parameters<typeof RepositoryDiscovery>[0]> = {}) => (
     <RepositoryDiscovery
       adapter={adapter}
       hasCredentials
@@ -76,10 +76,16 @@ function renderDiscovery(
       projectId="project-1"
       onSelectionChange={onSelectionChange}
       {...props}
-    />,
+      {...overrides}
+    />
   );
+  const view = render(tree());
 
-  return { onSelectionChange };
+  return {
+    onSelectionChange,
+    rerenderWith: (overrides: Partial<Parameters<typeof RepositoryDiscovery>[0]>) =>
+      view.rerender(tree(overrides)),
+  };
 }
 
 async function discover(user: ReturnType<typeof userEvent.setup>, value = "acme") {
@@ -182,6 +188,72 @@ describe("RepositoryDiscovery", () => {
     expect(screen.getByText("a")).toBeInTheDocument();
     expect(discoverPage).toHaveBeenLastCalledWith("acme", "cred", 1, 20);
     expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps paging the discovery that produced the results when the owner field is edited", async () => {
+    const discoverPage = vi
+      .fn()
+      .mockResolvedValueOnce({ repositories: [repo("widgets")], hasMore: true })
+      .mockResolvedValueOnce({ repositories: [repo("gadgets")], hasMore: false });
+    const { onSelectionChange } = renderDiscovery(makeAdapter({ discover: discoverPage }));
+    const user = userEvent.setup();
+
+    await discover(user, "alpha");
+    await user.click(await screen.findByRole("checkbox"));
+    await user.clear(screen.getByLabelText("Workspace"));
+    await user.type(screen.getByLabelText("Workspace"), "beta");
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+
+    expect(await screen.findByText("gadgets")).toBeInTheDocument();
+    expect(discoverPage).toHaveBeenLastCalledWith("alpha", "cred", 1, 20);
+    await waitFor(() => {
+      expect(lastSelection(onSelectionChange)).toEqual([
+        expect.objectContaining({ owner: "alpha", name: "widgets" }),
+      ]);
+    });
+  });
+
+  it("drops the results and the selection when the credential changes", async () => {
+    const adapter = makeAdapter({
+      discover: vi.fn().mockResolvedValue({ repositories: [repo("widgets")], hasMore: true }),
+    });
+    const { onSelectionChange, rerenderWith } = renderDiscovery(adapter);
+    const user = userEvent.setup();
+
+    await discover(user);
+    await user.click(await screen.findByRole("checkbox"));
+
+    rerenderWith({ credentialName: "other" });
+
+    await waitFor(() => {
+      expect(screen.queryByText("widgets")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
+    expect(lastSelection(onSelectionChange)).toEqual([]);
+  });
+
+  it("locks the form and the pager while a page is loading", async () => {
+    let resolvePage: (page: {
+      repositories: DiscoveredRepositoryItem[];
+      hasMore: boolean;
+    }) => void = () => undefined;
+    const discoverPage = vi
+      .fn()
+      .mockResolvedValueOnce({ repositories: [repo("a")], hasMore: true })
+      .mockReturnValueOnce(new Promise((resolve) => (resolvePage = resolve)));
+    renderDiscovery(makeAdapter({ discover: discoverPage }));
+    const user = userEvent.setup();
+
+    await discover(user);
+    await user.click(await screen.findByRole("button", { name: /load more/i }));
+
+    expect(screen.getByLabelText("Workspace")).toBeDisabled();
+    expect(screen.getByRole("button", { name: /discover/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /load more/i })).toBeDisabled();
+
+    resolvePage({ repositories: [repo("b")], hasMore: false });
+    expect(await screen.findByText("b")).toBeInTheDocument();
+    expect(screen.getByLabelText("Workspace")).toBeEnabled();
   });
 
   it("shows the label instead of the name and filters by either", async () => {
