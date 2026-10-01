@@ -14,6 +14,7 @@ export const SOURCE_LABELS: Record<SourceSystem, string> = {
   GITHUB: "GitHub",
   JIRA: "Jira",
   CONFLUENCE: "Confluence",
+  NOTION: "Notion",
   UPLOAD: "Uploads",
 };
 

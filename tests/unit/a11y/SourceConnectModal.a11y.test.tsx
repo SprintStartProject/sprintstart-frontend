@@ -23,6 +23,7 @@ describe("SourceConnectModal Accessibility", () => {
         type: "Space",
         icon: Activity,
       },
+      NOTION: { name: "Notion", description: "Connect to Notion", type: "Page", icon: Activity },
     };
     const { baseElement } = render(
       <MemoryRouter>

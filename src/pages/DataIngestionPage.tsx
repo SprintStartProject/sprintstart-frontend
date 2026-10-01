@@ -161,7 +161,8 @@ function toSourceSystem(value: string): SourceSystem | null {
     normalized === "GITHUB" ||
     normalized === "JIRA" ||
     normalized === "UPLOAD" ||
-    normalized === "CONFLUENCE"
+    normalized === "CONFLUENCE" ||
+    normalized === "NOTION"
   ) {
     return normalized;
   }

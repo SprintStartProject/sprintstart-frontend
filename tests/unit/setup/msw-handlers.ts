@@ -676,6 +676,43 @@ export const handlers = [
   http.get("/api/v1/connectors/confluence/sources", () =>
     HttpResponse.json({ connectorId: "confluence", sources: [] }),
   ),
+  http.get("/api/v1/notion/credentials", () => HttpResponse.json([])),
+  http.get("/api/v1/notion/pages", () => HttpResponse.json([])),
+  http.get("/api/v1/notion/projects/:projectId/connections", () => HttpResponse.json([])),
+  http.post("/api/v1/notion/projects/:projectId/connections", () =>
+    HttpResponse.json(
+      {
+        id: "notion-conn-default",
+        projectId: "proj-1",
+        pageId: "page-default",
+        pageTitle: "Example Page",
+        pageUrl: "https://www.notion.so/Example-Page-pagedefault",
+        credentialName: "default",
+        sourceEnabled: true,
+        autoUpdate: false,
+        schedule: null,
+        scheduleSpec: null,
+        nextSyncAt: null,
+        lastEditedTime: null,
+        contentHash: null,
+        lastSyncedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+      },
+      { status: 201 },
+    ),
+  ),
+  http.post("/api/v1/notion/projects/:projectId/connections/:connectionId/update", ({ params }) =>
+    HttpResponse.json({
+      runId: "run-default",
+      connectionId: params.connectionId,
+      outcome: "UNCHANGED",
+    }),
+  ),
+  http.get("/api/v1/connectors/notion/sources", () =>
+    HttpResponse.json({ connectorId: "notion", sources: [] }),
+  ),
   // Every surface that opens the buddy dock asks for its suggestion chips. A default empty list
   // keeps that request handled for the many tests that open the dock without being about the
   // chips; `useBuddySuggestions`' own suite mocks the service directly and never sees this.

@@ -33,7 +33,7 @@ import type { ConfluenceConnectionDto } from "../../../../src/services/sources/c
 describe("data-ingestion data helpers", () => {
   describe("SOURCE_SYSTEMS / SOURCE_META", () => {
     it("lists all known source systems", () => {
-      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"]);
+      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE", "NOTION"]);
     });
 
     it("provides meta for every source system", () => {

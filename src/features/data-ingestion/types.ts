@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
+export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE" | "NOTION";
 
 export type BackendProjectSourceStatus =
   | "CONNECTED"

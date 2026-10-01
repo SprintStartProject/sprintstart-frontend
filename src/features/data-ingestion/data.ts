@@ -7,6 +7,7 @@ import {
   GitBranch,
   History,
   Loader2,
+  NotebookText,
   Ticket,
 } from "lucide-react";
 import type {
@@ -24,7 +25,7 @@ import type {
 import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
 import type { ConfluenceConnectionDto } from "../../services/sources/confluenceService.ts";
 
-export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
+export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE", "NOTION"];
 
 export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
   GITHUB: {
@@ -50,6 +51,12 @@ export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
     type: "Confluence",
     icon: BookOpen,
     description: "Indexes pages, hierarchical documents and spaces from Confluence Cloud.",
+  },
+  NOTION: {
+    name: "Notion Page",
+    type: "Notion",
+    icon: NotebookText,
+    description: "Indexes pages that were shared with a Notion integration.",
   },
 };
 

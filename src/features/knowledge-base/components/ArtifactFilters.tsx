@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   Languages,
   ListChecks,
+  NotebookText,
   RefreshCw,
   Search,
   Ticket,
@@ -124,6 +125,7 @@ const SOURCE_ICONS: Record<SourceSystem, ReactNode> = {
   GITHUB: <GitBranch className={ICON_CLASS} aria-hidden="true" />,
   JIRA: <Ticket className={ICON_CLASS} aria-hidden="true" />,
   CONFLUENCE: <BookOpen className={ICON_CLASS} aria-hidden="true" />,
+  NOTION: <NotebookText className={ICON_CLASS} aria-hidden="true" />,
   UPLOAD: <Upload className={ICON_CLASS} aria-hidden="true" />,
 };
 
