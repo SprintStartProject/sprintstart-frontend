@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, useNavigate } from "react-router-dom";
@@ -7,6 +7,7 @@ import * as useAuthHook from "../../../../src/context/useAuth";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
 import { PermissionGroup } from "../../../../src/services/types";
 import { knowledgeRequestService } from "../../../../src/services/knowledgeRequestService";
+import { getPmAttentionCount } from "../../../../src/services/teamManagementService";
 import { mockViewport } from "../../setup/matchMedia";
 
 // Mutable so individual tests can flip it mid-suite. Module-level mock
@@ -43,6 +44,23 @@ vi.mock("../../../../src/services/knowledgeRequestService", () => ({
   onOpenEscalationsChanged: () => () => {},
 }));
 
+// The other half of the PM Dashboard's number: pending skip requests and unread feedback. The
+// emitter is kept real so a skip decision or a read feedback can be announced mid-test.
+const { attentionListeners } = vi.hoisted(() => ({ attentionListeners: new Set<() => void>() }));
+vi.mock("../../../../src/services/teamManagementService", () => ({
+  getPmAttentionCount: vi.fn(),
+  onPmAttentionChanged: (listener: () => void) => {
+    attentionListeners.add(listener);
+    return () => attentionListeners.delete(listener);
+  },
+}));
+
+const attention = (pendingSkips: number, unreadFeedback: number) => ({
+  pendingSkips,
+  unreadFeedback,
+  total: pendingSkips + unreadFeedback,
+});
+
 const mockProfile = {
   id: "1",
   authId: "auth",
@@ -69,6 +87,8 @@ function renderWithProviders(ui: React.ReactElement, at = "/") {
 describe("SideBar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    attentionListeners.clear();
+    vi.mocked(getPmAttentionCount).mockResolvedValue(attention(0, 0));
     window.localStorage.clear();
     document.documentElement.className = "";
     projectState.canManageSelected = true;
@@ -182,7 +202,7 @@ describe("SideBar", () => {
     expect(screen.queryByText("Escalation Inbox")).not.toBeInTheDocument();
   });
 
-  it("shows the escalation inbox to a PM managing the selected project", () => {
+  it("leaves the escalation inbox to the PM dashboard instead of giving it an entry", () => {
     vi.mocked(useAuthHook.useAuth).mockReturnValue({
       status: "authenticated",
       profile: { ...mockProfile, permissionGroup: PermissionGroup.PM },
@@ -193,9 +213,10 @@ describe("SideBar", () => {
 
     renderWithProviders(<SideBar />);
 
-    // The project context is mocked with `canManageSelected: true`, so the
-    // manager-assignment gate passes and the entry renders.
-    expect(screen.getAllByText("Escalation Inbox").length).toBeGreaterThan(0);
+    // The inbox is a section of the PM dashboard now: a managing PM reaches it through the
+    // dashboard's entry, and a separate entry would light up beside it.
+    expect(screen.getAllByText("PM Dashboard").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Escalation Inbox")).not.toBeInTheDocument();
   });
 
   it("hides the escalation inbox from a PM who only has member access to the selected project", () => {
@@ -215,7 +236,7 @@ describe("SideBar", () => {
     expect(screen.queryByText("Escalation Inbox")).not.toBeInTheDocument();
   });
 
-  it("activates only the Escalation Inbox entry on its own route", () => {
+  it("activates the PM Dashboard entry, and only that one, inside the escalations section", () => {
     const pmProfile = {
       ...mockProfile,
       permissionGroup: PermissionGroup.PM,
@@ -229,10 +250,8 @@ describe("SideBar", () => {
     });
 
     // The framer-motion test mock surfaces `layoutId` as `data-layout-id`,
-    // rendered once per active entry. Two active entries here (the Escalation
-    // Inbox via NavLink match plus a force-active PM Dashboard) would each
-    // mount one pill sharing the same id. `initialEntries` (instead of the
-    // helper's default `/` location) is what puts the route in the inbox.
+    // rendered once per active entry. `initialEntries` (instead of the helper's
+    // default `/` location) is what puts the route in the inbox section.
     render(
       <MemoryRouter initialEntries={["/insights/knowledge-requests"]}>
         <ThemeProvider>
@@ -240,8 +259,6 @@ describe("SideBar", () => {
         </ThemeProvider>
       </MemoryRouter>,
     );
-
-    expect(screen.getAllByText("Escalation Inbox").length).toBeGreaterThan(0);
 
     // The sidebar mounts twice (desktop + mobile drawer), so there are two
     // pills in total -- but each instance must carry exactly ONE. A second
@@ -258,7 +275,7 @@ describe("SideBar", () => {
       .find((link) => desktopNav.contains(link));
     // The pill is what the sidebar highlights *with* — the same `[data-layout-id]` counted
     // above — so asserting on it survives any restyling of the entry itself.
-    expect(pmDashboardEntry?.querySelector("[data-layout-id]")).toBeNull();
+    expect(pmDashboardEntry?.querySelector("[data-layout-id]")).not.toBeNull();
   });
 
   /**
@@ -342,7 +359,7 @@ describe("SideBar", () => {
    * The count is owned by `SideBar`, not by `SidebarContent` — that renders
    * twice at once, once for the desktop rail and once for the mobile drawer,
    * so owning the read there would fire it twice on every page load and every
-   * project switch. Same reason the PM attention flag lives up there.
+   * project switch. Same reason the PM attention count lives up there.
    */
   describe("open escalation count", () => {
     const asPm = () => {
@@ -365,7 +382,7 @@ describe("SideBar", () => {
       expect(knowledgeRequestService.countOpen).toHaveBeenCalledTimes(1);
     });
 
-    it("puts the number on the Escalation Inbox entry", async () => {
+    it("counts escalations into the PM Dashboard entry's number", async () => {
       asPm();
       vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(3);
 
@@ -373,7 +390,93 @@ describe("SideBar", () => {
 
       // Once per sidebar: the desktop rail and the mobile drawer both render it.
       await waitFor(() => expect(screen.getAllByText("3").length).toBeGreaterThan(0));
-      expect(screen.getAllByText("3 open escalations").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText("3 items need your attention: 3 open escalations").length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("adds pending skip requests and unread feedback, and says what the number is", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(1);
+      vi.mocked(getPmAttentionCount).mockResolvedValue(attention(2, 1));
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(screen.getAllByText("4").length).toBeGreaterThan(0));
+      expect(
+        screen.getAllByText(
+          "4 items need your attention: 2 pending skip requests, 1 unread feedback, 1 open escalation",
+        ).length,
+      ).toBeGreaterThan(0);
+      expect(getPmAttentionCount).toHaveBeenCalledTimes(1);
+      expect(getPmAttentionCount).toHaveBeenCalledWith("proj1");
+      // Open, the number carries no tooltip of its own: it would shadow the link's title
+      // (name and chord). Folded to icons, its words become its title.
+      expect(screen.getAllByText("4")[0].parentElement).not.toHaveAttribute("title");
+    });
+
+    it("shows no number when nothing is waiting", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(0);
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(getPmAttentionCount).toHaveBeenCalled());
+      await waitFor(() => expect(knowledgeRequestService.countOpen).toHaveBeenCalled());
+      expect(screen.queryByText(/need(s)? your attention/)).not.toBeInTheDocument();
+      expect(screen.queryByText("Open skip requests, unread feedback or escalations")).toBeNull();
+    });
+
+    it("shows no number while part of it is still loading", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(2);
+      vi.mocked(getPmAttentionCount).mockReturnValue(new Promise(() => {}));
+
+      renderWithProviders(<SideBar />);
+
+      // The known part still raises the marker, but no count claims to be the total.
+      await waitFor(() =>
+        expect(
+          screen.getAllByText("Open skip requests, unread feedback or escalations").length,
+        ).toBeGreaterThan(0),
+      );
+      expect(screen.queryByText("2")).not.toBeInTheDocument();
+    });
+
+    it("shows no number when the read fails", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(0);
+      vi.mocked(getPmAttentionCount).mockRejectedValue(new Error("boom"));
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(getPmAttentionCount).toHaveBeenCalled());
+      expect(screen.queryByText(/need(s)? your attention/)).not.toBeInTheDocument();
+      expect(screen.queryByText("0")).not.toBeInTheDocument();
+    });
+
+    it("updates after a skip decision or read feedback is announced", async () => {
+      asPm();
+      vi.mocked(knowledgeRequestService.countOpen).mockResolvedValue(0);
+      vi.mocked(getPmAttentionCount).mockResolvedValue(attention(1, 1));
+
+      renderWithProviders(<SideBar />);
+
+      await waitFor(() => expect(screen.getAllByText("2").length).toBeGreaterThan(0));
+
+      vi.mocked(getPmAttentionCount).mockResolvedValue(attention(0, 1));
+      act(() => {
+        attentionListeners.forEach((listener) => {
+          listener();
+        });
+      });
+
+      await waitFor(() =>
+        expect(
+          screen.getAllByText("1 item needs your attention: 1 unread feedback").length,
+        ).toBeGreaterThan(0),
+      );
+      expect(screen.queryByText("2")).not.toBeInTheDocument();
     });
 
     it("never reads it for somebody who cannot open the inbox", () => {
@@ -388,6 +491,7 @@ describe("SideBar", () => {
       renderWithProviders(<SideBar />);
 
       expect(knowledgeRequestService.countOpen).not.toHaveBeenCalled();
+      expect(getPmAttentionCount).not.toHaveBeenCalled();
     });
   });
 

@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
@@ -86,6 +87,29 @@ describe("UserDetailsDrawer Accessibility", () => {
     expect(screen.getByRole("button", { name: "Delete Alice Smith" })).toBeInTheDocument();
     expect(screen.getByText("Email")).toBeInTheDocument();
 
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("should not have any a11y violations while the move confirmation is open", async () => {
+    const actor = userEvent.setup();
+    const { baseElement } = render(
+      <MemoryRouter>
+        <UserDetailsDrawer
+          user={{ ...user, permissionGroup: "User" }}
+          availableProjects={availableProjects}
+          isOpen={true}
+          onClose={vi.fn()}
+          onOpenProjectDetails={vi.fn()}
+          onUserUpdated={vi.fn()}
+          onRequestDelete={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await actor.click(screen.getByRole("button", { name: /Add project/i }));
+    await actor.click(screen.getByText("Backend"));
+
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("removed from SprintStart");
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 });

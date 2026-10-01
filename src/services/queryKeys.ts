@@ -99,6 +99,10 @@ export const queryKeys = {
     // `projectId` is `null` for the unfiltered, org-wide read.
     filtered: (projectId: string | null) => ["team-overview", projectId ?? "all"] as const,
   },
+  pmAttention: {
+    // The sidebar's count of pending skip requests and unread feedback for one project.
+    count: (projectId: string) => ["pm-attention", "count", projectId] as const,
+  },
   ingestion: {
     sourceStatuses: (projectId: string) => ["ingestion", "source-statuses", projectId] as const,
   },
@@ -113,5 +117,23 @@ export const queryKeys = {
   },
   onboardingMetrics: {
     project: (projectId: string) => ["onboarding-metrics", "project", projectId] as const,
+  },
+  memberFeedback: {
+    // Not project-scoped: feedback belongs to the member's path, and the admin endpoint answers
+    // for the member across projects.
+    byUser: (userId: string) => ["member-feedback", userId] as const,
+  },
+  projectRoles: {
+    // `getProjectRoles` takes no project argument, but the roles it returns are the selected
+    // project's, so the key still carries it — a switch must not serve the previous project's.
+    byProject: (projectId: string) => ["project-roles", projectId] as const,
+  },
+  memberSkills: {
+    byUser: (userId: string) => ["member-skills", userId] as const,
+  },
+  memberPath: {
+    // A member's full onboarding path as a PM reads it (phases with their steps) — what the
+    // member side panel counts "phase 2 of 4" from.
+    byUser: (userId: string) => ["member-path", userId] as const,
   },
 } as const;

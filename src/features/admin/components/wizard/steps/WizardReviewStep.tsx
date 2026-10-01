@@ -1,4 +1,4 @@
-import { GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
+import { ArrowRightLeft, GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { BitbucketIcon } from "../../../../../components/icons/BitbucketIcon";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
@@ -10,6 +10,11 @@ export type ReviewPerson = {
   id: string;
   name: string;
   profileIcon?: string | null;
+  /**
+   * Names of the projects this person would be removed from when the project is
+   * created. Only set for a regular user who is in other projects already.
+   */
+  movedFrom?: string[];
 };
 
 type WizardReviewStepProps = {
@@ -50,13 +55,27 @@ function sourceTitle(source: DraftSource): string {
 }
 
 function PersonChip({ person, suffix }: { person: ReviewPerson; suffix?: string }) {
+  const movedFrom = person.movedFrom?.join(", ");
+
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface py-0.5 pr-3 pl-0.5 text-xs text-app-text">
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border py-0.5 pr-3 pl-0.5 text-xs text-app-text ${
+        movedFrom
+          ? "border-app-warning-border bg-app-warning-bg"
+          : "border-app-border bg-app-surface"
+      }`}
+    >
       <UserAvatar profileIcon={person.profileIcon} fallbackName={person.name} size={20} />
       <span className="truncate">
         {person.name}
         {suffix && <span className="text-app-text-muted"> · {suffix}</span>}
       </span>
+      {movedFrom && (
+        <span className="inline-flex items-center gap-1 font-medium text-app-warning-text">
+          <ArrowRightLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
+          from {movedFrom}
+        </span>
+      )}
     </span>
   );
 }
@@ -75,10 +94,10 @@ function ReviewBlock({
   return (
     <section className="overflow-hidden rounded-2xl border border-app-border">
       <header className="flex items-center justify-between border-b border-app-border bg-app-surface-muted px-4 py-2.5">
-        <h4 className="text-sm font-semibold text-app-text">
+        <h3 className="text-sm font-semibold text-app-text">
           {title}
           {count !== undefined && <span className="text-app-text-muted"> · {count}</span>}
-        </h4>
+        </h3>
         <button
           type="button"
           onClick={onEdit}
@@ -109,6 +128,7 @@ export function WizardReviewStep({
   onEditSources,
 }: WizardReviewStepProps) {
   const memberCount = members.length + (manager ? 1 : 0);
+  const movedMembers = members.filter((member) => member.movedFrom?.length);
 
   return (
     <div className="space-y-4">
@@ -156,11 +176,20 @@ export function WizardReviewStep({
         {memberCount === 0 ? (
           <span className="text-app-text-muted">No members</span>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {manager && <PersonChip person={manager} suffix="Manager" />}
-            {members.map((member) => (
-              <PersonChip key={member.id} person={member} />
-            ))}
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {manager && <PersonChip person={manager} suffix="Manager" />}
+              {members.map((member) => (
+                <PersonChip key={member.id} person={member} />
+              ))}
+            </div>
+
+            {movedMembers.length > 0 && (
+              <p role="note" className="text-xs text-app-text-muted">
+                People marked with an arrow are moved out of their current projects. Their project
+                roles and onboarding progress are reset.
+              </p>
+            )}
           </div>
         )}
       </ReviewBlock>

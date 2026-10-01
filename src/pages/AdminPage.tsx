@@ -630,6 +630,7 @@ export function AdminPage() {
           onOpenProjectDetails={openProjectDetailsFromUserDrawer}
           onUserUpdated={handleUserUpdated}
           onRequestDelete={requestUserDelete}
+          onMembershipsMoved={() => void refreshAdminData()}
         />
       )}
 
@@ -646,6 +647,7 @@ export function AdminPage() {
           onOpenSourceDetails={openSourceDetails}
           onProjectUpdated={handleProjectUpdated}
           onProjectDeleted={handleProjectDeleted}
+          onMembershipsMoved={() => void refreshAdminData()}
         />
       )}
 
@@ -697,6 +699,7 @@ export function AdminPage() {
         existingProjectNames={projects.map((project) => project.name)}
         onClose={() => setIsCreateWizardOpen(false)}
         onProjectCreated={handleProjectCreated}
+        onMembershipsMoved={() => void refreshAdminData()}
       />
     </div>
   );
