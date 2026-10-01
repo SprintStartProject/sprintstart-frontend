@@ -174,4 +174,79 @@ describe("SourceDetailsPanel, Notion", () => {
 
     expect(screen.queryByRole("button", { name: /remove from project/i })).not.toBeInTheDocument();
   });
+  describe("sync schedule", () => {
+    const schedule = {
+      autoUpdate: true,
+      spec: { type: "INTERVAL", everyMinutes: 30 },
+      nextSyncAt: null,
+    };
+
+    it("loads the schedule for the page's connection", async () => {
+      const onLoadNotionConfig = vi.fn().mockResolvedValue(schedule);
+
+      render(
+        <SourceDetailsPanel
+          source={notionSource}
+          canManageSyncSettings
+          onLoadNotionConfig={onLoadNotionConfig}
+          onSaveNotionConfig={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Sync Schedule")).toBeInTheDocument();
+      await waitFor(() => expect(onLoadNotionConfig).toHaveBeenCalledWith("conn-1"));
+      expect(await screen.findByLabelText("Minutes")).toHaveValue(30);
+      expect(
+        screen.getByRole("switch", { name: "Toggle Notion page auto update" }),
+      ).toBeInTheDocument();
+    });
+
+    it("saves the schedule against the connection id", async () => {
+      const user = userEvent.setup();
+      const onSaveNotionConfig = vi.fn().mockResolvedValue(undefined);
+
+      render(
+        <SourceDetailsPanel
+          source={notionSource}
+          canManageSyncSettings
+          onLoadNotionConfig={vi.fn().mockResolvedValue(schedule)}
+          onSaveNotionConfig={onSaveNotionConfig}
+          onClose={vi.fn()}
+        />,
+      );
+
+      const minutes = await screen.findByLabelText("Minutes");
+      await user.clear(minutes);
+      await user.type(minutes, "45");
+      await user.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() =>
+        expect(onSaveNotionConfig).toHaveBeenCalledWith(
+          "conn-1",
+          expect.objectContaining({
+            autoUpdate: true,
+            schedule: { type: "INTERVAL", everyMinutes: 45 },
+          }),
+        ),
+      );
+    });
+
+    it("hides the schedule without the manage rights or without the handlers", () => {
+      const { rerender } = render(
+        <SourceDetailsPanel
+          source={notionSource}
+          onLoadNotionConfig={vi.fn()}
+          onSaveNotionConfig={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(screen.queryByText("Sync Schedule")).not.toBeInTheDocument();
+
+      rerender(
+        <SourceDetailsPanel source={notionSource} canManageSyncSettings onClose={vi.fn()} />,
+      );
+      expect(screen.queryByText("Sync Schedule")).not.toBeInTheDocument();
+    });
+  });
 });

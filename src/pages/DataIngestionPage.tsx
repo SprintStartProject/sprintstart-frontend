@@ -107,7 +107,12 @@ const DEFAULT_GLOBAL_CONFLUENCE_SYNC_CONFIG: ConfigureGithubRepositoryRequest = 
   schedule: { type: "INTERVAL", everyMinutes: 60 },
 };
 
-type SyncSettingsProvider = "github" | "jira" | "confluence";
+const DEFAULT_GLOBAL_NOTION_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
+  autoUpdate: true,
+  schedule: { type: "INTERVAL", everyMinutes: 60 },
+};
+
+type SyncSettingsProvider = "github" | "jira" | "confluence" | "notion";
 
 /**
  * Wording for the global sync-settings modal, per connector. `one` and `many`
@@ -121,9 +126,15 @@ const SYNC_SETTINGS_COPY: Record<
   github: { label: "GitHub", one: "GitHub repository", many: "GitHub repositories" },
   jira: { label: "Jira", one: "Jira instance", many: "Jira instances" },
   confluence: { label: "Confluence", one: "Confluence space", many: "Confluence spaces" },
+  notion: { label: "Notion", one: "Notion page", many: "Notion pages" },
 };
 
-const SYNC_SETTINGS_PROVIDER_ORDER: SyncSettingsProvider[] = ["github", "jira", "confluence"];
+const SYNC_SETTINGS_PROVIDER_ORDER: SyncSettingsProvider[] = [
+  "github",
+  "jira",
+  "confluence",
+  "notion",
+];
 
 // Small enough that the run table stays scannable and pagination is actually
 // reachable rather than a single page of rows.
@@ -496,6 +507,8 @@ export function DataIngestionPage() {
     useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_JIRA_SYNC_CONFIG);
   const [globalConfluenceSyncConfig, setGlobalConfluenceSyncConfig] =
     useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_CONFLUENCE_SYNC_CONFIG);
+  const [globalNotionSyncConfig, setGlobalNotionSyncConfig] =
+    useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_NOTION_SYNC_CONFIG);
   const [syncSettingsProvider, setSyncSettingsProvider] = useState<SyncSettingsProvider>("github");
   const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
   const [pollingUntil, setPollingUntil] = useState<number | null>(null);
@@ -921,6 +934,7 @@ export function DataIngestionPage() {
   const hasGithubSources = visibleSourceSystems.has("GITHUB");
   const hasJiraSources = visibleSourceSystems.has("JIRA");
   const hasConfluenceSources = visibleSourceSystems.has("CONFLUENCE");
+  const hasNotionSources = visibleSourceSystems.has("NOTION");
   // The connectors whose global sync policy can be edited right now: one tab per
   // connector that actually has sources on this project.
   const syncSettingsProviders = useMemo<SegmentedTabOption<SyncSettingsProvider>[]>(() => {
@@ -928,12 +942,13 @@ export function DataIngestionPage() {
       github: hasGithubSources,
       jira: hasJiraSources,
       confluence: hasConfluenceSources,
+      notion: hasNotionSources,
     };
 
     return SYNC_SETTINGS_PROVIDER_ORDER.filter((provider) => hasSources[provider]).map(
       (provider) => ({ value: provider, label: SYNC_SETTINGS_COPY[provider].label }),
     );
-  }, [hasConfluenceSources, hasGithubSources, hasJiraSources]);
+  }, [hasConfluenceSources, hasGithubSources, hasJiraSources, hasNotionSources]);
   const syncSettingsCopy = SYNC_SETTINGS_COPY[syncSettingsProvider];
 
   const sourceHealth = useMemo(() => {
@@ -1257,6 +1272,37 @@ export function DataIngestionPage() {
     [confluenceConnections, loadData, reloadSourceStatuses, selectedProjectId],
   );
 
+  // Notion has no "configure all" endpoint either: one connection is one page, so the global
+  // policy is applied page by page. Every page is attempted even if one fails, and the
+  // failures are reported as one error so the form can show what did not go through.
+  const handleSaveGlobalNotionConfig = useCallback(
+    async (request: ConfigureGithubRepositoryRequest) => {
+      if (!selectedProjectId) {
+        throw new Error("Select a project before saving the sync schedule.");
+      }
+
+      const results = await Promise.allSettled(
+        notionConnections.map((connection) =>
+          notionService.configureSchedule(selectedProjectId, connection.id, {
+            schedule: request.schedule,
+            autoUpdate: request.autoUpdate,
+          }),
+        ),
+      );
+
+      const failed = results.filter((result) => result.status === "rejected").length;
+      if (failed > 0) {
+        throw new Error(
+          `Couldn't apply the schedule to ${failed} of ${results.length} Notion pages.`,
+        );
+      }
+
+      setGlobalNotionSyncConfig(request);
+      await Promise.all([loadData(false), reloadSourceStatuses()]);
+    },
+    [loadData, notionConnections, reloadSourceStatuses, selectedProjectId],
+  );
+
   // Memoized because the schedule form reloads itself whenever `initialConfig`
   // changes identity — a record rebuilt on every render would discard whatever
   // the user had just selected.
@@ -1265,8 +1311,14 @@ export function DataIngestionPage() {
       github: globalGithubSyncConfig,
       jira: globalJiraSyncConfig,
       confluence: globalConfluenceSyncConfig,
+      notion: globalNotionSyncConfig,
     }),
-    [globalConfluenceSyncConfig, globalGithubSyncConfig, globalJiraSyncConfig],
+    [
+      globalConfluenceSyncConfig,
+      globalGithubSyncConfig,
+      globalJiraSyncConfig,
+      globalNotionSyncConfig,
+    ],
   );
 
   const globalSyncSavers: Record<
@@ -1276,6 +1328,7 @@ export function DataIngestionPage() {
     github: handleSaveGlobalGithubConfig,
     jira: handleSaveGlobalJiraConfig,
     confluence: handleSaveGlobalConfluenceConfig,
+    notion: handleSaveGlobalNotionConfig,
   };
 
   const handleLoadGithubRepositoryConfig = useCallback(
@@ -1337,6 +1390,46 @@ export function DataIngestionPage() {
       }
 
       await confluenceService.configureSchedule(selectedProjectId, connectionId, {
+        schedule: request.schedule,
+        autoUpdate: request.autoUpdate,
+      });
+      await Promise.all([loadData(false), reloadSourceStatuses()]);
+    },
+    [loadData, reloadSourceStatuses, selectedProjectId],
+  );
+
+  // The backend has no endpoint for a single Notion connection, so the form finds its page in
+  // the project's list and reads the schedule off it. `scheduleSpec` is the Notion spelling of
+  // what Confluence calls `spec`.
+  const handleLoadNotionConfig = useCallback(
+    async (connectionId: string) => {
+      if (!selectedProjectId) {
+        throw new Error("Select a project before loading the sync schedule.");
+      }
+
+      const connections = await notionService.listConnections(selectedProjectId);
+      const connection = connections.find((candidate) => candidate.id === connectionId);
+
+      if (!connection) {
+        throw new Error("This page is no longer connected to the project.");
+      }
+
+      return {
+        autoUpdate: connection.autoUpdate,
+        spec: connection.scheduleSpec ?? null,
+        nextSyncAt: connection.nextSyncAt ?? null,
+      };
+    },
+    [selectedProjectId],
+  );
+
+  const handleSaveNotionConfig = useCallback(
+    async (connectionId: string, request: ConfigureGithubRepositoryRequest) => {
+      if (!selectedProjectId) {
+        throw new Error("Select a project before saving the sync schedule.");
+      }
+
+      await notionService.configureSchedule(selectedProjectId, connectionId, {
         schedule: request.schedule,
         autoUpdate: request.autoUpdate,
       });
@@ -1703,6 +1796,8 @@ export function DataIngestionPage() {
             onSaveJiraConfig={handleSaveJiraConfig}
             onLoadConfluenceConfig={handleLoadConfluenceConfig}
             onSaveConfluenceConfig={handleSaveConfluenceConfig}
+            onLoadNotionConfig={handleLoadNotionConfig}
+            onSaveNotionConfig={handleSaveNotionConfig}
             onSetSourceEnabled={handleSetSourceEnabled}
             onSetJiraSourceEnabled={handleSetJiraSourceEnabled}
             onSetNotionSourceEnabled={handleSetNotionSourceEnabled}

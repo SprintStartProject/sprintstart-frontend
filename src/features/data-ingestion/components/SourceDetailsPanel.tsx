@@ -71,6 +71,13 @@ type SourceDetailsPanelProps = {
     connectionId: string,
     request: ConfigureGithubRepositoryRequest,
   ) => Promise<void>;
+  /** Loads the sync schedule of a Notion page (by connection id). */
+  onLoadNotionConfig?: (connectionId: string) => Promise<SyncScheduleConfig>;
+  /** Saves the sync schedule of a Notion page (by connection id). */
+  onSaveNotionConfig?: (
+    connectionId: string,
+    request: ConfigureGithubRepositoryRequest,
+  ) => Promise<void>;
   /** Enables/disables the source in the connector (allow/deny for ingestion). */
   onSetSourceEnabled?: (
     repository: NonNullable<DataSource["githubRepository"]>,
@@ -103,6 +110,8 @@ export function SourceDetailsPanel({
   onSaveJiraConfig,
   onLoadConfluenceConfig,
   onSaveConfluenceConfig,
+  onLoadNotionConfig,
+  onSaveNotionConfig,
   onSetSourceEnabled,
   onSetJiraSourceEnabled,
   onSetNotionSourceEnabled,
@@ -163,6 +172,12 @@ export function SourceDetailsPanel({
     Boolean(confluence?.connectionId) &&
     onLoadConfluenceConfig !== undefined &&
     onSaveConfluenceConfig !== undefined;
+  const canManageNotionConfig =
+    canManageSyncSettings &&
+    isNotion &&
+    Boolean(notion?.connectionId) &&
+    onLoadNotionConfig !== undefined &&
+    onSaveNotionConfig !== undefined;
   const canToggleEnabled =
     canManageSyncSettings &&
     source.sourceSystem === "GITHUB" &&
@@ -680,6 +695,24 @@ export function SourceDetailsPanel({
               autoUpdateOnText="Due checks update this Confluence space."
               autoUpdateOffText="Due checks only mark this Confluence space out of date."
               toggleAriaLabel="Toggle Confluence space auto update"
+            />
+          </DrawerCard>
+        )}
+
+      {canManageNotionConfig &&
+        notion?.connectionId &&
+        onLoadNotionConfig &&
+        onSaveNotionConfig && (
+          <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
+            {/* Same control again: Notion connections carry the identical schedule
+                contract, only the load/save endpoints differ. */}
+            <GithubRepositorySyncSettings
+              loadKey={notion.connectionId}
+              loadConfig={() => onLoadNotionConfig(notion.connectionId)}
+              onSave={(request) => onSaveNotionConfig(notion.connectionId, request)}
+              autoUpdateOnText="Due checks update this Notion page."
+              autoUpdateOffText="Due checks only mark this Notion page out of date."
+              toggleAriaLabel="Toggle Notion page auto update"
             />
           </DrawerCard>
         )}

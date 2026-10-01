@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { http, HttpResponse } from "msw";
+import { ToastProvider } from "../../../src/context/ToastProvider";
 import { server } from "../setup/vitest.setup";
 import { DataIngestionPage } from "../../../src/pages/DataIngestionPage";
 import { createProjectContextValue, createSelectableProject } from "../setup/projectContext";
@@ -1282,6 +1283,129 @@ describe("DataIngestionPage", () => {
       await user.click(within(confirm).getByRole("button", { name: /^remove$/i }));
 
       await waitFor(() => expect(deleted).toBe("proj1/conn-1"));
+    });
+
+    it("loads the drawer schedule from the connection's scheduleSpec and saves it", async () => {
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow]);
+      const saved: unknown[] = [];
+      server.use(
+        http.get("/api/v1/notion/projects/:projectId/connections", () =>
+          HttpResponse.json([
+            {
+              ...notionConnection,
+              autoUpdate: true,
+              scheduleSpec: { type: "INTERVAL", everyMinutes: 30 },
+            },
+          ]),
+        ),
+        http.put(
+          "/api/v1/notion/projects/:projectId/connections/:connectionId/schedule",
+          async ({ request, params }) => {
+            saved.push({ connectionId: params.connectionId, body: await request.json() });
+            return HttpResponse.json(notionConnection);
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/data-ingestion?sourceId=conn-1"]}>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      const panel = await screen.findByRole("dialog");
+      const minutes = await within(panel).findByLabelText("Minutes");
+      await waitFor(() => expect(minutes).toHaveValue(30));
+
+      await user.clear(minutes);
+      await user.type(minutes, "45");
+      await user.click(within(panel).getByRole("button", { name: /save/i }));
+
+      await waitFor(() =>
+        expect(saved).toEqual([
+          {
+            connectionId: "conn-1",
+            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 45 } },
+          },
+        ]),
+      );
+    });
+
+    it("applies the global sync schedule to every Notion page", async () => {
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow]);
+      const requests: unknown[] = [];
+      server.use(
+        http.get("/api/v1/notion/projects/:projectId/connections", () =>
+          HttpResponse.json([
+            notionConnection,
+            { ...notionConnection, id: "conn-2", pageId: "page-2", pageUrl: "https://n/2" },
+          ]),
+        ),
+        http.put(
+          "/api/v1/notion/projects/:projectId/connections/:connectionId/schedule",
+          async ({ request, params }) => {
+            requests.push({ connectionId: params.connectionId, body: await request.json() });
+            return HttpResponse.json(notionConnection);
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await user.click(await screen.findByRole("button", { name: /manage sync settings/i }));
+      expect(await screen.findByText("Notion Sync Settings")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("switch", { name: /toggle global notion auto update/i }));
+      await user.click(screen.getByRole("button", { name: /apply globally/i }));
+
+      await waitFor(() => expect(requests).toHaveLength(2));
+      const body = { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } };
+      expect(requests).toEqual(
+        expect.arrayContaining([
+          { connectionId: "conn-1", body },
+          { connectionId: "conn-2", body },
+        ]),
+      );
+    });
+
+    it("reports how many pages the global schedule could not be applied to", async () => {
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow]);
+      server.use(
+        http.get("/api/v1/notion/projects/:projectId/connections", () =>
+          HttpResponse.json([
+            notionConnection,
+            { ...notionConnection, id: "conn-2", pageId: "page-2", pageUrl: "https://n/2" },
+          ]),
+        ),
+        http.put(
+          "/api/v1/notion/projects/:projectId/connections/:connectionId/schedule",
+          ({ params }) =>
+            params.connectionId === "conn-2"
+              ? HttpResponse.json({ message: "boom" }, { status: 500 })
+              : HttpResponse.json(notionConnection),
+        ),
+      );
+      const user = userEvent.setup();
+      // The form reports a failed save through a toast, so this render needs the provider.
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+        { wrapper: ToastProvider },
+      );
+
+      await user.click(await screen.findByRole("button", { name: /manage sync settings/i }));
+      await screen.findByText("Notion Sync Settings");
+      await user.click(screen.getByRole("switch", { name: /toggle global notion auto update/i }));
+      await user.click(screen.getByRole("button", { name: /apply globally/i }));
+
+      expect(
+        await screen.findByText("Couldn't apply the schedule to 1 of 2 Notion pages."),
+      ).toBeInTheDocument();
     });
 
     it("enables and disables the page through the notion connector, scoped to the project", async () => {
