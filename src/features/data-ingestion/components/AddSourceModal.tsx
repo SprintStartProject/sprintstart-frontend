@@ -14,6 +14,7 @@ import {
   createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
+  createNotionDraft,
   createUploadDraft,
   hasFailedSources,
   isValidConfluenceSpaceId,
@@ -31,10 +32,13 @@ import {
 } from "../../admin/components/wizard/sources/AddSourceFlow.tsx";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens.ts";
 import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials.ts";
+import { useNotionCredentials } from "../../settings/hooks/useNotionCredentials.ts";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
+import type { NotionPageSelection } from "./NotionPageDiscovery.tsx";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
+import type { NotionCredentialDto } from "../../../services/sources/notionService.ts";
 
 type AddSourceModalProps = {
   projectId: string | null;
@@ -154,6 +158,11 @@ export function AddSourceModal({
   const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
   const [confluenceCredentialName, setConfluenceCredentialName] = useState("");
 
+  // Notion detail state. The ticked pages come from the page picker; the
+  // credential list is owned here so an inline "add credential" can select it.
+  const [notionCredentialName, setNotionCredentialName] = useState("");
+  const [notionSelection, setNotionSelection] = useState<NotionPageSelection[]>([]);
+
   // Upload detail state — files staged in memory until the list is connected.
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
 
@@ -169,6 +178,30 @@ export function AddSourceModal({
     reload: reloadJiraCredentials,
     addCredentialLocally,
   } = useAtlassianCredentials(isJiraDetail || isConfluenceDetail);
+
+  const isNotionDetail = isAddingSource && addStep === "detail" && addType === "NOTION";
+  const {
+    credentials: notionCredentials,
+    loaded: notionCredentialsLoaded,
+    isRefreshing: notionCredentialsLoading,
+    reload: reloadNotionCredentials,
+    addCredentialLocally: addNotionCredentialLocally,
+  } = useNotionCredentials(isNotionDetail);
+
+  // Adopt the first stored Notion credential once the list arrives, keeping a
+  // still-valid choice.
+  useEffect(() => {
+    if (!notionCredentialsLoaded || notionCredentialsLoading) return;
+
+    void Promise.resolve().then(() => {
+      setNotionCredentialName((current) => {
+        if (notionCredentials.length === 0) return "";
+        return current && notionCredentials.some((credential) => credential.name === current)
+          ? current
+          : notionCredentials[0].name;
+      });
+    });
+  }, [notionCredentials, notionCredentialsLoaded, notionCredentialsLoading]);
 
   // Adopt the first token as soon as the list arrives (and heal a stale
   // selection) so discovery is usable on the first open.
@@ -212,6 +245,7 @@ export function AddSourceModal({
     setConfluenceBaseUrl("");
     setConfluenceSpaceId("");
     setConfluenceCredentialName("");
+    setNotionSelection([]);
   };
 
   // --- Add-source sub-flow ---
@@ -260,12 +294,28 @@ export function AddSourceModal({
     await reloadJiraCredentials();
   };
 
+  const handleNotionCredentialSaved = async (credential: NotionCredentialDto) => {
+    addNotionCredentialLocally(credential);
+    setNotionCredentialName(credential.name);
+    await reloadNotionCredentials();
+  };
+
   const selectedJiraCredential = jiraCredentials.find(
     (credential) => credential.displayName === jiraCredentialName,
   );
 
   const selectedConfluenceCredential = jiraCredentials.find(
     (credential) => credential.displayName === confluenceCredentialName,
+  );
+
+  const selectedNotionCredential = notionCredentials.find(
+    (credential) => credential.name === notionCredentialName,
+  );
+
+  // Stable until the staged list changes, so the picker's marker memo does not rerun.
+  const stagedPageIds = useMemo(
+    () => sources.flatMap((source) => (source.type === "NOTION" ? [source.pageId] : [])),
+    [sources],
   );
 
   const canAddSource =
@@ -281,11 +331,13 @@ export function AddSourceModal({
                 isValidConfluenceSpaceId(confluenceSpaceId) &&
                 selectedConfluenceCredential,
               )
-            : false;
+            : addType === "NOTION"
+              ? notionSelection.length > 0 && Boolean(selectedNotionCredential)
+              : false;
 
   /**
    * The draft(s) captured on the current detail screen — several at once for the
-   * GitHub multi-select, one for Jira/Upload/Confluence. Empty when the detail isn't
+   * GitHub and Notion multi-selects, one for Jira/Upload/Confluence. Empty when the detail isn't
    * complete enough to stage.
    */
   const buildDetailDrafts = (): DraftSource[] => {
@@ -321,6 +373,17 @@ export function AddSourceModal({
           credentialName: selectedConfluenceCredential.displayName,
         }),
       ];
+    }
+
+    if (addType === "NOTION" && selectedNotionCredential) {
+      return notionSelection.map((page) =>
+        createNotionDraft({
+          pageId: page.pageId,
+          pageTitle: page.title,
+          pageUrl: page.url,
+          credentialName: selectedNotionCredential.name,
+        }),
+      );
     }
 
     return [];
@@ -592,6 +655,16 @@ export function AddSourceModal({
                 onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
                 onRemoveFile: (index) =>
                   setUploadFiles((current) => current.filter((_, position) => position !== index)),
+              }}
+              notion={{
+                credentialName: notionCredentialName,
+                credentials: notionCredentials,
+                credentialsLoaded: notionCredentialsLoaded,
+                onCredentialNameChange: setNotionCredentialName,
+                onSelectionChange: setNotionSelection,
+                stagedPageIds,
+                onCredentialSaved: handleNotionCredentialSaved,
+                projectId,
               }}
               confluence={{
                 baseUrl: confluenceBaseUrl,

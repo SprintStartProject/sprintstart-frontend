@@ -19,6 +19,10 @@ import {
   GithubRepositoryDiscovery,
   type DiscoverySelection,
 } from "../../../../data-ingestion/components/GithubRepositoryDiscovery";
+import {
+  NotionPageDiscovery,
+  type NotionPageSelection,
+} from "../../../../data-ingestion/components/NotionPageDiscovery";
 import { JiraConnectStep } from "../../../../data-ingestion/components/JiraConnectStep";
 import { ConfluenceConnectStep } from "../../../../data-ingestion/components/ConfluenceConnectStep";
 import { SourceTypeStep } from "../../../../data-ingestion/components/SourceTypeStep";
@@ -26,8 +30,10 @@ import { FileUploadZone } from "../../../../knowledge-base/components/FileUpload
 import { useDialogFocus } from "../../../../../components/ui/useDialogFocus";
 import { TokenAddForm } from "../../../../settings/components/TokenAddForm";
 import { AtlassianCredentialAddForm } from "../../../../settings/components/atlassian/AtlassianCredentialAddForm";
+import { NotionCredentialAddForm } from "../../../../settings/components/notion/NotionCredentialAddForm";
 import type { SourceSystem } from "../../../../data-ingestion/types";
 import type { AtlassianCredentialDto } from "../../../../../services/sources/atlassianService";
+import type { NotionCredentialDto } from "../../../../../services/sources/notionService";
 
 /**
  * Below this width the credential form stays inline (phone/tablet); at or above
@@ -105,6 +111,25 @@ type ConfluenceDetailProps = {
   onCredentialSaved: (credential: AtlassianCredentialDto) => Promise<void>;
 };
 
+/** Notion detail: credential plus a page picker; nothing connects until provisioning. */
+type NotionDetailProps = {
+  credentialName: string;
+  credentials: NotionCredentialDto[];
+  credentialsLoaded: boolean;
+  onCredentialNameChange: (value: string) => void;
+  /** Must be stable (a state setter), the picker only re-reports on change. */
+  onSelectionChange: (selection: NotionPageSelection[]) => void;
+  /** Page ids already in the staged list, so they cannot be picked twice. */
+  stagedPageIds: readonly string[];
+  /** Adds the new credential to the list, selects it, and reconciles with the server. */
+  onCredentialSaved: (credential: NotionCredentialDto) => Promise<void>;
+  /**
+   * Scopes discovery to an existing project so pages already connected to it are
+   * flagged. `null`/omitted (the create-project wizard) skips that marker.
+   */
+  projectId?: string | null;
+};
+
 type AddSourceFlowProps = {
   step: AddSourceStep;
   selectedType: SourceSystem;
@@ -122,6 +147,7 @@ type AddSourceFlowProps = {
   jira: JiraDetailProps;
   upload: UploadDetailProps;
   confluence: ConfluenceDetailProps;
+  notion: NotionDetailProps;
   /**
    * Told when the desktop credential companion opens/closes, so the wizard can
    * slide its modal left to make room for it.
@@ -562,6 +588,49 @@ function ConfluenceDetail({
   );
 }
 
+/** Notion detail with an "add credential" trigger above the page picker. */
+function NotionDetail({
+  isBusy,
+  notion,
+  onCompanionOpenChange,
+}: {
+  isBusy: boolean;
+  notion: NotionDetailProps;
+  onCompanionOpenChange?: (open: boolean) => void;
+}) {
+  // Only hint "nothing stored" once the list has loaded, so the chip does not
+  // flash while credentials are still being fetched.
+  const missingCredential = notion.credentialsLoaded && notion.credentials.length === 0;
+
+  return (
+    <div className="space-y-4">
+      <CredentialSlot
+        buttonLabel="Add Notion credential"
+        panelTitle="New Notion credential"
+        onCompanionOpenChange={onCompanionOpenChange}
+        missingLabel={missingCredential ? "No credential yet" : undefined}
+        renderForm={(close, embedded) => (
+          <NotionCredentialAddForm
+            onClose={close}
+            onSaved={notion.onCredentialSaved}
+            embedded={embedded}
+          />
+        )}
+      />
+
+      <NotionPageDiscovery
+        credentials={notion.credentials}
+        credentialName={notion.credentialName}
+        onCredentialNameChange={notion.onCredentialNameChange}
+        projectId={notion.projectId ?? null}
+        stagedPageIds={notion.stagedPageIds}
+        onSelectionChange={notion.onSelectionChange}
+        isConnecting={isBusy}
+      />
+    </div>
+  );
+}
+
 /** One-line brief shown under the detail header, per source type. */
 const DETAIL_SUBTITLE: Record<SourceSystem, string> = {
   GITHUB: "Pick the repositories to index, then add them to your source list.",
@@ -627,6 +696,7 @@ export function AddSourceFlow({
   jira,
   upload,
   confluence,
+  notion,
   onCompanionOpenChange,
 }: AddSourceFlowProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -646,6 +716,8 @@ export function AddSourceFlow({
         confluence={confluence}
         onCompanionOpenChange={onCompanionOpenChange}
       />
+    ) : selectedType === "NOTION" ? (
+      <NotionDetail isBusy={isBusy} notion={notion} onCompanionOpenChange={onCompanionOpenChange} />
     ) : (
       <GithubDetail isBusy={isBusy} github={github} onCompanionOpenChange={onCompanionOpenChange} />
     );

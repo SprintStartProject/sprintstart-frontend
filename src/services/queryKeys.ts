@@ -57,6 +57,12 @@ export const queryKeys = {
     // auth-independent tests for no real protection.
     mine: () => ["atlassian-credentials"] as const,
   },
+  notion: {
+    // Pages the credential's integration can see; the credential name is part of the key so
+    // switching credentials never shows another integration's pages.
+    pages: (credentialName: string) => ["notion", "pages", credentialName] as const,
+    connections: (projectId: string) => ["notion", "connections", projectId] as const,
+  },
   notionCredentials: {
     // Not scoped by user id, for the same reason as `atlassianCredentials.mine`.
     mine: () => ["notion-credentials"] as const,

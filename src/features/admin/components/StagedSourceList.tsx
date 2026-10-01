@@ -5,6 +5,7 @@ import {
   FileText,
   GitBranch,
   Loader2,
+  NotebookText,
   RefreshCw,
   Trash2,
   Ticket,
@@ -60,6 +61,10 @@ function TypeIcon({ source }: { source: DraftSource }) {
     return <BookOpen className="h-4 w-4 text-app-text-muted" />;
   }
 
+  if (source.type === "NOTION") {
+    return <NotebookText className="h-4 w-4 text-app-text-muted" />;
+  }
+
   return <GitBranch className="h-4 w-4 text-app-text-muted" />;
 }
 
@@ -82,6 +87,7 @@ function StatusIcon({ source }: { source: DraftSource }) {
 /** Primary line: the human name of the source, by type. */
 function sourceTitle(source: DraftSource): string {
   if (source.type === "GITHUB") return `${source.owner}/${source.name}`;
+  if (source.type === "NOTION") return source.pageTitle;
 
   return source.displayName;
 }
@@ -102,6 +108,10 @@ function sourceDetail(source: DraftSource): string {
 
   if (source.type === "CONFLUENCE") {
     return `${source.baseUrl} (${source.spaceId})`;
+  }
+
+  if (source.type === "NOTION") {
+    return source.pageUrl;
   }
 
   return source.tokenName;

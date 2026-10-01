@@ -17,6 +17,7 @@ import {
   createConfluenceDraft,
   createDraftSourceFromDiscovery,
   createJiraDraft,
+  createNotionDraft,
   createUploadDraft,
   hasFailedSources,
   isValidConfluenceSpaceId,
@@ -26,9 +27,12 @@ import {
 } from "../projectSourcesDraft";
 import { sortOwnerOptions } from "../sourceOwners";
 import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
+import type { NotionPageSelection } from "../../data-ingestion/components/NotionPageDiscovery";
 import type { SourceSystem } from "../../data-ingestion/types";
 import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
+import { useNotionCredentials } from "../../settings/hooks/useNotionCredentials";
+import type { NotionCredentialDto } from "../../../services/sources/notionService";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
 import { getDisplayName } from "../data";
 import { getMovedUsers } from "../projectMove";
@@ -82,8 +86,8 @@ const STEP_INDEX: Record<Exclude<WizardPhase, "provisioning">, number> = {
   review: 3,
 };
 
-// All four connectors can now be staged from the add-source sub-flow.
-const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
+// All five connectors can be staged from the add-source sub-flow.
+const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE", "NOTION"];
 
 /**
  * Transactional create-project wizard: everything is drafted locally across the
@@ -157,6 +161,11 @@ export function CreateProjectWizard({
   const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
   const [confluenceCredentialName, setConfluenceCredentialName] = useState("");
 
+  // Notion: the ticked pages come from the page picker, the credential list is
+  // owned here so an inline "add credential" can select the new one.
+  const [notionCredentialName, setNotionCredentialName] = useState("");
+  const [notionSelection, setNotionSelection] = useState<NotionPageSelection[]>([]);
+
   // Upload files staged in memory; uploaded during provisioning once a project
   // id exists.
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -208,6 +217,30 @@ export function CreateProjectWizard({
     reload: reloadJiraCredentials,
     addCredentialLocally,
   } = useAtlassianCredentials(isOpen && (isJiraDetail || isConfluenceDetail));
+
+  const isNotionDetail = isAddingSource && addStep === "detail" && addType === "NOTION";
+  const {
+    credentials: notionCredentials,
+    loaded: notionCredentialsLoaded,
+    isRefreshing: notionCredentialsLoading,
+    reload: reloadNotionCredentials,
+    addCredentialLocally: addNotionCredentialLocally,
+  } = useNotionCredentials(isOpen && isNotionDetail);
+
+  // Adopt the first stored Notion credential once the list arrives, keeping a
+  // still-valid choice.
+  useEffect(() => {
+    if (!notionCredentialsLoaded || notionCredentialsLoading) return;
+
+    void Promise.resolve().then(() => {
+      setNotionCredentialName((current) => {
+        if (notionCredentials.length === 0) return "";
+        return current && notionCredentials.some((credential) => credential.name === current)
+          ? current
+          : notionCredentials[0].name;
+      });
+    });
+  }, [notionCredentials, notionCredentialsLoaded, notionCredentialsLoading]);
 
   // The token list arrives asynchronously; adopt the first token as soon as it
   // does (and heal a stale selection) so discovery is usable on the first open.
@@ -288,6 +321,7 @@ export function CreateProjectWizard({
     setAddStep("type");
     setAddType("GITHUB");
     setGithubSelection([]);
+    setNotionSelection([]);
     resetJiraDraftFields();
     resetConfluenceDraftFields();
     setUploadFiles([]);
@@ -302,6 +336,7 @@ export function CreateProjectWizard({
 
   const resetSourceDraftFields = () => {
     setGithubSelection([]);
+    setNotionSelection([]);
     resetJiraDraftFields();
     resetConfluenceDraftFields();
     setUploadFiles([]);
@@ -457,12 +492,28 @@ export function CreateProjectWizard({
     await reloadJiraCredentials();
   };
 
+  const handleNotionCredentialSaved = async (credential: NotionCredentialDto) => {
+    addNotionCredentialLocally(credential);
+    setNotionCredentialName(credential.name);
+    await reloadNotionCredentials();
+  };
+
   const selectedJiraCredential = jiraCredentials.find(
     (credential) => credential.displayName === jiraCredentialName,
   );
 
   const selectedConfluenceCredential = jiraCredentials.find(
     (credential) => credential.displayName === confluenceCredentialName,
+  );
+
+  const selectedNotionCredential = notionCredentials.find(
+    (credential) => credential.name === notionCredentialName,
+  );
+
+  // Stable until the staged list changes, so the picker's marker memo does not rerun.
+  const stagedPageIds = useMemo(
+    () => sources.flatMap((source) => (source.type === "NOTION" ? [source.pageId] : [])),
+    [sources],
   );
 
   const canAddSource =
@@ -478,7 +529,9 @@ export function CreateProjectWizard({
                 isValidConfluenceSpaceId(confluenceSpaceId) &&
                 selectedConfluenceCredential,
               )
-            : false;
+            : addType === "NOTION"
+              ? notionSelection.length > 0 && Boolean(selectedNotionCredential)
+              : false;
 
   const commitAddSource = () => {
     if (!canAddSource) return;
@@ -515,6 +568,22 @@ export function CreateProjectWizard({
             spaceId: confluenceSpaceId.trim(),
             credentialName: selectedConfluenceCredential.displayName,
           }),
+        ),
+      );
+    } else if (addType === "NOTION" && selectedNotionCredential) {
+      setSources((current) =>
+        notionSelection.reduce(
+          (accumulated, page) =>
+            addDraftSource(
+              accumulated,
+              createNotionDraft({
+                pageId: page.pageId,
+                pageTitle: page.title,
+                pageUrl: page.url,
+                credentialName: selectedNotionCredential.name,
+              }),
+            ),
+          current,
         ),
       );
     }
@@ -887,6 +956,15 @@ export function CreateProjectWizard({
                     setUploadFiles((current) =>
                       current.filter((_, position) => position !== index),
                     ),
+                }}
+                notion={{
+                  credentialName: notionCredentialName,
+                  credentials: notionCredentials,
+                  credentialsLoaded: notionCredentialsLoaded,
+                  onCredentialNameChange: setNotionCredentialName,
+                  onSelectionChange: setNotionSelection,
+                  stagedPageIds,
+                  onCredentialSaved: handleNotionCredentialSaved,
                 }}
                 confluence={{
                   baseUrl: confluenceBaseUrl,

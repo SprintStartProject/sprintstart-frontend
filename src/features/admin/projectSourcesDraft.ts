@@ -4,6 +4,8 @@ import {
 } from "../../services/sources/githubService";
 import { connectJiraInstance } from "../../services/sources/jiraService";
 import { confluenceService } from "../../services/sources/confluenceService";
+import { notionService } from "../../services/sources/notionService";
+import { ApiError } from "../../services/apiClient";
 import { knowledgeGapService } from "../../services/knowledgeGapService";
 import { knowledgeService } from "../../services/knowledgeService";
 import type { DiscoverySelection } from "../data-ingestion/components/GithubRepositoryDiscovery";
@@ -17,15 +19,15 @@ import type { DiscoverySelection } from "../data-ingestion/components/GithubRepo
  * failing the whole batch.
  *
  * A source can be one of four kinds — a GitHub repository, a Jira instance,
- * an in-memory file upload, or a Confluence space — modelled as a discriminated
- * union on `type` so a single list can hold a mix of all four. Nothing here
+ * an in-memory file upload, a Confluence space, or a Notion page — modelled as a
+ * discriminated union on `type` so a single list can hold a mix of all five. Nothing here
  * touches the backend until {@link connectDraftSources} runs during
  * provisioning; uploads in particular hold their `File[]` in memory until then.
  */
 
 export type DraftSourceStatus = "pending" | "connecting" | "connected" | "failed";
 
-export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
+export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE" | "NOTION";
 
 /** Fields every staged source carries regardless of its type. */
 type DraftSourceBase = {
@@ -113,8 +115,22 @@ export type ConfluenceDraftSource = DraftSourceBase & {
   credentialName: string;
 };
 
+export type NotionDraftSource = DraftSourceBase & {
+  type: "NOTION";
+  /** Notion's id of the page; a page belongs to exactly one project. */
+  pageId: string;
+  pageTitle: string;
+  pageUrl: string;
+  /** Name of a stored Notion credential. */
+  credentialName: string;
+};
+
 export type DraftSource =
-  GithubDraftSource | JiraDraftSource | UploadDraftSource | ConfluenceDraftSource;
+  | GithubDraftSource
+  | JiraDraftSource
+  | UploadDraftSource
+  | ConfluenceDraftSource
+  | NotionDraftSource;
 
 let draftSourceCounter = 0;
 
@@ -224,9 +240,30 @@ export function createConfluenceDraft(params: {
   };
 }
 
+/** Stages one page picked in the Notion discovery flow. */
+export function createNotionDraft(params: {
+  pageId: string;
+  pageTitle: string;
+  pageUrl: string;
+  credentialName: string;
+}): NotionDraftSource {
+  return {
+    id: nextDraftSourceId(),
+    type: "NOTION",
+    pageId: params.pageId,
+    pageTitle: params.pageTitle,
+    pageUrl: params.pageUrl,
+    credentialName: params.credentialName,
+    status: "pending",
+    errorMessage: "",
+    ownerAssignmentFailed: false,
+    wasReused: false,
+  };
+}
+
 /**
  * Whether two drafts point at the same underlying source, used to dedupe on
- * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL; two
+ * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL, Notion by page id; two
  * uploads are always distinct (the same file can legitimately be staged twice).
  * Drafts of different types are never the same source.
  */
@@ -249,6 +286,10 @@ export function isSameSource(left: DraftSource, right: DraftSource): boolean {
       left.baseUrl.trim().toLowerCase() === right.baseUrl.trim().toLowerCase() &&
       left.spaceId.trim().toLowerCase() === right.spaceId.trim().toLowerCase()
     );
+  }
+
+  if (left.type === "NOTION" && right.type === "NOTION") {
+    return left.pageId === right.pageId;
   }
 
   return false;
@@ -459,6 +500,25 @@ async function connectOneDraftSource(
     });
 
     // A Confluence space belongs to exactly one project, so it is never reused.
+    return NOTHING_EXTRA;
+  }
+
+  if (source.type === "NOTION") {
+    try {
+      await notionService.createConnection(projectId, {
+        credentialName: source.credentialName,
+        pageId: source.pageId,
+      });
+    } catch (error) {
+      // A page belongs to exactly one project, so a 409 means it is taken, whether by this
+      // project or another. The raw server text says "conflict"; this says what to do.
+      if (error instanceof ApiError && error.status === 409) {
+        throw new Error("This Notion page is already connected to a project.");
+      }
+      throw error;
+    }
+
+    // Never reused, for the same reason: the page cannot be linked to a second project.
     return NOTHING_EXTRA;
   }
 

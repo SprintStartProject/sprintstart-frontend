@@ -1,4 +1,4 @@
-import { ArrowRightLeft, GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
+import { ArrowRightLeft, GitBranch, Ticket, FileText, BookOpen, NotebookText } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
 import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
@@ -35,6 +35,7 @@ const typeIcons: Record<DraftSourceType, ComponentType<{ className?: string }>> 
   JIRA: Ticket,
   UPLOAD: FileText,
   CONFLUENCE: BookOpen,
+  NOTION: NotebookText,
 };
 
 const typeLabels: Record<DraftSourceType, string> = {
@@ -42,10 +43,14 @@ const typeLabels: Record<DraftSourceType, string> = {
   JIRA: "Jira",
   UPLOAD: "Upload",
   CONFLUENCE: "Confluence",
+  NOTION: "Notion",
 };
 
 function sourceTitle(source: DraftSource): string {
-  return source.type === "GITHUB" ? `${source.owner}/${source.name}` : source.displayName;
+  if (source.type === "GITHUB") return `${source.owner}/${source.name}`;
+  if (source.type === "NOTION") return source.pageTitle;
+
+  return source.displayName;
 }
 
 function PersonChip({ person, suffix }: { person: ReviewPerson; suffix?: string }) {
