@@ -83,7 +83,7 @@ export function parseGithubMetadata(
  * metadata is the org profile (no repository fields), so they are excluded
  * explicitly — letting them through would run the org JSON through the repo
  * parser and always fail. Non-GitHub source systems (`UPLOAD`, `JIRA`,
- * `CONFLUENCE`, including their `PAGE` artifacts) carry different metadata
+ * `CONFLUENCE`, `NOTION`, including their `PAGE` artifacts) carry different metadata
  * shapes and are excluded by the source-system check.
  *
  * @param artifact The artifact whose metadata should be interpreted.

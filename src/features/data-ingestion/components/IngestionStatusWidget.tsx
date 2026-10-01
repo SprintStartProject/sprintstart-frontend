@@ -140,8 +140,8 @@ export function IngestionStatusWidget() {
         <EmptyState size="sm">No ingestion status to show right now.</EmptyState>
       ) : sources.length === 0 ? (
         <EmptyState size="sm">
-          No sources connected yet — connect a repository, Jira or Confluence so the buddy has
-          something to answer from.
+          No sources connected yet — connect a repository, Jira, Confluence or Notion so the buddy
+          has something to answer from.
         </EmptyState>
       ) : (
         <div className="space-y-4">

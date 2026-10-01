@@ -43,6 +43,19 @@ describe("SourceLinkBadge", () => {
     expect(link).toHaveTextContent("Open in Confluence");
   });
 
+  it("renders Notion link badge", () => {
+    render(
+      <SourceLinkBadge
+        sourceUrl="https://www.notion.so/Sprint-Planning-page1"
+        sourceSystem="NOTION"
+      />,
+    );
+
+    const link = screen.getByTestId("artifact-drawer-source-link");
+    expect(link).toHaveTextContent("Open in Notion");
+    expect(link).toHaveAttribute("href", "https://www.notion.so/Sprint-Planning-page1");
+  });
+
   it("falls back to generic label for other source systems", () => {
     render(
       <SourceLinkBadge sourceUrl="https://example.com/custom" sourceSystem={"OTHER" as never} />,

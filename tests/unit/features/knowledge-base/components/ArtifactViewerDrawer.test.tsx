@@ -234,6 +234,16 @@ describe("ArtifactViewerDrawer", () => {
       expect(link).toHaveAttribute("href", sourceUrl);
     });
 
+    it("shows the source link for a Notion artifact", () => {
+      const sourceUrl = "https://www.notion.so/Sprint-Planning-page1";
+      renderDrawer(createArtifact({ sourceSystem: "NOTION", artifactType: "PAGE", sourceUrl }));
+
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toHaveTextContent("Open in Notion");
+      expect(link).toHaveAttribute("href", sourceUrl);
+    });
+
     it("shows no source link for an uploaded artifact even if sourceUrl is present", () => {
       renderDrawer(
         createArtifact({
@@ -488,6 +498,49 @@ describe("ArtifactViewerDrawer", () => {
       const rawContent = await screen.findByTestId("raw-content");
       expect(rawContent.querySelector(".prose")).toBeInTheDocument();
       expect(await screen.findByText("Meeting Notes")).toBeInTheDocument();
+    });
+
+    it("renders Notion page artifacts as markdown", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Sprint Goals\n- Ship the connector",
+        mimeType: "text/markdown",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Sprint Planning",
+          artifactType: "PAGE",
+          sourceSystem: "NOTION",
+          sourceUrl: "https://www.notion.so/Sprint-Planning-page1",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("Sprint Goals")).toBeInTheDocument();
+    });
+
+    it("renders a Notion page as markdown even when it was stored as text/plain", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Sprint Goals\n- Ship the connector",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Sprint Planning",
+          artifactType: "PAGE",
+          sourceSystem: "NOTION",
+          sourceUrl: "https://www.notion.so/Sprint-Planning-page1",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
     });
 
     it("does not render a PAGE artifact from a non-Confluence source as markdown", async () => {

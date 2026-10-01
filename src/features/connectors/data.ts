@@ -1,4 +1,4 @@
-import { BookOpen, GitBranch, Plug } from "lucide-react";
+import { BookOpen, GitBranch, NotebookText, Plug } from "lucide-react";
 import type { ConnectorDto } from "../../services/connectorService.ts";
 import type { ConnectorListItem, ConnectorMeta } from "./types.ts";
 
@@ -16,6 +16,11 @@ const CONNECTOR_META: Record<string, ConnectorMeta> = {
     label: "Confluence Cloud Connector",
     description: "Pages and spaces from connected Confluence Cloud tenants.",
     icon: BookOpen,
+  },
+  notion: {
+    label: "Notion Connector",
+    description: "Pages shared with a Notion integration and connected to a project.",
+    icon: NotebookText,
   },
 };
 

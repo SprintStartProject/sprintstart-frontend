@@ -12,6 +12,8 @@ function getSourceSystemLabel(sourceSystem: SourceSystem): string {
       return "Open in Jira";
     case "CONFLUENCE":
       return "Open in Confluence";
+    case "NOTION":
+      return "Open in Notion";
     default:
       return "Open source";
   }

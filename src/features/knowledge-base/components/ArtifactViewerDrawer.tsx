@@ -212,7 +212,13 @@ const shouldRenderAsMarkdown = (
   const isConfluence =
     artifact?.sourceSystem === "CONFLUENCE" || sourceUrl.includes("/wiki/spaces/");
 
-  return content.mimeType.startsWith("text/markdown") || isPrOrIssue || isMd || isConfluence;
+  // Notion pages are stored as Markdown (mime `text/markdown`), so the mime type already
+  // decides this; the source-system check is a safeguard for rows stored without it.
+  const isNotion = artifact?.sourceSystem === "NOTION";
+
+  return (
+    content.mimeType.startsWith("text/markdown") || isPrOrIssue || isMd || isConfluence || isNotion
+  );
 };
 
 // Hoisted to module scope so ReactMarkdown doesn't see a new array on every render

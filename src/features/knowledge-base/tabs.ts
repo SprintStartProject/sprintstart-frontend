@@ -21,7 +21,13 @@ export const SOURCE_LABELS: Record<SourceSystem, string> = {
 /**
  * Standard left-to-right order for the source facet.
  */
-export const DEFAULT_SOURCE_ORDER: SourceSystem[] = ["GITHUB", "JIRA", "CONFLUENCE", "UPLOAD"];
+export const DEFAULT_SOURCE_ORDER: SourceSystem[] = [
+  "GITHUB",
+  "JIRA",
+  "CONFLUENCE",
+  "NOTION",
+  "UPLOAD",
+];
 
 /**
  * Human-readable display names for artifact types.
