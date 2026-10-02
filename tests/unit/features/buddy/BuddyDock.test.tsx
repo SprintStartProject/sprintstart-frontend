@@ -34,13 +34,13 @@ function renderDock(
   {
     suggestions = [],
     setDraft = vi.fn(),
-    startFreshVisit = vi.fn(async () => {}),
+    newConversation = vi.fn(async () => {}),
     isThinking = false,
     isStreaming = false,
   }: {
     suggestions?: BuddySuggestion[];
     setDraft?: () => void;
-    startFreshVisit?: () => Promise<void>;
+    newConversation?: () => Promise<void>;
     isThinking?: boolean;
     isStreaming?: boolean;
   } = {},
@@ -59,7 +59,7 @@ function renderDock(
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}
           suggestions={suggestions}
-          startFreshVisit={startFreshVisit}
+          newConversation={newConversation}
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}
@@ -273,18 +273,18 @@ describe("BuddyDock new conversation", () => {
     expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });
 
-  it("starts the fresh visit once, on the session the dock was handed", async () => {
-    const startFreshVisit = vi.fn(async () => {});
-    renderDock([assistant("Hello."), user("How do we deploy?")], { startFreshVisit });
+  it("starts a new conversation once, on the session the dock was handed", async () => {
+    const newConversation = vi.fn(async () => {});
+    renderDock([assistant("Hello."), user("How do we deploy?")], { newConversation });
 
     await userEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
 
-    expect(startFreshVisit).toHaveBeenCalledTimes(1);
+    expect(newConversation).toHaveBeenCalledTimes(1);
   });
 
-  // startFreshVisit clears the thread and greets, but cannot call back the request already
-  // streaming into it: that stream's callbacks still hold the shared conversation, so its tool
-  // events would land under the brand-new greeting.
+  // newConversation clears the thread, but cannot call back the request already streaming into
+  // it: that stream's callbacks still hold the shared conversation, so its tool events would
+  // land in the brand-new one.
   it("withdraws while the buddy is still thinking", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
       isThinking: true,

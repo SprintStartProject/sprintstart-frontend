@@ -46,7 +46,7 @@ type BuddyDockProps = Pick<
   | "confirmAction"
   | "dismissAction"
   | "suggestions"
-  | "startFreshVisit"
+  | "newConversation"
   | "isGreeting"
   | "isDeciding"
   | "teamProjectId"
@@ -137,7 +137,7 @@ function BuddyDockImpl({
   suggestions,
   dinoGameActive = false,
   onDinoGameExit,
-  startFreshVisit,
+  newConversation,
   isGreeting,
   isDeciding,
   teamProjectId,
@@ -181,7 +181,6 @@ function BuddyDockImpl({
       teamProjectId === null ? <BuddyQuestionActions question={question} /> : undefined,
     [teamProjectId],
   );
-  const startFresh = useCallback(() => void startFreshVisit(), [startFreshVisit]);
 
   // Escape closes it, the way every other dismissible surface in the app behaves. Bound to the
   // document rather than the panel so it works while the hire is reading the page behind it.
@@ -276,30 +275,33 @@ function BuddyDockImpl({
           {/* Hire conversation ↔ team conversations. Rendered by the caller (the widget), like
                     every other session-driven piece here, so the dock needs no project context
                     of its own. `max-w-full min-w-0` keeps a long project name from pushing the
-                    fresh-visit button out of a 384 px window. */}
+                    fresh-visit control out of a 384 px window. */}
           {headerControl && <div className="max-w-[11rem] min-w-0 shrink-0">{headerControl}</div>}
 
           {/* Same control, same words and the same promise as the one on `/buddy`: the window is
                     a view of that conversation, so anything it can do to the conversation it has to
                     be able to do here — a hire who had to open the full page to start over would
                     reasonably conclude the two were different buddies. Offered only once there is
-                    something to leave behind; on an untouched thread it would start the visit that
-                    is already on screen.
+                    something to leave behind; on an untouched conversation it would create a
+                    second empty one the hire did not ask for.
 
-                    Withdrawn while a turn is in flight. `startFreshVisit` clears the thread and
-                    greets, but it cannot call back the request already streaming into it: that
+                    The hire's surface only — team mode has one conversation per project and
+                    nothing to start.
+
+                    Withdrawn while a turn is in flight. A new conversation clears the thread,
+                    but the click cannot call back the request already streaming into it: that
                     stream's callbacks still hold the shared conversation, so its tool events
-                    would land under the new greeting — "Checking your progress…" beneath a fresh
-                    hello — and its completion would clear the greeting's own thinking state.
+                    would land in the new one — "Checking your progress…" beneath an empty
+                    thread — and its completion would clear the new one's thinking state.
                     Offering the control only between turns is the cheap half of that fix;
                     aborting the stream is the other half and belongs in the session, alongside
                     the same gap on `BuddyPage`. */}
-          {hasUserMessage && !isBusy && (
+          {hasUserMessage && !isBusy && teamProjectId === null && (
             <Button
               variant="ghost"
               size="xs"
               iconOnly
-              onClick={() => void startFreshVisit()}
+              onClick={() => void newConversation()}
               aria-label="Start a new conversation"
               // No chord named here, deliberately. The window floats over every page, and
               // `Alt+N` belongs to whichever one is underneath it — on `/chat` it starts a new
@@ -363,7 +365,6 @@ function BuddyDockImpl({
             onRetryOpen={onRetryOpen}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={onDinoGameExit}
-            onStartFreshVisit={startFresh}
           />
         </div>
 

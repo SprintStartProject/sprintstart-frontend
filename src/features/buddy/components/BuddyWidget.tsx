@@ -35,7 +35,7 @@ const HANDOFF_FALLBACK_MS = 1200;
  *
  * Mounted once at the app root (see `App.tsx`) so it survives navigation and keeps one
  * conversation for the lifetime of the session — which is what "always-on" means, and the
- * reason it is not a per-page component. `useBuddy` warms the visit on mount for the same
+ * reason it is not a per-page component. `useBuddy` warms the conversation on mount for the same
  * reason: writing a greeting is the slow part of meeting the buddy, and doing it before the
  * click turns the click into the replay path.
  *
@@ -75,7 +75,7 @@ export function BuddyWidget() {
     openError,
     retryOpen,
     closeDock,
-    startFreshVisit,
+    newConversation,
     teamProjectId,
     switchTeamProject,
     isGreeting,
@@ -83,7 +83,8 @@ export function BuddyWidget() {
   } = useBuddy();
 
   // The switcher (and the composer, and everything else) waits: a turn in flight cannot be
-  // called back into a thread that a switch would clear. Same rule as the fresh-visit control.
+  // called back into a thread that a switch would clear. Same rule as the new-conversation
+  // control.
   // `isGreeting` closes the hole where the first token had already released `isOpening` while
   // the greeting was still streaming.
   const isTurnInFlight = isThinking || isStreaming || isOpening || isGreeting || isDeciding;
@@ -352,7 +353,7 @@ export function BuddyWidget() {
             suggestions={suggestions}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={closeDinoGame}
-            startFreshVisit={startFreshVisit}
+            newConversation={newConversation}
             isGreeting={isGreeting}
             isDeciding={isDeciding}
             teamProjectId={teamProjectId}

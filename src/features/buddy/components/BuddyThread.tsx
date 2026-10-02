@@ -1,6 +1,6 @@
-import { Fragment, memo } from "react";
+import { memo } from "react";
 import type { ReactNode } from "react";
-import { AlertCircle, RotateCcw } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import { toolLabel } from "../toolLabel";
@@ -72,25 +72,6 @@ type BuddyThreadProps = {
   dinoGameActive?: boolean;
   /** Called when the player leaves the dino waiting-game. */
   onDinoGameExit?: () => void;
-  /**
-   * Clears the conversation above the visit divider and opens a clean one.
-   *
-   * Offered from the divider itself rather than from a button in the page header, because the
-   * divider is the one place on screen that already means "everything above here is the last
-   * conversation" — a control that tidies exactly that belongs on the line that says so, and
-   * nowhere else. Which is also why it is only ever drawn when there *is* a divider: a visit
-   * with nothing above it is already the fresh one.
-   */
-  onStartFreshVisit?: () => void;
-  /**
-   * The keyboard chord for that control, named in its tooltip — when there is one.
-   *
-   * Passed in rather than read from `useNewConversationShortcut`, because whether the chord
-   * does anything depends on who is rendering this thread. `/buddy` binds it and says so; the
-   * dock floats over pages that bind it to their *own* new conversation, or to nothing at all,
-   * and a tooltip promising a key that starts somebody else's chat is worse than no tooltip.
-   */
-  freshVisitShortcut?: string;
 };
 
 type BuddyThreadRowProps = {
@@ -105,12 +86,10 @@ type BuddyThreadRowProps = {
   renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
   /** The greeting's suggested next step — present on the row it hangs under, nowhere else. */
   lastMessageFooter?: ReactNode;
-  onStartFreshVisit?: () => void;
-  freshVisitShortcut?: string;
 };
 
 /**
- * One turn: the visit divider if it opens one, then the bubble.
+ * One turn: the bubble.
  *
  * Extracted from the thread's map and memoised for the same reason `MessageRow` in the chat is:
  * with the thread memoised, a keystroke never reaches it — and when a token arrives, only the row
@@ -135,8 +114,6 @@ function BuddyThreadRowImpl({
   renderQuestionAction,
   renderReplyAction,
   lastMessageFooter,
-  onStartFreshVisit,
-  freshVisitShortcut,
 }: BuddyThreadRowProps) {
   const isUser = message.role === "USER";
   const hasText = message.content.trim().length > 0;
@@ -150,71 +127,30 @@ function BuddyThreadRowImpl({
   if (!isUser && !hasText && !hasActions && !message.error) return null;
 
   return (
-    <Fragment>
-      {/* Everything above belongs to the last conversation; the buddy has just opened a
-                        new one under it, grounded in what it remembers rather than in the text
-                        above. Saying so is what stops the greeting reading as a non-sequitur
-                        replying to a question from an hour ago. */}
-      {message.startsVisit && (
-        <div className="flex items-center gap-3 py-1">
-          <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-
-          <span className="flex items-center gap-1">
-            <span className="text-xs font-medium text-app-text-muted">New conversation</span>
-
-            {onStartFreshVisit && (
-              <button
-                type="button"
-                onClick={onStartFreshVisit}
-                data-testid="buddy-clear-previous"
-                aria-label="Clear the earlier conversation"
-                title={
-                  freshVisitShortcut
-                    ? `Clear the earlier conversation (${freshVisitShortcut})`
-                    : "Clear the earlier conversation"
-                }
-                className="rounded-full p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            )}
-          </span>
-
-          <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-        </div>
-      )}
-
-      <BuddyMessage
-        speaker={isUser ? "YOU" : "BUDDY"}
-        showName={showNames}
-        compact={compact}
-        isStreaming={isStreaming}
-        error={message.error}
-        footer={
-          <>
-            {isUser && renderQuestionAction?.(message.content)}
-            {!isUser && hasText && renderReplyAction?.(message.content, message)}
-            {!isUser && hasActions && (
-              <BuddyActionProposals
-                messageId={message.id}
-                actions={message.actions ?? []}
-                onConfirm={confirmAction}
-                onDismiss={dismissAction}
-              />
-            )}
-            {lastMessageFooter}
-          </>
-        }
-      >
-        {hasText ? (
-          isUser ? (
-            message.content
-          ) : (
-            <BuddyMarkdown content={message.content} />
-          )
-        ) : undefined}
-      </BuddyMessage>
-    </Fragment>
+    <BuddyMessage
+      speaker={isUser ? "YOU" : "BUDDY"}
+      showName={showNames}
+      compact={compact}
+      isStreaming={isStreaming}
+      error={message.error}
+      footer={
+        <>
+          {isUser && renderQuestionAction?.(message.content)}
+          {!isUser && hasText && renderReplyAction?.(message.content, message)}
+          {!isUser && hasActions && (
+            <BuddyActionProposals
+              messageId={message.id}
+              actions={message.actions ?? []}
+              onConfirm={confirmAction}
+              onDismiss={dismissAction}
+            />
+          )}
+          {lastMessageFooter}
+        </>
+      }
+    >
+      {hasText ? isUser ? message.content : <BuddyMarkdown content={message.content} /> : undefined}
+    </BuddyMessage>
   );
 }
 
@@ -253,8 +189,6 @@ function BuddyThreadImpl({
   onRetryOpen,
   dinoGameActive = false,
   onDinoGameExit,
-  onStartFreshVisit,
-  freshVisitShortcut,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
   // one is the turn receiving tokens — while a turn is running at all. Being last is not on its
@@ -281,7 +215,7 @@ function BuddyThreadImpl({
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {/* Above the thread rather than in it: what failed is the whole conversation, so there is
-                nothing below for it to belong to -- and on a first visit there is nothing below at
+                nothing below for it to belong to -- and on a first open there is nothing below at
                 all. `alert`, because it arrives without the hire doing anything. */}
       {openError && (
         <div
@@ -326,8 +260,6 @@ function BuddyThreadImpl({
               ? lastMessageFooter
               : undefined
           }
-          onStartFreshVisit={onStartFreshVisit}
-          freshVisitShortcut={freshVisitShortcut}
         />
       ))}
 

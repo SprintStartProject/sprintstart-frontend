@@ -90,7 +90,7 @@ export function ConversationRail({
  * The top padding a conversation has to carry while a control floats over it.
  *
  * Two of them do, one per corner and both to the same measurements: {@link RailToggle} on the
- * left, and the buddy page's `BuddyFreshVisitButton` on the right. Either sits at `top-3` and is
+ * left, and the buddy page's `BuddyNewConversationButton` on the right. Either sits at `top-3` and is
  * about 40px tall, so on a phone — where the conversation runs to both page edges — the first
  * message would start underneath it. From `md` up the page gutter is wide enough that a control
  * sits beside the column rather than over it, and the page's own `pt-8` stands. One number

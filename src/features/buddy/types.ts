@@ -305,15 +305,6 @@ export type BuddyMessageView = BuddyMessage & {
   /** Actions the buddy proposed in this turn, each awaiting the hire's confirmation. */
   actions?: ProposedAction[];
   /**
-   * True for a greeting that opened a new visit *under* a conversation already on screen.
-   *
-   * Only ever set for a greeting this surface streamed itself, because that is the only one it
-   * can know about: a greeting read back from the server arrives as an ordinary message at the
-   * top of the window, where a "this is where the new one starts" rule would be pointing at
-   * nothing. It drives the divider in `BuddyThread`.
-   */
-  startsVisit?: boolean;
-  /**
    * True for the buddy's opening greeting, whether it was streamed here or read back as the only
    * message of an unanswered visit.
    *

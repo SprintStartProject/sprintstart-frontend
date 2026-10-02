@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getMessages,
+  getSessions,
+  createSession,
   performAction,
   streamMessage,
   streamOpenBuddy,
@@ -29,7 +31,7 @@ describe("buddyService", () => {
         ),
       );
 
-      const result = await getMessages();
+      const result = await getMessages("session-1");
       expect(result).toHaveLength(2);
       expect(result[0].role).toBe("USER");
       expect(result[1].content).toBe("hello!");
@@ -64,11 +66,11 @@ describe("buddyService", () => {
       const onDone = vi.fn();
       const onError = vi.fn();
 
-      await streamMessage("hello", { onToken, onCitation: vi.fn(), onDone, onError });
+      await streamMessage("hello", { onToken, onCitation: vi.fn(), onDone, onError }, "session-1");
 
       expect(mockKeycloakInstance.updateToken).toHaveBeenCalledWith(30);
       expect(capturedAuthHeader).toBe("Bearer test-token");
-      expect(capturedBody).toEqual({ content: "hello" });
+      expect(capturedBody).toEqual({ content: "hello", sessionId: "session-1" });
       expect(onToken).toHaveBeenCalledTimes(2);
       expect(onToken).toHaveBeenNthCalledWith(1, "hel");
       expect(onToken).toHaveBeenNthCalledWith(2, "lo");
@@ -87,11 +89,15 @@ describe("buddyService", () => {
         }),
       );
 
-      await streamMessage("hello", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-      });
+      await streamMessage(
+        "hello",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+        },
+        "session-1",
+      );
 
       expect(mockKeycloakInstance.login).toHaveBeenCalledOnce();
       expect(messageSent).toBe(false);
@@ -126,7 +132,7 @@ describe("buddyService", () => {
       const onDone = vi.fn();
       const onError = vi.fn();
 
-      await streamMessage("hello", { onToken, onCitation: vi.fn(), onDone, onError });
+      await streamMessage("hello", { onToken, onCitation: vi.fn(), onDone, onError }, "session-1");
 
       expect(onToken).toHaveBeenCalledTimes(2);
       expect(onToken).toHaveBeenNthCalledWith(2, "lo");
@@ -145,7 +151,11 @@ describe("buddyService", () => {
       const onError = vi.fn();
 
       await expect(
-        streamMessage("hello", { onToken: vi.fn(), onCitation: vi.fn(), onDone, onError }),
+        streamMessage(
+          "hello",
+          { onToken: vi.fn(), onCitation: vi.fn(), onDone, onError },
+          "session-1",
+        ),
       ).resolves.toBeUndefined();
 
       expect(onError).toHaveBeenCalledTimes(1);
@@ -163,12 +173,16 @@ describe("buddyService", () => {
       );
 
       const onError = vi.fn();
-      await streamMessage("hello", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onError,
-      });
+      await streamMessage(
+        "hello",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onError,
+        },
+        "session-1",
+      );
 
       expect(onError).toHaveBeenCalledWith("HTTP error! status: 500");
     });
@@ -200,11 +214,15 @@ describe("buddyService", () => {
       const onCitation = vi.fn();
       const onDone = vi.fn();
 
-      await streamMessage("hello", {
-        onToken: vi.fn(),
-        onCitation,
-        onDone,
-      });
+      await streamMessage(
+        "hello",
+        {
+          onToken: vi.fn(),
+          onCitation,
+          onDone,
+        },
+        "session-1",
+      );
 
       expect(onCitation).toHaveBeenCalledWith({
         artifactId: "a1",
@@ -238,12 +256,16 @@ describe("buddyService", () => {
       );
 
       const onError = vi.fn();
-      await streamMessage("hello", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onError,
-      });
+      await streamMessage(
+        "hello",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onError,
+        },
+        "session-1",
+      );
 
       expect(onError).toHaveBeenCalledWith("Model overload");
     });
@@ -276,12 +298,16 @@ describe("buddyService", () => {
       );
 
       const onActionProposal = vi.fn();
-      await streamMessage("help me start my first task", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onActionProposal,
-      });
+      await streamMessage(
+        "help me start my first task",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onActionProposal,
+        },
+        "session-1",
+      );
 
       expect(onActionProposal).toHaveBeenCalledWith({
         action: "claim_goal",
@@ -321,12 +347,16 @@ describe("buddyService", () => {
       );
 
       const onActionProposal = vi.fn();
-      await streamMessage("let me try that", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onActionProposal,
-      });
+      await streamMessage(
+        "let me try that",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onActionProposal,
+        },
+        "session-1",
+      );
 
       expect(onActionProposal).toHaveBeenNthCalledWith(1, {
         action: "claim_goal",
@@ -388,12 +418,16 @@ describe("buddyService", () => {
       );
 
       const onActionProposal = vi.fn();
-      await streamMessage("can Ana confirm my retro?", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onActionProposal,
-      });
+      await streamMessage(
+        "can Ana confirm my retro?",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onActionProposal,
+        },
+        "session-1",
+      );
 
       expect(onActionProposal).toHaveBeenNthCalledWith(
         1,
@@ -436,12 +470,16 @@ describe("buddyService", () => {
       );
 
       const onActionProposal = vi.fn();
-      await streamMessage("where do I stand?", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onActionProposal,
-      });
+      await streamMessage(
+        "where do I stand?",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onActionProposal,
+        },
+        "session-1",
+      );
 
       expect(onActionProposal).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -483,12 +521,16 @@ describe("buddyService", () => {
       );
 
       const onActionProposal = vi.fn();
-      await streamMessage("clean up my board", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onActionProposal,
-      });
+      await streamMessage(
+        "clean up my board",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onActionProposal,
+        },
+        "session-1",
+      );
 
       expect(onActionProposal).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -612,12 +654,16 @@ describe("buddyService", () => {
       );
 
       const onActionProposal = vi.fn();
-      await streamMessage("send both", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onActionProposal,
-      });
+      await streamMessage(
+        "send both",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onActionProposal,
+        },
+        "session-1",
+      );
 
       expect(onActionProposal).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -640,13 +686,13 @@ describe("buddyService", () => {
         }),
       );
 
-      const result = await getMessages("p-123");
+      const result = await getMessages(undefined, "p-123");
 
       expect(result[0].content).toBe("team hello");
       expect(capturedUrl).toBe("?teamProjectId=p-123");
     });
 
-    it("reads the hire conversation without any query param", async () => {
+    it("reads a hire conversation under the sessionId query param", async () => {
       let capturedUrl = "";
       server.use(
         http.get("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
@@ -655,9 +701,9 @@ describe("buddyService", () => {
         }),
       );
 
-      await getMessages();
+      await getMessages("s-1");
 
-      expect(capturedUrl).toBe("");
+      expect(capturedUrl).toBe("?sessionId=s-1");
     });
 
     it("sends teamProjectId on the message body, never as null", async () => {
@@ -679,6 +725,7 @@ describe("buddyService", () => {
       await streamMessage(
         "who is behind?",
         { onToken: vi.fn(), onCitation: vi.fn(), onDone: vi.fn() },
+        undefined,
         "p-123",
       );
 
@@ -701,7 +748,7 @@ describe("buddyService", () => {
         }),
       );
 
-      await streamOpenBuddy({ onToken: vi.fn(), onDone: vi.fn() }, "p-123");
+      await streamOpenBuddy({ onToken: vi.fn(), onDone: vi.fn() }, undefined, "p-123");
 
       expect(capturedUrl).toBe("?teamProjectId=p-123");
     });
@@ -728,13 +775,17 @@ describe("buddyService", () => {
 
       const onStoredProposal = vi.fn();
       const onActionProposal = vi.fn();
-      await streamMessage("change the plan", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onActionProposal,
-        onStoredProposal,
-      });
+      await streamMessage(
+        "change the plan",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onActionProposal,
+          onStoredProposal,
+        },
+        "session-1",
+      );
 
       expect(onStoredProposal).toHaveBeenCalledWith({
         proposalId: "prop-1",
@@ -768,12 +819,16 @@ describe("buddyService", () => {
       );
 
       const onStoredProposal = vi.fn();
-      await streamMessage("m", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onStoredProposal,
-      });
+      await streamMessage(
+        "m",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onStoredProposal,
+        },
+        "session-1",
+      );
 
       expect(onStoredProposal).toHaveBeenCalledWith(
         expect.objectContaining({ risk: null, preview: "y" }),
@@ -804,12 +859,16 @@ describe("buddyService", () => {
       );
 
       const onStoredProposal = vi.fn();
-      await streamMessage("m", {
-        onToken: vi.fn(),
-        onCitation: vi.fn(),
-        onDone: vi.fn(),
-        onStoredProposal,
-      });
+      await streamMessage(
+        "m",
+        {
+          onToken: vi.fn(),
+          onCitation: vi.fn(),
+          onDone: vi.fn(),
+          onStoredProposal,
+        },
+        "session-1",
+      );
 
       expect(onStoredProposal).toHaveBeenCalledWith(
         expect.objectContaining({ preview: null, risk: "BULK" }),
@@ -854,6 +913,80 @@ describe("buddyService", () => {
 
       // The hook maps this to the outcome line; the service's job is only to fail visibly.
       await expect(confirmStoredProposal("prop-9")).rejects.toThrow();
+    });
+  });
+
+  describe("getSessions", () => {
+    it("unwraps the conversation list the backend sends", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/me/buddy/sessions", () =>
+          HttpResponse.json({
+            sessions: [
+              {
+                id: "s-2",
+                title: "Deploys",
+                userId: "u-1",
+                projectId: null,
+                createdAt: "2026-09-30T08:00:00.000Z",
+              },
+              {
+                id: "s-1",
+                title: "",
+                userId: "u-1",
+                projectId: null,
+                createdAt: "2026-09-29T08:00:00.000Z",
+              },
+            ],
+          }),
+        ),
+      );
+
+      const sessions = await getSessions();
+
+      // Newest first, exactly as sent — the client picks from this order.
+      expect(sessions.map((session) => session.id)).toEqual(["s-2", "s-1"]);
+      expect(sessions[1].title).toBe("");
+    });
+  });
+
+  describe("createSession", () => {
+    it("posts an empty body and returns the id", async () => {
+      let capturedBody: unknown = null;
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/sessions", async ({ request }) => {
+          capturedBody = await request.json();
+          return HttpResponse.json({ id: "s-new" }, { status: 201 });
+        }),
+      );
+
+      const id = await createSession();
+
+      expect(id).toBe("s-new");
+      // No project is named, deliberately: the hire's conversation is not one project's.
+      expect(capturedBody).toEqual({});
+    });
+  });
+
+  describe("hire opening", () => {
+    it("opens the greeting under the sessionId query param", async () => {
+      let capturedUrl = "";
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/open/stream", ({ request }) => {
+          capturedUrl = new URL(request.url).search;
+          return new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } });
+        }),
+      );
+
+      await streamOpenBuddy({ onToken: vi.fn(), onDone: vi.fn() }, "s-1");
+
+      expect(capturedUrl).toBe("?sessionId=s-1");
     });
   });
 });
