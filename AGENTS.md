@@ -54,7 +54,7 @@ Feature-first: domain code lives in `features/<name>/`; only genuinely shared co
 - `pages/` — route-level page views (one per user-facing flow).
 - `router/` — React Router v7 config + `AuthGuard`.
 - `auth/` — access policy (`AppRoute`, `canAccessRoute`, route→permission map).
-- `context/` — global providers/hooks (`AuthProvider`, `ThemeProvider`, `ChatProvider`, `ChatPreferencesProvider`, `useAuth`, `useTheme`, `useChatPreferences`).
+- `context/` — global providers/hooks (`AuthProvider`, `ThemeProvider`, `ToastProvider`, `ChatProvider`, `FocusModeProvider`, `useAuth`, `useTheme`, `useToast`, `useFocusMode`).
 - `services/` — backend/API communication (one module per domain; SSE streaming via `sse.ts`; HTTP via `apiClient.ts`).
 - `config/` — integration config (e.g. `keycloak.ts`).
 - `hooks/`, `styles/`, `mocks/` — shared utilities, global CSS/tokens + animation tokens, dev mock data.
@@ -195,6 +195,6 @@ Everything else — `ui/Button`, `ui/Input`, `SpotlightCard`, `AuroraBackground`
 
 ## 12. Git & repo boundaries
 
-- Separate repos: `sprintstart-frontend`, `sprintstart-backend`, `sprintstart-ai`, `sprintstart-ai-ops`, `Wiki`. Don't assume a shared monorepo checkout. (There is **no** `sprintstart-k8s` repo — per-component Kubernetes manifests live inside each repo's own `k8s/` folder; here that's `sprintstart-frontend/k8s/`.)
+- Separate repos: `sprintstart-frontend`, `sprintstart-backend`, `sprintstart-ai`, `sprintstart-ai-ops`, `sprintstart-k8s`, `Wiki`. Don't assume a shared monorepo checkout. The cluster deployment lives in `sprintstart-k8s` (Kustomize base and dev/prod overlays, deployed through Argo CD). The manifests under `k8s/frontend/` in this repo are an older standalone set that the cluster does not use.
 - Feature work branches off `dev`; PRs target `dev`.
 - Agent instruction files: `AGENTS.md` (this file) is **shared/committed**; `GEMINI.md`, `CLAUDE.md`, and `*.local.md` are gitignored (per-developer).

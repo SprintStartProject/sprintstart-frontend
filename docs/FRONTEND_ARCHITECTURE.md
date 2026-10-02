@@ -86,6 +86,7 @@ src/
 │   ├── onboarding/          # AI onboarding paths, journey canvas, generation, checks
 │   ├── onboarding-metrics/  # Onboarding progress and attention per hire (insights)
 │   ├── orientation/         # Task orientation editor and panel
+│   ├── pm-area/             # PM workspace layout (PmWorkspace), team roster, attention analysis
 │   ├── profile/             # User profile view/edit
 │   ├── projects/            # Project selection (ProjectProvider)
 │   ├── settings/            # User settings, personal credentials
@@ -98,7 +99,7 @@ src/
 ├── auth/                # accessPolicy.ts (AppRoute union + canAccessRoute), redirectUtils.ts
 ├── context/             # Global providers (Auth, Theme, Chat, Toast, FocusMode)
 ├── services/            # Backend communication (one module per domain), query client, query keys
-├── components/          # Shared UI: common/, icons/, layout/, ui/ primitives
+├── components/          # Shared UI: common/, layout/, ui/ primitives
 ├── config/              # Integration config (keycloak.ts)
 ├── hooks/               # Shared hooks (incl. the TanStack Query based fetch hooks)
 ├── styles/              # Global CSS (index.css) + animation tokens (tokens.ts)
@@ -259,7 +260,8 @@ factory in `src/services/queryKeys.ts`. Project-scoped keys always contain the
 
 `useFetch` is deprecated and has no callers left. The sidebar warms the page module
 and its main query on `pointerdown` (`src/services/routePrefetch.ts`). The reasoning
-behind this setup is recorded in ADR-017 in the Wiki.
+behind this setup is recorded in ADR-017 in the Wiki, which is still on the Wiki branch
+`tanstack-query-adr` and not yet merged into `main`.
 
 ---
 
@@ -285,48 +287,49 @@ The codebase uses the **native `fetch` API** (not axios). All HTTP calls go thro
 - Yields each `data:` JSON payload as a typed object.
 - Skips malformed `data:` lines (logs via `console.warn`) rather than aborting.
 
-Used by `chatService`, `knowledgeService`, and `onboardingService` so the
-line-splitting / JSON-parsing logic lives in exactly one place.
+Used by `chatService`, `knowledgeService`, and `onboardingService`. `buddyService`
+and `aiStreamService` do not use it yet and still split and parse their streams in
+their own read loops.
 
 ### 6.3 Service modules (`src/services/`)
 
 One module per domain. Each exports typed functions and surfaces backend failures
 (no empty `catch`, no silent swallow):
 
-| Module                         | Domain                                                                           |
-| ------------------------------ | -------------------------------------------------------------------------------- |
-| `adminUserService.ts`          | Admin user management                                                            |
-| `aiStreamService.ts`           | Live AI progress events (SSE over `fetch`)                                       |
-| `apiClient.ts`, `apiError.ts`  | Shared fetch wrapper and `ApiError`                                              |
-| `arrivalService.ts`            | Arrival steps                                                                    |
-| `attestationService.ts`        | Attestation requests                                                             |
-| `blueprintService.ts`          | Onboarding path blueprints                                                       |
-| `boardService.ts`              | Board cards and board arrangement sync                                           |
-| `buddyService.ts`              | AI buddy (SSE streaming)                                                         |
-| `chatService.ts`               | Chatbot (SSE streaming)                                                          |
-| `connectorService.ts`          | Connectors + source allow/deny lists                                             |
-| `dashboardLayoutService.ts`    | Dashboard widget layout                                                          |
-| `faqService.ts`                | Insights FAQ clusters                                                            |
-| `ingestionService.ts`          | Data ingestion runs + artifacts                                                  |
-| `knowledgeGapService.ts`       | Insights knowledge gaps                                                          |
-| `knowledgeRequestService.ts`   | Escalated knowledge requests                                                     |
-| `knowledgeService.ts`          | Knowledge base + streamed summaries                                              |
-| `myStarterWorkService.ts`      | The current hire's starter work                                                  |
-| `onboardingFeedbackService.ts` | Onboarding feedback                                                              |
-| `onboardingGraphService.ts`    | Onboarding journey graph                                                         |
-| `onboardingMetricsService.ts`  | Onboarding metrics (insights)                                                    |
-| `onboardingService.ts`         | Onboarding paths, steps, tasks, feedback                                         |
-| `orientationService.ts`        | Task orientation                                                                 |
-| `projectService.ts`            | Projects, managed projects, project selection                                    |
-| `queryClient.ts`               | Shared TanStack Query client (§5.2)                                              |
-| `queryKeys.ts`                 | Central query key factory (§5.2)                                                 |
-| `routePrefetch.ts`             | Sidebar prefetch of page modules and queries (§5.2)                              |
-| `sse.ts`                       | Shared SSE stream parser                                                         |
-| `starterWorkService.ts`        | Starter work pool and review                                                     |
-| `teamManagementService.ts`     | Team overview, member detail, skills                                             |
-| `userService.ts`               | Current user profile                                                             |
-| `types.ts`                     | Backend DTO types (the closest thing to a global types folder)                   |
-| `sources/`                     | Per-source services (GitHub, Jira, Confluence, Bitbucket, Atlassian credentials) |
+| Module                         | Domain                                                                |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `adminUserService.ts`          | Admin user management                                                 |
+| `aiStreamService.ts`           | Live AI progress events (SSE over `fetch`)                            |
+| `apiClient.ts`, `apiError.ts`  | Shared fetch wrapper and `ApiError`                                   |
+| `arrivalService.ts`            | Arrival steps                                                         |
+| `attestationService.ts`        | Attestation requests                                                  |
+| `blueprintService.ts`          | Onboarding path blueprints                                            |
+| `boardService.ts`              | Board cards and board arrangement sync                                |
+| `buddyService.ts`              | AI buddy (SSE streaming)                                              |
+| `chatService.ts`               | Chatbot (SSE streaming)                                               |
+| `connectorService.ts`          | Connectors + source allow/deny lists                                  |
+| `dashboardLayoutService.ts`    | Dashboard widget layout                                               |
+| `faqService.ts`                | Insights FAQ clusters                                                 |
+| `ingestionService.ts`          | Data ingestion runs + artifacts                                       |
+| `knowledgeGapService.ts`       | Insights knowledge gaps                                               |
+| `knowledgeRequestService.ts`   | Escalated knowledge requests                                          |
+| `knowledgeService.ts`          | Knowledge base + streamed summaries                                   |
+| `myStarterWorkService.ts`      | The current hire's starter work                                       |
+| `onboardingFeedbackService.ts` | Onboarding feedback                                                   |
+| `onboardingGraphService.ts`    | Onboarding journey graph                                              |
+| `onboardingMetricsService.ts`  | Onboarding metrics (insights)                                         |
+| `onboardingService.ts`         | Onboarding paths, steps, tasks, feedback                              |
+| `orientationService.ts`        | Task orientation                                                      |
+| `projectService.ts`            | Projects, managed projects, project selection                         |
+| `queryClient.ts`               | Shared TanStack Query client (§5.2)                                   |
+| `queryKeys.ts`                 | Central query key factory (§5.2)                                      |
+| `routePrefetch.ts`             | Sidebar prefetch of page modules and queries (§5.2)                   |
+| `sse.ts`                       | Shared SSE stream parser                                              |
+| `starterWorkService.ts`        | Starter work pool and review                                          |
+| `teamManagementService.ts`     | Team overview, member detail, skills                                  |
+| `userService.ts`               | Current user profile                                                  |
+| `types.ts`                     | Backend DTO types (the closest thing to a global types folder)        |
+| `sources/`                     | Per-source services (GitHub, Jira, Confluence, Atlassian credentials) |
 
 ### 6.4 Vite dev proxy (`vite.config.ts`)
 
@@ -416,9 +419,11 @@ spring configs.
 Usage:
 
 ```tsx
-import { centralSpringToken } from "@/styles/tokens";
+import { centralSpringToken } from "../styles/tokens.ts";
 <motion.div transition={centralSpringToken} ... />
 ```
+
+There is no `@/` path alias; imports are relative.
 
 ### 8.2 Layout transitions & list deletions
 
@@ -428,7 +433,7 @@ Use **layout animations** to interpolate this reflow smoothly.
 
 ```tsx
 import { motion, AnimatePresence } from "framer-motion";
-import { centralSpringToken } from "@/styles/tokens";
+import { centralSpringToken } from "../styles/tokens.ts";
 
 export function TaskList({ tasks, onDelete }) {
   return (
@@ -470,20 +475,21 @@ export function TaskList({ tasks, onDelete }) {
 
 ### 9.1 Commands
 
-| Purpose                                                       | Command                                              |
-| ------------------------------------------------------------- | ---------------------------------------------------- |
-| Install deps (runs `keycloakify sync-extensions` postinstall) | `npm install`                                        |
-| Dev server (`:5173`)                                          | `npm run dev`                                        |
-| Production build (`tsc -b` + `vite build`)                    | `npm run build`                                      |
-| Lint                                                          | `npm run lint`                                       |
-| All unit tests (CI-friendly, non-watch)                       | `npm run test`                                       |
-| Unit tests only (excludes a11y)                               | `npm run unit`                                       |
-| A11y tests only                                               | `npm run a11y`                                       |
-| **Definition of Done (one command)**                          | `npm run try` (install + build + lint + unit + a11y) |
-| Storybook (`:6006`)                                           | `npm run storybook`                                  |
-| Build Keycloak theme                                          | `npm run build-keycloak-theme`                       |
-| Dev Keycloak theme                                            | `npm run dev-keycloak-theme`                         |
-| Full stack via Docker (`:3000`)                               | `docker compose up --build`                          |
+| Purpose                                                       | Command                                                             |
+| ------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Install deps (runs `keycloakify sync-extensions` postinstall) | `npm install`                                                       |
+| Dev server (`:5173`)                                          | `npm run dev`                                                       |
+| Production build (`tsc -b` + `vite build`)                    | `npm run build`                                                     |
+| Lint                                                          | `npm run lint`                                                      |
+| Format / check formatting                                     | `npm run format` / `npm run format:check`                           |
+| All unit tests (CI-friendly, non-watch)                       | `npm run test`                                                      |
+| Unit tests only (excludes a11y)                               | `npm run unit`                                                      |
+| A11y tests only                                               | `npm run a11y`                                                      |
+| **Definition of Done (one command)**                          | `npm run try` (install + format check + build + lint + unit + a11y) |
+| Storybook (`:6006`)                                           | `npm run storybook`                                                 |
+| Build Keycloak theme                                          | `npm run build-keycloak-theme`                                      |
+| Dev Keycloak theme                                            | `npm run dev-keycloak-theme`                                        |
+| Full stack via Docker (`:3000`)                               | `docker compose up --build`                                         |
 
 ### 9.2 Vite config
 
@@ -494,7 +500,9 @@ export function TaskList({ tasks, onDelete }) {
 - `keycloakify({ accountThemeImplementation: "none" })` — Keycloakify Vite plugin.
 - Dev proxy (see §6.4).
 - Vitest config: `environment: 'jsdom'`, `globals: true`,
-  `setupFiles: './tests/unit/setup/vitest.setup.ts'`.
+  `setupFiles: './tests/unit/setup/vitest.setup.ts'`, a 30 s test timeout, and an
+  alias that routes `@testing-library/react` through `tests/unit/setup/rtl.tsx` (see
+  [testing_strategy.md §4](./testing_strategy.md#4-vitest-configuration)).
 
 ### 9.3 TypeScript config
 
@@ -502,7 +510,8 @@ export function TaskList({ tasks, onDelete }) {
   (so `.ts`/`.tsx` extensions on relative imports are allowed and encouraged),
   `target: es2023`, `jsx: react-jsx`, strict linting flags.
 - `tsconfig.node.json` — for Vite config files.
-- `tsconfig.test.json` — for test files (relaxes some lint rules).
+- `tsconfig.test.json` — for test files: extends `tsconfig.app.json`, adds the
+  `vitest/globals` and `jsdom` types, and includes `tests/`.
 
 ---
 
@@ -520,7 +529,8 @@ export function TaskList({ tasks, onDelete }) {
 
 The cluster deployment is defined in the separate `sprintstart-k8s` repository
 (Kustomize base and dev/prod overlays, deployed through Argo CD with image updater).
-`k8s/frontend/` in this repository holds a standalone set of manifests.
+`k8s/frontend/` in this repository holds an older standalone set of manifests that
+the cluster does not use.
 
 ### 10.3 Keycloak theme
 

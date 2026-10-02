@@ -44,14 +44,20 @@ self-contained under `src/features/` and surfaced through dedicated routes:
 - **AI Assistant / Chatbot** — A streaming chat interface (Server-Sent Events) that answers questions grounded in the indexed knowledge base. Supports multiple conversations, chat history, and inline **citations** back to the source artifacts (files, lines, PDF pages). Responses render Markdown, syntax-highlighted code blocks, and math (KaTeX).
 - **Knowledge Base** — Browse, search, and upload indexed **artifacts** (commits, files, issues, pull requests, documents) ingested from GitHub, Jira, or direct uploads. Each artifact can be summarized on demand via a streamed, citation-backed AI summary.
 - **Onboarding** — Personalized, AI-generated onboarding **paths** composed of phases, steps, tasks, and resources (video, document, task, link). Includes phase **knowledge checks** (multiple choice + short-text, AI-graded), a **skip-request** review workflow, step feedback, and phase locking until prerequisites pass.
-- **Data Ingestion** — Connect data sources (GitHub, Jira, Upload), trigger ingestion runs, track run status (running / completed / partial / failed), inspect failed artifacts, and review run history with pagination.
-- **Connectors** — Manage project connectors and their source allow/deny lists (GitHub, extensible to Jira).
+- **Data Ingestion** — Connect data sources (GitHub, Jira, Confluence, Upload), trigger ingestion runs, track run status (running / completed / partial / failed), inspect failed artifacts, and review run history with pagination.
+- **Connectors** — Part of the Data Ingestion page: the project's connectors and their source allow/deny lists. GitHub and Confluence have their own labels and icons, any other connector the backend reports is shown with generic metadata.
 - **Team Management** — A project-manager view of the team: onboarding progress, current phase/step, project roles, skills (beginner → expert), and per-user skill assessments. Supports filtering and sorting (progress, step duration) and a per-member detail page. Includes the **Skill Wizard** (`/skill-wizard`) for authoring skills linked to project roles.
 - **PM Dashboard** — A project-manager overview surface for monitoring team onboarding trajectories, velocity, and skill acquisition.
-- **Admin** — User management (enable/disable, onboarding status, permission groups), project management (sources, members, project managers), API token management, and authoring of phase-check questions/options plus attempt review.
+- **Admin** — User management (enable/disable, onboarding status, permission groups), project management (sources, members, project managers), and API token management.
 - **Insights — Knowledge Gaps** — AI-detected missing documentation per component, with severity (high / medium / low), component owners, and refresh tracking.
 - **Insights — FAQ** — AI-generated clusters of frequently asked questions and the documents that answer them.
-- **Settings & Profile** — Central configuration hub with tabs for user profile management (avatar, display name, password update), appearance (light/dark/system theme), chat preferences, moments toggles, and access tokens (GitHub PAT / Jira credential management for authorized roles).
+- **Insights — Knowledge Requests** — Questions escalated by hires, collected in an inbox where PMs answer them.
+- **Insights — Onboarding** — Onboarding progress per hire and the hires that need attention.
+- **Board** — The hire's own board of cards, areas and stages, synced with the server.
+- **AI Buddy** — An AI companion next to the chat that holds a conversation, keeps drafts and proposes edits to the hire's board.
+- **Blueprints** — Onboarding path blueprints for PMs, edited as a graph and kept in versions.
+- **Hire Setup** — Arrival steps and the starter task pool with its review, as tabs of one page.
+- **Settings & Profile** — Central configuration page with sections for the user profile (avatar, display name, password), appearance (light/dark/system theme, visual effects and optional extras), and access tokens (GitHub PATs and Atlassian credentials, for authorized roles).
 - **Moments & Easter Eggs** — Gamified celebrations (confetti, achievement moments, sound effects) and interactive easter eggs (the dino waiting-game, `2048` behind the dashboard header icon, Space Invaders behind the 404 page's rocket).
 
 ---
@@ -64,34 +70,51 @@ The codebase follows a **feature-first** organization: domain code lives in
 
 ```
 src/
-├── features/            # Self-contained domain slices
-│   ├── admin/           # User, project & token management
-│   ├── chatbot/         # Streaming AI assistant (SSE prompt stream)
-│   ├── connectors/      # Connector + source allow/deny management
-│   ├── dashboard/       # Dashboard hero & NextStepWidget
-│   ├── data-ingestion/  # Sources, ingestion runs, artifact tables
-│   ├── easter-eggs/     # Easter eggs: egg shell + game registry, the
-│   │                    # effect bus, phrases and the dino waiting-game
-│   ├── faq/             # AI FAQ clusters (insights)
-│   ├── knowledge-base/  # Artifact browsing + streamed summaries + file upload
-│   ├── knowledge-gaps/  # AI-detected documentation gaps (insights)
-│   ├── moments/         # Celebrations, confetti, rocket animations
-│   ├── onboarding/      # AI onboarding paths, knowledge checks, skip workflow
-│   ├── profile/         # Profile form components
-│   ├── projects/        # Multi-project switching & global ProjectContext
-│   ├── settings/        # User settings tabs, themes & credentials
-│   └── team-management/ # Team overview, member detail, Skill Wizard
-├── pages/               # Route-level views (one per user-facing flow)
-├── router/              # React Router v7 config + AuthGuard
-├── auth/                # Access policy (AppRoute union, canAccessRoute)
-├── context/             # Global providers (AuthProvider, ThemeProvider, ChatProvider)
-├── services/            # Backend communication (one module per domain; SSE streaming via sse.ts)
-├── components/          # Shared UI: common/, layout/, ui/ primitives
-├── config/              # Integration config (keycloak.ts)
-├── hooks/               # Shared hooks
-├── styles/              # Global CSS + semantic design tokens + centralized spring tokens
-├── mocks/               # Dev mock datasets and fallback fixtures
-└── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated — do not hand-edit)
+├── features/               # Self-contained domain slices
+│   ├── access/             # Stored connector credentials (admin access management)
+│   ├── admin/              # User, project & token management, create-project wizard
+│   ├── ai-activity/        # Live AI progress log for generations
+│   ├── arrival/            # Arrival step authoring (Hire Setup)
+│   ├── attestation/        # Requests to confirm a hire's work
+│   ├── blueprints/         # Onboarding path blueprints: graph editor, versions
+│   ├── board/              # The hire's board: cards, areas, stages, server sync
+│   ├── buddy/              # AI buddy: conversation, drafts, board edit proposals
+│   ├── card-blueprints/    # Cards a PM wants every hire of a role to start with
+│   ├── chatbot/            # Streaming AI assistant (SSE prompt stream)
+│   ├── competency-graph/   # Force layout for the competency graph
+│   ├── connectors/         # Connector + source allow/deny management
+│   ├── dashboard/          # Personal dashboard grid and widgets
+│   ├── data-ingestion/     # Sources, ingestion runs, artifact tables
+│   ├── easter-eggs/        # Easter eggs: egg shell + game registry, the
+│   │                       # effect bus, phrases and the dino waiting-game
+│   ├── faq/                # AI FAQ clusters (insights)
+│   ├── graph-diagram/      # Shared xyflow diagram canvas with dagre layout
+│   ├── knowledge-base/     # Artifact browsing + streamed summaries + file upload
+│   ├── knowledge-gaps/     # AI-detected documentation gaps (insights)
+│   ├── knowledge-request/  # Escalated questions inbox and answers (insights)
+│   ├── moments/            # Celebrations, confetti, rocket animations
+│   ├── onboarding/         # AI onboarding paths, journey canvas, generation, checks
+│   ├── onboarding-metrics/ # Onboarding progress and attention per hire (insights)
+│   ├── orientation/        # Task orientation editor and panel
+│   ├── pm-area/            # PM workspace layout, team roster, attention analysis
+│   ├── profile/            # Profile form components
+│   ├── projects/           # Multi-project switching & global ProjectContext
+│   ├── settings/           # User settings sections, themes & credentials
+│   ├── shortcuts/          # Global keyboard shortcuts
+│   ├── starter-work/       # Starter task pool and review (Hire Setup)
+│   ├── task-pool/          # Grabbing a task from the pool
+│   └── team-management/    # Team overview, member detail, Skill Wizard
+├── pages/                  # Route-level views (one per user-facing flow)
+├── router/                 # React Router v7 config + AuthGuard
+├── auth/                   # Access policy (AppRoute union, canAccessRoute)
+├── context/                # Global providers (Auth, Theme, Chat, Toast, FocusMode)
+├── services/               # Backend communication (one module per domain; SSE streaming via sse.ts)
+├── components/             # Shared UI: common/, layout/, ui/ primitives
+├── config/                 # Integration config (keycloak.ts)
+├── hooks/                  # Shared hooks
+├── styles/                 # Global CSS + semantic design tokens + centralized spring tokens
+├── mocks/                  # Two fallback fixtures used by teamManagementService
+└── keycloak-theme/         # Keycloakify overrides (kc.gen.tsx is generated — do not hand-edit)
 ```
 
 **Key conventions**
@@ -104,18 +127,19 @@ src/
   absolute URL: both are reached through the frontend's own origin and resolved by a
   reverse proxy, which differs per deployment target:
 
-  | Route   | Vite dev (`vite.config.ts`) | Docker (`nginx.conf`)       | Kubernetes (`k8s/frontend/01-configmap.yaml`) |
-  | ------- | --------------------------- | --------------------------- | --------------------------------------------- |
-  | `/api`  | `127.0.0.1:8080`            | `host.docker.internal:8080` | `sprintstart-backend:8080`                    |
-  | `/v1`   | `127.0.0.1:8080`            | not proxied                 | `sprintstart-backend:8080`                    |
-  | `/auth` | `127.0.0.1:8081`            | `host.docker.internal:8081` | not proxied                                   |
+  | Route   | Vite dev (`vite.config.ts`) | Docker (`nginx.conf`)       | Kubernetes (`sprintstart-k8s`) |
+  | ------- | --------------------------- | --------------------------- | ------------------------------ |
+  | `/api`  | `127.0.0.1:8080`            | `host.docker.internal:8080` | `sprintstart-backend:8080`     |
+  | `/v1`   | `127.0.0.1:8080`            | not proxied                 | `sprintstart-backend:8080`     |
+  | `/auth` | `127.0.0.1:8081`            | `host.docker.internal:8081` | `sprintstart-keycloak:8080`    |
 
-  The gaps are real, not omissions in this table. `/v1` is currently unused by the
-  SPA, so its absence in Docker costs nothing today. The missing `/auth` route under
-  Kubernetes does matter: `config/keycloak.ts` builds the Keycloak URL as
-  `window.location.origin + /auth`, and the ingress forwards everything to the
-  frontend service, so that path would fall through to the SPA. Adding a route
-  before relying on the Kubernetes manifests is tracked separately.
+  The Kubernetes column is the nginx config in `base/sprintstart-frontend/configmap.yaml`
+  of the `sprintstart-k8s` repository, which is what the cluster runs. `/v1` is
+  currently unused by the SPA, so its absence in Docker costs nothing today. The
+  manifests under `k8s/frontend/` in this repository are an older standalone set that
+  the cluster does not use. They have no `/auth` route, so `config/keycloak.ts`
+  (which builds the Keycloak URL as `window.location.origin + /auth`) would not work
+  with them as they are.
 
 - **Design system** — One shared semantic palette (CSS variables → Tailwind
   `app-*` classes) defined in `src/styles/index.css`. Always use tokens, never
@@ -219,5 +243,5 @@ The application uses **Keycloak** for Identity and Access Management. When devel
 ## Testing & Mocking Strategy
 
 - **HTTP Mocking in Tests**: Unit and component tests use **MSW (Mock Service Worker)** via `setupServer` in `tests/unit/setup/msw-handlers.ts` to intercept `fetch` and SSE streams.
-- **Service Resilience**: Services are designed with graceful fallback handling to allow UI development to proceed smoothly even when backend modules are evolving.
+- **No mock mode**: `npm run dev` always talks to the real backend and Keycloak. Only `teamManagementService` falls back to the fixtures in `src/mocks/` when a request fails; every other service surfaces the error. New fallbacks are not wanted.
 - For complete details on testing conventions, coverage expectations, and axe-core rules, consult [docs/testing_strategy.md](./docs/testing_strategy.md).

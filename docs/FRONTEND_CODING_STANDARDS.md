@@ -39,8 +39,9 @@ only this repository gets the full set of frontend rules here.
   (`tsconfig.app.json` has `allowImportingTsExtensions: true`). Mix is fine —
   follow the convention of the file you're editing.
 
-- **`any` is strictly forbidden.** Narrow types using explicit interfaces or type
-  guards. (ESLint: `@typescript-eslint/no-explicit-any: warn`.)
+- **Don't use `any`.** Narrow types using explicit interfaces or type guards.
+  ESLint only warns (`@typescript-eslint/no-explicit-any: warn`), but treat the
+  warning as something to fix, not to live with.
 
 - **`eqeqeq: error`** — always `===` / `!==`.
 
@@ -52,8 +53,16 @@ only this repository gets the full set of frontend rules here.
 - **`no-console: warn`** — only `console.warn` and `console.error` are allowed;
   no stray `console.log`.
 
-- **No suppressions** — never commit `// @ts-ignore`, `// @ts-expect-error`, or
-  `// eslint-disable-*`. Fix the underlying type mismatch instead.
+- **No type suppressions** — never commit `// @ts-ignore` or `// @ts-expect-error`.
+  Fix the underlying type mismatch instead.
+
+- **`eslint-disable` only as a last resort** — disable one rule for one line
+  (`// eslint-disable-next-line <rule>`), never a whole block or file, and give the
+  reason after `--`:
+
+  ```typescript
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `act` closes over fresh state each render
+  ```
 
 ---
 
@@ -61,14 +70,22 @@ only this repository gets the full set of frontend rules here.
 
 - **Functional components + hooks only.** Class components are legacy and not used.
 
-- **Named exports ONLY**, except lazy-loaded route pages which require default
-  exports:
+- **Named exports ONLY**, route pages included. `AppRouter` lazy-loads pages by
+  mapping the named export, so they need no default export:
 
   ```typescript
   // Good
   export function MyComponent() { ... }
   export const MyComponent = () => { ... };
+
+  // How AppRouter loads a page
+  const ChatPage = lazy(() =>
+    import("../pages/ChatPage").then((module) => ({ default: module.ChatPage })),
+  );
   ```
+
+  The only default exports are the ones a tool requires: Storybook's `meta` in
+  `*.stories.tsx` and config files such as `vite.config.ts` and `eslint.config.js`.
 
 - **Keep components focused.** Extract hooks for non-trivial logic/state.
 
@@ -348,14 +365,14 @@ only this repository gets the full set of frontend rules here.
 ## 10. Anti-patterns (do not)
 
 - **No `any`** (TypeScript) — type it properly.
-- **No suppressions** — `// @ts-ignore`, `// @ts-expect-error`,
-  `# type: ignore`, `@SuppressWarnings`-style escape hatches. Fix the underlying
-  type mismatch instead.
+- **No type suppressions** — `// @ts-ignore`, `// @ts-expect-error`. Fix the
+  underlying type mismatch instead. `eslint-disable` only per line, per rule, with a
+  reason (§2).
 - **No hardcoded colors** — use the shared palette tokens.
 - **No ad-hoc spring configs** — use `src/styles/tokens.ts`.
 - **No empty `catch` blocks** — surface backend failures.
 - **No class components** — functional + hooks only.
-- **No default exports** except lazy-loaded route pages.
+- **No default exports** except where a tool requires one (Storybook `meta`, config files).
 
 ---
 

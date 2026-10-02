@@ -33,17 +33,18 @@ This document defines the strict documentation standards for the React and TypeS
 
 You MUST document all page-level or view-level components. Describe the view's responsibility, route context, and its main sub-components.
 
+Start with what the view is for. Don't open with the component name, it is already
+on the line below.
+
 ```tsx
 /**
- * RoleSelectionView
+ * The hire's onboarding path, shown either as a list of phases or as the journey graph.
  *
- * Allows users to select their working area during the onboarding process.
- * Bound to the `/onboarding/select-role` route.
- *
- * The selected role is stored in the backend and used to generate
- * a personalized onboarding path.
+ * Bound to `/onboarding` and `/onboarding/:stepId`. `AuthGuard` blocks both once the
+ * user has completed onboarding. Generating a path is not this page's job:
+ * `OnboardingJourneyProvider` owns it, so leaving the page does not cancel it.
  */
-export function RoleSelectionView() { ... }
+export function OnBoardingPage() { ... }
 ```
 
 ### Reusable UI Components
@@ -52,10 +53,10 @@ Document reusable components when their purpose or usage context is not immediat
 
 ```tsx
 /**
- * TaskCard
+ * Summary card for an onboarding task inside the onboarding phase dashboard.
  *
- * Displays a summary card for an onboarding task inside the onboarding phase dashboard.
- * Includes interactive hover state transitions using spring motion configurations.
+ * Reused in the hire's own view and in the PM's member detail, so it must not assume
+ * that the viewer is the hire.
  */
 export function TaskCard(props: TaskCardProps) { ... }
 ```
@@ -104,21 +105,21 @@ for the full routing model.)
 
 Document route components with their route path, the `AppRoute` literal they
 correspond to in `src/auth/accessPolicy.ts`, the permission groups allowed to
-access them, and any auth/redirect behavior the `AuthGuard` enforces for them:
+access them, and which guard enforces that. `AuthGuard` only handles login, the
+skill-assessment redirect and the onboarding block; role and project checks by URL
+are done by `ManagerAreaGuard` in `AppRouter.tsx`, and only for the routes wrapped
+in it.
 
 ```tsx
 /**
- * AdminPage
+ * The selected project's sources, their connectors and their ingestion runs.
  *
- * The admin dashboard. Bound to the `/admin` route (`AppRoute` literal in
- * `src/auth/accessPolicy.ts`). Accessible only to `HR` and `ADMIN` permission
- * groups (see `routePermissions`).
- *
- * `AuthGuard` redirects unauthenticated users to `/login` and authenticated
- * users without the required group to their default route via
- * `getDefaultRoute(profile)`.
+ * Bound to `/data-ingestion`, open to `PM`, `HR` and `ADMIN` (`routePermissions` in
+ * `src/auth/accessPolicy.ts`). The route is wrapped in `ManagerAreaGuard`, which
+ * additionally requires a PM to manage the selected project and otherwise redirects
+ * to `getDefaultRoute(profile)`.
  */
-export function AdminPage() { ... }
+export function DataIngestionPage() { ... }
 ```
 
 For sub-routes with dynamic params, document the param shape and where the value
@@ -126,13 +127,12 @@ comes from:
 
 ```tsx
 /**
- * TeamMemberDetailPage
+ * One hire's progress, roles and skills, for the people who manage them.
  *
- * Bound to `/team/:userId`. The `userId` path param is read via `useParams()`
- * and fetches the member's detail from `teamManagementService`. Linked from
- * `TeamManagementPage`'s member cards.
+ * Rendered by `PmWorkspace` for `/team/:userId`; the workspace reads the param and
+ * passes it in as `userId`, so this page never calls `useParams()` itself.
  */
-export function TeamMemberDetailPage() { ... }
+export function TeamMemberDetailPage({ userId }: { userId?: string }) { ... }
 ```
 
 ---
@@ -181,17 +181,14 @@ You MUST document effects when:
 - They depend on multiple conditions.
 - Their execution timing is critical to the business logic.
 
-```tsx
-useEffect(() => {
-  /**
-   * Loads the onboarding path once the authenticated user profile is available.
-   * The backend requires the user ID to return the correct path.
-   */
-  const loadPath = async () => { ... };
+An effect is not an exported symbol, so it gets a plain comment above it, not a TSDoc
+block:
 
-  if (profile?.id) {
-    void loadPath();
-  }
+```tsx
+// Waits for the profile: the backend needs the user ID to return the right path.
+useEffect(() => {
+  if (!profile?.id) return;
+  void loadPath(profile.id);
 }, [profile?.id]);
 ```
 
@@ -208,29 +205,28 @@ Document layout transitions, spring tokens, and why `<AnimatePresence>` is used 
 > [`src/styles/tokens.ts`](../src/styles/tokens.ts) — import the tokens you need
 > rather than inlining ad-hoc spring configs. See
 > [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
-> for the full reference (13 presets including `buttonHoverMotion` for consistent
-> button feedback, `modalBackdropVariants` for dialogs, etc.).
+> for the full reference (e.g. `buttonHoverMotion` for consistent button feedback,
+> `modalBackdropVariants` for dialogs).
+
+Inside JSX a comment has to be written as `{/* ... */}`:
 
 ```tsx
-/**
- * AnimatePresence wrapper handles layout transitions as items
- * are deleted from the dashboard list.
- *
- * Utilizes centralized transition config `centralSpringToken` to prevent
- * jittery animations on mobile devices.
- */
-<AnimatePresence mode="popLayout">
-  {tasks.map((task) => (
-    <motion.div
-      layout
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={centralSpringToken}
-      key={task.id}
-    >
-      <TaskCard task={task} />
-    </motion.div>
-  ))}
-</AnimatePresence>
+<div className="grid gap-4">
+  {/* popLayout lets the remaining cards close the gap while a deleted one is still
+      animating out, instead of jumping once the exit has finished. */}
+  <AnimatePresence mode="popLayout">
+    {tasks.map((task) => (
+      <motion.div
+        layout
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={centralSpringToken}
+        key={task.id}
+      >
+        <TaskCard task={task} />
+      </motion.div>
+    ))}
+  </AnimatePresence>
+</div>
 ```
 
 ---
@@ -243,14 +239,18 @@ Interactive components MUST declare labels to support assistive devices and auto
 - **`data-testid`**: Required on key interactive items (role selections, chat submit buttons) targeted by tests.
 
 ```tsx
-/**
- * Menu toggle button. Contains only a Lucide icon, requiring
- * an aria-label for screen-reader compliance.
- */
-<button onClick={toggleSidebar} aria-label="Toggle navigation menu" data-testid="sidebar-toggle">
-  <MenuIcon />
-</button>
+<Button
+  variant="ghost"
+  iconOnly
+  onClick={toggleSidebar}
+  aria-label="Toggle navigation menu"
+  data-testid="sidebar-toggle"
+>
+  <MenuIcon className="h-4 w-4" />
+</Button>
 ```
+
+The label and test id need no comment; why they are there is what this section says.
 
 ---
 

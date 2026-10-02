@@ -1,9 +1,8 @@
 # Frontend Testing Strategy
 
 This document describes the actual testing setup for `sprintstart-frontend`. It
-replaces the previous `mocking_strategy.md`, which described a Playwright + axios
-
-- `cross-env` pipeline that does not match the current codebase.
+replaces the previous `mocking_strategy.md`, which described a pipeline of Playwright,
+axios and `cross-env` that does not match the current codebase.
 
 > **Related docs**
 >
@@ -14,15 +13,17 @@ replaces the previous `mocking_strategy.md`, which described a Playwright + axio
 
 ## 1. Overview
 
-| Area                | Tool                                                                   |
-| ------------------- | ---------------------------------------------------------------------- |
-| Test runner         | **Vitest 4** (configured in `vite.config.ts` `test:` block)            |
-| Component testing   | **@testing-library/react** + **@testing-library/user-event**           |
-| DOM matchers        | **@testing-library/jest-dom**                                          |
-| HTTP mocking        | **msw** ^2.14 (`setupServer` from `msw/node`)                          |
-| Accessibility       | **vitest-axe** ^0.1 (axe-core assertions via `expect().toPassAxe()`)   |
-| Browser environment | **jsdom** ^29                                                          |
-| Coverage            | built-in Vitest coverage (configured via `vitest` in `vite.config.ts`) |
+| Area                | Tool                                                                 |
+| ------------------- | -------------------------------------------------------------------- |
+| Test runner         | **Vitest 4** (configured in `vite.config.ts` `test:` block)          |
+| Component testing   | **@testing-library/react** + **@testing-library/user-event**         |
+| DOM matchers        | **@testing-library/jest-dom**                                        |
+| HTTP mocking        | **msw** ^2.14 (`setupServer` from `msw/node`)                        |
+| Accessibility       | **vitest-axe** ^0.1 (axe-core assertions via `expect().toPassAxe()`) |
+| Browser environment | **jsdom** ^29                                                        |
+
+Coverage is not set up: there is no coverage provider (`@vitest/coverage-v8`) in
+`package.json` and no `coverage` block in the Vitest config.
 
 **What we do NOT use:**
 
@@ -34,12 +35,12 @@ replaces the previous `mocking_strategy.md`, which described a Playwright + axio
 
 ## 2. Commands
 
-| Purpose                                                      | Command        |
-| ------------------------------------------------------------ | -------------- |
-| All unit tests (CI-friendly, non-watch)                      | `npm run test` |
-| Unit tests only (excludes `tests/unit/a11y/**/*`)            | `npm run unit` |
-| A11y tests only (`tests/unit/a11y/`)                         | `npm run a11y` |
-| Full DoD verification (install + build + lint + unit + a11y) | `npm run try`  |
+| Purpose                                                                     | Command        |
+| --------------------------------------------------------------------------- | -------------- |
+| All unit tests (CI-friendly, non-watch)                                     | `npm run test` |
+| Unit tests only (excludes `tests/unit/a11y/**/*`)                           | `npm run unit` |
+| A11y tests only (`tests/unit/a11y/`)                                        | `npm run a11y` |
+| Full DoD verification (install + format check + build + lint + unit + a11y) | `npm run try`  |
 
 Scripts (from `package.json`):
 
@@ -48,7 +49,7 @@ Scripts (from `package.json`):
   "test": "vitest run",
   "unit": "vitest run --exclude 'tests/unit/a11y/**/*'",
   "a11y": "vitest run tests/unit/a11y/",
-  "try": "npm install && npm run build && npm run lint && npm run unit && npm run a11y"
+  "try": "npm install && npm run format:check && npm run build && npm run lint && npm run unit && npm run a11y"
 }
 ```
 
@@ -61,8 +62,12 @@ tests/
 └── unit/
     ├── setup/                    # Shared test infrastructure
     │   ├── vitest.setup.ts       # Global setup (jest-dom, MSW, Keycloak mock, polyfills)
+    │   ├── rtl.tsx               # render/renderHook with a fresh QueryClientProvider (§4)
     │   ├── test-utils.tsx        # renderWithProviders() + createMockProfile()
-    │   └── msw-handlers.ts       # Default MSW handlers (backend HTTP + SSE mocks)
+    │   ├── msw-handlers.ts       # Default MSW handlers (backend HTTP + SSE mocks)
+    │   ├── projectContext.ts     # createProjectContextValue() for tests without ProjectProvider
+    │   ├── matchMedia.ts         # mockViewport() to pin min-width media queries
+    │   └── testing-library-react-dist.d.ts  # Types for the deep import in rtl.tsx
     ├── a11y/                     # Accessibility tests (*.a11y.test.tsx)
     ├── auth/                     # Permission/access-policy tests
     ├── components/               # Shared component tests
@@ -71,7 +76,9 @@ tests/
     ├── hooks/                    # Shared hook tests
     ├── pages/                    # Page-level tests (*.test.tsx + *.a11y.test.tsx)
     ├── router/                   # AuthGuard tests
-    └── services/                 # Service module tests (backend contracts, error paths)
+    ├── services/                 # Service module tests (backend contracts, error paths)
+    ├── styles/                   # Guard against class strings Prettier would break
+    └── bootSplash.test.ts        # src/bootSplash.ts (the splash index.html paints)
 ```
 
 `tests/unit/` mirrors `src/` structure. When you change a component, update its
@@ -90,13 +97,32 @@ Configured in [`vite.config.ts`](../vite.config.ts):
 
 ```typescript
 test: {
-  environment: 'jsdom',
-  globals: true,                                          // describe/it/expect available globally
-  setupFiles: './tests/unit/setup/vitest.setup.ts',
+  environment: "jsdom",
+  globals: true, // describe/it/expect available globally
+  setupFiles: "./tests/unit/setup/vitest.setup.ts",
+  exclude: [...configDefaults.exclude, "**/.worktrees/**"],
+  testTimeout: 30000,
+  alias: [
+    {
+      find: /^@testing-library\/react$/,
+      replacement: fileURLToPath(new URL("./tests/unit/setup/rtl.tsx", import.meta.url)),
+    },
+  ],
 }
 ```
 
 `globals: true` means you don't need to import `describe`, `it`, `expect`, etc.
+
+The `alias` routes every import of `@testing-library/react` through
+[`tests/unit/setup/rtl.tsx`](../tests/unit/setup/rtl.tsx). Its `render` and
+`renderHook` wrap the UI in a `QueryClientProvider` with a fresh client per test
+(`retry: false`, `gcTime: 0`), so components that read through TanStack Query work
+without any extra setup and no cache leaks into the next test. Keep the RegExp form
+of the alias; the comment in `vite.config.ts` explains why a string key silently
+does not match.
+
+The 30 s `testTimeout` exists because axe scans of full pages are slow when many run
+in parallel.
 
 ---
 
@@ -105,19 +131,24 @@ test: {
 Loaded once before all tests. Sets up:
 
 1. **jest-dom** matchers (`toBeInTheDocument`, `toHaveTextContent`, etc.)
-2. **vitest-axe** matchers (`toPassAxe()` extension on `expect`)
-3. **MSW server** — `setupServer(...handlers)`, with `beforeAll → server.listen`,
+2. **Testing Library timeout** — `configure({ asyncUtilTimeout: 10000 })`, so
+   `findBy*` and `waitFor` wait up to 10 s instead of 1 s
+3. **vitest-axe** matchers (`toPassAxe()` extension on `expect`)
+4. **MSW server** — `setupServer(...handlers)`, with `beforeAll → server.listen`,
    `afterEach → server.resetHandlers`, `afterAll → server.close`
-4. **Keycloak JS mock** — `vi.mock('keycloak-js', ...)` returns a controllable
+5. **Keycloak JS mock** — `vi.mock('keycloak-js', ...)` returns a controllable
    singleton (`mockKeycloakInstance`) with stubbed `init`/`login`/`logout`/`updateToken`
-5. **`@keycloakify/react` mock** — `useKeycloak()` returns a stubbed authenticated state
-6. **React Router mock** — preserves the real `react-router-dom` and `react-router`
-   exports (so `MemoryRouter` etc. work in tests)
-7. **Framer Motion mock** — maps common HTML tags (`div`, `button`, `span`, …)
-   to plain `React.createElement`, and stubs `AnimatePresence` to passthrough
-   children. Prevents layout timeouts and layout clipping in jsdom.
-8. **Browser polyfills** — `ResizeObserver`, `IntersectionObserver`, `matchMedia`,
-   `HTMLElement.prototype.scrollIntoView` (jsdom doesn't implement these)
+6. **`@keycloakify/react` mock** — `useKeycloak()` returns a stubbed authenticated state
+7. **React Router passthrough** — `react-router-dom` and `react-router` are mocked
+   with their real exports, nothing is replaced (so `MemoryRouter` etc. work in tests)
+8. **Framer Motion mock** — `motion` is a proxy that renders any `motion.<tag>` as a
+   plain element of that tag and drops motion-only props (a `layoutId` is kept as
+   `data-layout-id`). `AnimatePresence` passes its children through. Prevents layout
+   timeouts and layout clipping in jsdom.
+9. **Browser polyfills** — `ResizeObserver`, `IntersectionObserver`, `matchMedia`
+   (always `matches: false`; use `mockViewport()` from `matchMedia.ts` for desktop
+   layouts), `HTMLElement.prototype.scrollIntoView`, and the layout methods of
+   `Range` (jsdom doesn't implement these)
 
 ---
 
@@ -126,7 +157,8 @@ Loaded once before all tests. Sets up:
 ### `renderWithProviders(ui, options)`
 
 Wraps a component in `MemoryRouter` + `ThemeProvider` before rendering with
-Testing Library. Accepts a `route` option to set the initial URL:
+Testing Library (and, through the alias in §4, in a `QueryClientProvider`). Accepts a
+`route` option to set the initial URL:
 
 ```tsx
 const { getByText } = renderWithProviders(<MyPage />, { route: "/team/123" });
@@ -256,14 +288,16 @@ declare:
   chat submit buttons, etc.).
 
 ```tsx
-/**
- * Menu toggle button. Contains only a Lucide icon, requiring
- * an aria-label for screen-reader compliance.
- */
-<button onClick={toggleSidebar} aria-label="Toggle navigation menu" data-testid="sidebar-toggle">
-  <MenuIcon />
-</button>
+<Button
+  variant="ghost"
+  iconOnly
+  onClick={toggleSidebar}
+  aria-label="Toggle navigation menu"
+  data-testid="sidebar-toggle"
+>
+  <MenuIcon className="h-4 w-4" />
+</Button>
 ```
 
-These attributes are tested by the `jsx-a11y` ESLint plugin (compile-time) and
-the a11y test suite (runtime).
+A missing accessible name is caught by the `jsx-a11y` ESLint plugin (compile-time)
+and the a11y test suite (runtime). Nothing checks `data-testid` automatically.
