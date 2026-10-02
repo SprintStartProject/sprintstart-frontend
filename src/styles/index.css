@@ -28,11 +28,16 @@ body {
      content leaves for it both read this, so the two can never disagree. */
   --app-sidebar-width: 286px;
 
-  /* Backgrounds */
-  --bg: #f9fafb;
+  /* Backgrounds
+     Light mode cannot lift a card by making it brighter than white, so the page
+     and the insets inside a card are tinted instead. The steps are sized to
+     roughly match the dark theme's (page -> card -> inset): with the old
+     near-white page (#f9fafb) a white card only showed by its border, and a
+     tile nested in a card did not show at all. */
+  --bg: #edf1f5;
   --bg-soft: #f3f4f6;
   --surface: #ffffff;
-  --surface-muted: #f8fafc;
+  --surface-muted: #f3f6f9;
   --surface-hover: #f1f5f9;
 
   /* Borders */
