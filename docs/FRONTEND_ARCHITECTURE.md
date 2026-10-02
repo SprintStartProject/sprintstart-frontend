@@ -99,12 +99,22 @@ src/
 ├── context/             # Global providers (Auth, Theme, Chat, Toast, FocusMode)
 ├── services/            # Backend communication (one module per domain), query client, query keys
 ├── components/          # Shared UI: common/, layout/, ui/ primitives
-├── config/              # Integration config (keycloak.ts)
+├── config/              # keycloak.ts (Keycloak client), contributionWording.ts (wording shared with the backend)
 ├── hooks/               # Shared hooks (incl. the TanStack Query based fetch hooks)
 ├── styles/              # Global CSS (index.css) + animation tokens (tokens.ts)
 ├── mocks/               # Two fixtures used as fallback by teamManagementService
-└── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated, do not hand-edit)
+├── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated, do not hand-edit)
+├── main.tsx             # Entry point: boots the login theme or the app (see below)
+├── main-app.tsx         # React root of the app: StrictMode, BrowserRouter, App
+├── App.tsx              # App-level providers (§5.1) around AppRouter
+└── bootSplash.ts        # Dismisses the boot splash that index.html paints before React
 ```
+
+`main.tsx` decides at runtime what this bundle is: when Keycloak injected a
+`window.kcContext`, it loads the login theme (`keycloak-theme/main`); with
+`VITE_KC_DEV=true` it loads the theme's dev preview (`keycloak-theme/main.dev`);
+otherwise it loads the app (`main-app`). The login theme and the app are built from
+the same `index.html`.
 
 > **Note:** there is **no `src/types/` folder**. Global types live alongside their
 > consumers (e.g. `src/services/types.ts` for backend DTOs, `src/auth/accessPolicy.ts`
@@ -146,17 +156,22 @@ It waits for the project context to load and redirects to `getDefaultRoute` when
 `AuthGuard` handles authentication and the app-wide redirects. Role-based URL
 blocking is done by `ManagerAreaGuard` (§4.1). `AuthGuard`:
 
-1. Reads `status` (`loading` | `authenticated` | `unauthenticated`) and `profile`
-   from `useAuth()`.
-2. Redirects unauthenticated users to `/login` (preserving the original target via
-   `location.state.from`).
-3. Redirects authenticated users on `/login` back to where they came from.
+1. Reads `status` (`loading` | `signingOut` | `unauthenticated` | `authenticated`)
+   and `profile` from `useAuth()`.
+2. Redirects unauthenticated users to `/login`. The original target is stored in
+   `sessionStorage` (`src/auth/redirectUtils.ts`) and also passed as `?redirect=`
+   and `location.state.from`, because the Keycloak round trip loses the router state.
+3. Redirects authenticated users on `/login` to the stored target, or to
+   `getDefaultRoute(profile)` when there is none. When Keycloak returns to `/` or
+   strips the hash fragment, it restores the stored target as well.
 4. Redirects authenticated users who need a skill assessment to `/skill-wizard`
    (the only route exempt from the skill-assessment gate).
 5. Blocks `/onboarding` and `/onboarding/:stepId` for users who have completed
    onboarding.
 6. Renders a page skeleton while auth state or the skill-assessment check is in
-   flight.
+   flight. It renders nothing while `status` is `signingOut` (a logout return or a
+   failed silent SSO check), and nothing while `loading` on `/login`, because the
+   skeleton's header does not match the login card.
 
 ### 4.3 Access policy (`src/auth/accessPolicy.ts`)
 
@@ -205,7 +220,7 @@ Declared in `AppRouter.tsx`:
 /knowledge-base                 /arrival-steps   (redirects to /hire-setup)
 /blueprints                     /starter-work    (redirects to /hire-setup)
 /blueprints/:pathId             /settings
-/data-ingestion                 /profile
+/data-ingestion                 /profile         (redirects to /settings)
                                 *                (NotFoundPage)
 ```
 
@@ -472,12 +487,17 @@ separate React root: no `ThemeProvider`, no `AuthProvider`, nothing from
   `src/styles/index.css` directly, so the `--color-app-*` tokens and the
   `.app-aurora` / `.app-bg-grid` / etc. keyframes are available as-is in `login.css`.
 
-Everything else (`ui/Button`, `ui/Input`, `SpotlightCard`, `AuroraBackground`, the
-animated `SidebarLogo` mark) is **not shared**. The login theme has its own
-hand-maintained, trimmed-down copies under `src/keycloak-theme/login/components/`,
-which read `localStorage` directly for settings like `isAuroraEnabled` and
-`isTiltEnabled`, since there is no `ThemeContext` there. When a shared primitive or
-token changes, the copy has to be ported by hand (rule in
+Everything else is **not shared** and exists twice, as hand-maintained copies:
+
+- `SpotlightCard`, `AuroraBackground` and the animated `SidebarLogo` mark have
+  trimmed-down copies under `src/keycloak-theme/login/components/`. They read
+  `localStorage` directly for settings like `isAuroraEnabled` and `isTiltEnabled`,
+  since there is no `ThemeContext` there.
+- `ui/Button` and `ui/Input` have no component copy. The login form is Keycloak's own
+  markup, so their look (radius, focus ring, hover and press feedback) is rebuilt in
+  CSS on Keycloak's classes in `login/login.css`.
+
+When a shared primitive or token changes, the copy has to be ported by hand (rule in
 [FRONTEND_CODING_STANDARDS.md §4](./FRONTEND_CODING_STANDARDS.md#4-styling-tailwind-css-v4)).
 
 **Deploying a theme change is a second step, in a second repo.** Editing
