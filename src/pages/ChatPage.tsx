@@ -427,7 +427,7 @@ export function ChatPage() {
 
             {/* E1: AnimatePresence wraps dynamically added/removed
                             message rows so enter/exit animate smoothly (chat
-                            switch, new messages). Per AGENTS.md §11. */}
+                            switch, new messages). Per FRONTEND_CODING_STANDARDS.md §6. */}
             <AnimatePresence mode="popLayout">
               {messages.map((message, index) => (
                 <motion.div

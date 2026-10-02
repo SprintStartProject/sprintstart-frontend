@@ -83,7 +83,7 @@ div.kcFormGroupClass {
 
 /* Same focus treatment as the app's shared Input (fieldStyles.ts):
    brand-colored border + a visible `--app-focus` ring, never just
-   `outline: none` with nothing to replace it (AGENTS.md §9). */
+   `outline: none` with nothing to replace it (FRONTEND_CODING_STANDARDS.md §5). */
 .pf-c-form-control:focus {
   outline: none;
   border-color: var(--color-app-brand-border-strong);

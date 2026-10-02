@@ -109,6 +109,27 @@ only this repository gets the full set of frontend rules here.
 - **Stay consistent beyond color, too.** Use the shared Tailwind scale for spacing,
   radius, and sizing instead of arbitrary one-off pixel values.
 
+- **Use the shared UI primitives in `src/components/ui/`, don't rebuild them.** Every
+  one of them exists because the same widget had drifted into a dozen slightly
+  different versions. Reach for the component first; if it can't do what you need,
+  extend the component instead of patching it at the call site.
+
+  | Need                   | Use                                        | Not                                             |
+  | ---------------------- | ------------------------------------------ | ----------------------------------------------- |
+  | Any action control     | `ui/Button`                                | a hand-styled `<button>` or `<motion.button>`   |
+  | Text field / dropdown  | `ui/Input`, `ui/Select`, `ui/Textarea`     | a bare `<input>` / `<select>` / `<textarea>`    |
+  | Label + hint + error   | `ui/Field`                                 | a `<label>` next to an input, wired by hand     |
+  | Status pill            | `ui/Badge`                                 | `rounded-full … px-2 … text-xs` on a `<span>`   |
+  | Dialog / drawer        | `ui/Modal`, `ui/SidePanel`                 | a hand-rolled `fixed inset-0` overlay           |
+  | Waiting                | `ui/Spinner`, or `Button`'s `loading` prop | a bare `<Loader2 className="animate-spin" />`   |
+  | Nothing to show        | `ui/EmptyState`                            | an ad-hoc centred `<p>`                         |
+  | Background scroll lock | `ui/useScrollLock`                         | setting `document.body.style.overflow` yourself |
+
+  The primitives already carry the focus ring, the 44px touch target, the
+  `disabled` / `aria-busy` treatment, the hover motion, the `aria-describedby`
+  wiring for errors, and the focus trap. Rebuilding one by hand means getting all of
+  that right again. The bullets below give the details for each.
+
 - **Dialogs are [`ui/Modal`](../src/components/ui/Modal.tsx)** (or
   [`ui/SidePanel`](../src/components/ui/SidePanel.tsx) for a drawer). It brings
   the focus trap, Escape handling, focus restore, `aria-modal` and the
@@ -237,6 +258,30 @@ only this repository gets the full set of frontend rules here.
   [`useAutoResize`](../src/components/ui/useAutoResize.ts). Do not re-implement
   the height maths inline: every hand-rolled copy so far forgot to shrink the
   field again when the value was reset from the outside.
+
+- **The Keycloak login theme has its own copies.** If you change a shared visual
+  primitive or token (button radius or hover, input focus ring, card border, shadow
+  or radius, the brand mark's animation, anything in `styles/index.css`), check
+  whether `src/keycloak-theme/login/` has its own copy of that pattern and port the
+  change there too. Nothing keeps the two in sync. See
+  [FRONTEND_ARCHITECTURE.md §10.3](./FRONTEND_ARCHITECTURE.md#103-keycloak-login-theme)
+  for what is shared, what is copied, and how a theme change gets deployed.
+
+### Responsive design
+
+- **Desktop is the primary target**, because that is where the app is mainly used.
+  Design the desktop layout first; this is _not_ mobile-first.
+- **Every page must still be responsive** down to phone size: widgets get narrower
+  or stack vertically, the sidebar collapses, and tables and dialogs must not
+  overflow.
+- Use the Tailwind breakpoints (`sm:`, `md:`, `lg:`) to scale the desktop layout
+  _down_. The app shell already does this: sticky sidebar on desktop, slide-out
+  drawer and top bar below `lg` (see `components/layout/SideBar.tsx`; global token
+  adjustments at `@media (max-width: 1024px)`).
+- Prefer fluid layouts (`flex`/`grid`, `max-w-*`, `min-w-0` to allow truncation)
+  over fixed pixel widths.
+- **Test desktop first, then tablet and mobile** before finishing UI work: widgets
+  reflow, the sidebar collapses, nothing overflows.
 
 ---
 
