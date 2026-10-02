@@ -49,6 +49,8 @@ const BASE_PROPS = {
   activeTool: null,
   confirmAction: vi.fn(),
   dismissAction: vi.fn(),
+  actionDrafts: {},
+  setActionDraft: vi.fn(),
 };
 
 const SUGGESTED_STEP = <button type="button">Start with the packet</button>;

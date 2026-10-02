@@ -10,6 +10,8 @@ import {
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
 import { announceBuddyPathChanged } from "../aiBuddyBus";
+import { actionDraftKey } from "../actionDrafts";
+import type { ActionDrafts } from "../actionDrafts";
 import { BUDDY_PATH_ACTIONS } from "../types";
 import { useAuth } from "../../../context/useAuth";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
@@ -198,6 +200,16 @@ export function useBuddyConversation(
    * and a parent cannot reach into a child's setter.
    */
   const [draftResetToken, setDraftResetToken] = useState(0);
+  /**
+   * The hire's wording for the proposals that carry an editable message — a flag's question, the
+   * only payload a person reads and the hire therefore rewords (see `actionDrafts` for the key).
+   *
+   * Session state rather than card state, for the same reason the composer's words are: the dock
+   * unmounts when it closes, the full page mounts a second card for the same action, and either
+   * one would otherwise throw away words the hire was halfway through. Unlike the composer's,
+   * nothing below this provider needs to write it, so it lives here rather than in a context.
+   */
+  const [actionDrafts, setActionDrafts] = useState<ActionDrafts>({});
   /**
    * The last greeting a surface has actually put in front of the hire — either watched while it
    * streamed, or revealed by `useGreetingReveal`. Held here, not per surface, so a greeting the
@@ -520,7 +532,8 @@ export function useBuddyConversation(
    *
    * Nothing is deleted. The whole transcript stays in `buddy_messages`, and the buddy's durable
    * memory note is untouched — it is what the greeting is written from, which is why starting
-   * fresh does not mean starting over. Only the hire's scrollback moves on.
+   * fresh does not mean starting over. Only the hire's scrollback moves on — together with any
+   * flag wording they had half-edited, which belonged to the offers in it.
    */
   const startFreshVisit = useCallback(async () => {
     // The button stays enabled while the greeting is written, so a second click would run a
@@ -546,6 +559,9 @@ export function useBuddyConversation(
     // The box is emptied through the token: a question typed about the conversation being
     // cleared is about a thread that no longer exists. See `draftResetToken`.
     setDraftResetToken((token) => token + 1);
+    // Wording the hire had half-edited belongs to the offers that are going with the
+    // transcript — it is not a composer draft and must not outlive them.
+    setActionDrafts({});
     setIsOpening(true);
     try {
       await greet();
@@ -775,6 +791,29 @@ export function useBuddyConversation(
   const inFlightRef = useRef<Set<string>>(new Set());
 
   /**
+   * Records what the hire typed into a proposal's field, so it survives a closed dock, a handed-
+   * over conversation and the retry a refusal offers — see `actionDrafts` for why it is session
+   * state and not the card's own.
+   */
+  const setActionDraft = useCallback((key: string, text: string) => {
+    setActionDrafts((current) => ({ ...current, [key]: text }));
+  }, []);
+
+  /**
+   * Forgets a draft whose proposal is done with — it was sent, or the hire declined it. Nothing
+   * is left to edit, and a card re-rendered later must not offer wording that has already left
+   * the product.
+   */
+  const clearActionDraft = useCallback((key: string) => {
+    setActionDrafts((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  /**
    * Confirms a proposed action: the one call that mutates. Reflects the outcome inline — a
    * legible line whether it changed something (`ok`) or legibly couldn't, or a retryable error
    * if the request itself failed.
@@ -856,6 +895,9 @@ export function useBuddyConversation(
             ok: result.ok,
             outcome: result.message,
           });
+          // It went out: the wording has left the product, so the session keeps none of it. A
+          // refusal keeps it — that card is about to be handed the hire's text back to correct.
+          if (result.ok) clearActionDraft(actionDraftKey(messageId, action.id));
           // A path action just moved something on a page that may be open behind this dock. Told
           // rather than polled, and only on success: a refused confirm changed nothing to refresh.
           if (result.ok && "action" in action && BUDDY_PATH_ACTIONS.includes(action.action)) {
@@ -891,7 +933,7 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, patchAction, invalidateBoard],
+    [beginDecision, endDecision, patchAction, invalidateBoard, clearActionDraft],
   );
 
   /**
@@ -915,6 +957,9 @@ export function useBuddyConversation(
       // but still worth putting away here.
       if (!("proposalId" in action)) {
         patchAction(messageId, actionId, { status: "dismissed" });
+        // A hire offer is the only kind that carries a draft, and this is the one place one is
+        // declined — the wording goes with the offer it belonged to.
+        clearActionDraft(actionDraftKey(messageId, actionId));
         return;
       }
 
@@ -960,16 +1005,17 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, patchAction],
+    [beginDecision, endDecision, patchAction, clearActionDraft],
   );
 
   /**
    * The thread on screen always belongs to exactly one conversation, and when the derived
    * target moves — a switch, a restored preference arriving, an involuntary exit — the thread
    * is cleared and the new conversation opens exactly as an untouched visit would: read first,
-   * then greeted. The backend keeps the conversations separate, so reusing the latch would show
-   * one inside the other. Mid-turn the move waits: the busy flags are in the dependency list,
-   * so the effect re-runs the moment the turn ends and applies then.
+   * then greeted. The drafts of the thread it clears go with it, like every other piece of
+   * state that belonged to those offers. The backend keeps the conversations separate, so
+   * reusing the latch would show one inside the other. Mid-turn the move waits: the busy flags
+   * are in the dependency list, so the effect re-runs the moment the turn ends and applies then.
    */
   const openedForRef = useRef<string>("hire");
   useEffect(() => {
@@ -995,6 +1041,9 @@ export function useBuddyConversation(
     setOpenError(null);
     // Same rule as a fresh visit: the words belonged to the conversation that just went away.
     setDraftResetToken((token) => token + 1);
+    // Bound to the offers of the conversation being left, not to the tab: a switch starts
+    // with no wording of its own, like every other piece of session state here.
+    setActionDrafts({});
     setActiveTool(null);
     setIsThinking(false);
     setIsStreaming(false);
@@ -1079,7 +1128,10 @@ export function useBuddyConversation(
     // thing about them the session still owns — the news that the thread they belonged to is
     // gone. See `draftResetToken`.
     draftResetToken,
-
+    // The same idea for the fields a proposal carries: a flag's question is the hire's to word,
+    // and the session is what keeps that wording across a closed dock and a handed-over page.
+    actionDrafts,
+    setActionDraft,
     sendMessage,
     confirmAction,
     dismissAction,

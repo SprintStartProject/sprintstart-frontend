@@ -46,6 +46,8 @@ function renderConversation(overrides: {
         activeTool={overrides.activeTool ?? null}
         confirmAction={vi.fn()}
         dismissAction={vi.fn()}
+        actionDrafts={{}}
+        setActionDraft={vi.fn()}
         openError={overrides.openError ?? null}
         onRetryOpen={overrides.onRetryOpen}
       />
