@@ -178,12 +178,14 @@ describe("ArrivalStepAuthoring", () => {
     expect(screen.getByText("Only PMs and admins can change this list.")).toBeInTheDocument();
   });
 
-  /** Opens the "Add step" wizard and advances past the Kind step — picking a kind now advances
-   * immediately, there is no separate "Next" click. */
+  /** Opens the "Add step" modal and moves on to the custom form. The suggestions are listed
+   * right away, with "Custom" as the last entry — picking it advances, there is no "Next". */
   async function openAddWizard(kind: "Suggested" | "Custom") {
     fireEvent.click(await screen.findByRole("button", { name: "Add step" }));
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(await within(dialog).findByRole("button", { name: new RegExp(`^${kind}`) }));
+    if (kind === "Custom") {
+      fireEvent.click(await within(dialog).findByRole("button", { name: /^Custom/ }));
+    }
     return dialog;
   }
 
@@ -414,8 +416,12 @@ describe("ArrivalStepAuthoring", () => {
     render(<ArrivalStepAuthoring />);
     const dialog = await openAddWizard("Suggested");
 
-    fireEvent.click(within(dialog).getByRole("button", { name: /Add your GitHub username/ }));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
+    const addButton = within(dialog).getByRole("button", { name: "Add step" });
+    expect(addButton).toBeDisabled();
+    fireEvent.click(
+      await within(dialog).findByRole("button", { name: /Add your GitHub username/ }),
+    );
+    fireEvent.click(addButton);
 
     await waitFor(() => {
       expect(arrivalService.createStep).toHaveBeenCalledWith(
@@ -424,7 +430,92 @@ describe("ArrivalStepAuthoring", () => {
     });
   });
 
-  it("disables the Suggested card once every suggestion is already on the list", async () => {
+  it("adds several suggestions in one go", async () => {
+    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([
+      derivable(),
+      derivable({ key: "slack-account", suggestedTitle: "Join Slack" }),
+    ]);
+
+    render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Suggested");
+
+    const github = await within(dialog).findByRole("button", { name: /Add your GitHub username/ });
+    const slack = within(dialog).getByRole("button", { name: /Join Slack/ });
+    fireEvent.click(github);
+    fireEvent.click(slack);
+    expect(github).toHaveAttribute("aria-pressed", "true");
+    expect(slack).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add 2 steps" }));
+
+    await waitFor(() => {
+      expect(arrivalService.createStep).toHaveBeenCalledTimes(2);
+    });
+    expect(arrivalService.createStep).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "github-account" }),
+    );
+    expect(arrivalService.createStep).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "slack-account" }),
+    );
+  });
+
+  it("deselects a suggestion on a second click", async () => {
+    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable()]);
+
+    render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Suggested");
+
+    const github = await within(dialog).findByRole("button", { name: /Add your GitHub username/ });
+    fireEvent.click(github);
+    fireEvent.click(github);
+
+    expect(github).toHaveAttribute("aria-pressed", "false");
+    expect(within(dialog).getByRole("button", { name: "Add step" })).toBeDisabled();
+  });
+
+  it("separates Custom from the suggestions with a divider", async () => {
+    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable()]);
+
+    render(<ArrivalStepAuthoring />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add step" }));
+
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByRole("button", { name: /Add your GitHub username/ });
+    expect(within(dialog).getByRole("separator")).toBeInTheDocument();
+  });
+
+  it("lists the suggestions up front with Custom as the extra last entry", async () => {
+    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable()]);
+
+    render(<ArrivalStepAuthoring />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add step" }));
+
+    const dialog = await screen.findByRole("dialog");
+    const suggestion = await within(dialog).findByRole("button", {
+      name: /Add your GitHub username/,
+    });
+    const custom = within(dialog).getByRole("button", { name: /^Custom/ });
+
+    expect(suggestion.compareDocumentPosition(custom) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(within(dialog).queryByPlaceholderText("Request VPN access")).not.toBeInTheDocument();
+  });
+
+  it("returns from the custom form to the suggestions", async () => {
+    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable()]);
+
+    render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Custom");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Back" }));
+
+    expect(
+      await within(dialog).findByRole("button", { name: /Add your GitHub username/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("disables suggestions already on the list but keeps Custom available", async () => {
     vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable({ added: true })]);
 
     render(<ArrivalStepAuthoring />);
@@ -432,9 +523,10 @@ describe("ArrivalStepAuthoring", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(
-      await within(dialog).findByText("All suggestions are already on the list"),
+      await within(dialog).findByText("All suggestions are already on the list."),
     ).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: /^Suggested/ })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: /Add your GitHub username/ })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: /^Custom/ })).toBeEnabled();
   });
 
   it("still shows the lists when the catalog cannot be loaded", async () => {
