@@ -16,6 +16,7 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
 import { ProjectIndustryPanel } from "../../projects/industry/ProjectIndustryPanel";
@@ -302,11 +303,7 @@ export function ProjectDetailsDrawer({
         title={draftProject.name || visibleProject.name}
         closeAriaLabel="Close project details"
         widthClassName="w-full sm:w-[min(94vw,34rem)] lg:w-[min(72vw,58rem)]"
-        leading={
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand">
-            <Folder className="h-6 w-6" />
-          </div>
-        }
+        leading={<IconTile icon={Folder} size="2xl" tone="brand" />}
         badge={
           <>
             <AccessBadge variant="neutral">

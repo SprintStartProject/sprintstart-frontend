@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Minus, Plus } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
+import { IconTile } from "../../../components/ui/IconTile";
 import { DASHBOARD_SIZE_LABELS } from "../layout/sizes";
 import type {
   DashboardWidgetDefinition,
@@ -232,12 +233,7 @@ function WidgetOption({
           : "border-app-border-muted bg-app-surface-muted hover:border-app-border"
       }`}
     >
-      <span
-        aria-hidden="true"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-brand-soft text-app-brand-text"
-      >
-        <Icon className="h-4 w-4" />
-      </span>
+      <IconTile icon={Icon} size="md" tone="brand" />
 
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-app-text">{widget.title}</span>

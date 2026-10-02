@@ -14,6 +14,7 @@ import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { IconTile } from "../../../components/ui/IconTile";
 import type { ProjectManager } from "../../../services/projectService";
 import {
   resolvePeopleDraft,
@@ -218,9 +219,7 @@ export function ProjectPeopleSection({
   return (
     <div>
       <div className="mb-4 flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand">
-          <Users className="h-4 w-4" />
-        </span>
+        <IconTile icon={Users} size="md" tone="brand" />
         <div>
           <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
             People

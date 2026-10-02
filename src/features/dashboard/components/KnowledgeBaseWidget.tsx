@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
+import { IconTile } from "../../../components/ui/IconTile";
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import { knowledgeService } from "../../../services/knowledgeService";
@@ -75,9 +76,7 @@ export function KnowledgeBaseWidget() {
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <BookOpen className="h-3.5 w-3.5" />
-          </span>
+          <IconTile icon={BookOpen} size="sm" tone="accent" />
           <span className="text-sm font-semibold text-app-text">Knowledge base</span>
         </div>
 

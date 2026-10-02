@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
+import { IconTile } from "../../../components/ui/IconTile";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import { Textarea } from "../../../components/ui/Textarea";
@@ -230,15 +231,11 @@ export function AddArrivalStepModal({
                           derivation.added ? "cursor-not-allowed opacity-50" : ""
                         }`}
                       >
-                        <span
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                            isSelected
-                              ? "bg-app-brand text-white"
-                              : "bg-app-bg-soft text-app-text-muted"
-                          }`}
-                        >
-                          <HowItsDoneIcon className="h-4 w-4" aria-hidden="true" />
-                        </span>
+                        <IconTile
+                          icon={HowItsDoneIcon}
+                          size="lg"
+                          tone={isSelected ? "accent" : "neutral"}
+                        />
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-semibold text-app-text">
                             {derivation.suggestedTitle}
@@ -272,9 +269,7 @@ export function AddArrivalStepModal({
                     onClick={() => setPhase("custom")}
                     className={`flex w-full items-start gap-3 ${radioCardClassName(false)}`}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft text-app-text-muted">
-                      <PenLine className="h-4 w-4" aria-hidden="true" />
-                    </span>
+                    <IconTile icon={PenLine} size="lg" tone="neutral" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-app-text">Custom</span>
                       <span className="mt-1 block text-xs text-app-text-muted">

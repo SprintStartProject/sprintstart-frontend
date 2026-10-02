@@ -289,9 +289,12 @@ export function ProjectAccessPanel({
                       disabled={hasPendingProjectChange}
                       className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all hover:border-app-brand-border-strong hover:bg-app-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-surface-muted text-app-text-muted transition-colors group-hover:bg-app-surface group-hover:text-app-brand">
-                        <Folder className="h-4 w-4" />
-                      </span>
+                      <IconTile
+                        icon={Folder}
+                        size="lg"
+                        tone="neutral"
+                        className="transition-colors group-hover:bg-app-surface group-hover:text-app-brand"
+                      />
 
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-app-text">
@@ -330,9 +333,7 @@ export function ProjectAccessPanel({
             >
               <div className="flex items-start justify-between gap-3 sm:gap-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-surface text-app-text-muted">
-                    <Folder className="h-4 w-4" />
-                  </div>
+                  <IconTile icon={Folder} size="lg" tone="brand" />
 
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-app-text">{project.name}</p>
