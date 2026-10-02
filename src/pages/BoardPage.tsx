@@ -139,20 +139,20 @@ const UNDO_WINDOW_MS = 7000;
 const FOLD_THRESHOLD = 8;
 
 /**
- * Which cards the board is showing.
+ * The hire's board: their own cards, the buddy's and the team's, arranged in areas and stages and
+ * synced with the server.
  *
- * Not a search and not a sort — the one cut worth making by hand is *who put this here*, which is
- * the one thing a card's content never says on its own. Three sources, and they partition the
- * board:
+ * The filter rail cuts by *who put a card here*, the one thing a card's content never says on its
+ * own (see `layout/boardFilters.ts`):
  *
  * - `buddy` — placed for the hire in conversation, contents read live.
- * - `team` — a card blueprint their PM wrote for everybody in this role.
  * - `mine` — everything else they own: their own notes and lists, and the steps of their own
  *   personalised path. The path counts as theirs because it *is*: it was drafted for them, they
  *   edit it, and nobody else on the project has the same one.
  *
- * Where a card sits in the process is a separate question, and the stages, the focus view and the
- * section tabs answer that one.
+ * Cards from a PM's card blueprints have no filter of their own. They sit in the area "From your
+ * team", which the section tabs reach. Where a card sits in the process is a separate question,
+ * and the stages, the focus view and the section tabs answer that one.
  *
  * Bound to `/board`, open to every permission group, not wrapped in `ManagerAreaGuard`.
  */
@@ -592,13 +592,6 @@ export function BoardPage() {
     [allCards, states],
   );
 
-  /**
-   * The provenance cuts worth offering on *this* board.
-   *
-   * "From your team" only appears once the team has actually prescribed something. An option that
-   * can only ever come back empty is a promise the board cannot keep, and on an installation where
-   * nobody has written a blueprint that is every board.
-   */
   /**
    * Whether the board has been divided into anything worth navigating.
    *

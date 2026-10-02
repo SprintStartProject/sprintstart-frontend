@@ -165,10 +165,6 @@ function emphasisClass({ emphasis, selected, dragging }: JourneyNodeRenderState)
 }
 
 /**
- * What a step carries beyond its state -- a skip request, the member's feedback -- as small pills on
- * the card's top edge, so they can be seen without opening anything.
- */
-/**
  * A small pulsing dot: something changed here since the member last looked.
  *
  * Only pulses where motion is welcome; the colour and the "New" label carry it otherwise.
@@ -184,6 +180,10 @@ export function UpdateDot({ className = "bg-white" }: { className?: string }) {
   );
 }
 
+/**
+ * What a step carries beyond its state -- a skip request, the member's feedback -- as small pills on
+ * the card's top edge, so they can be seen without opening anything.
+ */
 export function ItemFlags({
   item,
   inline = false,
