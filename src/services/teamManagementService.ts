@@ -168,6 +168,12 @@ export async function getTeamOverviewOrThrow(projectIds: string[]): Promise<Team
   return withUnreadFeedbackFlag(users, feedback);
 }
 
+/**
+ * One member's row from the team overview, or `undefined` when they are not in it.
+ *
+ * Reads the whole overview through {@link getTeamOverview}, so it inherits its fallback: when
+ * the backend is unreachable, the member is looked up among the mock users.
+ */
 export async function getTeamMember(userId: string): Promise<TeamOverviewUser | undefined> {
   const users = await getTeamOverview();
 
@@ -199,6 +205,12 @@ export async function getMyTeamOverview(): Promise<TeamOverviewUser> {
   };
 }
 
+/**
+ * Lists all project roles.
+ *
+ * **Never throws.** When the request fails, it returns the roles of the mock users instead. The
+ * caller cannot tell this from a success; see the mock fallbacks in `docs/testing_strategy.md` §8.
+ */
 export async function getProjectRoles(): Promise<ProjectRole[]> {
   try {
     const response = await apiClient.fetch<{ projectRoles?: ProjectRole[] } | ProjectRole[]>(
@@ -211,6 +223,14 @@ export async function getProjectRoles(): Promise<ProjectRole[]> {
   }
 }
 
+/**
+ * Creates a project role.
+ *
+ * **Never throws.** When the request fails, it adds the role to the in-memory mock list and returns
+ * it with a made-up `mock-role-…` id, which later calls with that id will not find on the backend.
+ * The caller cannot tell this from a success; see the mock fallbacks in
+ * `docs/testing_strategy.md` §8.
+ */
 export async function createProjectRole(name: string, description: string): Promise<ProjectRole> {
   try {
     return await apiClient.fetch<ProjectRole>("/api/v1/projectRoles", {
@@ -233,6 +253,13 @@ export async function createProjectRole(name: string, description: string): Prom
   }
 }
 
+/**
+ * Gives a user a project role.
+ *
+ * **Never throws.** When the request fails, it adds the role to that user among the in-memory mock
+ * users instead. The caller cannot tell this from a success; see the mock fallbacks in
+ * `docs/testing_strategy.md` §8.
+ */
 export async function assignProjectRoleToUser(userId: string, roleId: string): Promise<void> {
   try {
     await apiClient.fetch(`/api/v1/users/${userId}/project-roles`, {
@@ -263,6 +290,13 @@ export async function assignProjectRoleToUser(userId: string, roleId: string): P
   }
 }
 
+/**
+ * Takes a project role away from a user.
+ *
+ * **Never throws.** When the request fails, it removes the role from that user among the in-memory
+ * mock users instead. The caller cannot tell this from a success; see the mock fallbacks in
+ * `docs/testing_strategy.md` §8.
+ */
 export async function unassignProjectRoleFromUser(userId: string, roleId: string): Promise<void> {
   try {
     await apiClient.fetch(`/api/v1/users/${userId}/project-roles/${roleId}`, {
@@ -340,6 +374,11 @@ type PmAttentionListener = () => void;
 
 const pmAttentionListeners = new Set<PmAttentionListener>();
 
+/**
+ * Subscribes to changes of what waits on the project manager.
+ *
+ * @returns A function that removes the listener again.
+ */
 export function onPmAttentionChanged(listener: PmAttentionListener): () => void {
   pmAttentionListeners.add(listener);
   return () => {
@@ -353,6 +392,11 @@ function notifyPmAttentionChanged(): void {
   });
 }
 
+/**
+ * Accepts a hire's request to skip their current step. PM and ADMIN only.
+ *
+ * @param reviewComment Optional note for the hire about the decision.
+ */
 export async function acceptOnboardingSkipRequest(
   skipId: string,
   reviewComment = "",
@@ -367,6 +411,11 @@ export async function acceptOnboardingSkipRequest(
   notifyPmAttentionChanged();
 }
 
+/**
+ * Denies a hire's request to skip their current step. PM and ADMIN only.
+ *
+ * @param reviewComment Optional note for the hire about the decision.
+ */
 export async function denyOnboardingSkipRequest(skipId: string, reviewComment = ""): Promise<void> {
   await apiClient.fetch(`/api/v1/admin/onboarding/skips/${skipId}/deny`, {
     method: "POST",
@@ -407,6 +456,7 @@ function normaliseFeedback(item: OnboardingFeedback): OnboardingFeedback {
   };
 }
 
+/** Loads all step feedback one user has given, with `read` normalised. PM and ADMIN only. */
 export async function getUserOnboardingFeedback(userId: string): Promise<OnboardingFeedback[]> {
   const feedback = await apiClient.fetch<OnboardingFeedback[]>(
     `/api/v1/admin/onboarding/users/${userId}/feedback`,
@@ -415,12 +465,17 @@ export async function getUserOnboardingFeedback(userId: string): Promise<Onboard
   return feedback.map(normaliseFeedback);
 }
 
+/**
+ * Loads the step feedback of all users, across every project, with `read` normalised. Callers
+ * that need one project's feedback filter by its members themselves. PM and ADMIN only.
+ */
 export async function getAllOnboardingFeedback(): Promise<OnboardingFeedback[]> {
   const feedback = await apiClient.fetch<OnboardingFeedback[]>("/api/v1/admin/onboarding/feedback");
 
   return feedback.map(normaliseFeedback);
 }
 
+/** Marks one feedback item as read. PM and ADMIN only. */
 export async function markOnboardingFeedbackRead(feedbackId: string): Promise<void> {
   await apiClient.fetch(`/api/v1/admin/onboarding/feedback/${feedbackId}/read`, {
     method: "POST",
@@ -429,6 +484,15 @@ export async function markOnboardingFeedbackRead(feedbackId: string): Promise<vo
   notifyPmAttentionChanged();
 }
 
+/**
+ * Loads another user's onboarding path with its phases and their steps.
+ *
+ * When the path comes back without phases, or a phase without steps, they are loaded
+ * separately and filled in.
+ *
+ * @returns The path, or `null` when the path cannot be loaded at all (including when the user
+ *   has none). A phase whose steps fail to load is returned with an empty step list.
+ */
 export async function getUserOnboardingPath(
   userId: string,
 ): Promise<OnboardingPathEndpoint | null> {
@@ -497,6 +561,7 @@ export type CreateOnboardingTaskRequest = {
   finished?: boolean;
 };
 
+/** Adds a step to a phase of a member's onboarding path. */
 export async function createOnboardingStepForPhase(
   phaseId: string,
   request: CreateOnboardingStepRequest,
@@ -510,6 +575,7 @@ export async function createOnboardingStepForPhase(
   );
 }
 
+/** Replaces a step on a member's onboarding path, including its status and skip state. */
 export async function updateOnboardingStep(
   stepId: string,
   request: UpdateOnboardingStepRequest,
@@ -520,6 +586,7 @@ export async function updateOnboardingStep(
   });
 }
 
+/** Adds a task to a step of a member's onboarding path. */
 export async function createOnboardingTaskForStep(
   stepId: string,
   request: CreateOnboardingTaskRequest,
@@ -530,6 +597,7 @@ export async function createOnboardingTaskForStep(
   });
 }
 
+/** Deletes a step from a member's onboarding path. */
 export async function deleteOnboardingStep(stepId: string): Promise<void> {
   await apiClient.fetch(`/api/v1/onboarding/steps/${stepId}`, {
     method: "DELETE",
@@ -558,6 +626,12 @@ export async function updateOnboardingTask(
   });
 }
 
+/**
+ * Loads the tasks of one step on a member's onboarding path.
+ *
+ * Never throws: when the request fails it returns an empty list, which looks the same as a step
+ * without tasks.
+ */
 export async function getOnboardingTasksByStep(stepId: string): Promise<OnboardingTaskEndpoint[]> {
   try {
     return await apiClient.fetch<OnboardingTaskEndpoint[]>(
@@ -568,6 +642,7 @@ export async function getOnboardingTasksByStep(stepId: string): Promise<Onboardi
   }
 }
 
+/** Deletes a task from a member's onboarding path. */
 export async function deleteOnboardingTask(taskId: string): Promise<void> {
   await apiClient.fetch(`/api/v1/onboarding/tasks/${taskId}`, {
     method: "DELETE",
@@ -611,6 +686,14 @@ function toSkill(skill: SkillResponseDto): Skill {
   };
 }
 
+/**
+ * Lists all skills, retired ones included (see `status`).
+ *
+ * **Never throws.** When the request fails, it returns the mock skills instead.
+ * {@link getUserSkillLevels} and {@link getMySkillLevels} label real assessments with this list,
+ * so in that case they show mock skill names. The caller cannot tell this from a success; see
+ * the mock fallbacks in `docs/testing_strategy.md` §8.
+ */
 export async function getSkills(): Promise<Skill[]> {
   try {
     const response = await apiClient.fetch<SkillResponseDto[]>("/api/v1/skills");
@@ -621,12 +704,18 @@ export async function getSkills(): Promise<Skill[]> {
   }
 }
 
+/**
+ * Loads one skill.
+ *
+ * @throws ApiError 404 when the skill does not exist.
+ */
 export async function getSkillById(skillId: string): Promise<Skill> {
   const response = await apiClient.fetch<SkillResponseDto>(`/api/v1/skills/${skillId}`);
 
   return toSkill(response);
 }
 
+/** Renames a skill or changes the roles it is linked to. Only the given fields change. */
 export async function updateSkill(
   skillId: string,
   data: { name?: string; roleIds?: string[] },
@@ -698,6 +787,7 @@ export async function acceptSkillSuggestion(
   return response.map(toSkill);
 }
 
+/** Lists the skills linked to one project role. */
 export async function getSkillsByRoleId(roleId: string): Promise<Skill[]> {
   const response = await apiClient.fetch<SkillResponseDto[]>(
     `/api/v1/projectRoles/${roleId}/skills`,
@@ -706,6 +796,11 @@ export async function getSkillsByRoleId(roleId: string): Promise<Skill[]> {
   return response.map(toSkill);
 }
 
+/**
+ * Replaces the complete list of skills linked to a project role.
+ *
+ * @returns The role's skills after the change.
+ */
 export async function updateRoleSkills(roleId: string, skillIds: string[]): Promise<Skill[]> {
   const response = await apiClient.fetch<SkillResponseDto[]>(
     `/api/v1/projectRoles/${roleId}/skills`,
@@ -718,6 +813,15 @@ export async function updateRoleSkills(roleId: string, skillIds: string[]): Prom
   return response.map(toSkill);
 }
 
+/**
+ * Brings a retired skill back. There is no reactivate endpoint: the backend reactivates a
+ * retired skill when a skill with the same name is created, so this posts `name` and links it
+ * to `roleIds`.
+ *
+ * **Never throws.** When the request fails, it sets the skill to active in the in-memory mock list
+ * instead. The caller cannot tell this from a success; see the mock fallbacks in
+ * `docs/testing_strategy.md` §8.
+ */
 export async function reactivateSkill(
   skillId: string,
   name: string,
@@ -750,6 +854,15 @@ export async function reactivateSkill(
   }
 }
 
+/**
+ * Creates a skill linked to `roleIds`. A retired skill with the same name is reactivated
+ * instead of duplicated.
+ *
+ * **Never throws.** When the request fails, it applies the same logic to the in-memory mock list
+ * and returns a skill with a made-up `mock-skill-…` id. This includes the backend's 409 for an
+ * active skill with the same name. The caller cannot tell this from a success; see the mock
+ * fallbacks in `docs/testing_strategy.md` §8.
+ */
 export async function createSkill(name: string, roleIds: string[]): Promise<Skill> {
   try {
     const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
@@ -788,6 +901,13 @@ export async function createSkill(name: string, roleIds: string[]): Promise<Skil
   }
 }
 
+/**
+ * Deletes a project role.
+ *
+ * **Never throws.** When the request fails, it removes the role from the in-memory mock roles,
+ * skills and users instead. The caller cannot tell this from a success; see the mock fallbacks in
+ * `docs/testing_strategy.md` §8.
+ */
 export async function deleteProjectRole(roleId: string): Promise<void> {
   try {
     await apiClient.fetch(`/api/v1/projectRoles/${roleId}`, {
@@ -810,6 +930,14 @@ export async function deleteProjectRole(roleId: string): Promise<void> {
   }
 }
 
+/**
+ * Retires a skill. The backend keeps it with status `RETIRED` rather than deleting it, so it can
+ * be reactivated later.
+ *
+ * **Never throws.** When the request fails, it marks the skill as retired in the in-memory mock
+ * list instead. The caller cannot tell this from a success; see the mock fallbacks in
+ * `docs/testing_strategy.md` §8.
+ */
 export async function deleteSkill(skillId: string): Promise<void> {
   try {
     await apiClient.fetch(`/api/v1/admin/skills/${skillId}`, {
@@ -823,8 +951,6 @@ export async function deleteSkill(skillId: string): Promise<void> {
     );
   }
 }
-
-// Removed mock role functions
 
 export type CreateSkillAssessmentRequest = {
   userId: string;
@@ -842,6 +968,11 @@ function getSkillAssessmentPromptStateKey(userId: string) {
   return `${skillAssessmentPromptStatePrefix}:${userId}`;
 }
 
+/**
+ * Whether a user has dismissed or completed the skill assessment prompt, as stored in this
+ * browser's `localStorage`. `null` means neither, so `AuthGuard` may still send them to
+ * `/skill-wizard`.
+ */
 export function getSkillAssessmentPromptState(userId: string): SkillAssessmentPromptState | null {
   if (typeof window === "undefined") return null;
 
@@ -850,18 +981,30 @@ export function getSkillAssessmentPromptState(userId: string): SkillAssessmentPr
   return value === "dismissed" || value === "completed" ? value : null;
 }
 
+/** Remembers in `localStorage` that a user closed the skill assessment without finishing it. */
 export function markSkillAssessmentPromptDismissed(userId: string): void {
   if (typeof window === "undefined") return;
 
   window.localStorage.setItem(getSkillAssessmentPromptStateKey(userId), "dismissed");
 }
 
+/** Remembers in `localStorage` that a user finished the skill assessment. */
 export function markSkillAssessmentPromptCompleted(userId: string): void {
   if (typeof window === "undefined") return;
 
   window.localStorage.setItem(getSkillAssessmentPromptStateKey(userId), "completed");
 }
 
+/**
+ * Whether the signed-in user has assessed at least one skill.
+ *
+ * The request always reads the signed-in user's own assessments; `userId` is only used by the
+ * fallback.
+ *
+ * **Never throws.** When the request fails, it answers from the in-memory mock assessments, which
+ * are empty after a reload. The caller cannot tell this from a success; see the mock fallbacks in
+ * `docs/testing_strategy.md` §8.
+ */
 export async function hasCompletedSkillAssessment(userId: string): Promise<boolean> {
   try {
     const response = await apiClient.fetch<SkillAssessmentResponseDto[]>("/api/v1/me/skills");
@@ -872,6 +1015,14 @@ export async function hasCompletedSkillAssessment(userId: string): Promise<boole
   }
 }
 
+/**
+ * Saves the signed-in user's skill assessments, one request per skill, in order.
+ *
+ * **Never throws.** When the request fails, including halfway through the list, it stores the
+ * assessments in the in-memory mock list instead. `SkillWizardPage` relies on this function
+ * throwing to keep the wizard open, so a failed save is reported to the user as saved. The caller
+ * cannot tell this from a success; see the mock fallbacks in `docs/testing_strategy.md` §8.
+ */
 export async function saveUserSkillAssessments(
   assessments: CreateSkillAssessmentRequest[],
 ): Promise<void> {
@@ -942,6 +1093,13 @@ function joinSkillLevels(
   });
 }
 
+/**
+ * Another user's completed skill assessments, each labelled with its skill and role names.
+ *
+ * Never throws: when the assessments cannot be read it returns an empty list, which looks the
+ * same as a user who has not assessed anything. Skill and role names come from
+ * {@link getSkills} and {@link getProjectRoles}, which fall back to mock data on failure.
+ */
 export async function getUserSkillLevels(userId: string): Promise<UserSkillLevel[]> {
   try {
     const [assessments, skills, roles] = await Promise.all([
