@@ -15,6 +15,7 @@ import {
   type PathWindowState,
 } from "../../onboarding/pathWindow.ts";
 import { onboardingService } from "../../../services/onboardingService.ts";
+import { onBuddyPathChanged } from "../../buddy/aiBuddyBus.ts";
 
 /** What each state is called and wears. Never colour alone — every one carries a word and a glyph. */
 const STATES: Record<
@@ -78,17 +79,24 @@ export function BoardPathWindow({
   useEffect(() => {
     let cancelled = false;
 
-    void onboardingService
-      .fetchPath()
-      .then((path) => {
-        if (!cancelled) setWhere(pathWindow(path));
-      })
-      // No path, or no reaching it: the board has plenty else to show, and a strip that cannot
-      // say where somebody is should not say anything at all.
-      .catch(() => undefined);
+    const read = () =>
+      void onboardingService
+        .fetchPath()
+        .then((path) => {
+          if (!cancelled) setWhere(pathWindow(path));
+        })
+        // No path, or no reaching it: the board has plenty else to show, and a strip that cannot
+        // say where somebody is should not say anything at all.
+        .catch(() => undefined);
+
+    read();
+    // Read again when the buddy moved the path on, so the strip under the dock says where the
+    // hire now stands.
+    const unsubscribe = onBuddyPathChanged(read);
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 

@@ -53,7 +53,7 @@ self-contained under `src/features/` and surfaced through dedicated routes:
 - **Insights — Knowledge Requests** — Questions escalated by hires, collected in an inbox where PMs answer them.
 - **Insights — Onboarding** — Onboarding progress per hire and the hires that need attention.
 - **Board** — The hire's own board of cards, areas and stages, synced with the server.
-- **AI Buddy** — An AI companion next to the chat that holds a conversation, keeps drafts and proposes edits to the hire's board.
+- **AI Buddy** — An AI companion next to the chat that holds a conversation and keeps drafts. It proposes changes the hire confirms first: edits to their board, progress on their onboarding path (completing steps and tasks, answering knowledge checks, adding a step, requesting a skip), and flagging a question to their PM. The onboarding path can open a conversation about a step or question.
 - **Blueprints** — Onboarding path blueprints for PMs, edited as a graph and kept in versions.
 - **Hire Setup** — Arrival steps and the starter task pool with its review, as tabs of one page.
 - **Settings & Profile** — Central configuration page with sections for the user profile (avatar, display name, password), appearance (light/dark/system theme, visual effects and optional extras), and access tokens (GitHub PATs and Atlassian credentials, for authorized roles).

@@ -68,8 +68,7 @@ src/
 │   ├── attestation/         # Requests to confirm a hire's work
 │   ├── blueprints/          # Onboarding path blueprints: graph editor, versions
 │   ├── board/               # The hire's board: cards, areas, stages, marks, server sync
-│   ├── buddy/               # AI buddy: conversation, drafts, board edit proposals
-│   ├── card-blueprints/     # Cards a PM wants every hire of a role to start with
+│   ├── buddy/               # AI buddy: conversation, drafts, proposals for the board and the onboarding path
 │   ├── chatbot/             # Streaming AI assistant
 │   ├── competency-graph/    # Force layout for the competency graph
 │   ├── connectors/          # Connector + source allow/deny management

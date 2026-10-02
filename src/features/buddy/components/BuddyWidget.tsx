@@ -68,6 +68,8 @@ export function BuddyWidget() {
     toggleOpen,
     confirmAction,
     dismissAction,
+    actionDrafts,
+    setActionDraft,
     suggestions,
     dinoGameActive,
     closeDinoGame,
@@ -349,6 +351,8 @@ export function BuddyWidget() {
             activeTool={activeTool}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
+            actionDrafts={actionDrafts}
+            setActionDraft={setActionDraft}
             suggestions={suggestions}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={closeDinoGame}

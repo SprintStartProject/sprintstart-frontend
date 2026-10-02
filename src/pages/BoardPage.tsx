@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   AlertCircle,
   Check,
@@ -10,7 +11,6 @@ import {
   Milestone,
   Minimize2,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
@@ -21,11 +21,9 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { BoardChainPanel } from "../features/board/components/BoardChainPanel";
-import { useGeneratedPathCards } from "../features/board/hooks/useGeneratedPathCards";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
-import { BoardPathNotes } from "../features/board/components/BoardPathNotes";
 import { BoardPathWindow } from "../features/board/components/BoardPathWindow";
 import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
 import { BoardFilterTriggers } from "../features/board/components/BoardFilterTriggers";
@@ -36,7 +34,6 @@ import { BoardNextUp } from "../features/board/components/BoardNextUp";
 import { BoardLocalOnlyNotice } from "../features/board/components/BoardLocalOnlyNotice";
 import { nextUp } from "../features/board/layout/nextUp";
 import { useProjectContext } from "../features/projects/useProjectContext";
-import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
@@ -90,19 +87,18 @@ import {
  * memory and never replayed — so anything durable it showed you was gone by the next visit. This is
  * where those things live instead. Chat is the conversation; this is the whiteboard beside it.
  *
- * Per project, because what belongs on it is: the path, the open work, later the current task. The
- * project switcher is the same one the rest of the app uses, so the choice is remembered across
- * pages rather than being a setting of this one.
+ * Per project, because what belongs on it is: the open work, the current task, what the buddy
+ * remembers. The project switcher is the same one the rest of the app uses, so the choice is
+ * remembered across pages rather than being a setting of this one.
+ *
+ * **Not the onboarding.** That is the path on the Onboarding page, which a PM's blueprint prescribes
+ * and the buddy tutors along. The board used to carry a second one -- a rail from joining to a first
+ * accepted contribution, and a button that copied the path's steps into checklists -- and two plans
+ * that drift apart are worse than one.
  *
  * The shell is the app's page shell — banner header over `app-page-frame`, `PageHeader` for the
  * title block, shared primitives for the actions and for every empty, loading and error state — so
  * the board sits at the same gutter and reads with the same weight as Starter Work beside it.
- *
- * **The path is lifted out of the grid into the header.** It is the one card that says where the
- * hire stands overall; every other card is a detail of some part of it, so it belongs above them
- * rather than competing with a checklist for a slot. It keeps its place in the board's order — the
- * grid renders the rest, and a reorder puts the path back at the index it came from, so lifting it
- * for display never quietly rewrites what the hire arranged.
  *
  * **The board is now a process, not a pile.** Three things carry that, and none of them changes the
  * board's own order:
@@ -114,9 +110,7 @@ import {
  * - *sections* down the side, so a board of forty cards is read one part at a time.
  *
  * The reason for all three is the same. A board that shows everything at once is fine at eight
- * cards and unusable at forty, and forty is what a generated onboarding path produces. See
- * `layout/boardStructure.ts` for the model and `generation/pathToCards.ts` for where the cards come
- * from.
+ * cards and unusable at forty. See `layout/boardStructure.ts` for the model.
  */
 
 /**
@@ -139,26 +133,23 @@ const UNDO_WINDOW_MS = 7000;
 const FOLD_THRESHOLD = 8;
 
 /**
- * The hire's board: their own cards, the buddy's and the team's, arranged in areas and stages and
- * synced with the server.
+ * The hire's board: their own cards and the buddy's, arranged in areas and stages and synced with
+ * the server. The onboarding path itself lives on the Onboarding page; the board only shows the
+ * current step of it, as a live `PATH_STEP` card. That card is `AI`-owned, so it counts as `buddy`.
  *
  * The filter rail cuts by *who put a card here*, the one thing a card's content never says on its
- * own (see `layout/boardFilters.ts`):
+ * own (see `layout/boardFilters.ts`). Two sources, and they partition the board:
  *
  * - `buddy` — placed for the hire in conversation, contents read live.
- * - `mine` — everything else they own: their own notes and lists, and the steps of their own
- *   personalised path. The path counts as theirs because it *is*: it was drafted for them, they
- *   edit it, and nobody else on the project has the same one.
+ * - `mine` — everything they wrote themselves: their own notes, links and lists.
  *
- * Cards from a PM's card blueprints have no filter of their own. They sit in the area "From your
- * team", which the section tabs reach. Where a card sits in the process is a separate question,
- * and the stages, the focus view and the section tabs answer that one.
+ * Where a card sits in the process is a separate question, and the stages, the focus view and the
+ * section tabs answer that one.
  *
  * Bound to `/board`, open to every permission group, not wrapped in `ManagerAreaGuard`.
  */
 export function BoardPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();
-  const { profile } = useAuth();
   const toast = useToast();
   const { isFocused, setFocused } = useFocusMode();
 
@@ -181,8 +172,6 @@ export function BoardPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFocused, setFocused]);
 
-  /** The hire's roles on this project, which decide which of the team's blueprints reach them. */
-  const roleIds = useMemo(() => (profile?.projectRoles ?? []).map((role) => role.id), [profile]);
   const [isArranging, setIsArranging] = useState(false);
   const [filter, setFilter] = useState<BoardFilter>("all");
   const [sectionId, setSectionId] = useState<string | null>(null);
@@ -495,14 +484,6 @@ export function BoardPage() {
     });
   }
 
-  // The path is drawn above the board -- the window for where they stand, `BoardPathNotes` for
-  // the two things the card says that nothing else does -- and the grid gets everything else. Its
-  // index is kept so a reorder of the visible cards can put it back where it was: the board's
-  // order is the hire's, and this is a display decision, not an edit to it.
-  const pathIndex =
-    board?.cards.findIndex((card) => card.content.kind === "PATH_TO_FIRST_CONTRIBUTION") ?? -1;
-  const pathCard = pathIndex === -1 ? null : (board?.cards[pathIndex] ?? null);
-
   /**
    * Every card the board is holding, whatever the current view.
    *
@@ -519,22 +500,13 @@ export function BoardPage() {
     () =>
       board?.cards.filter(
         (card) =>
-          card !== pathCard &&
-          !pendingRemovals.has(card.id) &&
-          (isTaskPoolShown || card.content.kind !== "TASK_POOL"),
+          !pendingRemovals.has(card.id) && (isTaskPoolShown || card.content.kind !== "TASK_POOL"),
       ) ?? [],
-    [board, pathCard, pendingRemovals, isTaskPoolShown],
+    [board, pendingRemovals, isTaskPoolShown],
   );
 
-  const {
-    structure,
-    states,
-    assignStage,
-    assignGroupStage,
-    toggleDone,
-    setPredecessor,
-    applyPlan,
-  } = useBoardStructure(boardId, allCards);
+  const { structure, states, assignStage, assignGroupStage, toggleDone, setPredecessor } =
+    useBoardStructure(boardId, allCards);
 
   /**
    * The card whose run is being looked at, or null.
@@ -866,12 +838,7 @@ export function BoardPage() {
     return cuts;
   }, [allCards, filter, openStackIds, shownSectionId, sections, stacks]);
 
-  const handleReorder = (cardIds: string[]) => {
-    if (!pathCard || pathIndex === -1) return void reorder(cardIds);
-    const next = [...cardIds];
-    next.splice(Math.min(pathIndex, next.length), 0, pathCard.id);
-    return void reorder(next);
-  };
+  const handleReorder = (cardIds: string[]) => void reorder(cardIds);
 
   /**
    * Opens the planning mode, with nothing folded away.
@@ -890,82 +857,6 @@ export function BoardPage() {
   function startArranging() {
     setOpenStages(new Set(BOARD_STAGES));
     setIsArranging(true);
-  }
-
-  const { generate, generating } = useGeneratedPathCards();
-
-  /**
-   * Builds the hire's personalised onboarding path into cards, and files them.
-   *
-   * The cards are written server-side; the areas, stages and order between them are this client's
-   * to keep, so both halves are applied here rather than left for the hire to arrange by hand. A
-   * generated path that landed as forty loose cards would be the exact complaint this answers.
-   */
-  async function handleGenerate() {
-    if (!selectedProjectId) return;
-
-    const existingTitles = new Set(
-      allCards.flatMap((card) =>
-        card.content.kind === "CHECKLIST" && card.content.title ? [card.content.title] : [],
-      ),
-    );
-
-    const result = await generate(selectedProjectId, roleIds, existingTitles);
-
-    if (result === "NOTHING_TO_BUILD") {
-      toast.info("Nothing to build from yet", {
-        description:
-          "Generate your onboarding path on the Onboarding page, or ask your PM to set up card blueprints.",
-      });
-      return;
-    }
-    if (result === "NOTHING_NEW") {
-      toast.info("Your path is already on the board", {
-        description: "Every step that isn't finished is already a card here.",
-      });
-      return;
-    }
-    if (result === "FAILED") {
-      showErrorToast("Your path couldn't be built into cards", {
-        description: "Nothing was changed — try again.",
-      });
-      return;
-    }
-
-    // One area per phase, named after it — and a second run adds to the area it made the first
-    // time rather than making another one beside it. Without that, generating again after the PM
-    // added a blueprint left two areas called "From your team", one holding the old cards and one
-    // holding the new, which is the same card twice as far as anybody reading the board can tell.
-    //
-    // The index is in the id because a plan is applied inside a single millisecond and `Date.now()`
-    // alone would mint the same id for every phase.
-    const stamp = Date.now();
-    const filed = [...groups];
-    result.areas.forEach((area, index) => {
-      const existing = filed.findIndex((group) => group.name === area.name);
-      if (existing !== -1) {
-        filed[existing] = {
-          ...filed[existing],
-          cardIds: [...filed[existing].cardIds, ...area.cardIds],
-        };
-
-        return;
-      }
-
-      filed.push({
-        id: `group-path-${stamp}-${index}`,
-        name: area.name,
-        cardIds: area.cardIds,
-        collapsed: false,
-      });
-    });
-    saveGroups(filed);
-    applyPlan(result.stages, result.chain);
-
-    refresh();
-    toast.success(`${result.cardCount} cards added from your path`, {
-      description: "Grouped by phase, in the order the path puts them in.",
-    });
   }
 
   /**
@@ -990,7 +881,7 @@ export function BoardPage() {
               subtitle={
                 isArranging
                   ? "Say when each card is due and what it waits on."
-                  : "Where your onboarding stays put between conversations."
+                  : "Where your work stays put between conversations."
               }
               actions={
                 isArranging ? (
@@ -1003,16 +894,6 @@ export function BoardPage() {
                   </Button>
                 ) : (
                   <>
-                    <Button
-                      variant="secondary"
-                      onClick={() => void handleGenerate()}
-                      disabled={!selectedProjectId}
-                      loading={generating}
-                      icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
-                      title="Turn your personalised onboarding path into checklists here"
-                    >
-                      Build my path
-                    </Button>
                     {/* The one switch from the rail worth a copy here, for the widths where
                         there is no margin to put a rail in. `lg:hidden` rather than a second
                         implementation: one state, two places it can be reached from. */}
@@ -1050,9 +931,6 @@ export function BoardPage() {
           page; this is about the work, and it belongs where the work is.
         */}
         {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
-        {pathCard?.content.kind === "PATH_TO_FIRST_CONTRIBUTION" && (
-          <BoardPathNotes content={pathCard.content} />
-        )}
         {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
             space: the board is a column of cards and the margin is where a hand rests. So the
             offers live there — always in reach, never in the way, and out of the row above the
@@ -1292,26 +1170,22 @@ export function BoardPage() {
               <SlidingTabPanel activeKey={sectionValue} index={sectionIndex} className="space-y-4">
                 {/* A board with nothing on it is the first thing a new hire sees, and an empty page
                 cannot say what the board is *for*. Named after what it will hold rather than after
-                its own emptiness — and it points at the two things that fill it: the path, and the
-                row of buttons directly above. */}
+                its own emptiness — and it says where the onboarding is, because it is not here. */}
                 {allCards.length === 0 && (
                   <EmptyState
                     icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
                     title="Nothing on your board yet"
-                    action={
-                      <Button
-                        variant="primary"
-                        onClick={() => void handleGenerate()}
-                        loading={generating}
-                        icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
-                      >
-                        Build my path
-                      </Button>
-                    }
                   >
                     This is where things stay put between conversations — the task you are on, work
-                    worth picking up, what your buddy remembers. Build your onboarding path into
-                    checklists here, and add a note, a link or a list of your own at any time.
+                    worth picking up, what your buddy remembers. Add a note, a link or a list of
+                    your own at any time. Your onboarding itself is on the{" "}
+                    <Link
+                      to="/onboarding"
+                      className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    >
+                      Onboarding page
+                    </Link>
+                    .
                   </EmptyState>
                 )}
 
