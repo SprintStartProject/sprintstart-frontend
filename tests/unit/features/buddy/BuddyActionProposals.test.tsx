@@ -2,15 +2,15 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { BuddyActionProposals as BuddyActionList } from "../../../../src/features/buddy/components/BuddyActionProposals";
-import type { ProposedAction } from "../../../../src/features/buddy/types";
+import { BuddyActionProposals } from "../../../../src/features/buddy/components/BuddyActionProposals";
+import type { HireActionProposal, ProposedAction } from "../../../../src/features/buddy/types";
 
 // The card has its own test file; here we only assert *whether* it renders.
 vi.mock("../../../../src/features/buddy/components/BuddyOrientationCard", () => ({
   BuddyOrientationCard: () => <div data-testid="buddy-orientation-card" />,
 }));
 
-function action(overrides: Partial<ProposedAction> = {}): ProposedAction {
+function action(overrides: Partial<HireActionProposal> = {}): HireActionProposal {
   return {
     id: "a1",
     action: "claim_goal",
@@ -48,7 +48,7 @@ function Proposals({
   };
 
   return (
-    <BuddyActionList
+    <BuddyActionProposals
       messageId="m1"
       actions={actions}
       actionDrafts={drafts}
@@ -167,7 +167,7 @@ describe("BuddyActionProposals", () => {
    * what leaves the product in somebody's name is theirs to word.
    */
   describe("a proposed flag to the PM", () => {
-    const flag = (overrides: Partial<ProposedAction> = {}) =>
+    const flag = (overrides: Partial<HireActionProposal> = {}) =>
       action({
         action: "flag_to_pm",
         label: "Flag this to your PM",
@@ -618,7 +618,7 @@ describe("BuddyActionProposals", () => {
 
   /** The one offer that replaces something, so it has to say which wording is leaving. */
   describe("a proposed rewording", () => {
-    const reword = (overrides: Partial<ProposedAction> = {}) =>
+    const reword = (overrides: Partial<HireActionProposal> = {}) =>
       action({
         action: "reword_checklist_item",
         label: "Reword this line",
@@ -686,6 +686,197 @@ describe("BuddyActionProposals", () => {
       );
 
       expect(screen.getByText(/Deploys run on Thursdays/)).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * The board edits reach into what the hire already has, so the offer shows what agreeing would
+   * touch: the backend's own sentence first, then the cards, link or list it is about.
+   */
+  describe("board edits", () => {
+    it("names every card a clean-up would take off, and describes the button with the preview", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "dismiss_cards",
+              label: "Remove these from your board",
+              cardIds: ["c-1", "c-2"],
+              cardNames: ["Old deploy note", "current task"],
+              preview: "Take 2 cards off your board. Nothing is deleted.",
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Would come off your board:")).toBeInTheDocument();
+      expect(screen.getByText(/Old deploy note/)).toBeInTheDocument();
+      expect(screen.getByText(/current task/)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Remove these from your board/ }),
+      ).toHaveAccessibleDescription("Take 2 cards off your board. Nothing is deleted.");
+    });
+
+    it("shows a new order as a numbered list, in the proposed order", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "reorder_cards",
+              label: "Rearrange your board",
+              cardIds: ["c-2", "c-1"],
+              cardNames: ["Runbook", "Getting started"],
+              preview: "Put these first on your board, in this order.",
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+        />,
+      );
+
+      const items = screen.getAllByRole("listitem").map((li) => li.textContent);
+      expect(items).toEqual(["Runbook", "Getting started"]);
+      expect(screen.getByRole("list").tagName).toBe("OL");
+    });
+
+    it("shows a proposed link as text, never as something to click", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "place_link",
+              label: "Keep this link",
+              linkUrl: "https://wiki/runbook",
+              linkLabel: "Runbook",
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Runbook")).toBeInTheDocument();
+      expect(screen.getByText("https://wiki/runbook")).toBeInTheDocument();
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    });
+
+    it("shows a checklist edit as the whole new list, with what would go in the preview", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "edit_checklist",
+              label: "Update this list",
+              cardId: "c-1",
+              checklistTitle: "Getting started",
+              checklistItems: ["Run it locally", "Open a PR"],
+              preview: "Lines that would go: \u201CFix it\u201D.",
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("The list would read:")).toBeInTheDocument();
+      expect(screen.getByText(/Open a PR/)).toBeInTheDocument();
+      expect(screen.getByText(/Lines that would go/)).toBeInTheDocument();
+    });
+
+    /**
+     * Fail closed, as stored proposals do: a clean-up whose card names did not arrive would be a
+     * button that removes cards nobody was shown.
+     */
+    it("refuses to confirm a clean-up that arrived without its card names", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "dismiss_cards",
+              label: "Remove these from your board",
+              cardIds: ["c-1", "c-2"],
+              preview: "Take 2 cards off your board.",
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("buddy-proposal-unsupported")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Remove these from your board/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("refuses to confirm a checklist edit whose preview of removed lines is missing", () => {
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "edit_checklist",
+              label: "Update this list",
+              cardId: "c-1",
+              checklistItems: ["Run it locally"],
+            }),
+          ]}
+          onConfirm={vi.fn()}
+          onDismiss={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("buddy-proposal-unsupported")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Update this list/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Not now/ })).toBeInTheDocument();
+    });
+
+    it("confirms with the proposal as it was offered", async () => {
+      const onConfirm = vi.fn();
+      render(
+        <BuddyActionProposals
+          messageId="m1"
+          actions={[
+            action({
+              action: "edit_note",
+              label: "Update this note",
+              cardId: "c-9",
+              noteText: "Deploys run on Tuesdays",
+            }),
+          ]}
+          onConfirm={onConfirm}
+          onDismiss={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Deploys run on Tuesdays")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /Update this note/ }));
+
+      expect(onConfirm).toHaveBeenCalledWith(
+        "m1",
+        expect.objectContaining({ cardId: "c-9", noteText: "Deploys run on Tuesdays" }),
+      );
     });
   });
 

@@ -8,7 +8,7 @@ import { Button } from "./Button";
 import { useDialogFocus } from "./useDialogFocus";
 import { useScrollLock } from "./useScrollLock";
 
-type ModalSize = "sm" | "md" | "lg" | "xl";
+type ModalSize = "sm" | "md" | "lg" | "xl" | "2xl" | "full";
 
 type ModalProps = {
   isOpen: boolean;
@@ -54,6 +54,12 @@ type ModalProps = {
    * elements to carry one, and a dialog is the thing a test opens and closes.
    */
   testId?: string;
+  /**
+   * Extra classes for the dialog panel itself. `dark` here renders the dialog in the dark theme
+   * whatever the app's theme is — the palette tokens are scoped to the `.dark` class, so the
+   * whole subtree switches with it.
+   */
+  panelClassName?: string;
   onClose: () => void;
 };
 
@@ -62,11 +68,15 @@ const sizeClassNames: Record<ModalSize, string> = {
   md: "max-w-md",
   lg: "max-w-2xl",
   xl: "max-w-4xl",
+  // For a dialog that is a small workspace of its own (the PM's project analysis), not a form.
+  "2xl": "max-w-6xl",
+  // Nearly the whole viewport, at a fixed height: for a dialog that is a canvas of its own.
+  full: "h-[calc(100dvh-2rem)] max-w-[100rem]",
 };
 
 /**
  * Portal-based dialog overlay — the core modal primitive for all dialogs.
- * Supports configurable size (sm/md/lg/xl), role (dialog/alertdialog),
+ * Supports configurable size (sm/md/lg/xl/2xl/full), role (dialog/alertdialog),
  * escape-key and backdrop dismiss, optional header actions, and a shared
  * backdrop/dialog animation via modalBackdropVariants + getModalDialogVariants.
  */
@@ -91,6 +101,7 @@ export function Modal({
   descriptionId = "modal-description",
   errorMessage,
   testId,
+  panelClassName = "",
   onClose,
 }: ModalProps) {
   // Moving focus in, keeping Tab inside and putting focus back is shared with the canvas covers,
@@ -163,7 +174,7 @@ export function Modal({
             initial="hidden"
             animate="visible"
             exit="exit"
-            className={`relative z-10 flex max-h-[calc(100dvh-2rem)] w-full ${sizeClassNames[size]} flex-col overflow-hidden rounded-[28px] border border-app-border bg-app-bg shadow-2xl`}
+            className={`relative z-10 flex max-h-[calc(100dvh-2rem)] w-full ${sizeClassNames[size]} flex-col overflow-hidden rounded-[28px] border border-app-border bg-app-bg shadow-2xl ${panelClassName}`}
           >
             <div className="pointer-events-none absolute -top-16 -right-16 h-[200px] w-[200px] rounded-full bg-app-brand-glow blur-3xl" />
 

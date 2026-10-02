@@ -18,8 +18,14 @@ import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import {
   BUDDY_ACTION_AMEND_CHECKLIST,
   BUDDY_ACTION_CLAIM_GOAL,
+  BUDDY_ACTION_DISMISS_CARDS,
+  BUDDY_ACTION_EDIT_CHECKLIST,
+  BUDDY_ACTION_EDIT_LINK,
+  BUDDY_ACTION_EDIT_NOTE,
   BUDDY_ACTION_PLACE_CHECKLIST,
+  BUDDY_ACTION_PLACE_LINK,
   BUDDY_ACTION_PLACE_NOTE,
+  BUDDY_ACTION_REORDER_CARDS,
   BUDDY_ACTION_REWORD_CHECKLIST,
   BUDDY_ACTION_TICK_CHECKLIST,
 } from "../types";
@@ -58,7 +64,8 @@ function isNotFound(e: unknown): boolean {
 /**
  * The hire-confirmed buddy actions that write to the board, by their wire names: the five
  * `BuddyBoardWriteActions` handles (placing, amending, ticking and rewording a checklist, and
- * the note), plus `claim_goal`, which pins the claimed task as the board's CURRENT_TASK card —
+ * the note), the six board edits (a link, editing a note, link or checklist, clearing cards off
+ * and rearranging them), plus `claim_goal`, which pins the claimed task as the board's CURRENT_TASK card —
  * its own outcome line says so ("It's on your board too"). Every other confirm changes something
  * else — a task claim, an attestation request, a flag, a username — and needs no board sync.
  */
@@ -69,6 +76,12 @@ const BUDDY_BOARD_ACTIONS = new Set<string>([
   BUDDY_ACTION_REWORD_CHECKLIST,
   BUDDY_ACTION_PLACE_NOTE,
   BUDDY_ACTION_CLAIM_GOAL,
+  BUDDY_ACTION_PLACE_LINK,
+  BUDDY_ACTION_EDIT_NOTE,
+  BUDDY_ACTION_EDIT_LINK,
+  BUDDY_ACTION_EDIT_CHECKLIST,
+  BUDDY_ACTION_DISMISS_CARDS,
+  BUDDY_ACTION_REORDER_CARDS,
 ]);
 
 /**
@@ -687,10 +700,16 @@ export function useBuddyConversation(
                 phaseId: proposal.phaseId,
                 onboardingTaskId: proposal.onboardingTaskId,
                 answer: proposal.answer,
+                optionIds: proposal.optionIds,
                 description: proposal.description,
                 reason: proposal.reason,
                 waitsOnIds: proposal.waitsOnIds,
                 unlocksIds: proposal.unlocksIds,
+                linkUrl: proposal.linkUrl,
+                linkLabel: proposal.linkLabel,
+                cardIds: proposal.cardIds,
+                cardNames: proposal.cardNames,
+                preview: proposal.preview,
                 status: "idle",
               });
             },
@@ -862,10 +881,14 @@ export function useBuddyConversation(
                   phaseId: action.phaseId,
                   onboardingTaskId: action.onboardingTaskId,
                   answer: action.answer,
+                  optionIds: action.optionIds,
                   description: action.description,
                   reason: action.reason,
                   waitsOnIds: action.waitsOnIds,
                   unlocksIds: action.unlocksIds,
+                  linkUrl: action.linkUrl,
+                  linkLabel: action.linkLabel,
+                  cardIds: action.cardIds,
                 });
           patchAction(messageId, action.id, {
             status: "resolved",

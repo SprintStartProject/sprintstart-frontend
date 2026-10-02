@@ -2,9 +2,9 @@ import { render } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { BuddyActionProposals } from "../../../src/features/buddy/components/BuddyActionProposals";
-import type { ProposedAction } from "../../../src/features/buddy/types";
+import type { HireActionProposal } from "../../../src/features/buddy/types";
 
-function flag(overrides: Partial<ProposedAction> = {}): ProposedAction {
+function flag(overrides: Partial<HireActionProposal> = {}): HireActionProposal {
   return {
     id: "a1",
     action: "flag_to_pm",
@@ -16,7 +16,7 @@ function flag(overrides: Partial<ProposedAction> = {}): ProposedAction {
 }
 
 /** Rendered the way the thread does: with a session-held store for the one field that is editable. */
-function renderFlag(action: ProposedAction) {
+function renderFlag(action: HireActionProposal) {
   return render(
     <main>
       <BuddyActionProposals

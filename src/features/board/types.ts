@@ -1,5 +1,6 @@
 import type { ArrivalStep } from "../arrival/types";
 import type { StepStatus } from "../onboarding/types";
+import type { TaskType } from "../starter-work/types";
 
 /**
  * The board: a hire's persistent working surface on one project.
@@ -14,6 +15,7 @@ export type BoardCardKind =
   | "OPEN_PULL_REQUESTS"
   | "CURRENT_TASK"
   | "SUGGESTED_TASKS"
+  | "TASK_POOL"
   | "COMPETENCY_PROGRESS"
   | "MEMORY_RECAP"
   | "DIAGRAM"
@@ -35,6 +37,51 @@ export type AuthoredCardKind = "NOTE" | "LINK" | "CHECKLIST";
  * content is a live read. `HIRE` cards are theirs, and the mentor never removes one.
  */
 export type BoardCardOwner = "AI" | "HIRE";
+
+/**
+ * Who changed a card.
+ *
+ * Not the owner, which answers who *may* change it: the buddy rewriting a hire's note changes the
+ * words, not the owner, and a board that cannot say which is a board where the hire finds different
+ * text under their own card and has no way to tell how it got there.
+ */
+export type BoardActor = "HIRE" | "BUDDY";
+
+/** What the most recent change to a card was. Only the latest one is kept — never a history. */
+export type BoardCardChange = "CREATED" | "EDITED" | "TICKED" | "DISMISSED" | "MOVED";
+
+/** The most recent change to one card: what it was, whose, and when. */
+export type BoardCardLastChange = {
+  change: BoardCardChange;
+  by: BoardActor;
+  at: string;
+};
+
+/**
+ * What a card said before its most recent content edit, and the edit that replaced it.
+ *
+ * Depth one, whole content — the next edit overwrites it, so there is never more than one version
+ * to go back to. Restoring goes through the card's own edit path, which makes an undo an edit
+ * itself and lets it be undone in turn.
+ */
+export type BoardCardPrevious = {
+  content: BoardCardContent;
+  replacedBy: BoardActor;
+  replacedAt: string;
+};
+/**
+ * What just happened to one card's undo.
+ *
+ * `forReplacedAt` is the card's `previous.replacedAt` at the moment a refusal was raised, so the
+ * line can retire itself the moment the card moves on again: without it, a notice raised for one
+ * failed press would sit above a strip whose undo is already about a newer edit entirely. `null`
+ * when the re-read could not say which version the refusal was about.
+ */
+export type BoardUndoNotice = {
+  cardId: string;
+  kind: "restored" | "stale";
+  forReplacedAt: string | null;
+};
 
 /** One open pull request. `waitingHours` is null once somebody has responded — the clock stopped. */
 export type BoardPullRequest = {
@@ -109,6 +156,32 @@ export type BoardSuggestedTask = {
 export type SuggestedTasksContent = {
   kind: "SUGGESTED_TASKS";
   tasks: BoardSuggestedTask[];
+};
+
+/** One task in the pool, with what a hire needs to choose it. Never a score. */
+export type BoardPoolTask = {
+  taskId: string;
+  title: string;
+  summary: string | null;
+  /** Why this is a reasonable first task, in the words of whoever put it in the pool. */
+  rationale: string | null;
+  url: string | null;
+  taskType: TaskType;
+  reasons: string[];
+  /** Near the top of the ranking and matched on at least one signal. */
+  bestFit: boolean;
+  /** Three-valued: only `true` means the tracker shows somebody on it. */
+  sourceHasAssignee: boolean | null;
+};
+
+/**
+ * The whole live pool, best fit first, to browse and grab from by hand. The order is the ranking —
+ * filter it, never re-sort it. `currentTaskId` is the task the hire is on, if any.
+ */
+export type TaskPoolContent = {
+  kind: "TASK_POOL";
+  tasks: BoardPoolTask[];
+  currentTaskId: string | null;
 };
 
 /** One competency, with the bar it is measured against — never a score out of a hundred. */
@@ -296,6 +369,7 @@ export type BoardCardContent =
   | OpenPullRequestsContent
   | CurrentTaskContent
   | SuggestedTasksContent
+  | TaskPoolContent
   | CompetencyProgressContent
   | MemoryRecapContent
   | DiagramContent
@@ -334,6 +408,22 @@ export type BoardCard = {
    */
   placedAt: string | null;
   content: BoardCardContent;
+  /**
+   * The most recent change to this card, whoever made it; null — or absent, on a client meeting an
+   * older backend — for a card nobody has touched since the board seeded it.
+   *
+   * Recorded for hire and buddy alike, which is what lets the client say who did what without ever
+   * labelling a hire's own change as the buddy's.
+   */
+  lastChange?: BoardCardLastChange | null;
+  /**
+   * The version this card's most recent content edit replaced, or null/absent when there is none
+   * to go back to. Live cards never carry one — only the authored kinds hold stored content.
+   *
+   * The hire's own words, not a label saying something changed: somebody who finds different text
+   * on their card needs to be able to read what was there, and to put it back in one action.
+   */
+  previous?: BoardCardPrevious | null;
 };
 
 export type Board = {

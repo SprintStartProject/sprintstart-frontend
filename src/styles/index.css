@@ -442,6 +442,25 @@ body {
   }
 }
 
+/* The desktop sidebar and the page's margin beside it ease together when the sidebar folds to
+   icons, and follow the pointer exactly while its edge is dragged (`SidebarResizeHandle` marks
+   the drag on the root). */
+.app-sidebar-eases {
+  transition:
+    width 300ms ease-out,
+    margin-left 300ms ease-out;
+}
+
+html[data-sidebar-resizing] .app-sidebar-eases {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar-eases {
+    transition: none;
+  }
+}
+
 .app-page-frame {
   width: 100%;
   padding-left: var(--app-page-gutter);

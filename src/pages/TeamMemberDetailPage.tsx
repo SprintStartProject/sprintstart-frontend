@@ -1,6 +1,6 @@
-import { MessageSquareText, Pencil, Plus, ThumbsDown, ThumbsUp, Users, X } from "lucide-react";
+import { ArrowLeft, Hand, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../context/useToast";
 import type {
   OnboardingPathEndpoint,
@@ -29,8 +29,6 @@ import {
   type OnboardingFeedback,
   type UserSkillLevel,
 } from "../services/teamManagementService";
-import { isSkipPending } from "../features/onboarding/journey";
-import { isFeedbackUnread } from "../features/team-management/feedbackState";
 
 type DetailOnboardingStep = OnboardingStepEndpoint & {
   startedAt?: string | null;
@@ -42,27 +40,60 @@ type DetailOnboardingStep = OnboardingStepEndpoint & {
   } | null;
 };
 
-function getElapsedDays(startedAt: string): number {
-  const started = new Date(startedAt).getTime();
-
-  return Math.max(0, Math.floor((Date.now() - started) / (1000 * 60 * 60 * 24)));
-}
-
-import { UserAvatar } from "../components/common/UserAvatar";
-import { Modal } from "../components/ui/Modal";
-import { PageShell } from "../components/layout/PageShell";
+import { Button } from "../components/ui/Button";
+import { MemberHero } from "../features/pm-area/components/MemberHero";
+import { MemberOpenItems } from "../features/pm-area/components/MemberOpenItems";
+import { MemberSignals } from "../features/pm-area/components/MemberSummary";
+import { waitingOn } from "../features/pm-area/memberStatus";
+import { MEMBER_PHASE_PARAM, MEMBER_STEP_PARAM } from "../features/pm-area/pmWorkspacePaths";
+import { isUnread, type SkipDecision } from "../features/pm-area/useMemberOpenItems";
+import { useTeamRoster } from "../features/pm-area/useTeamRoster";
 import { PanelPresence } from "../components/ui/PanelPresence";
 import { MemberDetailDialogs } from "../features/team-management/components/detail/MemberDetailDialogs";
 import { MemberGapsPanel } from "../features/team-management/components/detail/MemberGapsPanel";
-import { MemberJourneySection } from "../features/team-management/components/detail/MemberJourneySection";
+import {
+  MemberJourneySection,
+  type MemberJourneyHandle,
+} from "../features/team-management/components/detail/MemberJourneySection";
 import { AlertDialog } from "../components/ui/AlertDialog";
+import { onboardingService } from "../services/onboardingService";
 import {
   PhaseCheckAdminModal,
   type PhaseCheckAdminTab,
 } from "../features/team-management/components/detail/PhaseCheckAdminModal";
-import { SkipReview } from "../features/team-management/components/detail/SkipReview";
 import { StepDetailsPanel } from "../features/team-management/components/detail/StepDetailsPanel";
 import { useProjectContext } from "../features/projects/useProjectContext";
+
+/** A rebuild failure, in the PM's words rather than the member's. */
+function describeRebuildError(message: string, reason?: string): string {
+  if (reason === "not-enough-knowledge") {
+    return "The project's knowledge base does not cover any phase yet. The current path is unchanged.";
+  }
+  if (/no active blueprint/i.test(message)) {
+    return "This project has no published onboarding blueprint yet. Publish one, then try again.";
+  }
+  if (/multiple active blueprints/i.test(message)) {
+    return "This project has more than one published onboarding blueprint. Archive all but one, then try again.";
+  }
+  if (/status: 403/.test(message)) {
+    return "Only the project's manager can rebuild paths, and only for members of the project.";
+  }
+  return `${message || "The generation failed."} The current path is unchanged.`;
+}
+
+function BackToTeam({ onBack }: { onBack: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onBack}
+      icon={<ArrowLeft className="h-4 w-4" />}
+      className="mb-3 -ml-2"
+    >
+      Team
+    </Button>
+  );
+}
 
 function formatMinutes(minutes?: number | null): string {
   if (!minutes || minutes <= 0) return "No estimate";
@@ -103,24 +134,54 @@ function getStepStatusStyles(status: string) {
   return "border-app-border bg-app-surface-muted text-app-text-muted";
 }
 
-export function TeamMemberDetailPage() {
+/**
+ * A member's full profile, shown inside the PM workspace's Team section (`/team/:userId`).
+ */
+export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const { selectedProjectId } = useProjectContext();
-  const { userId } = useParams<{ userId: string }>();
 
   const navigate = useNavigate();
 
   const [user, setUser] = useState<TeamOverviewUser | undefined>(undefined);
+  // The figures and phases at the top take the manager down to the path through this.
+  const journeyRef = useRef<MemberJourneyHandle>(null);
   const [availableRoles, setAvailableRoles] = useState<ProjectRole[]>([]);
-  const [selectedRoleId, setSelectedRoleId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [rolesModalOpen, setRolesModalOpen] = useState(false);
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   const [roleToRemove, setRoleToRemove] = useState<ProjectRole | null>(null);
   const [skillLevels, setSkillLevels] = useState<UserSkillLevel[]>([]);
   const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
   const [feedbackItems, setFeedbackItems] = useState<OnboardingFeedback[]>([]);
   const [onboardingPath, setOnboardingPath] = useState<OnboardingPathEndpoint | null>(null);
-  const [detailStepId, setDetailStepId] = useState("");
+  // The open step lives in the URL (see `MEMBER_STEP_PARAM`): opening pushes, so Back closes it;
+  // closing replaces, so Back does not open it again.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const detailStepId = searchParams.get(MEMBER_STEP_PARAM) ?? "";
+  // A phase asked for on the way in (the member panel's summary links here with one): shown in
+  // the path once it is there, then dropped from the URL.
+  const requestedPhaseId = searchParams.get(MEMBER_PHASE_PARAM);
+  useEffect(() => {
+    if (!requestedPhaseId || !onboardingPath || !journeyRef.current) return;
+    journeyRef.current.showPhase(requestedPhaseId);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete(MEMBER_PHASE_PARAM);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [requestedPhaseId, onboardingPath, setSearchParams]);
+  const setDetailStepId = (stepId: string) =>
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (stepId) next.set(MEMBER_STEP_PARAM, stepId);
+        else next.delete(MEMBER_STEP_PARAM);
+        return next;
+      },
+      { replace: !stepId },
+    );
   // A step asked to be deleted from the graph, where there is no details panel to confirm in.
   const [graphStepToDelete, setGraphStepToDelete] = useState<string | null>(null);
   const [stepToDelete, setStepToDelete] = useState<DetailOnboardingStep | null>(null);
@@ -152,12 +213,21 @@ export function TeamMemberDetailPage() {
   useEffect(() => {
     shownUserId.current = userId;
   }, [userId]);
-  const [reviewingSkipIds, setReviewingSkipIds] = useState<readonly string[]>([]);
+  // Which decision is in flight for which skip, so the button that was pressed shows the spinner.
+  const [reviewingSkips, setReviewingSkips] = useState<Readonly<Record<string, SkipDecision>>>({});
   // `feedbackError` stays for the feedback *load* failure (shown inline where the
   // list would be); every action outcome on this page is a toast instead.
   const [feedbackError, setFeedbackError] = useState("");
   const [loadError, setLoadError] = useState("");
   const toast = useToast();
+  const { data: roster } = useTeamRoster();
+  // Rebuilding a member's path is the PM's call alone (members can only build their first one),
+  // so the control lives here rather than on the member's onboarding page.
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
+  const [rebuildingUserId, setRebuildingUserId] = useState<string | null>(null);
+  // Leaving the page only stops watching; the generation carries on on the backend.
+  const rebuildWatch = useRef<AbortController | null>(null);
+  useEffect(() => () => rebuildWatch.current?.abort(), []);
 
   useEffect(() => {
     // A response for the member (or project) this page has since moved away from is dropped: it
@@ -344,22 +414,21 @@ export function TeamMemberDetailPage() {
     );
   }, [availableRoles, user]);
 
-  async function handleAddRole() {
-    if (!user || !selectedRoleId) return;
+  async function handleAddRole(roleId: string) {
+    if (!user) return;
 
-    const roleToAdd = availableRoles.find((role) => role.id === selectedRoleId);
+    const roleToAdd = availableRoles.find((role) => role.id === roleId);
 
     if (!roleToAdd) return;
 
-    setSavingRoleId(selectedRoleId);
+    setSavingRoleId(roleId);
 
     try {
-      await assignProjectRoleToUser(user.userId, selectedRoleId);
+      await assignProjectRoleToUser(user.userId, roleId);
       setUser({
         ...user,
         roles: [...user.roles, roleToAdd],
       });
-      setSelectedRoleId("");
       toast.success("Role assigned");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't assign the role.");
@@ -398,10 +467,14 @@ export function TeamMemberDetailPage() {
   async function reviewSkip(skipId: string, action: "accept" | "deny", comment = "") {
     if (skipsInReview.current.has(skipId)) return;
     skipsInReview.current.add(skipId);
-    setReviewingSkipIds([...skipsInReview.current]);
+    setReviewingSkips((current) => ({ ...current, [skipId]: action }));
     const release = () => {
       skipsInReview.current.delete(skipId);
-      setReviewingSkipIds([...skipsInReview.current]);
+      setReviewingSkips((current) => {
+        const next = { ...current };
+        delete next[skipId];
+        return next;
+      });
     };
 
     try {
@@ -592,68 +665,101 @@ export function TeamMemberDetailPage() {
     }
   }
 
+  function handleRebuildPath() {
+    if (!user || !selectedProjectId || rebuildingUserId) return;
+    const memberId = user.userId;
+    const firstName = user.firstname;
+    const controller = new AbortController();
+    rebuildWatch.current?.abort();
+    rebuildWatch.current = controller;
+    setConfirmRebuild(false);
+    setRebuildingUserId(memberId);
+    toast.info(`Rebuilding ${firstName}'s onboarding path`, {
+      description: "This runs in the background and takes a few minutes.",
+    });
+
+    const finish = () => {
+      if (rebuildWatch.current === controller) rebuildWatch.current = null;
+      setRebuildingUserId((current) => (current === memberId ? null : current));
+    };
+
+    void onboardingService
+      .rebuildMemberPath(
+        selectedProjectId,
+        memberId,
+        {
+          onPath: () => {},
+          onDone: () => {
+            finish();
+            if (shownUserId.current !== memberId) return;
+            toast.success(`${firstName}'s onboarding path was rebuilt`);
+            void Promise.all([refreshOnboardingPath(), refreshMember()]);
+          },
+          onError: (message, reason) => {
+            finish();
+            toast.error(`${firstName}'s path could not be rebuilt`, {
+              description: describeRebuildError(message, reason),
+            });
+          },
+          onInterrupted: () => {
+            finish();
+            toast.info("Lost track of the rebuild", {
+              description: "It keeps running on the server. Reload the page in a few minutes.",
+            });
+          },
+        },
+        controller.signal,
+      )
+      .catch((error: unknown) => {
+        finish();
+        if (controller.signal.aborted) return;
+        toast.error(`${firstName}'s path could not be rebuilt`, {
+          description: error instanceof Error ? error.message : undefined,
+        });
+      });
+  }
+
+  // Always to the roster, not back through history: the button says "Team", and history could
+  // just as well lead to the overview or to the previous member.
   function goBack() {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      void navigate(-1);
-    } else {
-      void navigate("/team-management");
-    }
+    void navigate("/team-management");
   }
 
-  // Loading and not-found share PageShell with the success render below, so the band
-  // (and the back button in it) never disappears and reappears while the member loads.
-  if (loading) {
+  // Loading and not-found keep the back button, so it never disappears and reappears while the
+  // member loads.
+  if (loading || !user) {
     return (
-      <PageShell
-        icon={Users}
-        title="Team member"
-        subtitle=""
-        back={{ label: "Back", onClick: goBack }}
-      >
-        <div className="flex min-h-96 items-center justify-center">
-          <p className="text-sm text-app-text-muted">Loading team member...</p>
-        </div>
-      </PageShell>
+      <section aria-label="Team member">
+        <BackToTeam onBack={goBack} />
+        {loading ? (
+          <div className="flex min-h-96 items-center justify-center">
+            <p className="text-sm text-app-text-muted">Loading team member...</p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-app-border bg-app-surface p-8">
+            <p className="text-sm text-app-text">
+              {loadError
+                ? `The team member could not be loaded: ${loadError}`
+                : "Team member not found."}
+            </p>
+          </div>
+        )}
+      </section>
     );
   }
 
-  if (!user) {
-    return (
-      <PageShell
-        icon={Users}
-        title="Team member"
-        subtitle=""
-        back={{ label: "Back", onClick: goBack }}
-      >
-        <div className="rounded-3xl border border-app-border bg-app-surface p-8">
-          <p className="text-sm text-app-text">
-            {loadError
-              ? `The team member could not be loaded: ${loadError}`
-              : "Team member not found."}
-          </p>
-        </div>
-      </PageShell>
-    );
-  }
-
-  const elapsedDays = user.currentStep?.startedAt ? getElapsedDays(user.currentStep.startedAt) : 0;
-  const progressPercentage = Math.round(user.progressPercentage * 100);
-  // The team overview's skip is a different DTO from the path's: it carries `status`, not
-  // `accepted`, so `isSkipPending` does not apply to it. Every reading below that *does* see an
-  // `accepted` goes through the predicate.
-  const pendingSkip = user.currentStep?.skip?.status === "PENDING" ? user.currentStep.skip : null;
-  const unreadFeedback = feedbackItems.filter(isFeedbackUnread);
+  // Items, not kinds: three unread comments are three things to read. The member's own flag stands
+  // in for feedback that has not loaded (or could not be), so the strip never under-reports.
+  const unreadFeedbackCount = feedbackItems.filter(isUnread).length;
+  const openItemCount =
+    (waitingOn(user).includes("skip") ? 1 : 0) +
+    (unreadFeedbackCount > 0 ? unreadFeedbackCount : user.hasFeedback ? 1 : 0);
   const phases = [...(onboardingPath?.phases ?? [])].sort((a, b) => a.position - b.position);
   const allSteps = phases.flatMap((phase) =>
     [...(phase.steps ?? [])]
       .sort((a, b) => a.position - b.position)
       .map((step) => step as DetailOnboardingStep),
   );
-  // Every step's, like the journey section counts them: phases run side by side, so the step
-  // waiting on a skip answer is not always the current one.
-  const pendingSkipCount = allSteps.filter(
-    (step) => !!step.skip?.id && isSkipPending(step.skip) && step.status !== "SKIPPED",
-  ).length;
   const checkModalPhase = checkModal
     ? (phases.find((phase) => phase.id === checkModal.phaseId) ?? null)
     : null;
@@ -701,334 +807,109 @@ export function TeamMemberDetailPage() {
 
   return (
     <>
-      <PageShell
-        icon={Users}
-        title={`${user.firstname} ${user.lastname}`}
-        subtitle={user.currentStep?.title || "Onboarding completed"}
-        back={{ label: "Back", onClick: goBack }}
-        mainClassName="pt-6 pb-24 lg:pt-8"
-        bandExtra={
-          <div>
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex shrink-0 items-center justify-center">
-                  <UserAvatar
-                    profileIcon={user.profileIcon}
-                    fallbackName={`${user.firstname} ${user.lastname}`.trim()}
-                    seed={user.userId}
-                    size={56}
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {user.roles.length > 0 ? (
-                    user.roles.map((role) => (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => setRolesModalOpen(true)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-3 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand hover:text-app-brand"
-                        title="Edit roles"
-                      >
-                        <span>{role.name}</span>
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    ))
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setRolesModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-app-border px-3 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand hover:text-app-brand"
-                      title="Choose role"
-                    >
-                      <span>Choose role</span>
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="lg:text-right">
-                <p className="text-xs font-medium tracking-wide text-app-text-muted uppercase">
-                  Current Step
-                  {user.currentStep?.startedAt && (
-                    <span className="ml-2 font-normal normal-case">
-                      · {elapsedDays} {elapsedDays === 1 ? "day" : "days"} ago
-                    </span>
-                  )}
-                </p>
-
-                <p className="mt-2 text-sm font-medium text-app-text">
-                  {user.currentStep?.title || "Onboarding Completed"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center gap-3">
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-app-border-muted">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-app-brand to-app-progress-fill-end transition-all duration-500"
-                  style={{
-                    width: `${progressPercentage}%`,
-                  }}
-                />
-              </div>
-
-              <span className="text-sm font-medium text-app-text tabular-nums">
-                {progressPercentage}%
-              </span>
-            </div>
-          </div>
-        }
-      >
-        <MemberJourneySection
-          userId={user.userId}
-          memberName={`${user.firstname} ${user.lastname}`.trim()}
-          path={onboardingPath}
-          stepTaskCounts={stepTaskCounts}
-          onOpenStep={setDetailStepId}
-          onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
-          onDeleteStep={setGraphStepToDelete}
-          onReviewSkip={reviewSkip}
-          feedbackItems={feedbackItems}
-          onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
-          markingFeedbackId={markingFeedbackId}
-          onPathChanged={refreshOnboardingPath}
-        />
-
-        {/* Below the journey rather than beside it: the graph needs the width, and these read fine
-            as two cards side by side. items-start keeps each card at its own height. */}
-        <aside aria-label="Member insights" className="mt-6 grid items-start gap-4 lg:grid-cols-2">
-          <div className="rounded-3xl border border-app-border bg-app-surface p-6">
-            <h2 className="text-lg font-semibold text-app-text">Feedback & Skip Requests</h2>
-
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <MessageSquareText className="h-4 w-4 text-app-text-muted" />
-                  <p className="text-sm font-semibold text-app-text">Open items</p>
-                </div>
-
-                {unreadFeedback.length + pendingSkipCount > 0 && (
-                  <span className="rounded-full bg-app-warning-bg px-2.5 py-1 text-xs font-medium text-app-warning-text">
-                    {unreadFeedback.length + pendingSkipCount} open
-                  </span>
-                )}
-              </div>
-
-              {/* The same control the step panel and the graph aside use, rather than a second
-                  pair of buttons with their own wording, their own busy state and no comment
-                  field. The card supplies which step it is about. */}
-              {pendingSkip && (
-                <SkipReview
-                  reason={pendingSkip.reason}
-                  meta={user.currentStep?.title}
-                  disabled={reviewingSkipIds.includes(pendingSkip.id)}
-                  onReview={(action, comment) => reviewSkip(pendingSkip.id, action, comment)}
-                />
-              )}
-
-              {loadingFeedback ? (
-                <p className="rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                  Loading feedback...
-                </p>
-              ) : unreadFeedback.length > 0 ? (
-                unreadFeedback.map((feedback) => {
-                  const isUnread = isFeedbackUnread(feedback);
-                  // Coloured by what it says, not by whether it has been read: a thumbs-down and a
-                  // thumbs-up are different news. Unread is a badge of its own.
-                  const tone =
-                    feedback.helpful === true
-                      ? {
-                          card: "border-app-success-border bg-app-success-bg",
-                          icon: "text-app-success-text",
-                          label: "Found it helpful",
-                        }
-                      : feedback.helpful === false
-                        ? {
-                            card: "border-app-danger-border bg-app-danger-bg",
-                            icon: "text-app-danger-text",
-                            label: "Found it not helpful",
-                          }
-                        : {
-                            card: "border-app-brand-border bg-app-brand-soft",
-                            icon: "text-app-brand-text",
-                            label: "Feedback",
-                          };
-
-                  return (
-                    <div
-                      key={feedback.id}
-                      className={`rounded-2xl border p-4 ${tone.card} ${isUnread ? "" : "opacity-75"}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 gap-3">
-                          <span
-                            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface ${tone.icon}`}
-                          >
-                            {feedback.helpful === true ? (
-                              <ThumbsUp className="h-4 w-4" />
-                            ) : feedback.helpful === false ? (
-                              <ThumbsDown className="h-4 w-4" />
-                            ) : (
-                              <MessageSquareText className="h-4 w-4" />
-                            )}
-                          </span>
-
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-semibold text-app-text">{tone.label}</p>
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                                  isUnread
-                                    ? "bg-app-brand text-white"
-                                    : "bg-app-surface text-app-text-muted"
-                                }`}
-                              >
-                                {isUnread ? "New" : "Read"}
-                              </span>
-                            </div>
-
-                            <p className="mt-2 text-sm text-app-text">{feedback.message}</p>
-
-                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-app-text-muted">
-                              {feedback.stepTitle && (
-                                <span className="rounded-full bg-app-surface px-2 py-0.5">
-                                  {feedback.stepTitle}
-                                </span>
-                              )}
-                              {feedback.createdAt && (
-                                <span>
-                                  {new Date(feedback.createdAt).toLocaleDateString("en-US", {
-                                    year: "numeric",
-                                    month: "short",
-                                    day: "numeric",
-                                  })}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {isUnread && (
-                          <button
-                            type="button"
-                            onClick={() => void handleMarkFeedbackRead(feedback.id)}
-                            disabled={markingFeedbackId === feedback.id}
-                            className="shrink-0 rounded-lg border border-app-warning-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-warning-text transition-colors hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {markingFeedbackId === feedback.id ? "Marking..." : "Mark read"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              ) : user.hasFeedback && feedbackItems.length === 0 ? (
-                <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface text-app-warning-text">
-                      <MessageSquareText className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-app-text">Feedback</p>
-                        <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-medium text-app-warning-text">
-                          Unread
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-app-text">
-                        {user.firstname} has left feedback on their onboarding path.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : !pendingSkip ? (
-                <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-                  No open feedback or skip requests.
-                </p>
-              ) : null}
-
-              {feedbackError && <p className="text-xs text-app-danger-text">{feedbackError}</p>}
-            </div>
-          </div>
-          <MemberGapsPanel
-            skillLevels={skillLevels}
-            skillGaps={skillGaps}
-            knowledgeGaps={topKnowledgeGaps}
-            onOpenKnowledgeGap={(gapId) => {
-              void navigate(`/insights/knowledge-gaps/${gapId}`);
-            }}
+      <section aria-label={`${user.firstname} ${user.lastname}`}>
+        <div className="flex items-start justify-between gap-3">
+          <BackToTeam onBack={goBack} />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setConfirmRebuild(true)}
+            icon={<RefreshCw className="h-4 w-4" />}
+            loading={rebuildingUserId === user.userId}
+            disabled={!selectedProjectId || rebuildingUserId !== null}
+            title={`Rebuild ${user.firstname}'s onboarding path with AI`}
+          >
+            {rebuildingUserId === user.userId
+              ? "Rebuilding…"
+              : onboardingPath
+                ? "Rebuild path"
+                : "Build path"}
+          </Button>
+        </div>
+        <div className="mb-5">
+          <MemberHero
+            member={user}
+            roster={roster ?? []}
+            assignableRoles={unassignedRoles}
+            savingRoleId={savingRoleId}
+            onAddRole={(roleId) => void handleAddRole(roleId)}
+            onRemoveRole={setRoleToRemove}
+            figures={
+              <MemberSignals
+                path={onboardingPath}
+                feedback={feedbackItems}
+                skillLevels={skillLevels}
+                knowledgeGapCount={knowledgeGaps.length}
+                onOpen={() => journeyRef.current?.showPhase()}
+              />
+            }
           />
-        </aside>
-      </PageShell>
-
-      <Modal
-        isOpen={rolesModalOpen}
-        title="Manage Roles"
-        description={`Add or remove roles for ${user.firstname}.`}
-        closeLabel="Close roles modal"
-        onClose={() => setRolesModalOpen(false)}
-      >
-        <div className="space-y-2">
-          {user.roles.length > 0 ? (
-            user.roles.map((role) => (
-              <div
-                key={role.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3"
-              >
-                <span className="text-sm font-medium text-app-text">{role.name}</span>
-
-                <button
-                  type="button"
-                  onClick={() => setRoleToRemove(role)}
-                  disabled={savingRoleId === role.id}
-                  className="rounded-lg p-1.5 text-app-text-muted hover:bg-app-surface-hover hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={`Remove ${role.name}`}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ))
-          ) : (
-            <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-              No role assigned yet. Choose a role below.
-            </p>
+        </div>
+        <div className="space-y-5">
+          {/* Only while something is open: an empty "waiting on you" strip at the top of every
+              profile would push the rest down to say nothing. Each line opens its step. Fed
+              from this page's own feedback and skip handling, so it shares the guard with the
+              journey and the step panel. The summary that stood beside it moved to the member
+              panel, one press from the roster. */}
+          {openItemCount > 0 && (
+            <section
+              aria-label="Waiting on you"
+              className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
+            >
+              <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wider text-app-warning-text uppercase">
+                <Hand aria-hidden="true" className="h-3.5 w-3.5" />
+                Waiting on you
+                <span className="rounded-full bg-app-surface px-1.5 py-0.5 text-[11px] tracking-normal normal-case tabular-nums">
+                  {openItemCount}
+                </span>
+              </h2>
+              <MemberOpenItems
+                member={user}
+                feedback={feedbackItems}
+                feedbackLoading={loadingFeedback}
+                feedbackError={Boolean(feedbackError)}
+                reviewingSkip={
+                  user.currentStep?.skip?.id
+                    ? (reviewingSkips[user.currentStep.skip.id] ?? null)
+                    : null
+                }
+                markingFeedbackId={markingFeedbackId}
+                onReviewSkip={(skipId, decision) => void reviewSkip(skipId, decision)}
+                onMarkRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+                onOpenStep={setDetailStepId}
+              />
+            </section>
           )}
+
+          <MemberJourneySection
+            ref={journeyRef}
+            userId={user.userId}
+            memberName={`${user.firstname} ${user.lastname}`.trim()}
+            path={onboardingPath}
+            stepTaskCounts={stepTaskCounts}
+            onOpenStep={setDetailStepId}
+            onOpenQuestions={(phaseId, tab) => setCheckModal({ phaseId, tab })}
+            onDeleteStep={setGraphStepToDelete}
+            onReviewSkip={reviewSkip}
+            feedbackItems={feedbackItems}
+            onMarkFeedbackRead={(feedbackId) => void handleMarkFeedbackRead(feedbackId)}
+            markingFeedbackId={markingFeedbackId}
+            onPathChanged={refreshOnboardingPath}
+          />
+
+          {/* Below the journey rather than beside it: the graph needs the width. */}
+          <aside aria-label="Member insights">
+            <MemberGapsPanel
+              skillLevels={skillLevels}
+              skillGaps={skillGaps}
+              knowledgeGaps={topKnowledgeGaps}
+              onOpenKnowledgeGap={(gapId) => {
+                void navigate(`/insights/knowledge-gaps/${gapId}`);
+              }}
+            />
+          </aside>
         </div>
-
-        <div className="mt-6 flex gap-2">
-          <select
-            value={selectedRoleId}
-            onChange={(event) => setSelectedRoleId(event.target.value)}
-            className="min-w-0 flex-1 rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand"
-          >
-            <option value="">Choose role</option>
-
-            {unassignedRoles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            onClick={() => void handleAddRole()}
-            disabled={!selectedRoleId || savingRoleId !== null}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-4 py-2 text-sm font-medium text-app-text-inverse hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            Add
-          </button>
-        </div>
-
-        {unassignedRoles.length === 0 && (
-          <p className="mt-3 text-xs text-app-text-muted">
-            All available roles are already assigned.
-          </p>
-        )}
-      </Modal>
+      </section>
       <MemberDetailDialogs
         firstName={user.firstname}
         roleToRemove={roleToRemove}
@@ -1050,6 +931,15 @@ export function TeamMemberDetailPage() {
           onClose={() => setCheckModal(null)}
         />
       )}
+      <AlertDialog
+        isOpen={confirmRebuild}
+        title={`Rebuild ${user.firstname}'s onboarding path?`}
+        description={`The path is put together again from the project's current blueprint and knowledge base. ${user.firstname}'s progress on the current path is replaced.`}
+        confirmLabel="Rebuild path"
+        variant="danger"
+        onClose={() => setConfirmRebuild(false)}
+        onConfirm={handleRebuildPath}
+      />
       <AlertDialog
         isOpen={graphStepToDelete !== null}
         title="Delete this step?"
