@@ -11,6 +11,12 @@ export type ProjectAccessPanelProps = {
   availableProjects: ProjectSummary[];
   onOpenProjectDetails: (projectId: string) => void;
   onAssignProject: (projectId: string) => Promise<void>;
+  /**
+   * Asked before a project is assigned; resolving `false` aborts the assignment
+   * silently. Lets the parent warn about side effects (a move out of another
+   * project) without the panel knowing the rule.
+   */
+  confirmAssign?: (projectId: string) => Promise<boolean>;
   onRemoveProject: (projectId: string) => Promise<void>;
 };
 
@@ -25,6 +31,7 @@ export function ProjectAccessPanel({
   availableProjects,
   onOpenProjectDetails,
   onAssignProject,
+  confirmAssign,
   onRemoveProject,
 }: ProjectAccessPanelProps) {
   const assignedProjectKey = useMemo(
@@ -173,6 +180,8 @@ export function ProjectAccessPanel({
 
   const addProject = async (projectId: string) => {
     if (hasPendingProjectChange) return;
+
+    if (confirmAssign && !(await confirmAssign(projectId))) return;
 
     setPendingProjectId(projectId);
 

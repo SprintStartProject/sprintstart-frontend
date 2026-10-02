@@ -22,8 +22,12 @@ const userDetails: AdminUser = {
   hasCompletedOnboarding: true,
 };
 
+const projectA = { id: "proj-a", name: "Alpha" };
+const projectB = { id: "proj-b", name: "Beta" };
+
 function renderDrawer(overrides: Partial<AdminUser> = {}) {
   const onUserUpdated = vi.fn();
+  const onMembershipsMoved = vi.fn();
   const onClose = vi.fn();
   const onOpenProjectDetails = vi.fn();
   const onRequestDelete = vi.fn();
@@ -31,16 +35,17 @@ function renderDrawer(overrides: Partial<AdminUser> = {}) {
   render(
     <UserDetailsDrawer
       user={{ ...userDetails, ...overrides }}
-      availableProjects={[]}
+      availableProjects={[projectA, projectB]}
       isOpen
       onClose={onClose}
       onOpenProjectDetails={onOpenProjectDetails}
       onUserUpdated={onUserUpdated}
       onRequestDelete={onRequestDelete}
+      onMembershipsMoved={onMembershipsMoved}
     />,
   );
 
-  return { onUserUpdated, onClose, onOpenProjectDetails, onRequestDelete };
+  return { onUserUpdated, onClose, onOpenProjectDetails, onRequestDelete, onMembershipsMoved };
 }
 
 describe("UserDetailsDrawer", () => {
@@ -126,5 +131,108 @@ describe("UserDetailsDrawer", () => {
 
     expect(screen.getByText("Email is required.")).toBeInTheDocument();
     expect(onUserUpdated).not.toHaveBeenCalled();
+  });
+
+  describe("assigning a project", () => {
+    async function pickProjectB(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(screen.getByRole("button", { name: /Add project/i }));
+      await user.click(screen.getByText("Beta"));
+    }
+
+    it("warns before moving a regular user and replaces the project list", async () => {
+      const assignRequests: string[] = [];
+      server.use(
+        http.post("/api/v1/admin/projects/proj-b/users", () => {
+          assignRequests.push("proj-b");
+          return HttpResponse.json([]);
+        }),
+      );
+      const { onUserUpdated, onMembershipsMoved } = renderDrawer({
+        projects: [projectA],
+        projectIds: ["proj-a"],
+      });
+      const user = userEvent.setup();
+
+      await pickProjectB(user);
+
+      expect(await screen.findByRole("alertdialog")).toHaveTextContent(
+        "John Doe will be removed from Alpha.",
+      );
+      expect(assignRequests).toEqual([]);
+
+      await user.click(screen.getByRole("button", { name: "Move user" }));
+
+      await waitFor(() => {
+        expect(onUserUpdated).toHaveBeenCalledWith(
+          expect.objectContaining({ projects: [projectB], projectIds: ["proj-b"] }),
+        );
+      });
+      expect(assignRequests).toEqual(["proj-b"]);
+      expect(onMembershipsMoved).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not assign anything when the move is cancelled", async () => {
+      const assignRequests: string[] = [];
+      server.use(
+        http.post("/api/v1/admin/projects/proj-b/users", () => {
+          assignRequests.push("proj-b");
+          return HttpResponse.json([]);
+        }),
+      );
+      const { onUserUpdated, onMembershipsMoved } = renderDrawer({
+        projects: [projectA],
+        projectIds: ["proj-a"],
+      });
+      const user = userEvent.setup();
+
+      await pickProjectB(user);
+      await user.click(await screen.findByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      });
+      expect(assignRequests).toEqual([]);
+      expect(onUserUpdated).not.toHaveBeenCalled();
+      expect(onMembershipsMoved).not.toHaveBeenCalled();
+    });
+
+    it("adds the project without a dialog for a project manager", async () => {
+      server.use(http.post("/api/v1/admin/projects/proj-b/users", () => HttpResponse.json([])));
+      const { onUserUpdated, onMembershipsMoved } = renderDrawer({
+        permissionGroup: "Project Manager",
+        projects: [projectA],
+        projectIds: ["proj-a"],
+      });
+      const user = userEvent.setup();
+
+      await pickProjectB(user);
+
+      await waitFor(() => {
+        expect(onUserUpdated).toHaveBeenCalledWith(
+          expect.objectContaining({
+            projects: [projectA, projectB],
+            projectIds: expect.arrayContaining(["proj-a", "proj-b"]) as string[],
+          }),
+        );
+      });
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(onMembershipsMoved).not.toHaveBeenCalled();
+    });
+
+    it("assigns a user without any project without a dialog", async () => {
+      server.use(http.post("/api/v1/admin/projects/proj-b/users", () => HttpResponse.json([])));
+      const { onUserUpdated, onMembershipsMoved } = renderDrawer();
+      const user = userEvent.setup();
+
+      await pickProjectB(user);
+
+      await waitFor(() => {
+        expect(onUserUpdated).toHaveBeenCalledWith(
+          expect.objectContaining({ projects: [projectB], projectIds: ["proj-b"] }),
+        );
+      });
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(onMembershipsMoved).not.toHaveBeenCalled();
+    });
   });
 });

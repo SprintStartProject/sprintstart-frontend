@@ -3,10 +3,14 @@ import type { ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import type { BuddyMessageView, ProposedAction } from "../types";
+import type { ActionDrafts } from "../actionDrafts";
 import { toolLabel } from "../toolLabel";
 import { BuddyActionProposals } from "./BuddyActionProposals";
 import { BuddyMarkdown } from "./BuddyMarkdown";
 import { BuddyMessage, BuddyTypingMessage } from "./BuddyMessage";
+
+/** The drafts a row without any proposal gets: one shared object, so its memo is never broken. */
+const EMPTY_ACTION_DRAFTS: ActionDrafts = {};
 
 type BuddyThreadProps = {
   messages: BuddyMessageView[];
@@ -23,6 +27,10 @@ type BuddyThreadProps = {
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
   dismissAction: (messageId: string, action: ProposedAction) => void;
+  /** The session's wording for offers that carry an editable message — see `actionDrafts`. */
+  actionDrafts: ActionDrafts;
+  /** Records one, so it outlives whichever surface is on screen. */
+  setActionDraft: (key: string, text: string) => void;
   /** Names above the bubbles — on for the page, off in the dock. */
   showNames?: boolean;
   /** The dock's narrow layout — see `BuddyMessage`'s `compact`. */
@@ -82,6 +90,10 @@ type BuddyThreadRowProps = {
   compact: boolean;
   confirmAction: (messageId: string, action: ProposedAction) => void;
   dismissAction: (messageId: string, action: ProposedAction) => void;
+  /** The session's wording for the row's own offers, if any — see `BuddyThreadProps`. */
+  actionDrafts: ActionDrafts;
+  /** Records one, so it outlives whichever surface is on screen. */
+  setActionDraft: (key: string, text: string) => void;
   renderQuestionAction?: (question: string) => ReactNode;
   renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
   /** The greeting's suggested next step — present on the row it hangs under, nowhere else. */
@@ -111,6 +123,8 @@ function BuddyThreadRowImpl({
   compact,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   renderQuestionAction,
   renderReplyAction,
   lastMessageFooter,
@@ -141,6 +155,8 @@ function BuddyThreadRowImpl({
             <BuddyActionProposals
               messageId={message.id}
               actions={message.actions ?? []}
+              actionDrafts={actionDrafts}
+              setActionDraft={setActionDraft}
               onConfirm={confirmAction}
               onDismiss={dismissAction}
             />
@@ -180,6 +196,8 @@ function BuddyThreadImpl({
   activeTool,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   showNames = false,
   compact = false,
   lastMessageFooter,
@@ -245,6 +263,11 @@ function BuddyThreadImpl({
           compact={compact}
           confirmAction={confirmAction}
           dismissAction={dismissAction}
+          // Handed only to the rows that actually carry a proposal: the drafts object changes
+          // identity on every keystroke in a flag's field, and each row is memoised (#236), so
+          // the shared empty object keeps that keystroke from re-rendering the whole transcript.
+          actionDrafts={(message.actions?.length ?? 0) > 0 ? actionDrafts : EMPTY_ACTION_DRAFTS}
+          setActionDraft={setActionDraft}
           renderQuestionAction={renderQuestionAction}
           renderReplyAction={renderReplyAction}
           // Resolved here rather than inside the row: only the buddy's latest reply gets it, and

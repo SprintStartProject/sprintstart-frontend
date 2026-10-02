@@ -58,6 +58,8 @@ function renderDock(
           activeTool={null}
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
           suggestions={suggestions}
           newConversation={newConversation}
           isGreeting={false}
@@ -70,15 +72,15 @@ function renderDock(
   );
 }
 
-const assistant = (content: string): BuddyMessageView => ({
-  id: "a1",
+const assistant = (content: string, id = "a1"): BuddyMessageView => ({
+  id,
   role: "ASSISTANT",
   content,
   createdAt: "2026-08-03T00:00:00Z",
 });
 
-const user = (content: string): BuddyMessageView => ({
-  id: "u1",
+const user = (content: string, id = "u1"): BuddyMessageView => ({
+  id,
   role: "USER",
   content,
   createdAt: "2026-08-03T00:00:00Z",
@@ -302,7 +304,7 @@ describe("BuddyDock new conversation", () => {
   });
 
   it("comes back once the turn is over", () => {
-    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.")]);
+    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.", "a2")]);
 
     expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });

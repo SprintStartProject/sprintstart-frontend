@@ -1,6 +1,7 @@
 import { memo, useCallback } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
+import type { ActionDrafts } from "../actionDrafts";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
 import { BuddyReplyActions } from "./BuddyReplyActions";
@@ -19,6 +20,10 @@ type BuddyConversationProps = {
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
   dismissAction: (messageId: string, action: ProposedAction) => void;
+  /** The session's wording for offers that carry an editable message — see `actionDrafts`. */
+  actionDrafts: ActionDrafts;
+  /** Records one, so it outlives whichever surface is on screen. */
+  setActionDraft: (key: string, text: string) => void;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
   /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
@@ -85,6 +90,8 @@ function BuddyConversationImpl({
   activeTool,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   placeholder,
   lastMessageFooter,
   renderQuestionAction,
@@ -163,6 +170,8 @@ function BuddyConversationImpl({
             activeTool={activeTool}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
+            actionDrafts={actionDrafts}
+            setActionDraft={setActionDraft}
             showNames
             lastMessageFooter={lastMessageFooter}
             renderQuestionAction={renderQuestionAction}
