@@ -1,11 +1,12 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
 import { BuddyProviderWithStubs } from "./buddyTestHarness";
 import { server } from "../../setup/vitest.setup";
 
-function greetingStream(text: string) {
+/** A one-token SSE stream, ended cleanly — the shape both the greeting and a reply arrive in. */
+function oneTokenStream(text: string) {
   const encoder = new TextEncoder();
   return new HttpResponse(
     new ReadableStream({
@@ -51,7 +52,7 @@ describe("buddy conversation continuity", () => {
       http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json(conversation)),
       http.post("/api/v1/onboarding/me/buddy/open/stream", () => {
         opened += 1;
-        return greetingStream("Picking up where we left off?");
+        return oneTokenStream("Picking up where we left off?");
       }),
     );
 
@@ -92,7 +93,7 @@ describe("buddy conversation continuity", () => {
       ),
       http.post("/api/v1/onboarding/me/buddy/open/stream", () => {
         opened += 1;
-        return greetingStream("Welcome back!");
+        return oneTokenStream("Welcome back!");
       }),
     );
 
@@ -107,7 +108,7 @@ describe("buddy conversation continuity", () => {
   it("greets a hire whose first conversation is still empty", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
-      http.post("/api/v1/onboarding/me/buddy/open/stream", () => greetingStream("Welcome back!")),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => oneTokenStream("Welcome back!")),
     );
 
     const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
@@ -126,7 +127,7 @@ describe("buddy conversation continuity", () => {
         HttpResponse.json({ id: "s-new" }, { status: 201 }),
       ),
       http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
-      http.post("/api/v1/onboarding/me/buddy/open/stream", () => greetingStream("Hello there!")),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => oneTokenStream("Hello there!")),
     );
 
     const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
@@ -164,7 +165,7 @@ describe("buddy conversation continuity", () => {
       http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
       http.post("/api/v1/onboarding/me/buddy/open/stream", () => {
         opened += 1;
-        return greetingStream("Welcome back!");
+        return oneTokenStream("Welcome back!");
       }),
     );
 
@@ -180,6 +181,47 @@ describe("buddy conversation continuity", () => {
     // The newest conversation is the one on screen, it is empty, and it stays that way: only
     // the hire's first conversation opens with the greeting.
     expect(result.current.messages).toHaveLength(0);
+    expect(opened).toBe(0);
+  });
+
+  /**
+   * The composer is live from the first paint, so a send can beat the opening read. What it
+   * must not then get is a greeting on top of it: the conversation is one the hire has spoken
+   * in, however briefly, and "never-spoken" is read as of the read settling.
+   */
+  it("does not greet over a turn sent while the opening read was still in flight", async () => {
+    let opened = 0;
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/sessions", () => HttpResponse.json({ sessions: [] })),
+      http.post("/api/v1/onboarding/me/buddy/sessions", () =>
+        HttpResponse.json({ id: "s-new" }, { status: 201 }),
+      ),
+      // The read is slow here on purpose; the composer is not.
+      http.get("/api/v1/onboarding/me/buddy/messages", async () => {
+        await delay(80);
+        return HttpResponse.json([]);
+      }),
+      http.post("/api/v1/onboarding/me/buddy/messages", () => oneTokenStream("Hi!")),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => {
+        opened += 1;
+        return oneTokenStream("Hello there!");
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+
+    // The hire speaks immediately — long before the opening read settles.
+    await act(async () => {
+      await result.current.sendMessage("hello?");
+    });
+
+    await waitFor(() => {
+      expect(result.current.isOpening).toBe(false);
+    });
+
+    // Their turn and its reply are the thread; no greeting landed on top of them.
+    expect(result.current.messages.some((message) => message.content === "hello?")).toBe(true);
+    expect(result.current.messages.some((message) => message.content === "Hi!")).toBe(true);
     expect(opened).toBe(0);
   });
 });

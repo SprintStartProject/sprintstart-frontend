@@ -136,6 +136,17 @@ export function useBuddyConversation(
   onTeamModeLeft?: () => void,
 ) {
   const [messages, setMessages] = useState<BuddyMessageView[]>([]);
+  /**
+   * The thread as of the last render, readable from the opening callbacks without making them
+   * depend on it. The composer is live before the opening read settles, so a hire can speak
+   * while `openSession` is still awaiting `getMessages`; the greeting guard asks this ref
+   * whether anyone has spoken, because a callback's closed-over state is a render behind.
+   */
+  const messagesRef = useRef<BuddyMessageView[]>([]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const invalidateBoard = useInvalidateBoard();
@@ -539,6 +550,9 @@ export function useBuddyConversation(
   /**
    * Brings one conversation on screen: reads it, merges its window in front of anything the
    * composer has already put up, and greets only the hire's first, never-spoken conversation.
+   * Never-spoken is read as of when the read settles: a turn the composer sent while
+   * `getMessages` was still in flight is the hire having spoken, and a greeting over it would
+   * answer their question with a hello.
    *
    * A conversation with anything in it is read, not re-greeted — the greeting belongs to the
    * conversation, not to every reopening of it — and a conversation the hire created on
@@ -556,7 +570,11 @@ export function useBuddyConversation(
         const history = await getMessages(sessionId);
         mergeHistory(history);
 
-        if (history.length === 0 && sessionsRef.current.length === 1) {
+        if (
+          history.length === 0 &&
+          sessionsRef.current.length === 1 &&
+          !messagesRef.current.some((message) => message.role === "USER")
+        ) {
           greetingRef.current = true;
           try {
             await greet({ sessionId });
@@ -605,7 +623,10 @@ export function useBuddyConversation(
         const history = await getMessages(undefined, teamId);
         mergeHistory(history);
 
-        if (history.length === 0) {
+        if (
+          history.length === 0 &&
+          !messagesRef.current.some((message) => message.role === "USER")
+        ) {
           greetingRef.current = true;
           try {
             await greet({ teamProjectId: teamId });
@@ -733,6 +754,9 @@ export function useBuddyConversation(
       setOpenerAction(null);
       setOpenError(null);
       setDraftResetToken((token) => token + 1);
+      // Bound to the offers of the conversation being left, not to the tab: a switch starts
+      // with no wording of its own, like every other piece of session state here.
+      setActionDrafts({});
       setActiveTool(null);
       setPresentedGreetingId(null);
       closeDinoGame();

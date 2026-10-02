@@ -418,7 +418,9 @@ function BuddyMentorHome() {
                 currentSessionId={currentSessionId}
                 disabled={isBusy || isOpening || isGreeting || isDeciding}
                 onSelect={selectConversation}
-                className="max-h-[45%] shrink-0"
+                // The cap only exists to leave the PM replies their share of the rail; with
+                // none to show, the conversations are the whole rail.
+                className={replies.hasAny ? "max-h-[45%] shrink-0" : "min-h-0 flex-1"}
               />
 
               {replies.hasAny && (
