@@ -65,7 +65,8 @@ self-contained under `src/features/` and surfaced through dedicated routes:
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v20 or higher recommended)
+- [Node.js](https://nodejs.org/) 20.19+ or 22.12+ (the minimum Vite 8 accepts; the Docker image
+  builds with Node 24)
 - npm (the project ships a `package-lock.json` and a `postinstall` hook for Keycloakify)
 
 ### Installation
@@ -136,8 +137,16 @@ The application uses **Keycloak** for Identity and Access Management. When devel
 3. **Assign Roles**:
    - Go to the user's **Role mapping** tab -> **Assign role**.
    - Filter by realm roles and assign the appropriate role for testing:
-     - `USER` — Standard developer onboarding and chat access.
-     - `PM` — Project Manager (access to PM dashboard, team management, skill wizard, data ingestion).
-     - `HR` — Human Resources (team management, project overview).
-     - `ADMIN` — System Administrator (full user/project management, token configuration, system administration).
+     - `USER` — The hire's surfaces: dashboard, onboarding, chat, AI buddy, board, knowledge
+       base and settings.
+     - `PM` — Everything `USER` has, plus the PM workspace (PM dashboard, team management,
+       insights), data ingestion, blueprints and hire setup. All of these except hire setup
+       are only open for a project the PM manages.
+     - `HR` — The same pages as `PM`, without the project-manager check, plus the admin page.
+       Some of them are read-only for HR (answering knowledge requests, acting in hire setup).
+     - `ADMIN` — Everything, including the admin-only project actions (industry, assigning a
+       project manager, deleting a project).
+   - The skill wizard (`/skill-wizard`) is open to every role. `AuthGuard` sends a user there
+     when their project roles have skills they have not assessed yet.
+   - Which role may open which route is defined in `src/auth/accessPolicy.ts`.
 4. **Log In**: Open [http://localhost:5173](http://localhost:5173). You will be redirected to the Keycloak login screen, authenticate, and return to the application.

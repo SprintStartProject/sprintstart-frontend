@@ -61,4 +61,5 @@ this list is only a reminder.
   ([architecture §10.2](./docs/FRONTEND_ARCHITECTURE.md#102-kubernetes)).
 - Feature work branches off `dev`; PRs target `dev`.
 - Agent instruction files: `AGENTS.md` (this file) is **shared/committed**;
-  `GEMINI.md`, `CLAUDE.md`, and `*.local.md` are gitignored (per-developer).
+  `GEMINI.md`, `CLAUDE.md`, `AGENTS.local.md`, `GEMINI.local.md` and `CLAUDE.local.md`
+  are gitignored (per-developer). Other `*.local.md` files are not ignored.
