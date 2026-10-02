@@ -150,10 +150,11 @@ Functions MUST be documented whenever they contain business logic or behavior th
 
 ```tsx
 /**
- * Loads the current user profile when the application starts.
+ * Initializes Keycloak and loads the backend profile of the signed-in user.
  *
- * The result determines whether the user can access protected routes
- * or needs to complete the role selection first.
+ * The profile is retried a few times, because a user who has just signed in for the
+ * first time may not exist in the backend yet. Without a profile the user counts as
+ * signed out and ends up on the login page.
  */
 const initAuth = async () => { ... };
 ```
@@ -236,7 +237,52 @@ The comment explains the choice the rule leaves open, such as why a list uses
 
 ---
 
-## 7. Anti-Patterns: What NOT to Document
+## 7. Tags and Markers
+
+### Tags
+
+Use a tag only when it adds something the signature does not already say.
+
+- **`@param name - Description.`** With the hyphen, as TSDoc defines it. Only for
+  parameters whose meaning is not clear from name and type.
+- **`@returns Description.`** When the type does not say enough, e.g. what `null` or
+  an empty list means.
+- **`@throws ErrorType when ...`** Name the condition, and for an `ApiError` the
+  status code: `@throws ApiError 404 when the skill does not exist.` A function that
+  catches every failure and never throws says so in its summary instead.
+- **`{@link symbol}`** To refer to another function, type or component, so the editor
+  can jump to it.
+
+```tsx
+/**
+ * Replaces the complete list of skills linked to a project role.
+ *
+ * @param skillIds - Every skill the role should have afterwards, not only the new ones.
+ * @returns The role's skills after the change.
+ * @throws ApiError 404 when the role or one of the skills does not exist.
+ */
+export async function updateRoleSkills(roleId: string, skillIds: string[]): Promise<Skill[]> { ... }
+```
+
+### Backend gaps
+
+Code that works around a missing backend feature gets a `TODO(backend):` paragraph in
+its TSDoc. Say what is missing (an endpoint, a field, a status) and what can be removed
+once it exists. Use exactly this marker, so all of them can be found with one search.
+
+```tsx
+/**
+ * How many onboarding items wait on the project manager in one project.
+ *
+ * TODO(backend): there is no count endpoint, so this reads the team overview and the
+ * feedback list and counts here. Once one exists, only the body of this function changes.
+ */
+export async function getPmAttentionCount(projectId: string): Promise<PmAttentionCount> { ... }
+```
+
+---
+
+## 8. Anti-Patterns: What NOT to Document
 
 > [!CAUTION]
 > AI AGENTS: NEVER generate comments for the following trivial scenarios. Doing so degrades code readability.
