@@ -8,7 +8,7 @@ This document defines the strict documentation standards for the React and TypeS
 > **Related docs**
 >
 > - [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) — system architecture (routing, services, state, design system, animation).
-> - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) §9 — documentation rules summary.
+> - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) — coding rules, including accessibility labels and `data-testid` (§5) and animation (§6).
 > - [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
 
 ---
@@ -31,7 +31,7 @@ This document defines the strict documentation standards for the React and TypeS
 
 ### Views & Page-Level Components
 
-You MUST document all page-level or view-level components. Describe the view's responsibility, route context, and its main sub-components.
+You MUST document all page-level or view-level components. Describe the view's responsibility, the user flow it belongs to, its route context, and the backend, auth, routing or state dependencies it relies on.
 
 Start with what the view is for. Don't open with the component name, it is already
 on the line below.
@@ -73,6 +73,7 @@ Document the props of components when:
 - The meaning of a prop is not obvious.
 - The prop influences complex behavior.
 - The prop contains callback functions.
+- The prop value must follow backend or auth-related constraints.
 
 ```tsx
 type TaskCardProps = {
@@ -97,11 +98,8 @@ _Do not_ document obvious props like `id`, `className`, or `children` unless add
 
 ### React Router v7 Routes
 
-This codebase uses React Router v7's **declarative `<Route element={...}>` API**
-guarded by an `AuthGuard` wrapper component — **not** the data-router
-`loader`/`action` APIs. There are no `LoaderFunctionArgs` or route loaders in the
-codebase. (See [FRONTEND_ARCHITECTURE.md §4](./FRONTEND_ARCHITECTURE.md#4-routing--access-control)
-for the full routing model.)
+How routing and the guards work is described in
+[FRONTEND_ARCHITECTURE.md §4](./FRONTEND_ARCHITECTURE.md#4-routing--access-control).
 
 Document route components with their route path, the `AppRoute` literal they
 correspond to in `src/auth/accessPolicy.ts`, the permission groups allowed to
@@ -139,7 +137,14 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) { ... }
 
 ## 4. Functions and Business Logic
 
-Functions MUST be documented whenever they contain business logic or behavior that is not immediately obvious.
+Functions MUST be documented whenever they contain business logic or behavior that is not immediately obvious. That includes:
+
+- Permission or role rules.
+- Conditional user flows.
+- Data transformations.
+- Backend contract assumptions.
+- Error handling decisions.
+- Temporary limitations or known backend gaps.
 
 ### Async Operations & User Actions
 
@@ -171,6 +176,11 @@ export async function fetchOnboardingPath(userId: string): Promise<OnboardingPat
 
 ## 5. Hooks and Effects
 
+### Custom hooks
+
+Document a custom hook when it encapsulates business behavior, backend calls,
+authorization state, routing behavior, or non-trivial state synchronization.
+
 ### `useEffect` Documentation
 
 Simple effects DO NOT require documentation.
@@ -200,15 +210,10 @@ useEffect(() => {
 
 Document layout transitions, spring tokens, and why `<AnimatePresence>` is used in a specific context.
 
-> [!NOTE]
-> All Framer Motion transition presets are centralized in
-> [`src/styles/tokens.ts`](../src/styles/tokens.ts) — import the tokens you need
-> rather than inlining ad-hoc spring configs. See
-> [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
-> for the full reference (e.g. `buttonHoverMotion` for consistent button feedback,
-> `modalBackdropVariants` for dialogs).
-
-Inside JSX a comment has to be written as `{/* ... */}`:
+Which tokens to use and how to set up `<AnimatePresence>` is in
+[FRONTEND_CODING_STANDARDS.md §6](./FRONTEND_CODING_STANDARDS.md#6-animation-framer-motion-12).
+The comment explains the choice the rule leaves open, such as why a list uses
+`popLayout`. Inside JSX it has to be written as `{/* ... */}`:
 
 ```tsx
 <div className="grid gap-4">
@@ -231,30 +236,7 @@ Inside JSX a comment has to be written as `{/* ... */}`:
 
 ---
 
-## 7. Accessibility & Testing Labels
-
-Interactive components MUST declare labels to support assistive devices and automated tests.
-
-- **`aria-label`**: Required on buttons or links that contain only graphic icons.
-- **`data-testid`**: Required on key interactive items (role selections, chat submit buttons) targeted by tests.
-
-```tsx
-<Button
-  variant="ghost"
-  iconOnly
-  onClick={toggleSidebar}
-  aria-label="Toggle navigation menu"
-  data-testid="sidebar-toggle"
->
-  <MenuIcon className="h-4 w-4" />
-</Button>
-```
-
-The label and test id need no comment; why they are there is what this section says.
-
----
-
-## 8. Anti-Patterns: What NOT to Document
+## 7. Anti-Patterns: What NOT to Document
 
 > [!CAUTION]
 > AI AGENTS: NEVER generate comments for the following trivial scenarios. Doing so degrades code readability.

@@ -1,9 +1,8 @@
 # Frontend Architecture
 
-This document is the authoritative architecture reference for `sprintstart-frontend`.
-It replaces the frontend section of the (root-level) `ARCHITECTURE.md` so that this
-repository is self-sufficient: a developer cloning only `sprintstart-frontend/` gets
-the full architecture picture without needing root files.
+This document describes how `sprintstart-frontend` is built: structure, routing,
+state, services, design-system mechanics, build and deployment. Rules for writing
+code live in the coding standards; this file only describes.
 
 > **Related docs**
 >
@@ -293,8 +292,8 @@ their own read loops.
 
 ### 6.3 Service modules (`src/services/`)
 
-One module per domain. Each exports typed functions and surfaces backend failures
-(no empty `catch`, no silent swallow):
+One module per domain (rules for writing them in
+[FRONTEND_CODING_STANDARDS.md §7](./FRONTEND_CODING_STANDARDS.md#7-services--api-layer)):
 
 | Module                         | Domain                                                                |
 | ------------------------------ | --------------------------------------------------------------------- |
@@ -355,131 +354,58 @@ with them as they are.
 
 ## 7. Design system
 
-### 7.1 One shared palette
+This section describes how the design system is built. The rules for using it
+(tokens only, UI primitives, radius/shadow/heading scales, color-blind safety,
+contrast, focus) are in
+[FRONTEND_CODING_STANDARDS.md §4 and §5](./FRONTEND_CODING_STANDARDS.md#4-styling-tailwind-css-v4).
 
-A set of **semantic design tokens** (CSS variables → Tailwind `app-*` classes)
-defined in [`src/styles/index.css`](../src/styles/index.css). **Always use tokens;
-never hardcode colors** (no `#2563eb`, no raw Tailwind colors like `text-blue-500`).
+### 7.1 Semantic tokens
 
-Semantic roles:
+All colors are semantic design tokens, defined as CSS custom properties in
+[`src/styles/index.css`](../src/styles/index.css). An `@theme inline` block maps them
+to Tailwind utilities with the `app-` prefix. The families:
 
 - **Surfaces**: `bg-app-bg`, `bg-app-surface`, `bg-app-surface-muted`
 - **Text**: `text-app-text`, `text-app-text-muted`, `text-app-text-subtle`
 - **Borders**: `border-app-border`, …
 - **Brand**: `bg-app-brand`, `text-app-brand`, …
-- **Status**: `success` / `warning` / `danger` / `neutral`
+- **Status**: `success` / `warning` / `danger` / `neutral`, each with `-bg`,
+  `-border` and `-text` variants, plus `-solid` for all but `neutral`
   (e.g. `bg-app-success-bg text-app-success-text`)
 
 ### 7.2 Light / dark theme
 
-Controlled via the `.dark` class on `document.documentElement`, managed by
-`ThemeProvider`. The entry CSS uses `@import "tailwindcss"`, `@custom-variant dark`,
-and `@theme inline` to map CSS custom properties into Tailwind tokens. Every color
-works in both themes automatically when you use tokens.
-
-### 7.3 Color-blind accessibility (required)
-
-Never rely on color **alone** to convey meaning. Always back it with an
-**icon, text label, or shape** (e.g. status = chip text + icon, not just red/green)
-— this is why finished/skipped/locked steps use distinct icons _and_ labels. Keep
-color pairs distinguishable for common color-vision deficiencies.
-
-### 7.4 Contrast & focus
-
-- Meet **WCAG 2.1 AA** for text and interactive elements.
-- Keep visible focus via the `--app-focus` token (`focus-visible:ring-app-focus`) —
-  don't remove outlines.
-
-### 7.5 Stay consistent beyond color
-
-Use the shared Tailwind scale for spacing, radius, and sizing instead of arbitrary
-one-off pixel values, so padding/margins/gaps match the rest of the app.
+`ThemeProvider` sets the `.dark` class on `document.documentElement` and persists the
+choice (light, dark or system). `index.css` defines the light values under `:root`
+and overrides them under `.dark`, so anything styled with tokens follows the theme
+without `dark:` prefixes. `@custom-variant dark` is there for the rare case that
+needs one.
 
 ---
 
 ## 8. Animation system (Framer Motion 12)
 
-The codebase consumes `framer-motion` (^12) directly with inline `motion.` props.
+The codebase uses `framer-motion` (^12) directly through `motion.*` components and
+`<AnimatePresence>`. The rules for using it are in
+[FRONTEND_CODING_STANDARDS.md §6](./FRONTEND_CODING_STANDARDS.md#6-animation-framer-motion-12).
 
-### 8.1 Centralized spring tokens
+Every shared motion value lives in [`src/styles/tokens.ts`](../src/styles/tokens.ts),
+each with a TSDoc comment saying when to use it. Read the file rather than a copy of
+it here; it falls into four groups:
 
-Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts).
+- **Spring transitions**: `centralSpringToken` (the default for layout and list
+  motion), `hoverSpringToken` (hover and tap micro-interactions), plus a few
+  specialised springs such as `sidePanelSlideToken` or `celebrationSpringToken`.
+- **Button motion**: `buttonHoverMotion` and `buttonHoverMotionDisabled`, which
+  `ui/Button` applies itself.
+- **Dialog variants**: `modalBackdropVariants` and `getModalDialogVariants`, used by
+  `ui/Modal`.
+- **Timing constants**: e.g. `SIDE_PANEL_SLIDE_MS`, `SKELETON_APPEAR_DELAY_MS`.
 
-```typescript
-import type { Transition } from "framer-motion";
-
-/** Default spring for layout transitions, list enter/exit, and general motion.
- *  Snappy but not stiff — settles quickly without overshooting violently. */
-export const centralSpringToken: Transition = {
-  type: "spring",
-  stiffness: 300,
-  damping: 25,
-  mass: 0.8,
-};
-
-/** Lighter spring for hover/tap micro-interactions — faster, slightly bouncier. */
-export const hoverSpringToken: Transition = {
-  type: "spring",
-  stiffness: 400,
-  damping: 15,
-};
-```
-
-**Rule:** use these presets for ALL `motion` transitions — do not inline ad-hoc
-spring configs.
-
-Usage:
-
-```tsx
-import { centralSpringToken } from "../styles/tokens.ts";
-<motion.div transition={centralSpringToken} ... />
-```
-
-There is no `@/` path alias; imports are relative.
-
-### 8.2 Layout transitions & list deletions
-
-When items (like steps or resources) are added or removed dynamically, standard
-CSS transitions cause adjacent elements to snap instantly to their new locations.
-Use **layout animations** to interpolate this reflow smoothly.
-
-```tsx
-import { motion, AnimatePresence } from "framer-motion";
-import { centralSpringToken } from "../styles/tokens.ts";
-
-export function TaskList({ tasks, onDelete }) {
-  return (
-    <div className="grid gap-4">
-      <AnimatePresence mode="popLayout">
-        {tasks.map((task) => (
-          <motion.div
-            layout
-            key={task.id}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={centralSpringToken}
-          >
-            <TaskCard task={task} onDelete={onDelete} />
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}
-```
-
-### 8.3 Defensive layout rules
-
-1. **`mode="popLayout"`** — always specify on `<AnimatePresence>` when wrapping
-   elements that affect document reflow. This pops the exiting element out of the
-   layout flow, allowing surrounding elements to animate into their new positions
-   immediately rather than waiting for the exit animation to complete.
-2. **`layout` attribute** — the direct child of `<AnimatePresence>` must have
-   `layout` set. This tells Framer Motion to watch the element's bounding box and
-   animate size or position changes.
-3. **Key declarations** — the animated child must have a unique, stable `key`. Avoid
-   index offsets; use database UUIDs.
+The variant factories take a `prefersReducedMotion` flag, and `ui/Button` drops its
+hover motion when the user prefers reduced motion. In tests, `framer-motion` is
+replaced by a passthrough mock (see
+[testing_strategy.md §5](./testing_strategy.md#5-global-setup-testsunitsetupvitestsetupts)).
 
 ---
 
@@ -505,7 +431,7 @@ All npm scripts are listed in the [README](../README.md#commands--scripts).
 ### 9.3 TypeScript config
 
 - `tsconfig.app.json` — `verbatimModuleSyntax: true`, `allowImportingTsExtensions: true`
-  (so `.ts`/`.tsx` extensions on relative imports are allowed and encouraged),
+  (so `.ts`/`.tsx` extensions on relative imports are allowed),
   `target: es2023`, `jsx: react-jsx`, strict linting flags.
 - `tsconfig.node.json` — for Vite config files.
 - `tsconfig.test.json` — for test files: extends `tsconfig.app.json`, adds the
@@ -567,13 +493,3 @@ token changes, the copy has to be ported by hand (rule in
 Nothing syncs the two repos automatically. Skip this and the running Keycloak keeps
 serving whatever theme JAR was last committed, while the source here moves on
 without it.
-
----
-
-## 11. Reference
-
-- [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) — TS / React / Tailwind / a11y conventions.
-- [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — TSDoc/JSDoc rules.
-- [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
-- [../AGENTS.md](../AGENTS.md) — short-context orientation guide for AI agents.
-- [../README.md](../README.md) — setup, prerequisites, env vars, developer notes.

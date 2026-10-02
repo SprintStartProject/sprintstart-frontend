@@ -1,10 +1,8 @@
 # Frontend Coding Standards & Conventions
 
-These are the coding standards for `sprintstart-frontend`. Developers and AI agents
-must follow these rules to maintain a predictable, clean, and highly maintainable
-codebase. This file is the frontend-only companion to the root-level
-`CODING_STANDARDS.md` (which also covers Kotlin and Python); a developer cloning
-only this repository gets the full set of frontend rules here.
+These are the coding rules for `sprintstart-frontend`, for developers and AI agents
+alike. How the codebase is built is described in the architecture doc; this file
+says how to write code for it.
 
 > **Related docs**
 >
@@ -91,20 +89,14 @@ only this repository gets the full set of frontend rules here.
 
 - **Comments and identifiers in English.**
 
-- **Services return typed responses and surface backend failures** — don't silently
-  swallow errors (no empty `catch`).
-
 ---
 
 ## 4. Styling (Tailwind CSS v4)
 
-- **Always use the palette tokens; never hardcode colors.**
-  - No `#2563eb`, no raw Tailwind colors like `text-blue-500`.
-  - Use the semantic roles: surfaces (`bg-app-bg`, `bg-app-surface`,
-    `bg-app-surface-muted`), text (`text-app-text`, `text-app-text-muted`,
-    `text-app-text-subtle`), borders (`border-app-border`, …), brand
-    (`bg-app-brand`, `text-app-brand`, …), and status (`success` / `warning` /
-    `danger` / `neutral`, e.g. `bg-app-success-bg text-app-success-text`).
+- **Always use the palette tokens; never hardcode colors.** No `#2563eb`, no raw
+  Tailwind colors like `text-blue-500`. Every color must work in light and dark
+  mode, which tokens give you for free. The token families are listed in
+  [FRONTEND_ARCHITECTURE.md §7](./FRONTEND_ARCHITECTURE.md#7-design-system).
 
 - **Stay consistent beyond color, too.** Use the shared Tailwind scale for spacing,
   radius, and sizing instead of arbitrary one-off pixel values.
@@ -165,10 +157,6 @@ only this repository gets the full set of frontend rules here.
 - **No custom standalone `.css` classes** unless styling third-party widgets or
   dealing with browser overrides.
 
-- **Light/dark theme** is controlled via the `.dark` class (`@custom-variant dark`),
-  managed by `ThemeProvider`. Every color must work in both themes — which is
-  automatic when you use tokens.
-
 - **Every action control is [`ui/Button`](../src/components/ui/Button.tsx) — do not
   hand-roll a `<button>` with its own classes.** Pick `variant` by intent
   (`primary` | `secondary` | `ghost` | `danger` | `dangerSoft` | `dangerGhost`)
@@ -208,6 +196,12 @@ only this repository gets the full set of frontend rules here.
   them. The one thing outside the ladder is a `shadow-lg` used as _emphasis_ on
   a filled brand surface — a selected tab, the logo tile. That is decoration on
   a coloured shape, not elevation, and it stays.
+
+  **The brand lift shadow (`hover:shadow-app-brand-lift`) belongs to `primary`
+  buttons and to nothing else.** It marks the one action a screen wants; if every
+  button glowed, the cue would carry no information. It is a token in `index.css`
+  with separate light and dark values — never an arbitrary `shadow-[…]` value,
+  which cannot adapt to the theme.
 
 - **Heading scale — pick the rung by role, not by how big it should look.**
 
@@ -309,14 +303,37 @@ only this repository gets the full set of frontend rules here.
 
 ## 6. Animation (Framer Motion 12)
 
-- **Use the centralized spring transition tokens** — don't inline ad-hoc spring
-  configs. Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts),
-  exporting `centralSpringToken` (default layout/list motion) and `hoverSpringToken`
-  (micro-interactions).
+- **Use the presets in [`src/styles/tokens.ts`](../src/styles/tokens.ts)** for every
+  `motion` transition — don't inline ad-hoc spring configs. `centralSpringToken` is
+  the default; what else is in there is described in
+  [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12).
 
-- **Wrap dynamically added/removed elements** (lists, drawers) in `<AnimatePresence>`
-  to avoid clipping on exit. Use `mode="popLayout"` when the wrapper affects
-  document reflow.
+- **Wrap dynamically added or removed elements** (lists, drawers) in
+  `<AnimatePresence>`, so they animate out instead of being clipped. For lists whose
+  items affect the layout around them:
+  - Set `mode="popLayout"`. It takes the exiting element out of the layout flow,
+    so its neighbours move into place right away instead of waiting for the exit
+    animation to finish.
+  - Give the direct child of `<AnimatePresence>` the `layout` prop, so Framer
+    Motion animates its size and position changes.
+  - Give that child a unique, stable `key` (the backend id), never the array index.
+
+  ```tsx
+  <AnimatePresence mode="popLayout">
+    {tasks.map((task) => (
+      <motion.div
+        layout
+        key={task.id}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={centralSpringToken}
+      >
+        <TaskCard task={task} />
+      </motion.div>
+    ))}
+  </AnimatePresence>
+  ```
 
 - **Do not apply `buttonHoverMotion` by hand.**
   [`ui/Button`](../src/components/ui/Button.tsx) already carries it, for every
@@ -329,22 +346,13 @@ only this repository gets the full set of frontend rules here.
   to feel the same — the `role="combobox"` trigger in `FilterSelect` and the
   `aria-pressed` filter chips. Those, and only those.
 
-- **The brand lift shadow (`hover:shadow-app-brand-lift`) belongs to `primary`
-  and to nothing else.** It marks the one action a screen wants; if every button
-  glowed, the cue would carry no information. It is a token in `index.css` with
-  separate light and dark values — never an arbitrary `shadow-[…]` value, which
-  cannot adapt to the theme.
-
-- See [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
-  for the full animation system.
-
 ---
 
 ## 7. Services & API layer
 
-- **Use `services/apiClient.ts`** (native `fetch` wrapper) — **not axios**. The
-  `apiClient.fetch<T>(endpoint, options)` helper handles JWT refresh, auth headers,
-  JSON parsing, and `ApiError` throwing.
+- **Use `apiClient.fetch<T>()` from `services/apiClient.ts`** for every HTTP call,
+  not axios or a bare `fetch`. What it does for you is described in
+  [FRONTEND_ARCHITECTURE.md §6.1](./FRONTEND_ARCHITECTURE.md#61-apiclient-srcservicesapiclientts).
 
 - **Typed responses** — every service function declares its return type
   (`Promise<SomeDto>`); never `Promise<any>`.
@@ -362,66 +370,19 @@ only this repository gets the full set of frontend rules here.
 
 ## 8. Testing
 
-- **Framework:** Vitest 4 + Testing Library (`@testing-library/react`,
-  `user-event`, `jest-dom`) in a `jsdom` environment, with `msw` for HTTP mocking
-  and `vitest-axe` for accessibility checks.
-
-- **Location:** unit tests live under `tests/unit/**`, mirroring `src/` structure
-  (`services/`, `components/`, `pages/`, `context/`, `router/`, `features/`,
-  `hooks/`, `auth/`, `a11y/`).
-
-- **Run:** `npm run test` (CI-friendly, non-watch). `npm run unit` excludes a11y;
-  `npm run a11y` runs a11y only.
-
-- **What to cover:** services (backend contracts, error paths), business/permission
-  logic (`AuthGuard`, access policy), hooks, and key page/component behavior — not
-  trivial markup.
-
-- **E2E hooks:** elements targeted by end-to-end tests must declare a `data-testid`.
-
-- **Update tests in the same PR** as the component change.
-
-- See [testing_strategy.md](./testing_strategy.md) for the full setup.
+All testing rules (what to cover, where tests live, how to mock) are in
+[testing_strategy.md](./testing_strategy.md).
 
 ---
 
-## 9. Documentation (the _why_, not the obvious _what_)
+## 9. Documentation
 
-- Use **TSDoc** blocks on exported symbols — see
-  [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md)
-  for the full rules.
-
-- In short, document:
-  - **Pages/views:** responsibility, user flow, key backend/auth/routing/state deps.
-  - **Reusable components:** when purpose/behavior/constraints aren't obvious.
-  - **Props:** when reused, domain-meaningful, callbacks, or backend/auth-constrained
-    (skip `id` / `children` / `className` unless special).
-  - **Service functions:** purpose, important params, non-obvious return, failure
-    behavior — document **every** exported service function.
-  - **Hooks/effects:** when timing or dependencies matter.
-  - **Business logic:** permission/role rules, conditional flows, data transforms,
-    backend-contract assumptions, and **temporary limitations / known backend gaps**.
-
-- Don't document obvious assignments, trivial state updates, plain JSX, or restate
-  names. Keep comments current — update/remove them when behavior changes.
+All rules for TSDoc and comments are in
+[FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md).
 
 ---
 
-## 10. Anti-patterns (do not)
-
-- **No `any`** (TypeScript) — type it properly.
-- **No type suppressions** — `// @ts-ignore`, `// @ts-expect-error`. Fix the
-  underlying type mismatch instead. `eslint-disable` only per line, per rule, with a
-  reason (§2).
-- **No hardcoded colors** — use the shared palette tokens.
-- **No ad-hoc spring configs** — use `src/styles/tokens.ts`.
-- **No empty `catch` blocks** — surface backend failures.
-- **No class components** — functional + hooks only.
-- **No default exports** except where a tool requires one (Storybook `meta`, config files).
-
----
-
-## 11. Enforcement
+## 10. Enforcement
 
 ESLint flat config ([`eslint.config.js`](../eslint.config.js)):
 
@@ -432,26 +393,16 @@ ESLint flat config ([`eslint.config.js`](../eslint.config.js)):
 - `jsx-a11y` flat recommended.
 - `prettier` (formatting via `eslint-config-prettier`).
 
-**Before finishing any change:**
-
-```bash
-npm run lint        # ESLint
-npm run build       # tsc -b + vite build (type-check + compile)
-npm run test        # full Vitest suite (unit + a11y)
-# OR, the one-shot Definition of Done:
-npm run try         # install + build + lint + unit + a11y
-```
+**Definition of Done:** `npm run try` passes. It runs `npm install`, the Prettier
+check, the build (`tsc -b` + `vite build`), ESLint, and the unit and a11y tests.
+The individual scripts are listed in the [README](../README.md#commands--scripts).
 
 ### Formatting
 
 Prettier owns formatting — don't fight it, don't hand-align, don't argue with
 the class order. The config lives in [`.prettierrc`](../.prettierrc):
-2 spaces, double quotes, `printWidth: 100`.
-
-```bash
-npm run format        # rewrite
-npm run format:check  # verify (also part of `npm run try`)
-```
+2 spaces, double quotes, `printWidth: 100`. `npm run format` rewrites,
+`npm run format:check` verifies.
 
 `prettier-plugin-tailwindcss` sorts Tailwind classes. It needs
 `"tailwindStylesheet": "./src/styles/index.css"` because Tailwind v4 has no

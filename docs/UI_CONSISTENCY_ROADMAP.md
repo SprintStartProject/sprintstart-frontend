@@ -421,7 +421,7 @@ das Plugin sortiert Klassen um. Beides ändert kein Markup und kein Styling.
 Einzige inhaltliche Änderung im ganzen Reformat: ein Klammerpaar um ein
 mehrzeiliges `return` in `public/easter-eggs/2048.html`.
 
-Regel steht in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §11.
+Regel steht in [`FRONTEND_CODING_STANDARDS.md`](./FRONTEND_CODING_STANDARDS.md) §10.
 
 ---
 

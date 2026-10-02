@@ -1,13 +1,12 @@
 # Frontend Testing Strategy
 
-This document describes the actual testing setup for `sprintstart-frontend`. It
-replaces the previous `mocking_strategy.md`, which described a pipeline of Playwright,
-axios and `cross-env` that does not match the current codebase.
+This document is the single place for testing in `sprintstart-frontend`: what to
+test, where tests live, and how the test setup works.
 
 > **Related docs**
 >
 > - [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) — system architecture (routing, services, state).
-> - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) §8 — testing rules summary.
+> - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) — coding rules, including accessibility labels and `data-testid` (§5).
 
 ---
 
@@ -25,33 +24,25 @@ axios and `cross-env` that does not match the current codebase.
 Coverage is not set up: there is no coverage provider (`@vitest/coverage-v8`) in
 `package.json` and no `coverage` block in the Vitest config.
 
-**What we do NOT use:**
+There are no end-to-end tests (no Playwright, no Cypress).
 
-- ❌ Playwright (the old `mocking_strategy.md` claimed we did — it was wrong)
-- ❌ axios-mock-adapter (the old doc showed `axios.get` — the codebase uses native `fetch` via `apiClient`)
-- ❌ `cross-env` and a `VITE_USE_MOCK_MODE` mock mode (the old doc described both, neither exists in the codebase; see §8)
+### What to test
+
+- Services: the backend contract (URL, method, body) and the error paths.
+- Business and permission logic: `AuthGuard`, the access policy.
+- Hooks with real logic.
+- Key page and component behavior. Not trivial markup.
+
+When you change a component that has tests, update them in the same PR.
 
 ---
 
 ## 2. Commands
 
-| Purpose                                                                     | Command        |
-| --------------------------------------------------------------------------- | -------------- |
-| All unit tests (CI-friendly, non-watch)                                     | `npm run test` |
-| Unit tests only (excludes `tests/unit/a11y/**/*`)                           | `npm run unit` |
-| A11y tests only (`tests/unit/a11y/`)                                        | `npm run a11y` |
-| Full DoD verification (install + format check + build + lint + unit + a11y) | `npm run try`  |
-
-Scripts (from `package.json`):
-
-```json
-{
-  "test": "vitest run",
-  "unit": "vitest run --exclude 'tests/unit/a11y/**/*'",
-  "a11y": "vitest run tests/unit/a11y/",
-  "try": "npm install && npm run format:check && npm run build && npm run lint && npm run unit && npm run a11y"
-}
-```
+`npm run test` runs the whole suite once (no watch mode). `npm run unit` skips
+`tests/unit/a11y/` and `npm run a11y` runs only that folder, because the axe scans
+are the slow part. All scripts are listed in the
+[README](../README.md#commands--scripts).
 
 ---
 
@@ -81,8 +72,7 @@ tests/
     └── bootSplash.test.ts        # src/bootSplash.ts (the splash index.html paints)
 ```
 
-`tests/unit/` mirrors `src/` structure. When you change a component, update its
-tests in the same PR.
+`tests/unit/` mirrors the `src/` structure.
 
 ### File naming conventions
 
@@ -203,17 +193,16 @@ it('returns the user profile', async () => {
 });
 ```
 
-The MSW server intercepts native `fetch()` calls (including those made by
-`apiClient.fetch`), so no axios-mock-adapter is needed.
+The MSW server intercepts native `fetch()` calls, including those made by
+`apiClient.fetch`.
 
 ---
 
 ## 8. Mock data (`src/mocks/`)
 
-There is **no mock mode**. An earlier version of this document described a
-`VITE_USE_MOCK_MODE` flag, but no code reads it. `npm run dev` always talks to
-the real backend at `127.0.0.1:8080` and Keycloak at `127.0.0.1:8081` through
-the Vite dev proxy, so both have to be running (see the README).
+There is **no mock mode**. `npm run dev` always talks to the real backend at
+`127.0.0.1:8080` and Keycloak at `127.0.0.1:8081` through the Vite dev proxy, so
+both have to be running (see the README).
 
 `src/mocks/` only holds two fixtures, both used by
 `src/services/teamManagementService.ts`:
@@ -252,52 +241,3 @@ it("passes axe accessibility checks", async () => {
 
 The `toPassAxe()` matcher is wired up in `vitest.setup.ts` via
 `vitest-axe/extend-expect`. Targets **WCAG 2.1 AA**.
-
-Run a11y tests in isolation:
-
-```bash
-npm run a11y
-```
-
----
-
-## 10. Test doubles
-
-| Concern             | Tool                                                                              |
-| ------------------- | --------------------------------------------------------------------------------- |
-| Component rendering | `@testing-library/react` `render` / `renderWithProviders`                         |
-| User interactions   | `@testing-library/user-event`                                                     |
-| DOM matchers        | `@testing-library/jest-dom`                                                       |
-| HTTP mocking        | `msw` (`setupServer`, `http.get/post/patch/...`)                                  |
-| Browser environment | `jsdom`                                                                           |
-| axe-core assertions | `vitest-axe` (`toPassAxe()`)                                                      |
-| Module mocks        | Vitest `vi.mock()` / `vi.fn()`                                                    |
-| React Router        | `MemoryRouter` from `react-router-dom` (real module, not mocked)                  |
-| Framer Motion       | mocked in `vitest.setup.ts` (passthrough — prevents jsdom layout issues)          |
-| Keycloak JS         | mocked in `vitest.setup.ts` (`mockKeycloakInstance` exported for per-test config) |
-
----
-
-## 11. E2E hooks in component code
-
-To support automated testing (and screen readers), interactive components must
-declare:
-
-- **`aria-label`** on buttons/links that contain only graphic icons.
-- **`data-testid`** on key interactive items targeted by tests (role selections,
-  chat submit buttons, etc.).
-
-```tsx
-<Button
-  variant="ghost"
-  iconOnly
-  onClick={toggleSidebar}
-  aria-label="Toggle navigation menu"
-  data-testid="sidebar-toggle"
->
-  <MenuIcon className="h-4 w-4" />
-</Button>
-```
-
-A missing accessible name is caught by the `jsx-a11y` ESLint plugin (compile-time)
-and the a11y test suite (runtime). Nothing checks `data-testid` automatically.

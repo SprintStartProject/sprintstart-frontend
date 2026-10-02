@@ -31,7 +31,7 @@ fix it in the same PR.
 `npm run try` passes (format check, build, lint, unit and a11y tests), tests of
 changed components are updated in the same PR, and new or changed code is documented
 per the documentation guidelines. Details in
-[FRONTEND_CODING_STANDARDS.md §11](./docs/FRONTEND_CODING_STANDARDS.md#11-enforcement).
+[FRONTEND_CODING_STANDARDS.md §10](./docs/FRONTEND_CODING_STANDARDS.md#10-enforcement).
 
 ---
 
