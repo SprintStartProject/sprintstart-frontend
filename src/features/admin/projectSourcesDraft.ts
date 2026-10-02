@@ -124,6 +124,10 @@ function nextDraftSourceId(): string {
   return `draft-source-${draftSourceCounter}`;
 }
 
+/**
+ * Stages a GitHub repository. With a `repositoryId` the repository is already ingested elsewhere
+ * and connecting only links it to the project; without one it is fetched and ingested.
+ */
 export function createDraftSource(
   owner: string,
   name: string,
@@ -204,6 +208,10 @@ export function isValidConfluenceSpaceId(spaceId: string): boolean {
   return /^\d+$/.test(spaceId.trim());
 }
 
+/**
+ * Stages a Confluence space. Without a display name it is called `Confluence Space <spaceId>`;
+ * check the space ID with {@link isValidConfluenceSpaceId} first.
+ */
 export function createConfluenceDraft(params: {
   displayName?: string;
   baseUrl: string;
@@ -226,8 +234,9 @@ export function createConfluenceDraft(params: {
 
 /**
  * Whether two drafts point at the same underlying source, used to dedupe on
- * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL; two
- * uploads are always distinct (the same file can legitimately be staged twice).
+ * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL,
+ * Confluence by base URL and space ID; two uploads are always distinct (the same
+ * file can legitimately be staged twice).
  * Drafts of different types are never the same source.
  */
 export function isSameSource(left: DraftSource, right: DraftSource): boolean {
@@ -294,6 +303,7 @@ function patchDraftSource(
   return sources.map((source) => (source.id === sourceId ? { ...source, ...patch } : source));
 }
 
+/** Sources a save still has to connect: pending, failed or still connecting. */
 export function countUnconnectedSources(sources: DraftSource[]): number {
   return sources.filter((source) => source.status !== "connected").length;
 }

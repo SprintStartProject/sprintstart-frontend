@@ -44,6 +44,11 @@ When you change a component that has tests, update them in the same PR.
 are the slow part. All scripts are listed in the
 [README](../README.md#commands--scripts).
 
+On Node 25 or newer, run them with `NODE_OPTIONS=--no-experimental-webstorage`. Otherwise
+Node's own `localStorage` hides the one jsdom provides and every test that touches storage
+fails. CI runs Node 24 and is not affected. Details in the
+[README](../README.md#local-pitfalls).
+
 ---
 
 ## 3. Test file organization

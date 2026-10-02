@@ -39,6 +39,10 @@ export type PeopleDraft = {
   managerId: string | null | undefined;
 };
 
+/**
+ * Fingerprint of the server state a draft is based on: the member ids, sorted so the order the
+ * backend lists them in does not matter, and the manager's id.
+ */
 export function buildPeopleSnapshotKey(
   members: ProjectUser[],
   manager: ProjectManager | null,
@@ -65,6 +69,7 @@ export function resolvePeopleDraft(draft: PeopleDraft, snapshotKey: string): Peo
   return draft.snapshotKey === snapshotKey ? draft : createEmptyPeopleDraft(snapshotKey);
 }
 
+/** Pending changes for the save button's count; a changed manager counts as one. */
 export function countPeopleChanges(draft: PeopleDraft): number {
   return (
     draft.addedUserIds.size + draft.removedUserIds.size + (draft.managerId === undefined ? 0 : 1)
@@ -101,6 +106,7 @@ export function stageToggleRemoveUser(draft: PeopleDraft, userId: string): Peopl
   return { ...draft, addedUserIds, removedUserIds };
 }
 
+/** Stages a new project manager; `null` stages clearing the assignment. */
 export function stageManager(draft: PeopleDraft, managerId: string | null): PeopleDraft {
   return { ...draft, managerId };
 }

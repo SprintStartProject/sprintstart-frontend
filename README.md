@@ -65,8 +65,9 @@ self-contained under `src/features/` and surfaced through dedicated routes:
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 20.19+ or 22.12+ (the minimum Vite 8 accepts; the Docker image
-  builds with Node 24)
+- [Node.js](https://nodejs.org/) 20.19+ or 22.12+ (the minimum Vite 8 accepts). CI and the
+  Docker image use Node 24, which is the safe choice. On Node 25 or newer the tests need a flag,
+  see [Local pitfalls](#local-pitfalls).
 - npm (the project ships a `package-lock.json` and a `postinstall` hook for Keycloakify)
 
 ### Installation
@@ -118,6 +119,32 @@ VITE_KEYCLOAK_CLIENT_ID=sprintstart-frontend
 | **Keycloak Theme Dev**       | `npm run dev-keycloak-theme` (Runs Vite with `VITE_KC_DEV=true` for mock theme preview) |
 | **Build Keycloak Theme**     | `npm run build-keycloak-theme` (Builds JAR via Keycloakify & Maven)                     |
 | **Docker Full Stack**        | `docker compose up --build` (Nginx container serving SPA at `http://localhost:3000`)    |
+
+### Local pitfalls
+
+Two things fail locally while CI (Linux, Node 24) stays green:
+
+- **Node 25 or newer breaks about 480 tests.** Node brings its own `localStorage`, which is
+  undefined without `--localstorage-file` and hides the one jsdom provides. Run the tests with
+  the built-in one switched off:
+
+  ```bash
+  NODE_OPTIONS=--no-experimental-webstorage npm run test
+  ```
+
+- **`npm run format:check` fails on hundreds of files on Windows.** With
+  `core.autocrlf=true` Git checks the files out with CRLF, while Prettier expects LF. Git turns
+  them back into LF on commit, so nothing wrong reaches the repository, but `npm run try` stops
+  at the format check. Switch this clone to LF and check the files out again (only with a clean
+  working tree, the second command discards local changes):
+
+  ```bash
+  git config core.autocrlf input
+  ```
+
+  ```bash
+  git rm -r --cached -q . && git reset --hard
+  ```
 
 ---
 

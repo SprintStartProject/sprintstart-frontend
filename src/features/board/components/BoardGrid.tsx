@@ -563,6 +563,10 @@ function BoardCardView({
   }
 }
 
+/** Stand-ins for a board rendered without undo state — one with no writes to report. */
+const NO_IDS: ReadonlySet<string> = new Set();
+const NO_NOTICES: ReadonlyMap<string, BoardUndoNotice> = new Map();
+
 /**
  * The board's layout: cards in board order, packed into columns, rearrangeable by dragging.
  *
@@ -588,10 +592,6 @@ function BoardCardView({
  * board some people cannot arrange at all. Both send the whole resulting order, because that is
  * what the board now looks like.
  */
-/** Stand-ins for a board rendered without undo state — one with no writes to report. */
-const NO_IDS: ReadonlySet<string> = new Set();
-const NO_NOTICES: ReadonlyMap<string, BoardUndoNotice> = new Map();
-
 export function BoardGrid({
   board,
   onDismiss,

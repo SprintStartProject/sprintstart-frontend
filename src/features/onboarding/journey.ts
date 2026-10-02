@@ -96,6 +96,13 @@ export function orderedPhaseItems(phase: OnboardingPhaseEndpoint): PhaseItem[] {
   return orderByGraph(phaseItems(phase));
 }
 
+/**
+ * How one step or question of a phase reads on the path.
+ *
+ * A finished, skipped, running or passed item keeps that state even inside a locked phase; only
+ * items that are still to do show as locked, either because the backend marks the item itself
+ * locked or because `phaseLocked` is set. A failed question that may be tried again is `retry`.
+ */
 export function itemState(item: PhaseItem, phaseLocked: boolean): ItemState {
   if (item.kind === "step") {
     const { status, locked } = item.step;
@@ -112,12 +119,20 @@ export function itemState(item: PhaseItem, phaseLocked: boolean): ItemState {
 
 export const isItemComplete = (state: ItemState) => state === "done" || state === "skipped";
 
+/**
+ * Done items of a phase out of all its items, steps and questions alike. Skipped steps count as
+ * done; the phase's lock is ignored, since it does not change what has been completed.
+ */
 export function phaseProgress(phase: OnboardingPhaseEndpoint): Progress {
   const items = phaseItems(phase);
   const completed = items.filter((item) => isItemComplete(itemState(item, false))).length;
   return { completed, total: items.length, percentage: percent(completed, items.length) };
 }
 
+/**
+ * {@link phaseProgress} summed over the whole path, plus the number of finished phases and of
+ * finished steps. `stepsDone` counts only `FINISHED` steps, skipped ones are not in it.
+ */
 export function pathProgress(path: OnboardingPathEndpoint): Progress & {
   phasesDone: number;
   stepsDone: number;
@@ -151,6 +166,11 @@ export function isPhaseStarted(phase: OnboardingPhaseEndpoint): boolean {
   );
 }
 
+/**
+ * How a whole phase reads: `done` once nothing is left to do (checked before the lock, so a
+ * finished phase never shows as locked), then `locked`, then `active` once the member has
+ * started anything in it, otherwise `open`.
+ */
 export function phaseState(phase: OnboardingPhaseEndpoint): PhaseState {
   if (!isPhaseOpen(phase)) return "done";
   if (phase.locked) return "locked";
@@ -233,6 +253,7 @@ export function feedbackOf(item: PhaseItem): "helpful" | "unhelpful" | "comment"
   return "comment";
 }
 
+/** An estimate for display, e.g. `45 min` or `1h 30m`; no value or 0 reads as "No estimate". */
 export function formatMinutes(minutes?: number | null): string {
   if (!minutes || minutes <= 0) return "No estimate";
   if (minutes < 60) return `${minutes} min`;

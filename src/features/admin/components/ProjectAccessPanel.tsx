@@ -26,6 +26,13 @@ type ProjectPickerState = {
   isOpen: boolean;
 };
 
+/**
+ * The user drawer's project memberships: the assigned projects, a searchable picker to assign
+ * another one, and a remove action per project.
+ *
+ * The panel does not know the one-project rule. The drawer passes `confirmAssign`, which asks
+ * before an assignment that would move a user out of their other projects.
+ */
 export function ProjectAccessPanel({
   assignedProjects,
   availableProjects,

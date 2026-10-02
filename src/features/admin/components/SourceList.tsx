@@ -27,6 +27,13 @@ function getMeta(type: string) {
   return null;
 }
 
+/**
+ * A project's sources as cards in the project drawer.
+ *
+ * The status badges come from the same helpers as on the Data Ingestion page, so a source is
+ * described the same way on both screens. With `onOpenSourceDetails` each card is a link to the
+ * source's details.
+ */
 export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
   if (sources.length === 0) {
     return (
