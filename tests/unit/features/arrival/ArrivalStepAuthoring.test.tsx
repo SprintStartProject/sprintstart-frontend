@@ -15,6 +15,13 @@ vi.mock("../../../../src/services/arrivalService", () => ({
   },
 }));
 
+// One stable object, as the real hook hands out: the component feeds `toast.error` into an effect.
+const toastSpies = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+
+vi.mock("../../../../src/context/useToast", () => ({
+  useToast: () => toastSpies,
+}));
+
 const step = (over: Partial<ArrivalStep> = {}): ArrivalStep => ({
   key: "vpn",
   projectId: null,
@@ -55,6 +62,8 @@ describe("ArrivalStepAuthoring", () => {
     vi.mocked(arrivalService.updateStep).mockReset();
     vi.mocked(arrivalService.reorderSteps).mockReset();
     vi.mocked(arrivalService.deleteStep).mockReset();
+    toastSpies.success.mockReset();
+    toastSpies.error.mockReset();
     mockLists([step()]);
   });
 
@@ -527,6 +536,121 @@ describe("ArrivalStepAuthoring", () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /Add your GitHub username/ })).toBeDisabled();
     expect(within(dialog).getByRole("button", { name: /^Custom/ })).toBeEnabled();
+  });
+
+  it("stops at the first refused suggestion and keeps the rest selected", async () => {
+    const github = derivable();
+    const slack = derivable({ key: "slack-account", suggestedTitle: "Join Slack" });
+    const notion = derivable({ key: "notion-account", suggestedTitle: "Join Notion" });
+    // The first load, then the silent reload after the one write that lands: GitHub is now on
+    // the list. There is no reload after the refused write.
+    vi.mocked(arrivalService.listDerivableSteps)
+      .mockResolvedValueOnce([github, slack, notion])
+      .mockResolvedValue([{ ...github, added: true }, slack, notion]);
+    vi.mocked(arrivalService.createStep)
+      .mockResolvedValueOnce(step({ key: "github-account" }))
+      .mockRejectedValueOnce(new Error("409"));
+
+    render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Suggested");
+
+    fireEvent.click(
+      await within(dialog).findByRole("button", { name: /Add your GitHub username/ }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: /Join Slack/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /Join Notion/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add 3 steps" }));
+
+    await waitFor(() => {
+      expect(toastSpies.error).toHaveBeenCalledWith("That didn't save", {
+        description: "That step could not be added. It may already be on the list.",
+      });
+    });
+
+    expect(arrivalService.createStep).toHaveBeenCalledTimes(2);
+    expect(arrivalService.createStep).not.toHaveBeenCalledWith(
+      expect.objectContaining({ key: "notion-account" }),
+    );
+    // Only the one that landed is announced.
+    expect(toastSpies.success).toHaveBeenCalledTimes(1);
+    expect(toastSpies.success).toHaveBeenCalledWith("Step added");
+
+    // The modal stays open: the landed one is on the list, the refused and the untried are still
+    // picked, so a retry is one click.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Add your GitHub username/ })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: /Join Slack/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(dialog).getByRole("button", { name: /Join Notion/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(await within(dialog).findByRole("button", { name: "Add 2 steps" })).toBeEnabled();
+  });
+
+  it("counts the steps in the confirmation when a whole batch lands", async () => {
+    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([
+      derivable(),
+      derivable({ key: "slack-account", suggestedTitle: "Join Slack" }),
+    ]);
+    vi.mocked(arrivalService.createStep).mockResolvedValue(step());
+
+    render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Suggested");
+
+    fireEvent.click(
+      await within(dialog).findByRole("button", { name: /Add your GitHub username/ }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: /Join Slack/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add 2 steps" }));
+
+    await waitFor(() => {
+      expect(toastSpies.success).toHaveBeenCalledWith("2 steps added");
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("locks the suggestions and Custom while a batch is being written", async () => {
+    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable()]);
+    vi.mocked(arrivalService.createStep).mockReturnValue(new Promise(() => {}));
+
+    render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Suggested");
+
+    const github = await within(dialog).findByRole("button", { name: /Add your GitHub username/ });
+    fireEvent.click(github);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add step" }));
+
+    await waitFor(() => {
+      expect(github).toBeDisabled();
+    });
+    expect(within(dialog).getByRole("button", { name: /^Custom/ })).toBeDisabled();
+  });
+
+  it("moves focus into the new screen when switching between the list and Custom", async () => {
+    vi.mocked(arrivalService.listDerivableSteps).mockResolvedValue([derivable()]);
+
+    render(<ArrivalStepAuthoring />);
+    const dialog = await openAddWizard("Custom");
+    const body = within(dialog).getByTestId("add-arrival-step-body");
+
+    await within(dialog).findByPlaceholderText("Request VPN access");
+    await waitFor(() => {
+      expect(body).toHaveFocus();
+    });
+
+    // Focus is somewhere else again by the time the user goes back.
+    within(dialog).getByPlaceholderText("Request VPN access").focus();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Back" }));
+    await within(dialog).findByRole("button", { name: /Add your GitHub username/ });
+
+    await waitFor(() => {
+      expect(body).toHaveFocus();
+    });
   });
 
   it("still shows the lists when the catalog cannot be loaded", async () => {

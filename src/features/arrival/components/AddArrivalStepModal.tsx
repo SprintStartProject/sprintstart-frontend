@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
@@ -40,9 +40,9 @@ type AddArrivalStepModalProps = {
 
 /**
  * "Add step" opens straight onto the steps SprintStart can check for itself, with "Custom" as one
- * more entry at the end of that list — the same shape as the connector picker in data ingestion.
- * The suggestions are multi-select, so the common case is a few taps plus "Add step"; below a
- * divider, "Custom" is the one entry that moves on to a form, which has a way back to the list.
+ * more entry at the end of that list. The suggestions are multi-select, so the common case is a
+ * few taps plus "Add step"; below a divider, "Custom" is the one entry that moves on to a form,
+ * which has a way back to the list.
  *
  * Only ever mounted while open, so nothing here needs to reset itself on close — a fresh mount
  * starts clean the next time it opens.
@@ -83,6 +83,19 @@ export function AddArrivalStepModal({
   const isDuplicateKey =
     key.trim().length > 0 && existingKeys[targetScope].includes(key.trim().toLowerCase());
   const canSubmitCustom = key.trim().length > 0 && title.trim().length > 0 && !isDuplicateKey;
+
+  // Switching screens unmounts the control that was just activated, which would drop focus to
+  // <body>. This container sits outside the animated screens so it is still there to take focus;
+  // the initial mount is skipped so it does not fight the Modal's own autofocus.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const hasRenderedRef = useRef(false);
+  useEffect(() => {
+    if (!hasRenderedRef.current) {
+      hasRenderedRef.current = true;
+      return;
+    }
+    bodyRef.current?.focus();
+  }, [phase]);
 
   const goBack = () => setPhase("list");
 
@@ -171,203 +184,213 @@ export function AddArrivalStepModal({
       onClose={onClose}
       footer={footer}
     >
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={phase}
-          initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: offset }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: offset }}
-          transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-        >
-          {phase === "list" && (
-            <div className="space-y-3">
-              <p className="flex items-center gap-1.5 text-xs text-app-text-subtle">
-                <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {derivable.length === 0
-                  ? "No suggestions are available right now."
-                  : hasFreeSuggestions
-                    ? "Suggestions always apply to every project — a derivation is company-wide."
-                    : "All suggestions are already on the list."}
-              </p>
+      <div
+        ref={bodyRef}
+        tabIndex={-1}
+        data-testid="add-arrival-step-body"
+        className="focus:outline-none"
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={phase}
+            initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: offset }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: offset }}
+            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+          >
+            {phase === "list" && (
+              <div className="space-y-3">
+                <p className="flex items-center gap-1.5 text-xs text-app-text-subtle">
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {derivable.length === 0
+                    ? "No suggestions are available right now."
+                    : hasFreeSuggestions
+                      ? "Suggestions always apply to every project — a derivation is company-wide."
+                      : "All suggestions are already on the list."}
+                </p>
 
-              <div className="space-y-2">
-                {derivable.map((derivation) => {
-                  const isSelected = selectedKeys.includes(derivation.key) && !derivation.added;
-                  const howItsDone = howStepGetsDone({
-                    key: derivation.key,
-                    settledBy: "OBSERVED",
-                    selfConfirmable: derivation.selfConfirmable,
-                  });
-                  const HowItsDoneIcon = howItsDone.icon;
+                <div className="space-y-2">
+                  {derivable.map((derivation) => {
+                    const isSelected = selectedKeys.includes(derivation.key) && !derivation.added;
+                    const howItsDone = howStepGetsDone({
+                      key: derivation.key,
+                      settledBy: "OBSERVED",
+                      selfConfirmable: derivation.selfConfirmable,
+                    });
+                    const HowItsDoneIcon = howItsDone.icon;
 
-                  return (
-                    <button
-                      key={derivation.key}
-                      type="button"
-                      aria-pressed={isSelected}
-                      disabled={derivation.added}
-                      onClick={() => toggleSuggestion(derivation.key)}
-                      className={`flex w-full items-start gap-3 ${radioCardClassName(isSelected)} ${
-                        derivation.added ? "cursor-not-allowed opacity-50" : ""
-                      }`}
-                    >
-                      <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                          isSelected
-                            ? "bg-app-brand text-white"
-                            : "bg-app-bg-soft text-app-text-muted"
+                    return (
+                      <button
+                        key={derivation.key}
+                        type="button"
+                        aria-pressed={isSelected}
+                        disabled={derivation.added || submitting}
+                        onClick={() => toggleSuggestion(derivation.key)}
+                        className={`flex w-full items-start gap-3 ${radioCardClassName(isSelected)} ${
+                          derivation.added ? "cursor-not-allowed opacity-50" : ""
                         }`}
                       >
-                        <HowItsDoneIcon className="h-4 w-4" aria-hidden="true" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-app-text">
-                          {derivation.suggestedTitle}
+                        <span
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                            isSelected
+                              ? "bg-app-brand text-white"
+                              : "bg-app-bg-soft text-app-text-muted"
+                          }`}
+                        >
+                          <HowItsDoneIcon className="h-4 w-4" aria-hidden="true" />
                         </span>
-                        <span className="mt-1 block text-xs text-app-text-muted">
-                          {derivation.suggestedDescription}
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-semibold text-app-text">
+                            {derivation.suggestedTitle}
+                          </span>
+                          <span className="mt-1 block text-xs text-app-text-muted">
+                            {derivation.suggestedDescription}
+                          </span>
+                          <span className="mt-2 block text-xs font-medium text-app-text-subtle">
+                            {derivation.added ? "Already on the list" : howItsDone.label}
+                          </span>
                         </span>
-                        <span className="mt-2 block text-xs font-medium text-app-text-subtle">
-                          {derivation.added ? "Already on the list" : howItsDone.label}
+                        <span
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border ${
+                            isSelected
+                              ? "border-app-brand bg-app-brand text-white"
+                              : "border-app-border bg-app-bg"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {isSelected && <Check className="h-3.5 w-3.5" />}
                         </span>
-                      </span>
-                      <span
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border ${
-                          isSelected
-                            ? "border-app-brand bg-app-brand text-white"
-                            : "border-app-border bg-app-bg"
-                        }`}
-                        aria-hidden="true"
-                      >
-                        {isSelected && <Check className="h-3.5 w-3.5" />}
-                      </span>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
 
-                {derivable.length > 0 && <hr className="my-3 border-app-border" />}
+                  {derivable.length > 0 && <hr className="my-3 border-app-border" />}
 
-                <button
-                  type="button"
-                  onClick={() => setPhase("custom")}
-                  className={`flex w-full items-start gap-3 ${radioCardClassName(false)}`}
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft text-app-text-muted">
-                    <PenLine className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-app-text">Custom</span>
-                    <span className="mt-1 block text-xs text-app-text-muted">
-                      Write one yourself.
-                    </span>
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {phase === "custom" && (
-            <div className="space-y-3">
-              <Field label="What needs to be done" required>
-                <Input
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Request VPN access"
-                />
-              </Field>
-
-              <Field
-                label="How to do it"
-                optional
-                hint="Anything they need to know before starting."
-              >
-                <Textarea
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  minRows={2}
-                  placeholder="Ask in #it-helpdesk; usually same-day."
-                />
-              </Field>
-
-              <Field label="Where to do it" optional hint="Link to tool or docs.">
-                <Input
-                  value={href}
-                  onChange={(event) => setHref(event.target.value)}
-                  placeholder="https://…"
-                />
-              </Field>
-
-              {hasProject && (
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium text-app-text">Who gets it</legend>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      aria-pressed={who === "project"}
-                      aria-label={projectName ?? "This project"}
-                      onClick={() => setWho("project")}
-                      className={`flex items-center gap-2.5 ${radioCardClassName(who === "project")}`}
-                    >
-                      <FolderKanban
-                        className={`h-4 w-4 shrink-0 ${who === "project" ? "text-app-brand" : "text-app-text-muted"}`}
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-app-text">
-                          {projectName ?? "This project"}
-                        </span>
-                        <span className="block text-xs text-app-text-muted">
-                          Only people on this project.
-                        </span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={who === "company"}
-                      aria-label="Everyone"
-                      onClick={() => setWho("company")}
-                      className={`flex items-center gap-2.5 ${radioCardClassName(who === "company")}`}
-                    >
-                      <Building2
-                        className={`h-4 w-4 shrink-0 ${who === "company" ? "text-app-brand" : "text-app-text-muted"}`}
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-app-text">Everyone</span>
-                        <span className="block text-xs text-app-text-muted">
-                          Every new hire, any project.
-                        </span>
-                      </span>
-                    </button>
-                  </div>
-                </fieldset>
-              )}
-
-              <details open className="text-xs text-app-text-subtle">
-                <summary className="flex cursor-pointer items-center gap-1.5 font-medium">
-                  <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
-                  Advanced
-                </summary>
-                <div className="mt-2">
-                  <Field
-                    label="Key"
-                    hint="A short id, fixed once saved — it is what people's records point at."
-                    error={
-                      isDuplicateKey ? "A step with this key is already on that list." : undefined
-                    }
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setPhase("custom")}
+                    className={`flex w-full items-start gap-3 ${radioCardClassName(false)}`}
                   >
-                    <Input
-                      value={key}
-                      onChange={(event) => setManualKey(event.target.value)}
-                      placeholder="vpn-access"
-                    />
-                  </Field>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft text-app-text-muted">
+                      <PenLine className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-app-text">Custom</span>
+                      <span className="mt-1 block text-xs text-app-text-muted">
+                        Write one yourself.
+                      </span>
+                    </span>
+                  </button>
                 </div>
-              </details>
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
+              </div>
+            )}
+
+            {phase === "custom" && (
+              <div className="space-y-3">
+                <Field label="What needs to be done" required>
+                  <Input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="Request VPN access"
+                  />
+                </Field>
+
+                <Field
+                  label="How to do it"
+                  optional
+                  hint="Anything they need to know before starting."
+                >
+                  <Textarea
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    minRows={2}
+                    placeholder="Ask in #it-helpdesk; usually same-day."
+                  />
+                </Field>
+
+                <Field label="Where to do it" optional hint="Link to tool or docs.">
+                  <Input
+                    value={href}
+                    onChange={(event) => setHref(event.target.value)}
+                    placeholder="https://…"
+                  />
+                </Field>
+
+                {hasProject && (
+                  <fieldset className="space-y-2">
+                    <legend className="text-sm font-medium text-app-text">Who gets it</legend>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        aria-pressed={who === "project"}
+                        aria-label={projectName ?? "This project"}
+                        onClick={() => setWho("project")}
+                        className={`flex items-center gap-2.5 ${radioCardClassName(who === "project")}`}
+                      >
+                        <FolderKanban
+                          className={`h-4 w-4 shrink-0 ${who === "project" ? "text-app-brand" : "text-app-text-muted"}`}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-app-text">
+                            {projectName ?? "This project"}
+                          </span>
+                          <span className="block text-xs text-app-text-muted">
+                            Only people on this project.
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={who === "company"}
+                        aria-label="Everyone"
+                        onClick={() => setWho("company")}
+                        className={`flex items-center gap-2.5 ${radioCardClassName(who === "company")}`}
+                      >
+                        <Building2
+                          className={`h-4 w-4 shrink-0 ${who === "company" ? "text-app-brand" : "text-app-text-muted"}`}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-app-text">
+                            Everyone
+                          </span>
+                          <span className="block text-xs text-app-text-muted">
+                            Every new hire, any project.
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                  </fieldset>
+                )}
+
+                <details open className="text-xs text-app-text-subtle">
+                  <summary className="flex cursor-pointer items-center gap-1.5 font-medium">
+                    <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                    Advanced
+                  </summary>
+                  <div className="mt-2">
+                    <Field
+                      label="Key"
+                      hint="A short id, fixed once saved — it is what people's records point at."
+                      error={
+                        isDuplicateKey ? "A step with this key is already on that list." : undefined
+                      }
+                    >
+                      <Input
+                        value={key}
+                        onChange={(event) => setManualKey(event.target.value)}
+                        placeholder="vpn-access"
+                      />
+                    </Field>
+                  </div>
+                </details>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </Modal>
   );
 }
