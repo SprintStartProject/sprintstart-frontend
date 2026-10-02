@@ -61,26 +61,6 @@ describe("taking a card into the conversation", () => {
     expect(lastDraft()).toMatch(/where do I stand/i);
   });
 
-  it("a stalled path asks about the thing that is actually stuck", () => {
-    render(
-      <BoardGrid
-        board={board([
-          {
-            kind: "PATH_TO_FIRST_CONTRIBUTION",
-            moments: [],
-            acceptedCount: 0,
-            autonomyReachedAt: null,
-            stalledReason: "no response in 5 days",
-          },
-        ])}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /ask your buddy about this/i }));
-
-    expect(lastDraft()).toContain("no response in 5 days");
-  });
-
   it("a suggested task is grabbed behind its own confirm, with the buddy one press away", () => {
     render(
       <BoardGrid
@@ -118,7 +98,6 @@ describe("taking a card into the conversation", () => {
             title: "Fix the flaky login test",
             summary: null,
             url: null,
-            chosen: true,
             closedAtSource: false,
           },
         ])}

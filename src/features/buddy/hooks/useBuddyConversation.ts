@@ -9,6 +9,8 @@ import {
   streamMessage,
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
+import { announceBuddyPathChanged } from "../aiBuddyBus";
+import { BUDDY_PATH_ACTIONS } from "../types";
 import { useAuth } from "../../../context/useAuth";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
 import {
@@ -677,6 +679,16 @@ export function useBuddyConversation(
                 noteText: proposal.noteText,
                 lineBefore: proposal.lineBefore,
                 lineAfter: proposal.lineAfter,
+                stepId: proposal.stepId,
+                questionId: proposal.questionId,
+                phaseId: proposal.phaseId,
+                onboardingTaskId: proposal.onboardingTaskId,
+                answer: proposal.answer,
+                optionIds: proposal.optionIds,
+                description: proposal.description,
+                reason: proposal.reason,
+                waitsOnIds: proposal.waitsOnIds,
+                unlocksIds: proposal.unlocksIds,
                 linkUrl: proposal.linkUrl,
                 linkLabel: proposal.linkLabel,
                 cardIds: proposal.cardIds,
@@ -825,6 +837,16 @@ export function useBuddyConversation(
                   noteText: action.noteText,
                   lineBefore: action.lineBefore,
                   lineAfter: action.lineAfter,
+                  stepId: action.stepId,
+                  questionId: action.questionId,
+                  phaseId: action.phaseId,
+                  onboardingTaskId: action.onboardingTaskId,
+                  answer: action.answer,
+                  optionIds: action.optionIds,
+                  description: action.description,
+                  reason: action.reason,
+                  waitsOnIds: action.waitsOnIds,
+                  unlocksIds: action.unlocksIds,
                   linkUrl: action.linkUrl,
                   linkLabel: action.linkLabel,
                   cardIds: action.cardIds,
@@ -834,6 +856,11 @@ export function useBuddyConversation(
             ok: result.ok,
             outcome: result.message,
           });
+          // A path action just moved something on a page that may be open behind this dock. Told
+          // rather than polled, and only on success: a refused confirm changed nothing to refresh.
+          if (result.ok && "action" in action && BUDDY_PATH_ACTIONS.includes(action.action)) {
+            announceBuddyPathChanged();
+          }
 
           // `board.all()`, not a project key: the backend re-resolves the project server-side
           // (the caller's single onboarding project) and never tells the client which board —

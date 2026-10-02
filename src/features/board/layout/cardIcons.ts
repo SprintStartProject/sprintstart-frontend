@@ -9,7 +9,6 @@ import {
   Network,
   PenLine,
   PlaneLanding,
-  Route,
   Sparkles,
   Target,
   type LucideIcon,
@@ -30,7 +29,6 @@ import type { BoardCardKind } from "../types";
  * a confident wrong one reads as a different card.
  */
 const ICONS: Record<BoardCardKind, LucideIcon> = {
-  PATH_TO_FIRST_CONTRIBUTION: Route,
   CURRENT_TASK: Target,
   DIAGRAM: Network,
   ARRIVAL_STEPS: PlaneLanding,

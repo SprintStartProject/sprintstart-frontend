@@ -5,11 +5,13 @@ import { Button } from "../../../../components/ui/Button";
 import {
   formatMinutes,
   itemState,
+  linkedCardId,
   orderedPhaseItems,
   waitingOn,
   type PhaseItem,
 } from "../../journey";
 import { ItemFlags, ItemGlyph } from "../../graph/JourneyNodeCards";
+import { itemNumbers } from "../../itemNumbers";
 import { itemKindLabel, itemStateLabel, primaryActionLabel } from "../../graph/nodeLabels";
 import type { OnboardingPhaseEndpoint } from "../../types";
 
@@ -18,6 +20,10 @@ type Props = {
   nextItemId: string | null;
   /** The item unfolded in place, if any. */
   expandedItemId: string | null;
+  /** The item a link from the buddy landed on, lit up until `onLinkHighlightEnd` says it played. */
+  linkedItemId?: string | null;
+  /** The light on `linkedItemId` has played; the page takes it away so it does not play again. */
+  onLinkHighlightEnd?: () => void;
   onToggle: (item: PhaseItem) => void;
   /** Start, continue or answer: opens the item in place, starting a step that was not started. */
   onPrimary: (item: PhaseItem) => void;
@@ -37,11 +43,16 @@ export function PhaseItemList({
   phase,
   nextItemId,
   expandedItemId,
+  linkedItemId = null,
+  onLinkHighlightEnd,
   onToggle,
   onPrimary,
   renderExpanded,
 }: Props) {
   const items = orderedPhaseItems(phase);
+  // The numbers the buddy uses for the same items. Labels rather than a count down this list: the
+  // list reads in graph order, the numbers stay put so "#3" means one item on every surface.
+  const numbers = itemNumbers(phase);
 
   if (items.length === 0) {
     return (
@@ -63,10 +74,14 @@ export function PhaseItemList({
         const minutes = item.kind === "step" ? item.step.estimatedMinutes : null;
         const muted = state === "done" || state === "skipped" || state === "locked";
         const canUnfold = state !== "locked";
+        const isLinked = linkedItemId === item.id;
 
         return (
           <li
+            // Keyed on the item alone: a key per link remounted the row, and with it a step that
+            // was open with a typed answer in it.
             key={item.id}
+            id={linkedCardId(item.id)}
             data-item-id={item.id}
             className={`overflow-hidden rounded-2xl border transition-colors ${
               isExpanded
@@ -80,7 +95,14 @@ export function PhaseItemList({
                   : isQuestion
                     ? "border-app-question-border/60 bg-app-question-bg/30 hover:bg-app-question-bg/60"
                     : "border-app-border/70 bg-app-surface/60 hover:bg-app-surface"
-            }`}
+            } ${isLinked ? "app-link-highlight" : ""}`}
+            onAnimationEnd={
+              isLinked
+                ? (event) => {
+                    if (event.target === event.currentTarget) onLinkHighlightEnd?.();
+                  }
+                : undefined
+            }
           >
             <div className="flex items-center gap-3 p-3 pr-4">
               <button
@@ -111,6 +133,9 @@ export function PhaseItemList({
                             : "text-app-text"
                       }`}
                     >
+                      <span className="mr-1.5 font-mono font-normal text-app-text-subtle">
+                        #{numbers.get(item.id)}
+                      </span>
                       {isQuestion ? item.question.question : item.title}
                     </span>
                   </span>
