@@ -25,6 +25,7 @@ and uses **Keycloak** for identity and access management.
 - **Feature-first architecture** — domain code lives in `src/features/<name>/`; only
   genuinely shared code lives in top-level folders.
 - **React Router v7** with declarative `<Route element={...}>` + an `AuthGuard` wrapper.
+- **TanStack Query 5** as the shared cache for all backend data (see §5.2).
 - **Tailwind CSS v4** with a single shared semantic palette (light/dark themes).
 - **Framer Motion 12** with centralized spring transition tokens.
 - **Keycloakify 11** for a custom Keycloak login theme.
@@ -37,12 +38,14 @@ and uses **Keycloak** for identity and access management.
 | ------------------------- | ----------------------------------------------------------------------------------------------- |
 | UI framework              | **React 19**                                                                                    |
 | Routing                   | **React Router v7** (`react-router-dom` ^7)                                                     |
+| Server state              | **TanStack Query 5** (`@tanstack/react-query`)                                                  |
 | Language                  | **TypeScript** (strict, `verbatimModuleSyntax`)                                                 |
 | Build tooling             | **Vite 8**                                                                                      |
 | Styling                   | **Tailwind CSS v4** (semantic design tokens, light/dark themes)                                 |
 | Animation                 | **Framer Motion 12** (centralized spring tokens)                                                |
 | Authentication            | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11**           |
 | Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter`       |
+| Graphs and diagrams       | `@xyflow/react` (node canvases), `dagre` (layered layout), `d3-force` (competency graph layout) |
 | Icons                     | `lucide-react`                                                                                  |
 | Avatars                   | `boring-avatars`                                                                                |
 | Unit testing              | **Vitest 4** + **Testing Library** (`jsdom`, `msw`, `vitest-axe`)                               |
@@ -59,29 +62,48 @@ goes in the top-level folders.
 ```
 src/
 ├── features/            # Self-contained domain slices (components/, hooks/, types.ts)
-│   ├── admin/               # User, project & token management
+│   ├── access/              # Stored connector credentials (admin access management)
+│   ├── admin/               # User, project & token management, create-project wizard
+│   ├── ai-activity/         # Live AI progress log for generations (useAiStream)
+│   ├── arrival/             # Arrival step authoring (Hire Setup)
+│   ├── attestation/         # Requests to confirm a hire's work
+│   ├── blueprints/          # Onboarding path blueprints: graph editor, versions
+│   ├── board/               # The hire's board: cards, areas, stages, marks, server sync
+│   ├── buddy/               # AI buddy: conversation, drafts, board edit proposals
+│   ├── card-blueprints/     # Cards a PM wants every hire of a role to start with
 │   ├── chatbot/             # Streaming AI assistant
+│   ├── competency-graph/    # Force layout for the competency graph
 │   ├── connectors/          # Connector + source allow/deny management
+│   ├── dashboard/           # Personal dashboard grid and widgets
 │   ├── data-ingestion/      # Sources, ingestion runs, artifacts
+│   ├── easter-eggs/         # Hidden mini-games
 │   ├── faq/                 # AI FAQ clusters (insights)
+│   ├── graph-diagram/       # Shared xyflow diagram canvas with dagre layout
 │   ├── knowledge-base/      # Artifact browsing + streamed summaries
 │   ├── knowledge-gaps/      # AI-detected documentation gaps (insights)
-│   ├── onboarding/          # AI onboarding paths, checks, skip workflow
+│   ├── knowledge-request/   # Escalated questions inbox and answers (insights)
+│   ├── moments/             # Celebration animations (launch, path reveal, completion)
+│   ├── onboarding/          # AI onboarding paths, journey canvas, generation, checks
+│   ├── onboarding-metrics/  # Onboarding progress and attention per hire (insights)
+│   ├── orientation/         # Task orientation editor and panel
 │   ├── profile/             # User profile view/edit
-│   ├── projects/            # Project selection
-│   ├── settings/            # User settings (chat preferences, etc.)
+│   ├── projects/            # Project selection (ProjectProvider)
+│   ├── settings/            # User settings, personal credentials
+│   ├── shortcuts/           # Global keyboard shortcuts
+│   ├── starter-work/        # Starter task pool and review (Hire Setup)
+│   ├── task-pool/           # Grabbing a task from the pool
 │   └── team-management/     # Team overview, member detail, Skill Wizard
 ├── pages/               # Route-level views (one per user-facing flow)
-├── router/              # AppRouter.tsx + AuthGuard.tsx
-├── auth/                # accessPolicy.ts (AppRoute union + canAccessRoute)
-├── context/             # Global providers (Auth, Theme, Chat, ChatPreferences)
-├── services/            # Backend communication (one module per domain; SSE streaming)
-├── components/          # Shared UI: common/, layout/, ui/ primitives
+├── router/              # AppRouter.tsx (incl. ManagerAreaGuard) + AuthGuard.tsx
+├── auth/                # accessPolicy.ts (AppRoute union + canAccessRoute), redirectUtils.ts
+├── context/             # Global providers (Auth, Theme, Chat, Toast, FocusMode)
+├── services/            # Backend communication (one module per domain), query client, query keys
+├── components/          # Shared UI: common/, icons/, layout/, ui/ primitives
 ├── config/              # Integration config (keycloak.ts)
-├── hooks/               # Shared hooks
+├── hooks/               # Shared hooks (incl. the TanStack Query based fetch hooks)
 ├── styles/              # Global CSS (index.css) + animation tokens (tokens.ts)
-├── mocks/               # Dev mock data
-└── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated — do not hand-edit)
+├── mocks/               # Two fixtures used as fallback by teamManagementService
+└── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated, do not hand-edit)
 ```
 
 > **Note:** there is **no `src/types/` folder**. Global types live alongside their
@@ -106,9 +128,23 @@ codebase.
 user-facing route is declared as a `<Route element={<Page />} />` entry. Auth is
 handled by the wrapper, not per-route loaders.
 
+All pages except `LoginPage` are loaded lazily with `React.lazy` behind one shared
+`Suspense` fallback (`PageShellSkeleton`). `LoginPage` is bundled eagerly because the
+Keycloak redirect chain can land on it through several full page reloads in a row.
+
+Two layout routes group pages that share a header: `AssistantShell` for `/chat` and
+`/buddy`, and `PmWorkspace` for the PM area (`/pm-dashboard`, `/team-management`,
+`/team/:userId` and the `/insights/*` pages).
+
+Routes that a user without access must not reach by URL are wrapped in
+`ManagerAreaGuard`: the PM area, `/data-ingestion`, `/blueprints` and `/hire-setup`.
+It waits for the project context to load and redirects to `getDefaultRoute` when
+`canAccessRoute` fails.
+
 ### 4.2 AuthGuard (`src/router/AuthGuard.tsx`)
 
-`AuthGuard` is the single entry point for access control. It:
+`AuthGuard` handles authentication and the app-wide redirects. Role-based URL
+blocking is done by `ManagerAreaGuard` (§4.1). `AuthGuard`:
 
 1. Reads `status` (`loading` | `authenticated` | `unauthenticated`) and `profile`
    from `useAuth()`.
@@ -117,7 +153,9 @@ handled by the wrapper, not per-route loaders.
 3. Redirects authenticated users on `/login` back to where they came from.
 4. Redirects authenticated users who need a skill assessment to `/skill-wizard`
    (the only route exempt from the skill-assessment gate).
-5. Renders a full-screen spinner while auth state or skill-assessment check is in
+5. Blocks `/onboarding` and `/onboarding/:stepId` for users who have completed
+   onboarding.
+6. Renders a page skeleton while auth state or the skill-assessment check is in
    flight.
 
 ### 4.3 Access policy (`src/auth/accessPolicy.ts`)
@@ -129,8 +167,10 @@ Route-level authorization is centralized in `src/auth/accessPolicy.ts`:
   `'/insights/knowledge-gaps'`).
 - **`routePermissions`** — `Record<AppRoute, readonly PermissionGroup[]>` mapping
   each route to the groups allowed to access it.
-- **`canAccessRoute(profile, route)`** — returns `true` if the user's
-  `permissionGroup` is in the route's allow-list.
+- **`canAccessRoute(profile, route, managesSelectedProject)`**: returns `true` if the
+  user's `permissionGroup` is in the route's allow-list. For PMs on the routes in
+  `MANAGER_ASSIGNMENT_ROUTES` it also requires that they manage the selected project
+  (`canManageSelected` from `useProjectContext()`).
 - **`getDefaultRoute(profile)`** — the route to redirect to after login.
 - **`getMatchingProtectedRoute(pathname)`** — matches a real URL (including
   dynamic segments like `/team/:userId`) back to an `AppRoute` for permission
@@ -150,36 +190,76 @@ Route-level authorization is centralized in `src/auth/accessPolicy.ts`:
 
 ### 4.4 Actual route list
 
-Declared in `AppRouter.tsx` (17 routes):
+Declared in `AppRouter.tsx`:
 
 ```
-/login                          /team-management
-/skill-wizard                   /team/:userId
-/                               /pm-dashboard
-/chat                           /admin
-/chat/:id                       /insights/faq
-/onboarding                     /insights/faq/:groupId
-/onboarding/:stepId             /insights/knowledge-gaps
-/knowledge-base                 /insights/knowledge-gaps/:gapId
+/login                          /pm-dashboard
+/skill-wizard                   /team-management
+/                               /team/:userId
+/chat                           /insights/faq/:groupId?
+/chat/:id                       /insights/knowledge-gaps/:gapId?
+/buddy                          /insights/knowledge-requests
+/onboarding                     /insights/onboarding
+/onboarding/:stepId             /admin
+/board                          /hire-setup
+/knowledge-base                 /arrival-steps   (redirects to /hire-setup)
+/blueprints                     /starter-work    (redirects to /hire-setup)
+/blueprints/:pathId             /settings
 /data-ingestion                 /profile
+                                *                (NotFoundPage)
 ```
 
 ---
 
 ## 5. State management
 
-There is **no global store** (no Redux, Zustand, etc.). Cross-cutting state is
-handled by React Context providers in `src/context/`:
+There is **no global store** (no Redux, Zustand, etc.). Backend data lives in the
+TanStack Query cache (§5.2). Cross-cutting client state is handled by React Context
+providers.
 
-| Provider / hook                                  | File                                                                                | Responsibility                                                                               |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `AuthProvider` + `useAuth`                       | `AuthProvider.tsx`, `AuthContext.ts`, `useAuth.ts`                                  | Initializes Keycloak, fetches the user profile (with retries), exposes `status` + `profile`. |
-| `ThemeProvider` + `useTheme`                     | `ThemeProvider.tsx`, `ThemeContext.ts`, `useTheme.ts`                               | Light/dark/system theme via `.dark` class on `document.documentElement`; persists choice.    |
-| `ChatProvider`                                   | `ChatProvider.tsx`, `ChatContext.ts`                                                | Active conversation state for the chatbot feature.                                           |
-| `ChatPreferencesProvider` + `useChatPreferences` | `ChatPreferencesProvider.tsx`, `ChatPreferencesContext.ts`, `useChatPreferences.ts` | Per-user chat UI preferences.                                                                |
+### 5.1 Context providers
+
+Global providers in `src/context/`:
+
+| Provider / hook                      | File                                                              | Responsibility                                                                               |
+| ------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `AuthProvider` + `useAuth`           | `AuthProvider.tsx`, `AuthContext.ts`, `useAuth.ts`                | Initializes Keycloak, fetches the user profile (with retries), exposes `status` + `profile`. |
+| `ThemeProvider` + `useTheme`         | `ThemeProvider.tsx`, `ThemeContext.ts`, `useTheme.ts`             | Light/dark/system theme via `.dark` class on `document.documentElement`; persists choice.    |
+| `ToastProvider` + `useToast`         | `ToastProvider.tsx`, `ToastContext.ts`, `useToast.ts`             | App-wide toasts that survive route changes.                                                  |
+| `ChatProvider`                       | `ChatProvider.tsx`, `ChatContext.ts`                              | Active conversation state for the chatbot feature.                                           |
+| `FocusModeProvider` + `useFocusMode` | `FocusModeProvider.tsx`, `FocusModeContext.ts`, `useFocusMode.ts` | Lets a page put the app shell into focus mode.                                               |
+
+Feature providers mounted at app level (`App.tsx`):
+
+| Provider                    | Location                          | Responsibility                                                                          |
+| --------------------------- | --------------------------------- | --------------------------------------------------------------------------------------- |
+| `ProjectProvider`           | `features/projects/`              | Loads the user's projects, holds the globally selected project and `canManageSelected`. |
+| `MyKnowledgeGapsProvider`   | `features/knowledge-gaps/`        | Knowledge gaps the user owns in the selected project.                                   |
+| `MomentsProvider`           | `features/moments/`               | Celebration animations, e.g. the launch sequence after login.                           |
+| `CardMarksProvider`         | `features/board/marks/`           | Highlights on board cards, shared with the selection toolbar.                           |
+| `OnboardingJourneyProvider` | `features/onboarding/generation/` | Onboarding path generation that keeps running across route changes.                     |
+| `BuddyProvider`             | `features/buddy/`                 | AI buddy session and drafts.                                                            |
 
 Feature-local state stays inside the feature (e.g. `onboarding` step state lives in
 `features/onboarding/`).
+
+### 5.2 Server state (TanStack Query)
+
+All backend reads go through one shared `QueryClient` (`src/services/queryClient.ts`,
+`staleTime` 30 s, `retry` 1, cleared on logout). Query keys come from the central
+factory in `src/services/queryKeys.ts`. Project-scoped keys always contain the
+`projectId`, user-scoped keys the user id.
+
+| Situation                                   | Hook                       |
+| ------------------------------------------- | -------------------------- |
+| Normal page or widget read                  | `useQueryFetch`            |
+| Panel that refreshes itself (polling)       | `useLiveFetch`             |
+| Small read in the app shell (badge, count)  | `useRateLimitedRead`       |
+| Writes, optimistic updates, custom `select` | `useQuery` / `useMutation` |
+
+`useFetch` is deprecated and has no callers left. The sidebar warms the page module
+and its main query on `pointerdown` (`src/services/routePrefetch.ts`). The reasoning
+behind this setup is recorded in ADR-017 in the Wiki.
 
 ---
 
@@ -213,23 +293,40 @@ line-splitting / JSON-parsing logic lives in exactly one place.
 One module per domain. Each exports typed functions and surfaces backend failures
 (no empty `catch`, no silent swallow):
 
-| Module                     | Domain                                                         |
-| -------------------------- | -------------------------------------------------------------- |
-| `adminUserService.ts`      | Admin user management                                          |
-| `apiClient.ts`             | Shared fetch wrapper                                           |
-| `chatService.ts`           | Chatbot (SSE streaming)                                        |
-| `connectorService.ts`      | Connectors + source allow/deny lists                           |
-| `faqService.ts`            | Insights FAQ clusters                                          |
-| `ingestionService.ts`      | Data ingestion runs + artifacts                                |
-| `knowledgeGapService.ts`   | Insights knowledge gaps                                        |
-| `knowledgeService.ts`      | Knowledge base + streamed summaries                            |
-| `onboardingService.ts`     | Onboarding paths, steps, tasks, feedback                       |
-| `projectService.ts`        | Project selection                                              |
-| `sse.ts`                   | Shared SSE stream parser                                       |
-| `teamManagementService.ts` | Team overview, member detail, skills                           |
-| `userService.ts`           | Current user profile                                           |
-| `types.ts`                 | Backend DTO types (the closest thing to a global types folder) |
-| `sources/`                 | Per-source services (e.g. `githubService`)                     |
+| Module                         | Domain                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `adminUserService.ts`          | Admin user management                                                            |
+| `aiStreamService.ts`           | Live AI progress events (SSE over `fetch`)                                       |
+| `apiClient.ts`, `apiError.ts`  | Shared fetch wrapper and `ApiError`                                              |
+| `arrivalService.ts`            | Arrival steps                                                                    |
+| `attestationService.ts`        | Attestation requests                                                             |
+| `blueprintService.ts`          | Onboarding path blueprints                                                       |
+| `boardService.ts`              | Board cards and board arrangement sync                                           |
+| `buddyService.ts`              | AI buddy (SSE streaming)                                                         |
+| `chatService.ts`               | Chatbot (SSE streaming)                                                          |
+| `connectorService.ts`          | Connectors + source allow/deny lists                                             |
+| `dashboardLayoutService.ts`    | Dashboard widget layout                                                          |
+| `faqService.ts`                | Insights FAQ clusters                                                            |
+| `ingestionService.ts`          | Data ingestion runs + artifacts                                                  |
+| `knowledgeGapService.ts`       | Insights knowledge gaps                                                          |
+| `knowledgeRequestService.ts`   | Escalated knowledge requests                                                     |
+| `knowledgeService.ts`          | Knowledge base + streamed summaries                                              |
+| `myStarterWorkService.ts`      | The current hire's starter work                                                  |
+| `onboardingFeedbackService.ts` | Onboarding feedback                                                              |
+| `onboardingGraphService.ts`    | Onboarding journey graph                                                         |
+| `onboardingMetricsService.ts`  | Onboarding metrics (insights)                                                    |
+| `onboardingService.ts`         | Onboarding paths, steps, tasks, feedback                                         |
+| `orientationService.ts`        | Task orientation                                                                 |
+| `projectService.ts`            | Projects, managed projects, project selection                                    |
+| `queryClient.ts`               | Shared TanStack Query client (§5.2)                                              |
+| `queryKeys.ts`                 | Central query key factory (§5.2)                                                 |
+| `routePrefetch.ts`             | Sidebar prefetch of page modules and queries (§5.2)                              |
+| `sse.ts`                       | Shared SSE stream parser                                                         |
+| `starterWorkService.ts`        | Starter work pool and review                                                     |
+| `teamManagementService.ts`     | Team overview, member detail, skills                                             |
+| `userService.ts`               | Current user profile                                                             |
+| `types.ts`                     | Backend DTO types (the closest thing to a global types folder)                   |
+| `sources/`                     | Per-source services (GitHub, Jira, Confluence, Bitbucket, Atlassian credentials) |
 
 ### 6.4 Vite dev proxy (`vite.config.ts`)
 
@@ -421,8 +518,9 @@ export function TaskList({ tasks, onDelete }) {
 
 ### 10.2 Kubernetes
 
-`k8s/` (inside this repo, not a separate `sprintstart-k8s` repo) holds per-component
-Kubernetes manifests.
+The cluster deployment is defined in the separate `sprintstart-k8s` repository
+(Kustomize base and dev/prod overlays, deployed through Argo CD with image updater).
+`k8s/frontend/` in this repository holds a standalone set of manifests.
 
 ### 10.3 Keycloak theme
 

@@ -28,7 +28,7 @@ replaces the previous `mocking_strategy.md`, which described a Playwright + axio
 
 - ❌ Playwright (the old `mocking_strategy.md` claimed we did — it was wrong)
 - ❌ axios-mock-adapter (the old doc showed `axios.get` — the codebase uses native `fetch` via `apiClient`)
-- ❌ `cross-env` (the old doc claimed mock mode is activated via `cross-env VITE_USE_MOCK_MODE=true vite` — actually it's activated via the `VITE_USE_MOCK_MODE` env var, which a dev can set in `.env.development`; see §8)
+- ❌ `cross-env` and a `VITE_USE_MOCK_MODE` mock mode (the old doc described both, neither exists in the codebase; see §8)
 
 ---
 
@@ -176,74 +176,29 @@ The MSW server intercepts native `fetch()` calls (including those made by
 
 ---
 
-## 8. Mock mode (`VITE_USE_MOCK_MODE`)
+## 8. Mock data (`src/mocks/`)
 
-The codebase has a service-layer mock mode activated by the **environment
-variable** `VITE_USE_MOCK_MODE=true`.
+There is **no mock mode**. An earlier version of this document described a
+`VITE_USE_MOCK_MODE` flag, but no code reads it. `npm run dev` always talks to
+the real backend at `127.0.0.1:8080` and Keycloak at `127.0.0.1:8081` through
+the Vite dev proxy, so both have to be running (see the README).
 
-> [!NOTE]
-> Mock mode is **opt-in**. The repo no longer ships a `.env.development` that
-> sets it by default — a fresh clone's `npm run dev` will attempt to call the
-> real backend at `127.0.0.1:8080` and Keycloak at `127.0.0.1:8081`. To enable
-> mock mode, see "Enabling mock mode" below.
+`src/mocks/` only holds two fixtures, both used by
+`src/services/teamManagementService.ts`:
 
-### How it works
+| File                    | Fallback in                                                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `teamOverviewMock.json` | `getTeamOverview`, `getProjectRoles`, `createProjectRole`, `assignProjectRoleToUser`, `unassignProjectRoleFromUser`, `deleteProjectRole` |
+| `skillsMock.json`       | `getSkills`, `reactivateSkill`, `createSkill`, `deleteSkill`, `deleteProjectRole`                                                        |
 
-Each service function checks the flag before initiating any external network
-fetch:
-
-```typescript
-import { mockConversations } from "../mocks/chatMocks";
-
-export async function fetchChatHistory(chatId: string): Promise<MessageDto[]> {
-  if (import.meta.env.VITE_USE_MOCK_MODE === "true") {
-    return mockConversations[chatId] ?? [];
-  }
-  // Standard backend fetch via apiClient
-  return apiClient.fetch<MessageDto[]>(`/api/v1/chats/${chatId}`);
-}
-```
-
-### Rationale
-
-During local development or automated unit/a11y testing, backend components
-(Keycloak, PostgreSQL, LLM services) may be unmerged or offline. Mock mode lets
-the dev server and tests run without a live backend, returning mock DTOs from
-`src/mocks/` instead of making real HTTP calls.
-
-### Enabling mock mode
-
-Pick whichever fits your workflow:
-
-- **Per-dev persistent (recommended):** create `.env.development` (gitignored)
-  in the repo root with one line:
-  ```env
-  VITE_USE_MOCK_MODE=true
-  ```
-  Vite auto-loads `.env.development` in `npm run dev` (mode = development), so
-  mock mode stays on for every `npm run dev` without re-typing.
-- **Per-shell (one-off):** set the env var before starting the dev server:
-  ```powershell
-  $env:VITE_USE_MOCK_MODE = "true"; npm run dev
-  ```
-  ```bash
-  VITE_USE_MOCK_MODE=true npm run dev
-  ```
-- **Per-project (shared with your team):** add the line to `.env` (also
-  gitignored) if you want it applied in every Vite mode, not just development.
-
-### Disabling mock mode
-
-- If you've set it in `.env.development` / `.env`, edit the file to
-  `VITE_USE_MOCK_MODE=false` (or delete the file).
-- For a single command, prefix with `false`:
-  `$env:VITE_USE_MOCK_MODE = "false"; npm run dev`
+These functions fall back to the fixtures when the backend request fails.
+Functions that must not invent data, such as `getTeamOverviewOrThrow`, do not
+fall back.
 
 ### In tests
 
-MSW is the preferred HTTP mocking layer (it intercepts at the `fetch` level, so
-service code runs unchanged). Mock mode is mostly relevant for `npm run dev`
-and `npm run storybook`.
+Use MSW handlers (§7) to control backend responses. Do not add new fixtures to
+`src/mocks/` for tests, and do not add new service-level mock fallbacks.
 
 ---
 

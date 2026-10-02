@@ -2,7 +2,7 @@ import keycloak from "../config/keycloak";
 
 /**
  * One chunk of an AI generation's live progress — the frontend view of the backend's
- * `AiProgressEvent` (Seam 1 of the live-AI-visibility initiative).
+ * `AiProgressEvent`.
  *
  * `result` is opaque here: the surface re-reads its normal endpoint on `done` for the authoritative
  * artifact rather than reconstructing it from `result`. `item` carries the finalized element as a
