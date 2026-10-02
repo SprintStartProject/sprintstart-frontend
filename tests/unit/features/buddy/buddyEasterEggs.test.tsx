@@ -1,7 +1,6 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useBuddy } from "../../../../src/features/buddy/hooks/useBuddy";
-import { BuddyProviderWithStubs } from "./buddyTestHarness";
+import { BuddyProviderWithStubs, useBuddyWithDraft } from "./buddyTestHarness";
 import { http, HttpResponse } from "msw";
 import { server } from "../../setup/vitest.setup";
 
@@ -35,7 +34,7 @@ describe("buddy easter eggs", () => {
     server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
     server.use(http.post("/api/v1/onboarding/me/buddy/open/stream", () => silentGreeting()));
 
-    const harness = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    const harness = renderHook(() => useBuddyWithDraft(), { wrapper: BuddyProviderWithStubs });
     await waitFor(() => {
       expect(harness.result.current.messages).toHaveLength(0);
     });

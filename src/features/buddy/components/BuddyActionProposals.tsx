@@ -2,10 +2,13 @@ import { Check, Info, Loader2, RotateCcw, TriangleAlert, Users, X } from "lucide
 import type { ProposedAction, ProposalRisk } from "../types";
 import {
   BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_EDIT_CHECKLIST,
   BUDDY_ACTION_OPEN_ORIENTATION,
   BUDDY_ACTION_REWORD_CHECKLIST,
   BUDDY_ACTION_TICK_CHECKLIST,
 } from "../types";
+import { lacksBoardEditDetails } from "../boardEditProposals";
+import { BuddyBoardEditDetails } from "./BuddyBoardEditDetails";
 import { BuddyOrientationCard } from "./BuddyOrientationCard";
 
 type BuddyActionProposalsProps = {
@@ -13,7 +16,7 @@ type BuddyActionProposalsProps = {
   messageId: string;
   actions: ProposedAction[];
   onConfirm: (messageId: string, action: ProposedAction) => void;
-  onDismiss: (messageId: string, actionId: string) => void;
+  onDismiss: (messageId: string, action: ProposedAction) => void;
 };
 
 /**
@@ -99,8 +102,11 @@ export function BuddyActionProposals({
         const isStored = "proposalId" in action;
         // Fail closed: a proposal whose risk did not survive the stream (or that arrived
         // without its description) is not confirmable — an approval card for a project
-        // mutation must never guess how loudly to warn, nor confirm what it cannot show.
-        const isUnsupported = isStored && (action.risk === null || !action.preview);
+        // mutation must never guess how loudly to warn, nor confirm what it cannot show. A
+        // hire's board edit follows the same rule: no confirm for a change it cannot show.
+        const isUnsupported = isStored
+          ? action.risk === null || !action.preview
+          : lacksBoardEditDetails(action);
         const previewId = `buddy-proposal-preview-${action.id}`;
 
         return (
@@ -108,6 +114,17 @@ export function BuddyActionProposals({
             key={action.id}
             className="flex max-w-full min-w-0 flex-col gap-1.5 rounded-xl border border-app-border bg-app-bg p-2.5"
           >
+            {/* What confirming would change comes FIRST, in the backend's own words, and the
+                confirm button describes it (aria-describedby). For a stored team proposal the
+                target is the id, so this is the offer's full description; for a hire's board edit
+                it is the part the payload alone would not show — which cards, which lines go.
+                Never a summary the client recomposed, and never read after the button. */}
+            {action.preview && (
+              <p id={previewId} className="text-xs leading-relaxed break-words text-app-text-muted">
+                {action.preview}
+              </p>
+            )}
+
             {/* Shown before the press, not after it, and only where the payload is *content*.
                 `place_checklist` is the one action whose confirm writes the mentor's own sentences
                 onto a surface the hire owns — the same reason the assessment proposal names the
@@ -133,6 +150,11 @@ export function BuddyActionProposals({
                   <p className="text-xs text-app-text-muted">
                     Ticked off on that list — nothing else on it changes:
                   </p>
+                )}
+                {/* The whole list as it would read, replacing what is there. What would be lost is
+                    named in the preview above, since a missing line is invisible in this one. */}
+                {action.action === BUDDY_ACTION_EDIT_CHECKLIST && (
+                  <p className="text-xs text-app-text-muted">The list would read:</p>
                 )}
                 <ul className="mt-1 space-y-0.5">
                   {action.checklistItems.map((item, index) => (
@@ -181,15 +203,7 @@ export function BuddyActionProposals({
                 {action.noteText}
               </p>
             )}
-            {/* What the manager is agreeing to comes FIRST, in the buddy's own words, and the
-                confirm button describes it (aria-describedby): the target is the stored id, so
-                this text is the offer's full description — never a summary the client
-                recomposed, and never read after the button that acts on it. */}
-            {isStored && action.preview && (
-              <p id={previewId} className="text-xs leading-relaxed break-words text-app-text-muted">
-                {action.preview}
-              </p>
-            )}
+            {!isStored && <BuddyBoardEditDetails action={action} />}
 
             {/* A stored proposal warns about itself before it is even clicked: how much it would
                 change decides how loudly the card speaks, before any confirm happens. */}
@@ -207,7 +221,7 @@ export function BuddyActionProposals({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => onDismiss(messageId, action.id)}
+                    onClick={() => onDismiss(messageId, action)}
                     disabled={isConfirming}
                     className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-60"
                   >
@@ -227,7 +241,7 @@ export function BuddyActionProposals({
                   type="button"
                   onClick={() => onConfirm(messageId, action)}
                   disabled={isConfirming}
-                  aria-describedby={isStored && action.preview ? previewId : undefined}
+                  aria-describedby={action.preview ? previewId : undefined}
                   className="flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-app-brand px-3 py-1.5 text-left text-sm font-medium break-words text-white transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isConfirming ? (
@@ -239,7 +253,7 @@ export function BuddyActionProposals({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onDismiss(messageId, action.id)}
+                  onClick={() => onDismiss(messageId, action)}
                   disabled={isConfirming}
                   className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:opacity-60"
                 >

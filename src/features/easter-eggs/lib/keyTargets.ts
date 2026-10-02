@@ -1,13 +1,35 @@
 /**
- * Key-target guards shared by the easter-egg games and the Space-to-play
- * trigger. Generic keyboard helpers, so they live here rather than in any one
- * game's hook.
+ * Key-target guards shared by the easter-egg games, the Space-to-play trigger
+ * and the keyboard shortcuts. Generic keyboard helpers, so they live here
+ * rather than in any one game's hook.
  */
 
 /** Shared guard: true while the event landed in a text field that owns the keys. */
 export const isTypingTarget = (el: EventTarget | null): boolean =>
   el instanceof HTMLElement &&
   (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable === true);
+
+/**
+ * Input types somebody can type into. Everything else an `<input>` can be —
+ * checkbox, radio, range, file… — is focusable without being a text field.
+ */
+const TEXT_INPUT_TYPES = new Set(["text", "search", "email", "url", "password", "number", "tel"]);
+
+/**
+ * True when the event landed somewhere that produces text — the guard the
+ * shortcut matcher uses.
+ *
+ * Deliberately stricter than {@link isTypingTarget}, which answers the wider
+ * question "a form control owns this key": the games want that one, because
+ * arrows belong to a focused radio group and Space to a focused switch. A
+ * shortcut chord is neither, and the wider question meant that one click on a
+ * checkbox silenced every `Alt+…` chord until focus moved on.
+ */
+export const isTextEntryTarget = (el: EventTarget | null): boolean =>
+  el instanceof HTMLElement &&
+  (el instanceof HTMLInputElement
+    ? TEXT_INPUT_TYPES.has(el.type)
+    : el.tagName === "TEXTAREA" || el.isContentEditable === true);
 
 /**
  * Controls on which Space already has a meaning of its own: activating a

@@ -93,6 +93,23 @@ export const handlers = [
     ]),
   ),
 
+  // Nobody has arranged their dashboard yet: the default layout. Tests that care about a stored
+  // layout override this handler.
+  http.get("/api/v1/users/me/dashboard/layout", ({ request }) =>
+    HttpResponse.json({
+      version: Number(new URL(request.url).searchParams.get("version")),
+      items: [],
+      updatedAt: null,
+    }),
+  ),
+
+  http.put("/api/v1/users/me/dashboard/layout", async ({ request }) => {
+    const body = (await request.json()) as { version: number; items: unknown[] };
+    return HttpResponse.json({ ...body, updatedAt: new Date().toISOString() });
+  }),
+
+  http.delete("/api/v1/users/me/dashboard/layout", () => new HttpResponse(null, { status: 204 })),
+
   http.get("/api/v1/users/me/projects", () =>
     HttpResponse.json([{ id: "project-1", name: "SprintStart Project" }]),
   ),
@@ -572,6 +589,9 @@ export const handlers = [
   }),
 
   http.post("/api/v1/users/:userId/project-roles", () => new HttpResponse(null, { status: 200 })),
+  // A member's onboarding path, read by the PM member side panel. No path by default; tests that
+  // care about the "phase 2 of 4" line override it.
+  http.get("/api/v1/onboarding/users/:userId/path", () => new HttpResponse(null, { status: 404 })),
 
   http.get("/api/v1/confluence/projects/:projectId/connections", () => HttpResponse.json([])),
   http.post("/api/v1/confluence/projects/:projectId/connections", () =>
@@ -656,4 +676,8 @@ export const handlers = [
   http.get("/api/v1/connectors/confluence/sources", () =>
     HttpResponse.json({ connectorId: "confluence", sources: [] }),
   ),
+  // Every surface that opens the buddy dock asks for its suggestion chips. A default empty list
+  // keeps that request handled for the many tests that open the dock without being about the
+  // chips; `useBuddySuggestions`' own suite mocks the service directly and never sees this.
+  http.get("/api/v1/onboarding/me/buddy/suggestions", () => HttpResponse.json([])),
 ];

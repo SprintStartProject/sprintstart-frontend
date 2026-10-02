@@ -25,7 +25,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { PageShell } from "../components/layout/PageShell";
-import { AlertDialog } from "../components/ui/AlertDialog";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { SegmentedTabs } from "../components/ui/SegmentedTabs";
@@ -221,7 +220,6 @@ export function OnBoardingPage() {
       SLIDING_PANEL_EXIT_MS,
     );
   }, []);
-  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [isDinoActiveInGeneration, setIsDinoActiveInGeneration] = useState(false);
   /**
    * The last running generation, kept so the generation screen can stay up while the dino game
@@ -690,7 +688,6 @@ export function OnBoardingPage() {
 
   const requestGeneration = () => {
     if (!selectedProjectId) return;
-    setConfirmRegenerate(false);
     startGeneration(selectedProjectId);
   };
 
@@ -799,26 +796,37 @@ export function OnBoardingPage() {
             <GenerationIssueSummary issues={generationIssues} />
             {/* Retrying a phase that was skipped for lack of material changes nothing, so when that
                 is all there is, the button says so rather than inviting the same answer. */}
-            <p className="mt-5 text-xs text-app-text-subtle">
-              {retryCouldHelp(generationIssues)
-                ? "Trying again re-runs assembly for every phase."
-                : "Another run will produce the same result until the project has more material."}
-            </p>
+            {canManageSelected && (
+              <p className="mt-5 text-xs text-app-text-subtle">
+                {retryCouldHelp(generationIssues)
+                  ? "Trying again re-runs assembly for every phase."
+                  : "Another run will produce the same result until the project has more material."}
+              </p>
+            )}
           </div>
         ) : null}
-        <Button
-          className="mt-6"
-          variant={
-            generationIssues.length === 0 || retryCouldHelp(generationIssues)
-              ? "primary"
-              : "secondary"
-          }
-          onClick={requestGeneration}
-          icon={<RefreshCw className="h-4 w-4" />}
-          disabled={!selectedProjectId}
-        >
-          Try generation again
-        </Button>
+        {/* Building an existing path again replaces it, which is the project manager's call: the
+            backend refuses it to members, so they are pointed at the PM instead of a button that
+            can only fail. */}
+        {canManageSelected ? (
+          <Button
+            className="mt-6"
+            variant={
+              generationIssues.length === 0 || retryCouldHelp(generationIssues)
+                ? "primary"
+                : "secondary"
+            }
+            onClick={requestGeneration}
+            icon={<RefreshCw className="h-4 w-4" />}
+            disabled={!selectedProjectId}
+          >
+            Try generation again
+          </Button>
+        ) : (
+          <p className="mt-6 max-w-lg text-sm text-app-text-muted">
+            Your project manager can rebuild your path from your page in the team area.
+          </p>
+        )}
       </CenteredState>
     );
   }
@@ -839,30 +847,20 @@ export function OnBoardingPage() {
                 ? "You made it through every phase. Everything stays here to look back on."
                 : "Your path into the project. Phases that are open can be done in any order."
             }
+            // Rebuilding a path throws the member's progress away, so it is the PM's call: it lives
+            // on the member's page in the PM area, not here.
             actions={
-              <>
-                {generationIssues.length > 0 && (
-                  <span
-                    role="status"
-                    aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
-                  >
-                    <Badge variant="warning" size="sm" title={generationIssueSummary}>
-                      <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                      {generationIssues.length}
-                    </Badge>
-                  </span>
-                )}
-                <Button
-                  variant="secondary"
-                  onClick={() => setConfirmRegenerate(true)}
-                  icon={<RefreshCw className="h-4 w-4" />}
-                  aria-label="Regenerate path with AI"
-                  title="Regenerate path with AI"
-                  disabled={!selectedProjectId}
+              generationIssues.length > 0 && (
+                <span
+                  role="status"
+                  aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
                 >
-                  Rebuild
-                </Button>
-              </>
+                  <Badge variant="warning" size="sm" title={generationIssueSummary}>
+                    <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                    {generationIssues.length}
+                  </Badge>
+                </span>
+              )
             }
           />
         </div>
@@ -978,21 +976,6 @@ export function OnBoardingPage() {
           )}
         </SlidingTabPanel>
       </main>
-
-      <AlertDialog
-        isOpen={confirmRegenerate}
-        title="Rebuild your onboarding path?"
-        description="Your path is put together again from the project's current blueprint and knowledge base. Progress on the current path is replaced."
-        confirmLabel="Rebuild path"
-        variant="danger"
-        onClose={() => setConfirmRegenerate(false)}
-        onConfirm={() => {
-          requestGeneration();
-          toast.info("Rebuilding your onboarding path", {
-            description: "This runs in the background; you can keep using the app.",
-          });
-        }}
-      />
     </div>
   );
 }

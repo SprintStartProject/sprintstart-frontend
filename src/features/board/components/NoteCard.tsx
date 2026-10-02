@@ -12,14 +12,22 @@ import { Marked } from "./Marked";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardMark } from "../marks/cardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";
-import type { AuthoredCardRequest, BoardCard, NoteContent } from "../types";
+import type { AuthoredCardRequest, BoardCard, BoardUndoNotice, NoteContent } from "../types";
 
 type NoteCardProps = {
   content: NoteContent;
-  card: Pick<BoardCard, "id" | "owner" | "placedAt">;
+  card: Pick<BoardCard, "id" | "owner" | "placedAt" | "previous" | "lastChange">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  /** Puts the card back to what it said before its latest edit. See `BoardCardFrame`. */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring?: boolean;
+  /** True while a write of this card is still on its way — see `CardEditHistory`'s `paused`. */
+  saving?: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice?: BoardUndoNotice | null;
   /** Where this note was made from, when it was made from something. See `layout/cardOrigins.ts`. */
   origin?: CardOrigin | null;
 };
@@ -57,7 +65,18 @@ function splitNote(text: string): { heading: string; body: string } {
  * body as separate fields and joins them back into one text on save: the split is how the note is
  * shown *and* how it is written, but never how it is stored — there is no title on the wire.
  */
-export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin }: NoteCardProps) {
+export function NoteCard({
+  content,
+  card,
+  onDismiss,
+  dismissing,
+  onEdit,
+  onRestorePrevious,
+  restoring,
+  saving,
+  undoNotice,
+  origin,
+}: NoteCardProps) {
   const { heading, body } = splitNote(content.text);
   // Colour only: which words are marked is written into the note's own text. See `marks/`.
   const marks = useCardMarks().marksFor(card.id);
@@ -112,6 +131,10 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
+      onRestorePrevious={onRestorePrevious}
+      restoring={restoring}
+      paused={editing || Boolean(saving)}
+      undoNotice={undoNotice}
       action={
         onEdit && !editing ? (
           <Button
@@ -128,7 +151,7 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
     >
       {editing ? (
         <div className="space-y-3">
-          <Field label="Title (optional)" controlId={`note-title-${card.id}`}>
+          <Field label="Title" optional controlId={`note-title-${card.id}`}>
             <Input
               value={titleDraft}
               onChange={(event) => setTitleDraft(event.target.value)}

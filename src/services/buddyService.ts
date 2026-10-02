@@ -148,10 +148,16 @@ interface BuddyStreamChunk {
   /** `reword_checklist_item`: the line as it reads now, and as it would read. */
   line_before?: string;
   line_after?: string;
+  /** `place_link` / `edit_link`: where the link would point, and what it would be called. */
+  link_url?: string;
+  link_label?: string;
+  /** `dismiss_cards` / `reorder_cards`: the cards in order, and their board names (display only). */
+  card_ids?: string[];
+  card_names?: string[];
   // Team-mode proposal: the stored proposal to confirm or dismiss by id. Present instead of the
   // per-action payload fields — the client echoes nothing back but this id.
   proposal_id?: string;
-  // Team-mode proposal: what the manager is agreeing to, in words.
+  // What confirming would change, in words: every team-mode proposal, and the hire's board edits.
   preview?: string;
   // Team-mode proposal: STANDARD, DESTRUCTIVE or BULK — how loudly the card warns.
   risk?: string;
@@ -186,6 +192,9 @@ export async function performAction(
     noteText?: string;
     lineBefore?: string;
     lineAfter?: string;
+    linkUrl?: string;
+    linkLabel?: string;
+    cardIds?: string[];
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -205,6 +214,9 @@ export async function performAction(
       noteText: extras.noteText,
       lineBefore: extras.lineBefore,
       lineAfter: extras.lineAfter,
+      linkUrl: extras.linkUrl,
+      linkLabel: extras.linkLabel,
+      cardIds: extras.cardIds,
     }),
   });
 }
@@ -452,6 +464,11 @@ export async function streamMessage(
               noteText: event.note_text,
               lineBefore: event.line_before,
               lineAfter: event.line_after,
+              linkUrl: event.link_url,
+              linkLabel: event.link_label,
+              cardIds: event.card_ids,
+              cardNames: event.card_names,
+              preview: event.preview,
             });
           }
           break;

@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame";
-import { matchEggPhrase } from "../../easter-eggs/lib/eggPhrases";
-import { playEggEffect } from "../../easter-eggs/eggEffectBus";
 import {
   getMessages,
   streamOpenBuddy,
@@ -12,6 +10,21 @@ import {
   type BuddyOpeningAction,
 } from "../../../services/buddyService";
 import { useAuth } from "../../../context/useAuth";
+import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
+import {
+  BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_CLAIM_GOAL,
+  BUDDY_ACTION_DISMISS_CARDS,
+  BUDDY_ACTION_EDIT_CHECKLIST,
+  BUDDY_ACTION_EDIT_LINK,
+  BUDDY_ACTION_EDIT_NOTE,
+  BUDDY_ACTION_PLACE_CHECKLIST,
+  BUDDY_ACTION_PLACE_LINK,
+  BUDDY_ACTION_PLACE_NOTE,
+  BUDDY_ACTION_REORDER_CARDS,
+  BUDDY_ACTION_REWORD_CHECKLIST,
+  BUDDY_ACTION_TICK_CHECKLIST,
+} from "../types";
 import type { ActionPatch, BuddyMessageView, ProposedAction } from "../types";
 
 /**
@@ -43,6 +56,36 @@ const PROPOSAL_GONE = "This proposal is no longer available.";
 function isNotFound(e: unknown): boolean {
   return e instanceof Error && "status" in e && (e as { status: number }).status === 404;
 }
+
+/**
+ * The hire-confirmed buddy actions that write to the board, by their wire names: the five
+ * `BuddyBoardWriteActions` handles (placing, amending, ticking and rewording a checklist, and
+ * the note), the six board edits (a link, editing a note, link or checklist, clearing cards off
+ * and rearranging them), plus `claim_goal`, which pins the claimed task as the board's CURRENT_TASK card —
+ * its own outcome line says so ("It's on your board too"). Every other confirm changes something
+ * else — a task claim, an attestation request, a flag, a username — and needs no board sync.
+ */
+const BUDDY_BOARD_ACTIONS = new Set<string>([
+  BUDDY_ACTION_PLACE_CHECKLIST,
+  BUDDY_ACTION_AMEND_CHECKLIST,
+  BUDDY_ACTION_TICK_CHECKLIST,
+  BUDDY_ACTION_REWORD_CHECKLIST,
+  BUDDY_ACTION_PLACE_NOTE,
+  BUDDY_ACTION_CLAIM_GOAL,
+  BUDDY_ACTION_PLACE_LINK,
+  BUDDY_ACTION_EDIT_NOTE,
+  BUDDY_ACTION_EDIT_LINK,
+  BUDDY_ACTION_EDIT_CHECKLIST,
+  BUDDY_ACTION_DISMISS_CARDS,
+  BUDDY_ACTION_REORDER_CARDS,
+]);
+
+/**
+ * The mid-answer tool that puts a card on the board. `place_card` is deliberately not a confirmed
+ * action — it applies the moment the mentor runs it — so a turn that ran it is the only signal
+ * the client ever gets that the board moved. Acted on by `sendMessage` when the turn ends.
+ */
+const BUDDY_BOARD_TOOLS = new Set<string>(["place_card"]);
 
 /**
  * Where "is the buddy in team mode" lives between reloads — scoped to the signed-in user, the
@@ -87,6 +130,7 @@ export function useBuddyConversation(
   const [messages, setMessages] = useState<BuddyMessageView[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const invalidateBoard = useInvalidateBoard();
   // The tool the buddy is running right now, if any -- drives "Checking your progress…"
   // in place of a generic spinner. Cleared as soon as the answer starts streaming.
   const [activeTool, setActiveTool] = useState<string | null>(null);
@@ -143,7 +187,15 @@ export function useBuddyConversation(
   // Set when the conversation could not be brought on screen at all -- distinct from a turn that
   // failed, which carries its own reason. Nothing is on screen to hang that on, so it is state.
   const [openError, setOpenError] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
+  /**
+   * Bumped whenever the conversation on screen is replaced — a fresh visit, a project switch.
+   *
+   * The composer's words are not this hook's any more (see `BuddyDraftProvider`), so the one
+   * thing this session still owes them is the news that they belonged to a thread that is gone.
+   * Told as a token rather than a call: the composer's state lives *below* this hook's provider,
+   * and a parent cannot reach into a child's setter.
+   */
+  const [draftResetToken, setDraftResetToken] = useState(0);
   /**
    * The last greeting a surface has actually put in front of the hire — either watched while it
    * streamed, or revealed by `useGreetingReveal`. Held here, not per surface, so a greeting the
@@ -489,7 +541,9 @@ export function useBuddyConversation(
     setMessages([]);
     setOpenerAction(null);
     setOpenError(null);
-    setDraft("");
+    // The box is emptied through the token: a question typed about the conversation being
+    // cleared is about a thread that no longer exists. See `draftResetToken`.
+    setDraftResetToken((token) => token + 1);
     setIsOpening(true);
     try {
       await greet();
@@ -557,12 +611,27 @@ export function useBuddyConversation(
       // Once the hire says anything, the opener's one-click suggestion has served its purpose.
       setOpenerAction(null);
 
+      // Whether this turn ran a tool that puts a card on the board. A property rather than a
+      // `let`, so the reads below see the writes made in the stream callbacks — see `greet`.
+      const touched = { board: false };
+
+      /**
+       * `place_card` is the one board write that is not confirmed: its `tool_use` event is the
+       * whole signal the client gets, and it cannot say whether the tool wrote a card or was
+       * refused. So the board is marked stale when the turn ends — the failing paths included.
+       * See `useInvalidateBoard` for why the mark is what makes this visible.
+       */
+      const syncBoardIfTouched = () => {
+        if (touched.board) invalidateBoard();
+      };
+
       try {
         await streamMessage(
           text,
           {
             onToolUse: (name) => {
               setActiveTool(name);
+              if (BUDDY_BOARD_TOOLS.has(name)) touched.board = true;
             },
 
             onToken: (token) => {
@@ -608,6 +677,11 @@ export function useBuddyConversation(
                 noteText: proposal.noteText,
                 lineBefore: proposal.lineBefore,
                 lineAfter: proposal.lineAfter,
+                linkUrl: proposal.linkUrl,
+                linkLabel: proposal.linkLabel,
+                cardIds: proposal.cardIds,
+                cardNames: proposal.cardNames,
+                preview: proposal.preview,
                 status: "idle",
               });
             },
@@ -655,15 +729,20 @@ export function useBuddyConversation(
           // Read at call time: a turn speaks to whichever conversation is current when it starts.
           teamProjectIdRef.current ?? undefined,
         );
+
+        // The turn is over — the first moment a card placed mid-answer is certainly on the board.
+        syncBoardIfTouched();
       } catch (e) {
         console.error(e);
         setIsStreaming(false);
         setIsThinking(false);
         setActiveTool(null);
         failReply(assistantId);
+        // Same reason as above: a turn that placed a card and then broke still wrote it.
+        syncBoardIfTouched();
       }
     },
-    [failReply],
+    [failReply, invalidateBoard],
   );
 
   /** Patches one proposed action in place, keyed by its message and action id. */
@@ -746,12 +825,22 @@ export function useBuddyConversation(
                   noteText: action.noteText,
                   lineBefore: action.lineBefore,
                   lineAfter: action.lineAfter,
+                  linkUrl: action.linkUrl,
+                  linkLabel: action.linkLabel,
+                  cardIds: action.cardIds,
                 });
           patchAction(messageId, action.id, {
             status: "resolved",
             ok: result.ok,
             outcome: result.message,
           });
+
+          // `board.all()`, not a project key: the backend re-resolves the project server-side
+          // (the caller's single onboarding project) and never tells the client which board —
+          // see `useInvalidateBoard`.
+          if (result.ok && "action" in action && BUDDY_BOARD_ACTIONS.has(action.action)) {
+            invalidateBoard();
+          }
         } catch (e) {
           console.error(e);
           // A settled proposal does NOT come back 404 — the backend answers 200 with ok: false
@@ -775,11 +864,16 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, patchAction],
+    [beginDecision, endDecision, patchAction, invalidateBoard],
   );
 
   /**
    * Declines a proposed action — nothing changes; the conversation simply continues.
+   *
+   * The action itself arrives from the card that drew it, the way `confirmAction`'s does. It used
+   * to arrive as an id and be looked up in the transcript, which is what forced a
+   * `messagesRef` to keep this callback's identity stable — the callback now depends on nothing
+   * that a token can change, and the lookup (and its staleness question) is gone with it.
    *
    * A stored proposal is declined *at the backend* rather than only on screen, because it may
    * also be sitting in another tab waiting to be confirmed: dismissal closes that door too, and
@@ -787,13 +881,12 @@ export function useBuddyConversation(
    * backend — declining is purely local, as it has always been.
    */
   const dismissAction = useCallback(
-    (messageId: string, actionId: string) => {
-      const action = messages
-        .find((m) => m.id === messageId)
-        ?.actions?.find((a) => a.id === actionId);
+    (messageId: string, action: ProposedAction) => {
+      const actionId = action.id;
 
-      // Unknown action: nothing to decline at the backend, but still worth putting away here.
-      if (!action || !("proposalId" in action)) {
+      // A hire offer, or one that arrived without its details: nothing to decline at the backend,
+      // but still worth putting away here.
+      if (!("proposalId" in action)) {
         patchAction(messageId, actionId, { status: "dismissed" });
         return;
       }
@@ -840,7 +933,7 @@ export function useBuddyConversation(
         }
       })();
     },
-    [beginDecision, endDecision, messages, patchAction],
+    [beginDecision, endDecision, patchAction],
   );
 
   /**
@@ -873,7 +966,8 @@ export function useBuddyConversation(
     setMessages([]);
     setOpenerAction(null);
     setOpenError(null);
-    setDraft("");
+    // Same rule as a fresh visit: the words belonged to the conversation that just went away.
+    setDraftResetToken((token) => token + 1);
     setActiveTool(null);
     setIsThinking(false);
     setIsStreaming(false);
@@ -934,35 +1028,6 @@ export function useBuddyConversation(
     [isThinking, isStreaming, isOpening, isGreeting, isDeciding, selection, setTeamMode],
   );
 
-  /**
-   * Handles a composer submission: an egg phrase plays its effect and is swallowed, anything
-   * else is sent. Returns whether a turn was started — `false` means the submission went
-   * nowhere, which the composer uses to decide whether the caret should be handed off.
-   */
-  const handleSubmit = useCallback(
-    (event: React.FormEvent) => {
-      event.preventDefault();
-
-      // Easter-egg phrases are intercepted before anything is sent: the
-      // effect plays app-wide (EggEffectsLayer) and the message is swallowed
-      // silently — no reply, no request. Same contract as the AI chat.
-      const eggEffect = matchEggPhrase(draft);
-      if (eggEffect) {
-        setDraft("");
-        playEggEffect(eggEffect);
-        return false;
-      }
-
-      const text = draft;
-      if (!text.trim()) return false;
-
-      setDraft("");
-      void sendMessage(text);
-      return true;
-    },
-    [draft, sendMessage, setDraft],
-  );
-
   return {
     messages,
     isThinking,
@@ -983,10 +1048,12 @@ export function useBuddyConversation(
     isDeciding,
     switchTeamProject,
 
-    draft,
-    setDraft,
+    // The composer's words live in `BuddyDraftProvider`, below this provider; this is the only
+    // thing about them the session still owns — the news that the thread they belonged to is
+    // gone. See `draftResetToken`.
+    draftResetToken,
+
     sendMessage,
-    handleSubmit,
     confirmAction,
     dismissAction,
 

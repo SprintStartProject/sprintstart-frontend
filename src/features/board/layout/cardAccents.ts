@@ -99,6 +99,7 @@ const ACCENTS: Record<BoardCardKind, CardAccent> = {
 
   // What the board has worked out about the hire: what to try next, how far along they are.
   SUGGESTED_TASKS: PURPLE,
+  TASK_POOL: PURPLE,
   COMPETENCY_PROGRESS: PURPLE,
 
   // The hire's current step, live from the path — the one AI-owned card the hire partly writes to.

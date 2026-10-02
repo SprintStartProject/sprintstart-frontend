@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useState } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 import { LogOut, Menu, Settings, X } from "lucide-react";
@@ -10,9 +10,15 @@ import { useProjectContext } from "../../features/projects/useProjectContext";
 import { useOnboardingAvailable } from "../../features/onboarding/hooks/useOnboardingAvailable";
 import { useOnboardingJourney } from "../../features/onboarding/generation/OnboardingJourneyContext";
 import { useMyKnowledgeGaps } from "../../features/knowledge-gaps/useMyKnowledgeGaps";
-import { usePmAttentionFlag } from "../../features/team-management/usePmAttentionFlag";
-import { useOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
+import { usePmAttentionCount } from "../../features/team-management/usePmAttentionCount";
+import { useKnownOpenEscalationCount } from "../../features/knowledge-request/useOpenEscalationCount";
 import { useUnseenSkipAnswerCount } from "../../features/onboarding/hooks/useUnseenSkipAnswerCount";
+import {
+  SIDEBAR_TOGGLE_SHORTCUT,
+  navigationShortcut,
+  useShortcutListener,
+} from "../../features/shortcuts";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import {
   AdminIcon,
   BlueprintsIcon,
@@ -21,7 +27,6 @@ import {
   DashboardIcon,
   DataIngestionIcon,
   HireSetupIcon,
-  InboxIcon,
   KnowledgeBaseIcon,
   OnboardingIcon,
   PmDashboardIcon,
@@ -29,6 +34,9 @@ import {
 } from "./SidebarNavIcons";
 import { SidebarLogo } from "./SidebarLogo";
 import { SidebarNavLink } from "./SidebarNavLink";
+import { SidebarResizeHandle } from "./SidebarResizeHandle";
+import { SidebarAccountFlyout } from "./SidebarAccountFlyout";
+import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH_VAR, useSidebarLayout } from "./useSidebarLayout";
 import { hoverSpringToken } from "../../styles/tokens";
 
 type SidebarNavItem = {
@@ -50,30 +58,66 @@ type SidebarContentProps = {
    */
   hasPmAttentionItems?: boolean;
   /**
-   * How many escalated questions are waiting on a person. Passed in for the
-   * same reason as the flag above: this component is mounted twice at once.
+   * The number on the PM Dashboard entry and what it stands for, or `null` while any part of it
+   * is still loading or failed to load -- see {@link pmDashboardBadge}. Passed in for the same
+   * reason as the flag above: this component is mounted twice at once.
    */
-  openEscalationCount?: number;
+  pmBadge?: PmDashboardBadge | null;
   /** Skip requests the project manager answered that the member has not looked at yet. */
   unseenSkipAnswerCount?: number;
+  /** Folded to icons -- the desktop sidebar only; the mobile drawer is always full width. */
+  collapsed?: boolean;
+  /** Lets the logo fold and unfold the desktop sidebar. Left out on the mobile drawer. */
+  onToggleCollapsed?: () => void;
 };
 
 /**
- * The escalation inbox's route, named because three things have to agree on it:
- * the nav entry, the access check that decides whether to read the count, and
- * the entry the count is handed to.
+ * The escalation inbox's route. It has no entry of its own any more -- it is a section of the PM
+ * dashboard -- but the access check that decides whether to read the open count is still the
+ * inbox's own, and the count now rides on the PM dashboard's entry.
  */
 const ESCALATION_INBOX_PATH = "/insights/knowledge-requests" as const;
 
+type PmDashboardBadge = {
+  count: number;
+  /** What the number counts, for a screen reader: the total and its parts. */
+  label: string;
+};
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
 /**
- * What the number on the inbox entry counts, for a screen reader.
+ * The number on the PM Dashboard entry: pending skip requests, unread onboarding feedback and
+ * open escalations, added up.
  *
- * Handed only to that entry rather than to every one of them: the wording is
- * this entry's, and a future counted entry inheriting it would quietly announce
- * its own total as escalations.
+ * `null` unless every part is known. A part still loading or whose read failed would otherwise
+ * count as nothing and quietly shrink the total -- a smaller number that looks just as sure of
+ * itself as the right one. Escalations are part of it because the entry already carried their
+ * count, and a second number beside the first would have to explain which is which.
+ *
+ * Handed only to the PM dashboard entry: a future counted entry inheriting the label would
+ * announce its own total as skip requests and feedback.
  */
-const describeOpenEscalations = (open: number) =>
-  `${open} open ${open === 1 ? "escalation" : "escalations"}`;
+function pmDashboardBadge(
+  attention: { pendingSkips: number; unreadFeedback: number } | null,
+  openEscalations: number | null,
+): PmDashboardBadge | null {
+  if (attention === null || openEscalations === null) return null;
+
+  const count = attention.pendingSkips + attention.unreadFeedback + openEscalations;
+  const parts = [
+    attention.pendingSkips > 0 &&
+      plural(attention.pendingSkips, "pending skip request", "pending skip requests"),
+    attention.unreadFeedback > 0 &&
+      plural(attention.unreadFeedback, "unread feedback", "unread feedback items"),
+    openEscalations > 0 && plural(openEscalations, "open escalation", "open escalations"),
+  ].filter(Boolean);
+
+  return {
+    count,
+    label: `${plural(count, "item needs", "items need")} your attention: ${parts.join(", ")}`,
+  };
+}
 
 const navItems: SidebarNavItem[] = [
   {
@@ -133,15 +177,6 @@ const projectManagerNavItems: SidebarNavItem[] = [
     path: "/hire-setup",
     icon: HireSetupIcon,
   },
-  // The escalation inbox, surfaced as its own entry while it is being evaluated
-  // (the buddy page links to it from nowhere a PM would look). `canAccessRoute`
-  // already hides it from hires: the route is PM/HR/ADMIN-only, and for a PM it
-  // additionally requires managing the selected project.
-  {
-    label: "Escalation Inbox",
-    path: ESCALATION_INBOX_PATH,
-    icon: InboxIcon,
-  },
 ];
 
 const adminNavItems: SidebarNavItem[] = [
@@ -165,8 +200,10 @@ function SidebarContent({
   onNavigate,
   "aria-label": ariaLabel = "Primary Navigation",
   hasPmAttentionItems = false,
-  openEscalationCount = 0,
+  pmBadge = null,
   unseenSkipAnswerCount = 0,
+  collapsed = false,
+  onToggleCollapsed,
 }: SidebarContentProps) {
   const { profile, logout, status } = useAuth();
   const { canManageSelected } = useProjectContext();
@@ -206,9 +243,12 @@ function SidebarContent({
     canAccessRoute(profile, item.path, canManageSelected),
   );
 
-  // `/insights/knowledge-requests` is deliberately absent: it has its own
-  // sidebar entry, so listing it here would leave two entries active at once
-  // -- including two active pills sharing one Framer Motion `layoutId`.
+  // The icon-only footer button has no room for a chip, so its name carries the chord — in
+  // both attributes, because `aria-label` wins the accessible-name computation and a `title`
+  // alone would reach the mouse tooltip only.
+  const settingsShortcut = navigationShortcut("/settings");
+  const settingsLabel = settingsShortcut ? `Settings (${settingsShortcut})` : "Settings";
+
   /**
    * The buddy is the other half of the chat's page, not a page of its own: one header, one
    * switch, two conversations. So the entry that leads there lights up for both — without it
@@ -229,7 +269,8 @@ function SidebarContent({
     location.pathname.startsWith("/team/") ||
     location.pathname.startsWith("/insights/faq") ||
     location.pathname.startsWith("/insights/knowledge-gaps") ||
-    location.pathname.startsWith("/insights/onboarding");
+    location.pathname.startsWith("/insights/onboarding") ||
+    location.pathname.startsWith(ESCALATION_INBOX_PATH);
 
   const sections: SidebarSection[] = [
     { items: visibleNavItems },
@@ -256,12 +297,93 @@ function SidebarContent({
     .flatMap((section) => section.items.map((item) => item.path))
     .join("|")}`;
 
+  /** The footer card, the same in the open sidebar and in the folded rail's flyout. */
+  const footerCard = (
+    <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+      {profile && (
+        <div className="flex items-center justify-between gap-2 py-[2px]">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
+              <UserAvatar
+                size={32}
+                profileIcon={profile.profileIcon}
+                fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
+                seed={profile.id}
+              />
+            </div>
+
+            <div className="flex flex-col overflow-hidden">
+              <span className="truncate text-sm font-semibold text-app-text">
+                {profile.username}
+              </span>
+
+              <span className="truncate text-[10px] font-medium tracking-wider text-app-text-muted uppercase">
+                {profile.permissionGroup.replace("_", " ")}
+              </span>
+            </div>
+          </div>
+          <motion.div
+            whileHover={{ scale: 1.18 }}
+            whileTap={{ scale: 0.92 }}
+            transition={hoverSpringToken}
+            className="shrink-0"
+          >
+            <NavLink
+              to="/settings"
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                `flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
+                  isActive
+                    ? "bg-app-brand-soft text-app-brand"
+                    : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+                }`
+              }
+              title={settingsLabel}
+              aria-label={settingsLabel}
+            >
+              <Settings className="h-[18px] w-[18px]" />
+            </NavLink>
+          </motion.div>
+        </div>
+      )}
+
+      <ProjectSwitcher className="w-full" />
+
+      <motion.button
+        type="button"
+        onClick={() => {
+          void logout();
+        }}
+        disabled={status === "loading"}
+        whileHover={status === "loading" ? undefined : { scale: 1.02 }}
+        whileTap={status === "loading" ? undefined : { scale: 0.98 }}
+        transition={hoverSpringToken}
+        className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <LogOut aria-hidden="true" className="h-[16px] w-[16px]" />
+        Logout
+      </motion.button>
+    </div>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-app-bg text-app-text">
-      <div className="flex shrink-0 items-center gap-3 px-[24px] py-[24px]">
-        <SidebarLogo />
+      <div
+        className={`flex shrink-0 items-center gap-3 py-[24px] ${
+          collapsed ? "justify-center px-0" : "px-[24px]"
+        }`}
+      >
+        <SidebarLogo
+          sidebarToggle={onToggleCollapsed ? { collapsed, onToggle: onToggleCollapsed } : undefined}
+        />
 
-        <h1 className="text-lg leading-none font-bold tracking-tight text-app-text">SprintStart</h1>
+        <h1
+          className={
+            collapsed ? "sr-only" : "text-lg leading-none font-bold tracking-tight text-app-text"
+          }
+        >
+          SprintStart
+        </h1>
       </div>
 
       <nav
@@ -276,12 +398,15 @@ function SidebarContent({
         onPointerLeave={() => pointerY.set(Number.NEGATIVE_INFINITY)}
         // 24px inner padding. This and DOCK_HOVER_SCALE trade directly
         // against each other: the item grows rightwards from a fixed
-        // left edge, so 286px sidebar - 2x24 = 238px wide, x1.06 = 252px,
+        // left edge, so at the default 286px sidebar - 2x24 = 238px wide, x1.06 = 252px,
         // finishing ~10px short of the border. Pulling the content
         // further left again would need a smaller scale to keep that
         // gap. Header and footer share the inset, so everything lines
         // up on one left edge.
-        className="app-scrollbar min-h-0 flex-1 space-y-[5px] overflow-x-hidden overflow-y-auto px-[24px] py-[20px]"
+        // Folded to icons the inset shrinks to 16px, which leaves each 44px row centred.
+        className={`app-scrollbar min-h-0 flex-1 space-y-[5px] overflow-x-hidden overflow-y-auto py-[20px] ${
+          collapsed ? "px-[16px]" : "px-[24px]"
+        }`}
       >
         {sections.map((section, sectionIndex) => (
           <div
@@ -289,9 +414,21 @@ function SidebarContent({
             className={sectionIndex > 0 ? "pt-[20px]" : undefined}
           >
             {section.heading ? (
-              <p className="px-[12px] pb-[8px] text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
-                {section.heading}
-              </p>
+              collapsed ? (
+                // No room for the words: a short rule marks where the group starts, and the
+                // heading stays for assistive technology.
+                <>
+                  <p className="sr-only">{section.heading}</p>
+                  <span
+                    aria-hidden="true"
+                    className="mx-auto mb-[12px] block h-px w-6 bg-app-border"
+                  />
+                </>
+              ) : (
+                <p className="px-[12px] pb-[8px] text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+                  {section.heading}
+                </p>
+              )
             ) : null}
 
             <div className="space-y-[5px]">
@@ -306,6 +443,7 @@ function SidebarContent({
                     (item.path === "/pm-dashboard" && isPmSectionActive) ||
                     (item.path === "/chat" && isAssistantSectionActive)
                   }
+                  shortcut={navigationShortcut(item.path)}
                   indicatorLayoutId={indicatorLayoutId}
                   pointerY={pointerY}
                   hasAttentionMarker={
@@ -318,15 +456,16 @@ function SidebarContent({
                       ? "A component has been assigned to you"
                       : item.path === "/onboarding"
                         ? "Your project manager answered a skip request"
-                        : "Open skip requests or unread feedback"
+                        : "Open skip requests, unread feedback or escalations"
                   }
-                  count={item.path === ESCALATION_INBOX_PATH ? openEscalationCount : 0}
+                  count={item.path === "/pm-dashboard" ? (pmBadge?.count ?? 0) : 0}
                   busy={item.path === "/onboarding" && generation.status === "running"}
                   busyLabel="Your onboarding path is being built"
                   countLabel={
-                    item.path === ESCALATION_INBOX_PATH ? describeOpenEscalations : undefined
+                    item.path === "/pm-dashboard" && pmBadge ? () => pmBadge.label : undefined
                   }
                   onNavigate={onNavigate}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
@@ -336,74 +475,31 @@ function SidebarContent({
 
       {/* Floating glass card instead of a full-bleed bar. The 12px outer
                 gutter plus 12px inner padding lines its content up with the
-                24px inset used by the nav items above. */}
-      <div className="shrink-0 px-[12px] pt-[8px] pb-[16px]">
-        <div className="space-y-[12px] rounded-[18px] border border-app-border/70 bg-app-surface/70 p-[12px] shadow-[0_10px_30px_-18px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-          {profile && (
-            <div className="flex items-center justify-between gap-2 py-[2px]">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted">
-                  <UserAvatar
-                    size={32}
-                    profileIcon={profile.profileIcon}
-                    fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
-                    seed={profile.id}
-                  />
-                </div>
-
-                <div className="flex flex-col overflow-hidden">
-                  <span className="truncate text-sm font-semibold text-app-text">
-                    {profile.username}
-                  </span>
-
-                  <span className="truncate text-[10px] font-medium tracking-wider text-app-text-muted uppercase">
-                    {profile.permissionGroup.replace("_", " ")}
-                  </span>
-                </div>
-              </div>
-              <motion.div
-                whileHover={{ scale: 1.18 }}
-                whileTap={{ scale: 0.92 }}
-                transition={hoverSpringToken}
-                className="shrink-0"
-              >
-                <NavLink
-                  to="/settings"
-                  onClick={onNavigate}
-                  className={({ isActive }) =>
-                    `flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${
-                      isActive
-                        ? "bg-app-brand-soft text-app-brand"
-                        : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
-                    }`
-                  }
-                  title="Settings"
-                  aria-label="Settings"
-                >
-                  <Settings className="h-[18px] w-[18px]" />
-                </NavLink>
-              </motion.div>
-            </div>
-          )}
-
-          <ProjectSwitcher className="w-full" />
-
-          <motion.button
-            type="button"
-            onClick={() => {
-              void logout();
-            }}
-            disabled={status === "loading"}
-            whileHover={status === "loading" ? undefined : { scale: 1.02 }}
-            whileTap={status === "loading" ? undefined : { scale: 0.98 }}
-            transition={hoverSpringToken}
-            className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                24px inset used by the nav items above. Folded, the card slides
+                out from the avatar instead of being squeezed into the rail. */}
+      {collapsed ? (
+        <div className="flex shrink-0 justify-center pt-[8px] pb-[16px]">
+          <SidebarAccountFlyout
+            label="Account and project"
+            trigger={
+              profile ? (
+                <UserAvatar
+                  size={32}
+                  profileIcon={profile.profileIcon}
+                  fallbackName={`${profile.firstName} ${profile.lastName}`.trim()}
+                  seed={profile.id}
+                />
+              ) : (
+                <Settings aria-hidden="true" className="h-[18px] w-[18px] text-app-text-muted" />
+              )
+            }
           >
-            <LogOut className="h-[16px] w-[16px]" />
-            Logout
-          </motion.button>
+            {footerCard}
+          </SidebarAccountFlyout>
         </div>
-      </div>
+      ) : (
+        <div className="shrink-0 px-[12px] pt-[8px] pb-[16px]">{footerCard}</div>
+      )}
     </div>
   );
 }
@@ -426,23 +522,27 @@ export function SideBar() {
   // hook rate-limits that so quick navigation cannot hammer the backend.
   // Gated on access so a regular member never pays for a request they could
   // not act on anyway.
-  const hasPmAttentionItems = usePmAttentionFlag(
+  const pmAttention = usePmAttentionCount(
     selectedProjectId,
     canAccessRoute(profile, "/pm-dashboard", canManageSelected),
     pathname,
   );
 
-  // Its own read, not a second use of the flag above: that one counts pending
-  // skip requests and unread feedback off the team overview, and knows nothing
-  // about escalations. Gated on the inbox route rather than the dashboard --
-  // for a PM it additionally requires managing the selected project, so a PM
-  // who is only a member of it neither pays for the request nor sees a badge
-  // for an entry their sidebar does not show.
-  const openEscalationCount = useOpenEscalationCount(
+  // Its own read: escalations are not onboarding items and have their own count endpoint. Gated
+  // on the inbox route rather than the dashboard -- for a PM it additionally requires managing
+  // the selected project, so a PM who is only a member of it neither pays for the request nor
+  // sees it counted. `null` while loading or failed, 0 when there is nothing of it to count.
+  const openEscalations = useKnownOpenEscalationCount(
     selectedProjectId,
     canAccessRoute(profile, ESCALATION_INBOX_PATH, canManageSelected),
     pathname,
   );
+
+  const pmBadge = pmDashboardBadge(pmAttention, openEscalations);
+  // While part of the number is unknown the entry shows no number, only the marker -- and only if
+  // a part that is known has something in it. Better "something is waiting" than a wrong count.
+  const hasPmAttentionItems =
+    pmBadge === null && ((pmAttention?.total ?? 0) > 0 || (openEscalations ?? 0) > 0);
 
   // Owned here for the same reason: read once, handed to both sidebars.
   const { availability } = useOnboardingJourney();
@@ -452,21 +552,74 @@ export function SideBar() {
     pathname,
   );
 
+  // The desktop sidebar's width and folded state, remembered across visits. The mobile drawer
+  // does not use either: it keeps its fixed width and opens over the page.
+  const sidebarLayout = useSidebarLayout();
+  const desktopWidth = sidebarLayout.collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarLayout.width;
+  // On the root, where the page's own margin reads it too. Set before paint, so a folded sidebar
+  // never shows at full width for a frame on load.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty(SIDEBAR_WIDTH_VAR, `${desktopWidth}px`);
+    return () => {
+      root.style.removeProperty(SIDEBAR_WIDTH_VAR);
+    };
+  }, [desktopWidth]);
+
   const closeMobileSidebar = () => {
     setIsMobileSidebarOpen(false);
   };
+
+  // A chord can change the route without any link being clicked (Alt+H — nothing runs
+  // `onNavigate` then), and the drawer would still be standing open over the new page.
+  // Deferred to a microtask so this is not a synchronous setState inside the effect body,
+  // which `react-hooks/set-state-in-effect` rejects.
+  useEffect(() => {
+    void Promise.resolve().then(() => setIsMobileSidebarOpen(false));
+  }, [pathname]);
+
+  /**
+   * Alt+S toggles whichever sidebar is on screen: below `lg` the drawer, as the header's
+   * button does; from `lg` up the desktop sidebar's fold to icons, as its logo does (#244).
+   *
+   * Never the drawer on a wide screen: it is not on screen there, so the chord would flip
+   * state nobody can see -- and leave it flipped, opening the drawer uninvited the next time
+   * the window narrows.
+   */
+  const toggleMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen((isOpen) => !isOpen);
+  }, []);
+  const isDesktopLayout = useMediaQuery("(min-width: 1024px)");
+
+  useShortcutListener(
+    SIDEBAR_TOGGLE_SHORTCUT,
+    isDesktopLayout ? sidebarLayout.toggleCollapsed : toggleMobileSidebar,
+  );
 
   return (
     <>
       <aside
         aria-label="Desktop Sidebar"
-        className="fixed top-0 bottom-0 left-0 hidden w-[var(--app-sidebar-width)] flex-col border-r border-app-border bg-app-bg lg:flex"
+        // Fixed from `lg` up and out of the page's flow (the page leaves its width free, see
+        // App), so the width lives in a CSS variable both read. It eases when the sidebar folds
+        // and follows the pointer exactly while the edge is dragged (`app-sidebar-eases`).
+        className="app-sidebar-eases fixed top-0 bottom-0 left-0 hidden w-[var(--app-sidebar-desktop-width,var(--app-sidebar-width))] flex-col border-r border-app-border bg-app-bg lg:flex"
       >
         <SidebarContent
           aria-label="Desktop Navigation"
           hasPmAttentionItems={hasPmAttentionItems}
-          openEscalationCount={openEscalationCount}
+          pmBadge={pmBadge}
           unseenSkipAnswerCount={unseenSkipAnswerCount}
+          collapsed={sidebarLayout.collapsed}
+          onToggleCollapsed={sidebarLayout.toggleCollapsed}
+        />
+        {/* Also on the folded rail: its edge pulls the sidebar open again. */}
+        <SidebarResizeHandle
+          width={sidebarLayout.width}
+          collapsed={sidebarLayout.collapsed}
+          onResize={sidebarLayout.setWidth}
+          onCollapse={() => sidebarLayout.setCollapsed(true)}
+          onExpand={() => sidebarLayout.setCollapsed(false)}
         />
       </aside>
 
@@ -483,7 +636,7 @@ export function SideBar() {
           type="button"
           aria-label={isMobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
           aria-expanded={isMobileSidebarOpen}
-          onClick={() => setIsMobileSidebarOpen((isOpen) => !isOpen)}
+          onClick={toggleMobileSidebar}
           className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
         >
           {isMobileSidebarOpen ? (
@@ -518,7 +671,7 @@ export function SideBar() {
           aria-label="Mobile Navigation"
           onNavigate={closeMobileSidebar}
           hasPmAttentionItems={hasPmAttentionItems}
-          openEscalationCount={openEscalationCount}
+          pmBadge={pmBadge}
           unseenSkipAnswerCount={unseenSkipAnswerCount}
         />
       </aside>

@@ -1,7 +1,9 @@
 import { Badge } from "../../../../components/ui/Badge";
+import { InfoHint } from "../../../../components/ui/InfoHint";
 import type { KnowledgeGap } from "../../../knowledge-gaps/types";
 import type { UserSkillLevel } from "../../../../services/teamManagementService";
-import { SpotlightCard } from "../../../../components/ui/SpotlightCard";
+import { GraduationCap, SearchX } from "lucide-react";
+import { PmCard, PmCardHeader } from "../../../pm-area/components/PmCard";
 
 type MemberGapsPanelProps = {
   skillLevels: UserSkillLevel[];
@@ -17,6 +19,15 @@ const LEVEL_DOTS: Record<string, number> = {
   EXPERT: 4,
 };
 
+/**
+ * The member's skill assessment plus their skill and knowledge gaps, rendered as the two cards
+ * beside the journey on the member detail page. Read-only apart from opening a knowledge gap,
+ * which hands off to the knowledge-gaps detail view via `onOpenKnowledgeGap`.
+ *
+ * The "Knowledge gaps" explainer is an `InfoHint` in its `"top-end"` placement: the enclosing
+ * `SpotlightCard` clips overflow, so the tooltip has to open upward and right-aligned to stay
+ * inside the card when the lists are short or the viewport is narrow.
+ */
 export function MemberGapsPanel({
   skillLevels,
   skillGaps,
@@ -32,13 +43,13 @@ export function MemberGapsPanel({
 
   return (
     <>
-      <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
-        <h2 className="text-lg font-semibold text-app-text">Skill Assessment</h2>
+      <PmCard aria-label="Skill assessment">
+        <PmCardHeader icon={GraduationCap} title="Skill assessment" />
 
         {skillLevels.length === 0 ? (
-          <p className="mt-3 text-sm text-app-text-muted">No completed skill assessment.</p>
+          <p className="text-sm text-app-text-muted">No completed skill assessment.</p>
         ) : (
-          <div className="mt-4 space-y-4">
+          <div className="space-y-4">
             {Object.entries(skillsByRole).map(([roleName, skills]) => (
               <div key={roleName}>
                 <p className="mb-2 text-xs font-medium tracking-wide text-app-text-muted uppercase">
@@ -54,12 +65,12 @@ export function MemberGapsPanel({
             ))}
           </div>
         )}
-      </SpotlightCard>
+      </PmCard>
 
-      <SpotlightCard roundedClassName="rounded-3xl" className="p-6">
-        <h2 className="text-lg font-semibold text-app-text">Gaps</h2>
+      <PmCard aria-label="Gaps" tone="pink">
+        <PmCardHeader icon={SearchX} tone="pink" title="Gaps" />
 
-        <div className="mt-4 space-y-4">
+        <div className="space-y-4">
           <SkillGapsSection skillGaps={skillGaps} />
 
           <KnowledgeGapsSection
@@ -67,7 +78,7 @@ export function MemberGapsPanel({
             onOpenKnowledgeGap={onOpenKnowledgeGap}
           />
         </div>
-      </SpotlightCard>
+      </PmCard>
     </>
   );
 }
@@ -144,7 +155,14 @@ function KnowledgeGapsSection({
     <div>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-app-text">Knowledge gaps</p>
-        <GapCountBadge count={knowledgeGaps.length} />
+        <div className="flex items-center gap-2">
+          <GapCountBadge count={knowledgeGaps.length} />
+          <InfoHint
+            placement="top-end"
+            label="What is a knowledge gap?"
+            text="A knowledge gap is a component whose documentation is missing material the project expects — for example runbooks or ADRs. The gaps are detected from the project's ingested documentation and refresh when new material is ingested."
+          />
+        </div>
       </div>
 
       <div className="mt-2 space-y-2">

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
@@ -6,7 +6,7 @@ import { BoardPage } from "../../../src/pages/BoardPage";
 import type { Board } from "../../../src/features/board/types";
 
 vi.mock("../../../src/services/boardService", () => ({
-  boardService: { fetchBoard: vi.fn(), tickPathStepTask: vi.fn() },
+  boardService: { fetchBoard: vi.fn(), tickPathStepTask: vi.fn(), restorePrevious: vi.fn() },
 }));
 
 vi.mock("../../../src/context/useAuth", () => ({
@@ -104,6 +104,22 @@ const board: Board = {
         reason: null,
       },
     },
+    {
+      // An authored card whose latest edit can still be undone — the strip below the header, with
+      // its disclosure and its Undo, is what this fixture puts in front of axe.
+      id: "c4",
+      kind: "NOTE",
+      owner: "HIRE",
+      position: 3,
+      placedAt: null,
+      content: { kind: "NOTE", text: "deploys are on Fridays" },
+      lastChange: { change: "EDITED", by: "BUDDY", at: "2026-09-29T09:00:00Z" },
+      previous: {
+        content: { kind: "NOTE", text: "deploys are on Thursdays" },
+        replacedBy: "BUDDY",
+        replacedAt: "2026-09-29T09:00:00Z",
+      },
+    },
   ],
 };
 
@@ -136,6 +152,25 @@ describe("BoardPage Accessibility", () => {
     );
 
     await waitFor(() => expect(screen.getByText(/couldn't be loaded/i)).toBeInTheDocument());
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no violations with an edited card's previous version open", async () => {
+    vi.mocked(boardService.fetchBoard).mockResolvedValue(board);
+
+    const { baseElement } = render(
+      <MemoryRouter>
+        <BoardPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "deploys are on Fridays" })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Show what it said before" }));
+
+    expect(screen.getByText("deploys are on Thursdays")).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 });

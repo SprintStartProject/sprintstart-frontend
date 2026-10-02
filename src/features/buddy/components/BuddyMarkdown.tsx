@@ -1,3 +1,4 @@
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -20,8 +21,14 @@ import remarkGfm from "remark-gfm";
  *
  * `break-words` is safe to put on every `code`: inside a `pre` the whitespace is preserved and no
  * wrapping is allowed at all, so it applies to inline code only and code blocks still scroll.
+ *
+ * Memoised on `content`: parsing Markdown is the single most expensive thing a reply does, and a
+ * reply's text never changes once written — so a render that did not change the text (a keystroke
+ * that reaches a parent, a token that belongs to a different row) skips the whole parse. The
+ * memoised row above this is the first line of defence; this is the second, for the renders that
+ * legitimately re-render the message (a later token in the same reply re-parses only that reply).
  */
-export function BuddyMarkdown({ content }: { content: string }) {
+function BuddyMarkdownImpl({ content }: { content: string }) {
   return (
     <div className="min-w-0 space-y-2 break-words [&_a]:break-words [&_a]:underline [&_code]:rounded [&_code]:bg-app-surface [&_code]:px-1 [&_code]:py-0.5 [&_code]:break-words [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:max-w-full [&_pre]:min-w-0 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-app-surface [&_pre]:p-3 [&_ul]:list-disc [&_ul]:pl-5">
       <ReactMarkdown
@@ -54,3 +61,5 @@ export function BuddyMarkdown({ content }: { content: string }) {
     </div>
   );
 }
+
+export const BuddyMarkdown = memo(BuddyMarkdownImpl);

@@ -192,7 +192,11 @@ export function SidePanel({
       <motion.div
         ref={panelRef}
         role="dialog"
-        aria-modal="true"
+        // Only while it is actually open. A closed panel is kept mounted so its backdrop can
+        // fade, and calling it `aria-modal` then would tell the shortcuts layer that an
+        // overlay owns the keyboard — on the Board, where one lives for the whole visit,
+        // every chord would go silent.
+        aria-modal={isOpen ? "true" : undefined}
         // A sideways flick inside a panel is a flick inside a panel. Without this it reached the
         // page underneath, where it switches tabs -- behind an overlay the person is reading.
         {...{ [SWIPE_IGNORE_ATTRIBUTE]: "" }}
