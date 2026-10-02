@@ -325,10 +325,10 @@ The order of Tailwind classes drifted as well.
 - One reformat of the **whole repo** (`25f0bb6d`), not just `src/` and `tests/`,
   because `format:check` checks everything. It only moved line breaks and quotes and
   sorted classes; the single change in content was a pair of parentheses around a
-  multi-line `return` in `public/easter-eggs/2048.html`.
-  [`.git-blame-ignore-revs`](../.git-blame-ignore-revs) has an entry prepared for
-  it, but only with a placeholder instead of the commit id, so `git blame` does not
-  skip it yet.
+  multi-line `return` in `public/easter-eggs/2048.html`. The commit is listed in
+  [`.git-blame-ignore-revs`](../.git-blame-ignore-revs), together with the later
+  formatting-only fixes, so `git blame` skips them once the file is enabled per clone
+  (see the coding standards §10).
 
 ---
 

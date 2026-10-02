@@ -84,8 +84,11 @@ in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
   );
   ```
 
-  The only default exports are the ones a tool requires: Storybook's `meta` in
-  `*.stories.tsx` and config files such as `vite.config.ts` and `eslint.config.js`.
+  Default exports are left only where a tool requires them: Storybook's `meta` in
+  `*.stories.tsx`, config files such as `vite.config.ts` and `eslint.config.js`, and
+  the Keycloakify pages that `keycloakify sync-extensions` generates. Two older
+  modules still default-export and should not be copied: `App.tsx` and
+  `config/keycloak.ts`.
 
 - **Keep components focused.** Extract hooks for non-trivial logic/state.
 

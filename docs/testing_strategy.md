@@ -128,14 +128,13 @@ Loaded once before all tests. Sets up:
    `afterEach → server.resetHandlers`, `afterAll → server.close`
 5. **Keycloak JS mock** — `vi.mock('keycloak-js', ...)` returns a controllable
    singleton (`mockKeycloakInstance`) with stubbed `init`/`login`/`logout`/`updateToken`
-6. **`@keycloakify/react` mock** — `useKeycloak()` returns a stubbed authenticated state
-7. **React Router passthrough** — `react-router-dom` and `react-router` are mocked
+6. **React Router passthrough** — `react-router-dom` and `react-router` are mocked
    with their real exports, nothing is replaced (so `MemoryRouter` etc. work in tests)
-8. **Framer Motion mock** — `motion` is a proxy that renders any `motion.<tag>` as a
+7. **Framer Motion mock** — `motion` is a proxy that renders any `motion.<tag>` as a
    plain element of that tag and drops motion-only props (a `layoutId` is kept as
    `data-layout-id`). `AnimatePresence` passes its children through. Prevents layout
    timeouts and layout clipping in jsdom.
-9. **Browser polyfills** — `ResizeObserver`, `IntersectionObserver`, `matchMedia`
+8. **Browser polyfills** — `ResizeObserver`, `IntersectionObserver`, `matchMedia`
    (always `matches: false`; use `mockViewport()` from `matchMedia.ts` for desktop
    layouts), `HTMLElement.prototype.scrollIntoView`, and the layout methods of
    `Range` (jsdom doesn't implement these)
@@ -213,8 +212,10 @@ both have to be running (see the README).
 | `skillsMock.json`       | `getSkills`, `reactivateSkill`, `createSkill`, `deleteSkill`, `deleteProjectRole`                                                        |
 
 These functions fall back to the fixtures when the backend request fails.
-Functions that must not invent data, such as `getTeamOverviewOrThrow`, do not
-fall back.
+`hasCompletedSkillAssessment` and `saveUserSkillAssessments` fall back the same way,
+but to an in-memory list of assessments that starts empty, not to a fixture. In all
+of these cases the caller cannot tell the fallback from a success. Functions that
+must not invent data, such as `getTeamOverviewOrThrow`, do not fall back.
 
 ### In tests
 
