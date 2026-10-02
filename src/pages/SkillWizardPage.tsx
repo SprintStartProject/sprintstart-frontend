@@ -14,6 +14,14 @@ import type { Skill, TeamOverviewUser } from "../features/team-management/types"
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 
+/**
+ * The signed-in user's skill self-assessment for the skills linked to their project roles.
+ *
+ * Bound to `/skill-wizard`, the one route `AuthGuard` never redirects away from because
+ * of a missing assessment; it sends users here instead. Closing marks the prompt as
+ * dismissed and submitting marks it as completed, both in `localStorage` per user, so the
+ * guard stops redirecting. Either way the user continues to `/onboarding`.
+ */
 export function SkillWizardPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
