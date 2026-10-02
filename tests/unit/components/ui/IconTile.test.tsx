@@ -32,6 +32,23 @@ describe("IconTile", () => {
     expect(tile).toHaveClass("text-white");
   });
 
+  it("maps the soft tones to their background and text tokens", () => {
+    const tones: Partial<Record<IconTileTone, string[]>> = {
+      brand: ["bg-app-brand-soft", "text-app-brand-text"],
+      cyan: ["bg-app-cyan-bg", "text-app-cyan-text"],
+      success: ["bg-app-success-bg", "text-app-success-text"],
+      danger: ["bg-app-danger-bg", "text-app-danger-text"],
+      muted: ["bg-app-surface-muted", "text-app-text-muted"],
+    };
+
+    for (const [tone, expected] of Object.entries(tones)) {
+      const view = render(<IconTile icon={Users} tone={tone as IconTileTone} />);
+
+      expect(getTile(view.container)).toHaveClass(...expected);
+      view.unmount();
+    }
+  });
+
   it("sets tile and icon classes for every size", () => {
     const sizes: Record<IconTileSize, { tile: string[]; icon: string[] }> = {
       sm: { tile: ["h-7", "w-7", "rounded-lg"], icon: ["h-3.5", "w-3.5"] },

@@ -79,7 +79,7 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         {selectedProject ? (
           <span
             aria-hidden="true"
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-xs font-semibold ${monogramTint(selectedProject.id)}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${monogramTint(selectedProject.id)}`}
           >
             {monogramLetters(selectedProject.name)}
           </span>

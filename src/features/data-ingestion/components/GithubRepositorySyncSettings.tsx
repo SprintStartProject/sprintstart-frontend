@@ -285,7 +285,7 @@ export function GithubRepositorySyncSettings({
           fields below it. */}
       <div className="flex items-center justify-between gap-4 rounded-2xl border border-app-border bg-app-surface-muted p-4">
         <div className="flex min-w-0 items-start gap-3">
-          <IconTile icon={RefreshCw} size="lg" tone="brand" />
+          <IconTile icon={RefreshCw} size="lg" tone="neutral" />
 
           <div className="min-w-0">
             <p className="text-sm font-semibold text-app-text">Auto update</p>
