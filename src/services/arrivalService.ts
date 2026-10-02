@@ -83,6 +83,10 @@ export const arrivalService = {
     });
   },
 
+  /**
+   * Changes a step definition. Only the fields present in `request` change; `key` is the
+   * step's identity and cannot be renamed. Omit `projectId` for the company-wide list.
+   */
   async updateStep(
     key: string,
     request: UpdateArrivalStepRequest,
