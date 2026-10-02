@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { axe } from "vitest-axe";
 import { ArrivalSection } from "../../../src/features/arrival/components/ArrivalSection";
@@ -79,5 +79,22 @@ describe("ArrivalSection Accessibility", () => {
     });
 
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("should not have any a11y violations in the add-step modal", async () => {
+    render(<ArrivalSection />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add step" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByRole("button", { name: /Add your GitHub username/ });
+
+    // The suggestions first, with one picked so the pressed state is part of the scan...
+    fireEvent.click(within(dialog).getByRole("button", { name: /Add your GitHub username/ }));
+    expect(await axe(dialog)).toHaveNoViolations();
+
+    // ...then the custom form behind "Custom".
+    fireEvent.click(within(dialog).getByRole("button", { name: /^Custom/ }));
+    await within(dialog).findByPlaceholderText("Request VPN access");
+    expect(await axe(dialog)).toHaveNoViolations();
   });
 });
