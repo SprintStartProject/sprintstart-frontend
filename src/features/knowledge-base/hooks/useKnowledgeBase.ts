@@ -362,7 +362,8 @@ export function useKnowledgeBase(
   }, [facetsData?.repositories]);
 
   const repositoryOptions = useMemo<FacetOption<string>[]>(() => {
-    if (!selectedSources.has("GITHUB")) return [];
+    // Repositories belong to the git providers; the facet shows while either is selected.
+    if (!selectedSources.has("GITHUB") && !selectedSources.has("BITBUCKET")) return [];
     const repos = (facetsData?.repositories ?? []).map((r) => r.value);
     const offered = Array.from(new Set([...repos, ...selectedRepositories])).sort((a, b) =>
       a.localeCompare(b),

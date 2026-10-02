@@ -1,4 +1,5 @@
 import { BookOpen, GitBranch, Plug } from "lucide-react";
+import { BitbucketIcon } from "../../components/icons/BitbucketIcon.tsx";
 import type { ConnectorDto } from "../../services/connectorService.ts";
 import type { ConnectorListItem, ConnectorMeta } from "./types.ts";
 
@@ -11,6 +12,11 @@ const CONNECTOR_META: Record<string, ConnectorMeta> = {
     description:
       "Commits, files, issues and pull request metadata from connected GitHub repositories.",
     icon: GitBranch,
+  },
+  bitbucket: {
+    label: "Bitbucket Repository Connector",
+    description: "Pull requests, files and metadata from connected Bitbucket Cloud repositories.",
+    icon: BitbucketIcon,
   },
   confluence: {
     label: "Confluence Cloud Connector",

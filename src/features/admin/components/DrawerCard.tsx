@@ -1,12 +1,12 @@
 import { motion, useReducedMotion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import type { IconComponent } from "../../../components/icons/types.ts";
 
 type DrawerCardProps = {
   /** Uppercase section label shown in the card header. Omit for a headerless card. */
   label?: string;
-  /** Optional lucide icon rendered in a soft tile beside the label. */
-  icon?: LucideIcon;
+  /** Optional icon (lucide or a brand logo) rendered in a soft tile beside the label. */
+  icon?: IconComponent;
   /** Position in the body stack, so cards reveal in sequence when the drawer opens. */
   index?: number;
   /** Optional trailing content in the header row (counts, actions). */

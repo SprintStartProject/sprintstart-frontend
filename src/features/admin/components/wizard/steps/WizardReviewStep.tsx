@@ -1,5 +1,6 @@
 import { ArrowRightLeft, GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
+import { BitbucketIcon } from "../../../../../components/icons/BitbucketIcon";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
 import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
 import type { DraftSource, DraftSourceType } from "../../../projectSourcesDraft";
@@ -35,6 +36,7 @@ const typeIcons: Record<DraftSourceType, ComponentType<{ className?: string }>> 
   JIRA: Ticket,
   UPLOAD: FileText,
   CONFLUENCE: BookOpen,
+  BITBUCKET: BitbucketIcon,
 };
 
 const typeLabels: Record<DraftSourceType, string> = {
@@ -42,10 +44,14 @@ const typeLabels: Record<DraftSourceType, string> = {
   JIRA: "Jira",
   UPLOAD: "Upload",
   CONFLUENCE: "Confluence",
+  BITBUCKET: "Bitbucket",
 };
 
 function sourceTitle(source: DraftSource): string {
-  return source.type === "GITHUB" ? `${source.owner}/${source.name}` : source.displayName;
+  if (source.type === "GITHUB") return `${source.owner}/${source.name}`;
+  if (source.type === "BITBUCKET") return `${source.workspace}/${source.slug}`;
+
+  return source.displayName;
 }
 
 function PersonChip({ person, suffix }: { person: ReviewPerson; suffix?: string }) {

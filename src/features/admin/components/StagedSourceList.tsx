@@ -9,6 +9,7 @@ import {
   Trash2,
   Ticket,
 } from "lucide-react";
+import { BitbucketIcon } from "../../../components/icons/BitbucketIcon";
 import { Button } from "../../../components/ui/Button";
 import { FilterSelect } from "../../../components/ui/FilterSelect";
 import { NO_OWNER_OPTION, type SourceOwnerOption } from "../sourceOwners";
@@ -60,6 +61,10 @@ function TypeIcon({ source }: { source: DraftSource }) {
     return <BookOpen className="h-4 w-4 text-app-text-muted" />;
   }
 
+  if (source.type === "BITBUCKET") {
+    return <BitbucketIcon className="h-4 w-4 text-app-text-muted" />;
+  }
+
   return <GitBranch className="h-4 w-4 text-app-text-muted" />;
 }
 
@@ -82,6 +87,7 @@ function StatusIcon({ source }: { source: DraftSource }) {
 /** Primary line: the human name of the source, by type. */
 function sourceTitle(source: DraftSource): string {
   if (source.type === "GITHUB") return `${source.owner}/${source.name}`;
+  if (source.type === "BITBUCKET") return `${source.workspace}/${source.slug}`;
 
   return source.displayName;
 }
@@ -89,7 +95,7 @@ function sourceTitle(source: DraftSource): string {
 /**
  * Secondary line shown when the source is not in a failed state: the instance
  * URL for Jira, the staged file count for an upload, or the credential for a
- * GitHub repository.
+ * GitHub or Bitbucket repository.
  */
 function sourceDetail(source: DraftSource): string {
   if (source.type === "UPLOAD") {
@@ -104,12 +110,16 @@ function sourceDetail(source: DraftSource): string {
     return `${source.baseUrl} (${source.spaceId})`;
   }
 
+  if (source.type === "BITBUCKET") {
+    return source.credentialName;
+  }
+
   return source.tokenName;
 }
 
 /**
- * The status line under the title. A staged GitHub repository that is already
- * ingested elsewhere is linked rather than fetched, so "Not connected yet" would
+ * The status line under the title. A staged GitHub or Bitbucket repository that
+ * is already ingested elsewhere is linked rather than fetched, so "Not connected yet" would
  * misdescribe it — it says so instead, before and after the run.
  *
  * Saying so afterwards matters as much as before: a linked source finishes
@@ -118,7 +128,11 @@ function sourceDetail(source: DraftSource): string {
  * worked at all.
  */
 function statusDescription(source: DraftSource): string {
-  if (source.status === "pending" && source.type === "GITHUB" && source.repositoryId) {
+  if (
+    source.status === "pending" &&
+    (source.type === "GITHUB" || source.type === "BITBUCKET") &&
+    source.repositoryId
+  ) {
     return "Already ingested, will be linked";
   }
 

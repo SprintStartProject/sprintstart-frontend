@@ -15,6 +15,7 @@ import {
   Ticket,
   Upload,
 } from "lucide-react";
+import { BitbucketIcon } from "../../../components/icons/BitbucketIcon";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Select } from "../../../components/ui/Select.tsx";
@@ -66,10 +67,10 @@ export interface ArtifactFiltersProps {
    */
   formatOptions: FacetOption<UploadFormat>[];
   /**
-   * Repositories behind the project's GitHub artifacts, with counts. Empty
-   * unless GitHub is part of the source selection — the facet describes GitHub
-   * only, so the section disappears with it and the hook owns that rule rather
-   * than the toolbar re-deriving it.
+   * Repositories behind the project's GitHub and Bitbucket artifacts, with
+   * counts. Empty unless one of them is part of the source selection — the facet
+   * describes the git providers only, so the section disappears with them and the
+   * hook owns that rule rather than the toolbar re-deriving it.
    */
   repositoryOptions: FacetOption<string>[];
   selectedSources: ReadonlySet<SourceSystem>;
@@ -124,6 +125,7 @@ const SOURCE_ICONS: Record<SourceSystem, ReactNode> = {
   GITHUB: <GitBranch className={ICON_CLASS} aria-hidden="true" />,
   JIRA: <Ticket className={ICON_CLASS} aria-hidden="true" />,
   CONFLUENCE: <BookOpen className={ICON_CLASS} aria-hidden="true" />,
+  BITBUCKET: <BitbucketIcon className={ICON_CLASS} aria-hidden="true" />,
   UPLOAD: <Upload className={ICON_CLASS} aria-hidden="true" />,
 };
 

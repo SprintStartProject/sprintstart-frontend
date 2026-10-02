@@ -96,7 +96,7 @@ export interface KnowledgeBaseUrlState {
   /** Search text exactly as written to `?q=`; trimming is the request builder's job. */
   search: string;
   sources: ReadonlySet<SourceSystem>;
-  /** Only ever non-empty while GitHub is among `sources` — see {@link parseKnowledgeBaseSearch}. */
+  /** Only ever non-empty while GitHub or Bitbucket is among `sources` — see {@link parseKnowledgeBaseSearch}. */
   repositories: ReadonlySet<string>;
   /** Only ever non-null while Uploads is among `sources` — see {@link parseKnowledgeBaseSearch}. */
   format: UploadFormat | null;
@@ -166,7 +166,7 @@ function readPositiveInt(raw: string | null, fallback: number, max: number): num
  * because people type URLs by hand.
  *
  * The two dependent facets keep the invariant the toggles enforce: a `format` only counts while
- * Uploads is selected and `repos` only while GitHub is. Otherwise a shared link could carry a
+ * Uploads is selected and `repos` only while GitHub or Bitbucket is. Otherwise a shared link could carry a
  * filter the panel does not even show — narrowing the list with no visible way to undo it.
  *
  * @param params The current `location.search`, parsed.
@@ -186,7 +186,10 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
   const format =
     sources.has("UPLOAD") && FORMAT_VALUES.has(rawFormat) ? (rawFormat as UploadFormat) : null;
 
-  const repositoryList = sources.has("GITHUB") ? readList(params, KB_URL_PARAM.repositories) : [];
+  const repositoryList =
+    sources.has("GITHUB") || sources.has("BITBUCKET")
+      ? readList(params, KB_URL_PARAM.repositories)
+      : [];
   const repositories: ReadonlySet<string> =
     repositoryList.length > 0 ? new Set(repositoryList) : NO_STRINGS;
 
@@ -415,7 +418,15 @@ export function useKnowledgeBaseUrlState(
         const isRemoving = toggleInList(params, KB_URL_PARAM.sources, source);
         // The dependent facets describe one source each; they go when their source goes.
         if (isRemoving && source === "UPLOAD") params.delete(KB_URL_PARAM.format);
-        if (isRemoving && source === "GITHUB") params.delete(KB_URL_PARAM.repositories);
+        // Repositories belong to GitHub and Bitbucket together, so they go once neither is left.
+        if (isRemoving && (source === "GITHUB" || source === "BITBUCKET")) {
+          const remaining = readList(params, KB_URL_PARAM.sources).map((value) =>
+            value.toUpperCase(),
+          );
+          if (!remaining.includes("GITHUB") && !remaining.includes("BITBUCKET")) {
+            params.delete(KB_URL_PARAM.repositories);
+          }
+        }
         params.delete(KB_URL_PARAM.page);
       }, "push"),
     [commit],

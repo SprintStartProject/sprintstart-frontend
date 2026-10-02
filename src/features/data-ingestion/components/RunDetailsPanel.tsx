@@ -174,10 +174,10 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
 
 /**
  * The connector-specific origin of a run, shown next to the repository in the
- * details panel: the GitHub owner (from `run.owner`, falling back to the first
- * segment of `"owner/name"`) or the Jira instance domain (from the instance URL
- * in `run.sourceId`). Both are already carried on the run, so no extra fetch is
- * needed. Returns null for uploads and runs with no attributable origin.
+ * details panel: the GitHub owner or Bitbucket workspace (from `run.owner`,
+ * falling back to the first segment of `"owner/name"`) or the Jira instance
+ * domain (from the instance URL in `run.sourceId`). All are already carried on
+ * the run, so no extra fetch is needed. Returns null for uploads and runs with no attributable origin.
  */
 function buildOriginRow(run: IngestionRun): { label: string; value: string } | null {
   if (run.sourceSystem === "JIRA") {
@@ -187,6 +187,11 @@ function buildOriginRow(run: IngestionRun): { label: string; value: string } | n
   if (run.sourceSystem === "GITHUB") {
     const owner = run.owner ?? run.sourceId?.split("/")[0] ?? null;
     return owner ? { label: "Owner", value: owner } : null;
+  }
+
+  if (run.sourceSystem === "BITBUCKET") {
+    const workspace = run.owner ?? run.sourceId?.split("/")[0] ?? null;
+    return workspace ? { label: "Workspace", value: workspace } : null;
   }
 
   if (run.sourceSystem === "CONFLUENCE") {

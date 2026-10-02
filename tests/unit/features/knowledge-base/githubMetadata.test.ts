@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getArtifactRepository,
   matchesRepository,
+  parseBitbucketMetadata,
   parseGithubMetadata,
 } from "../../../../src/features/knowledge-base/githubMetadata";
 import type { Artifact } from "../../../../src/features/knowledge-base/types";
@@ -199,6 +200,136 @@ describe("matchesRepository", () => {
       matchesRepository(
         { sourceSystem: "GITHUB", artifactType: "ORG_METADATA", metadata: orgProfile },
         new Set(["SprintStart/sprintstart-backend"]),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("parseBitbucketMetadata", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("parses the backend shape with repositoryId, workspace and slug", () => {
+    const parsed = parseBitbucketMetadata(
+      JSON.stringify({ repositoryId: "bb-1", workspace: "acme", slug: "widgets" }),
+    );
+
+    expect(parsed).toEqual({ repositoryId: "bb-1", workspace: "acme", slug: "widgets" });
+  });
+
+  it("accepts a workspace profile that names no slug", () => {
+    const parsed = parseBitbucketMetadata(
+      JSON.stringify({ workspace: "acme", uuid: "{1}", name: "Acme", members: [] }),
+    );
+
+    expect(parsed?.workspace).toBe("acme");
+    expect(parsed?.slug).toBeUndefined();
+  });
+
+  it("trims the names and drops a blank slug or non-string repositoryId", () => {
+    const parsed = parseBitbucketMetadata(
+      JSON.stringify({ repositoryId: 7, workspace: "  acme ", slug: "   " }),
+    );
+
+    expect(parsed).toEqual({ repositoryId: undefined, workspace: "acme", slug: undefined });
+  });
+
+  it("returns null for missing, malformed or workspace-less metadata", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    expect(parseBitbucketMetadata(undefined)).toBeNull();
+    expect(parseBitbucketMetadata("")).toBeNull();
+    expect(parseBitbucketMetadata("{not json")).toBeNull();
+    expect(parseBitbucketMetadata("[1]")).toBeNull();
+    expect(parseBitbucketMetadata(JSON.stringify({ slug: "widgets" }))).toBeNull();
+    expect(parseBitbucketMetadata(JSON.stringify({ workspace: " " }))).toBeNull();
+  });
+
+  it("names Bitbucket in the malformed-metadata warning", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    parseBitbucketMetadata("{not json");
+
+    expect(warn).toHaveBeenCalledWith(
+      "Ignoring unparseable Bitbucket artifact metadata",
+      "{not json",
+    );
+  });
+});
+
+describe("getArtifactRepository for Bitbucket", () => {
+  const repoMetadata = JSON.stringify({ repositoryId: "bb-1", workspace: "acme", slug: "widgets" });
+
+  it("resolves workspace/slug for a repository artifact", () => {
+    expect(
+      getArtifactRepository({
+        sourceSystem: "BITBUCKET",
+        artifactType: "PULL_REQUEST",
+        metadata: repoMetadata,
+      }),
+    ).toBe("acme/widgets");
+  });
+
+  it("returns null for the workspace profile and for unusable metadata", () => {
+    expect(
+      getArtifactRepository({
+        sourceSystem: "BITBUCKET",
+        artifactType: "ORG_METADATA",
+        metadata: JSON.stringify({ workspace: "acme", members: [] }),
+      }),
+    ).toBeNull();
+    expect(
+      getArtifactRepository({ sourceSystem: "BITBUCKET", artifactType: "FILE", metadata: "" }),
+    ).toBeNull();
+  });
+
+  it("does not read GitHub's repositoryFullName from a Bitbucket artifact", () => {
+    expect(
+      getArtifactRepository({
+        sourceSystem: "BITBUCKET",
+        artifactType: "FILE",
+        metadata: JSON.stringify({ repositoryFullName: "acme/widgets" }),
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("matchesRepository for Bitbucket", () => {
+  const artifact = (
+    slug: string,
+  ): Pick<Artifact, "sourceSystem" | "artifactType" | "metadata"> => ({
+    sourceSystem: "BITBUCKET",
+    artifactType: "FILE",
+    metadata: JSON.stringify({ repositoryId: "bb-1", workspace: "acme", slug }),
+  });
+  const workspaceProfile = (
+    workspace: string,
+  ): Pick<Artifact, "sourceSystem" | "artifactType" | "metadata"> => ({
+    sourceSystem: "BITBUCKET",
+    artifactType: "ORG_METADATA",
+    metadata: JSON.stringify({ workspace, members: [] }),
+  });
+
+  it("narrows Bitbucket repository artifacts to the selected repositories", () => {
+    expect(matchesRepository(artifact("widgets"), new Set(["acme/widgets"]))).toBe(true);
+    expect(matchesRepository(artifact("gadgets"), new Set(["acme/widgets"]))).toBe(false);
+  });
+
+  it("matches everything while nothing is selected", () => {
+    expect(matchesRepository(artifact("widgets"), new Set())).toBe(true);
+  });
+
+  it("shows the workspace profile when its workspace owns a chosen repository, case-insensitively", () => {
+    expect(matchesRepository(workspaceProfile("ACME"), new Set(["acme/widgets"]))).toBe(true);
+    expect(matchesRepository(workspaceProfile("other"), new Set(["acme/widgets"]))).toBe(false);
+  });
+
+  it("still lets other sources through", () => {
+    expect(
+      matchesRepository(
+        { sourceSystem: "UPLOAD", artifactType: "FILE", metadata: "" },
+        new Set(["acme/widgets"]),
       ),
     ).toBe(true);
   });

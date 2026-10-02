@@ -48,7 +48,12 @@ function deriveArtifactFromCitation(citation: CitationArtifactOpen): Artifact {
   const name = citation.filename.toLowerCase();
 
   let artifactType: ArtifactType = "FILE";
-  if (url.includes("/pull/") || name.startsWith("pr #") || name.startsWith("pull request")) {
+  if (
+    url.includes("/pull/") ||
+    url.includes("/pull-requests/") ||
+    name.startsWith("pr #") ||
+    name.startsWith("pull request")
+  ) {
     artifactType = "PULL_REQUEST";
   } else if (
     url.includes("/issues/") ||
@@ -60,7 +65,13 @@ function deriveArtifactFromCitation(citation: CitationArtifactOpen): Artifact {
   }
 
   let sourceSystem: SourceSystem = "GITHUB";
-  if (url.includes("atlassian.net") || url.includes("/browse/") || name.startsWith("jira #")) {
+  if (url.includes("bitbucket.org")) {
+    sourceSystem = "BITBUCKET";
+  } else if (
+    url.includes("atlassian.net") ||
+    url.includes("/browse/") ||
+    name.startsWith("jira #")
+  ) {
     sourceSystem = "JIRA";
   }
 

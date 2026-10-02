@@ -29,6 +29,7 @@ import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import {
   buildRunSourceLabels,
+  createBitbucketSourceFromInstance,
   createConfluenceSourceFromConnection,
   createConfluenceSourceFromInstance,
   createJiraSourceFromInstance,
@@ -45,6 +46,7 @@ import {
 } from "../features/data-ingestion/data.ts";
 import type {
   BackendProjectSourceStatus,
+  BitbucketRepositoryDetails,
   DataSource,
   GithubRepositoryDetails,
   IngestionRun,
@@ -62,6 +64,13 @@ import { getIngestionRunsPage, getIngestionSourceStatuses } from "../services/in
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
+import {
+  configureAllBitbucketRepositories,
+  configureBitbucketRepository,
+  getBitbucketRepositoryConfig,
+  removeBitbucketRepositoryFromProject,
+  updateBitbucketRepository,
+} from "../services/sources/bitbucketService.ts";
 import {
   configureAllGithubRepositories,
   configureGithubRepository,
@@ -103,23 +112,44 @@ const DEFAULT_GLOBAL_CONFLUENCE_SYNC_CONFIG: ConfigureGithubRepositoryRequest = 
   schedule: { type: "INTERVAL", everyMinutes: 60 },
 };
 
-type SyncSettingsProvider = "github" | "jira" | "confluence";
+const DEFAULT_GLOBAL_BITBUCKET_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
+  autoUpdate: true,
+  schedule: { type: "INTERVAL", everyMinutes: 60 },
+};
+
+type SyncSettingsProvider = "github" | "bitbucket" | "jira" | "confluence";
 
 /**
- * Wording for the global sync-settings modal, per connector. `one` and `many`
+ * Wording for the global sync-settings modal, per connector. `autoUpdateOff`
+ * overrides the default "only mark out of date" line for a connector whose
+ * scheduler does nothing at all while auto update is off. `one` and `many`
  * name the connector's sources so the copy reads naturally in both the
  * "overwrites every connected …" and the "updates all connected …" sentences.
  */
 const SYNC_SETTINGS_COPY: Record<
   SyncSettingsProvider,
-  { label: string; one: string; many: string }
+  { label: string; one: string; many: string; autoUpdateOff?: string }
 > = {
   github: { label: "GitHub", one: "GitHub repository", many: "GitHub repositories" },
+  bitbucket: {
+    label: "Bitbucket",
+    one: "Bitbucket repository",
+    many: "Bitbucket repositories",
+    // The Bitbucket scheduler skips a repository with auto update off instead of
+    // marking it out of date.
+    autoUpdateOff:
+      "Due checks skip connected Bitbucket repositories. They only update when started manually.",
+  },
   jira: { label: "Jira", one: "Jira instance", many: "Jira instances" },
   confluence: { label: "Confluence", one: "Confluence space", many: "Confluence spaces" },
 };
 
-const SYNC_SETTINGS_PROVIDER_ORDER: SyncSettingsProvider[] = ["github", "jira", "confluence"];
+const SYNC_SETTINGS_PROVIDER_ORDER: SyncSettingsProvider[] = [
+  "github",
+  "bitbucket",
+  "jira",
+  "confluence",
+];
 
 // Small enough that the run table stays scannable and pagination is actually
 // reachable rather than a single page of rows.
@@ -145,8 +175,8 @@ const DEFAULT_RUN_FILTER: RunFilterState = {
 
 /**
  * A source offered in the run-history filter. `value` is the GitHub repository
- * id, Jira instance URL, or Confluence space id; `sourceSystem` decides which
- * query param it maps to (repositoryId vs. sourceRef).
+ * id (also used for Bitbucket and Confluence), or Jira instance URL;
+ * `sourceSystem` decides which query param it maps to (repositoryId vs. sourceRef).
  */
 type RunSourceFilterOption = {
   value: string;
@@ -161,7 +191,8 @@ function toSourceSystem(value: string): SourceSystem | null {
     normalized === "GITHUB" ||
     normalized === "JIRA" ||
     normalized === "UPLOAD" ||
-    normalized === "CONFLUENCE"
+    normalized === "CONFLUENCE" ||
+    normalized === "BITBUCKET"
   ) {
     return normalized;
   }
@@ -268,8 +299,11 @@ function buildProjectDataSources(
     const sourceSystem = toSourceSystem(projectSource.type);
     if (!sourceSystem) return [];
 
-    // Jira and Confluence cards are built solely from the connector-neutral status rows.
-    if (sourceSystem === "JIRA" || sourceSystem === "CONFLUENCE") return [];
+    // Jira, Confluence and Bitbucket cards are built solely from the connector-neutral
+    // status rows; a project source of these types must not add a second, fallback card.
+    if (sourceSystem === "JIRA" || sourceSystem === "CONFLUENCE" || sourceSystem === "BITBUCKET") {
+      return [];
+    }
     // Skip UPLOAD only when an authoritative status row already exists so the card
     // does not vanish when artifact count is 0 or when run status fallback is needed.
     if (sourceSystem === "UPLOAD" && sourceInstances.some((s) => s.sourceSystem === "UPLOAD")) {
@@ -481,6 +515,8 @@ export function DataIngestionPage() {
   const [isSyncSettingsModalOpen, setIsSyncSettingsModalOpen] = useState(false);
   const [globalGithubSyncConfig, setGlobalGithubSyncConfig] =
     useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG);
+  const [globalBitbucketSyncConfig, setGlobalBitbucketSyncConfig] =
+    useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_BITBUCKET_SYNC_CONFIG);
   const [globalJiraSyncConfig, setGlobalJiraSyncConfig] =
     useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_JIRA_SYNC_CONFIG);
   const [globalConfluenceSyncConfig, setGlobalConfluenceSyncConfig] =
@@ -634,11 +670,14 @@ export function DataIngestionPage() {
         page,
         size: RUN_PAGE_SIZE,
         projectId: selectedProjectId || undefined,
-        // GitHub and Confluence scope by repositoryId (filtering on backend sourceInstanceId UUID);
-        // Jira scopes by the run's sourceInstanceRef via sourceRef (instance URL).
+        // GitHub, Bitbucket and Confluence scope by repositoryId (filtering on backend
+        // sourceInstanceId UUID); Jira scopes by the run's sourceInstanceRef via
+        // sourceRef (instance URL).
         repositoryId:
           hasSource &&
-          (runFilter.sourceSystem === "GITHUB" || runFilter.sourceSystem === "CONFLUENCE")
+          (runFilter.sourceSystem === "GITHUB" ||
+            runFilter.sourceSystem === "BITBUCKET" ||
+            runFilter.sourceSystem === "CONFLUENCE")
             ? runFilter.sourceValue
             : undefined,
         sourceRef:
@@ -820,11 +859,25 @@ export function DataIngestionPage() {
       );
     });
 
+    // Bitbucket cards come from the status rows alone, like Jira: every field the
+    // card and drawer show is on the row.
+    const bitbucketSources = sourceInstances
+      .filter((status) => status.sourceSystem === "BITBUCKET")
+      .map((status) =>
+        createBitbucketSourceFromInstance(status, connectorEnabledById.get("bitbucket")),
+      );
+
     const uploadSources = sourceInstances
       .filter((status) => status.sourceSystem === "UPLOAD")
       .map((status) => createUploadSourceFromInstance(status));
 
-    return [...githubAndUpload, ...jiraSources, ...confluenceSources, ...uploadSources];
+    return [
+      ...githubAndUpload,
+      ...bitbucketSources,
+      ...jiraSources,
+      ...confluenceSources,
+      ...uploadSources,
+    ];
   }, [
     confluenceConnections,
     connectorEnabledById,
@@ -877,6 +930,7 @@ export function DataIngestionPage() {
     [sources],
   );
   const hasGithubSources = visibleSourceSystems.has("GITHUB");
+  const hasBitbucketSources = visibleSourceSystems.has("BITBUCKET");
   const hasJiraSources = visibleSourceSystems.has("JIRA");
   const hasConfluenceSources = visibleSourceSystems.has("CONFLUENCE");
   // The connectors whose global sync policy can be edited right now: one tab per
@@ -884,6 +938,7 @@ export function DataIngestionPage() {
   const syncSettingsProviders = useMemo<SegmentedTabOption<SyncSettingsProvider>[]>(() => {
     const hasSources: Record<SyncSettingsProvider, boolean> = {
       github: hasGithubSources,
+      bitbucket: hasBitbucketSources,
       jira: hasJiraSources,
       confluence: hasConfluenceSources,
     };
@@ -891,7 +946,7 @@ export function DataIngestionPage() {
     return SYNC_SETTINGS_PROVIDER_ORDER.filter((provider) => hasSources[provider]).map(
       (provider) => ({ value: provider, label: SYNC_SETTINGS_COPY[provider].label }),
     );
-  }, [hasConfluenceSources, hasGithubSources, hasJiraSources]);
+  }, [hasBitbucketSources, hasConfluenceSources, hasGithubSources, hasJiraSources]);
   const syncSettingsCopy = SYNC_SETTINGS_COPY[syncSettingsProvider];
 
   const sourceHealth = useMemo(() => {
@@ -926,7 +981,7 @@ export function DataIngestionPage() {
   const runSourceLabels = useMemo(() => buildRunSourceLabels(sources), [sources]);
 
   // Sources offered in the run filter, from the project's connected sources: a
-  // GitHub repo filters by its repositoryId, a Jira instance by its URL
+  // GitHub or Bitbucket repo filters by its repositoryId, a Jira instance by its URL
   // (sourceId), which the query maps to sourceRef.
   const runSourceOptions = useMemo<RunSourceFilterOption[]>(
     () =>
@@ -937,6 +992,16 @@ export function DataIngestionPage() {
               value: source.githubRepository.repositoryId,
               label: source.name,
               sourceSystem: "GITHUB",
+            },
+          ];
+        }
+
+        if (source.bitbucketRepository?.repositoryId) {
+          return [
+            {
+              value: source.bitbucketRepository.repositoryId,
+              label: source.name,
+              sourceSystem: "BITBUCKET",
             },
           ];
         }
@@ -1131,6 +1196,17 @@ export function DataIngestionPage() {
         return;
       }
 
+      if (source.sourceSystem === "BITBUCKET") {
+        const repositoryId = source.bitbucketRepository?.repositoryId;
+        if (!repositoryId) {
+          throw new Error("Repository details are not available for this source.");
+        }
+
+        await updateBitbucketRepository(repositoryId);
+        refreshAfterUpdate();
+        return;
+      }
+
       if (source.sourceSystem !== "GITHUB" || !source.githubRepository) {
         throw new Error("Repository details are not available for this source.");
       }
@@ -1150,6 +1226,15 @@ export function DataIngestionPage() {
       // reset the selected project (e.g. a slow managed-projects fetch), which
       // makes the page-data effect treat it as a project switch and blank the
       // page. See the note on refreshSourceDetails.
+      await Promise.all([loadData(false), reloadSourceStatuses()]);
+    },
+    [loadData, reloadSourceStatuses],
+  );
+
+  const handleSaveGlobalBitbucketConfig = useCallback(
+    async (request: ConfigureGithubRepositoryRequest) => {
+      await configureAllBitbucketRepositories(request);
+      setGlobalBitbucketSyncConfig(request);
       await Promise.all([loadData(false), reloadSourceStatuses()]);
     },
     [loadData, reloadSourceStatuses],
@@ -1202,10 +1287,16 @@ export function DataIngestionPage() {
   const globalSyncConfigs = useMemo<Record<SyncSettingsProvider, ConfigureGithubRepositoryRequest>>(
     () => ({
       github: globalGithubSyncConfig,
+      bitbucket: globalBitbucketSyncConfig,
       jira: globalJiraSyncConfig,
       confluence: globalConfluenceSyncConfig,
     }),
-    [globalConfluenceSyncConfig, globalGithubSyncConfig, globalJiraSyncConfig],
+    [
+      globalBitbucketSyncConfig,
+      globalConfluenceSyncConfig,
+      globalGithubSyncConfig,
+      globalJiraSyncConfig,
+    ],
   );
 
   const globalSyncSavers: Record<
@@ -1213,6 +1304,7 @@ export function DataIngestionPage() {
     (request: ConfigureGithubRepositoryRequest) => Promise<void>
   > = {
     github: handleSaveGlobalGithubConfig,
+    bitbucket: handleSaveGlobalBitbucketConfig,
     jira: handleSaveGlobalJiraConfig,
     confluence: handleSaveGlobalConfluenceConfig,
   };
@@ -1230,6 +1322,20 @@ export function DataIngestionPage() {
       // No reloadProjects(): see refreshSourceDetails — a per-repo sync-schedule
       // change never alters the project switcher, and reloading it can reset the
       // selected project and blank the page mid-save.
+      await Promise.all([loadData(false), reloadSourceStatuses()]);
+    },
+    [loadData, reloadSourceStatuses],
+  );
+
+  const handleLoadBitbucketRepositoryConfig = useCallback(
+    async (repository: BitbucketRepositoryDetails) =>
+      getBitbucketRepositoryConfig(repository.workspace, repository.slug),
+    [],
+  );
+
+  const handleSaveBitbucketRepositoryConfig = useCallback(
+    async (repository: BitbucketRepositoryDetails, request: ConfigureGithubRepositoryRequest) => {
+      await configureBitbucketRepository(repository, request);
       await Promise.all([loadData(false), reloadSourceStatuses()]);
     },
     [loadData, reloadSourceStatuses],
@@ -1308,6 +1414,18 @@ export function DataIngestionPage() {
     [refreshSourceDetails],
   );
 
+  // Bitbucket repositories go through the same generic connector endpoint, keyed
+  // by `workspace/slug`.
+  const handleSetBitbucketSourceEnabled = useCallback(
+    async (repository: BitbucketRepositoryDetails, enabled: boolean) => {
+      await connectorService.patchConnectorSources("bitbucket", [
+        { sourceId: repository.fullName, enabled },
+      ]);
+      await refreshSourceDetails();
+    },
+    [refreshSourceDetails],
+  );
+
   // Jira instances are gated through the same generic connector endpoint as
   // GitHub: the JiraConnector's patchSource flips `sourceEnabled` and the AI
   // service is notified, keyed by the instance URL.
@@ -1321,7 +1439,7 @@ export function DataIngestionPage() {
 
   // Removes a source's link to the selected project (the DELETE counterpart to
   // linking it via the Add Source flow), keyed per connector: a repository id
-  // for GitHub, the instance URL for Jira, the connection id for Confluence. The
+  // for GitHub and Bitbucket, the instance URL for Jira, the connection id for Confluence. The
   // source and its artifacts are kept; only this project stops using it. Closes
   // the drawer and refreshes the project-scoped lists so the card disappears.
   const handleUnlinkSource = useCallback(
@@ -1346,6 +1464,20 @@ export function DataIngestionPage() {
         }
 
         await confluenceService.deleteConnection(selectedProjectId, connectionId);
+
+        setSelectedSourceId(null);
+        await refreshSourceDetails();
+        return;
+      }
+
+      if (source.sourceSystem === "BITBUCKET") {
+        const bitbucketRepositoryId = source.bitbucketRepository?.repositoryId;
+
+        if (!bitbucketRepositoryId || !selectedProjectId) {
+          throw new Error("This repository cannot be removed from the project.");
+        }
+
+        await removeBitbucketRepositoryFromProject(bitbucketRepositoryId, selectedProjectId);
 
         setSelectedSourceId(null);
         await refreshSourceDetails();
@@ -1605,11 +1737,14 @@ export function DataIngestionPage() {
             canManageSyncSettings={canManageGithubSyncSettings}
             onLoadRepositoryConfig={handleLoadGithubRepositoryConfig}
             onSaveRepositoryConfig={handleSaveGithubRepositoryConfig}
+            onLoadBitbucketConfig={handleLoadBitbucketRepositoryConfig}
+            onSaveBitbucketConfig={handleSaveBitbucketRepositoryConfig}
             onLoadJiraConfig={handleLoadJiraConfig}
             onSaveJiraConfig={handleSaveJiraConfig}
             onLoadConfluenceConfig={handleLoadConfluenceConfig}
             onSaveConfluenceConfig={handleSaveConfluenceConfig}
             onSetSourceEnabled={handleSetSourceEnabled}
+            onSetBitbucketSourceEnabled={handleSetBitbucketSourceEnabled}
             onSetJiraSourceEnabled={handleSetJiraSourceEnabled}
             onUnlinkSource={canIngestIntoSelectedProject ? handleUnlinkSource : undefined}
             onClose={closeSourceDetails}
@@ -1686,7 +1821,10 @@ export function DataIngestionPage() {
           showNextSync={false}
           disclaimer={`Applying global settings overwrites the sync settings of every connected ${syncSettingsCopy.one}.`}
           autoUpdateOnText={`Due checks update all connected ${syncSettingsCopy.many}.`}
-          autoUpdateOffText={`Due checks only mark connected ${syncSettingsCopy.many} out of date.`}
+          autoUpdateOffText={
+            syncSettingsCopy.autoUpdateOff ??
+            `Due checks only mark connected ${syncSettingsCopy.many} out of date.`
+          }
           toggleAriaLabel={`Toggle global ${syncSettingsCopy.label} auto update`}
           saveLabel="Apply globally"
         />

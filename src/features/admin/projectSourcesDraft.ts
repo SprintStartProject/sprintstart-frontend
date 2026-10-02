@@ -2,6 +2,11 @@ import {
   addRepositoryToProject,
   connectGithubRepository,
 } from "../../services/sources/githubService";
+import { ApiError } from "../../services/apiClient";
+import {
+  addBitbucketRepositoryToProject,
+  connectBitbucketRepository,
+} from "../../services/sources/bitbucketService";
 import { connectJiraInstance } from "../../services/sources/jiraService";
 import { confluenceService } from "../../services/sources/confluenceService";
 import { knowledgeGapService } from "../../services/knowledgeGapService";
@@ -16,16 +21,17 @@ import type { DiscoverySelection } from "../data-ingestion/components/GithubRepo
  * outcome so a partial failure can be shown and retried per source instead of
  * failing the whole batch.
  *
- * A source can be one of four kinds — a GitHub repository, a Jira instance,
- * an in-memory file upload, or a Confluence space — modelled as a discriminated
- * union on `type` so a single list can hold a mix of all four. Nothing here
+ * A source can be one of five kinds — a GitHub repository, a Bitbucket
+ * repository, a Jira instance, an in-memory file upload, or a Confluence space —
+ * modelled as a discriminated union on `type` so a single list can hold a mix of
+ * all of them. Nothing here
  * touches the backend until {@link connectDraftSources} runs during
  * provisioning; uploads in particular hold their `File[]` in memory until then.
  */
 
 export type DraftSourceStatus = "pending" | "connecting" | "connected" | "failed";
 
-export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
+export type DraftSourceType = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE" | "BITBUCKET";
 
 /** Fields every staged source carries regardless of its type. */
 type DraftSourceBase = {
@@ -88,6 +94,20 @@ export type GithubDraftSource = DraftSourceBase & {
   repositoryId?: string;
 };
 
+export type BitbucketDraftSource = DraftSourceBase & {
+  type: "BITBUCKET";
+  workspace: string;
+  slug: string;
+  /** Name of a stored Atlassian credential, shared with Jira and Confluence. */
+  credentialName: string;
+  /**
+   * Set when the repository is already ingested elsewhere: connecting then only
+   * links it to the project (reusing its artifacts) instead of fetching and
+   * ingesting it again. Absent for genuinely new repositories.
+   */
+  repositoryId?: string;
+};
+
 export type JiraDraftSource = DraftSourceBase & {
   type: "JIRA";
   displayName: string;
@@ -114,7 +134,11 @@ export type ConfluenceDraftSource = DraftSourceBase & {
 };
 
 export type DraftSource =
-  GithubDraftSource | JiraDraftSource | UploadDraftSource | ConfluenceDraftSource;
+  | GithubDraftSource
+  | BitbucketDraftSource
+  | JiraDraftSource
+  | UploadDraftSource
+  | ConfluenceDraftSource;
 
 let draftSourceCounter = 0;
 
@@ -157,6 +181,44 @@ export function createDraftSourceFromDiscovery(
     selection.owner,
     selection.name,
     tokenName,
+    selection.linkState === "linkable" ? selection.repositoryId : undefined,
+  );
+}
+
+export function createBitbucketDraft(
+  workspace: string,
+  slug: string,
+  credentialName: string,
+  repositoryId?: string,
+): BitbucketDraftSource {
+  return {
+    id: nextDraftSourceId(),
+    type: "BITBUCKET",
+    workspace,
+    slug,
+    credentialName,
+    status: "pending",
+    errorMessage: "",
+    ownerAssignmentFailed: false,
+    wasReused: false,
+    repositoryId,
+  };
+}
+
+/**
+ * Stages a repository picked in the Bitbucket discovery flow. A `linkable`
+ * selection carries the repository id so it can be linked without re-ingesting;
+ * everything else is staged as a new repository to fetch and ingest. The
+ * selection's `owner` is the workspace and its `name` the repository slug.
+ */
+export function createBitbucketDraftFromDiscovery(
+  selection: DiscoverySelection,
+  credentialName: string,
+): BitbucketDraftSource {
+  return createBitbucketDraft(
+    selection.owner,
+    selection.name,
+    credentialName,
     selection.linkState === "linkable" ? selection.repositoryId : undefined,
   );
 }
@@ -226,7 +288,8 @@ export function createConfluenceDraft(params: {
 
 /**
  * Whether two drafts point at the same underlying source, used to dedupe on
- * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL; two
+ * add. Identity is per type: GitHub by `owner/name`, Bitbucket by
+ * `workspace/slug`, Jira by instance URL; two
  * uploads are always distinct (the same file can legitimately be staged twice).
  * Drafts of different types are never the same source.
  */
@@ -237,6 +300,13 @@ export function isSameSource(left: DraftSource, right: DraftSource): boolean {
     return (
       left.owner.toLowerCase() === right.owner.toLowerCase() &&
       left.name.toLowerCase() === right.name.toLowerCase()
+    );
+  }
+
+  if (left.type === "BITBUCKET" && right.type === "BITBUCKET") {
+    return (
+      left.workspace.toLowerCase() === right.workspace.toLowerCase() &&
+      left.slug.toLowerCase() === right.slug.toLowerCase()
     );
   }
 
@@ -429,6 +499,40 @@ async function connectOneDraftSource(
       wasReused,
       ownerAssignmentFailed: await assignStagedOwner(source, projectId),
     };
+  }
+
+  if (source.type === "BITBUCKET") {
+    if (source.repositoryId) {
+      // Already ingested elsewhere: link it to this project, reusing its artifacts.
+      await addBitbucketRepositoryToProject(source.repositoryId, projectId);
+
+      return { wasReused: true, ownerAssignmentFailed: false };
+    }
+
+    try {
+      await connectBitbucketRepository({
+        workspace: source.workspace,
+        slug: source.slug,
+        credentialName: source.credentialName,
+        projectId,
+      });
+    } catch (error) {
+      // A repository Bitbucket cannot find arrives as a 404 whose message names
+      // it. A failed Bitbucket call during the check (a rejected token, an
+      // outage) arrives as a bare 500, so say what the likely cause is instead
+      // of showing the status text.
+      if (error instanceof ApiError && error.status >= 500) {
+        throw new Error(
+          `Couldn't connect ${source.workspace}/${source.slug}. Check that the repository exists and that the selected credential can read it.`,
+        );
+      }
+
+      throw error;
+    }
+
+    // The backend reports no `wasReused` for Bitbucket, so a connect that found
+    // an existing connection cannot be told apart from a fresh one.
+    return NOTHING_EXTRA;
   }
 
   if (source.type === "JIRA") {

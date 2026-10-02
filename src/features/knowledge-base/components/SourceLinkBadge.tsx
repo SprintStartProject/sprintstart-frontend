@@ -8,6 +8,8 @@ function getSourceSystemLabel(sourceSystem: SourceSystem): string {
   switch (sourceSystem) {
     case "GITHUB":
       return "Open in GitHub";
+    case "BITBUCKET":
+      return "Open in Bitbucket";
     case "JIRA":
       return "Open in Jira";
     case "CONFLUENCE":

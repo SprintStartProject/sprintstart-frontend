@@ -36,6 +36,15 @@ describe("useAvailableSources", () => {
     expect([...result.current.sources].sort()).toEqual(["CONFLUENCE", "GITHUB", "JIRA", "UPLOAD"]);
   });
 
+  it("offers Bitbucket once its connector is enabled", async () => {
+    mockListConnectors.mockResolvedValue([connector("github"), connector("bitbucket")]);
+
+    const { result } = renderHook(() => useAvailableSources());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect([...result.current.sources].sort()).toEqual(["BITBUCKET", "GITHUB", "UPLOAD"]);
+  });
+
   it("leaves out a disabled connector and any id the chat has no filter for", async () => {
     mockListConnectors.mockResolvedValue([
       connector("github"),

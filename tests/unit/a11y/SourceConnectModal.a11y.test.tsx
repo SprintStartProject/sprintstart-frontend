@@ -23,6 +23,12 @@ describe("SourceConnectModal Accessibility", () => {
         type: "Space",
         icon: Activity,
       },
+      BITBUCKET: {
+        name: "Bitbucket",
+        description: "Connect to Bitbucket",
+        type: "Repository",
+        icon: Activity,
+      },
     };
     const { baseElement } = render(
       <MemoryRouter>

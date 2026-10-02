@@ -105,6 +105,12 @@ export function SourceList({
                       </p>
                     )}
 
+                    {source.bitbucketRepository?.workspace && (
+                      <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
+                        {source.bitbucketRepository.workspace}
+                      </p>
+                    )}
+
                     {source.jiraInstance?.instanceUrl && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
                         {formatInstanceDomain(source.jiraInstance.instanceUrl)}
