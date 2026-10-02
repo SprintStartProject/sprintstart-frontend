@@ -14,18 +14,23 @@ function renderFilter(range: DateRange = OPEN) {
   return { onRangeChange, ...view };
 }
 
+function pickPreset(name: string) {
+  fireEvent.click(screen.getByTestId("kb-date-preset"));
+  fireEvent.click(screen.getByRole("option", { name }));
+}
+
 describe("ArtifactDateRangeFilter", () => {
   it("resolves a preset to absolute dates when it is picked, and pushes it", () => {
     const { onRangeChange } = renderFilter();
 
-    fireEvent.change(screen.getByTestId("kb-date-preset"), { target: { value: "7d" } });
+    pickPreset("Last 7 days");
 
     expect(onRangeChange).toHaveBeenCalledWith({ from: "2026-09-18", to: "2026-09-24" }, "push");
   });
 
   it("shows the preset a range still equals, and Custom once it does not", () => {
     const { rerender } = renderFilter({ from: "2026-09-18", to: "2026-09-24" });
-    expect(screen.getByTestId("kb-date-preset")).toHaveValue("7d");
+    expect(screen.getByTestId("kb-date-preset")).toHaveTextContent("Last 7 days");
 
     rerender(
       <ArtifactDateRangeFilter
@@ -34,14 +39,14 @@ describe("ArtifactDateRangeFilter", () => {
         now={NOW}
       />,
     );
-    expect(screen.getByTestId("kb-date-preset")).toHaveValue("CUSTOM");
+    expect(screen.getByTestId("kb-date-preset")).toHaveTextContent("Custom range…");
     expect(screen.getByTestId("kb-date-from")).toHaveValue("2026-01-01");
   });
 
   it("reveals two date fields for a custom range and replaces on each edit", () => {
     const { onRangeChange } = renderFilter();
 
-    fireEvent.change(screen.getByTestId("kb-date-preset"), { target: { value: "CUSTOM" } });
+    pickPreset("Custom range…");
     expect(onRangeChange).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText("Updated from"), { target: { value: "2026-09-01" } });
@@ -71,17 +76,17 @@ describe("ArtifactDateRangeFilter", () => {
 
   it("shows no chip and Any time while no range is set", () => {
     renderFilter();
-    expect(screen.getByTestId("kb-date-preset")).toHaveValue("ANY");
+    expect(screen.getByTestId("kb-date-preset")).toHaveTextContent("Any time");
     expect(screen.queryByTestId("kb-date-chip")).not.toBeInTheDocument();
   });
 
   it("goes back to Any time when the range is cleared from outside", () => {
     const { rerender } = renderFilter({ from: "2026-01-01", to: "2026-02-01" });
-    expect(screen.getByTestId("kb-date-preset")).toHaveValue("CUSTOM");
+    expect(screen.getByTestId("kb-date-preset")).toHaveTextContent("Custom range…");
 
     rerender(<ArtifactDateRangeFilter range={OPEN} onRangeChange={vi.fn()} now={NOW} />);
 
-    expect(screen.getByTestId("kb-date-preset")).toHaveValue("ANY");
+    expect(screen.getByTestId("kb-date-preset")).toHaveTextContent("Any time");
     expect(screen.queryByTestId("kb-date-from")).not.toBeInTheDocument();
   });
 });

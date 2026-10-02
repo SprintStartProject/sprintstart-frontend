@@ -143,7 +143,8 @@ readers.
 **Deliberately left as is:** `FilterSelect` and `Select` exist side by side.
 `FilterSelect` rebuilds the popup in React and can look like an app-style dropdown;
 `Select` leaves the popup to the operating system and is accessible and
-touch-friendly for free. Which one to pick is in the TSDoc of `Select`.
+touch-friendly for free. In practice `Select` is used in forms and editors and
+`FilterSelect` in filter bars and toolbars; the TSDoc of `Select` says the same.
 
 **Deliberately hand-written:** composite controls where several elements share one
 border, such as the chat composer (including its date filter fields) and the

@@ -118,6 +118,7 @@ in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
   | ---------------------- | ------------------------------------------ | ----------------------------------------------- |
   | Any action control     | `ui/Button`                                | a hand-styled `<button>` or `<motion.button>`   |
   | Text field / dropdown  | `ui/Input`, `ui/Select`, `ui/Textarea`     | a bare `<input>` / `<select>` / `<textarea>`    |
+  | Filter / sort dropdown | `ui/FilterSelect`                          | a `ui/Select` in a filter bar or toolbar        |
   | Label + hint + error   | `ui/Field`                                 | a `<label>` next to an input, wired by hand     |
   | Status pill            | `ui/Badge`                                 | `rounded-full … px-2 … text-xs` on a `<span>`   |
   | Dialog / drawer        | `ui/Modal`, `ui/SidePanel`                 | a hand-rolled `fixed inset-0` overlay           |
@@ -233,6 +234,10 @@ in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
   `Button`, so a control and a button in the same row are the same height. Use
   `icon` for a leading search/key glyph and `trailing` for an action pinned
   inside the right edge, rather than positioning them absolutely by hand.
+
+  `Select` is the dropdown for forms and editors. Filter and sort dropdowns in
+  toolbars and filter bars are [`ui/FilterSelect`](../src/components/ui/FilterSelect.tsx),
+  so every filter row opens the same app-styled list.
 
 - **Wrap a labelled control in [`ui/Field`](../src/components/ui/Field.tsx).**
   It generates the id, binds the `<label>`, collects `hint` and `error` into
