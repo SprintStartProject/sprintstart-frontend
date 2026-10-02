@@ -28,6 +28,8 @@ home under `docs/`:
   TSDoc and comment rules.
 - [testing_strategy.md](./docs/testing_strategy.md): Vitest, MSW, a11y tests and the
   test setup.
+- [UI_DESIGN_DECISIONS.md](./docs/UI_DESIGN_DECISIONS.md): why the UI rules exist,
+  and the open UI consistency items.
 - [AGENTS.md](./AGENTS.md): short entry point for humans and AI agents.
 
 ---

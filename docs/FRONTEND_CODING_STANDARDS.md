@@ -2,13 +2,15 @@
 
 These are the coding rules for `sprintstart-frontend`, for developers and AI agents
 alike. How the codebase is built is described in the architecture doc; this file
-says how to write code for it.
+says how to write code for it. Why the UI rules in §4 to §6 look the way they do is
+in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
 
 > **Related docs**
 >
 > - [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) — feature-first structure, routing, state, design system, animation.
 > - [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — TSDoc/JSDoc rules.
 > - [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
+> - [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md) — why the UI rules exist, and the open UI consistency items.
 
 ---
 
@@ -117,8 +119,8 @@ says how to write code for it.
   | Nothing to show        | `ui/EmptyState`                            | an ad-hoc centred `<p>`                         |
   | Background scroll lock | `ui/useScrollLock`                         | setting `document.body.style.overflow` yourself |
 
-  The primitives already carry the focus ring, the 44px touch target, the
-  `disabled` / `aria-busy` treatment, the hover motion, the `aria-describedby`
+  The primitives already carry the focus ring, the 44px touch target at the
+  default size, the `disabled` / `aria-busy` treatment, the press feedback, the `aria-describedby`
   wiring for errors, and the focus trap. Rebuilding one by hand means getting all of
   that right again. The bullets below give the details for each.
 
@@ -160,7 +162,9 @@ says how to write code for it.
 - **Every action control is [`ui/Button`](../src/components/ui/Button.tsx) — do not
   hand-roll a `<button>` with its own classes.** Pick `variant` by intent
   (`primary` | `secondary` | `ghost` | `danger` | `dangerSoft` | `dangerGhost`)
-  and `size` by density (`sm` | `md` | `lg`, default `md`); height, radius, type
+  and `size` by density (`xs` | `sm` | `md` | `lg`, default `md`; only `md` and
+  up meet the 44px touch target, `xs` is for the quiet actions under a chat
+  message); height, radius, type
   scale, hover, focus ring and disabled treatment then follow automatically.
   Use `loading` rather than wiring up your own spinner, and `iconOnly` (plus an
   `aria-label`) for square icon buttons. If a variant you need is missing, add it
@@ -237,7 +241,7 @@ says how to write code for it.
   ```
 
   Hand-written markup stays right for composite controls where the box is
-  shared — the "Every _n_ minutes" row, the chat composer, the borderless quick
+  shared — the chat composer and its date filter fields, the borderless quick
   chat field — and for checkboxes, radios and file pickers, which are a
   different anatomy.
 
@@ -338,13 +342,14 @@ says how to write code for it.
 - **Do not apply `buttonHoverMotion` by hand.**
   [`ui/Button`](../src/components/ui/Button.tsx) already carries it, for every
   variant and size, and swaps to `buttonHoverMotionDisabled` when the button is
-  disabled or loading. Reaching for `<motion.button {...buttonHoverMotion}>` is
-  how the app ended up with a "Refresh" icon button that magnified on one page
-  header and sat dead on the next.
+  disabled or loading. Despite its name it only gives press feedback; hover is
+  carried by each variant's `hover:` colours (see
+  [UI_DESIGN_DECISIONS.md §1a](./UI_DESIGN_DECISIONS.md#1a-hover-and-press-feedback)
+  for why buttons no longer grow on hover).
 
   The token stays public for the controls that are _not_ `Button` and still need
-  to feel the same — the `role="combobox"` trigger in `FilterSelect` and the
-  `aria-pressed` filter chips. Those, and only those.
+  to feel the same: the popup triggers of `FilterSelect`, `DropdownSelect` and
+  `MultiSelectFilter`.
 
 ---
 

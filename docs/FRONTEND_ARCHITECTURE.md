@@ -397,13 +397,14 @@ it here; it falls into four groups:
   motion), `hoverSpringToken` (hover and tap micro-interactions), plus a few
   specialised springs such as `sidePanelSlideToken` or `celebrationSpringToken`.
 - **Button motion**: `buttonHoverMotion` and `buttonHoverMotionDisabled`, which
-  `ui/Button` applies itself.
+  `ui/Button` applies itself. Despite the name they only scale on press, not on
+  hover.
 - **Dialog variants**: `modalBackdropVariants` and `getModalDialogVariants`, used by
   `ui/Modal`.
 - **Timing constants**: e.g. `SIDE_PANEL_SLIDE_MS`, `SKELETON_APPEAR_DELAY_MS`.
 
 The variant factories take a `prefersReducedMotion` flag, and `ui/Button` drops its
-hover motion when the user prefers reduced motion. In tests, `framer-motion` is
+press feedback when the user prefers reduced motion. In tests, `framer-motion` is
 replaced by a passthrough mock (see
 [testing_strategy.md §5](./testing_strategy.md#5-global-setup-testsunitsetupvitestsetupts)).
 

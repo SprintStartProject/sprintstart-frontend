@@ -23,6 +23,8 @@ fix it in the same PR.
   TSDoc and comment rules.
 - [docs/testing_strategy.md](./docs/testing_strategy.md): Vitest, MSW, a11y tests,
   test setup and utilities.
+- [docs/UI_DESIGN_DECISIONS.md](./docs/UI_DESIGN_DECISIONS.md): why the UI rules
+  exist, and the open UI consistency items.
 
 ---
 
