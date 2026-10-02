@@ -40,11 +40,11 @@ type UseGeneratedPathCardsResult = {
    * Resolves with what was created, or with the reason nothing was. Never throws: a page that has
    * to try/catch around a button is a page that will forget to.
    *
-   * @param projectId The project whose board is being filled.
-   * @param roleIds The hire's roles on that project, which decide the blueprints that apply.
-   * @param existingTitles Checklist titles already on the board, exactly as they are stored — the
-   *   run compares them itself, by {@link titleKey}, so a caller never has to know how a title is
-   *   marked or how the server trimmed it.
+   * @param projectId - The project whose board is being filled.
+   * @param roleIds - The hire's roles on that project, which decide the blueprints that apply.
+   * @param existingTitles - Checklist titles already on the board, exactly as they are stored —
+   *   the run compares them itself, by {@link titleKey}, so a caller never has to know how a title
+   *   is marked or how the server trimmed it.
    */
   generate: (
     projectId: string,

@@ -329,10 +329,10 @@ export type PmAttentionCount = {
  * How many onboarding items wait on the project manager in one project: pending skip requests
  * plus unread feedback, each counted from the backend's own answers.
  *
- * There is no endpoint that answers "how many" yet, so this reads the two lists that know --
- * the project's team overview (a pending skip rides on the member's current step) and the
- * feedback list, narrowed to the project's members since it is not scoped by project. Kept in
- * one function so a count endpoint can replace the body without touching a caller.
+ * TODO(backend): there is no endpoint that answers "how many" yet, so this reads the two lists
+ * that know -- the project's team overview (a pending skip rides on the member's current step)
+ * and the feedback list, narrowed to the project's members since it is not scoped by project.
+ * Kept in one function so a count endpoint can replace the body without touching a caller.
  *
  * Unlike {@link getTeamOverview} it never falls back to mock users, and it throws when either
  * read fails: a badge built from made-up members or half an answer is a wrong number, and the
@@ -395,7 +395,7 @@ function notifyPmAttentionChanged(): void {
 /**
  * Accepts a hire's request to skip their current step. PM and ADMIN only.
  *
- * @param reviewComment Optional note for the hire about the decision.
+ * @param reviewComment - Optional note for the hire about the decision.
  */
 export async function acceptOnboardingSkipRequest(
   skipId: string,
@@ -414,7 +414,7 @@ export async function acceptOnboardingSkipRequest(
 /**
  * Denies a hire's request to skip their current step. PM and ADMIN only.
  *
- * @param reviewComment Optional note for the hire about the decision.
+ * @param reviewComment - Optional note for the hire about the decision.
  */
 export async function denyOnboardingSkipRequest(skipId: string, reviewComment = ""): Promise<void> {
   await apiClient.fetch(`/api/v1/admin/onboarding/skips/${skipId}/deny`, {
@@ -1129,7 +1129,7 @@ export async function getUserSkillLevels(userId: string): Promise<UserSkillLevel
  * no request is spent on resolving them. A skill pointing at a role the user does not
  * hold labels itself "Unknown role" rather than borrowing another project's list.
  *
- * @param roles The signed-in user's own project roles, used to label each skill. Pass an
+ * @param roles - The signed-in user's own project roles, used to label each skill. Pass an
  *   empty list when they are not known yet — the labels degrade, the call does not fail.
  */
 export async function getMySkillLevels(

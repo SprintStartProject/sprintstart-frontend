@@ -34,7 +34,7 @@ export interface GithubArtifactMetadata {
  * Only fields the UI actually renders are validated; the backend always sends
  * `repositoryId` alongside, but nothing consumes it.
  *
- * @param json The raw `artifact.metadata` string (may be omitted).
+ * @param json - The raw `artifact.metadata` string (may be omitted).
  * @returns The parsed metadata, or `null` when the input is not usable.
  */
 export function parseGithubMetadata(
@@ -86,7 +86,7 @@ export function parseGithubMetadata(
  * `CONFLUENCE`, including their `PAGE` artifacts) carry different metadata
  * shapes and are excluded by the source-system check.
  *
- * @param artifact The artifact whose metadata should be interpreted.
+ * @param artifact - The artifact whose metadata should be interpreted.
  * @returns The `owner/repository` string, or `null`.
  *
  * Cached per artifact object through `repositoryInfoOf`: the card list, the
@@ -165,8 +165,8 @@ function repositoryInfoOf(
  * profile), so "SprintStart/frontend" must match a profile with login
  * "sprintstart".
  *
- * @param artifact The artifact under test.
- * @param selected The currently chosen repositories; empty means "no narrowing".
+ * @param artifact - The artifact under test.
+ * @param selected - The currently chosen repositories; empty means "no narrowing".
  * @returns Whether the artifact belongs in the filtered list.
  */
 export function matchesRepository(

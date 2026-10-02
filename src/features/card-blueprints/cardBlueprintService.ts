@@ -78,7 +78,7 @@ export const cardBlueprintService = {
   /**
    * Every card blueprint on a project, in the order the cards will be created.
    *
-   * @param projectId The project the blueprints belong to.
+   * @param projectId - The project the blueprints belong to.
    */
   list(projectId: string): Promise<CardBlueprint[]> {
     return Promise.resolve(read(projectId));

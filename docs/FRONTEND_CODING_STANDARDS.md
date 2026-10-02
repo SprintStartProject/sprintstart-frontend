@@ -64,6 +64,9 @@ in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `act` closes over fresh state each render
   ```
 
+  When the reason needs more than a line, write it as a comment directly above the
+  disable instead. A disable with no reason at all is not allowed.
+
 ---
 
 ## 3. React

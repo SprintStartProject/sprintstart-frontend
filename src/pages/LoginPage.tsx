@@ -7,8 +7,12 @@ import { SpotlightCard } from "../components/ui/SpotlightCard";
 import { resolveRedirectTarget, retrieveRedirectTarget } from "../auth/redirectUtils";
 
 /**
- * The authentication entry point.
- * Redirects users to the SSO identity provider and initiates the role selection upon first login.
+ * The sign-in card. Signing in itself happens at Keycloak; this page only sends the user there.
+ *
+ * Bound to `/login`, which is outside the access policy. `AuthGuard` sends unauthenticated
+ * users here and authenticated users away again. The button passes the page the user wanted
+ * (from `?redirect=`, the router state or `sessionStorage`) to `login`, so Keycloak returns
+ * there afterwards. The page is bundled eagerly, see the comment on its import in `AppRouter`.
  */
 export function LoginPage() {
   const { login, status } = useAuth();

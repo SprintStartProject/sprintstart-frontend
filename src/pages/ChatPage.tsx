@@ -87,7 +87,15 @@ function deriveArtifactFromCitation(citation: CitationArtifactOpen): Artifact {
 }
 
 /**
- * Displays the interface for communication with the chat.
+ * The AI assistant: a streamed conversation grounded in the selected project's sources, with
+ * citations that open the cited artifact, a rail of past conversations and date and source
+ * filters.
+ *
+ * Bound to `/chat` and `/chat/:id`, open to every permission group, and rendered inside
+ * `AssistantShell` next to the buddy. `useChat` reads the conversation from `:id`; on a bare
+ * `/chat` it opens the most recent conversation unless the navigation carries
+ * `state.newChat`, which is how "New chat" gets an empty one. Citations resolve against the
+ * project of the open conversation, not the one selected in the switcher.
  */
 export function ChatPage() {
   const { profile } = useAuth();

@@ -29,6 +29,14 @@ type PageHeaderProps = {
   iconPopover?: ReactNode;
 };
 
+/**
+ * The title row a page starts with: icon, `<h1>` title, optional subtitle, and actions on the
+ * right that wrap below the title on narrow screens.
+ *
+ * It is the page-title rung of the heading scale (`text-xl sm:text-2xl font-semibold`, see the
+ * coding standards §4), so a page uses this instead of a hand-written `<h1>`. The icon can double
+ * as an easter-egg trigger through `onIconClick`, `eggHint` and `iconPopover`.
+ */
 export function PageHeader({
   icon: Icon,
   title,

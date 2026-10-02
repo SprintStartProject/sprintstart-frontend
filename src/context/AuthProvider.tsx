@@ -49,7 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     /**
-     * Initializes Keycloak and sets up the authentication status.
+     * Initializes Keycloak and loads the backend profile of the signed-in user.
+     *
+     * The profile is retried a few times, because a user who has just signed in for the
+     * first time may not exist in the backend yet. Without a profile the user counts as
+     * signed out and ends up on the login page.
      */
     const initAuth = async () => {
       if (isInitialized.current) return;

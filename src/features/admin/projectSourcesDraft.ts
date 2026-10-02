@@ -312,7 +312,7 @@ export function hasFailedSources(sources: DraftSource[]): boolean {
  * coarse: naming — or even counting — the projects a source was already
  * connected to would tell a PM about projects that are not theirs.
  *
- * @param sources The settled run.
+ * @param sources - The settled run.
  * @returns `"none"` when nothing connected, `"reused"` when everything that
  * connected was linked, `"ingesting"` when everything is being fetched, and
  * `"mixed"` for a run with both.
@@ -332,7 +332,7 @@ export function connectOutcome(sources: DraftSource[]): "none" | "reused" | "ing
 /**
  * The line under a success toast, matching {@link connectOutcome}.
  *
- * @param sources The settled run.
+ * @param sources - The settled run.
  * @returns The description, or `undefined` when there is nothing to add.
  */
 export function connectOutcomeDescription(sources: DraftSource[]): string | undefined {

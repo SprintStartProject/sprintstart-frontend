@@ -21,7 +21,7 @@ import { SEVERITIES } from "../knowledge-gaps/severity";
  * get 403s, so they get no widget — the same rule that already hides the sidebar entries.
  * PM, HR and ADMIN all qualify; a regular user never does.
  *
- * @param canManageSelectedProject Whether the user manages the globally selected project.
+ * @param canManageSelectedProject - Whether the user manages the globally selected project.
  *   Only consulted for the PM role; defaults to `false` so a caller without project
  *   context stays on the strict side.
  */

@@ -153,6 +153,8 @@ const FOLD_THRESHOLD = 8;
  *
  * Where a card sits in the process is a separate question, and the stages, the focus view and the
  * section tabs answer that one.
+ *
+ * Bound to `/board`, open to every permission group, not wrapped in `ManagerAreaGuard`.
  */
 export function BoardPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();

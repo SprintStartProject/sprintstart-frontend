@@ -94,7 +94,8 @@ function summarise(path: BlueprintPath, graphNodes: BlueprintGraphNode[]): PathC
  * The overview endpoint carries no counts (`GetBlueprintPathOverviewResponse` is id, key, version,
  * revision, title, description, status), so the only way to say "sixteen phases" is to read each
  * path. That is fine for the handful a project has and is not fine unbounded, hence the cap.
- * **Backend TODO:** phase/step/question counts on the overview response would remove this entirely.
+ *
+ * TODO(backend): phase/step/question counts on the overview response would remove this entirely.
  */
 const CONTENTS_FETCH_LIMIT = 24;
 

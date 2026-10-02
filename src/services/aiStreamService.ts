@@ -38,7 +38,7 @@ export type AiStreamHandlers = {
  * events live, then re-reads its normal endpoint on `onDone` for the settled result. On any failure
  * the caller falls back to that same non-streaming read, so a dropped stream never costs the result.
  *
- * @param endpoint The `…/stream` endpoint (relative path), already carrying its query string.
+ * @param endpoint - The `…/stream` endpoint (relative path), already carrying its query string.
  */
 export async function streamAiProgress(
   endpoint: string,
