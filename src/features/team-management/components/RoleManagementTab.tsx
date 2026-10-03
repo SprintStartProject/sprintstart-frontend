@@ -44,8 +44,8 @@ const ROLE_SORT_OPTIONS: FilterSelectOption<RoleSort>[] = [
 /** The roles worth a look: nobody holds them, or they carry no skills to assess. */
 type RoleGapFilter = "no-members" | "no-skills";
 
-/** Who the open role's member list shows. */
-type MemberFilter = "all" | "holds" | "without";
+/** Who the open role's member list narrows to; none chosen shows everyone, as on every list. */
+type MemberFilter = "holds" | "without";
 
 /** Names in a sentence: the first few, then a count. */
 function nameList(names: string[], max = 3): string {
@@ -124,9 +124,14 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   // asked for more on top.
   const [newRoleSkills, setNewRoleSkills] = useState<PendingSkill[]>([]);
   const [suggestOnCreate, setSuggestOnCreate] = useState(true);
+  // Opening the form puts the cursor in its first field, so "New role" is one press to typing.
+  const newRoleNameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (showCreate) newRoleNameRef.current?.focus();
+  }, [showCreate]);
   // The open role's member list: a search and who to show.
   const [memberQuery, setMemberQuery] = useState("");
-  const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
+  const [memberFilter, setMemberFilter] = useState<MemberFilter | null>(null);
 
   useEffect(() => {
     async function loadSkills() {
@@ -189,7 +194,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     setOriginalUserIds(assignedUserIds);
     setSkillName("");
     setMemberQuery("");
-    setMemberFilter("all");
+    setMemberFilter(null);
   }
 
   function closeRole() {
@@ -661,21 +666,18 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
               />
             </div>
             <div role="group" aria-label="Show members" className="flex flex-wrap gap-2">
-              <PmFilterChip
-                active={memberFilter === "all"}
-                onClick={() => setMemberFilter("all")}
-                label="All"
-                count={users.length}
-              />
+              {/* Pressing the chosen one again lets go of it, back to everyone. */}
               <PmFilterChip
                 active={memberFilter === "holds"}
-                onClick={() => setMemberFilter("holds")}
+                onClick={() => setMemberFilter((current) => (current === "holds" ? null : "holds"))}
                 label="Has this role"
                 count={originalUserIds.length}
               />
               <PmFilterChip
                 active={memberFilter === "without"}
-                onClick={() => setMemberFilter("without")}
+                onClick={() =>
+                  setMemberFilter((current) => (current === "without" ? null : "without"))
+                }
                 label="Without a role"
                 count={usersWithoutRole.length}
                 flagged
@@ -1036,74 +1038,94 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={expandTransition}
-                  className="overflow-hidden border-b border-app-border-muted"
+                  className="overflow-hidden"
                 >
-                  <div className="grid gap-3 p-4 sm:grid-cols-[14rem_minmax(0,1fr)] sm:items-start">
-                    <div>
-                      <label
-                        htmlFor="new-role-name"
-                        className="mb-1 block text-xs font-medium text-app-text-muted"
+                  {/* Set apart from the rows under it — tinted, framed in the brand colour, with a
+                      heading of its own — so it reads as the thing to fill in now. */}
+                  <div className="m-2 rounded-xl border border-app-brand-border-strong bg-app-brand-soft/60 shadow-sm">
+                    <div className="flex items-start gap-3 px-4 pt-4">
+                      <span
+                        aria-hidden="true"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm"
                       >
-                        Name
-                      </label>
-                      <Input
-                        id="new-role-name"
-                        value={roleName}
-                        onChange={(event) => setRoleName(event.target.value)}
-                        placeholder="e.g. Backend"
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="new-role-description"
-                        className="mb-1 block text-xs font-medium text-app-text-muted"
-                      >
-                        Description
-                      </label>
-                      <Textarea
-                        id="new-role-description"
-                        value={roleDescription}
-                        onChange={(event) => setRoleDescription(event.target.value)}
-                        minRows={1}
-                        maxRows={6}
-                        placeholder="What this role is responsible for"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <NewRoleSkillsInput
-                        catalog={skills}
-                        value={newRoleSkills}
-                        onChange={setNewRoleSkills}
-                        disabled={creatingRole}
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
-                      {canSuggestSkills ? (
-                        <label
-                          htmlFor="new-role-suggest"
-                          className="flex cursor-pointer items-center gap-2 text-xs text-app-text-muted"
-                        >
-                          <Checkbox
-                            id="new-role-suggest"
-                            checked={suggestOnCreate}
-                            onChange={(event) => setSuggestOnCreate(event.target.checked)}
-                          />
-                          Also suggest skills with AI — to review once the role is open
-                        </label>
-                      ) : (
+                        <Plus className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-semibold text-app-text">New role</h4>
                         <p className="text-xs text-app-text-muted">
-                          The role opens right away to assign members.
+                          Name it, say what it is for and pick its skills — members can be given it
+                          right after.
                         </p>
-                      )}
-                      <Button
-                        variant="primary"
-                        onClick={() => void handleCreateRole()}
-                        disabled={!roleName.trim()}
-                        loading={creatingRole}
-                        icon={<Plus className="h-4 w-4" />}
-                      >
-                        {creatingRole ? "Creating role…" : "Create role"}
-                      </Button>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 p-4 sm:grid-cols-[14rem_minmax(0,1fr)] sm:items-start">
+                      <div>
+                        <label
+                          htmlFor="new-role-name"
+                          className="mb-1 block text-xs font-medium text-app-text-muted"
+                        >
+                          Name
+                        </label>
+                        <Input
+                          ref={newRoleNameRef}
+                          id="new-role-name"
+                          value={roleName}
+                          onChange={(event) => setRoleName(event.target.value)}
+                          placeholder="e.g. Backend"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="new-role-description"
+                          className="mb-1 block text-xs font-medium text-app-text-muted"
+                        >
+                          Description
+                        </label>
+                        <Textarea
+                          id="new-role-description"
+                          value={roleDescription}
+                          onChange={(event) => setRoleDescription(event.target.value)}
+                          minRows={1}
+                          maxRows={6}
+                          placeholder="What this role is responsible for"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <NewRoleSkillsInput
+                          catalog={skills}
+                          value={newRoleSkills}
+                          onChange={setNewRoleSkills}
+                          disabled={creatingRole}
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+                        {canSuggestSkills ? (
+                          <label
+                            htmlFor="new-role-suggest"
+                            className="flex cursor-pointer items-center gap-2 text-xs text-app-text-muted"
+                          >
+                            <Checkbox
+                              id="new-role-suggest"
+                              checked={suggestOnCreate}
+                              onChange={(event) => setSuggestOnCreate(event.target.checked)}
+                            />
+                            Also suggest skills with AI — to review once the role is open
+                          </label>
+                        ) : (
+                          <p className="text-xs text-app-text-muted">
+                            The role opens right away to assign members.
+                          </p>
+                        )}
+                        <Button
+                          variant="primary"
+                          onClick={() => void handleCreateRole()}
+                          disabled={!roleName.trim()}
+                          loading={creatingRole}
+                          icon={<Plus className="h-4 w-4" />}
+                        >
+                          {creatingRole ? "Creating role…" : "Create role"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </motion.section>
