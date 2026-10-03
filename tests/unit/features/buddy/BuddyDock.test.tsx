@@ -35,12 +35,14 @@ function renderDock(
     suggestions = [],
     setDraft = vi.fn(),
     newConversation = vi.fn(async () => {}),
+    isOpening = false,
     isThinking = false,
     isStreaming = false,
   }: {
     suggestions?: BuddySuggestion[];
     setDraft?: () => void;
     newConversation?: () => Promise<void>;
+    isOpening?: boolean;
     isThinking?: boolean;
     isStreaming?: boolean;
   } = {},
@@ -62,7 +64,7 @@ function renderDock(
           setActionDraft={vi.fn()}
           suggestions={suggestions}
           newConversation={newConversation}
-          isOpening={false}
+          isOpening={isOpening}
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}
@@ -299,6 +301,16 @@ describe("BuddyDock new conversation", () => {
   it("withdraws while a reply is still arriving", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
       isStreaming: true,
+    });
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  // An open is going into the very thread this click would clear: withdrawn while one is in
+  // flight, exactly like a live turn.
+  it("withdraws while a conversation is opening", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isOpening: true,
     });
 
     expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();

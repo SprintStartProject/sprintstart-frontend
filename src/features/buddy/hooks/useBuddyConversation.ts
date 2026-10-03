@@ -570,7 +570,17 @@ export function useBuddyConversation(
    */
   const refreshSessions = useCallback(async () => {
     try {
-      applySessions(await getSessions());
+      const fetched = await getSessions();
+
+      // The read is a moment, and a conversation created while it was in flight is newer
+      // than that moment: it stays, in front, rather than being replaced away. Without the
+      // merge, a slow refresh landing after a create dropped the new row from the rail until
+      // a reload — and the reuse pick then read a list that no longer held it. (Nothing
+      // deletes a conversation server-side yet; when one can, this needs the tombstone too.)
+      const fetchedIds = new Set(fetched.map((session) => session.id));
+      const createdMeanwhile = sessionsRef.current.filter((session) => !fetchedIds.has(session.id));
+
+      applySessions([...createdMeanwhile, ...fetched]);
     } catch (e) {
       // Cosmetic only: the rail keeps the titles it has; the next completed turn tries again.
       console.error(e);
@@ -794,6 +804,8 @@ export function useBuddyConversation(
     // the backend names a conversation from its first message, so an untitled newest row is
     // one nobody has written into — and the next reload would open it anyway. Without this,
     // leaving, switching back and pressing again piled up identical "New conversation" rows.
+    // (A title that failed to generate server-side leaves a used row untitled too — rare,
+    // and the reload this mirrors would open that same row.)
     const newest = sessionsRef.current[0];
     if (newest && newest.id !== currentSessionIdRef.current && newest.title.trim() === "") {
       await selectSession(newest.id);
@@ -923,6 +935,9 @@ export function useBuddyConversation(
           sessionId = currentSessionIdRef.current ?? (await resolveHireSession());
         } catch (e) {
           console.error(e);
+          // The banner this puts up owns the retry, like every other failure site: a stale
+          // "new conversation" marker must not outvote the move that actually failed.
+          retryRef.current = null;
           setOpenError(HISTORY_FAILED);
           return;
         }

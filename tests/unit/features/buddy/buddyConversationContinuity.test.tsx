@@ -403,4 +403,123 @@ describe("buddy conversation continuity", () => {
     expect(result.current.currentSessionId).toBe("s-new");
     expect(creates).toBe(1);
   });
+
+  /**
+   * An open in flight owns the thread until its read lands: a move that clears it — a switch,
+   * or "new conversation" — would race the read into a thread that is no longer the one it was
+   * for. Both are refused while one is opening, not merely after the fact.
+   */
+  it("refuses to start or switch conversations while the opening read is in flight", async () => {
+    let creates = 0;
+    let s1Reads = 0;
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/sessions", async () => {
+        await delay(300);
+        return HttpResponse.json({
+          sessions: [
+            {
+              id: "s-2",
+              title: "Where do I start?",
+              userId: "1",
+              projectId: null,
+              createdAt: "2026-09-30T10:00:00.000Z",
+            },
+            {
+              id: "s-1",
+              title: "Getting started",
+              userId: "1",
+              projectId: null,
+              createdAt: "2026-09-29T10:00:00.000Z",
+            },
+          ],
+        });
+      }),
+      http.get("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
+        if (new URL(request.url).searchParams.get("sessionId") === "s-1") s1Reads += 1;
+        return HttpResponse.json([]);
+      }),
+      http.post("/api/v1/onboarding/me/buddy/sessions", () => {
+        creates += 1;
+        return HttpResponse.json({ id: "s-new" }, { status: 201 });
+      }),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => oneTokenStream("Welcome back!")),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+
+    // The opening read is still resolving — its list is stubbed at 300 ms.
+    await waitFor(() => {
+      expect(result.current.isOpening).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.selectSession("s-1");
+      await result.current.newConversation();
+    });
+
+    // Both were refused: no second read, no conversation created. The open then finishes onto
+    // the newest conversation, exactly as if the clicks had never happened.
+    expect(s1Reads).toBe(0);
+    expect(creates).toBe(0);
+    await waitFor(() => {
+      expect(result.current.currentSessionId).toBe("s-2");
+    });
+    expect(result.current.sessions.map((session) => session.id)).toEqual(["s-2", "s-1"]);
+  });
+
+  /**
+   * A refresh is a read of a moment; a conversation created while it was in flight is newer
+   * than that moment and must survive it. Without the merge, the refresh replaced the list
+   * with its pre-create snapshot — the new row vanished from the rail until a reload.
+   */
+  it("keeps a conversation created while a list refresh is in flight", async () => {
+    let listCalls = 0;
+    const sessionOne = (title: string) => ({
+      id: "s-1",
+      title,
+      userId: "1",
+      projectId: null,
+      createdAt: "2026-09-30T09:00:00.000Z",
+    });
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/sessions", async () => {
+        listCalls += 1;
+        // The refresh's snapshot is taken before the create commits: it never holds s-new.
+        if (listCalls > 1) await delay(300);
+        return HttpResponse.json({
+          sessions: [sessionOne(listCalls > 1 ? "Where do I start?" : "")],
+        });
+      }),
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => oneTokenStream("Welcome back!")),
+      http.post("/api/v1/onboarding/me/buddy/messages", () => oneTokenStream("Hi!")),
+      http.post("/api/v1/onboarding/me/buddy/sessions", async () => {
+        await delay(40);
+        return HttpResponse.json({ id: "s-new" }, { status: 201 });
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    await waitFor(() => {
+      expect(result.current.currentSessionId).toBe("s-1");
+    });
+
+    // The turn writes s-1's title, which starts the (slow) refresh...
+    await act(async () => {
+      await result.current.sendMessage("where do I start?");
+    });
+
+    // ...and a create lands while that refresh is still on its way.
+    await act(async () => {
+      await result.current.newConversation();
+    });
+    expect(result.current.currentSessionId).toBe("s-new");
+
+    // Once the stale refresh has arrived, the conversation just created must still be there.
+    await act(async () => {
+      await delay(450);
+    });
+    expect(result.current.sessions.map((session) => session.id)).toEqual(["s-new", "s-1"]);
+    expect(result.current.currentSessionId).toBe("s-new");
+  });
 });
