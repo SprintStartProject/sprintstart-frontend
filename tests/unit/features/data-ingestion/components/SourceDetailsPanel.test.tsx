@@ -2,6 +2,7 @@ import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { GitBranch } from "lucide-react";
 import type { ComponentProps } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SidePanel } from "../../../../../src/components/ui/SidePanel";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
@@ -58,9 +59,17 @@ vi.mock("../../../../../src/services/connectorService", () => ({
 /**
  * The panel surfaces action outcomes through the app-wide toast system, so
  * every render is wrapped in a ToastProvider — otherwise `useToast` no-ops and
- * the success/error toasts never mount.
+ * the success/error toasts never mount. The router is there for the link to the
+ * knowledge base.
  */
-const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: ToastProvider });
+const render = (ui: Parameters<typeof rtlRender>[0]) =>
+  rtlRender(ui, {
+    wrapper: ({ children }) => (
+      <MemoryRouter>
+        <ToastProvider>{children}</ToastProvider>
+      </MemoryRouter>
+    ),
+  });
 
 const githubRepository: GithubRepositoryDetails = {
   owner: "acme",
@@ -480,6 +489,48 @@ describe("SourceDetailsPanel", () => {
     );
 
     expect(screen.queryByRole("button", { name: /Remove from project/ })).not.toBeInTheDocument();
+  });
+
+  describe("knowledge base link", () => {
+    const linkName = /Browse in the knowledge base/;
+
+    it("links a GitHub source to its repository in the knowledge base", () => {
+      render(panel(mockSource));
+
+      expect(screen.getByRole("link", { name: linkName })).toHaveAttribute(
+        "href",
+        "/knowledge-base?sources=GITHUB&repos=acme/monorepo",
+      );
+    });
+
+    it("links a Jira source to the Jira system", () => {
+      render(panel(jiraSource));
+
+      expect(screen.getByRole("link", { name: linkName })).toHaveAttribute(
+        "href",
+        "/knowledge-base?sources=JIRA",
+      );
+    });
+
+    it("tells a GitHub source's artifact count and repository", () => {
+      render(panel(mockSource));
+
+      expect(screen.getByRole("link", { name: linkName })).toHaveTextContent(
+        "10 artifacts · acme/monorepo",
+      );
+    });
+
+    it("tells a Jira source's artifact count and system", () => {
+      render(panel(jiraSource));
+
+      expect(screen.getByRole("link", { name: linkName })).toHaveTextContent("10 artifacts · Jira");
+    });
+
+    it("is absent while the source has no artifacts", () => {
+      render(panel({ ...mockSource, artifacts: 0, totalArtifactCount: 0 }));
+
+      expect(screen.queryByRole("link", { name: linkName })).not.toBeInTheDocument();
+    });
   });
 
   it("renders failed items from the source", () => {

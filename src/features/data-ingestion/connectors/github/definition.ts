@@ -50,6 +50,11 @@ export const githubConnector: ConnectorDefinition<ProjectSource, GithubDraftSour
     facetOrder: 1,
     icon: GitBranch,
     linkLabel: "Open in GitHub",
+    // The knowledge base filters GitHub artifacts by `owner/name`.
+    scopeOf: (details) =>
+      details.system === "GITHUB" && details.repository
+        ? { repositories: [`${details.repository.owner}/${details.repository.name}`] }
+        : {},
     // An organization's profile is metadata only: its content endpoint redirects to GitHub.
     metadataView: {
       appliesTo: (artifact) => artifact.artifactType === "ORG_METADATA",

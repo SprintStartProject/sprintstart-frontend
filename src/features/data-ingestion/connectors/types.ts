@@ -177,6 +177,12 @@ export type KnowledgeBaseSupport = {
   /** Whether a user can delete the artifacts here, because nothing upstream owns them. */
   deletable?: boolean;
   /**
+   * The narrowing beyond the source system that the knowledge base can express for one
+   * source, used to link from the source to its artifacts. Left out when the knowledge
+   * base has no filter finer than the system, as for Jira, Confluence and uploads.
+   */
+  scopeOf?(details: SourceDetails): { repositories?: string[] };
+  /**
    * A view for artifacts that have no stored content to fetch and render from their
    * `metadata` instead. The viewer shows it in place of the content.
    */

@@ -22,6 +22,7 @@ import { useManualSync } from "../hooks/useManualSync.ts";
 import type { DataSource, LoadingState, SourceChange } from "../types.ts";
 import { FailedItemList } from "./FailedItemList.tsx";
 import { InfoRow } from "./InfoRows.tsx";
+import { KnowledgeBaseLinkCard } from "./KnowledgeBaseLinkCard.tsx";
 import { SyncScheduleSettings } from "./SyncScheduleSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
@@ -337,8 +338,13 @@ export function SourceDetailsPanel({
 
       {DetailsSection && <DetailsSection source={source} enabledRow={enabledRow} />}
 
+      {/* Only offered when there is something to list, so it never leads to an empty page. */}
+      {details.artifactCount > 0 && (
+        <KnowledgeBaseLinkCard source={source} artifactCount={details.artifactCount} index={2} />
+      )}
+
       {hasResourceSyncTimes && (
-        <DrawerCard label="Last Synced" icon={Clock3} index={2} className="mt-4 sm:mt-5">
+        <DrawerCard label="Last Synced" icon={Clock3} index={3} className="mt-4 sm:mt-5">
           <dl className="-my-1">
             {resourceSyncTimes.map(({ label, value }) => (
               <InfoRow key={label} label={label} value={formatDateTime(value)} />
@@ -348,7 +354,7 @@ export function SourceDetailsPanel({
       )}
 
       {canEditSchedule && schedule && (
-        <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
+        <DrawerCard label="Sync Schedule" icon={CalendarClock} index={4} className="mt-4 sm:mt-5">
           <SyncScheduleSettings
             loadKey={source.sourceId}
             loadConfig={() => schedule.load(source, context)}
@@ -364,7 +370,7 @@ export function SourceDetailsPanel({
       )}
 
       {source.failedItems.length > 0 && (
-        <DrawerCard label="Failed Items" icon={XCircle} index={4} className="mt-4 sm:mt-5">
+        <DrawerCard label="Failed Items" icon={XCircle} index={5} className="mt-4 sm:mt-5">
           <FailedItemList items={source.failedItems} />
         </DrawerCard>
       )}
@@ -373,7 +379,7 @@ export function SourceDetailsPanel({
         <DrawerCard
           label="Project link"
           icon={Unlink}
-          index={5}
+          index={6}
           variant="danger"
           className="mt-4 sm:mt-5"
         >
