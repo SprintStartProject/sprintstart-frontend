@@ -87,13 +87,17 @@ export function AdminPage() {
     A hand-off, not a permanent part of the URL: it seeds the tab once and is then stripped, so
     the tab bar keeps behaving exactly as before and the back button does not turn into a
     step-through of sections.
+
+    Consumed whenever it arrives, not only on mount: the buddy links to `/admin?tab=projects`
+    in place, and somebody already on this page would otherwise keep their tab while the
+    parameter sat in the URL.
   */
   const [searchParams, setSearchParams] = useSearchParams();
   /*
     `?projectId=` and `?userId=` open that project's or user's drawer, so a link from elsewhere
     (a dashboard card, a message) can land on the thing it talks about. They are handed off
-    exactly like `tab`: read once, then stripped. The drawer itself opens once the lists have
-    loaded, since it needs the record to show.
+    like `tab`, but only on mount: the drawer logic below assumes no drawer is open yet. The
+    drawer itself opens once the lists have loaded, since it needs the record to show.
   */
   const [pendingDeepLink, setPendingDeepLink] = useState<{
     projectId: string | null;
@@ -104,22 +108,25 @@ export function AdminPage() {
 
     return projectId || userId ? { projectId, userId } : null;
   });
-  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
-    const requested = searchParams.get("tab");
-    const requestedTab = visibleAdminTabs.find((tab) => tab === requested);
+  const requestedTab = visibleAdminTabs.find((tab) => tab === searchParams.get("tab"));
+  const [activeTab, setActiveTab] = useState<AdminTab>(
+    () => requestedTab ?? (searchParams.get("projectId") ? "projects" : "users"),
+  );
+  // Adjusted during render rather than in the effect below: the tab follows a new request in
+  // the same paint, and forgetting the request once stripped lets the same link work twice.
+  const [handledTab, setHandledTab] = useState(requestedTab);
+  if (requestedTab !== handledTab) {
+    setHandledTab(requestedTab);
+    if (requestedTab) setActiveTab(requestedTab);
+  }
 
-    if (requestedTab) return requestedTab;
-
-    return searchParams.get("projectId") ? "projects" : "users";
-  });
-
-  const tabParamConsumed = useRef(false);
+  const drawerParamsConsumed = useRef(false);
 
   useEffect(() => {
-    if (tabParamConsumed.current) return;
-    tabParamConsumed.current = true;
+    const keys = drawerParamsConsumed.current ? ["tab"] : ["tab", "projectId", "userId"];
+    drawerParamsConsumed.current = true;
 
-    const handedOff = ["tab", "projectId", "userId"].filter((key) => searchParams.has(key));
+    const handedOff = keys.filter((key) => searchParams.has(key));
     if (handedOff.length === 0) return;
 
     const next = new URLSearchParams(searchParams);
