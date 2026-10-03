@@ -788,26 +788,19 @@ export async function createSkill(name: string, roleIds: string[]): Promise<Skil
   }
 }
 
+/**
+ * Deletes a project role.
+ *
+ * No mock fallback: it used to answer a failed delete by removing the role from the mock data,
+ * so the caller reported "Role deleted" while the backend still had it — and the next reload
+ * brought it straight back. A failure now reaches the caller, which says so.
+ *
+ * @throws ApiError when the backend refuses or cannot be reached.
+ */
 export async function deleteProjectRole(roleId: string): Promise<void> {
-  try {
-    await apiClient.fetch(`/api/v1/projectRoles/${roleId}`, {
-      method: "DELETE",
-    });
-
-    return;
-  } catch {
-    mockProjectRoles = mockProjectRoles.filter((role) => role.id !== roleId);
-
-    mockSkills = mockSkills.map((skill) => ({
-      ...skill,
-      roleIds: skill.roleIds.filter((linkedRoleId) => linkedRoleId !== roleId),
-    }));
-
-    mockUsers = mockUsers.map((user) => ({
-      ...user,
-      roles: user.roles.filter((role) => role.id !== roleId),
-    }));
-  }
+  await apiClient.fetch(`/api/v1/projectRoles/${roleId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function deleteSkill(skillId: string): Promise<void> {
