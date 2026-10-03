@@ -41,6 +41,14 @@ export function getConnector(system: SourceSystem): ConnectorDefinition {
   return CONNECTORS[system];
 }
 
+/**
+ * The definition of a source system that arrived over the wire (an artifact, a run),
+ * or null when the backend names a system this frontend does not know yet.
+ */
+export function findConnector(system: string): ConnectorDefinition | null {
+  return CONNECTOR_LIST.find((definition) => definition.meta.system === system) ?? null;
+}
+
 /** The definition behind a backend connector id (lowercase, e.g. "github"), if there is one. */
 export function findConnectorById(connectorId: string): ConnectorDefinition | null {
   return CONNECTOR_LIST.find((definition) => definition.meta.connectorId === connectorId) ?? null;

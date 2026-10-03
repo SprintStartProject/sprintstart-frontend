@@ -191,6 +191,13 @@ export const confluenceConnector: ConnectorDefinition<
   fallbackBackendStatus: (connection) =>
     connection?.sourceEnabled === false ? "DISABLED" : "CONNECTED",
 
+  // A space the status endpoint has no row for yet counts the pages its newest run
+  // created and updated, and was synced when that run finished.
+  runFallback: {
+    artifactCount: (run) => run.ingestedCount + run.updatedCount,
+    syncedAt: (run) => run.finishedAt ?? run.startedAt,
+  },
+
   toDetails: (_status, connection) => ({
     system: "CONFLUENCE",
     // A status row alone cannot name the space, so a card without a connection

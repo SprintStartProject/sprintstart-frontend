@@ -480,9 +480,9 @@ describe("data-ingestion data helpers", () => {
 
       const source = confluenceCard(null, confluenceConn, run);
       expect(deriveSyncStatus(source).label).toBe("Synced");
-      // A run only knows what it touched: the latest run's ingested count, never a total.
-      expect(source.artifacts).toBe(5);
-      expect(source.totalArtifactCount).toBe(0);
+      // Without a status row a space counts the pages its newest run created and updated.
+      expect(source.artifacts).toBe(6);
+      expect(source.totalArtifactCount).toBe(6);
     });
 
     it("names the card from spaceName, falling back to spaceKey when there is none", () => {

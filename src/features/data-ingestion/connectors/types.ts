@@ -7,6 +7,7 @@ import type {
 import type {
   BackendProjectSourceStatus,
   DataSource,
+  IngestionRun,
   SourceDetails,
   SourceInstanceIngestionStatus,
 } from "../types.ts";
@@ -262,6 +263,15 @@ export type ConnectorDefinition<C = unknown, D extends DraftSource = DraftSource
   ): { sourceId: string; name: string };
   /** The backend status to show when no status row exists for the source. */
   fallbackBackendStatus(connection: C | null): BackendProjectSourceStatus;
+  /**
+   * How a source without a status row reads its artifact total and sync time off its
+   * newest run. Without it the card shows the run's ingested count, an unknown total
+   * and the run's start.
+   */
+  runFallback?: {
+    artifactCount(run: IngestionRun): number;
+    syncedAt(run: IngestionRun): string | null;
+  };
   /** The identity and sync times only this connector's sources have. */
   toDetails(status: SourceInstanceIngestionStatus | null, connection: C | null): SourceDetails;
   /** The last-sync time per kind of resource the connector ingests (commits, issues, …). */

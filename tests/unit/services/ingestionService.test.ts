@@ -58,6 +58,186 @@ describe("ingestionService", () => {
     });
   });
 
+  // The run mapping is shared by every run endpoint; it is exercised here through the
+  // paged endpoint the Data Ingestion page loads its runs from.
+  describe("run mapping", () => {
+    function serveRuns(runs: Record<string, unknown>[]) {
+      server.use(http.get("/api/v1/ingestion-runs/page", () => HttpResponse.json({ items: runs })));
+    }
+
+    async function loadFirstRun() {
+      const { items } = await getIngestionRunsPage();
+      return items[0];
+    }
+
+    it("maps canonical run responses to IngestionRun objects", async () => {
+      serveRuns([
+        {
+          runId: "r1",
+          sourceSystem: "GITHUB",
+          sourceId: "octo/repo",
+          owner: "octo",
+          name: "repo",
+          repositoryId: "repo-uuid",
+          startedAt: "2026-07-01T00:00:00Z",
+          finishedAt: "2026-07-01T01:00:00Z",
+          ingestedCount: 10,
+          updatedCount: 2,
+          deletedCount: 1,
+          failedCount: 0,
+          failedItems: [],
+          status: "COMPLETED",
+          failureReason: null,
+          aiSyncStatus: "SUCCEEDED",
+          aiSyncFailureReason: null,
+        },
+      ]);
+
+      expect(await loadFirstRun()).toEqual({
+        runId: "r1",
+        sourceSystem: "GITHUB",
+        sourceId: "octo/repo",
+        owner: "octo",
+        name: "repo",
+        repositoryId: "repo-uuid",
+        startedAt: "2026-07-01T00:00:00Z",
+        finishedAt: "2026-07-01T01:00:00Z",
+        ingestedCount: 10,
+        updatedCount: 2,
+        deletedCount: 1,
+        failedCount: 0,
+        status: "COMPLETED",
+        failedItems: [],
+        failureReason: null,
+        aiSyncStatus: "SUCCEEDED",
+        aiSyncFailureReason: null,
+      });
+    });
+
+    it("defaults the optional run fields when the backend omits them", async () => {
+      serveRuns([
+        {
+          runId: "r-legacy",
+          sourceSystem: "GITHUB",
+          startedAt: "2026-07-01T00:00:00Z",
+          finishedAt: "2026-07-01T01:00:00Z",
+          status: "COMPLETED",
+        },
+      ]);
+
+      const run = await loadFirstRun();
+      expect(run.sourceId).toBeNull();
+      expect(run.owner).toBeNull();
+      expect(run.name).toBeNull();
+      expect(run.repositoryId).toBeNull();
+      expect(run.deletedCount).toBe(0);
+      expect(run.failureReason).toBeNull();
+      expect(run.aiSyncStatus).toBe("NOT_APPLICABLE");
+      expect(run.aiSyncFailureReason).toBeNull();
+    });
+
+    it("normalizes SUCCESS status to COMPLETED", async () => {
+      serveRuns([
+        {
+          runId: "r2",
+          sourceSystem: "JIRA",
+          startedAt: "2026-07-01T00:00:00Z",
+          finishedAt: "2026-07-01T01:00:00Z",
+          status: "SUCCESS",
+        },
+      ]);
+
+      expect((await loadFirstRun()).status).toBe("COMPLETED");
+    });
+
+    it("infers RUNNING when status is missing and no finishedAt", async () => {
+      serveRuns([
+        {
+          runId: "r3",
+          sourceSystem: "GITHUB",
+          startedAt: "2026-07-01T00:00:00Z",
+          finishedAt: null,
+          status: null,
+        },
+      ]);
+
+      expect((await loadFirstRun()).status).toBe("RUNNING");
+    });
+
+    it("infers FAILED when finishedAt is present and failedCount > 0", async () => {
+      serveRuns([
+        {
+          runId: "r4",
+          sourceSystem: "GITHUB",
+          startedAt: "2026-07-01T00:00:00Z",
+          finishedAt: "2026-07-01T01:00:00Z",
+          failedCount: 3,
+          status: null,
+        },
+      ]);
+
+      const run = await loadFirstRun();
+      expect(run.status).toBe("FAILED");
+      expect(run.failedCount).toBe(3);
+    });
+
+    it("infers FAILED when failedItems are present even with failedCount 0", async () => {
+      serveRuns([
+        {
+          runId: "r5",
+          sourceSystem: "GITHUB",
+          startedAt: "2026-07-01T00:00:00Z",
+          finishedAt: "2026-07-01T01:00:00Z",
+          failedCount: 0,
+          failedItems: [
+            { sourceId: "s1", artifactType: "COMMIT", sourceUrl: null, reason: "boom" },
+          ],
+          status: null,
+        },
+      ]);
+
+      const run = await loadFirstRun();
+      expect(run.status).toBe("FAILED");
+      expect(run.failedItems[0].artifactIdentifier).toBe("COMMIT: s1");
+    });
+
+    it("infers COMPLETED when finishedAt is present and nothing failed", async () => {
+      serveRuns([
+        {
+          runId: "r6",
+          sourceSystem: "GITHUB",
+          startedAt: "2026-07-01T00:00:00Z",
+          finishedAt: "2026-07-01T01:00:00Z",
+          failedCount: 0,
+          failedItems: [],
+          status: null,
+        },
+      ]);
+
+      expect((await loadFirstRun()).status).toBe("COMPLETED");
+    });
+
+    it("maps failed artifacts using sourceId first, then sourceUrl, then a fallback", async () => {
+      serveRuns([
+        {
+          runId: "r7",
+          sourceSystem: "GITHUB",
+          startedAt: "2026-07-01T00:00:00Z",
+          finishedAt: "2026-07-01T01:00:00Z",
+          failedItems: [
+            { sourceId: null, artifactType: "FILE", sourceUrl: "http://x/y", reason: "err" },
+            { sourceId: null, artifactType: "ISSUE", sourceUrl: null, reason: "err2" },
+          ],
+          status: "FAILED",
+        },
+      ]);
+
+      const run = await loadFirstRun();
+      expect(run.failedItems[0].artifactIdentifier).toBe("FILE: http://x/y");
+      expect(run.failedItems[1].artifactIdentifier).toBe("ISSUE: Unknown artifact");
+    });
+  });
+
   describe("getIngestionRunsPage", () => {
     it("sends the filters and maps the page envelope", async () => {
       let capturedParams: URLSearchParams | null = null;

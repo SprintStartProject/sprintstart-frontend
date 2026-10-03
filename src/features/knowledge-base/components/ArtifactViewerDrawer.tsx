@@ -23,7 +23,7 @@ import { useAskAi } from "../../../hooks/useAskAi";
 import { isEmptyContent, summariseBlockReason } from "../summarizability";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { preprocessMarkdown } from "../markdown";
-import { getConnector } from "../../data-ingestion/connectors/registry";
+import { findConnector } from "../../data-ingestion/connectors/registry";
 import { getArtifactRepository } from "../githubMetadata";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { RepositoryBadge } from "./RepositoryBadge";
@@ -168,6 +168,15 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
 }
 
 /**
+ * How the artifact's connector presents it, or undefined for a source system the
+ * frontend does not know yet. Such an artifact is shown as plain content with its
+ * source link and cannot be deleted.
+ */
+function knowledgeBaseOf(artifact: Artifact) {
+  return findConnector(artifact.sourceSystem)?.knowledgeBase;
+}
+
+/**
  * Determines whether an artifact should be rendered as Markdown.
  * Issues, Pull Requests, Jira items, Confluence artifacts, and Markdown files (.md/.markdown) are always rendered as Markdown.
  * Confluence is detected via sourceSystem or a /wiki/spaces/ URL pattern.
@@ -198,7 +207,7 @@ const shouldRenderAsMarkdown = (
     sourceUrl.includes("/browse/");
 
   const isConfluence =
-    (artifact !== null && getConnector(artifact.sourceSystem).knowledgeBase.markdown === true) ||
+    (artifact !== null && knowledgeBaseOf(artifact)?.markdown === true) ||
     sourceUrl.includes("/wiki/spaces/");
 
   return content.mimeType.startsWith("text/markdown") || isPrOrIssue || isMd || isConfluence;
@@ -651,7 +660,7 @@ export function ArtifactViewerDrawer({
     // the backend's content endpoint answers a 302 redirect to the org's GitHub page,
     // and following it would land the drawer on GitHub's HTML. They render purely from
     // `artifact.metadata` (org profile/teams/members), so skip the fetch entirely.
-    if (getConnector(artifact.sourceSystem).knowledgeBase.metadataView?.appliesTo(artifact)) {
+    if (knowledgeBaseOf(artifact)?.metadataView?.appliesTo(artifact)) {
       dispatch({ type: "skipContentLoad" });
       const myGeneration = summarizeGenerationRef.current;
       return () => {
@@ -908,9 +917,7 @@ export function ArtifactViewerDrawer({
     );
 
   const canDeleteThisArtifact =
-    canDelete &&
-    artifact !== null &&
-    getConnector(artifact.sourceSystem).knowledgeBase.deletable === true;
+    canDelete && artifact !== null && knowledgeBaseOf(artifact)?.deletable === true;
 
   const isMarkdownArtifact =
     artifact && content ? shouldRenderAsMarkdown(content, artifact) : false;
@@ -950,9 +957,7 @@ export function ArtifactViewerDrawer({
   const summariseBlockedReason = summariseBlockReason(content);
 
   // The connector's own view for an artifact that has no content to fetch.
-  const metadataView = artifact
-    ? getConnector(artifact.sourceSystem).knowledgeBase.metadataView
-    : undefined;
+  const metadataView = artifact ? knowledgeBaseOf(artifact)?.metadataView : undefined;
   const MetadataView = artifact && metadataView?.appliesTo(artifact) ? metadataView.View : null;
 
   const actionsContent = viewMode === "raw" && !MetadataView && (
@@ -1035,7 +1040,7 @@ export function ArtifactViewerDrawer({
   const hasSourceLink =
     Boolean(artifact?.sourceUrl?.trim()) &&
     artifact !== null &&
-    getConnector(artifact.sourceSystem).knowledgeBase.linkLabel !== null;
+    knowledgeBaseOf(artifact)?.linkLabel !== null;
 
   const headerBadge =
     repository || hasSourceLink ? (

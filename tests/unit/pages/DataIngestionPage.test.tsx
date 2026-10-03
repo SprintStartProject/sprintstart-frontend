@@ -921,6 +921,59 @@ describe("DataIngestionPage", () => {
     expect(screen.queryByText("Connector disabled")).not.toBeInTheDocument();
   });
 
+  it("shows the loading state, not the old error, while the connectors modal retries a failed load", async () => {
+    mockListConnectors.mockRejectedValueOnce(new Error("Forbidden"));
+    let rejectRetry: (error: Error) => void = () => {};
+    mockListConnectors.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectRetry = reject;
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("octocat/hello-world");
+    await waitFor(() => expect(mockListConnectors).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: /manage connectors/i }));
+
+    const modal = within(await screen.findByRole("dialog", { name: "Connectors" }));
+    expect(await modal.findByText("Loading connectors")).toBeInTheDocument();
+    expect(modal.queryByText("Forbidden")).not.toBeInTheDocument();
+    expect(modal.queryByText("No connectors registered")).not.toBeInTheDocument();
+
+    rejectRetry(new Error("Still forbidden"));
+
+    expect(await modal.findByText("Still forbidden")).toBeInTheDocument();
+    expect(modal.queryByText("Loading connectors")).not.toBeInTheDocument();
+  });
+
+  it("shows one banner per failed load even when the failures read the same", async () => {
+    mockGetIngestionRunsPage.mockRejectedValue(new Error("Network down"));
+    mockGetIngestionSourceStatuses.mockRejectedValue(new Error("Network down"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => expect(screen.getAllByText("Network down")).toHaveLength(2));
+      // Banners keyed by their message would collide here.
+      expect(consoleError.mock.calls.some((call) => String(call[0]).includes("same key"))).toBe(
+        false,
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("scopes the run history to the selected project", async () => {
     render(
       <MemoryRouter>

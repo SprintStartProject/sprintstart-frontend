@@ -58,7 +58,8 @@ type CreateDataSourceInput<C> = {
  *
  * With a status row the row is authoritative for health, counters and the stored
  * artifact total. Without one, the counters are those of `latestRun`, the total
- * is unknown (0), and the backend status falls back to the connection record.
+ * is unknown (0) unless the connector's `runFallback` reads it off the run, and
+ * the backend status falls back to the connection record.
  */
 export function createDataSource<C>({
   definition,
@@ -81,7 +82,11 @@ export function createDataSource<C>({
   const errors = status ? status.failedCount : (latestRun?.failedCount ?? failedItems.length);
   const lastRunAt = status ? status.lastRunTime : (latestRun?.startedAt ?? null);
   const latestIngestedCount = status ? status.ingestedCount : (latestRun?.ingestedCount ?? 0);
-  const totalArtifactCount = status ? status.artifactCount : 0;
+  const runFallback = !status && latestRun ? definition.runFallback : undefined;
+  const runArtifactCount = runFallback && latestRun ? runFallback.artifactCount(latestRun) : null;
+  const artifacts = status ? status.artifactCount : (runArtifactCount ?? latestIngestedCount);
+  const totalArtifactCount = status ? status.artifactCount : (runArtifactCount ?? 0);
+  const lastSyncAt = runFallback && latestRun ? runFallback.syncedAt(latestRun) : lastRunAt;
 
   return {
     sourceId,
@@ -99,8 +104,8 @@ export function createDataSource<C>({
       hasNeverSynced: lastRunAt === null,
       connectorEnabled,
     }),
-    artifacts: status ? status.artifactCount : latestIngestedCount,
-    lastSync: formatDateTime(lastRunAt),
+    artifacts,
+    lastSync: formatDateTime(lastSyncAt),
     errors,
     description: meta.description,
     lastRunAt,

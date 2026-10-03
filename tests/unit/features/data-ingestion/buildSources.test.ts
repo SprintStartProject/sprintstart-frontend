@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildDataSources } from "../../../../src/features/data-ingestion/buildSources";
 import { CONNECTORS } from "../../../../src/features/data-ingestion/connectors/registry";
-import { createDataSource } from "../../../../src/features/data-ingestion/data";
+import { createDataSource, formatDateTime } from "../../../../src/features/data-ingestion/data";
 import {
   confluenceSpaceOf,
   githubRepositoryOf,
@@ -226,6 +226,29 @@ describe("buildDataSources", () => {
     });
 
     expect(card.artifacts).toBe(5);
+    expect(card.lastRunAt).toBe("2026-07-28T10:00:00Z");
+  });
+
+  it("counts a Confluence space without a status row by its run's created and updated pages", () => {
+    const finishedAt = "2026-07-28T10:30:00Z";
+    const [card] = buildDataSources({
+      ...none,
+      confluenceConnections: [confluenceConnection],
+      latestRuns: [
+        run({
+          sourceSystem: "CONFLUENCE",
+          repositoryId: "conn-1",
+          status: "COMPLETED",
+          ingestedCount: 5,
+          updatedCount: 3,
+          finishedAt,
+        }),
+      ],
+    });
+
+    expect(card.artifacts).toBe(8);
+    expect(card.totalArtifactCount).toBe(8);
+    expect(card.lastSync).toBe(formatDateTime(finishedAt));
     expect(card.lastRunAt).toBe("2026-07-28T10:00:00Z");
   });
 

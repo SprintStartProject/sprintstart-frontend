@@ -618,9 +618,10 @@ export function DataIngestionPage() {
 
         <main ref={swipeRef} className="app-page-shell">
           <div className="space-y-8">
-            {[runsErrorMessage, sourceStatusErrorMessage, projectSourcesErrorMessage].map(
-              (message) =>
-                message ? <WarningBanner key={message}>{message}</WarningBanner> : null,
+            {runsErrorMessage && <WarningBanner>{runsErrorMessage}</WarningBanner>}
+            {sourceStatusErrorMessage && <WarningBanner>{sourceStatusErrorMessage}</WarningBanner>}
+            {projectSourcesErrorMessage && (
+              <WarningBanner>{projectSourcesErrorMessage}</WarningBanner>
             )}
 
             <DataIngestionSectionFilter
