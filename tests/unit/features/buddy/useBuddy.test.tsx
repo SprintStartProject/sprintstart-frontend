@@ -42,7 +42,7 @@ describe("useBuddy", () => {
    * moment a hire's session resolves, long before they click. Doing the work here is what makes
    * the click find the conversation already there.
    *
-   * It reads rather than opening blind; `buddyVisitContinuity` covers why that distinction is
+   * It reads rather than opening blind; `buddyConversationContinuity` covers why that distinction is
    * the whole ballgame.
    */
   it("starts closed, with the conversation already on its way", async () => {
@@ -511,15 +511,15 @@ describe("useBuddy", () => {
       expect(result.current.actionDrafts).not.toHaveProperty(key);
     });
 
-    /** The same reasoning one transition further: a fresh visit leaves its offers behind. */
-    it("starts a fresh visit without the flag wording of the visit before", async () => {
+    /** The same reasoning one transition further: a new conversation leaves its offers behind. */
+    it("starts a new conversation without the flag wording of the conversation before", async () => {
       const { result, key } = await confirmOnce(false, (session, key) => {
         session.setActionDraft(key, "Who owns the staging box?");
       });
       expect(result.current.actionDrafts[key]).toBe("Who owns the staging box?");
 
       await act(async () => {
-        await result.current.startFreshVisit();
+        await result.current.newConversation();
       });
 
       expect(result.current.messages).toHaveLength(0);

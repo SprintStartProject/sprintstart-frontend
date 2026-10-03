@@ -198,7 +198,8 @@ describe("useBuddyConversation — team mode", () => {
     expect(localStorage.getItem("buddyTeamMode:user-1")).toBe("false");
     expect(localStorage.getItem("buddyTeamMode:user-2")).toBe("true");
     expect(onLeft).not.toHaveBeenCalled();
-    await waitFor(() => expect(messagesUrl).toBe(""));
+    // Back in the hire's own surface, its conversation is read by session id.
+    await waitFor(() => expect(messagesUrl).toBe("?sessionId=session-1"));
   });
 
   it("does not inherit another user's team preference", () => {
@@ -233,8 +234,8 @@ describe("useBuddyConversation — team mode", () => {
     await waitFor(() => expect(result.current.isTeamMode).toBe(false));
     expect(result.current.teamProjectId).toBeNull();
     expect(onLeft).toHaveBeenCalledTimes(1);
-    // The hire conversation takes over, under no team param.
-    await waitFor(() => expect(messagesUrl).toBe(""));
+    // The hire conversation takes over, under its session id and no team param.
+    await waitFor(() => expect(messagesUrl).toBe("?sessionId=session-1"));
   });
 
   it("exits audibly when management of the selected project is lost", async () => {
@@ -257,7 +258,7 @@ describe("useBuddyConversation — team mode", () => {
     await waitFor(() => expect(result.current.isTeamMode).toBe(false));
     expect(result.current.teamProjectId).toBeNull();
     expect(onLeft).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(messagesUrl).toBe(""));
+    await waitFor(() => expect(messagesUrl).toBe("?sessionId=session-1"));
   });
 
   it("exits audibly on restore when there is no selection to bind to", async () => {
@@ -335,7 +336,7 @@ describe("useBuddyConversation — team mode", () => {
     // Refused: still the hire conversation, and nothing was asked of the selection.
     expect(setSelectedProjectId).not.toHaveBeenCalled();
     expect(result.current.isTeamMode).toBe(false);
-    expect(messagesUrl).toBe("");
+    expect(messagesUrl).toBe("?sessionId=session-1");
   });
 
   it("refuses a switch while a proposal decision is in flight", async () => {

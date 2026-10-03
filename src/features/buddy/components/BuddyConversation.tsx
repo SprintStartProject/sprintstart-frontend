@@ -36,10 +36,6 @@ type BuddyConversationProps = {
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
-  /** Clears the previous conversation from the visit divider — see `BuddyThread`. */
-  onStartFreshVisit?: () => void;
-  /** The chord named in that control's tooltip, where the caller has actually bound one. */
-  freshVisitShortcut?: string;
   /**
    * Leaves room at the top of the thread for a control floating over it.
    *
@@ -102,8 +98,6 @@ function BuddyConversationImpl({
   aboveComposer,
   openError,
   onRetryOpen,
-  onStartFreshVisit,
-  freshVisitShortcut,
   hasFloatingControl = false,
   focusComposerOnMount = false,
   isStreaming = false,
@@ -185,8 +179,6 @@ function BuddyConversationImpl({
             onRetryOpen={onRetryOpen}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={onDinoGameExit}
-            onStartFreshVisit={onStartFreshVisit}
-            freshVisitShortcut={freshVisitShortcut}
           />
         </div>
       </div>
@@ -216,7 +208,7 @@ function BuddyConversationImpl({
  * page's render — is silently the one prop that always changed, and the memo stops paying.
  *
  * The thread *inside* this carries the per-message boundary; this one is about the page's own
- * re-renders (the rail opening, a toast landing, a visit divider moving) not walking the whole
+ * re-renders (the rail opening, a toast landing, a conversation switch) not walking the whole
  * conversation.
  */
 export const BuddyConversation = memo(BuddyConversationImpl);
