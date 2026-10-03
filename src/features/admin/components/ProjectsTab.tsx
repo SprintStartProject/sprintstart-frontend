@@ -32,7 +32,8 @@ type ProjectsTabProps = {
    */
   users?: AdminUser[];
   onOpenProjectDetails: (project: ProjectOverview) => void;
-  hasSearchQuery?: boolean;
+  /** Whether a search or filter is narrowing the list, so an empty result can say so. */
+  isFiltered?: boolean;
   totalCount?: number;
 };
 
@@ -102,7 +103,7 @@ export function ProjectsTab({
   filteredProjects,
   users = [],
   onOpenProjectDetails,
-  hasSearchQuery,
+  isFiltered,
   totalCount,
 }: ProjectsTabProps) {
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
@@ -117,8 +118,8 @@ export function ProjectsTab({
       >
         {noProjectsExist
           ? "Create your first project to get started."
-          : hasSearchQuery
-            ? "Try adjusting your search term."
+          : isFiltered
+            ? "Try adjusting your search or filter."
             : "Try another search term or create a new project first."}
       </EmptyState>
     );

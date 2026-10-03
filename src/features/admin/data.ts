@@ -7,6 +7,7 @@ import type { ProjectManager } from "../../services/projectService";
 import type {
   AdminUser,
   ProjectEditFormState,
+  ProjectFilter,
   ProjectOverview,
   ProjectSummary,
   SkillStatusFilter,
@@ -345,13 +346,41 @@ export function filterAdminUsers(
   });
 }
 
+export const PROJECT_FILTER_OPTIONS: Array<{ value: ProjectFilter; label: string }> = [
+  { value: "all", label: "All projects" },
+  { value: "no-manager", label: "Without manager" },
+  { value: "sources-attention", label: "Sources need attention" },
+  { value: "no-members", label: "Without members" },
+];
+
+function matchesProjectFilter(project: ProjectOverview, filter: ProjectFilter): boolean {
+  switch (filter) {
+    case "no-manager":
+      return project.manager === null;
+    case "sources-attention":
+      return getSourceHealth(project.sources).state === "attention";
+    case "no-members":
+      return project.users.length === 0;
+    case "all":
+      return true;
+  }
+}
+
+/**
+ * Projects matching the search text and the state filter. The filter picks out
+ * the gaps the project cards flag (no manager, failing sources, nobody in it);
+ * the search then narrows within them.
+ */
 export function filterAdminProjects(
   projects: ProjectOverview[],
   projectSearchValue: string,
+  projectFilter: ProjectFilter = "all",
 ): ProjectOverview[] {
   const normalizedSearch = projectSearchValue.trim().toLowerCase();
 
   return projects.filter((project) => {
+    if (!matchesProjectFilter(project, projectFilter)) return false;
+
     const searchableValues = [
       project.id,
       project.name,

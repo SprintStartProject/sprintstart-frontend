@@ -228,6 +228,20 @@ describe("ProjectsTab", () => {
     expect(onOpenProjectDetails).toHaveBeenCalledWith(projects[0]);
   });
 
+  it("points at the search and filter when they leave nothing", () => {
+    render(
+      <ProjectsTab
+        filteredProjects={[]}
+        totalCount={3}
+        isFiltered
+        onOpenProjectDetails={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("No projects found")).toBeInTheDocument();
+    expect(screen.getByText("Try adjusting your search or filter.")).toBeInTheDocument();
+  });
+
   it("shows the empty state when no projects are provided", () => {
     render(<ProjectsTab filteredProjects={[]} onOpenProjectDetails={vi.fn()} />);
     expect(screen.getByText("No projects found")).toBeInTheDocument();

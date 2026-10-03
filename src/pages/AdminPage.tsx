@@ -48,6 +48,7 @@ import type {
   AdminProjectDetails,
   AdminTab,
   AdminUser,
+  ProjectFilter,
   ProjectOverview,
   Skill,
   SkillStatusFilter,
@@ -123,6 +124,7 @@ export function AdminPage() {
   const [searchValue, setSearchValue] = useState("");
   const [projectSearchValue, setProjectSearchValue] = useState("");
   const [userFilter, setUserFilter] = useState<UserFilter>("all");
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
   // Lives here, not in the tokens section, for the same reason as the two
   // above: only one tab is mounted at a time, so a filter kept inside a section
   // would reset every time you leave and come back.
@@ -256,8 +258,8 @@ export function AdminPage() {
   }, [users, searchValue, userFilter]);
 
   const filteredProjects = useMemo(() => {
-    return filterAdminProjects(projects, projectSearchValue);
-  }, [projects, projectSearchValue]);
+    return filterAdminProjects(projects, projectSearchValue, projectFilter);
+  }, [projects, projectSearchValue, projectFilter]);
 
   const totalPages = getTotalPages(filteredUsers.length);
   const safePage = getSafePage(page, totalPages);
@@ -508,6 +510,7 @@ export function AdminPage() {
     setDrawerOrigin(selectedUser ? { kind: "user", id: selectedUser.id } : null);
     setActiveTab("projects");
     setProjectSearchValue("");
+    setProjectFilter("all");
     setProjectPage(1);
     setSelectedUser(null);
     setSelectedProject(project);
@@ -830,8 +833,13 @@ export function AdminPage() {
                   <AdminProjectsToolbar
                     projectCount={filteredProjects.length}
                     projectSearchValue={projectSearchValue}
+                    projectFilter={projectFilter}
                     onProjectSearchChange={(value) => {
                       setProjectSearchValue(value);
+                      setProjectPage(1);
+                    }}
+                    onProjectFilterChange={(value) => {
+                      setProjectFilter(value);
                       setProjectPage(1);
                     }}
                     onCreateProject={openCreateWizard}
@@ -840,7 +848,7 @@ export function AdminPage() {
                   <ProjectsTab
                     filteredProjects={paginatedProjects}
                     users={users}
-                    hasSearchQuery={projectSearchValue.trim().length > 0}
+                    isFiltered={projectSearchValue.trim().length > 0 || projectFilter !== "all"}
                     totalCount={projects.length}
                     onOpenProjectDetails={openProjectDetails}
                   />

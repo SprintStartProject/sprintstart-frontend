@@ -3,6 +3,7 @@ import {
   PAGE_SIZE,
   DRAWER_CLOSE_DELAY_MS,
   PERMISSION_GROUP_OPTIONS,
+  PROJECT_FILTER_OPTIONS,
   USER_FILTER_OPTIONS,
   getDisplayName,
   getPermissionGroupVariant,
@@ -307,6 +308,57 @@ describe("admin data helpers", () => {
 
     it("returns every project on an empty search", () => {
       expect(filterAdminProjects([base, withManager], "")).toHaveLength(2);
+    });
+
+    describe("state filter", () => {
+      const broken: ProjectOverview = {
+        ...withManager,
+        id: "p3",
+        name: "Broken",
+        sources: [
+          { id: "s1", name: "Repo", type: "GITHUB", status: "CONNECTED" },
+          { id: "s2", name: "Board", type: "JIRA", status: "FAILED" },
+        ],
+        users: [{ id: "u1", username: "u", email: "", projectRoles: [] }],
+      };
+      const healthy: ProjectOverview = {
+        ...withManager,
+        id: "p4",
+        name: "Healthy",
+        sources: [{ id: "s3", name: "Repo", type: "GITHUB", status: "CONNECTED" }],
+        users: [{ id: "u2", username: "v", email: "", projectRoles: [] }],
+      };
+      const all = [base, withManager, broken, healthy];
+
+      it("keeps everything for 'all'", () => {
+        expect(filterAdminProjects(all, "", "all")).toHaveLength(4);
+      });
+
+      it("finds projects without a manager", () => {
+        expect(filterAdminProjects(all, "", "no-manager")).toEqual([base]);
+      });
+
+      it("finds projects whose sources need attention", () => {
+        expect(filterAdminProjects(all, "", "sources-attention")).toEqual([broken]);
+      });
+
+      it("finds projects without members", () => {
+        expect(filterAdminProjects(all, "", "no-members")).toEqual([base, withManager]);
+      });
+
+      it("applies the search on top of the filter", () => {
+        expect(filterAdminProjects(all, "beta", "no-members")).toEqual([withManager]);
+        expect(filterAdminProjects(all, "healthy", "no-members")).toEqual([]);
+      });
+
+      it("offers every filter in the toolbar", () => {
+        expect(PROJECT_FILTER_OPTIONS.map((option) => option.value)).toEqual([
+          "all",
+          "no-manager",
+          "sources-attention",
+          "no-members",
+        ]);
+      });
     });
   });
 

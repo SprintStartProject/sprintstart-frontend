@@ -276,6 +276,64 @@ describe("AdminPage", () => {
     expect(screen.getByText("Project Alpha")).toBeInTheDocument();
   });
 
+  describe("project filter", () => {
+    const withManager = createMockProject({
+      id: "p-managed",
+      name: "Managed",
+      manager: { id: "m1", username: "boss", email: "", firstName: "Bea", lastName: "Boss" },
+    });
+    const withoutManager = createMockProject({ id: "p-orphan", name: "Orphan" });
+
+    async function openProjectsTab() {
+      mockGetProjects.mockResolvedValue([withManager, withoutManager]);
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <AdminPage />
+        </MemoryRouter>,
+      );
+
+      await user.click(await screen.findByRole("button", { name: "Projects" }));
+      await screen.findByTestId("projects-tab");
+
+      return user;
+    }
+
+    it("narrows the list to projects without a manager", async () => {
+      const user = await openProjectsTab();
+
+      expect(screen.getByText("2 projects")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("combobox", { name: "Filter projects" }));
+      await user.click(screen.getByRole("option", { name: "Without manager" }));
+
+      expect(await screen.findByText("1 project")).toBeInTheDocument();
+      expect(screen.getByText("Orphan")).toBeInTheDocument();
+      expect(screen.queryByText("Managed")).not.toBeInTheDocument();
+    });
+
+    it("combines with the search", async () => {
+      const user = await openProjectsTab();
+
+      await user.click(screen.getByRole("combobox", { name: "Filter projects" }));
+      await user.click(screen.getByRole("option", { name: "Without manager" }));
+      await user.type(screen.getByPlaceholderText("Search projects..."), "Managed");
+
+      expect(await screen.findByText("0 projects")).toBeInTheDocument();
+    });
+
+    it("keeps the filter when switching to another tab and back", async () => {
+      const user = await openProjectsTab();
+
+      await user.click(screen.getByRole("combobox", { name: "Filter projects" }));
+      await user.click(screen.getByRole("option", { name: "Without manager" }));
+      await user.click(screen.getByRole("button", { name: "Users" }));
+      await user.click(await screen.findByRole("button", { name: "Projects" }));
+
+      expect(await screen.findByText("1 project")).toBeInTheDocument();
+    });
+  });
+
   it("switches to the tokens tab when clicked", async () => {
     const user = userEvent.setup();
     render(
