@@ -489,7 +489,8 @@ describe("SourceDetailsPanel", () => {
         errors: 1,
         failedItems: [
           {
-            artifactIdentifier: "FILE: broken.md",
+            artifactType: "FILE",
+            reference: "broken.md",
             reason: "Parse error",
           },
         ],
@@ -497,7 +498,7 @@ describe("SourceDetailsPanel", () => {
     );
 
     expect(screen.getByText("Failed Items")).toBeInTheDocument();
-    expect(screen.getByText("FILE: broken.md")).toBeInTheDocument();
+    expect(screen.getByText("File: broken.md")).toBeInTheDocument();
     expect(screen.getByText("Parse error")).toBeInTheDocument();
   });
 

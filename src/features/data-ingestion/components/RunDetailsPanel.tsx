@@ -24,6 +24,7 @@ import {
   SOURCE_META,
 } from "../data.ts";
 import type { AiSyncStatus, IngestionRun } from "../types.ts";
+import { FailedItemList } from "./FailedItemList.tsx";
 
 type RunDetailsPanelProps = {
   run: IngestionRun;
@@ -153,19 +154,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
           index={3}
           className="mt-4 sm:mt-5"
         >
-          <div className="space-y-3">
-            {run.failedItems.map((item) => (
-              <div
-                key={`${item.artifactIdentifier}-${item.reason}`}
-                className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
-              >
-                <p className="text-sm font-medium wrap-break-word text-app-warning-text">
-                  {item.artifactIdentifier}
-                </p>
-                <p className="mt-1 text-sm text-app-text-muted">{item.reason}</p>
-              </div>
-            ))}
-          </div>
+          <FailedItemList items={run.failedItems} />
         </DrawerCard>
       )}
     </DetailsSideDrawer>

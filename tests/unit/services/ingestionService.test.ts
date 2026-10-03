@@ -198,7 +198,11 @@ describe("ingestionService", () => {
 
       const run = await loadFirstRun();
       expect(run.status).toBe("FAILED");
-      expect(run.failedItems[0].artifactIdentifier).toBe("COMMIT: s1");
+      expect(run.failedItems[0]).toEqual({
+        artifactType: "COMMIT",
+        reference: "s1",
+        reason: "boom",
+      });
     });
 
     it("infers COMPLETED when finishedAt is present and nothing failed", async () => {
@@ -217,7 +221,7 @@ describe("ingestionService", () => {
       expect((await loadFirstRun()).status).toBe("COMPLETED");
     });
 
-    it("maps failed artifacts using sourceId first, then sourceUrl, then a fallback", async () => {
+    it("maps failed artifacts using sourceId first, then sourceUrl, then no reference", async () => {
       serveRuns([
         {
           runId: "r7",
@@ -233,8 +237,16 @@ describe("ingestionService", () => {
       ]);
 
       const run = await loadFirstRun();
-      expect(run.failedItems[0].artifactIdentifier).toBe("FILE: http://x/y");
-      expect(run.failedItems[1].artifactIdentifier).toBe("ISSUE: Unknown artifact");
+      expect(run.failedItems[0]).toEqual({
+        artifactType: "FILE",
+        reference: "http://x/y",
+        reason: "err",
+      });
+      expect(run.failedItems[1]).toEqual({
+        artifactType: "ISSUE",
+        reference: null,
+        reason: "err2",
+      });
     });
   });
 

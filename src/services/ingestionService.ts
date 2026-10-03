@@ -92,10 +92,9 @@ function clampPage(page: number) {
 }
 
 function mapFailedArtifact(item: CanonicalFailedArtifact): FailedArtifact {
-  const sourceReference = item.sourceId ?? item.sourceUrl ?? "Unknown artifact";
-
   return {
-    artifactIdentifier: `${item.artifactType}: ${sourceReference}`,
+    artifactType: item.artifactType,
+    reference: item.sourceId ?? item.sourceUrl ?? null,
     reason: item.reason,
   };
 }

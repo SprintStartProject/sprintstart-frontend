@@ -162,7 +162,13 @@ export type IngestionRunFilter = {
 };
 
 export type FailedArtifact = {
-  artifactIdentifier: string;
+  /**
+   * Kept as a plain string: Confluence reports `PAGE`, which the ingestion
+   * {@link ArtifactType} union does not list.
+   */
+  artifactType: string;
+  /** Source id or URL of the failed item; null when a whole fetch failed. */
+  reference: string | null;
   reason: string;
 };
 

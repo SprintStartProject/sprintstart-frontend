@@ -194,14 +194,14 @@ describe("SourceList", () => {
       createMockSource({
         sourceSystem: "GITHUB",
         failedItems: [
-          { artifactIdentifier: "FILE: broken.md", reason: "Parse error" },
-          { artifactIdentifier: "FILE: missing.md", reason: "Not found" },
+          { artifactType: "FILE", reference: "broken.md", reason: "Parse error" },
+          { artifactType: "FILE", reference: "missing.md", reason: "Not found" },
         ],
       }),
     ];
 
     render(<SourceList sources={sources} selectedSourceId={null} onSelectSource={vi.fn()} />);
 
-    expect(screen.getAllByText(/2 failed items in latest status/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/2 items failed in the latest sync/).length).toBeGreaterThan(0);
   });
 });

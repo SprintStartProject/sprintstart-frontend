@@ -245,12 +245,11 @@ function FailedItemsNote({ count }: { count: number }) {
   return (
     <div className="mt-5 rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
       <p className="text-sm font-semibold text-app-warning-text">
-        {count} failed item{count === 1 ? "" : "s"} in latest status
+        {count} {count === 1 ? "item" : "items"} failed in the latest sync
       </p>
 
       <p className="mt-1 text-sm text-app-text-muted">
-        Open the source details or check the backend response for failed artifact identifiers and
-        reasons.
+        Open the source to see which items failed and why.
       </p>
     </div>
   );

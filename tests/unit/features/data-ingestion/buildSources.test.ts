@@ -297,7 +297,7 @@ describe("createDataSource without a status row", () => {
       latestRun: run({
         status: "FAILED",
         failedCount: 2,
-        failedItems: [{ artifactIdentifier: "a", reason: "b" }],
+        failedItems: [{ artifactType: "FILE", reference: "a", reason: "b" }],
         ingestedCount: 3,
       }),
     });

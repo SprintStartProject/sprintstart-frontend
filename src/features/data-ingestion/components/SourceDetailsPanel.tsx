@@ -20,6 +20,7 @@ import { getConnector } from "../connectors/registry.ts";
 import { deriveConnectionStatus, deriveSyncStatus, formatDateTime, formatNumber } from "../data.ts";
 import { useManualSync } from "../hooks/useManualSync.ts";
 import type { DataSource, LoadingState, SourceChange } from "../types.ts";
+import { FailedItemList } from "./FailedItemList.tsx";
 import { InfoRow } from "./InfoRows.tsx";
 import { SyncScheduleSettings } from "./SyncScheduleSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
@@ -364,19 +365,7 @@ export function SourceDetailsPanel({
 
       {source.failedItems.length > 0 && (
         <DrawerCard label="Failed Items" icon={XCircle} index={4} className="mt-4 sm:mt-5">
-          <div className="space-y-3">
-            {source.failedItems.map((item) => (
-              <div
-                key={`${item.artifactIdentifier}-${item.reason}`}
-                className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
-              >
-                <p className="text-sm font-medium wrap-break-word text-app-warning-text">
-                  {item.artifactIdentifier}
-                </p>
-                <p className="mt-1 text-sm text-app-text-muted">{item.reason}</p>
-              </div>
-            ))}
-          </div>
+          <FailedItemList items={source.failedItems} />
         </DrawerCard>
       )}
 
