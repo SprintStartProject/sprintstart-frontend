@@ -22,6 +22,7 @@ import {
   stageToggleRemoveUser,
   type PeopleDraft,
 } from "../peopleDraft";
+import { matchesUserSearch } from "../data";
 import { getProjectsLeftOnMove, isManagerEligible } from "../projectMove";
 import type { AdminUser, ProjectUser } from "../types";
 
@@ -39,11 +40,22 @@ type ProjectPeopleSectionProps = {
   onDraftChange: (draft: PeopleDraft) => void;
 };
 
+type PersonIdentity = {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  email?: string;
+};
+
+/** Search results shown at once; the rest are reached by narrowing the search. */
+const MAX_ADDABLE_USERS = 6;
+
 /** A person in the list, whether already assigned or only staged. */
 type PersonRow = {
   id: string;
   displayName: string;
-  secondaryLabel: string;
+  /** Identity fields, shown as `@username · email` and matched by the search box. */
+  person: PersonIdentity;
   profileIcon: string | null;
   isManager: boolean;
   /** Whether the person may be assigned as manager (holds the PM/ADMIN role). */
@@ -68,8 +80,15 @@ function getDisplayName(user: {
   );
 }
 
-function matchesSearch(value: string, search: string) {
-  return value.toLowerCase().includes(search.trim().toLowerCase());
+/** `@username` and email side by side, each as its own span so both stay findable. */
+function PersonContact({ person, className }: { person: PersonIdentity; className?: string }) {
+  return (
+    <span className={["flex min-w-0 items-center gap-1.5", className].join(" ")}>
+      {person.username && <span className="shrink-0">@{person.username}</span>}
+      {person.username && person.email && <span aria-hidden="true">·</span>}
+      {person.email && <span className="truncate">{person.email}</span>}
+    </span>
+  );
 }
 
 /**
@@ -108,7 +127,7 @@ export function ProjectPeopleSection({
     const assigned: PersonRow[] = members.map((member) => ({
       id: member.id,
       displayName: getDisplayName(member),
-      secondaryLabel: member.email || member.username,
+      person: member,
       profileIcon: member.profileIcon ?? null,
       isManager: member.id === effectiveManagerId,
       isManagerEligible: isManagerEligible(...member.roles),
@@ -125,7 +144,7 @@ export function ProjectPeopleSection({
         {
           id: user.id,
           displayName: getDisplayName(user),
-          secondaryLabel: user.email || user.username,
+          person: user,
           profileIcon: user.profileIcon ?? null,
           isManager: user.id === effectiveManagerId,
           isManagerEligible: isManagerEligible(user.permissionGroup),
@@ -149,7 +168,7 @@ export function ProjectPeopleSection({
         combined.push({
           id: effectiveManagerId,
           displayName: getDisplayName(managerUser),
-          secondaryLabel: managerUser.email || managerUser.username,
+          person: managerUser,
           profileIcon: knownUser?.profileIcon ?? null,
           isManager: true,
           // Already the manager, so eligibility is moot — treat as eligible so
@@ -179,11 +198,7 @@ export function ProjectPeopleSection({
   ]);
 
   const visibleRows = useMemo(
-    () =>
-      rows.filter(
-        (row) =>
-          matchesSearch(row.displayName, search) || matchesSearch(row.secondaryLabel, search),
-      ),
+    () => rows.filter((row) => matchesUserSearch(row.person, search)),
     [rows, search],
   );
 
@@ -194,18 +209,15 @@ export function ProjectPeopleSection({
 
   // Non-members are only offered while searching, so the list does not open
   // with every user in the system.
-  const addableUsers = useMemo(() => {
+  const addableMatches = useMemo(() => {
     if (!search.trim()) return [];
 
     return availableUsers
       .filter((user) => !assignedIds.has(user.id))
-      .filter(
-        (user) =>
-          matchesSearch(getDisplayName(user), search) ||
-          matchesSearch(user.email || user.username, search),
-      )
-      .slice(0, 6);
+      .filter((user) => matchesUserSearch(user, search));
   }, [assignedIds, availableUsers, search]);
+
+  const addableUsers = addableMatches.slice(0, MAX_ADDABLE_USERS);
 
   const peopleCount = rows.filter((row) => !row.isPendingRemove).length;
   const managerCount = effectiveManagerId ? 1 : 0;
@@ -285,9 +297,7 @@ export function ProjectPeopleSection({
                   )}
                 </span>
 
-                <span className="block truncate text-xs text-app-text-muted">
-                  {row.secondaryLabel}
-                </span>
+                <PersonContact person={row.person} className="text-xs text-app-text-muted" />
 
                 {row.movedFrom.length > 0 && (
                   <span className="mt-1 flex items-start gap-1 text-xs font-medium text-app-warning-text">
@@ -410,15 +420,19 @@ export function ProjectPeopleSection({
                     <span className="block truncate text-sm font-semibold text-app-text">
                       {getDisplayName(user)}
                     </span>
-                    <span className="block truncate text-xs text-app-text-muted">
-                      {user.email || user.username}
-                    </span>
+                    <PersonContact person={user} className="text-xs text-app-text-muted" />
                   </span>
                   <UserPlus className="h-4 w-4 shrink-0 text-app-text-muted" />
                 </button>
               </motion.li>
             ))}
           </ul>
+
+          {addableMatches.length > addableUsers.length && (
+            <p className="mt-2 px-3 text-xs text-app-text-muted">
+              Showing {addableUsers.length} of {addableMatches.length} – refine your search
+            </p>
+          )}
         </div>
       )}
     </div>

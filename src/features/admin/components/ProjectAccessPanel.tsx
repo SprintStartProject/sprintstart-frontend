@@ -301,7 +301,11 @@ export function ProjectAccessPanel({
                 ) : (
                   <div className="flex flex-col items-center gap-1.5 px-3 py-6 text-center">
                     <Folder className="h-5 w-5 text-app-text-disabled" />
-                    <p className="text-sm text-app-text-muted">No unassigned projects available.</p>
+                    <p className="text-sm text-app-text-muted">
+                      {projectSearch.trim()
+                        ? `No projects match "${projectSearch.trim()}".`
+                        : "No other projects available."}
+                    </p>
                   </div>
                 )}
               </div>

@@ -15,6 +15,7 @@ import {
   getProjectEditFormState,
   getProjectSourcesCount,
   getProjectUsersCount,
+  pluralize,
 } from "../data";
 import {
   applyPeopleChanges,
@@ -301,10 +302,10 @@ export function ProjectDetailsDrawer({
         badge={
           <>
             <AccessBadge variant="neutral">
-              {memberCount > 0 ? `${memberCount} members` : "No members"}
+              {memberCount > 0 ? pluralize(memberCount, "member") : "No members"}
             </AccessBadge>
             <AccessBadge variant={sourceCount > 0 ? "success" : "neutral"}>
-              {sourceCount > 0 ? `${sourceCount} sources` : "No sources"}
+              {sourceCount > 0 ? pluralize(sourceCount, "source") : "No sources"}
             </AccessBadge>
           </>
         }

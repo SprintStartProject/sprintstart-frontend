@@ -52,8 +52,16 @@ describe("ProjectsTab", () => {
 
   it("renders source count and member count metadata", () => {
     render(<ProjectsTab filteredProjects={projects} onOpenProjectDetails={vi.fn()} />);
-    expect(screen.getByText("1 members")).toBeInTheDocument();
+    expect(screen.getByText("1 member")).toBeInTheDocument();
     expect(screen.getByText("2 sources")).toBeInTheDocument();
+    expect(screen.getByText("0 members")).toBeInTheDocument();
+  });
+
+  it("labels source types like the data ingestion page", () => {
+    render(<ProjectsTab filteredProjects={projects} onOpenProjectDetails={vi.fn()} />);
+
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+    expect(screen.getByText("Jira")).toBeInTheDocument();
   });
 
   it("names the assigned project manager on the card", () => {

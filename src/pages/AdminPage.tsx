@@ -137,6 +137,19 @@ export function AdminPage() {
    */
   const drawerCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * Stops a running close animation from clearing the selection afterwards.
+   * Every handler that opens a drawer has to call this first: otherwise opening
+   * something within the close delay of the previous drawer lets the stale
+   * timeout wipe the new selection and the drawer vanishes again.
+   */
+  const cancelPendingDrawerClose = () => {
+    if (drawerCloseTimeoutRef.current !== null) {
+      clearTimeout(drawerCloseTimeoutRef.current);
+      drawerCloseTimeoutRef.current = null;
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (drawerCloseTimeoutRef.current !== null) {
@@ -255,6 +268,7 @@ export function AdminPage() {
   };
 
   const openUserDetails = (user: AdminUser) => {
+    cancelPendingDrawerClose();
     setOpenUserMenuId(null);
     setSelectedProject(null);
     setSelectedSkill(null);
@@ -391,6 +405,7 @@ export function AdminPage() {
   };
 
   const openProjectDetails = (project: ProjectOverview) => {
+    cancelPendingDrawerClose();
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedSkill(null);
@@ -400,6 +415,7 @@ export function AdminPage() {
   };
 
   const openSkillDetails = (skill: Skill) => {
+    cancelPendingDrawerClose();
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedProject(null);
@@ -409,6 +425,7 @@ export function AdminPage() {
   };
 
   const openCreateSkillDrawer = () => {
+    cancelPendingDrawerClose();
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedProject(null);
@@ -427,6 +444,7 @@ export function AdminPage() {
 
     if (!project) return;
 
+    cancelPendingDrawerClose();
     setOpenUserMenuId(null);
     setActiveTab("projects");
     setProjectSearchValue("");
@@ -524,7 +542,9 @@ export function AdminPage() {
     setOpenUserMenuId(null);
     setIsDrawerOpen(false);
 
+    cancelPendingDrawerClose();
     drawerCloseTimeoutRef.current = setTimeout(() => {
+      drawerCloseTimeoutRef.current = null;
       setSelectedUser(null);
       setSelectedProject(null);
       setSelectedSkill(null);
@@ -532,11 +552,16 @@ export function AdminPage() {
     }, DRAWER_CLOSE_DELAY_MS);
   };
 
-  // The tokens section loads its own data through the access connector
-  // registry; only the create-project wizard still needs the PAT names here.
+  // Switching tabs only closes a drawer that is actually open; scheduling a
+  // close for nothing would leave a timeout behind that could clear a drawer
+  // opened right after the switch.
   const handleTabChange = (tab: AdminTab) => {
     setOpenUserMenuId(null);
-    closeDetails();
+
+    if (isDrawerOpen) {
+      closeDetails();
+    }
+
     setActiveTab(tab);
   };
 

@@ -1,6 +1,7 @@
 import type { BadgeVariant } from "../../components/ui/Badge";
 import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 import type { ProjectRole, Skill } from "../team-management/types";
+import { SOURCE_META } from "../data-ingestion/data";
 import type {
   AdminUser,
   ProjectEditFormState,
@@ -29,6 +30,59 @@ export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> = 
 export function getDisplayName(user: AdminUser) {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
   return fullName || user.username || user.email;
+}
+
+type SearchableUser = {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  email?: string;
+};
+
+/**
+ * Whether a person matches a free-text search.
+ *
+ * Name, username and email are each tested on their own. Searching a combined
+ * "label" such as `email || username` hides the username as soon as an email
+ * exists, which is the case for every real account.
+ */
+export function matchesUserSearch(user: SearchableUser, term: string): boolean {
+  const normalized = term.trim().toLowerCase();
+
+  if (normalized.length === 0) return true;
+
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+
+  return [fullName, user.username, user.email].some((value) =>
+    (value ?? "").toLowerCase().includes(normalized),
+  );
+}
+
+/** `"1 member"` / `"2 members"`. */
+export function pluralize(count: number, noun: string, plural = `${noun}s`): string {
+  return `${count} ${count === 1 ? noun : plural}`;
+}
+
+/**
+ * Display label for a project source's raw type string.
+ *
+ * Known systems use the label from the shared `SOURCE_META`, so "GitHub" reads
+ * the same here as on the Data Ingestion page. Unknown types fall back to a
+ * title-cased version of the raw value rather than disappearing.
+ */
+export function getSourceTypeLabel(type: string): string {
+  const normalized = type.toUpperCase();
+
+  if (normalized in SOURCE_META) {
+    return SOURCE_META[normalized as keyof typeof SOURCE_META].type;
+  }
+
+  return type
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function getPermissionGroupVariant(permissionGroup: string): BadgeVariant {
@@ -176,13 +230,17 @@ export function filterAdminProjects(
       project.id,
       project.name,
       project.description,
+      project.industry,
+      ...(project.manager
+        ? [
+            project.manager.firstName,
+            project.manager.lastName,
+            [project.manager.firstName, project.manager.lastName].filter(Boolean).join(" "),
+            project.manager.username,
+          ]
+        : []),
       ...project.sources.flatMap((source) => [source.id, source.name, source.type, source.status]),
-      ...project.users.flatMap((user) => [
-        user.id,
-        user.username,
-        user.email,
-        ...user.projectRoles,
-      ]),
+      ...project.users.flatMap((user) => [user.id, user.username, user.email]),
     ];
 
     return (

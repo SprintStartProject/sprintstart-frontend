@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { AdminPage } from "../../../src/pages/AdminPage";
+import { DRAWER_CLOSE_DELAY_MS } from "../../../src/features/admin/data";
 import type { AdminUser, ProjectSummary } from "../../../src/services/adminUserService";
 import type {
   AdminProject,
@@ -378,6 +379,54 @@ describe("AdminPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("John Details")).toBeInTheDocument();
+    });
+  });
+
+  /*
+    Closing a drawer schedules the selection to be cleared once the slide-out finishes. Opening
+    something else inside that window used to let the stale timeout wipe the new selection, so
+    the freshly opened drawer vanished again.
+  */
+  describe("drawer close race", () => {
+    const waitForCloseDelay = () =>
+      new Promise((resolve) => setTimeout(resolve, DRAWER_CLOSE_DELAY_MS + 100));
+
+    it("keeps a user drawer opened right after closing another one", async () => {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <AdminPage />
+        </MemoryRouter>,
+      );
+
+      await user.click(await screen.findByText("View John"));
+      await waitFor(() => expect(screen.getByText("John Details")).toBeInTheDocument());
+
+      await user.click(screen.getByRole("button", { name: "Close details overlay" }));
+      await user.click(screen.getByText("View Jane"));
+
+      await waitForCloseDelay();
+
+      expect(screen.getByText("Jane Details")).toBeInTheDocument();
+    });
+
+    it("keeps a project drawer opened right after switching tabs with a drawer open", async () => {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <AdminPage />
+        </MemoryRouter>,
+      );
+
+      await user.click(await screen.findByText("View John"));
+      await waitFor(() => expect(screen.getByText("John Details")).toBeInTheDocument());
+
+      await user.click(screen.getByRole("button", { name: "Projects" }));
+      await user.click(await screen.findByText("Open Project Alpha"));
+
+      await waitForCloseDelay();
+
+      expect(screen.getByText("Project Alpha Details")).toBeInTheDocument();
     });
   });
 

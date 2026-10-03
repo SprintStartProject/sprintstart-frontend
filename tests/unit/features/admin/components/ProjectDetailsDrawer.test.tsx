@@ -578,6 +578,43 @@ describe("ProjectDetailsDrawer", () => {
       );
     });
 
+    it("finds members and add suggestions by username, not just by email", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => expect(screen.getByText("Jane Doe")).toBeInTheDocument());
+
+      const search = screen.getByRole("textbox", { name: "Search or add people" });
+
+      await user.type(search, "jane.doe");
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+      expect(screen.getByText("@jane.doe")).toBeInTheDocument();
+
+      await user.clear(search);
+      await user.type(search, "tom.fis");
+      expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Tom Fischer/ })).toBeInTheDocument();
+    });
+
+    it("says when only some of the matching users are listed", async () => {
+      const user = userEvent.setup();
+      const manyUsers = Array.from({ length: 8 }, (_, index) => ({
+        ...availableUsers[1],
+        id: `bulk-${index}`,
+        username: `bulk.user${index}`,
+        email: `bulk${index}@example.com`,
+        firstName: "Bulk",
+        lastName: `User ${index}`,
+      })) as unknown as AdminUser[];
+
+      renderDrawer({ availableUsers: manyUsers });
+
+      await waitFor(() => expect(screen.getByText("Jane Doe")).toBeInTheDocument());
+      await user.type(screen.getByRole("textbox", { name: "Search or add people" }), "bulk");
+
+      expect(screen.getByText("Showing 6 of 8 – refine your search")).toBeInTheDocument();
+    });
+
     it("discards staged changes", async () => {
       const user = userEvent.setup();
       renderDrawer();

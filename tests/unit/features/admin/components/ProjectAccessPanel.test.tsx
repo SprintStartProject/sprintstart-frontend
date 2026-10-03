@@ -85,6 +85,33 @@ describe("ProjectAccessPanel", () => {
     expect(screen.queryByText("Beta")).not.toBeInTheDocument();
   });
 
+  it("tells a search without hits apart from having no other projects", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ProjectAccessPanel
+        assignedProjects={assignedProjects}
+        availableProjects={availableProjects}
+        {...defaultCallbacks}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Add project/i }));
+    await user.type(screen.getByPlaceholderText("Search projects..."), "zzz");
+
+    expect(screen.getByText('No projects match "zzz".')).toBeInTheDocument();
+
+    rerender(
+      <ProjectAccessPanel
+        assignedProjects={assignedProjects}
+        availableProjects={assignedProjects}
+        {...defaultCallbacks}
+      />,
+    );
+    await user.clear(screen.getByPlaceholderText("Search projects..."));
+
+    expect(screen.getByText("No other projects available.")).toBeInTheDocument();
+  });
+
   it("adds a project from the picker to the assigned list", async () => {
     const user = userEvent.setup();
     render(

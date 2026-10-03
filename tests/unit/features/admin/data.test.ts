@@ -12,8 +12,16 @@ import {
   getUserEditFormState,
   getDraftDisplayName,
   enrichUsersWithProjectNames,
+  filterAdminProjects,
+  getSourceTypeLabel,
+  matchesUserSearch,
+  pluralize,
 } from "../../../../src/features/admin/data";
-import type { AdminUser, UserEditFormState } from "../../../../src/features/admin/types";
+import type {
+  AdminUser,
+  ProjectOverview,
+  UserEditFormState,
+} from "../../../../src/features/admin/types";
 
 function createAdminUser(overrides: Partial<AdminUser> = {}): AdminUser {
   return {
@@ -222,6 +230,98 @@ describe("admin data helpers", () => {
       const [enriched] = enrichUsersWithProjectNames([user], []);
 
       expect(enriched.projects).toEqual([{ id: "p1", name: "Alpha" }]);
+    });
+  });
+
+  describe("matchesUserSearch", () => {
+    const person = {
+      firstName: "Jane",
+      lastName: "Doe",
+      username: "jane.d",
+      email: "jane@example.com",
+    };
+
+    it("matches everyone on an empty term", () => {
+      expect(matchesUserSearch(person, "   ")).toBe(true);
+    });
+
+    it("finds the username even though an email exists", () => {
+      expect(matchesUserSearch(person, "jane.d")).toBe(true);
+      expect(matchesUserSearch(person, "ne.d")).toBe(true);
+    });
+
+    it("matches the full name, the email and ignores case", () => {
+      expect(matchesUserSearch(person, "Jane Doe")).toBe(true);
+      expect(matchesUserSearch(person, "EXAMPLE.COM")).toBe(true);
+    });
+
+    it("does not match unrelated text", () => {
+      expect(matchesUserSearch(person, "tom")).toBe(false);
+    });
+
+    it("tolerates missing fields", () => {
+      expect(matchesUserSearch({ username: "solo" }, "solo")).toBe(true);
+      expect(matchesUserSearch({ username: "solo" }, "x")).toBe(false);
+    });
+  });
+
+  describe("filterAdminProjects", () => {
+    const base: ProjectOverview = {
+      id: "p1",
+      name: "Alpha",
+      description: "First",
+      manager: null,
+      sources: [],
+      users: [],
+      industry: "",
+      industryConfidence: null,
+      industryCustom: false,
+    };
+    const withManager: ProjectOverview = {
+      ...base,
+      id: "p2",
+      name: "Beta",
+      industry: "Fintech",
+      manager: {
+        id: "m1",
+        username: "mara.k",
+        email: "mara@example.com",
+        firstName: "Mara",
+        lastName: "Keller",
+      },
+    };
+
+    it("finds a project by its manager's name or username", () => {
+      expect(filterAdminProjects([base, withManager], "Mara Keller")).toEqual([withManager]);
+      expect(filterAdminProjects([base, withManager], "mara.k")).toEqual([withManager]);
+    });
+
+    it("finds a project by its industry", () => {
+      expect(filterAdminProjects([base, withManager], "fintech")).toEqual([withManager]);
+    });
+
+    it("returns every project on an empty search", () => {
+      expect(filterAdminProjects([base, withManager], "")).toHaveLength(2);
+    });
+  });
+
+  describe("pluralize", () => {
+    it("uses the singular only for exactly one", () => {
+      expect(pluralize(0, "member")).toBe("0 members");
+      expect(pluralize(1, "member")).toBe("1 member");
+      expect(pluralize(2, "source")).toBe("2 sources");
+    });
+  });
+
+  describe("getSourceTypeLabel", () => {
+    it("uses the shared source label", () => {
+      expect(getSourceTypeLabel("GITHUB")).toBe("GitHub");
+      expect(getSourceTypeLabel("jira")).toBe("Jira");
+    });
+
+    it("title-cases an unknown type", () => {
+      expect(getSourceTypeLabel("SONARQUBE")).toBe("Sonarqube");
+      expect(getSourceTypeLabel("custom_thing")).toBe("Custom Thing");
     });
   });
 });

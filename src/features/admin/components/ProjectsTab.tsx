@@ -1,5 +1,10 @@
 import { ChevronRight, FileText, Folder, Tag, UserCog, Users } from "lucide-react";
-import { getProjectSourcesCount, getProjectUsersCount } from "../data";
+import {
+  getProjectSourcesCount,
+  getProjectUsersCount,
+  getSourceTypeLabel,
+  pluralize,
+} from "../data";
 import type { ProjectManager } from "../../../services/projectService";
 import type { ProjectOverview, ProjectSource } from "../types";
 import { AccessBadge } from "./Badges";
@@ -18,15 +23,6 @@ function getManagerName(manager: ProjectManager) {
   return fullName || manager.username;
 }
 
-function formatSourceType(type: string) {
-  return type
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 function getSourceTypeBadges(sources: ProjectSource[]) {
   const countsByType = new Map<string, number>();
 
@@ -37,7 +33,7 @@ function getSourceTypeBadges(sources: ProjectSource[]) {
   return Array.from(countsByType.entries()).map(([type, count]) => ({
     type,
     count,
-    label: formatSourceType(type),
+    label: getSourceTypeLabel(type),
   }));
 }
 
@@ -128,14 +124,14 @@ export function ProjectsTab({
                   </div>
                 )}
 
-                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-app-text-disabled">
+                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-app-text-muted">
                   <span className="flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5" />
-                    {getProjectUsersCount(project)} members
+                    {pluralize(getProjectUsersCount(project), "member")}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <FileText className="h-3.5 w-3.5" />
-                    {getProjectSourcesCount(project)} sources
+                    {pluralize(getProjectSourcesCount(project), "source")}
                   </span>
                   {/* Spelled out even when unset: a project without a manager
                       is the state an admin most needs to spot from the list. */}

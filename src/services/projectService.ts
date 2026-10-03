@@ -4,14 +4,6 @@
 
 import { ApiError, apiClient } from "./apiClient";
 
-/**
- * Moves one user out of `sourceProjectId` and into the project addressed by the
- * request path.
- *
- * Deliberately a single request rather than a remove followed by an assign: a
- * project manager only sees users mapped to their own projects, so a failed
- * second call would leave them unable to undo the first.
- */
 export type GlobalUserRole = "ADMIN" | "HR" | "PM" | "USER" | (string & {});
 
 export type ProjectRole = "MEMBER" | "MANAGER" | "TEAMLEAD" | (string & {});
