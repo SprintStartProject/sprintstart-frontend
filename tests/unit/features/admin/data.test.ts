@@ -3,6 +3,7 @@ import {
   PAGE_SIZE,
   DRAWER_CLOSE_DELAY_MS,
   PERMISSION_GROUP_OPTIONS,
+  PROJECT_FILTER_OPTIONS,
   USER_FILTER_OPTIONS,
   getDisplayName,
   getPermissionGroupVariant,
@@ -12,8 +13,21 @@ import {
   getUserEditFormState,
   getDraftDisplayName,
   enrichUsersWithProjectNames,
+  filterAdminProjects,
+  filterAdminUsers,
+  getManagerName,
+  resolveUserProjects,
+  getSourceHealth,
+  getSourceTypeLabel,
+  groupSourcesByType,
+  matchesUserSearch,
+  pluralize,
 } from "../../../../src/features/admin/data";
-import type { AdminUser, UserEditFormState } from "../../../../src/features/admin/types";
+import type {
+  AdminUser,
+  ProjectOverview,
+  UserEditFormState,
+} from "../../../../src/features/admin/types";
 
 function createAdminUser(overrides: Partial<AdminUser> = {}): AdminUser {
   return {
@@ -83,9 +97,9 @@ describe("admin data helpers", () => {
   });
 
   describe("getPermissionGroupVariant", () => {
-    it("returns warning for ADMIN (case-insensitive)", () => {
-      expect(getPermissionGroupVariant("admin")).toBe("warning");
-      expect(getPermissionGroupVariant("ADMIN")).toBe("warning");
+    it("returns danger for ADMIN (case-insensitive)", () => {
+      expect(getPermissionGroupVariant("admin")).toBe("danger");
+      expect(getPermissionGroupVariant("ADMIN")).toBe("danger");
     });
 
     it("returns success for PROJECT_MANAGER", () => {
@@ -222,6 +236,253 @@ describe("admin data helpers", () => {
       const [enriched] = enrichUsersWithProjectNames([user], []);
 
       expect(enriched.projects).toEqual([{ id: "p1", name: "Alpha" }]);
+    });
+  });
+
+  describe("matchesUserSearch", () => {
+    const person = {
+      firstName: "Jane",
+      lastName: "Doe",
+      username: "jane.d",
+      email: "jane@example.com",
+    };
+
+    it("matches everyone on an empty term", () => {
+      expect(matchesUserSearch(person, "   ")).toBe(true);
+    });
+
+    it("finds the username even though an email exists", () => {
+      expect(matchesUserSearch(person, "jane.d")).toBe(true);
+      expect(matchesUserSearch(person, "ne.d")).toBe(true);
+    });
+
+    it("matches the full name, the email and ignores case", () => {
+      expect(matchesUserSearch(person, "Jane Doe")).toBe(true);
+      expect(matchesUserSearch(person, "EXAMPLE.COM")).toBe(true);
+    });
+
+    it("does not match unrelated text", () => {
+      expect(matchesUserSearch(person, "tom")).toBe(false);
+    });
+
+    it("tolerates missing fields", () => {
+      expect(matchesUserSearch({ username: "solo" }, "solo")).toBe(true);
+      expect(matchesUserSearch({ username: "solo" }, "x")).toBe(false);
+    });
+  });
+
+  describe("filterAdminProjects", () => {
+    const base: ProjectOverview = {
+      id: "p1",
+      name: "Alpha",
+      description: "First",
+      manager: null,
+      sources: [],
+      users: [],
+      industry: "",
+      industryConfidence: null,
+      industryCustom: false,
+    };
+    const withManager: ProjectOverview = {
+      ...base,
+      id: "p2",
+      name: "Beta",
+      industry: "Fintech",
+      manager: {
+        id: "m1",
+        username: "mara.k",
+        email: "mara@example.com",
+        firstName: "Mara",
+        lastName: "Keller",
+      },
+    };
+
+    it("finds a project by its manager's name or username", () => {
+      expect(filterAdminProjects([base, withManager], "Mara Keller")).toEqual([withManager]);
+      expect(filterAdminProjects([base, withManager], "mara.k")).toEqual([withManager]);
+    });
+
+    it("finds a project by its industry", () => {
+      expect(filterAdminProjects([base, withManager], "fintech")).toEqual([withManager]);
+    });
+
+    it("returns every project on an empty search", () => {
+      expect(filterAdminProjects([base, withManager], "")).toHaveLength(2);
+    });
+
+    describe("state filter", () => {
+      const broken: ProjectOverview = {
+        ...withManager,
+        id: "p3",
+        name: "Broken",
+        sources: [
+          { id: "s1", name: "Repo", type: "GITHUB", status: "CONNECTED" },
+          { id: "s2", name: "Board", type: "JIRA", status: "FAILED" },
+        ],
+        users: [{ id: "u1", username: "u", email: "", projectRoles: [] }],
+      };
+      const healthy: ProjectOverview = {
+        ...withManager,
+        id: "p4",
+        name: "Healthy",
+        sources: [{ id: "s3", name: "Repo", type: "GITHUB", status: "CONNECTED" }],
+        users: [{ id: "u2", username: "v", email: "", projectRoles: [] }],
+      };
+      const all = [base, withManager, broken, healthy];
+
+      it("keeps everything for 'all'", () => {
+        expect(filterAdminProjects(all, "", "all")).toHaveLength(4);
+      });
+
+      it("finds projects without a manager", () => {
+        expect(filterAdminProjects(all, "", "no-manager")).toEqual([base]);
+      });
+
+      it("finds projects whose sources need attention", () => {
+        expect(filterAdminProjects(all, "", "sources-attention")).toEqual([broken]);
+      });
+
+      it("finds projects without members", () => {
+        expect(filterAdminProjects(all, "", "no-members")).toEqual([base, withManager]);
+      });
+
+      it("applies the search on top of the filter", () => {
+        expect(filterAdminProjects(all, "beta", "no-members")).toEqual([withManager]);
+        expect(filterAdminProjects(all, "healthy", "no-members")).toEqual([]);
+      });
+
+      it("offers every filter in the toolbar", () => {
+        expect(PROJECT_FILTER_OPTIONS.map((option) => option.value)).toEqual([
+          "all",
+          "no-manager",
+          "sources-attention",
+          "no-members",
+        ]);
+      });
+    });
+  });
+
+  describe("pluralize", () => {
+    it("uses the singular only for exactly one", () => {
+      expect(pluralize(0, "member")).toBe("0 members");
+      expect(pluralize(1, "member")).toBe("1 member");
+      expect(pluralize(2, "source")).toBe("2 sources");
+    });
+  });
+
+  describe("getSourceHealth", () => {
+    it("reports no sources", () => {
+      expect(getSourceHealth([])).toMatchObject({ state: "none", label: "No sources" });
+    });
+
+    it("is healthy when every source is connected", () => {
+      expect(getSourceHealth([{ status: "CONNECTED" }, { status: "CONNECTED" }])).toMatchObject({
+        state: "healthy",
+        label: "All synced",
+      });
+    });
+
+    it("counts failed, disconnected and disabled sources as needing attention", () => {
+      const health = getSourceHealth([
+        { status: "FAILED" },
+        { status: "DISCONNECTED" },
+        { status: "DISABLED" },
+        { status: "CONNECTED" },
+      ]);
+
+      expect(health).toMatchObject({
+        state: "attention",
+        attentionCount: 3,
+        label: "3 need attention",
+      });
+    });
+
+    it("lets attention win over syncing, and keeps out-of-date apart from failures", () => {
+      expect(getSourceHealth([{ status: "UPDATING" }, { status: "ERROR" }]).state).toBe(
+        "attention",
+      );
+      expect(getSourceHealth([{ status: "UPDATING" }, { status: "CONNECTED" }]).state).toBe(
+        "syncing",
+      );
+      expect(getSourceHealth([{ status: "OUT_OF_DATE" }, { status: "CONNECTED" }])).toMatchObject({
+        state: "stale",
+        label: "1 out of date",
+      });
+    });
+  });
+
+  describe("filterAdminUsers", () => {
+    it("finds users without a project", () => {
+      const withProject = createAdminUser({ id: "a", projects: [{ id: "p", name: "P" }] });
+      const without = createAdminUser({ id: "b", projects: [] });
+
+      expect(filterAdminUsers([withProject, without], "", "no-project")).toEqual([without]);
+    });
+
+    it("offers the filter in the toolbar", () => {
+      expect(USER_FILTER_OPTIONS.map((option) => option.value)).toContain("no-project");
+    });
+  });
+
+  describe("resolveUserProjects", () => {
+    const overview = {
+      id: "p1",
+      name: "Renamed",
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+      industry: "",
+      industryConfidence: null,
+      industryCustom: false,
+    } satisfies ProjectOverview;
+
+    it("pairs each assigned project with its full record under the current name", () => {
+      expect(resolveUserProjects([{ id: "p1", name: "Old" }], [overview])).toEqual([
+        { id: "p1", name: "Renamed", overview },
+      ]);
+    });
+
+    it("keeps a project the list does not know, without a record", () => {
+      expect(resolveUserProjects([{ id: "gone", name: "Project gone" }], [overview])).toEqual([
+        { id: "gone", name: "Project gone", overview: null },
+      ]);
+    });
+  });
+
+  describe("getManagerName", () => {
+    const manager = {
+      id: "m1",
+      username: "mara.k",
+      email: "",
+      firstName: "Mara",
+      lastName: "Keller",
+    };
+
+    it("prefers the full name and falls back to the username", () => {
+      expect(getManagerName(manager)).toBe("Mara Keller");
+      expect(getManagerName({ ...manager, firstName: "", lastName: "" })).toBe("mara.k");
+    });
+  });
+
+  describe("groupSourcesByType", () => {
+    it("counts sources per type regardless of case, in order of first appearance", () => {
+      expect(groupSourcesByType([{ type: "JIRA" }, { type: "GITHUB" }, { type: "jira" }])).toEqual([
+        { type: "JIRA", label: "Jira", count: 2 },
+        { type: "GITHUB", label: "GitHub", count: 1 },
+      ]);
+    });
+  });
+
+  describe("getSourceTypeLabel", () => {
+    it("uses the shared source label", () => {
+      expect(getSourceTypeLabel("GITHUB")).toBe("GitHub");
+      expect(getSourceTypeLabel("jira")).toBe("Jira");
+    });
+
+    it("title-cases an unknown type", () => {
+      expect(getSourceTypeLabel("SONARQUBE")).toBe("Sonarqube");
+      expect(getSourceTypeLabel("custom_thing")).toBe("Custom Thing");
     });
   });
 });

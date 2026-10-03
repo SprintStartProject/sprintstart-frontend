@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertCircle, Loader2, RefreshCw, Terminal } from "lucide-react";
+import { AlertCircle, RefreshCw, Terminal } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
+import { Button } from "../components/ui/Button";
+import { Spinner } from "../components/ui/Spinner";
 import { SCROLL_CONTAINER_ATTRIBUTE } from "../components/ui/useScrollLock";
 import {
   DRAWER_CLOSE_DELAY_MS,
@@ -11,7 +13,6 @@ import {
   filterAdminProjects,
   filterAdminUsers,
   filterSkills,
-  getAvailableProjects,
   getDisplayName,
   getPaginatedProjects,
   getPaginatedSkills,
@@ -47,6 +48,7 @@ import type {
   AdminProjectDetails,
   AdminTab,
   AdminUser,
+  ProjectFilter,
   ProjectOverview,
   Skill,
   SkillStatusFilter,
@@ -91,8 +93,25 @@ export function AdminPage() {
     parameter sat in the URL.
   */
   const [searchParams, setSearchParams] = useSearchParams();
+  /*
+    `?projectId=` and `?userId=` open that project's or user's drawer, so a link from elsewhere
+    (a dashboard card, a message) can land on the thing it talks about. They are handed off
+    like `tab`, but only on mount: the drawer logic below assumes no drawer is open yet. The
+    drawer itself opens once the lists have loaded, since it needs the record to show.
+  */
+  const [pendingDeepLink, setPendingDeepLink] = useState<{
+    projectId: string | null;
+    userId: string | null;
+  } | null>(() => {
+    const projectId = searchParams.get("projectId");
+    const userId = searchParams.get("userId");
+
+    return projectId || userId ? { projectId, userId } : null;
+  });
   const requestedTab = visibleAdminTabs.find((tab) => tab === searchParams.get("tab"));
-  const [activeTab, setActiveTab] = useState<AdminTab>(requestedTab ?? "users");
+  const [activeTab, setActiveTab] = useState<AdminTab>(
+    () => requestedTab ?? (searchParams.get("projectId") ? "projects" : "users"),
+  );
   // Adjusted during render rather than in the effect below: the tab follows a new request in
   // the same paint, and forgetting the request once stripped lets the same link work twice.
   const [handledTab, setHandledTab] = useState(requestedTab);
@@ -101,11 +120,17 @@ export function AdminPage() {
     if (requestedTab) setActiveTab(requestedTab);
   }
 
+  const drawerParamsConsumed = useRef(false);
+
   useEffect(() => {
-    if (!searchParams.has("tab")) return;
+    const keys = drawerParamsConsumed.current ? ["tab"] : ["tab", "projectId", "userId"];
+    drawerParamsConsumed.current = true;
+
+    const handedOff = keys.filter((key) => searchParams.has(key));
+    if (handedOff.length === 0) return;
 
     const next = new URLSearchParams(searchParams);
-    next.delete("tab");
+    handedOff.forEach((key) => next.delete(key));
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
@@ -116,6 +141,7 @@ export function AdminPage() {
   const [searchValue, setSearchValue] = useState("");
   const [projectSearchValue, setProjectSearchValue] = useState("");
   const [userFilter, setUserFilter] = useState<UserFilter>("all");
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
   // Lives here, not in the tokens section, for the same reason as the two
   // above: only one tab is mounted at a time, so a filter kept inside a section
   // would reset every time you leave and come back.
@@ -150,6 +176,29 @@ export function AdminPage() {
    * test environments.
    */
   const drawerCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Stops a running close animation from clearing the selection afterwards.
+   * Every handler that opens a drawer has to call this first: otherwise opening
+   * something within the close delay of the previous drawer lets the stale
+   * timeout wipe the new selection and the drawer vanishes again.
+   */
+  const cancelPendingDrawerClose = useCallback(() => {
+    if (drawerCloseTimeoutRef.current !== null) {
+      clearTimeout(drawerCloseTimeoutRef.current);
+      drawerCloseTimeoutRef.current = null;
+    }
+  }, []);
+
+  /**
+   * The drawer a drawer was opened from (a user's project, a project's member).
+   * Drawers replace each other, so this is what lets the new one offer a way
+   * back. Only one step is kept: going back clears it, and opening anything
+   * unrelated from the page does too.
+   */
+  const [drawerOrigin, setDrawerOrigin] = useState<{ kind: "user" | "project"; id: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     return () => {
@@ -195,15 +244,39 @@ export function AdminPage() {
     }
   }, [activeTab, loadSkillPool]);
 
-  const availableProjects = useMemo(() => getAvailableProjects(projects), [projects]);
+  // Opens the drawer a `?projectId=` / `?userId=` link asked for. It waits for
+  // the lists, and a link to something that no longer exists simply opens
+  // nothing rather than an error — the page underneath is still the right place.
+  //
+  // Done while rendering rather than in an effect: this is state derived from
+  // data arriving, and it settles in one extra render because the link is
+  // cleared as it is applied. No drawer can be closing yet, so there is no
+  // pending close to cancel.
+  if (pendingDeepLink && loadingState === "success") {
+    const linkedProject = pendingDeepLink.projectId
+      ? projects.find((entry) => entry.id === pendingDeepLink.projectId)
+      : undefined;
+    const linkedUser = pendingDeepLink.userId
+      ? users.find((entry) => entry.id === pendingDeepLink.userId)
+      : undefined;
+
+    setPendingDeepLink(null);
+
+    if (linkedProject || linkedUser) {
+      setSelectedProject(linkedProject ?? null);
+      setSelectedUser(linkedProject ? null : (linkedUser ?? null));
+      setActiveTab(linkedProject ? "projects" : "users");
+      setIsDrawerOpen(true);
+    }
+  }
 
   const filteredUsers = useMemo(() => {
     return filterAdminUsers(users, searchValue, userFilter);
   }, [users, searchValue, userFilter]);
 
   const filteredProjects = useMemo(() => {
-    return filterAdminProjects(projects, projectSearchValue);
-  }, [projects, projectSearchValue]);
+    return filterAdminProjects(projects, projectSearchValue, projectFilter);
+  }, [projects, projectSearchValue, projectFilter]);
 
   const totalPages = getTotalPages(filteredUsers.length);
   const safePage = getSafePage(page, totalPages);
@@ -269,6 +342,8 @@ export function AdminPage() {
   };
 
   const openUserDetails = (user: AdminUser) => {
+    cancelPendingDrawerClose();
+    setDrawerOrigin(null);
     setOpenUserMenuId(null);
     setSelectedProject(null);
     setSelectedSkill(null);
@@ -405,6 +480,8 @@ export function AdminPage() {
   };
 
   const openProjectDetails = (project: ProjectOverview) => {
+    cancelPendingDrawerClose();
+    setDrawerOrigin(null);
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedSkill(null);
@@ -414,6 +491,8 @@ export function AdminPage() {
   };
 
   const openSkillDetails = (skill: Skill) => {
+    cancelPendingDrawerClose();
+    setDrawerOrigin(null);
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedProject(null);
@@ -423,6 +502,8 @@ export function AdminPage() {
   };
 
   const openCreateSkillDrawer = () => {
+    cancelPendingDrawerClose();
+    setDrawerOrigin(null);
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedProject(null);
@@ -441,14 +522,72 @@ export function AdminPage() {
 
     if (!project) return;
 
+    cancelPendingDrawerClose();
     setOpenUserMenuId(null);
+    setDrawerOrigin(selectedUser ? { kind: "user", id: selectedUser.id } : null);
     setActiveTab("projects");
     setProjectSearchValue("");
+    setProjectFilter("all");
     setProjectPage(1);
     setSelectedUser(null);
     setSelectedProject(project);
     setIsDrawerOpen(true);
   };
+
+  const openUserDetailsFromProjectDrawer = (userId: string) => {
+    const user = users.find((currentUser) => currentUser.id === userId);
+
+    if (!user) return;
+
+    cancelPendingDrawerClose();
+    setOpenUserMenuId(null);
+    setDrawerOrigin(selectedProject ? { kind: "project", id: selectedProject.id } : null);
+    setActiveTab("users");
+    setSelectedProject(null);
+    setSelectedUser(user);
+    setIsDrawerOpen(true);
+  };
+
+  // The label is looked up live, so a rename shows up and a deleted origin
+  // simply offers no way back instead of a button that does nothing.
+  const drawerOriginName = useMemo(() => {
+    if (!drawerOrigin) return null;
+
+    if (drawerOrigin.kind === "user") {
+      const originUser = users.find((entry) => entry.id === drawerOrigin.id);
+
+      return originUser ? getDisplayName(originUser) : null;
+    }
+
+    return projects.find((entry) => entry.id === drawerOrigin.id)?.name ?? null;
+  }, [drawerOrigin, users, projects]);
+
+  const goBackToDrawerOrigin = () => {
+    if (!drawerOrigin) return;
+
+    if (drawerOrigin.kind === "user") {
+      const originUser = users.find((entry) => entry.id === drawerOrigin.id);
+
+      if (originUser) {
+        setActiveTab("users");
+        openUserDetails(originUser);
+      }
+
+      return;
+    }
+
+    const originProject = projects.find((entry) => entry.id === drawerOrigin.id);
+
+    if (originProject) {
+      setActiveTab("projects");
+      openProjectDetails(originProject);
+    }
+  };
+
+  const drawerBackLink =
+    drawerOrigin && drawerOriginName
+      ? { label: `Back to ${drawerOriginName}`, onBack: goBackToDrawerOrigin }
+      : undefined;
 
   const handleProjectDeleted = useCallback(
     (projectId: string) => {
@@ -520,6 +659,11 @@ export function AdminPage() {
     void navigate(`/data-ingestion?${params.toString()}`);
   };
 
+  const openDataIngestion = (projectId: string) => {
+    const params = new URLSearchParams({ projectId });
+    void navigate(`/data-ingestion?${params.toString()}`);
+  };
+
   const handleUserUpdated = useCallback(
     (updatedUser: AdminUser) => {
       setUsers((currentUsers) =>
@@ -536,9 +680,12 @@ export function AdminPage() {
 
   const closeDetails = () => {
     setOpenUserMenuId(null);
+    setDrawerOrigin(null);
     setIsDrawerOpen(false);
 
+    cancelPendingDrawerClose();
     drawerCloseTimeoutRef.current = setTimeout(() => {
+      drawerCloseTimeoutRef.current = null;
       setSelectedUser(null);
       setSelectedProject(null);
       setSelectedSkill(null);
@@ -546,11 +693,16 @@ export function AdminPage() {
     }, DRAWER_CLOSE_DELAY_MS);
   };
 
-  // The tokens section loads its own data through the access connector
-  // registry; only the create-project wizard still needs the PAT names here.
+  // Switching tabs only closes a drawer that is actually open; scheduling a
+  // close for nothing would leave a timeout behind that could clear a drawer
+  // opened right after the switch.
   const handleTabChange = (tab: AdminTab) => {
     setOpenUserMenuId(null);
-    closeDetails();
+
+    if (isDrawerOpen) {
+      closeDetails();
+    }
+
     setActiveTab(tab);
   };
 
@@ -608,11 +760,12 @@ export function AdminPage() {
         <div className="mb-6 flex items-center gap-3 sm:justify-between">
           <TabSwitcher activeTab={activeTab} onChange={handleTabChange} tabs={visibleAdminTabs} />
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            iconOnly
             onClick={handleRefresh}
             disabled={isSkillsTabActive ? skillPoolLoadingState === "loading" : isRefreshing}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
+            className="shrink-0"
             aria-label="Refresh admin data"
           >
             <RefreshCw
@@ -622,7 +775,7 @@ export function AdminPage() {
                   : ""
               }`}
             />
-          </button>
+          </Button>
         </div>
 
         {/* Clipped horizontally because the section content slides in from
@@ -633,7 +786,7 @@ export function AdminPage() {
           {showInitialLoading ? (
             <div className="flex min-h-96 items-center justify-center">
               <div className="flex flex-col items-center gap-3 text-app-text-muted">
-                <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+                <Spinner size="lg" silent />
                 <p className="text-sm">Loading admin data...</p>
               </div>
             </div>
@@ -645,13 +798,9 @@ export function AdminPage() {
                   Admin data could not be loaded
                 </h3>
                 <p className="mt-2 text-sm text-app-text-muted">{errorMessage}</p>
-                <button
-                  type="button"
-                  onClick={() => void refreshAdminData()}
-                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-app-text px-5 py-2.5 text-sm font-medium text-app-text-inverse transition-colors hover:opacity-90"
-                >
+                <Button variant="primary" onClick={() => void refreshAdminData()} className="mt-5">
                   Try again
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -678,6 +827,7 @@ export function AdminPage() {
 
                   <UsersTab
                     paginatedUsers={paginatedUsers}
+                    projects={projects}
                     selectedUserIds={selectedUserIds}
                     allVisibleUsersSelected={allVisibleUsersSelected}
                     openUserMenuId={openUserMenuId}
@@ -700,8 +850,13 @@ export function AdminPage() {
                   <AdminProjectsToolbar
                     projectCount={filteredProjects.length}
                     projectSearchValue={projectSearchValue}
+                    projectFilter={projectFilter}
                     onProjectSearchChange={(value) => {
                       setProjectSearchValue(value);
+                      setProjectPage(1);
+                    }}
+                    onProjectFilterChange={(value) => {
+                      setProjectFilter(value);
                       setProjectPage(1);
                     }}
                     onCreateProject={openCreateWizard}
@@ -709,7 +864,8 @@ export function AdminPage() {
 
                   <ProjectsTab
                     filteredProjects={paginatedProjects}
-                    hasSearchQuery={projectSearchValue.trim().length > 0}
+                    users={users}
+                    isFiltered={projectSearchValue.trim().length > 0 || projectFilter !== "all"}
                     totalCount={projects.length}
                     onOpenProjectDetails={openProjectDetails}
                   />
@@ -791,10 +947,12 @@ export function AdminPage() {
       {selectedUser && (
         <UserDetailsDrawer
           user={selectedUser}
-          availableProjects={availableProjects}
+          projects={projects}
+          users={users}
           isOpen={isDrawerOpen}
           onClose={closeDetails}
           onOpenProjectDetails={openProjectDetailsFromUserDrawer}
+          back={drawerOrigin?.kind === "project" ? drawerBackLink : undefined}
           onUserUpdated={handleUserUpdated}
           onRequestDelete={requestUserDelete}
           onMembershipsMoved={() => void refreshAdminData()}
@@ -812,6 +970,9 @@ export function AdminPage() {
           canManageLifecycle={profile?.permissionGroup === "ADMIN"}
           onClose={closeDetails}
           onOpenSourceDetails={openSourceDetails}
+          onOpenDataIngestion={openDataIngestion}
+          onOpenUser={openUserDetailsFromProjectDrawer}
+          back={drawerOrigin?.kind === "user" ? drawerBackLink : undefined}
           onProjectUpdated={handleProjectUpdated}
           onProjectDeleted={handleProjectDeleted}
           onMembershipsMoved={() => void refreshAdminData()}

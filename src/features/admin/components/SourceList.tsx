@@ -1,32 +1,20 @@
-import { FileText } from "lucide-react";
+import { Database } from "lucide-react";
 import type { ProjectSource } from "../types";
 import {
   deriveSourceStatus,
   getBackendSourceStatusLabel,
   getSourceStatusFromBackend,
-  SOURCE_META,
 } from "../../data-ingestion/data";
 import { SourceStatusChip } from "../../data-ingestion/components/SourceStatusChip";
 import { SourceSyncBadge } from "../../data-ingestion/components/SourceSyncBadge";
 import { SourceTypeBadge } from "../../data-ingestion/components/SourceTypeBadge";
-import type { SourceSystem } from "../../data-ingestion/types";
+import { getSourceTypeMeta } from "../data";
 import { IconTile } from "../../../components/ui/IconTile";
 
 type SourceListProps = {
   sources: ProjectSource[];
   onOpenSourceDetails?: (sourceId: string) => void;
 };
-
-/** Resolves a project source's raw type string to the shared source metadata. */
-function getMeta(type: string) {
-  const normalized = type.toUpperCase();
-
-  if (normalized in SOURCE_META) {
-    return SOURCE_META[normalized as SourceSystem];
-  }
-
-  return null;
-}
 
 /**
  * A project's sources as cards in the project drawer.
@@ -39,7 +27,7 @@ export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
   if (sources.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-app-border bg-app-surface-muted px-4 py-6 text-center">
-        <FileText className="mx-auto mb-2 h-5 w-5 text-app-text-disabled" />
+        <Database className="mx-auto mb-2 h-5 w-5 text-app-text-disabled" />
         <p className="text-sm text-app-text-muted">No sources connected yet.</p>
       </div>
     );
@@ -48,8 +36,8 @@ export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {sources.map((source) => {
-        const meta = getMeta(source.type);
-        const Icon = meta?.icon ?? FileText;
+        const meta = getSourceTypeMeta(source.type);
+        const Icon = meta?.icon ?? Database;
 
         // The admin view only has the project source's backend status, so both
         // badges are derived from it — the same helpers the Data Ingestion page

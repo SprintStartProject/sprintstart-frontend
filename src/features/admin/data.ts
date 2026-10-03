@@ -1,9 +1,13 @@
 import type { BadgeVariant } from "../../components/ui/Badge";
 import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 import type { ProjectRole, Skill } from "../team-management/types";
+import { deriveSourceStatus, SOURCE_META } from "../data-ingestion/data";
+import type { SourceMeta, SourceSystem } from "../data-ingestion/types";
+import type { ProjectManager } from "../../services/projectService";
 import type {
   AdminUser,
   ProjectEditFormState,
+  ProjectFilter,
   ProjectOverview,
   ProjectSummary,
   SkillStatusFilter,
@@ -28,12 +32,107 @@ export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> = 
   { value: "disabled", label: "Disabled" },
   { value: "onboarded", label: "Onboarding completed" },
   { value: "not-onboarded", label: "Onboarding open" },
+  { value: "no-project", label: "Without project" },
 ];
 
 /** The user's full name, falling back to the username and then the email when it is empty. */
 export function getDisplayName(user: AdminUser) {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
   return fullName || user.username || user.email;
+}
+
+type SearchableUser = {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  email?: string;
+};
+
+/** Manager display name, falling back to the username when no name is set. */
+export function getManagerName(manager: ProjectManager): string {
+  const fullName = [manager.firstName, manager.lastName].filter(Boolean).join(" ");
+
+  return fullName || manager.username;
+}
+
+/**
+ * Whether a person matches a free-text search.
+ *
+ * Name, username and email are each tested on their own. Searching a combined
+ * "label" such as `email || username` hides the username as soon as an email
+ * exists, which is the case for every real account.
+ */
+export function matchesUserSearch(user: SearchableUser, term: string): boolean {
+  const normalized = term.trim().toLowerCase();
+
+  if (normalized.length === 0) return true;
+
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+
+  return [fullName, user.username, user.email].some((value) =>
+    (value ?? "").toLowerCase().includes(normalized),
+  );
+}
+
+/** `"1 member"` / `"2 members"`. */
+export function pluralize(count: number, noun: string, plural = `${noun}s`): string {
+  return `${count} ${count === 1 ? noun : plural}`;
+}
+
+/**
+ * Shared Data Ingestion metadata (label, icon) for a project source's raw type
+ * string, or `null` for a type the frontend does not know — the backend also
+ * emits types such as `SONARQUBE` that have no ingestion UI.
+ */
+export function getSourceTypeMeta(type: string): SourceMeta | null {
+  const normalized = type.toUpperCase();
+
+  return normalized in SOURCE_META ? SOURCE_META[normalized as SourceSystem] : null;
+}
+
+export type SourceTypeGroup = {
+  /** Upper-cased raw type, the grouping key. */
+  type: string;
+  label: string;
+  count: number;
+};
+
+/** Sources collapsed to one entry per type, in order of first appearance. */
+export function groupSourcesByType(sources: Array<{ type: string }>): SourceTypeGroup[] {
+  const groups = new Map<string, SourceTypeGroup>();
+
+  for (const source of sources) {
+    const key = source.type.toUpperCase();
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.count += 1;
+    } else {
+      groups.set(key, { type: key, label: getSourceTypeLabel(source.type), count: 1 });
+    }
+  }
+
+  return Array.from(groups.values());
+}
+
+/**
+ * Display label for a project source's raw type string.
+ *
+ * Known systems use the label from the shared `SOURCE_META`, so "GitHub" reads
+ * the same here as on the Data Ingestion page. Unknown types fall back to a
+ * title-cased version of the raw value rather than disappearing.
+ */
+export function getSourceTypeLabel(type: string): string {
+  const meta = getSourceTypeMeta(type);
+
+  if (meta) return meta.type;
+
+  return type
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 /**
@@ -43,7 +142,7 @@ export function getDisplayName(user: AdminUser) {
 export function getPermissionGroupVariant(permissionGroup: string): BadgeVariant {
   const normalized = permissionGroup.toUpperCase();
 
-  if (normalized.includes("ADMIN")) return "warning";
+  if (normalized.includes("ADMIN")) return "danger";
   if (normalized.includes("PROJECT")) return "success";
   return "neutral";
 }
@@ -58,6 +157,64 @@ export function getSourceStatusVariant(status: string): BadgeVariant {
   if (normalizedStatus === "DISCONNECTED") return "neutral";
 
   return "brand";
+}
+
+export type SourceHealthState = "none" | "healthy" | "syncing" | "stale" | "attention";
+
+export type SourceHealth = {
+  state: SourceHealthState;
+  total: number;
+  /** Sources that failed, are disconnected or switched off. */
+  attentionCount: number;
+  syncingCount: number;
+  /** Sources the backend flags as behind their upstream. */
+  staleCount: number;
+  label: string;
+};
+
+/**
+ * One-line health of a project's sources, for lists that cannot show each source.
+ *
+ * Built on the same {@link deriveSourceStatus} the Data Ingestion page uses, so a
+ * source reads as healthy or not identically in both places. A disabled source
+ * counts as needing attention: it silently stops feeding the knowledge base.
+ * "Out of date" is kept apart from failures on purpose — with auto-update off it
+ * is the expected state between syncs and must not look like a fault.
+ */
+export function getSourceHealth(sources: Array<{ status: string }>): SourceHealth {
+  let attentionCount = 0;
+  let syncingCount = 0;
+  let staleCount = 0;
+
+  for (const source of sources) {
+    const { state } = deriveSourceStatus({
+      backendStatus: source.status,
+      hasErrors: false,
+      hasNeverSynced: false,
+    });
+
+    if (state === "attention" || state === "disabled") attentionCount += 1;
+    else if (state === "syncing") syncingCount += 1;
+    else if (state === "stale") staleCount += 1;
+  }
+
+  const base = { total: sources.length, attentionCount, syncingCount, staleCount };
+
+  if (sources.length === 0) return { ...base, state: "none", label: "No sources" };
+
+  if (attentionCount > 0) {
+    return {
+      ...base,
+      state: "attention",
+      label: attentionCount === 1 ? "1 needs attention" : `${attentionCount} need attention`,
+    };
+  }
+
+  if (syncingCount > 0) return { ...base, state: "syncing", label: "Syncing" };
+
+  if (staleCount > 0) return { ...base, state: "stale", label: `${staleCount} out of date` };
+
+  return { ...base, state: "healthy", label: "All synced" };
 }
 
 export function getProjectUsersCount(project: { users: unknown[] }) {
@@ -102,6 +259,29 @@ export function getAvailableProjects(projects: ProjectOverview[]): ProjectSummar
       name: project.name,
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/**
+ * A project a user is assigned to, with the full project record when the
+ * project list has it. `overview` is `null` for a stale id, so views can show
+ * the name they know without inventing a manager or member count.
+ */
+export type UserProject = ProjectSummary & {
+  overview: ProjectOverview | null;
+};
+
+/** Pairs each assigned project summary with its full record from the project list. */
+export function resolveUserProjects(
+  assigned: ProjectSummary[],
+  projects: ProjectOverview[],
+): UserProject[] {
+  const projectsById = new Map(projects.map((project) => [project.id, project]));
+
+  return assigned.map((summary) => {
+    const overview = projectsById.get(summary.id) ?? null;
+
+    return { id: summary.id, name: overview?.name ?? summary.name, overview };
+  });
 }
 
 /**
@@ -177,34 +357,63 @@ export function filterAdminUsers(
       (userFilter === "enabled" && user.enabled) ||
       (userFilter === "disabled" && !user.enabled) ||
       (userFilter === "onboarded" && user.hasCompletedOnboarding) ||
-      (userFilter === "not-onboarded" && !user.hasCompletedOnboarding);
+      (userFilter === "not-onboarded" && !user.hasCompletedOnboarding) ||
+      (userFilter === "no-project" && user.projects.length === 0);
 
     return matchesSearch && matchesFilter;
   });
 }
 
+export const PROJECT_FILTER_OPTIONS: Array<{ value: ProjectFilter; label: string }> = [
+  { value: "all", label: "All projects" },
+  { value: "no-manager", label: "Without manager" },
+  { value: "sources-attention", label: "Sources need attention" },
+  { value: "no-members", label: "Without members" },
+];
+
+function matchesProjectFilter(project: ProjectOverview, filter: ProjectFilter): boolean {
+  switch (filter) {
+    case "no-manager":
+      return project.manager === null;
+    case "sources-attention":
+      return getSourceHealth(project.sources).state === "attention";
+    case "no-members":
+      return project.users.length === 0;
+    case "all":
+      return true;
+  }
+}
+
 /**
- * Narrows the project table to the search text: a case-insensitive substring match over the
- * project's own fields and those of its sources and members.
+ * Projects matching the search text and the state filter. The filter picks out
+ * the gaps the project cards flag (no manager, failing sources, nobody in it);
+ * the search then narrows within them.
  */
 export function filterAdminProjects(
   projects: ProjectOverview[],
   projectSearchValue: string,
+  projectFilter: ProjectFilter = "all",
 ): ProjectOverview[] {
   const normalizedSearch = projectSearchValue.trim().toLowerCase();
 
   return projects.filter((project) => {
+    if (!matchesProjectFilter(project, projectFilter)) return false;
+
     const searchableValues = [
       project.id,
       project.name,
       project.description,
+      project.industry,
+      ...(project.manager
+        ? [
+            project.manager.firstName,
+            project.manager.lastName,
+            [project.manager.firstName, project.manager.lastName].filter(Boolean).join(" "),
+            project.manager.username,
+          ]
+        : []),
       ...project.sources.flatMap((source) => [source.id, source.name, source.type, source.status]),
-      ...project.users.flatMap((user) => [
-        user.id,
-        user.username,
-        user.email,
-        ...user.projectRoles,
-      ]),
+      ...project.users.flatMap((user) => [user.id, user.username, user.email]),
     ];
 
     return (

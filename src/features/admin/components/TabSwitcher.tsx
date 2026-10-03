@@ -1,11 +1,11 @@
-import { BadgeCheck, Key, Layers, Users, type LucideIcon } from "lucide-react";
+import { FolderKanban, GraduationCap, Key, Users, type LucideIcon } from "lucide-react";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { ADMIN_TAB_ORDER, type AdminTab } from "../types";
 
 const TAB_META: Record<AdminTab, { label: string; icon: LucideIcon }> = {
   users: { label: "Users", icon: Users },
-  projects: { label: "Projects", icon: Layers },
-  skills: { label: "Skills", icon: BadgeCheck },
+  projects: { label: "Projects", icon: FolderKanban },
+  skills: { label: "Skills", icon: GraduationCap },
   tokens: { label: "Tokens", icon: Key },
 };
 
@@ -37,7 +37,7 @@ export function TabSwitcher({ activeTab, onChange, tabs = ADMIN_TAB_ORDER }: Tab
       onChange={onChange}
       layoutId="admin-tab-pill"
       ariaLabel="Admin sections"
-      // Mobile: the bar grows to fill the row and its three pills stretch to
+      // Mobile: the bar grows to fill the row and its pills stretch to
       // equal width, so it no longer sits left-aligned with dead space beside
       // the refresh button. Desktop keeps the compact, content-sized bar.
       // `grow`/`grow-0` (not `flex-1`) leaves each pill's own `shrink-0` intact.
