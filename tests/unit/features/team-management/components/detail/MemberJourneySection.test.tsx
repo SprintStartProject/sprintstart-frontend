@@ -1,8 +1,12 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { createRef } from "react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { onboardingGraphService } from "../../../../../../src/services/onboardingGraphService";
-import { MemberJourneySection } from "../../../../../../src/features/team-management/components/detail/MemberJourneySection";
+import {
+  MemberJourneySection,
+  type MemberJourneyHandle,
+} from "../../../../../../src/features/team-management/components/detail/MemberJourneySection";
 import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
@@ -180,6 +184,48 @@ describe("MemberJourneySection", () => {
     await waitFor(() => expect(onboardingGraphService.createConnectedStep).toHaveBeenCalled());
     const [, request] = vi.mocked(onboardingGraphService.createConnectedStep).mock.calls.at(-1)!;
     expect(request).toMatchObject({ waitsOn: ["verify"], unlocks: [] });
+  });
+
+  /** The PM reads this, so "you" in the badge would be about the PM. */
+  it("names the hire, not the reader, on a step the hire added", () => {
+    const withHireStep: OnboardingPathEndpoint = {
+      ...path,
+      phases: [
+        {
+          ...path.phases[0],
+          steps: [
+            ...path.phases[0].steps,
+            step({ id: "own", position: 3, title: "My own step", origin: "HIRE" }),
+          ],
+        },
+        path.phases[1],
+      ],
+    };
+    renderSection({ path: withHireStep });
+
+    expect(screen.getByText("Added by the hire")).toBeInTheDocument();
+    expect(screen.queryByText("You added this")).not.toBeInTheDocument();
+  });
+
+  it("shows a phase asked for from the summary above, and scrolls down to it", () => {
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    const ref = createRef<MemberJourneyHandle>();
+    try {
+      renderSection({ ref });
+
+      act(() => {
+        ref.current?.showPhase("phase2");
+      });
+
+      expect(
+        within(screen.getByRole("navigation", { name: "Onboarding phases" })).getByRole("button", {
+          name: /^Architecture/,
+        }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    } finally {
+      scrollIntoView.mockRestore();
+    }
   });
 
   it("says so when the member has no path yet", () => {

@@ -30,6 +30,28 @@ export type ActionPatch = {
 export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
 
 /**
+ * The backend's `flag_to_pm` action. Its `question` is the message that goes to the PM, so the
+ * confirm shows it: this one leaves the product and arrives in somebody's inbox in the hire's name.
+ */
+export const BUDDY_ACTION_FLAG_TO_PM = "flag_to_pm";
+
+/**
+ * The actions that change the hire's onboarding path.
+ *
+ * Listed once, here, because two surfaces need the same answer: confirming one of these has to tell
+ * whatever is showing a path that it is now stale (see `announceBuddyPathChanged`). Answering a
+ * question counts even when the answer was wrong — the attempt is recorded and the question's status
+ * moves either way.
+ */
+export const BUDDY_PATH_ACTIONS: readonly string[] = [
+  "complete_step",
+  "complete_task",
+  "answer_question",
+  "add_path_step",
+  "request_skip",
+];
+
+/**
  * The backend's `place_checklist` action: the mentor offering to keep a list it just wrote.
  *
  * Named here because two surfaces have to recognise it — the proposal draws the lines it would
@@ -90,11 +112,15 @@ export const BUDDY_ACTION_REORDER_CARDS = "reorder_cards";
 export type HireActionProposal = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
-  /** The action's tool name, sent back verbatim to confirm it (e.g. "claim_task_zero"). */
+  /** The action's tool name, sent back verbatim to confirm it (e.g. "claim_goal"). */
   action: string;
-  /** The button text ("Start Task 0"). */
+  /** The button text ("Work toward this task"). */
   label: string;
-  /** Carried through only for flag-to-PM: the question the buddy composed. */
+  /**
+   * Carried through only for flag-to-PM: the question the buddy composed. Shown in an editable
+   * field *above* the confirm — this one is a message, so the hire may reword it, and what reaches
+   * the PM is whatever that field held. See `BuddyActionProposals`.
+   */
   question?: string;
   /**
    * The goal-claim confirm payload (`claim_goal`), echoed back verbatim so the action runs
@@ -128,6 +154,37 @@ export type HireActionProposal = {
    */
   competencyKey?: string;
   level?: string;
+  /**
+   * The path-action confirm payloads: which node of the hire's own onboarding path the action is
+   * aimed at, the answer `answer_question` would send, and a new step's description.
+   *
+   * Echoed back verbatim for the same reason as `githubLogin`: the hire reads the step, or their own
+   * answer, on the button before agreeing to it, so what gets written has to be what they were
+   * shown — never something the client derived afterwards.
+   */
+  stepId?: string;
+  questionId?: string;
+  phaseId?: string;
+  onboardingTaskId?: string;
+  answer?: string;
+  /**
+   * The options a multiple-choice `answer` stands for, as the backend resolved them when it
+   * proposed. Echoed back so the confirm can check the button still means what it says — the
+   * backend refuses it if the question changed in between.
+   */
+  optionIds?: string[];
+  description?: string;
+  /**
+   * The reason `request_skip` sends to the PM. Shown in full under the button, because it goes out
+   * in the hire's name and a label has no room for it.
+   */
+  reason?: string;
+  /**
+   * Where `add_path_step` puts the new step in its phase's graph — what it waits on, and what will
+   * wait on it. Echoed back verbatim and re-checked against the hire's own path on confirm.
+   */
+  waitsOnIds?: string[];
+  unlocksIds?: string[];
   /**
    * The `place_checklist` confirm payload: the list the buddy wrote and offered to keep.
    *
@@ -293,7 +350,7 @@ export type BuddyStreamHandlers = {
   /** Optional: only some turns run a tool, and the surface may not show which. */
   onToolUse?: (tool: string) => void;
   /**
-   * The buddy has *proposed* an action the hire must confirm (e.g. "Start Task 0"). Nothing has
+   * The buddy has *proposed* an action the hire must confirm (e.g. "Work toward this task"). Nothing has
    * changed yet — the surface renders a confirm affordance and only mutates when the hire clicks.
    */
   onActionProposal?: (proposal: {
@@ -306,6 +363,16 @@ export type BuddyStreamHandlers = {
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    stepId?: string;
+    questionId?: string;
+    phaseId?: string;
+    onboardingTaskId?: string;
+    answer?: string;
+    optionIds?: string[];
+    description?: string;
+    reason?: string;
+    waitsOnIds?: string[];
+    unlocksIds?: string[];
     checklistTitle?: string;
     checklistItems?: string[];
     cardId?: string;

@@ -344,8 +344,8 @@ describe("KnowledgeBasePage", () => {
       </MemoryRouter>,
     );
 
-    const select = await screen.findByTestId("kb-page-size");
-    fireEvent.change(select, { target: { value: "50" } });
+    fireEvent.click(await screen.findByTestId("kb-page-size"));
+    fireEvent.click(screen.getByRole("option", { name: "50" }));
 
     await waitFor(() => {
       expect(mockGetArtifactPage).toHaveBeenLastCalledWith(

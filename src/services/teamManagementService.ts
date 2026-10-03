@@ -78,62 +78,94 @@ function toTeamOverviewProjects(user: BackendTeamOverviewUser): TeamOverviewUser
   return user.project?.id ? [{ id: user.project.id, name: user.project.name ?? "" }] : [];
 }
 
+/** The team overview as the backend has it, without the unread-feedback flag. Throws on failure. */
+async function readTeamOverviewUsers(
+  roleId?: string,
+  sortBy?: string,
+  projectIds?: string[],
+): Promise<TeamOverviewUser[]> {
+  const params = new URLSearchParams();
+  if (roleId && roleId !== "all") params.append("roleIds", roleId);
+  projectIds?.forEach((projectId) => params.append("projectIds", projectId));
+  if (sortBy) params.append("sortBy", sortBy);
+  params.append("size", "100");
+
+  const query = params.toString();
+  const url = `/api/v1/onboarding/team-overview${query ? `?${query}` : ""}`;
+
+  const response = await apiClient.fetch<{
+    content: BackendTeamOverviewUser[];
+  }>(url);
+
+  return response.content.map((user) => ({
+    ...user,
+    projects: toTeamOverviewProjects(user),
+    roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
+      ...role,
+      id: role.id || role.roleId || "",
+    })),
+  }));
+}
+
+/** Sets `hasFeedback` on every member with at least one feedback item nobody has read. */
+function withUnreadFeedbackFlag(
+  users: TeamOverviewUser[],
+  feedback: OnboardingFeedback[],
+): TeamOverviewUser[] {
+  const usersWithUnreadFeedback = new Set(
+    feedback
+      .filter((item) => item.read !== true && !item.readAt)
+      .map((item) => item.userId)
+      .filter((userId): userId is string => Boolean(userId)),
+  );
+
+  return users.map((user) => ({
+    ...user,
+    hasFeedback: usersWithUnreadFeedback.has(user.userId),
+  }));
+}
+
 /**
- * Skill levels for the *currently authenticated* user.
+ * The team overview, each member flagged when they have unread feedback.
  *
- * Mirrors {@link getUserSkillLevels} but reads `/api/v1/me/skills`, which is
- * open to the USER role — the admin endpoint behind `getUserSkillLevels`
- * would 403 for a regular user looking at their own dashboard. The raw
- * assessments only carry skill IDs, so names and roles are joined in from
- * the skill and project-role lists.
+ * Forgiving on purpose, for the screens that list the team: if the feedback list cannot be read
+ * the members come without the flag, and if the overview itself cannot be read this falls back to
+ * mock users. Anything that draws conclusions from the answer — a count, a finding — must use
+ * {@link getTeamOverviewOrThrow} instead, which never invents members.
  */
 export async function getTeamOverview(
   roleId?: string,
   sortBy?: string,
   projectIds?: string[],
 ): Promise<TeamOverviewUser[]> {
+  let users: TeamOverviewUser[];
   try {
-    const params = new URLSearchParams();
-    if (roleId && roleId !== "all") params.append("roleIds", roleId);
-    projectIds?.forEach((projectId) => params.append("projectIds", projectId));
-    if (sortBy) params.append("sortBy", sortBy);
-    params.append("size", "100");
-
-    const query = params.toString();
-    const url = `/api/v1/onboarding/team-overview${query ? `?${query}` : ""}`;
-
-    const response = await apiClient.fetch<{
-      content: BackendTeamOverviewUser[];
-    }>(url);
-
-    const users = response.content.map((user) => ({
-      ...user,
-      projects: toTeamOverviewProjects(user),
-      roles: user.roles.map((role: ProjectRole & { roleId?: string }) => ({
-        ...role,
-        id: role.id || role.roleId || "",
-      })),
-    }));
-
-    try {
-      const feedback = await getAllOnboardingFeedback();
-      const usersWithUnreadFeedback = new Set(
-        feedback
-          .filter((item) => item.read !== true && !item.readAt)
-          .map((item) => item.userId)
-          .filter((userId): userId is string => Boolean(userId)),
-      );
-
-      return users.map((user) => ({
-        ...user,
-        hasFeedback: usersWithUnreadFeedback.has(user.userId),
-      }));
-    } catch {
-      return users;
-    }
+    users = await readTeamOverviewUsers(roleId, sortBy, projectIds);
   } catch {
     return mockUsers;
   }
+
+  try {
+    return withUnreadFeedbackFlag(users, await getAllOnboardingFeedback());
+  } catch {
+    return users;
+  }
+}
+
+/**
+ * {@link getTeamOverview} without the fallbacks: the same members and the same unread-feedback
+ * flag, but it throws when the overview or the feedback list cannot be read.
+ *
+ * For the project analysis, which turns the answer into findings and a score: made-up members
+ * would become findings about people who do not exist, and a missing feedback list would read as
+ * "nothing unread". A failure has to reach the caller, so the check is marked as not run.
+ */
+export async function getTeamOverviewOrThrow(projectIds: string[]): Promise<TeamOverviewUser[]> {
+  const [users, feedback] = await Promise.all([
+    readTeamOverviewUsers(undefined, undefined, projectIds),
+    getAllOnboardingFeedback(),
+  ]);
+  return withUnreadFeedbackFlag(users, feedback);
 }
 
 export async function getTeamMember(userId: string): Promise<TeamOverviewUser | undefined> {
@@ -250,6 +282,51 @@ export async function unassignProjectRoleFromUser(userId: string, roleId: string
   }
 }
 
+/** What waits on the project manager in one project, as the sidebar counts it. */
+export type PmAttentionCount = {
+  /** Members whose current step has a skip request nobody has decided yet. */
+  pendingSkips: number;
+  /** Feedback items from the project's members that nobody has marked read. */
+  unreadFeedback: number;
+  total: number;
+};
+
+/**
+ * How many onboarding items wait on the project manager in one project: pending skip requests
+ * plus unread feedback, each counted from the backend's own answers.
+ *
+ * There is no endpoint that answers "how many" yet, so this reads the two lists that know --
+ * the project's team overview (a pending skip rides on the member's current step) and the
+ * feedback list, narrowed to the project's members since it is not scoped by project. Kept in
+ * one function so a count endpoint can replace the body without touching a caller.
+ *
+ * Unlike {@link getTeamOverview} it never falls back to mock users, and it throws when either
+ * read fails: a badge built from made-up members or half an answer is a wrong number, and the
+ * caller shows no number rather than that.
+ */
+export async function getPmAttentionCount(projectId: string): Promise<PmAttentionCount> {
+  const params = new URLSearchParams();
+  params.append("projectIds", projectId);
+  params.append("size", "100");
+
+  const [overview, feedback] = await Promise.all([
+    apiClient.fetch<{ content: BackendTeamOverviewUser[] }>(
+      `/api/v1/onboarding/team-overview?${params.toString()}`,
+    ),
+    getAllOnboardingFeedback(),
+  ]);
+
+  const memberIds = new Set(overview.content.map((user) => user.userId));
+  const pendingSkips = overview.content.filter(
+    (user) => user.currentStep?.skip?.status === "PENDING",
+  ).length;
+  const unreadFeedback = feedback.filter(
+    (item) => !item.read && item.userId !== undefined && memberIds.has(item.userId),
+  ).length;
+
+  return { pendingSkips, unreadFeedback, total: pendingSkips + unreadFeedback };
+}
+
 /**
  * Anything that can change whether the PM dashboard still needs attention
  * announces itself here: deciding a skip request, or marking feedback read.
@@ -352,6 +429,20 @@ export async function markOnboardingFeedbackRead(feedbackId: string): Promise<vo
   notifyPmAttentionChanged();
 }
 
+/**
+ * One member's onboarding path, for a reviewer looking at it.
+ *
+ * The endpoint now answers with the path *as its owner has it* — phases with their steps and their
+ * questions, each carrying that member's own status — so the hydration below is a fallback for a
+ * thin response rather than the normal road it used to be.
+ *
+ * **Every phase is normalised before it leaves here**, and that is the part worth keeping. The
+ * absence of `questions` on a phase took the whole team page down with a TypeError the moment
+ * questions became first-class members of a phase: three surfaces read `phase.questions` because the
+ * type promised it, and the wire did not deliver it. A missing array is filled at the boundary where
+ * untrusted JSON becomes a typed object — which is the only place a default belongs, and the reason
+ * no caller downstream has to defend itself against the same thing again.
+ */
 export async function getUserOnboardingPath(
   userId: string,
 ): Promise<OnboardingPathEndpoint | null> {
@@ -369,22 +460,20 @@ export async function getUserOnboardingPath(
 
     const hydratedPhases = await Promise.all(
       phases.map(async (phase) => {
-        if (phase.steps?.length > 0) return phase;
+        // Questions cannot be hydrated the way steps can: no endpoint hands out one member's
+        // questions with their status. An empty list is the honest stand-in, and it keeps the page
+        // standing instead of taking it down.
+        const normalised = { ...phase, questions: phase.questions ?? [] };
+        if (normalised.steps?.length > 0) return normalised;
 
         try {
           const steps = await apiClient.fetch<OnboardingStepEndpoint[]>(
             `/api/v1/onboarding/phases/${phase.id}/steps`,
           );
 
-          return {
-            ...phase,
-            steps,
-          };
+          return { ...normalised, steps };
         } catch {
-          return {
-            ...phase,
-            steps: [],
-          };
+          return { ...normalised, steps: [] };
         }
       }),
     );

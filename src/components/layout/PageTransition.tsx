@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useLocation } from "react-router-dom";
+import { isPmWorkspacePath } from "../../features/pm-area/pmWorkspacePaths";
 import { pageTransitionToken } from "../../styles/tokens";
 
 /**
@@ -8,9 +9,15 @@ import { pageTransitionToken } from "../../styles/tokens";
  * exists so `/chat` and `/buddy` keep one header across the crossing between them; keying
  * by the raw pathname here would remount that shared layout on every switch, undoing
  * exactly what it was built to avoid.
+ *
+ * The PM workspace is the same arrangement: one layout route for all of its sections, which
+ * slide between each other on their own.
  */
 function transitionKey(pathname: string): string {
-  return pathname.startsWith("/chat") || pathname === "/buddy" ? "assistant-shell" : pathname;
+  if (pathname.startsWith("/chat") || pathname === "/buddy") return "assistant-shell";
+  if (isPmWorkspacePath(pathname)) return "pm-workspace";
+
+  return pathname;
 }
 
 /**

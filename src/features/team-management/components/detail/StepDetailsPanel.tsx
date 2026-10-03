@@ -125,7 +125,7 @@ export function StepDetailsPanel({
           >
             {step.status.replace("_", " ")}
           </span>
-          <StepOriginBadge step={step} />
+          <StepOriginBadge step={step} viewer="reviewer" />
         </div>
       }
       panelBackgroundClassName="bg-app-surface"

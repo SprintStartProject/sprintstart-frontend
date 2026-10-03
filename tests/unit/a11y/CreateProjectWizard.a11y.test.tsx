@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { CreateProjectWizard } from "../../../src/features/admin/components/CreateProjectWizard";
+import type { AdminUser } from "../../../src/features/admin/types";
 import { mockViewport } from "../setup/matchMedia";
 
 vi.mock("../../../src/services/projectService", () => ({
@@ -27,13 +28,13 @@ vi.mock("../../../src/services/ingestionService", () => ({
   getIngestionSourceStatuses: vi.fn().mockResolvedValue([]),
 }));
 
-function renderWizard() {
+function renderWizard(users: AdminUser[] = []) {
   return render(
     <MemoryRouter>
       <CreateProjectWizard
         isOpen
         tokenNames={["team-pat"]}
-        users={[]}
+        users={users}
         onClose={vi.fn()}
         onProjectCreated={vi.fn()}
       />
@@ -147,6 +148,36 @@ describe("CreateProjectWizard Accessibility", () => {
     // At or above 1280px the form slides in beside the wizard, portalled to
     // <body> — `baseElement` is the whole body, so axe sees it too.
     expect(await screen.findByRole("dialog", { name: "New GitHub token" })).toBeInTheDocument();
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no axe violations on the review step with a member who would be moved", async () => {
+    const user = userEvent.setup();
+    const mover: AdminUser = {
+      id: "u1",
+      authId: "auth-u1",
+      username: "max",
+      email: "max@example.com",
+      firstName: "Max",
+      lastName: "Mustermann",
+      roles: [],
+      permissionGroup: "User",
+      projects: [{ id: "proj-alpha", name: "Alpha" }],
+      projectIds: ["proj-alpha"],
+      enabled: true,
+      profileIcon: "",
+      hasCompletedOnboarding: true,
+    };
+    const { baseElement } = renderWizard([mover]);
+
+    await settleModalFocus();
+    await user.type(screen.getByLabelText(/^Name/), "Apollo");
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("checkbox", { name: "Add Max Mustermann to the project" }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(await screen.findByRole("note")).toHaveTextContent(/moved out of their current/);
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 });

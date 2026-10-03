@@ -254,7 +254,7 @@ describe("buddyService", () => {
         start(controller) {
           controller.enqueue(
             encoder.encode(
-              'data: {"type":"action_proposal","action":"claim_task_zero","label":"Start Task 0"}\n\n',
+              'data: {"type":"action_proposal","action":"claim_goal","label":"Work toward this task"}\n\n',
             ),
           );
           controller.enqueue(
@@ -284,8 +284,8 @@ describe("buddyService", () => {
       });
 
       expect(onActionProposal).toHaveBeenCalledWith({
-        action: "claim_task_zero",
-        label: "Start Task 0",
+        action: "claim_goal",
+        label: "Work toward this task",
         question: undefined,
         taskId: undefined,
       });
@@ -515,14 +515,14 @@ describe("buddyService", () => {
       server.use(
         http.post("/api/v1/onboarding/me/buddy/actions", async ({ request }) => {
           capturedBody = await request.json();
-          return HttpResponse.json({ ok: true, message: "Task 0 is yours." });
+          return HttpResponse.json({ ok: true, message: "You are now working toward it." });
         }),
       );
 
-      const result = await performAction("claim_task_zero");
+      const result = await performAction("claim_goal");
 
-      expect(result).toEqual({ ok: true, message: "Task 0 is yours." });
-      expect(capturedBody).toMatchObject({ action: "claim_task_zero" });
+      expect(result).toEqual({ ok: true, message: "You are now working toward it." });
+      expect(capturedBody).toMatchObject({ action: "claim_goal" });
     });
 
     it("sends the composed question for a flag-to-PM confirmation", async () => {
@@ -575,6 +575,58 @@ describe("buddyService", () => {
 
       await performAction("reorder_cards", { cardIds: ["c-2", "c-1"] });
       expect(capturedBody).toMatchObject({ action: "reorder_cards", cardIds: ["c-2", "c-1"] });
+
+      // The options a multiple-choice answer stands for: without them the backend cannot check the
+      // button still means what it said, and sends nothing.
+      await performAction("answer_question", {
+        questionId: "q-1",
+        answer: "Git, Docker",
+        optionIds: ["o-1", "o-2"],
+      });
+      expect(capturedBody).toMatchObject({
+        action: "answer_question",
+        questionId: "q-1",
+        answer: "Git, Docker",
+        optionIds: ["o-1", "o-2"],
+      });
+    });
+
+    it("carries the resolved options of an answer proposal off the stream", async () => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              'data: {"type":"action_proposal","action":"answer_question","label":"Send this answer: “Git, Docker”","question_id":"q-1","answer":"Git, Docker","option_ids":["o-1","o-2"]}\n\n',
+            ),
+          );
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/messages",
+          () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+        ),
+      );
+
+      const onActionProposal = vi.fn();
+      await streamMessage("send both", {
+        onToken: vi.fn(),
+        onCitation: vi.fn(),
+        onDone: vi.fn(),
+        onActionProposal,
+      });
+
+      expect(onActionProposal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "answer_question",
+          questionId: "q-1",
+          answer: "Git, Docker",
+          optionIds: ["o-1", "o-2"],
+        }),
+      );
     });
   });
 

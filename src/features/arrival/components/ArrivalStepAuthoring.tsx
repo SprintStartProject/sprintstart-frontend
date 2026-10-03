@@ -163,10 +163,16 @@ export function ArrivalStepAuthoring({
             company: (company ?? []).map((step) => step.key.toLowerCase()),
             project: (project ?? []).map((step) => step.key.toLowerCase()),
           }}
-          onAddDerivable={async (derivation) => {
-            const ok = await addDerivable(derivation);
-            if (ok) showSuccessToast("Step added");
-            return ok;
+          onAddDerivables={async (derivations) => {
+            // One at a time, stopping at the first refusal: each write re-reads the lists, and a
+            // failed batch should leave the rest untried rather than half-guessed.
+            let added = 0;
+            for (const derivation of derivations) {
+              if (!(await addDerivable(derivation))) break;
+              added += 1;
+            }
+            if (added > 0) showSuccessToast(added === 1 ? "Step added" : `${added} steps added`);
+            return added === derivations.length;
           }}
           onCreate={async (request, who) => {
             const ok = await create(request, who);

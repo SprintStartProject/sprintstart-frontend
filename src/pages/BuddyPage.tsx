@@ -171,6 +171,8 @@ function BuddyMentorHome() {
     sendMessage,
     confirmAction,
     dismissAction,
+    actionDrafts,
+    setActionDraft,
     openError,
     dinoGameActive,
     closeDinoGame,
@@ -434,6 +436,8 @@ function BuddyMentorHome() {
         activeTool={activeTool}
         confirmAction={confirmAction}
         dismissAction={dismissAction}
+        actionDrafts={actionDrafts}
+        setActionDraft={setActionDraft}
         dinoGameActive={dinoGameActive}
         onDinoGameExit={closeDinoGame}
         // Both held in one identity above, with the reasons written there — the thread's memo

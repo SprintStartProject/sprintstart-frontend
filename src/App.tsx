@@ -22,6 +22,7 @@ import { EggEffectsLayer } from "./features/easter-eggs/components/EggEffectsLay
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
+import { useBuddyPathSync } from "./features/buddy/hooks/useBuddyPathSync";
 import { GlobalShortcuts } from "./features/shortcuts";
 
 function AppContent() {
@@ -29,6 +30,7 @@ function AppContent() {
   const { showRocketPet } = useMoments();
   const { isFocused } = useFocusMode();
   useScrollRestoration();
+  useBuddyPathSync();
 
   // Signed in at all — the shell is drawn for anyone past the login screen, onboarding included.
   // `signingOut` stays out on purpose: it is the boot script's "this load is a logout return"

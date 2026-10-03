@@ -45,6 +45,8 @@ type BuddyDockProps = Pick<
   | "activeTool"
   | "confirmAction"
   | "dismissAction"
+  | "actionDrafts"
+  | "setActionDraft"
   | "suggestions"
   | "startFreshVisit"
   | "isGreeting"
@@ -134,6 +136,8 @@ function BuddyDockImpl({
   activeTool,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   suggestions,
   dinoGameActive = false,
   onDinoGameExit,
@@ -356,6 +360,8 @@ function BuddyDockImpl({
             lastMessageFooter={lastMessageFooter}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
+            actionDrafts={actionDrafts}
+            setActionDraft={setActionDraft}
             // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
             // team-mode conversation is not one — the offer must not even render there.
             renderQuestionAction={renderQuestionAction}
