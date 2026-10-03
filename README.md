@@ -122,29 +122,13 @@ VITE_KEYCLOAK_CLIENT_ID=sprintstart-frontend
 
 ### Local pitfalls
 
-Two things fail locally while CI (Linux, Node 24) stays green:
+**Node 25 or newer breaks about 480 tests**, while CI (Linux, Node 24) stays green. Node
+brings its own `localStorage`, which is undefined without `--localstorage-file` and hides the
+one jsdom provides. Run the tests with the built-in one switched off:
 
-- **Node 25 or newer breaks about 480 tests.** Node brings its own `localStorage`, which is
-  undefined without `--localstorage-file` and hides the one jsdom provides. Run the tests with
-  the built-in one switched off:
-
-  ```bash
-  NODE_OPTIONS=--no-experimental-webstorage npm run test
-  ```
-
-- **`npm run format:check` fails on hundreds of files on Windows.** With
-  `core.autocrlf=true` Git checks the files out with CRLF, while Prettier expects LF. Git turns
-  them back into LF on commit, so nothing wrong reaches the repository, but `npm run try` stops
-  at the format check. Switch this clone to LF and check the files out again (only with a clean
-  working tree, the second command discards local changes):
-
-  ```bash
-  git config core.autocrlf input
-  ```
-
-  ```bash
-  git rm -r --cached -q . && git reset --hard
-  ```
+```bash
+NODE_OPTIONS=--no-experimental-webstorage npm run test
+```
 
 ---
 

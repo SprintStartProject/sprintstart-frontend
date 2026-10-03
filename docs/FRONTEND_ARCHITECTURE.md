@@ -271,7 +271,8 @@ factory in `src/services/queryKeys.ts`. Project-scoped keys always contain the
 | Small read in the app shell (badge, count)  | `useRateLimitedRead`       |
 | Writes, optimistic updates, custom `select` | `useQuery` / `useMutation` |
 
-`useFetch` is deprecated and has no callers left. The sidebar warms the page module
+`useFetch` is superseded by `useQueryFetch` and has no callers left; only its
+`UseFetchResult` type is still imported by `useQueryFetch`. The sidebar warms the page module
 and its main query on `pointerdown` (`src/services/routePrefetch.ts`). The reasoning
 behind this setup is recorded in ADR-017 in the Wiki, which is still on the Wiki branch
 `tanstack-query-adr` and not yet merged into `main`.

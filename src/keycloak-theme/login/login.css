@@ -167,10 +167,9 @@ div.kcFormGroupClass {
 }
 
 /* Respect the OS-level motion preference, same as the app's `buttonHoverMotion`
-   consumers (`ui/Button` checks `useReducedMotion`) — a growing button on
-   hover is exactly the kind of motion that setting asks to remove. */
+   consumers (`ui/Button` checks `useReducedMotion`): the press shrink is the only
+   transform left, so that is what the setting turns off. */
 @media (prefers-reduced-motion: reduce) {
-  .kcButtonClass.pf-c-button:hover,
   .kcButtonClass.pf-c-button:active {
     transform: none;
   }
