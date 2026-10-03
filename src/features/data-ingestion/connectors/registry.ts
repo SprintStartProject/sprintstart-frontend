@@ -51,6 +51,25 @@ export const CHAT_SOURCE_SYSTEMS: readonly SourceSystem[] = CONNECTOR_LIST.filte
   (definition) => definition.chat.filterable,
 ).map((definition) => definition.meta.system);
 
+/** The source systems in the order the knowledge base's source facet lists them. */
+export const KNOWLEDGE_BASE_SOURCE_ORDER: readonly SourceSystem[] = [...CONNECTOR_LIST]
+  .sort((left, right) => left.knowledgeBase.facetOrder - right.knowledgeBase.facetOrder)
+  .map((definition) => definition.meta.system);
+
+/**
+ * The source system a cited source comes from, judged by its URL and name (both
+ * lowercased). The connector that matches claims it; one that no connector matches
+ * goes to the default citation source.
+ */
+export function sourceSystemOfCitation(url: string, name: string): SourceSystem {
+  const claimed = CONNECTOR_LIST.find((definition) =>
+    definition.chat.matchesCitationUrl?.(url, name),
+  );
+  const fallback = CONNECTOR_LIST.find((definition) => definition.chat.isDefaultCitationSource);
+
+  return (claimed ?? fallback ?? CONNECTOR_LIST[0]).meta.system;
+}
+
 /** The source systems whose sources can be put on a sync schedule. */
 export const SCHEDULED_SOURCE_SYSTEMS: readonly SourceSystem[] = CONNECTOR_LIST.filter(
   (definition) => definition.actions.schedule !== undefined,

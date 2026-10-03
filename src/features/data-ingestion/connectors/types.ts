@@ -10,6 +10,7 @@ import type {
   SourceDetails,
   SourceInstanceIngestionStatus,
 } from "../types.ts";
+import type { Artifact } from "../../knowledge-base/types.ts";
 import type { DraftConnectOutcome, DraftSource } from "./draft.ts";
 import type { SourceSystem } from "./sourceSystems.ts";
 
@@ -134,6 +135,35 @@ export type DraftFormProps<D> = {
 };
 
 /**
+ * How the knowledge base presents the artifacts a connector ingested. The
+ * functions are declared as methods, like on {@link ConnectorDefinition}.
+ */
+export type KnowledgeBaseSupport = {
+  /** The source facet's name for the connector, e.g. "Uploads". */
+  label: string;
+  /** Position in the source facet, ascending. */
+  facetOrder: number;
+  icon: IconComponent;
+  /**
+   * The text of the link to an artifact at its origin ("Open in GitHub"). Null when an
+   * artifact has no origin to open, as with uploads.
+   */
+  linkLabel: string | null;
+  /** Whether the artifacts' content is Markdown whatever its mime type says. */
+  markdown?: boolean;
+  /** Whether a user can delete the artifacts here, because nothing upstream owns them. */
+  deletable?: boolean;
+  /**
+   * A view for artifacts that have no stored content to fetch and render from their
+   * `metadata` instead. The viewer shows it in place of the content.
+   */
+  metadataView?: {
+    appliesTo(artifact: Artifact): boolean;
+    View: (props: { artifact: Artifact }) => ReactNode;
+  };
+};
+
+/**
  * How a source of a connector is staged before it is connected: the form that
  * captures it, how the staged row reads, whether two rows are the same source and
  * what connecting one does. The functions are declared as methods, like on
@@ -185,7 +215,16 @@ export type ConnectorDefinition<C = unknown, D extends DraftSource = DraftSource
   chat: {
     /** Whether the chat's source filter can scope a question to this connector. */
     filterable: boolean;
+    /**
+     * Whether a cited source with this URL and name (both lowercased) comes from this
+     * connector. A citation names only the artifact's URL and title, so this is how the
+     * chat tells which connector's artifact it is opening.
+     */
+    matchesCitationUrl?(url: string, name: string): boolean;
+    /** Claims every citation no connector matches, e.g. a self-hosted GitHub. One connector sets it. */
+    isDefaultCitationSource?: boolean;
   };
+  knowledgeBase: KnowledgeBaseSupport;
   actions: SourceActions;
   /** The connector's own card in the details panel (identity rows); null when it has none. */
   DetailsSection: ComponentType<DetailsSectionProps> | null;

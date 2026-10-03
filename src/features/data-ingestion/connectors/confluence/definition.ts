@@ -59,7 +59,19 @@ export const confluenceConnector: ConnectorDefinition<
       description: "Pages and spaces from connected Confluence Cloud tenants.",
     },
   },
-  chat: { filterable: true },
+  chat: {
+    filterable: true,
+    matchesCitationUrl: (url) =>
+      url.includes("atlassian.net/wiki/") || url.includes("/wiki/spaces/"),
+  },
+  knowledgeBase: {
+    label: "Confluence",
+    facetOrder: 3,
+    icon: BookOpen,
+    linkLabel: "Open in Confluence",
+    // Confluence pages are stored as Markdown.
+    markdown: true,
+  },
   DetailsSection: ConfluenceDetailsSection,
   // Confluence runs carry the connection id as their repository id.
   runFilter: {

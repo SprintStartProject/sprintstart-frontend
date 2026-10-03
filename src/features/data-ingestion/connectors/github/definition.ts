@@ -12,6 +12,7 @@ import type { GithubRepositoryDetails, SourceInstanceIngestionStatus } from "../
 import { requireProjectId } from "../actionContext.ts";
 import type { ConnectorDefinition } from "../types.ts";
 import { GithubDetailsSection } from "./DetailsSection.tsx";
+import { GithubOrgMetadataView } from "./OrgMetadataView.tsx";
 import { GithubDraftForm } from "./DraftForm.tsx";
 import { connectGithubDraft, isSameGithubDraft, type GithubDraftSource } from "./draft.ts";
 
@@ -42,7 +43,18 @@ export const githubConnector: ConnectorDefinition<ProjectSource, GithubDraftSour
         "Commits, files, issues and pull request metadata from connected GitHub repositories.",
     },
   },
-  chat: { filterable: true },
+  chat: { filterable: true, isDefaultCitationSource: true },
+  knowledgeBase: {
+    label: "GitHub",
+    facetOrder: 1,
+    icon: GitBranch,
+    linkLabel: "Open in GitHub",
+    // An organization's profile is metadata only: its content endpoint redirects to GitHub.
+    metadataView: {
+      appliesTo: (artifact) => artifact.artifactType === "ORG_METADATA",
+      View: GithubOrgMetadataView,
+    },
+  },
   DetailsSection: GithubDetailsSection,
   runFilter: {
     param: "repositoryId",

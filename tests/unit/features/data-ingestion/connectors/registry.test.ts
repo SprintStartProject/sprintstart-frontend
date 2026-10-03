@@ -3,9 +3,11 @@ import {
   CHAT_SOURCE_SYSTEMS,
   CONNECTORS,
   CONNECTOR_LIST,
+  KNOWLEDGE_BASE_SOURCE_ORDER,
   SCHEDULED_SOURCE_SYSTEMS,
   findConnectorById,
   getConnector,
+  sourceSystemOfCitation,
 } from "../../../../../src/features/data-ingestion/connectors/registry";
 import {
   SOURCE_SYSTEMS,
@@ -170,6 +172,62 @@ describe("connector registry", () => {
       expect(CONNECTORS.GITHUB.actions.unlink?.removalHint).toMatch(/repository/);
       expect(CONNECTORS.JIRA.actions.unlink?.removalHint).toMatch(/instance/);
       expect(CONNECTORS.CONFLUENCE.actions.unlink?.removalHint).toMatch(/from scratch/);
+    });
+  });
+
+  describe("knowledge base and chat support", () => {
+    it("gives every connector its knowledge base wording", () => {
+      for (const { knowledgeBase } of CONNECTOR_LIST) {
+        expect(knowledgeBase.label).toBeTruthy();
+        expect(knowledgeBase.icon).toBeDefined();
+      }
+
+      expect(CONNECTORS.GITHUB.knowledgeBase.linkLabel).toBe("Open in GitHub");
+      expect(CONNECTORS.JIRA.knowledgeBase.linkLabel).toBe("Open in Jira");
+      expect(CONNECTORS.CONFLUENCE.knowledgeBase.linkLabel).toBe("Open in Confluence");
+      expect(CONNECTORS.UPLOAD.knowledgeBase.linkLabel).toBeNull();
+    });
+
+    it("lists the knowledge base source facet with uploads last", () => {
+      expect(KNOWLEDGE_BASE_SOURCE_ORDER).toEqual(["GITHUB", "JIRA", "CONFLUENCE", "UPLOAD"]);
+    });
+
+    it("lets only uploads be deleted and only Confluence be forced to Markdown", () => {
+      expect(
+        CONNECTOR_LIST.filter((d) => d.knowledgeBase.deletable).map((d) => d.meta.system),
+      ).toEqual(["UPLOAD"]);
+      expect(
+        CONNECTOR_LIST.filter((d) => d.knowledgeBase.markdown).map((d) => d.meta.system),
+      ).toEqual(["CONFLUENCE"]);
+    });
+
+    it("shows a metadata view for a GitHub organization only", () => {
+      const view = CONNECTORS.GITHUB.knowledgeBase.metadataView;
+      const artifact = { artifactType: "ORG_METADATA" } as Parameters<
+        NonNullable<typeof view>["appliesTo"]
+      >[0];
+
+      expect(view?.appliesTo(artifact)).toBe(true);
+      expect(view?.appliesTo({ ...artifact, artifactType: "FILE" })).toBe(false);
+      expect(CONNECTORS.JIRA.knowledgeBase.metadataView).toBeUndefined();
+    });
+
+    it("has exactly one default citation source", () => {
+      expect(
+        CONNECTOR_LIST.filter((definition) => definition.chat.isDefaultCitationSource),
+      ).toHaveLength(1);
+    });
+
+    it.each([
+      ["https://github.com/acme/api/pull/4", "pr #4", "GITHUB"],
+      ["https://git.corp.example/acme/api/blob/main/a.ts", "a.ts", "GITHUB"],
+      ["https://acme.atlassian.net/browse/ENG-1", "jira #eng-1", "JIRA"],
+      ["https://acme.atlassian.net/rest/x", "board", "JIRA"],
+      ["https://acme.atlassian.net/wiki/spaces/ENG/pages/1", "onboarding", "CONFLUENCE"],
+      ["https://wiki.corp.example/wiki/spaces/ENG/pages/1", "onboarding", "CONFLUENCE"],
+      ["", "handbook.pdf", "UPLOAD"],
+    ])("attributes the citation %s (%s) to %s", (url, name, system) => {
+      expect(sourceSystemOfCitation(url, name)).toBe(system);
     });
   });
 });

@@ -1,3 +1,4 @@
+import { CONNECTORS, KNOWLEDGE_BASE_SOURCE_ORDER } from "../data-ingestion/connectors/registry.ts";
 import type { Artifact, ArtifactSort, ArtifactType, SourceSystem, UploadFormat } from "./types";
 
 /**
@@ -8,19 +9,17 @@ import type { Artifact, ArtifactSort, ArtifactType, SourceSystem, UploadFormat }
 export type { UploadFormat } from "./types";
 
 /**
- * Human-readable display names for the artifact sources (connectors).
+ * Human-readable display names for the artifact sources (connectors), from the
+ * connector registry.
  */
-export const SOURCE_LABELS: Record<SourceSystem, string> = {
-  GITHUB: "GitHub",
-  JIRA: "Jira",
-  CONFLUENCE: "Confluence",
-  UPLOAD: "Uploads",
-};
+export const SOURCE_LABELS = Object.fromEntries(
+  KNOWLEDGE_BASE_SOURCE_ORDER.map((system) => [system, CONNECTORS[system].knowledgeBase.label]),
+) as Record<SourceSystem, string>;
 
 /**
- * Standard left-to-right order for the source facet.
+ * Standard left-to-right order for the source facet, from the connector registry.
  */
-export const DEFAULT_SOURCE_ORDER: SourceSystem[] = ["GITHUB", "JIRA", "CONFLUENCE", "UPLOAD"];
+export const DEFAULT_SOURCE_ORDER: SourceSystem[] = [...KNOWLEDGE_BASE_SOURCE_ORDER];
 
 /**
  * Human-readable display names for artifact types.

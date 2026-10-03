@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { FileText, Upload } from "lucide-react";
 import type { ProjectSource } from "../../../../services/projectService.ts";
 import type { ConnectorDefinition } from "../types.ts";
 import { UploadDraftForm } from "./DraftForm.tsx";
@@ -17,7 +17,18 @@ export const uploadConnector: ConnectorDefinition<ProjectSource, UploadDraftSour
   },
   // Uploads are always offered in the chat filter; the backend skips them when it
   // validates a source filter against the enabled connectors.
-  chat: { filterable: true },
+  chat: {
+    filterable: true,
+    // Uploads are stored without a URL, so a citation without one is an upload.
+    matchesCitationUrl: (url) => url === "",
+  },
+  knowledgeBase: {
+    label: "Uploads",
+    facetOrder: 4,
+    icon: Upload,
+    linkLabel: null,
+    deletable: true,
+  },
   draft: {
     DraftForm: UploadDraftForm,
     formHint: "Files are staged now and uploaded right after the project is created.",
