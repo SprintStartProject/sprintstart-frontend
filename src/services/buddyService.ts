@@ -64,9 +64,9 @@ export async function createSession(): Promise<string> {
  * Retrieves one conversation's messages, oldest first (the window since its last opening —
  * not the whole transcript).
  *
- * @param sessionId The conversation to read. Required for the hire's own conversations — the
+ * @param sessionId - The conversation to read. Required for the hire's own conversations — the
  *   backend answers `400` without one.
- * @param teamProjectId Pass to read the *team-mode* conversation with a managed project
+ * @param teamProjectId - Pass to read the *team-mode* conversation with a managed project
  *   instead; the backend keeps the two apart and team reads name no session.
  */
 export async function getMessages(
@@ -128,9 +128,9 @@ export interface BuddyOpeningHandlers {
  * Opening twice without the hire saying anything is the same visit: the greeting already there is
  * replayed whole and no model is called.
  *
- * @param handlers How the streamed greeting is received.
- * @param sessionId The conversation to open. Required for the hire's own conversations.
- * @param teamProjectId Pass to open a *team-mode* visit with a managed project instead of the
+ * @param handlers - How the streamed greeting is received.
+ * @param sessionId - The conversation to open. Required for the hire's own conversations.
+ * @param teamProjectId - Pass to open a *team-mode* visit with a managed project instead of the
  *   hire's own conversation — the backend greets a manager about their team there.
  */
 export async function streamOpenBuddy(
@@ -487,10 +487,10 @@ async function readBuddyStream(
 /**
  * Sends a message to the user's persistent buddy and streams the grounded reply.
  *
- * @param content The message to send.
- * @param handlers Helper operations handling the output of the buddy's response.
- * @param sessionId The conversation to speak into. Required for the hire's own conversations.
- * @param teamProjectId Pass to speak in *team mode* about a managed project instead of the hire's
+ * @param content - The message to send.
+ * @param handlers - Helper operations handling the output of the buddy's response.
+ * @param sessionId - The conversation to speak into. Required for the hire's own conversations.
+ * @param teamProjectId - Pass to speak in *team mode* about a managed project instead of the hire's
  *   own conversation. Sent in the body, not the query string — the backend's contract puts the
  *   team target on the POST body and leaves the hire's own conversation to `sessionId`.
  */

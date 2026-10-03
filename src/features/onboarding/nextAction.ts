@@ -117,7 +117,7 @@ export function nextItemInPhase(
  *
  * Locked phases are never candidates: their items exist but the backend refuses to start them.
  *
- * @param path The member's own path, as returned by `GET /onboarding/me/path`.
+ * @param path - The member's own path, as returned by `GET /onboarding/me/path`.
  */
 export function resolveNextAction(
   path: OnboardingPathEndpoint,

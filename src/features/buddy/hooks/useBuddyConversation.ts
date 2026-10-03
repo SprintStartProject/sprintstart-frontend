@@ -405,7 +405,7 @@ export function useBuddyConversation(
    * The greeting is a single growing message rather than one per token, so the hire watches it
    * being written instead of watching messages pile up.
    *
-   * @param target Which conversation it is for — `sessionId` for the hire's own, or
+   * @param target - Which conversation it is for — `sessionId` for the hire's own, or
    *   `teamProjectId` for a team conversation. Passed at call time, never captured: a switch
    *   that lands between turns opens the right one.
    */

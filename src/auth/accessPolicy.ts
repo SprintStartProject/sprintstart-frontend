@@ -138,6 +138,14 @@ export function isOnboardingAccessible(profile: UserProfile | null): boolean {
   return Boolean(profile && !profile.hasCompletedOnboarding);
 }
 
+/**
+ * The route a user is sent to when there is no better target: after login without a stored
+ * deep link, and whenever a guard turns them away from the page they asked for.
+ *
+ * Picks the first of `/`, `/admin` and `/data-ingestion` the profile may open. With the
+ * current permissions every group may open `/`, so in practice this is the dashboard.
+ * Without a profile it returns `/`, which `AuthGuard` then sends on to `/login`.
+ */
 export function getDefaultRoute(profile: UserProfile | null): AppRoute {
   if (!profile) {
     return "/";
@@ -158,6 +166,14 @@ export function getDefaultRoute(profile: UserProfile | null): AppRoute {
   return "/";
 }
 
+/**
+ * Maps a real pathname to the `AppRoute` whose permissions apply to it.
+ *
+ * Tries an exact match first, then the prefixes in `routePrefixes`, which is how dynamic
+ * sub-routes such as `/chat/:id`, `/onboarding/:stepId` or `/team/:userId` inherit the
+ * permissions of their parent route. Returns `null` for paths outside the access policy,
+ * e.g. an unknown URL.
+ */
 export function getMatchingProtectedRoute(pathname: string): AppRoute | null {
   const routes = Object.keys(routePermissions) as AppRoute[];
 

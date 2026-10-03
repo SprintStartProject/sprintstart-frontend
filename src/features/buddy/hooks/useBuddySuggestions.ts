@@ -11,8 +11,8 @@ import { getSuggestions, type BuddySuggestion } from "../../../services/buddySer
  * Failure is silence. A chip row is an invitation, not information: a failed call leaves no
  * chips and a working composer, never an error.
  *
- * @param enabled Fetch only once the surface is actually showing (the widget defers until the panel
- *   is first opened, so an unopened widget makes no request).
+ * @param enabled - Fetch only once the surface is actually showing (the widget defers until the
+ *   panel is first opened, so an unopened widget makes no request).
  */
 export function useBuddySuggestions(enabled = true): BuddySuggestion[] {
   const [suggestions, setSuggestions] = useState<BuddySuggestion[]>([]);

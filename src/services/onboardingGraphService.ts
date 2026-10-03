@@ -32,6 +32,7 @@ export type ConnectedStepRequest = {
 export const onboardingGraphService = {
   // ── The hire's own path ─────────────────────────────────
 
+  /** Stores where the phases of the caller's own path sit on the journey map. */
   async arrangeMyPath(nodes: GraphNodePosition[]): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/path/graph`, {
       method: "PUT",
@@ -39,6 +40,7 @@ export const onboardingGraphService = {
     });
   },
 
+  /** Stores where the steps and questions of one phase of the caller's own path sit. */
   async arrangeMyPhase(phaseId: string, nodes: GraphNodePosition[]): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/phases/${phaseId}/graph`, {
       method: "PUT",
@@ -48,6 +50,7 @@ export const onboardingGraphService = {
 
   // ── Somebody else's path (PM, HR, admin) ─────────────────
 
+  /** Stores where the phases of another user's path sit on the journey map. */
   async arrangeUserPath(userId: string, nodes: GraphNodePosition[]): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/users/${userId}/path/graph`, {
       method: "PUT",
@@ -55,6 +58,7 @@ export const onboardingGraphService = {
     });
   },
 
+  /** Stores where the steps and questions of one phase of another user's path sit. */
   async arrangePhase(phaseId: string, nodes: GraphNodePosition[]): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/phases/${phaseId}/graph`, {
       method: "PUT",
@@ -62,6 +66,9 @@ export const onboardingGraphService = {
     });
   },
 
+  /**
+   * Replaces the complete list of items a step or question waits on inside its phase.
+   */
   async replaceNodeBlockers(nodeId: string, blockerIds: string[]): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/nodes/${nodeId}/blockers`, {
       method: "PUT",
@@ -69,6 +76,7 @@ export const onboardingGraphService = {
     });
   },
 
+  /** Replaces the complete list of phases a phase waits on. */
   async replacePhaseBlockers(phaseId: string, blockerIds: string[]): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/phases/${phaseId}/blockers`, {
       method: "PUT",
@@ -76,6 +84,12 @@ export const onboardingGraphService = {
     });
   },
 
+  /**
+   * Adds a step to a phase and wires it into the phase graph in one call: it waits on the items
+   * in `waitsOn`, and the items in `unlocks` wait on it from now on.
+   *
+   * @returns The created step.
+   */
   async createConnectedStep(
     phaseId: string,
     request: ConnectedStepRequest,

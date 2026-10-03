@@ -18,6 +18,7 @@ export type WaitingKind = "skip" | "feedback";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
+/** First and last name, or "Unnamed member" when the backend has neither. */
 export function memberName(member: Pick<TeamOverviewUser, "firstname" | "lastname">): string {
   return `${member.firstname} ${member.lastname}`.trim() || "Unnamed member";
 }
@@ -27,6 +28,7 @@ export function progressPercent(member: Pick<TeamOverviewUser, "progressPercenta
   return Math.min(100, Math.max(0, Math.round(member.progressPercentage * 100)));
 }
 
+/** Reads `progressPercentage` as the fraction it is (0 to 1), not as a percentage. */
 export function memberStage(member: Pick<TeamOverviewUser, "progressPercentage">): MemberStage {
   if (member.progressPercentage >= 1) return "done";
   return member.progressPercentage > 0 ? "underway" : "not-started";
@@ -46,6 +48,7 @@ export function daysOnStep(member: Pick<TeamOverviewUser, "currentStep">): numbe
   return Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / DAY_MS));
 }
 
+/** Whether a member has been on their current step for more than {@link AT_RISK_AFTER_DAYS} days. */
 export function isAtRisk(member: Pick<TeamOverviewUser, "currentStep">): boolean {
   const days = daysOnStep(member);
   return days !== null && days > AT_RISK_AFTER_DAYS;
@@ -62,6 +65,7 @@ export function waitingOn(member: TeamOverviewUser): WaitingKind[] {
   return kinds;
 }
 
+/** A day count for display; 0 or less reads as "today". */
 export function formatDays(days: number): string {
   if (days <= 0) return "today";
   return days === 1 ? "1 day" : `${days} days`;

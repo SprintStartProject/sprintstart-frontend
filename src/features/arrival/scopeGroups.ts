@@ -14,7 +14,7 @@ export type ArrivalScopeGroup = {
  * collecting by key is the same rule: if the server sends a scope in two pieces, two headings is
  * the honest rendering of what it sent.
  *
- * @param steps The hire's steps, in server order.
+ * @param steps - The hire's steps, in server order.
  * @returns One group per consecutive run of the same scope. Empty in, empty out.
  */
 export function groupByScope(steps: ArrivalStep[]): ArrivalScopeGroup[] {

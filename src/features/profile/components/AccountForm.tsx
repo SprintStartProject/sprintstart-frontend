@@ -66,7 +66,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface p-6 shadow-sm">
+    <div className="rounded-xl border border-app-border bg-app-bg p-6">
       <h2 className="mb-4 text-lg font-semibold text-app-text">Account Information</h2>
 
       <div className="mb-6 flex items-center gap-6">
@@ -92,7 +92,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
       </div>
 
       {isChoosingIcon && (
-        <div className="animate-in fade-in slide-in-from-top-2 mb-6 rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
+        <div className="animate-in fade-in slide-in-from-top-2 mb-6 rounded-xl border border-app-border bg-app-surface p-4">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-medium text-app-text">Select an Avatar</span>
             <Button variant="ghost" size="sm" onClick={generateOptions}>
@@ -105,7 +105,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
                 key={seed}
                 type="button"
                 onClick={() => handleSelectIcon(seed)}
-                className="shrink-0 rounded-full transition-transform hover:scale-110 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none"
+                className="shrink-0 rounded-full transition-transform hover:scale-110 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-surface focus:outline-none"
                 aria-label={`Select avatar ${seed}`}
               >
                 <UserAvatar size={48} profileIcon={seed} />

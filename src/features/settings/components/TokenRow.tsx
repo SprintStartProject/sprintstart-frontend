@@ -16,7 +16,7 @@ type Panel = "none" | "rotate" | "delete";
 /**
  * One row in the PAT list. Only one inline panel (rotate or delete) can be
  * open at a time. The row itself is wrapped in `motion.div` so it animates
- * in/out when added/removed from the list (AGENTS.md §11).
+ * in/out when added/removed from the list (FRONTEND_CODING_STANDARDS.md §6).
  */
 export function TokenRow({ name, onSaved }: TokenRowProps) {
   const [panel, setPanel] = useState<Panel>("none");

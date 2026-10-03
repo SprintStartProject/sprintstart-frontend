@@ -50,6 +50,13 @@ function getMenuPosition(button: HTMLButtonElement): MenuPosition {
   return { top, left };
 }
 
+/**
+ * The user table of the admin page: one page of the filtered users, with row selection for bulk
+ * delete and a context menu per row.
+ *
+ * Holds no data of its own. Filtering, paging, selection and the open menu live in `AdminPage`;
+ * the menu is rendered in a portal so the table's overflow cannot clip it.
+ */
 export function UsersTab({
   paginatedUsers,
   selectedUserIds,

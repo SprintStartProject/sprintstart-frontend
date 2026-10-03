@@ -148,10 +148,10 @@ export function SidebarResizeHandle({
     onResize(next);
   };
 
-  /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex --
-     A focusable `separator` with a value is the ARIA pattern for a splitter, and an interactive
-     widget when focusable; the lint rules treat every separator as static. */
+  // A focusable `separator` with a value is the ARIA pattern for a splitter, and an interactive
+  // widget when focusable; the a11y lint rules treat every separator as static.
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- splitter, see above
     <div
       role="separator"
       aria-orientation="vertical"
@@ -160,6 +160,7 @@ export function SidebarResizeHandle({
       aria-valuemin={collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_MIN_WIDTH}
       aria-valuemax={SIDEBAR_MAX_WIDTH}
       aria-valuetext={collapsed ? "Collapsed" : `${width} pixels`}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- splitter, see above
       tabIndex={0}
       title={
         collapsed
@@ -185,5 +186,4 @@ export function SidebarResizeHandle({
       />
     </div>
   );
-  /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
 }

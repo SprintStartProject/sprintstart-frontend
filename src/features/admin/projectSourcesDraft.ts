@@ -124,6 +124,10 @@ function nextDraftSourceId(): string {
   return `draft-source-${draftSourceCounter}`;
 }
 
+/**
+ * Stages a GitHub repository. With a `repositoryId` the repository is already ingested elsewhere
+ * and connecting only links it to the project; without one it is fetched and ingested.
+ */
 export function createDraftSource(
   owner: string,
   name: string,
@@ -204,6 +208,10 @@ export function isValidConfluenceSpaceId(spaceId: string): boolean {
   return /^\d+$/.test(spaceId.trim());
 }
 
+/**
+ * Stages a Confluence space. Without a display name it is called `Confluence Space <spaceId>`;
+ * check the space ID with {@link isValidConfluenceSpaceId} first.
+ */
 export function createConfluenceDraft(params: {
   displayName?: string;
   baseUrl: string;
@@ -226,8 +234,9 @@ export function createConfluenceDraft(params: {
 
 /**
  * Whether two drafts point at the same underlying source, used to dedupe on
- * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL; two
- * uploads are always distinct (the same file can legitimately be staged twice).
+ * add. Identity is per type: GitHub by `owner/name`, Jira by instance URL,
+ * Confluence by base URL and space ID; two uploads are always distinct (the same
+ * file can legitimately be staged twice).
  * Drafts of different types are never the same source.
  */
 export function isSameSource(left: DraftSource, right: DraftSource): boolean {
@@ -294,6 +303,7 @@ function patchDraftSource(
   return sources.map((source) => (source.id === sourceId ? { ...source, ...patch } : source));
 }
 
+/** Sources a save still has to connect: pending, failed or still connecting. */
 export function countUnconnectedSources(sources: DraftSource[]): number {
   return sources.filter((source) => source.status !== "connected").length;
 }
@@ -312,7 +322,7 @@ export function hasFailedSources(sources: DraftSource[]): boolean {
  * coarse: naming — or even counting — the projects a source was already
  * connected to would tell a PM about projects that are not theirs.
  *
- * @param sources The settled run.
+ * @param sources - The settled run.
  * @returns `"none"` when nothing connected, `"reused"` when everything that
  * connected was linked, `"ingesting"` when everything is being fetched, and
  * `"mixed"` for a run with both.
@@ -332,7 +342,7 @@ export function connectOutcome(sources: DraftSource[]): "none" | "reused" | "ing
 /**
  * The line under a success toast, matching {@link connectOutcome}.
  *
- * @param sources The settled run.
+ * @param sources - The settled run.
  * @returns The description, or `undefined` when there is nothing to add.
  */
 export function connectOutcomeDescription(sources: DraftSource[]): string | undefined {

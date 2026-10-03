@@ -51,8 +51,8 @@ export type ForceLayout = {
  * second while settling (seconds before anything appeared) and ran without end
  * during a drag. Physics you can watch is not worth a graph you cannot use.
  *
- * @param path The graph to lay out; a change in its shape recomputes the layout.
- * @param enabled False for reduced motion. The relaxation involves no motion, so
+ * @param path - The graph to lay out; a change in its shape recomputes the layout.
+ * @param enabled - False for reduced motion. The relaxation involves no motion, so
  * this only exists to keep the reduced-motion path byte-identical to plain dagre.
  */
 export function useForceLayout(path: GraphShape, enabled: boolean): ForceLayout {

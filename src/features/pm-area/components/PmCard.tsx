@@ -4,14 +4,6 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 /**
- * The surface every PM section draws its blocks on.
- *
- * Same frame as the dashboard widgets (`WidgetShell`): a rounded-2xl card, a gradient icon chip
- * beside a small semibold title, the soft brand glow in the corner. The PM area used to wrap
- * whole sections in `SpotlightCard`s with their own `text-lg` headings inside, which made it the
- * one area of the app that looked like a different product.
- */
-/**
  * The colour a PM block is recognised by. Each section has one — Team is brand, Onboarding cyan,
  * Questions indigo, Knowledge gaps pink, Escalations purple — and its cards, figures and chips use
  * it wherever that section shows up, so a glance at a colour says which part of the area a block
@@ -56,6 +48,14 @@ const TONE_GLOW: Record<PmTone, string> = {
   neutral: "bg-app-brand/5",
 };
 
+/**
+ * The surface every PM section draws its blocks on.
+ *
+ * Same frame as the dashboard widgets (`WidgetShell`): a rounded-2xl card, a gradient icon chip
+ * beside a small semibold title, the soft brand glow in the corner. The PM area used to wrap
+ * whole sections in `SpotlightCard`s with their own `text-lg` headings inside, which made it the
+ * one area of the app that looked like a different product.
+ */
 export function PmCard({
   children,
   className = "",
