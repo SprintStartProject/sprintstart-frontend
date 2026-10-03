@@ -1,16 +1,16 @@
 # Frontend Coding Standards & Conventions
 
-These are the coding standards for `sprintstart-frontend`. Developers and AI agents
-must follow these rules to maintain a predictable, clean, and highly maintainable
-codebase. This file is the frontend-only companion to the root-level
-`CODING_STANDARDS.md` (which also covers Kotlin and Python); a developer cloning
-only this repository gets the full set of frontend rules here.
+These are the coding rules for `sprintstart-frontend`, for developers and AI agents
+alike. How the codebase is built is described in the architecture doc; this file
+says how to write code for it. Why the UI rules in §4 to §6 look the way they do is
+in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
 
 > **Related docs**
 >
 > - [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) — feature-first structure, routing, state, design system, animation.
 > - [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — TSDoc/JSDoc rules.
 > - [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
+> - [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md) — why the UI rules exist, and the open UI consistency items.
 
 ---
 
@@ -39,8 +39,9 @@ only this repository gets the full set of frontend rules here.
   (`tsconfig.app.json` has `allowImportingTsExtensions: true`). Mix is fine —
   follow the convention of the file you're editing.
 
-- **`any` is strictly forbidden.** Narrow types using explicit interfaces or type
-  guards. (ESLint: `@typescript-eslint/no-explicit-any: warn`.)
+- **Don't use `any`.** Narrow types using explicit interfaces or type guards.
+  ESLint only warns (`@typescript-eslint/no-explicit-any: warn`), but treat the
+  warning as something to fix, not to live with.
 
 - **`eqeqeq: error`** — always `===` / `!==`.
 
@@ -52,8 +53,19 @@ only this repository gets the full set of frontend rules here.
 - **`no-console: warn`** — only `console.warn` and `console.error` are allowed;
   no stray `console.log`.
 
-- **No suppressions** — never commit `// @ts-ignore`, `// @ts-expect-error`, or
-  `// eslint-disable-*`. Fix the underlying type mismatch instead.
+- **No type suppressions** — never commit `// @ts-ignore` or `// @ts-expect-error`.
+  Fix the underlying type mismatch instead.
+
+- **`eslint-disable` only as a last resort** — disable one rule for one line
+  (`// eslint-disable-next-line <rule>`), never a whole block or file, and give the
+  reason after `--`:
+
+  ```typescript
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `act` closes over fresh state each render
+  ```
+
+  When the reason needs more than a line, write it as a comment directly above the
+  disable instead. A disable with no reason at all is not allowed.
 
 ---
 
@@ -61,36 +73,63 @@ only this repository gets the full set of frontend rules here.
 
 - **Functional components + hooks only.** Class components are legacy and not used.
 
-- **Named exports ONLY**, except lazy-loaded route pages which require default
-  exports:
+- **Named exports ONLY**, route pages included. `AppRouter` lazy-loads pages by
+  mapping the named export, so they need no default export:
 
   ```typescript
   // Good
   export function MyComponent() { ... }
   export const MyComponent = () => { ... };
+
+  // How AppRouter loads a page
+  const ChatPage = lazy(() =>
+    import("../pages/ChatPage").then((module) => ({ default: module.ChatPage })),
+  );
   ```
+
+  Default exports are left only where a tool requires them: Storybook's `meta` in
+  `*.stories.tsx`, config files such as `vite.config.ts` and `eslint.config.js`, and
+  the Keycloakify pages that `keycloakify sync-extensions` generates. Two older
+  modules still default-export and should not be copied: `App.tsx` and
+  `config/keycloak.ts`.
 
 - **Keep components focused.** Extract hooks for non-trivial logic/state.
 
 - **Comments and identifiers in English.**
 
-- **Services return typed responses and surface backend failures** — don't silently
-  swallow errors (no empty `catch`).
-
 ---
 
 ## 4. Styling (Tailwind CSS v4)
 
-- **Always use the palette tokens; never hardcode colors.**
-  - No `#2563eb`, no raw Tailwind colors like `text-blue-500`.
-  - Use the semantic roles: surfaces (`bg-app-bg`, `bg-app-surface`,
-    `bg-app-surface-muted`), text (`text-app-text`, `text-app-text-muted`,
-    `text-app-text-subtle`), borders (`border-app-border`, …), brand
-    (`bg-app-brand`, `text-app-brand`, …), and status (`success` / `warning` /
-    `danger` / `neutral`, e.g. `bg-app-success-bg text-app-success-text`).
+- **Always use the palette tokens; never hardcode colors.** No `#2563eb`, no raw
+  Tailwind colors like `text-blue-500`. Every color must work in light and dark
+  mode, which tokens give you for free. The token families are listed in
+  [FRONTEND_ARCHITECTURE.md §7](./FRONTEND_ARCHITECTURE.md#7-design-system).
 
 - **Stay consistent beyond color, too.** Use the shared Tailwind scale for spacing,
   radius, and sizing instead of arbitrary one-off pixel values.
+
+- **Use the shared UI primitives in `src/components/ui/`, don't rebuild them.** Every
+  one of them exists because the same widget had drifted into a dozen slightly
+  different versions. Reach for the component first; if it can't do what you need,
+  extend the component instead of patching it at the call site.
+
+  | Need                   | Use                                        | Not                                             |
+  | ---------------------- | ------------------------------------------ | ----------------------------------------------- |
+  | Any action control     | `ui/Button`                                | a hand-styled `<button>` or `<motion.button>`   |
+  | Text field / dropdown  | `ui/Input`, `ui/Select`, `ui/Textarea`     | a bare `<input>` / `<select>` / `<textarea>`    |
+  | Filter / sort dropdown | `ui/FilterSelect`                          | a `ui/Select` in a filter bar or toolbar        |
+  | Label + hint + error   | `ui/Field`                                 | a `<label>` next to an input, wired by hand     |
+  | Status pill            | `ui/Badge`                                 | `rounded-full … px-2 … text-xs` on a `<span>`   |
+  | Dialog / drawer        | `ui/Modal`, `ui/SidePanel`                 | a hand-rolled `fixed inset-0` overlay           |
+  | Waiting                | `ui/Spinner`, or `Button`'s `loading` prop | a bare `<Loader2 className="animate-spin" />`   |
+  | Nothing to show        | `ui/EmptyState`                            | an ad-hoc centred `<p>`                         |
+  | Background scroll lock | `ui/useScrollLock`                         | setting `document.body.style.overflow` yourself |
+
+  The primitives already carry the focus ring, the 44px touch target at the
+  default size, the `disabled` / `aria-busy` treatment, the press feedback, the `aria-describedby`
+  wiring for errors, and the focus trap. Rebuilding one by hand means getting all of
+  that right again. The bullets below give the details for each.
 
 - **Dialogs are [`ui/Modal`](../src/components/ui/Modal.tsx)** (or
   [`ui/SidePanel`](../src/components/ui/SidePanel.tsx) for a drawer). It brings
@@ -127,14 +166,12 @@ only this repository gets the full set of frontend rules here.
 - **No custom standalone `.css` classes** unless styling third-party widgets or
   dealing with browser overrides.
 
-- **Light/dark theme** is controlled via the `.dark` class (`@custom-variant dark`),
-  managed by `ThemeProvider`. Every color must work in both themes — which is
-  automatic when you use tokens.
-
 - **Every action control is [`ui/Button`](../src/components/ui/Button.tsx) — do not
   hand-roll a `<button>` with its own classes.** Pick `variant` by intent
   (`primary` | `secondary` | `ghost` | `danger` | `dangerSoft` | `dangerGhost`)
-  and `size` by density (`sm` | `md` | `lg`, default `md`); height, radius, type
+  and `size` by density (`xs` | `sm` | `md` | `lg`, default `md`; only `md` and
+  up meet the 44px touch target, `xs` is for the quiet actions under a chat
+  message); height, radius, type
   scale, hover, focus ring and disabled treatment then follow automatically.
   Use `loading` rather than wiring up your own spinner, and `iconOnly` (plus an
   `aria-label`) for square icon buttons. If a variant you need is missing, add it
@@ -171,6 +208,12 @@ only this repository gets the full set of frontend rules here.
   a filled brand surface — a selected tab, the logo tile. That is decoration on
   a coloured shape, not elevation, and it stays.
 
+  **The brand lift shadow (`hover:shadow-app-brand-lift`) belongs to `primary`
+  buttons and to nothing else.** It marks the one action a screen wants; if every
+  button glowed, the cue would carry no information. It is a token in `index.css`
+  with separate light and dark values — never an arbitrary `shadow-[…]` value,
+  which cannot adapt to the theme.
+
 - **Heading scale — pick the rung by role, not by how big it should look.**
 
   | role               | size                                | example                                              |
@@ -192,6 +235,10 @@ only this repository gets the full set of frontend rules here.
   `icon` for a leading search/key glyph and `trailing` for an action pinned
   inside the right edge, rather than positioning them absolutely by hand.
 
+  `Select` is the dropdown for forms and editors. Filter and sort dropdowns in
+  toolbars and filter bars are [`ui/FilterSelect`](../src/components/ui/FilterSelect.tsx),
+  so every filter row opens the same app-styled list.
+
 - **Wrap a labelled control in [`ui/Field`](../src/components/ui/Field.tsx).**
   It generates the id, binds the `<label>`, collects `hint` and `error` into
   `aria-describedby` and sets `aria-invalid` — the wiring hand-written forms
@@ -205,7 +252,7 @@ only this repository gets the full set of frontend rules here.
   ```
 
   Hand-written markup stays right for composite controls where the box is
-  shared — the "Every _n_ minutes" row, the chat composer, the borderless quick
+  shared — the chat composer and its date filter fields, the borderless quick
   chat field — and for checkboxes, radios and file pickers, which are a
   different anatomy.
 
@@ -220,6 +267,30 @@ only this repository gets the full set of frontend rules here.
   [`useAutoResize`](../src/components/ui/useAutoResize.ts). Do not re-implement
   the height maths inline: every hand-rolled copy so far forgot to shrink the
   field again when the value was reset from the outside.
+
+- **The Keycloak login theme has its own copies.** If you change a shared visual
+  primitive or token (button radius or hover, input focus ring, card border, shadow
+  or radius, the brand mark's animation, anything in `styles/index.css`), check
+  whether `src/keycloak-theme/login/` has its own copy of that pattern and port the
+  change there too. Nothing keeps the two in sync. See
+  [FRONTEND_ARCHITECTURE.md §10.3](./FRONTEND_ARCHITECTURE.md#103-keycloak-login-theme)
+  for what is shared, what is copied, and how a theme change gets deployed.
+
+### Responsive design
+
+- **Desktop is the primary target**, because that is where the app is mainly used.
+  Design the desktop layout first; this is _not_ mobile-first.
+- **Every page must still be responsive** down to phone size: widgets get narrower
+  or stack vertically, the sidebar collapses, and tables and dialogs must not
+  overflow.
+- Use the Tailwind breakpoints (`sm:`, `md:`, `lg:`) to scale the desktop layout
+  _down_. The app shell already does this: sticky sidebar on desktop, slide-out
+  drawer and top bar below `lg` (see `components/layout/SideBar.tsx`; global token
+  adjustments at `@media (max-width: 1024px)`).
+- Prefer fluid layouts (`flex`/`grid`, `max-w-*`, `min-w-0` to allow truncation)
+  over fixed pixel widths.
+- **Test desktop first, then tablet and mobile** before finishing UI work: widgets
+  reflow, the sidebar collapses, nothing overflows.
 
 ---
 
@@ -247,42 +318,57 @@ only this repository gets the full set of frontend rules here.
 
 ## 6. Animation (Framer Motion 12)
 
-- **Use the centralized spring transition tokens** — don't inline ad-hoc spring
-  configs. Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts),
-  exporting `centralSpringToken` (default layout/list motion) and `hoverSpringToken`
-  (micro-interactions).
+- **Use the presets in [`src/styles/tokens.ts`](../src/styles/tokens.ts)** for every
+  `motion` transition — don't inline ad-hoc spring configs. `centralSpringToken` is
+  the default; what else is in there is described in
+  [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12).
 
-- **Wrap dynamically added/removed elements** (lists, drawers) in `<AnimatePresence>`
-  to avoid clipping on exit. Use `mode="popLayout"` when the wrapper affects
-  document reflow.
+- **Wrap dynamically added or removed elements** (lists, drawers) in
+  `<AnimatePresence>`, so they animate out instead of being clipped. For lists whose
+  items affect the layout around them:
+  - Set `mode="popLayout"`. It takes the exiting element out of the layout flow,
+    so its neighbours move into place right away instead of waiting for the exit
+    animation to finish.
+  - Give the direct child of `<AnimatePresence>` the `layout` prop, so Framer
+    Motion animates its size and position changes.
+  - Give that child a unique, stable `key` (the backend id), never the array index.
+
+  ```tsx
+  <AnimatePresence mode="popLayout">
+    {tasks.map((task) => (
+      <motion.div
+        layout
+        key={task.id}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={centralSpringToken}
+      >
+        <TaskCard task={task} />
+      </motion.div>
+    ))}
+  </AnimatePresence>
+  ```
 
 - **Do not apply `buttonHoverMotion` by hand.**
   [`ui/Button`](../src/components/ui/Button.tsx) already carries it, for every
   variant and size, and swaps to `buttonHoverMotionDisabled` when the button is
-  disabled or loading. Reaching for `<motion.button {...buttonHoverMotion}>` is
-  how the app ended up with a "Refresh" icon button that magnified on one page
-  header and sat dead on the next.
+  disabled or loading. Despite its name it only gives press feedback; hover is
+  carried by each variant's `hover:` colours (see
+  [UI_DESIGN_DECISIONS.md §1a](./UI_DESIGN_DECISIONS.md#1a-hover-and-press-feedback)
+  for why buttons no longer grow on hover).
 
   The token stays public for the controls that are _not_ `Button` and still need
-  to feel the same — the `role="combobox"` trigger in `FilterSelect` and the
-  `aria-pressed` filter chips. Those, and only those.
-
-- **The brand lift shadow (`hover:shadow-app-brand-lift`) belongs to `primary`
-  and to nothing else.** It marks the one action a screen wants; if every button
-  glowed, the cue would carry no information. It is a token in `index.css` with
-  separate light and dark values — never an arbitrary `shadow-[…]` value, which
-  cannot adapt to the theme.
-
-- See [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
-  for the full animation system.
+  to feel the same: the popup triggers of `FilterSelect`, `DropdownSelect` and
+  `MultiSelectFilter`.
 
 ---
 
 ## 7. Services & API layer
 
-- **Use `services/apiClient.ts`** (native `fetch` wrapper) — **not axios**. The
-  `apiClient.fetch<T>(endpoint, options)` helper handles JWT refresh, auth headers,
-  JSON parsing, and `ApiError` throwing.
+- **Use `apiClient.fetch<T>()` from `services/apiClient.ts`** for every HTTP call,
+  not axios or a bare `fetch`. What it does for you is described in
+  [FRONTEND_ARCHITECTURE.md §6.1](./FRONTEND_ARCHITECTURE.md#61-apiclient-srcservicesapiclientts).
 
 - **Typed responses** — every service function declares its return type
   (`Promise<SomeDto>`); never `Promise<any>`.
@@ -300,66 +386,19 @@ only this repository gets the full set of frontend rules here.
 
 ## 8. Testing
 
-- **Framework:** Vitest 4 + Testing Library (`@testing-library/react`,
-  `user-event`, `jest-dom`) in a `jsdom` environment, with `msw` for HTTP mocking
-  and `vitest-axe` for accessibility checks.
-
-- **Location:** unit tests live under `tests/unit/**`, mirroring `src/` structure
-  (`services/`, `components/`, `pages/`, `context/`, `router/`, `features/`,
-  `hooks/`, `auth/`, `a11y/`).
-
-- **Run:** `npm run test` (CI-friendly, non-watch). `npm run unit` excludes a11y;
-  `npm run a11y` runs a11y only.
-
-- **What to cover:** services (backend contracts, error paths), business/permission
-  logic (`AuthGuard`, access policy), hooks, and key page/component behavior — not
-  trivial markup.
-
-- **E2E hooks:** elements targeted by end-to-end tests must declare a `data-testid`.
-
-- **Update tests in the same PR** as the component change.
-
-- See [testing_strategy.md](./testing_strategy.md) for the full setup.
+All testing rules (what to cover, where tests live, how to mock) are in
+[testing_strategy.md](./testing_strategy.md).
 
 ---
 
-## 9. Documentation (the _why_, not the obvious _what_)
+## 9. Documentation
 
-- Use **TSDoc** blocks on exported symbols — see
-  [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md)
-  for the full rules.
-
-- In short, document:
-  - **Pages/views:** responsibility, user flow, key backend/auth/routing/state deps.
-  - **Reusable components:** when purpose/behavior/constraints aren't obvious.
-  - **Props:** when reused, domain-meaningful, callbacks, or backend/auth-constrained
-    (skip `id` / `children` / `className` unless special).
-  - **Service functions:** purpose, important params, non-obvious return, failure
-    behavior — document **every** exported service function.
-  - **Hooks/effects:** when timing or dependencies matter.
-  - **Business logic:** permission/role rules, conditional flows, data transforms,
-    backend-contract assumptions, and **temporary limitations / known backend gaps**.
-
-- Don't document obvious assignments, trivial state updates, plain JSX, or restate
-  names. Keep comments current — update/remove them when behavior changes.
+All rules for TSDoc and comments are in
+[FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md).
 
 ---
 
-## 10. Anti-patterns (do not)
-
-- **No `any`** (TypeScript) — type it properly.
-- **No suppressions** — `// @ts-ignore`, `// @ts-expect-error`,
-  `# type: ignore`, `@SuppressWarnings`-style escape hatches. Fix the underlying
-  type mismatch instead.
-- **No hardcoded colors** — use the shared palette tokens.
-- **No ad-hoc spring configs** — use `src/styles/tokens.ts`.
-- **No empty `catch` blocks** — surface backend failures.
-- **No class components** — functional + hooks only.
-- **No default exports** except lazy-loaded route pages.
-
----
-
-## 11. Enforcement
+## 10. Enforcement
 
 ESLint flat config ([`eslint.config.js`](../eslint.config.js)):
 
@@ -370,26 +409,16 @@ ESLint flat config ([`eslint.config.js`](../eslint.config.js)):
 - `jsx-a11y` flat recommended.
 - `prettier` (formatting via `eslint-config-prettier`).
 
-**Before finishing any change:**
-
-```bash
-npm run lint        # ESLint
-npm run build       # tsc -b + vite build (type-check + compile)
-npm run test        # full Vitest suite (unit + a11y)
-# OR, the one-shot Definition of Done:
-npm run try         # install + build + lint + unit + a11y
-```
+**Definition of Done:** `npm run try` passes. It runs `npm install`, the Prettier
+check, the build (`tsc -b` + `vite build`), ESLint, and the unit and a11y tests.
+The individual scripts are listed in the [README](../README.md#commands--scripts).
 
 ### Formatting
 
 Prettier owns formatting — don't fight it, don't hand-align, don't argue with
 the class order. The config lives in [`.prettierrc`](../.prettierrc):
-2 spaces, double quotes, `printWidth: 100`.
-
-```bash
-npm run format        # rewrite
-npm run format:check  # verify (also part of `npm run try`)
-```
+2 spaces, double quotes, `printWidth: 100`. `npm run format` rewrites,
+`npm run format:check` verifies.
 
 `prettier-plugin-tailwindcss` sorts Tailwind classes. It needs
 `"tailwindStylesheet": "./src/styles/index.css"` because Tailwind v4 has no

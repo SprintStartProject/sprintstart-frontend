@@ -1,4 +1,5 @@
 import { Badge } from "../../../components/ui/Badge.tsx";
+import { IconTile } from "../../../components/ui/IconTile";
 import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 
@@ -61,12 +62,7 @@ export function SourceTypeStep({
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-app-bg-soft">
-                    <Icon
-                      size={20}
-                      className={isSelected ? "text-app-brand" : "text-app-text-muted"}
-                    />
-                  </div>
+                  <IconTile icon={Icon} size="xl" tone={isSelected ? "brand" : "neutral"} />
 
                   {!isAvailable && (
                     <Badge variant="neutral" size="sm">

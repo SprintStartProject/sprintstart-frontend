@@ -80,13 +80,6 @@ export const KNOWLEDGE_TABS: readonly KnowledgeTabDef[] = [
 
 export const KNOWLEDGE_TAB_ORDER: readonly KnowledgeTab[] = KNOWLEDGE_TABS.map((tab) => tab.id);
 
-/**
- * File formats a reader can narrow *uploaded* artifacts to.
- *
- * Not a source type and not an artifact type: an upload's format only exists
- * for uploads, so this facet is offered only while `UPLOAD` is part of the
- * source selection (see `useKnowledgeBase`).
- */
 /** Human-readable display names for the file-format facet. */
 export const FORMAT_LABELS: Record<UploadFormat, string> = {
   PDF: "PDFs",

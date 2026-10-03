@@ -13,7 +13,7 @@ export type SegmentedTabOption<TValue extends string> = {
   /** Optional trailing count badge. */
   count?: number;
   /**
-   * Optional `data-testid` for end-to-end targeting, per AGENTS.md §5.
+   * Optional `data-testid` for end-to-end targeting, per FRONTEND_CODING_STANDARDS.md §5.
    *
    * Only for options whose label is not a stable handle — a provider switch
    * whose labels are product names, say. Prefer the accessible name where it

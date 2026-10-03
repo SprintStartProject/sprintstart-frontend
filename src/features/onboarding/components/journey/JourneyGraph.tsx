@@ -30,6 +30,7 @@ import {
   type JourneyEdgeTone,
 } from "../../graph/JourneyCanvas";
 import { ItemGlyph, ItemNodeCard, PhaseNodeCard } from "../../graph/JourneyNodeCards";
+import { itemNumbers } from "../../itemNumbers";
 import {
   ITEM_LAYOUT,
   ITEM_NODE_SIZE,
@@ -431,6 +432,8 @@ export function JourneyGraph({
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
   const focusedItem = entersItems ? (items.find((item) => item.id === openItemId) ?? null) : null;
   const progress = phaseProgress(openPhase);
+  // The numbers the list and the buddy use for these items, so a node can be named by the one on it.
+  const numbers = itemNumbers(openPhase);
 
   return (
     <motion.div
@@ -560,6 +563,7 @@ export function JourneyGraph({
             render={render}
             isNext={item.id === nextItemId}
             showUpdates={showMemberUpdates}
+            number={numbers.get(item.id)}
           />
         )}
       />

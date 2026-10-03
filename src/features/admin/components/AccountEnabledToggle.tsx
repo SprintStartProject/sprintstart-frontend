@@ -5,6 +5,12 @@ type AccountEnabledToggleProps = {
   onChange: (enabled: boolean) => void;
 };
 
+/**
+ * Switch that enables or disables a user's account, i.e. whether they can sign in.
+ *
+ * A hand-written `role="switch"` rather than `ui/Button`: it carries its own on/off state, which
+ * the coding standards list as an exception to the `Button` rule.
+ */
 export function AccountEnabledToggle({
   enabled,
   disabled,

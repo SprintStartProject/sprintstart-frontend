@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
-import { Select } from "../../../components/ui/Select.tsx";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 import {
   DATE_RANGE_PRESETS,
   describeDateRange,
@@ -15,6 +15,12 @@ import type { KnowledgeBaseHistoryMode } from "../hooks/useKnowledgeBaseUrlState
 
 const ANY = "ANY";
 const CUSTOM = "CUSTOM";
+
+const PRESET_OPTIONS: FilterSelectOption<string>[] = [
+  { value: ANY, label: "Any time" },
+  ...DATE_RANGE_PRESETS.map((option) => ({ value: option.id, label: option.label })),
+  { value: CUSTOM, label: "Custom range…" },
+];
 
 /** Props for {@link ArtifactDateRangeFilter}. */
 export interface ArtifactDateRangeFilterProps {
@@ -82,21 +88,13 @@ export function ArtifactDateRangeFilter({
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="kb-date-filter">
       <div className="w-40 shrink-0">
-        <Select
-          size="sm"
+        <FilterSelect
+          label="Filter by last update (changed, or added if never changed)"
           value={selectValue}
-          onChange={(event) => handlePresetChange(event.target.value)}
-          aria-label="Filter by last update (changed, or added if never changed)"
-          data-testid="kb-date-preset"
-        >
-          <option value={ANY}>Any time</option>
-          {DATE_RANGE_PRESETS.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-          <option value={CUSTOM}>Custom range…</option>
-        </Select>
+          options={PRESET_OPTIONS}
+          onChange={handlePresetChange}
+          testId="kb-date-preset"
+        />
       </div>
 
       {selectValue === CUSTOM && (

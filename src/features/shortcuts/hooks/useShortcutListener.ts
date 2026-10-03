@@ -10,10 +10,10 @@ import { isModalSurfaceOpen } from "../lib/modalSurface";
  * registry's rule ({@link isShortcutPress}) — this hook only decides when to listen and
  * what a press does.
  *
- * @param onTrigger Called with the event already `preventDefault`ed — and only when no modal
+ * @param onTrigger - Called with the event already `preventDefault`ed — and only when no modal
  *   surface owns the keyboard: the surface chords stand down for an open dialog the same way
  *   the global ones do (see `lib/modalSurface.ts`).
- * @param enabled Gate the listener where the thing it acts on is not on screen — an
+ * @param enabled - Gate the listener where the thing it acts on is not on screen — an
  *   unmounted surface must not answer for a mounted one.
  */
 export function useShortcutListener(

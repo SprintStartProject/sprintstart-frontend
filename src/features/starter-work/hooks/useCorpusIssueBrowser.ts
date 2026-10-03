@@ -40,8 +40,8 @@ const NO_CANDIDATES: StarterWorkCandidate[] = [];
  * never hidden at all — they are shown marked, because an issue missing from the list leaves a
  * reader unable to tell "filtered" from "not ingested".
  *
- * @param projectId The project whose corpus to browse; nothing loads while it is empty.
- * @param onPromoted Called with the created task, so the page can confirm where it went.
+ * @param projectId - The project whose corpus to browse; nothing loads while it is empty.
+ * @param onPromoted - Called with the created task, so the page can confirm where it went.
  */
 export function useCorpusIssueBrowser(
   projectId: string,

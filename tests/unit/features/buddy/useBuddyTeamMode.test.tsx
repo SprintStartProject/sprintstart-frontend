@@ -146,6 +146,33 @@ describe("useBuddyConversation — team mode", () => {
     expect(onLeft).not.toHaveBeenCalled();
   });
 
+  it("leaves the flag wording behind when the conversation switches", async () => {
+    // A draft belongs to the offer it was typed into, not to the tab: the conversation being
+    // switched to starts with no wording of its own, exactly like every other piece of state.
+    const onLeft = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ selection, onLeft }: { selection: ProjectSelectionSlice; onLeft?: () => void }) =>
+        useBuddyConversation(selection, onLeft),
+      { initialProps: { selection: sel("", false), onLeft }, wrapper: authWrapper },
+    );
+    await act(async () => {
+      await result.current.ensureOpened();
+    });
+
+    act(() => {
+      result.current.setActionDraft("m1:a1", "Who owns the staging box?");
+    });
+    expect(result.current.actionDrafts["m1:a1"]).toBe("Who owns the staging box?");
+
+    act(() => {
+      result.current.switchTeamProject("p1");
+      rerender({ selection: sel("p1", true), onLeft });
+    });
+
+    await waitFor(() => expect(result.current.actionDrafts).toEqual({}));
+    expect(result.current.teamProjectId).toBe("p1");
+  });
+
   it("persists the preference per user, restores it on remount, and leaves it audibly", async () => {
     localStorage.setItem("buddyTeamMode:user-1", "true");
     localStorage.setItem("buddyTeamMode:user-2", "true");

@@ -6,6 +6,7 @@ type ProjectListProps = {
   max?: number;
 };
 
+/** The first `max` projects as badges, the rest folded into one `+n` badge. */
 export function ProjectList({ projects, max = 2 }: ProjectListProps) {
   if (projects.length === 0) {
     return <span className="text-sm text-app-text-muted">No projects</span>;

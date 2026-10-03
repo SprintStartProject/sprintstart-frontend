@@ -39,9 +39,9 @@ const DEFAULT_SURROUNDINGS: readonly { id: DashboardWidgetId; size: DashboardWid
  * Only decides what a user finds the first time — everything after that is theirs, and
  * "reset" brings them back here.
  *
- * @param availableIds The widget ids {@link DashboardWidgetDefinition.isAvailable} said yes
+ * @param availableIds - The widget ids {@link DashboardWidgetDefinition.isAvailable} said yes
  *   to. Anything not in here is skipped rather than placed as a card that cannot load.
- * @param ownsKnowledgeGaps Whether a component has been put in this user's name. When it has,
+ * @param ownsKnowledgeGaps - Whether a component has been put in this user's name. When it has,
  *   the gaps card takes the knowledge base's place rather than being added beside it: work
  *   that is assigned to you outranks a reading list, and the default board is a fixed shape —
  *   a card added here is a card pushed off the bottom of the first screen. The knowledge base

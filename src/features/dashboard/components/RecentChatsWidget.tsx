@@ -2,6 +2,7 @@ import { useContext } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, MessageSquare, MessagesSquare } from "lucide-react";
 import { Spinner } from "../../../components/ui/Spinner";
+import { IconTile } from "../../../components/ui/IconTile";
 import { ChatContext } from "../../../context/ChatContext";
 import { formatRelativeDate } from "../../chatbot/format";
 
@@ -42,9 +43,7 @@ export function RecentChatsWidget() {
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <MessagesSquare className="h-3.5 w-3.5" />
-          </span>
+          <IconTile icon={MessagesSquare} size="sm" tone="accent" />
           <span className="text-sm font-semibold text-app-text">Your conversations</span>
         </div>
 

@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import { Select } from "../../../components/ui/Select";
@@ -109,12 +110,7 @@ export function SourceConnectModal({
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-app-bg-soft">
-                      <Icon
-                        size={20}
-                        className={isSelected ? "text-app-brand" : "text-app-text-muted"}
-                      />
-                    </div>
+                    <IconTile icon={Icon} size="xl" tone={isSelected ? "brand" : "neutral"} />
 
                     {!isAvailable && (
                       <Badge variant="neutral" size="sm">
@@ -132,9 +128,7 @@ export function SourceConnectModal({
 
         <div className="rounded-2xl border border-app-border bg-app-surface-muted p-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft">
-              <SelectedIcon size={20} className="text-app-text-muted" />
-            </div>
+            <IconTile icon={SelectedIcon} size="xl" tone="neutral" />
 
             <div>
               <p className="text-sm font-semibold text-app-text">{selectedMeta.name}</p>

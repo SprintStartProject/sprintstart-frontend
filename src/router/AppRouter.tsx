@@ -93,6 +93,15 @@ function ManagerAreaGuard({ route, children }: { route: AppRoute; children: Reac
   return <>{children}</>;
 }
 
+/**
+ * Every route of the app, inside one `AuthGuard` and one shared `Suspense` fallback.
+ *
+ * Pages are lazy-loaded except `LoginPage` (see the comment on its import). Two layout
+ * routes group pages that share a header: `AssistantShell` for `/chat` and `/buddy`, and
+ * `PmWorkspace` for the PM area. Routes a user without access must not reach by URL are
+ * wrapped in `ManagerAreaGuard`; the others rely on the sidebar not offering them. Which
+ * groups may open which route is defined in `src/auth/accessPolicy.ts`.
+ */
 export function AppRouter() {
   return (
     <AuthGuard>

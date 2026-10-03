@@ -73,6 +73,7 @@ export type SkillSuggestion = {
   chunkIds: string[];
 };
 
+/** Whether a skill belongs to a project role; a skill can belong to several (`roleIds`). */
 export function isSkillLinkedToRole(skill: Skill, roleId: string): boolean {
   return skill.roleIds.includes(roleId);
 }

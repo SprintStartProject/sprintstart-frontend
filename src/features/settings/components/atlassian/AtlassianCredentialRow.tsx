@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { KeyRound, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "../../../../components/ui/Button";
 import { Field } from "../../../../components/ui/Field";
+import { IconTile } from "../../../../components/ui/IconTile";
 import { Input } from "../../../../components/ui/Input";
 import { useToast } from "../../../../context/useToast";
 import { centralSpringToken } from "../../../../styles/tokens";
@@ -131,9 +132,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
       className="border-b border-app-border last:border-b-0"
     >
       <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:gap-4 sm:px-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-app-border bg-app-surface-muted">
-          <KeyRound className="h-4 w-4 text-app-text-muted" aria-hidden />
-        </div>
+        <IconTile icon={KeyRound} size="lg" tone="neutral" />
 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold break-words text-app-text">{displayName}</p>

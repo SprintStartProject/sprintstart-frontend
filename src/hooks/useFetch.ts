@@ -13,9 +13,8 @@ export interface UseFetchResult<T> {
  * `useState` + `useEffect` boilerplate.
  *
  * `error` is a boolean flag — the `loader` is responsible for logging the
- * underlying cause (the service layer already logs and falls back to mock
- * data). Results from a superseded call are ignored, so a fast-changing
- * dependency (e.g. a route param) can never apply stale data.
+ * underlying cause. Results from a superseded call are ignored, so a
+ * fast-changing dependency (e.g. a route param) can never apply stale data.
  */
 export function useFetch<T>(loader: () => Promise<T>, deps: DependencyList): UseFetchResult<T> {
   const [data, setData] = useState<T | null>(null);

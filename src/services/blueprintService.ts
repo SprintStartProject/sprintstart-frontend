@@ -193,11 +193,22 @@ export const blueprintService = {
         },
       )
       .then(toBlueprintPhase),
+  /**
+   * Replaces a phase's content (title, description, AI prompt, type). `revision` is the phase's
+   * current revision; a stale one is refused.
+   */
   updatePhase: (scope: BlueprintScope, phaseId: string, input: PhaseInput & { revision: number }) =>
     apiClient.fetch(`${blueprintBase(scope)}/phases/${phaseId}`, {
       method: "PUT",
       body: JSON.stringify(input),
     }),
+  /**
+   * Moves a phase to `position` among the phases of its path.
+   *
+   * `revision` is the phase's current revision; a stale one is refused. Returns every
+   * sibling whose position changed, each with its new revision, so the caller can update them
+   * without reloading the path.
+   */
   updatePhasePosition: (
     scope: BlueprintScope,
     phaseId: string,
@@ -256,6 +267,10 @@ export const blueprintService = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  /**
+   * Replaces a step's content and whether it is marked as AI assisted. `revision` is the
+   * step's current revision; a stale one is refused.
+   */
   updateStep: (
     scope: BlueprintScope,
     stepId: string,
@@ -271,6 +286,13 @@ export const blueprintService = {
       method: "DELETE",
       body: JSON.stringify({ revision }),
     }),
+  /**
+   * Moves a step to `position` among the steps of its phase.
+   *
+   * `revision` is the step's current revision; a stale one is refused. Returns every
+   * sibling whose position changed, each with its new revision, so the caller can update them
+   * without reloading the path.
+   */
   updateStepPosition: (
     scope: BlueprintScope,
     stepId: string,
@@ -369,6 +391,13 @@ export const blueprintService = {
       method: "PUT",
       body: JSON.stringify(input),
     }),
+  /**
+   * Moves a task to `position` among the tasks of its step.
+   *
+   * `revision` is the task's current revision; a stale one is refused. Returns every
+   * sibling whose position changed, each with its new revision, so the caller can update them
+   * without reloading the path.
+   */
   updateTaskPosition: (
     scope: BlueprintScope,
     taskId: string,
@@ -405,6 +434,10 @@ export const blueprintService = {
         body: JSON.stringify(input),
       },
     ),
+  /**
+   * Replaces a knowledge-check question's content, including its correct answer and
+   * explanation. `revision` is the question's current revision; a stale one is refused.
+   */
   updateQuestion: (
     scope: BlueprintScope,
     questionId: string,
@@ -420,6 +453,13 @@ export const blueprintService = {
       method: "DELETE",
       body: JSON.stringify({ revision }),
     }),
+  /**
+   * Moves a question to `position` among the questions of its phase.
+   *
+   * `revision` is the question's current revision; a stale one is refused. Returns every
+   * sibling whose position changed, each with its new revision, so the caller can update them
+   * without reloading the path.
+   */
   updateQuestionPosition: (
     scope: BlueprintScope,
     questionId: string,
@@ -450,6 +490,13 @@ export const blueprintService = {
       method: "PUT",
       body: JSON.stringify(input),
     }),
+  /**
+   * Moves a option to `position` among the options of its question.
+   *
+   * `revision` is the option's current revision; a stale one is refused. Returns every
+   * sibling whose position changed, each with its new revision, so the caller can update them
+   * without reloading the path.
+   */
   updateOptionPosition: (
     scope: BlueprintScope,
     optionId: string,

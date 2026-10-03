@@ -12,7 +12,7 @@ import { queryKeys } from "../../../services/queryKeys";
  * comes next — the open board, or the next visit — show the card. Call it only once the write has
  * really happened: a failed save must not cost the board its cache.
  *
- * @param projectId The project the card went to. Omit it only for writes whose project the
+ * @param projectId - The project the card went to. Omit it only for writes whose project the
  *   backend resolved server-side (buddy actions) and never told the client — that marks every
  *   cached board rather than guessing one.
  * @returns A stable callback; call it after a successful write to invalidate the board cache.

@@ -3,6 +3,7 @@ import { getProjectSourcesCount, getProjectUsersCount } from "../data";
 import type { ProjectManager } from "../../../services/projectService";
 import type { ProjectOverview, ProjectSource } from "../types";
 import { AccessBadge } from "./Badges";
+import { IconTile } from "../../../components/ui/IconTile";
 
 type ProjectsTabProps = {
   filteredProjects: ProjectOverview[];
@@ -41,6 +42,12 @@ function getSourceTypeBadges(sources: ProjectSource[]) {
   }));
 }
 
+/**
+ * The project list of the admin page; a row opens the project drawer.
+ *
+ * The empty state tells three cases apart: no project exists at all (`totalCount` is 0), the
+ * search matched nothing, and anything else.
+ */
 export function ProjectsTab({
   filteredProjects,
   onOpenProjectDetails,
@@ -95,9 +102,7 @@ export function ProjectsTab({
             aria-label={`Open details for ${project.name}`}
           >
             <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface-muted text-app-text-muted">
-                <Folder className="h-5 w-5" />
-              </div>
+              <IconTile icon={Folder} size="xl" tone="neutral" />
 
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-2">

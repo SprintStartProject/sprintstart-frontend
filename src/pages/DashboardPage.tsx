@@ -21,6 +21,9 @@ import { useDashboardLayout } from "../features/dashboard/layout/useDashboardLay
  *
  * A user who has never edited anything sees exactly the dashboard they saw before: the
  * default layout is the old page, in the old order, with the same role-dependent slot.
+ *
+ * Bound to `/`, open to every permission group; `getDefaultRoute` sends everybody here after
+ * login when there is no stored target.
  */
 export function DashboardPage() {
   const controller = useDashboardLayout();
