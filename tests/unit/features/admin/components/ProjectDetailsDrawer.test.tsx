@@ -123,6 +123,156 @@ describe("ProjectDetailsDrawer", () => {
     expect(vi.mocked(projectService.getProjectById)).not.toHaveBeenCalled();
   });
 
+  describe("overview and context", () => {
+    const member = (
+      id: string,
+      firstName: string,
+      roles: string[],
+      projectRoles: string[],
+      enabled = true,
+    ) => ({
+      id,
+      username: firstName.toLowerCase(),
+      email: `${firstName.toLowerCase()}@example.com`,
+      firstName,
+      lastName: "Test",
+      roles,
+      projectRoles,
+      enabled,
+    });
+
+    const directoryUser = (
+      id: string,
+      firstName: string,
+      permissionGroup: string,
+      projectIds: string[],
+      hasCompletedOnboarding: boolean,
+      enabled = true,
+    ) =>
+      ({
+        id,
+        username: firstName.toLowerCase(),
+        email: `${firstName.toLowerCase()}@example.com`,
+        firstName,
+        lastName: "Test",
+        permissionGroup,
+        projectIds,
+        projects: [],
+        enabled,
+        hasCompletedOnboarding,
+        profileIcon: null,
+      }) as unknown as AdminUser;
+
+    const directory = [
+      directoryUser("u-1", "Jane", "Admin", ["proj-1", "proj-2", "proj-3"], true),
+      directoryUser("u-2", "Tom", "User", ["proj-1"], false, false),
+      directoryUser("u-3", "Lea", "Project Manager", ["proj-1"], true),
+    ];
+
+    const healthDetails: AdminProjectDetails = {
+      ...projectDetails,
+      users: [
+        member("u-1", "Jane", ["ADMIN"], ["Backend Dev"]),
+        member("u-2", "Tom", ["USER"], [], false),
+        member("u-3", "Lea", ["PM"], []),
+      ],
+      sources: [
+        { id: "s1", name: "Repo A", type: "GITHUB", status: "CONNECTED" },
+        { id: "s2", name: "Board", type: "JIRA", status: "FAILED" },
+      ],
+    };
+
+    function renderWithDirectory(props: Record<string, unknown> = {}) {
+      vi.mocked(projectService.getProjectById).mockResolvedValue(healthDetails);
+
+      return render(
+        <ProjectDetailsDrawer
+          project={projectOverview}
+          availableUsers={directory}
+          isOpen={true}
+          onClose={vi.fn()}
+          {...props}
+        />,
+      );
+    }
+
+    it("marks a deactivated account on its row", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      expect(screen.getAllByText("Disabled")).toHaveLength(1);
+    });
+
+    it("says how many other projects an admin or PM is in, but not for a regular user", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      // Jane (admin) is in two projects besides this one; Lea (PM) and Tom are in only this one.
+      expect(screen.getByText("also in 2 projects")).toBeInTheDocument();
+      expect(screen.getAllByText(/^also in/)).toHaveLength(1);
+    });
+
+    it("names the manager in the header, or flags that there is none", async () => {
+      const { unmount } = renderWithDirectory();
+      expect(await screen.findByText("No manager")).toBeInTheDocument();
+      unmount();
+
+      vi.mocked(projectService.getProjectById).mockResolvedValue({
+        ...healthDetails,
+        manager: {
+          id: "u-1",
+          username: "jane",
+          email: "jane@example.com",
+          firstName: "Jane",
+          lastName: "Test",
+        },
+      });
+      render(
+        <ProjectDetailsDrawer
+          project={projectOverview}
+          availableUsers={directory}
+          isOpen={true}
+          onClose={vi.fn()}
+        />,
+      );
+
+      expect(await screen.findByText("Manager: Jane Test")).toBeInTheDocument();
+      expect(screen.queryByText("No manager")).not.toBeInTheDocument();
+    });
+
+    it("opens the project in Data Ingestion", async () => {
+      const user = userEvent.setup();
+      const onOpenDataIngestion = vi.fn();
+      renderWithDirectory({ onOpenDataIngestion });
+
+      await user.click(await screen.findByRole("button", { name: /Open in Data Ingestion/ }));
+
+      expect(onOpenDataIngestion).toHaveBeenCalledWith("proj-1");
+    });
+
+    it("hides the Data Ingestion shortcut when the page gives no way to open it", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      expect(
+        screen.queryByRole("button", { name: /Open in Data Ingestion/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("copies the project id", async () => {
+      const user = userEvent.setup();
+      renderWithDirectory();
+
+      await user.click(await screen.findByRole("button", { name: "Copy project ID" }));
+
+      expect(await screen.findByText("Project ID copied")).toBeInTheDocument();
+      await expect(navigator.clipboard.readText()).resolves.toBe("proj-1");
+    });
+  });
+
   describe("project deletion", () => {
     it("hides the danger zone from users who cannot manage the lifecycle", async () => {
       render(
@@ -612,7 +762,7 @@ describe("ProjectDetailsDrawer", () => {
       await waitFor(() => expect(screen.getByText("Jane Doe")).toBeInTheDocument());
       await user.type(screen.getByRole("textbox", { name: "Search or add people" }), "bulk");
 
-      expect(screen.getByText("Showing 6 of 8 – refine your search")).toBeInTheDocument();
+      expect(await screen.findByText("Showing 6 of 8 – refine your search")).toBeInTheDocument();
     });
 
     it("discards staged changes", async () => {

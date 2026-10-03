@@ -13,12 +13,12 @@ import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import {
   getDisplayName,
+  getManagerName,
   getProjectSourcesCount,
   getProjectUsersCount,
   getSourceHealth,
   pluralize,
 } from "../data";
-import type { ProjectManager } from "../../../services/projectService";
 import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
 import type { AdminUser, ProjectOverview } from "../types";
 import { SourceHealthChip } from "./SourceHealthChip";
@@ -38,13 +38,6 @@ type ProjectsTabProps = {
 
 /** Avatars shown in a card's member stack before the rest collapse into `+N`. */
 const MAX_STACKED_MEMBERS = 4;
-
-/** Manager display name, falling back to the username when no name is set. */
-function getManagerName(manager: ProjectManager) {
-  const fullName = [manager.firstName, manager.lastName].filter(Boolean).join(" ");
-
-  return fullName || manager.username;
-}
 
 function MemberStack({
   project,

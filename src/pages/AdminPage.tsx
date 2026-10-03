@@ -526,6 +526,11 @@ export function AdminPage() {
     void navigate(`/data-ingestion?${params.toString()}`);
   };
 
+  const openDataIngestion = (projectId: string) => {
+    const params = new URLSearchParams({ projectId });
+    void navigate(`/data-ingestion?${params.toString()}`);
+  };
+
   const handleUserUpdated = useCallback(
     (updatedUser: AdminUser) => {
       setUsers((currentUsers) =>
@@ -823,6 +828,7 @@ export function AdminPage() {
           canManageLifecycle={profile?.permissionGroup === "ADMIN"}
           onClose={closeDetails}
           onOpenSourceDetails={openSourceDetails}
+          onOpenDataIngestion={openDataIngestion}
           onProjectUpdated={handleProjectUpdated}
           onProjectDeleted={handleProjectDeleted}
           onMembershipsMoved={() => void refreshAdminData()}

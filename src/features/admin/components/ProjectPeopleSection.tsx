@@ -8,6 +8,7 @@ import {
   UserMinus,
   UserPlus,
   Undo2,
+  UserX,
   Users,
 } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
@@ -22,8 +23,13 @@ import {
   stageToggleRemoveUser,
   type PeopleDraft,
 } from "../peopleDraft";
-import { matchesUserSearch } from "../data";
-import { getProjectsLeftOnMove, isManagerEligible } from "../projectMove";
+import { matchesUserSearch, pluralize } from "../data";
+import {
+  canJoinMultipleProjects,
+  getOtherProjectCount,
+  getProjectsLeftOnMove,
+  isManagerEligible,
+} from "../projectMove";
 import type { AdminUser, ProjectUser } from "../types";
 
 type ProjectPeopleSectionProps = {
@@ -57,6 +63,9 @@ type PersonRow = {
   /** Identity fields, shown as `@username · email` and matched by the search box. */
   person: PersonIdentity;
   profileIcon: string | null;
+  isDisabled: boolean;
+  /** Other projects the person is in; only counted for roles that may be in several. */
+  otherProjectCount: number;
   isManager: boolean;
   /** Whether the person may be assigned as manager (holds the PM/ADMIN role). */
   isManagerEligible: boolean;
@@ -124,17 +133,30 @@ export function ProjectPeopleSection({
   );
 
   const rows = useMemo<PersonRow[]>(() => {
-    const assigned: PersonRow[] = members.map((member) => ({
-      id: member.id,
-      displayName: getDisplayName(member),
-      person: member,
-      profileIcon: member.profileIcon ?? null,
-      isManager: member.id === effectiveManagerId,
-      isManagerEligible: isManagerEligible(...member.roles),
-      isPendingAdd: false,
-      isPendingRemove: activeDraft.removedUserIds.has(member.id),
-      movedFrom: [],
-    }));
+    // Only PM and admin can be in several projects, so a count for anyone else
+    // would be a leftover from before a role change rather than a fact.
+    const countOtherProjects = (user: AdminUser | undefined) =>
+      user && canJoinMultipleProjects(user.permissionGroup)
+        ? getOtherProjectCount(user, projectId)
+        : 0;
+
+    const assigned: PersonRow[] = members.map((member) => {
+      const knownUser = availableUsersById.get(member.id);
+
+      return {
+        id: member.id,
+        displayName: getDisplayName(member),
+        person: member,
+        profileIcon: member.profileIcon ?? null,
+        isDisabled: !member.enabled,
+        otherProjectCount: countOtherProjects(knownUser),
+        isManager: member.id === effectiveManagerId,
+        isManagerEligible: isManagerEligible(...member.roles),
+        isPendingAdd: false,
+        isPendingRemove: activeDraft.removedUserIds.has(member.id),
+        movedFrom: [],
+      };
+    });
 
     const staged: PersonRow[] = [...activeDraft.addedUserIds].flatMap((userId) => {
       const user = availableUsersById.get(userId);
@@ -146,6 +168,8 @@ export function ProjectPeopleSection({
           displayName: getDisplayName(user),
           person: user,
           profileIcon: user.profileIcon ?? null,
+          isDisabled: !user.enabled,
+          otherProjectCount: countOtherProjects(user),
           isManager: user.id === effectiveManagerId,
           isManagerEligible: isManagerEligible(user.permissionGroup),
           isPendingAdd: true,
@@ -170,6 +194,8 @@ export function ProjectPeopleSection({
           displayName: getDisplayName(managerUser),
           person: managerUser,
           profileIcon: knownUser?.profileIcon ?? null,
+          isDisabled: knownUser ? !knownUser.enabled : false,
+          otherProjectCount: countOtherProjects(knownUser),
           isManager: true,
           // Already the manager, so eligibility is moot — treat as eligible so
           // the demote control renders normally.
@@ -298,6 +324,23 @@ export function ProjectPeopleSection({
                 </span>
 
                 <PersonContact person={row.person} className="text-xs text-app-text-muted" />
+
+                {(row.isDisabled || row.otherProjectCount > 0) && (
+                  <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {row.isDisabled && (
+                      <Badge variant="danger" size="sm">
+                        <UserX className="mr-1 h-3 w-3" aria-hidden="true" />
+                        Disabled
+                      </Badge>
+                    )}
+
+                    {row.otherProjectCount > 0 && (
+                      <span className="text-xs text-app-text-muted">
+                        also in {pluralize(row.otherProjectCount, "project")}
+                      </span>
+                    )}
+                  </span>
+                )}
 
                 {row.movedFrom.length > 0 && (
                   <span className="mt-1 flex items-start gap-1 text-xs font-medium text-app-warning-text">

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canJoinMultipleProjects,
   getMovedUsers,
+  getOtherProjectCount,
   getProjectsLeftOnMove,
   isManagerEligible,
 } from "../../../../src/features/admin/projectMove";
@@ -41,6 +42,27 @@ describe("isManagerEligible", () => {
 
   it("is true as soon as one signal qualifies", () => {
     expect(isManagerEligible("USER", "PM")).toBe(true);
+  });
+});
+
+describe("getOtherProjectCount", () => {
+  it("counts the projects besides the given one", () => {
+    const user = buildUser({ projectIds: ["project-a", "project-b", "project-c"], projects: [] });
+
+    expect(getOtherProjectCount(user, "project-a")).toBe(2);
+    expect(getOtherProjectCount(user, "project-z")).toBe(3);
+  });
+
+  it("reads the named projects when the ids are not filled in, without double counting", () => {
+    const user = buildUser({
+      projectIds: ["project-a"],
+      projects: [
+        { id: "project-a", name: "A" },
+        { id: "project-b", name: "B" },
+      ],
+    });
+
+    expect(getOtherProjectCount(user, "project-a")).toBe(1);
   });
 });
 

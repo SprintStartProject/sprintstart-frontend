@@ -3,6 +3,7 @@ import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 import type { ProjectRole, Skill } from "../team-management/types";
 import { deriveSourceStatus, SOURCE_META } from "../data-ingestion/data";
 import type { SourceMeta, SourceSystem } from "../data-ingestion/types";
+import type { ProjectManager } from "../../services/projectService";
 import type {
   AdminUser,
   ProjectEditFormState,
@@ -39,6 +40,13 @@ type SearchableUser = {
   username?: string;
   email?: string;
 };
+
+/** Manager display name, falling back to the username when no name is set. */
+export function getManagerName(manager: ProjectManager): string {
+  const fullName = [manager.firstName, manager.lastName].filter(Boolean).join(" ");
+
+  return fullName || manager.username;
+}
 
 /**
  * Whether a person matches a free-text search.

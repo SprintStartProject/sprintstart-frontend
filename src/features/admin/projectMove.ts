@@ -36,6 +36,20 @@ export function canJoinMultipleProjects(permissionGroup: string | undefined): bo
   );
 }
 
+/**
+ * How many projects other than `projectId` the user belongs to.
+ *
+ * `projectIds` is what the user endpoint returns; `projects` is the named list
+ * filled in from it (or updated optimistically), so either may be the one that
+ * is populated.
+ */
+export function getOtherProjectCount(user: AdminUser, projectId: string): number {
+  const ids = new Set([...user.projectIds, ...user.projects.map((project) => project.id)]);
+  ids.delete(projectId);
+
+  return ids.size;
+}
+
 /** A person an assignment would move, with the projects they would leave. */
 export type MovedUser = {
   user: AdminUser;

@@ -13,6 +13,7 @@ import {
   getDraftDisplayName,
   enrichUsersWithProjectNames,
   filterAdminProjects,
+  getManagerName,
   getSourceHealth,
   getSourceTypeLabel,
   groupSourcesByType,
@@ -353,6 +354,21 @@ describe("admin data helpers", () => {
         state: "stale",
         label: "1 out of date",
       });
+    });
+  });
+
+  describe("getManagerName", () => {
+    const manager = {
+      id: "m1",
+      username: "mara.k",
+      email: "",
+      firstName: "Mara",
+      lastName: "Keller",
+    };
+
+    it("prefers the full name and falls back to the username", () => {
+      expect(getManagerName(manager)).toBe("Mara Keller");
+      expect(getManagerName({ ...manager, firstName: "", lastName: "" })).toBe("mara.k");
     });
   });
 

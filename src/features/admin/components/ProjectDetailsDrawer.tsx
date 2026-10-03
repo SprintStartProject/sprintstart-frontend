@@ -1,5 +1,16 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertCircle, Database, FileText, Tag, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ChevronRight,
+  Copy,
+  Database,
+  FileText,
+  ShieldCheck,
+  Tag,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -14,6 +25,7 @@ import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
 import { ProjectIndustryPanel } from "../../projects/industry/ProjectIndustryPanel";
 import {
   getDisplayName,
+  getManagerName,
   getProjectEditFormState,
   getProjectSourcesCount,
   getProjectUsersCount,
@@ -48,6 +60,8 @@ type ProjectDetailsDrawerProps = {
   canManageLifecycle?: boolean;
   onClose: () => void;
   onOpenSourceDetails?: (projectId: string, sourceId: string) => void;
+  /** Opens the Data Ingestion page for this project; the shortcut is hidden without it. */
+  onOpenDataIngestion?: (projectId: string) => void;
   onProjectUpdated?: (updatedProject: AdminProjectDetails) => void;
   onProjectDeleted?: (projectId: string) => void;
   /**
@@ -81,6 +95,7 @@ export function ProjectDetailsDrawer({
   canManageLifecycle = false,
   onClose,
   onOpenSourceDetails,
+  onOpenDataIngestion,
   onProjectUpdated,
   onProjectDeleted,
   onMembershipsMoved,
@@ -270,6 +285,15 @@ export function ProjectDetailsDrawer({
     }
   };
 
+  const copyProjectId = async () => {
+    try {
+      await navigator.clipboard.writeText(project.id);
+      toast.success("Project ID copied");
+    } catch {
+      toast.error("Couldn't copy the project ID.");
+    }
+  };
+
   const confirmDeleteProject = async () => {
     setIsDeleting(true);
 
@@ -300,11 +324,24 @@ export function ProjectDetailsDrawer({
         badge={
           <>
             <AccessBadge variant="neutral">
+              <Users className="mr-1 h-3 w-3" aria-hidden="true" />
               {memberCount > 0 ? pluralize(memberCount, "member") : "No members"}
             </AccessBadge>
             <AccessBadge variant={sourceCount > 0 ? "success" : "neutral"}>
+              <Database className="mr-1 h-3 w-3" aria-hidden="true" />
               {sourceCount > 0 ? pluralize(sourceCount, "source") : "No sources"}
             </AccessBadge>
+            {visibleProject.manager ? (
+              <AccessBadge variant="brand">
+                <ShieldCheck className="mr-1 h-3 w-3" aria-hidden="true" />
+                {`Manager: ${getManagerName(visibleProject.manager)}`}
+              </AccessBadge>
+            ) : (
+              <AccessBadge variant="danger">
+                <AlertTriangle className="mr-1 h-3 w-3" aria-hidden="true" />
+                No manager
+              </AccessBadge>
+            )}
           </>
         }
         footer={
@@ -376,6 +413,25 @@ export function ProjectDetailsDrawer({
                     placeholder="No project description yet."
                   />
                 </Field>
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-app-border bg-app-surface-muted py-1 pr-1 pl-4">
+                  <div className="min-w-0">
+                    <p className="text-xs text-app-text-muted">Project ID</p>
+                    <p className="truncate font-mono text-xs text-app-text" title={project.id}>
+                      {project.id}
+                    </p>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={() => void copyProjectId()}
+                    aria-label="Copy project ID"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </DrawerCard>
 
@@ -407,7 +463,23 @@ export function ProjectDetailsDrawer({
               />
             </DrawerCard>
 
-            <DrawerCard label="Connected sources" icon={Database} index={3}>
+            <DrawerCard
+              label="Connected sources"
+              icon={Database}
+              index={3}
+              headerAccessory={
+                onOpenDataIngestion ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onOpenDataIngestion(project.id)}
+                    trailingIcon={<ChevronRight className="h-4 w-4" />}
+                  >
+                    Open in Data Ingestion
+                  </Button>
+                ) : undefined
+              }
+            >
               <SourceList
                 sources={visibleProject.sources}
                 onOpenSourceDetails={
