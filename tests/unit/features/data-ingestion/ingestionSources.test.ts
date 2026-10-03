@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  githubRepositoryOf,
+  jiraInstanceOf,
+} from "../../../../src/features/data-ingestion/sourceDetails";
 import { fetchIngestionSources } from "../../../../src/features/data-ingestion/ingestionSources";
 import type { SourceInstanceIngestionStatus } from "../../../../src/features/data-ingestion/types";
 
@@ -58,9 +62,9 @@ describe("fetchIngestionSources", () => {
 
     expect(mockGetIngestionSourceStatuses).toHaveBeenCalledWith("proj1");
     expect(sources.map((source) => source.sourceSystem)).toEqual(["GITHUB", "JIRA", "UPLOAD"]);
-    expect(sources[0].githubRepository?.fullName).toBe("acme/monorepo");
-    expect(sources[1].githubRepository).toBeNull();
-    expect(sources[1].jiraInstance?.instanceUrl).toBe("https://acme.atlassian.net");
-    expect(sources[2].githubRepository).toBeNull();
+    expect(sources.map((source) => source.details.system)).toEqual(["GITHUB", "JIRA", "UPLOAD"]);
+    expect(githubRepositoryOf(sources[0])?.fullName).toBe("acme/monorepo");
+    expect(githubRepositoryOf(sources[1])).toBeNull();
+    expect(jiraInstanceOf(sources[1])?.instanceUrl).toBe("https://acme.atlassian.net");
   });
 });

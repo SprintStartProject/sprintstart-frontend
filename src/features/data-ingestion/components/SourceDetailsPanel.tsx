@@ -32,7 +32,8 @@ import {
   formatNumber,
   SOURCE_META,
 } from "../data.ts";
-import type { DataSource, LoadingState } from "../types.ts";
+import { confluenceSpaceOf, githubRepositoryOf, jiraInstanceOf } from "../sourceDetails.ts";
+import type { DataSource, GithubRepositoryDetails, LoadingState } from "../types.ts";
 import { SyncScheduleSettings } from "./SyncScheduleSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
@@ -44,11 +45,9 @@ type SourceDetailsPanelProps = {
   onUpdateSource?: (source: DataSource) => Promise<void>;
   onRefreshDetails?: () => Promise<void>;
   canManageSyncSettings?: boolean;
-  onLoadRepositoryConfig?: (
-    repository: NonNullable<DataSource["githubRepository"]>,
-  ) => Promise<GithubRepositoryConfig>;
+  onLoadRepositoryConfig?: (repository: GithubRepositoryDetails) => Promise<GithubRepositoryConfig>;
   onSaveRepositoryConfig?: (
-    repository: NonNullable<DataSource["githubRepository"]>,
+    repository: GithubRepositoryDetails,
     request: SyncScheduleRequest,
   ) => Promise<void>;
   /** Loads the sync schedule of a Jira instance (by URL) for the schedule form. */
@@ -60,10 +59,7 @@ type SourceDetailsPanelProps = {
   /** Saves the sync schedule of a Confluence space (by connection id). */
   onSaveConfluenceConfig?: (connectionId: string, request: SyncScheduleRequest) => Promise<void>;
   /** Enables/disables the source in the connector (allow/deny for ingestion). */
-  onSetSourceEnabled?: (
-    repository: NonNullable<DataSource["githubRepository"]>,
-    enabled: boolean,
-  ) => Promise<void>;
+  onSetSourceEnabled?: (repository: GithubRepositoryDetails, enabled: boolean) => Promise<void>;
   /** Enables/disables a Jira instance as an ingestion source (by instance URL). */
   onSetJiraSourceEnabled?: (instanceUrl: string, enabled: boolean) => Promise<void>;
   /**
@@ -101,9 +97,9 @@ export function SourceDetailsPanel({
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
   const toast = useToast();
   const Icon = SOURCE_META[source.sourceSystem].icon;
-  const repository = source.githubRepository;
-  const jira = source.jiraInstance ?? null;
-  const confluence = source.confluenceSpace ?? null;
+  const repository = githubRepositoryOf(source);
+  const jira = jiraInstanceOf(source);
+  const confluence = confluenceSpaceOf(source);
   const isJira = source.sourceSystem === "JIRA";
   const isConfluence = source.sourceSystem === "CONFLUENCE";
   const isUpdating = updateState === "loading";
@@ -184,10 +180,17 @@ export function SourceDetailsPanel({
     : `The ${removableNoun} and its artifacts are kept. You can re-link it later.`;
   // GitHub exposes one timestamp per resource type; Jira refreshes issue data
   // (including comments and change history) as one combined resource.
-  const hasResourceSyncTimes =
-    source.lastCommitsSyncAt !== null ||
-    source.lastIssuesSyncAt !== null ||
-    source.lastPullRequestsSyncAt !== null;
+  const resourceSyncTimes: { label: string; value: string | null }[] =
+    source.details.system === "GITHUB"
+      ? [
+          { label: "Commits", value: source.details.syncTimes.commits },
+          { label: "Issues", value: source.details.syncTimes.issues },
+          { label: "Pull requests", value: source.details.syncTimes.pullRequests },
+        ]
+      : source.details.system === "JIRA"
+        ? [{ label: "Issues", value: source.details.syncTimes.issues }]
+        : [];
+  const hasResourceSyncTimes = resourceSyncTimes.some(({ value }) => value !== null);
 
   const handleToggleEnabled = useCallback(
     async (enabled: boolean) => {
@@ -316,7 +319,6 @@ export function SourceDetailsPanel({
       lastSync,
       latestUpdatedCount: source.latestUpdatedCount,
       errors: source.errors,
-      runIds: source.runIds,
     };
   }, [source]);
 
@@ -535,18 +537,9 @@ export function SourceDetailsPanel({
       {hasResourceSyncTimes && (
         <DrawerCard label="Last Synced" icon={Clock3} index={2} className="mt-4 sm:mt-5">
           <dl className="-my-1">
-            {isJira ? (
-              <InfoRow label="Issues" value={formatDateTime(source.lastIssuesSyncAt)} />
-            ) : (
-              <>
-                <InfoRow label="Commits" value={formatDateTime(source.lastCommitsSyncAt)} />
-                <InfoRow label="Issues" value={formatDateTime(source.lastIssuesSyncAt)} />
-                <InfoRow
-                  label="Pull requests"
-                  value={formatDateTime(source.lastPullRequestsSyncAt)}
-                />
-              </>
-            )}
+            {resourceSyncTimes.map(({ label, value }) => (
+              <InfoRow key={label} label={label} value={formatDateTime(value)} />
+            ))}
           </dl>
         </DrawerCard>
       )}

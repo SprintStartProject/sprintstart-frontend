@@ -22,14 +22,14 @@ function createMockSource(overrides: Partial<DataSource> = {}): DataSource {
     latestUpdatedCount: 3,
     totalArtifactCount: 10,
     deletedCount: 0,
-    runIds: [],
     sharesSourceSystem: false,
-    lastCommitsSyncAt: null,
-    lastIssuesSyncAt: null,
-    lastPullRequestsSyncAt: null,
     lastRunAt: "2026-07-05T10:00:00Z",
     failedItems: [],
-    githubRepository: null,
+    details: {
+      system: "GITHUB",
+      repository: null,
+      syncTimes: { commits: null, issues: null, pullRequests: null },
+    },
     description: "Indexes repositories, README files, pull requests.",
     ...overrides,
   };
@@ -72,12 +72,15 @@ describe("SourceList", () => {
         name: "Jira Project Board",
         type: "Jira",
         icon: Database,
-        githubRepository: null,
-        jiraInstance: {
-          instanceUrl: "https://acme.atlassian.net",
-          displayName: "Jira Project Board",
-          credentialName: "cred",
-          credentialUserEmail: "user@example.com",
+        details: {
+          system: "JIRA",
+          instance: {
+            instanceUrl: "https://acme.atlassian.net",
+            displayName: "Jira Project Board",
+            credentialName: "cred",
+            credentialUserEmail: "user@example.com",
+          },
+          syncTimes: { issues: null },
         },
       }),
     ];

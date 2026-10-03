@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "../../components/icons/types.ts";
+import type { SourceSystem } from "./connectors/sourceSystems.ts";
 
-export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
+export type { SourceSystem };
 
 export type BackendProjectSourceStatus =
   | "CONNECTED"
@@ -251,51 +253,58 @@ export type SourceStatusPresentation = {
 export type SourceMeta = {
   name: string;
   type: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   description: string;
 };
 
-export type SourceDetailsSource = {
+/**
+ * What a source card knows about its own source, beyond what every source has in
+ * common. One variant per source system, so a card can only ever read the
+ * identity of the system it belongs to.
+ */
+export type SourceDetails =
+  | {
+      system: "GITHUB";
+      /** Null for a repository whose status row could not be resolved. */
+      repository: GithubRepositoryDetails | null;
+      /** Per-artifact-type last-sync timestamps (from the status row). */
+      syncTimes: { commits: string | null; issues: string | null; pullRequests: string | null };
+    }
+  | {
+      system: "JIRA";
+      instance: JiraInstanceSourceDetails | null;
+      /** Jira refreshes issue data (comments and change history included) as one resource. */
+      syncTimes: { issues: string | null };
+    }
+  | {
+      system: "CONFLUENCE";
+      space: ConfluenceSpaceSourceDetails | null;
+    }
+  | { system: "UPLOAD" };
+
+/** A source card on the Data Ingestion page, the dashboard and the PM views. */
+export type DataSource = {
   sourceId: string;
   sourceSystem: SourceSystem;
   name: string;
+  /** The source system's short label, e.g. "GitHub". */
   type: string;
+  icon: IconComponent;
   status: SourceStatus;
   backendStatus?: BackendProjectSourceStatus;
+  /** The single unified status shown in the list and details drawer. */
+  statusView: SourceStatusPresentation;
   artifacts: number;
   lastSync: string;
   errors: number;
-  latestIngestedCount?: number;
-  latestUpdatedCount?: number;
-  totalArtifactCount?: number;
-  runIds?: string[];
-  sharesSourceSystem?: boolean;
-  failedItems?: FailedArtifact[];
-  githubRepository?: GithubRepositoryDetails | null;
-  /** Jira instance identity; null/absent for non-Jira sources. */
-  jiraInstance?: JiraInstanceSourceDetails | null;
-  /** Confluence space identity; null/absent for non-Confluence sources. */
-  confluenceSpace?: ConfluenceSpaceSourceDetails | null;
   description?: string;
-};
-
-export type DataSource = SourceDetailsSource & {
-  icon: LucideIcon;
-  /** The single unified status shown in the list and details drawer. */
-  statusView: SourceStatusPresentation;
   lastRunAt: string | null;
   latestIngestedCount: number;
   latestUpdatedCount: number;
-  /** Artifacts removed by the latest run (from the per-repo status endpoint). */
+  /** Artifacts removed by the latest run (from the status row). */
   deletedCount: number;
   totalArtifactCount: number;
-  runIds: string[];
   sharesSourceSystem: boolean;
   failedItems: FailedArtifact[];
-  githubRepository: GithubRepositoryDetails | null;
-  confluenceSpace?: ConfluenceSpaceSourceDetails | null;
-  /** Per-artifact-type last-sync timestamps (from the status row). */
-  lastCommitsSyncAt: string | null;
-  lastIssuesSyncAt: string | null;
-  lastPullRequestsSyncAt: string | null;
+  details: SourceDetails;
 };

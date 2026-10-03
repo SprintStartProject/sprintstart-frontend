@@ -9,7 +9,7 @@ import {
 import { SourceStatusChip } from "../../data-ingestion/components/SourceStatusChip";
 import { SourceSyncBadge } from "../../data-ingestion/components/SourceSyncBadge";
 import { SourceTypeBadge } from "../../data-ingestion/components/SourceTypeBadge";
-import type { SourceSystem } from "../../data-ingestion/types";
+import { toSourceSystem } from "../../data-ingestion/connectors/sourceSystems";
 
 type SourceListProps = {
   sources: ProjectSource[];
@@ -18,13 +18,9 @@ type SourceListProps = {
 
 /** Resolves a project source's raw type string to the shared source metadata. */
 function getMeta(type: string) {
-  const normalized = type.toUpperCase();
+  const system = toSourceSystem(type);
 
-  if (normalized in SOURCE_META) {
-    return SOURCE_META[normalized as SourceSystem];
-  }
-
-  return null;
+  return system ? SOURCE_META[system] : null;
 }
 
 export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {

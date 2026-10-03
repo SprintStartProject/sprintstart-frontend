@@ -1,5 +1,6 @@
 import { Badge } from "../../../components/ui/Badge.tsx";
-import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
+import { SOURCE_SYSTEMS } from "../connectors/sourceSystems.ts";
+import { SOURCE_META } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 
 /**
@@ -29,7 +30,7 @@ export function SourceTypeStep({
    * still renders (so the option stays visible) but shows a "Soon" badge.
    * Defaults to GitHub-only, matching the project-creation wizard.
    */
-  availableTypes?: SourceSystem[];
+  availableTypes?: readonly SourceSystem[];
 }) {
   return (
     <div className="space-y-5">

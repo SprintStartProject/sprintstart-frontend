@@ -9,10 +9,9 @@ import {
   type ScheduleSpec,
   type SyncScheduleRequest,
 } from "../../services/sources/syncSchedule.ts";
+import type { SourceSystem } from "./connectors/sourceSystems.ts";
+import { confluenceSpaceOf, githubRepositoryOf, jiraInstanceOf } from "./sourceDetails.ts";
 import type { DataSource } from "./types.ts";
-
-/** The connectors whose sync schedule can be applied to a whole project at once. */
-export type SyncSettingsProvider = "github" | "jira" | "confluence";
 
 /** The schedule to show in the project-wide form and whether the sources disagree on it. */
 export type ProjectSyncSchedule = {
@@ -30,16 +29,16 @@ type ScheduleTarget = {
 };
 
 function toTargets(
-  provider: SyncSettingsProvider,
+  system: SourceSystem,
   sources: DataSource[],
   projectId: string | null,
 ): ScheduleTarget[] {
-  const ofProvider = sources.filter((source) => source.sourceSystem === provider.toUpperCase());
+  const ofSystem = sources.filter((source) => source.sourceSystem === system);
 
-  switch (provider) {
-    case "github":
-      return ofProvider.flatMap((source) => {
-        const repository = source.githubRepository;
+  switch (system) {
+    case "GITHUB":
+      return ofSystem.flatMap((source) => {
+        const repository = githubRepositoryOf(source);
         if (!repository) return [];
 
         return [
@@ -49,9 +48,9 @@ function toTargets(
           },
         ];
       });
-    case "jira":
-      return ofProvider.flatMap((source) => {
-        const instanceUrl = source.jiraInstance?.instanceUrl;
+    case "JIRA":
+      return ofSystem.flatMap((source) => {
+        const instanceUrl = jiraInstanceOf(source)?.instanceUrl;
         if (!instanceUrl) return [];
 
         return [
@@ -61,9 +60,9 @@ function toTargets(
           },
         ];
       });
-    case "confluence":
-      return ofProvider.flatMap((source) => {
-        const connectionId = source.confluenceSpace?.connectionId;
+    case "CONFLUENCE":
+      return ofSystem.flatMap((source) => {
+        const connectionId = confluenceSpaceOf(source)?.connectionId;
         if (!connectionId) return [];
         if (!projectId) throw new Error("Select a project before using the sync schedule.");
 
@@ -83,6 +82,8 @@ function toTargets(
           },
         ];
       });
+    case "UPLOAD":
+      return [];
   }
 }
 
@@ -108,12 +109,12 @@ function scheduleKey({ autoUpdate, spec }: StoredSchedule): string {
  * its schedule is unknown.
  */
 export async function loadProjectSyncSchedule(
-  provider: SyncSettingsProvider,
+  system: SourceSystem,
   sources: DataSource[],
   projectId: string | null,
 ): Promise<ProjectSyncSchedule> {
   const results = await Promise.allSettled(
-    toTargets(provider, sources, projectId).map((target) => target.load()),
+    toTargets(system, sources, projectId).map((target) => target.load()),
   );
 
   const stored = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
@@ -135,13 +136,13 @@ export async function loadProjectSyncSchedule(
  * @param pluralNoun - How the connector's sources are named in that error, e.g. "GitHub repositories".
  */
 export async function saveProjectSyncSchedule(
-  provider: SyncSettingsProvider,
+  system: SourceSystem,
   sources: DataSource[],
   projectId: string | null,
   request: SyncScheduleRequest,
   pluralNoun: string,
 ): Promise<void> {
-  const targets = toTargets(provider, sources, projectId);
+  const targets = toTargets(system, sources, projectId);
   const results = await Promise.allSettled(targets.map((target) => target.save(request)));
 
   const failed = results.filter((result) => result.status === "rejected").length;

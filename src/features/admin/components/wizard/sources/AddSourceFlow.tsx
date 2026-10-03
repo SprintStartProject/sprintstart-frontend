@@ -113,7 +113,7 @@ type AddSourceFlowProps = {
    * still renders in the grid (with a "Soon" badge), so the shape of the flow
    * does not change as later phases enable them.
    */
-  availableTypes: SourceSystem[];
+  availableTypes: readonly SourceSystem[];
   onSelectType: (type: SourceSystem) => void;
   /** Returns from a type's detail screen to the type grid (the header's back). */
   onBack: () => void;

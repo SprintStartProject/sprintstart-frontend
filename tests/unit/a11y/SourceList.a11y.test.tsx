@@ -22,16 +22,16 @@ const sources: DataSource[] = [
     latestUpdatedCount: 5,
     totalArtifactCount: 42,
     deletedCount: 0,
-    runIds: [],
     sharesSourceSystem: false,
-    lastCommitsSyncAt: null,
-    lastIssuesSyncAt: null,
-    lastPullRequestsSyncAt: null,
     lastRunAt: "2026-07-01T00:00:00.000Z",
     icon: GitBranch,
     description: "Indexes repositories and source files.",
     failedItems: [],
-    githubRepository: null,
+    details: {
+      system: "GITHUB",
+      repository: null,
+      syncTimes: { commits: null, issues: null, pullRequests: null },
+    },
   },
 ];
 

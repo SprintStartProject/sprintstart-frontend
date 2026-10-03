@@ -27,6 +27,8 @@ const githubRepository: GithubRepositoryDetails = {
   enabled: true,
 };
 
+const noSyncTimes = { commits: null, issues: null, pullRequests: null };
+
 const mockSource: DataSource = {
   sourceId: "source-github",
   sourceSystem: "GITHUB",
@@ -42,15 +44,18 @@ const mockSource: DataSource = {
   latestUpdatedCount: 3,
   totalArtifactCount: 10,
   deletedCount: 0,
-  runIds: ["run-1"],
   sharesSourceSystem: false,
-  lastCommitsSyncAt: null,
-  lastIssuesSyncAt: null,
-  lastPullRequestsSyncAt: null,
   lastRunAt: "2026-07-05T10:00:00Z",
   failedItems: [],
-  githubRepository,
+  details: { system: "GITHUB", repository: githubRepository, syncTimes: noSyncTimes },
   description: "Indexes repositories.",
+};
+
+const jiraInstance = {
+  instanceUrl: "https://acme.atlassian.net",
+  displayName: "Team board",
+  credentialName: "default",
+  credentialUserEmail: "jira@corp.com",
 };
 
 const jiraSource: DataSource = {
@@ -59,13 +64,7 @@ const jiraSource: DataSource = {
   sourceSystem: "JIRA",
   name: "Team board",
   type: "Jira",
-  githubRepository: null,
-  jiraInstance: {
-    instanceUrl: "https://acme.atlassian.net",
-    displayName: "Team board",
-    credentialName: "default",
-    credentialUserEmail: "jira@corp.com",
-  },
+  details: { system: "JIRA", instance: jiraInstance, syncTimes: { issues: null } },
 };
 
 const confluenceSource: DataSource = {
@@ -74,14 +73,16 @@ const confluenceSource: DataSource = {
   sourceSystem: "CONFLUENCE",
   name: "Engineering",
   type: "Confluence",
-  githubRepository: null,
-  confluenceSpace: {
-    connectionId: "conn-1",
-    baseUrl: "https://acme.atlassian.net",
-    spaceId: "123456",
-    spaceKey: "ENG",
-    spaceName: "Engineering",
-    credentialName: "default",
+  details: {
+    system: "CONFLUENCE",
+    space: {
+      connectionId: "conn-1",
+      baseUrl: "https://acme.atlassian.net",
+      spaceId: "123456",
+      spaceKey: "ENG",
+      spaceName: "Engineering",
+      credentialName: "default",
+    },
   },
 };
 
@@ -327,7 +328,10 @@ describe("SourceDetailsPanel", () => {
   it("disables repository updates when repository details are unavailable", () => {
     render(
       <SourceDetailsPanel
-        source={{ ...mockSource, githubRepository: null }}
+        source={{
+          ...mockSource,
+          details: { system: "GITHUB", repository: null, syncTimes: noSyncTimes },
+        }}
         onUpdateSource={vi.fn().mockResolvedValue(undefined)}
         onClose={vi.fn()}
       />,
@@ -343,7 +347,7 @@ describe("SourceDetailsPanel", () => {
       sourceSystem: "UPLOAD",
       name: "Uploaded Documentation",
       type: "Upload",
-      githubRepository: null,
+      details: { system: "UPLOAD" },
     };
 
     render(
@@ -460,7 +464,11 @@ describe("SourceDetailsPanel", () => {
       <SourceDetailsPanel
         source={{
           ...mockSource,
-          githubRepository: { ...githubRepository, repositoryId: null },
+          details: {
+            system: "GITHUB",
+            repository: { ...githubRepository, repositoryId: null },
+            syncTimes: noSyncTimes,
+          },
         }}
         onUnlinkSource={vi.fn().mockResolvedValue(undefined)}
         onClose={vi.fn()}
@@ -496,7 +504,11 @@ describe("SourceDetailsPanel", () => {
       <SourceDetailsPanel
         source={{
           ...jiraSource,
-          lastIssuesSyncAt: "2026-07-05T10:00:00Z",
+          details: {
+            system: "JIRA",
+            instance: jiraInstance,
+            syncTimes: { issues: "2026-07-05T10:00:00Z" },
+          },
         }}
         onClose={vi.fn()}
       />,
@@ -513,9 +525,15 @@ describe("SourceDetailsPanel", () => {
       <SourceDetailsPanel
         source={{
           ...mockSource,
-          lastCommitsSyncAt: "2026-07-05T10:00:00Z",
-          lastIssuesSyncAt: "2026-07-05T10:00:00Z",
-          lastPullRequestsSyncAt: "2026-07-05T10:00:00Z",
+          details: {
+            system: "GITHUB",
+            repository: githubRepository,
+            syncTimes: {
+              commits: "2026-07-05T10:00:00Z",
+              issues: "2026-07-05T10:00:00Z",
+              pullRequests: "2026-07-05T10:00:00Z",
+            },
+          },
         }}
         onClose={vi.fn()}
       />,
@@ -532,7 +550,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },
@@ -552,7 +570,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },
@@ -573,7 +591,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },
@@ -635,7 +653,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },
@@ -664,7 +682,7 @@ describe("SourceDetailsPanel", () => {
       statusView: {
         state: "syncing",
         label: "Syncing",
-        icon: mockSource.icon,
+        icon: GitBranch,
         tone: "brand",
         spinning: true,
       },

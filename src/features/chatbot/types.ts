@@ -1,3 +1,6 @@
+import { CHAT_SOURCE_SYSTEMS } from "../data-ingestion/connectors/registry.ts";
+import type { SourceSystem } from "../data-ingestion/connectors/sourceSystems.ts";
+
 export type Chat = {
   id: string;
   title: string;
@@ -184,6 +187,11 @@ export type StreamHandlers = {
   onError?: (message: string) => void;
 };
 
-export const SOURCE_SYSTEMS = ["GITHUB", "UPLOAD", "JIRA", "CONFLUENCE"] as const;
+/**
+ * The source systems the chat's source filter can scope a question to. A subset of
+ * all source systems, because the AI service does not always know every one; the
+ * connector registry flags which do (`chat.filterable`).
+ */
+export const SOURCE_SYSTEMS: readonly SourceSystem[] = CHAT_SOURCE_SYSTEMS;
 
-export type SourceSystem = (typeof SOURCE_SYSTEMS)[number];
+export type { SourceSystem };

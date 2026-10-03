@@ -31,7 +31,8 @@ import {
 } from "../../admin/components/wizard/sources/AddSourceFlow.tsx";
 import { useGithubTokens } from "../../settings/hooks/useGithubTokens.ts";
 import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials.ts";
-import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
+import { SOURCE_SYSTEMS } from "../connectors/sourceSystems.ts";
+import { SOURCE_META } from "../data.ts";
 import type { SourceSystem } from "../types.ts";
 import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";

@@ -35,13 +35,17 @@ vi.mock("../../../../src/services/sources/confluenceService", () => ({
 function githubSource(name: string): DataSource {
   return {
     sourceSystem: "GITHUB",
-    githubRepository: {
-      owner: "acme",
-      name,
-      repositoryId: `id-${name}`,
-      fullName: `acme/${name}`,
-      url: `https://github.com/acme/${name}`,
-      enabled: true,
+    details: {
+      system: "GITHUB",
+      repository: {
+        owner: "acme",
+        name,
+        repositoryId: `id-${name}`,
+        fullName: `acme/${name}`,
+        url: `https://github.com/acme/${name}`,
+        enabled: true,
+      },
+      syncTimes: { commits: null, issues: null, pullRequests: null },
     },
   } as DataSource;
 }
@@ -49,11 +53,10 @@ function githubSource(name: string): DataSource {
 function jiraSource(instanceUrl: string): DataSource {
   return {
     sourceSystem: "JIRA",
-    jiraInstance: {
-      instanceUrl,
-      displayName: "Board",
-      credentialName: "",
-      credentialUserEmail: "",
+    details: {
+      system: "JIRA",
+      instance: { instanceUrl, displayName: "Board", credentialName: "", credentialUserEmail: "" },
+      syncTimes: { issues: null },
     },
   } as DataSource;
 }
@@ -61,11 +64,14 @@ function jiraSource(instanceUrl: string): DataSource {
 function confluenceSource(connectionId: string): DataSource {
   return {
     sourceSystem: "CONFLUENCE",
-    confluenceSpace: {
-      connectionId,
-      baseUrl: "https://acme.atlassian.net",
-      spaceId: "1",
-      spaceKey: "E",
+    details: {
+      system: "CONFLUENCE",
+      space: {
+        connectionId,
+        baseUrl: "https://acme.atlassian.net",
+        spaceId: "1",
+        spaceKey: "E",
+      },
     },
   } as DataSource;
 }
@@ -81,7 +87,7 @@ describe("loadProjectSyncSchedule", () => {
     mocks.getGithubRepositoryConfig.mockResolvedValue({ autoUpdate: false, spec: every(15) });
 
     const result = await loadProjectSyncSchedule(
-      "github",
+      "GITHUB",
       [githubSource("one"), githubSource("two")],
       "p1",
     );
@@ -95,7 +101,7 @@ describe("loadProjectSyncSchedule", () => {
       .mockResolvedValueOnce({ autoUpdate: true, spec: every(30) });
 
     const result = await loadProjectSyncSchedule(
-      "github",
+      "GITHUB",
       [githubSource("one"), githubSource("two")],
       "p1",
     );
@@ -109,7 +115,7 @@ describe("loadProjectSyncSchedule", () => {
       .mockResolvedValueOnce({ autoUpdate: false, spec: every(15) });
 
     const result = await loadProjectSyncSchedule(
-      "github",
+      "GITHUB",
       [githubSource("one"), githubSource("two")],
       "p1",
     );
@@ -129,7 +135,7 @@ describe("loadProjectSyncSchedule", () => {
       });
 
     const result = await loadProjectSyncSchedule(
-      "github",
+      "GITHUB",
       [githubSource("one"), githubSource("two")],
       "p1",
     );
@@ -143,7 +149,7 @@ describe("loadProjectSyncSchedule", () => {
       .mockRejectedValueOnce(new Error("boom"));
 
     const result = await loadProjectSyncSchedule(
-      "github",
+      "GITHUB",
       [githubSource("one"), githubSource("two")],
       "p1",
     );
@@ -154,7 +160,7 @@ describe("loadProjectSyncSchedule", () => {
   it("shows the default without a hint when no source has a schedule yet", async () => {
     mocks.getGithubRepositoryConfig.mockResolvedValue({ autoUpdate: true, spec: null });
 
-    const result = await loadProjectSyncSchedule("github", [githubSource("one")], "p1");
+    const result = await loadProjectSyncSchedule("GITHUB", [githubSource("one")], "p1");
 
     expect(result).toEqual({ config: DEFAULT_SYNC_SCHEDULE, isMixed: false });
   });
@@ -164,11 +170,11 @@ describe("loadProjectSyncSchedule", () => {
     mocks.getConnection.mockResolvedValue({ autoUpdate: undefined, spec: every(20) });
 
     const jira = await loadProjectSyncSchedule(
-      "jira",
+      "JIRA",
       [jiraSource("https://a.atlassian.net")],
       "p1",
     );
-    const confluence = await loadProjectSyncSchedule("confluence", [confluenceSource("c1")], "p1");
+    const confluence = await loadProjectSyncSchedule("CONFLUENCE", [confluenceSource("c1")], "p1");
 
     expect(mocks.getJiraConfig).toHaveBeenCalledWith("https://a.atlassian.net");
     expect(jira.config.schedule).toEqual(every(10));
@@ -179,7 +185,7 @@ describe("loadProjectSyncSchedule", () => {
   it("ignores sources of other connectors", async () => {
     mocks.getJiraConfig.mockResolvedValue({ autoUpdate: true, spec: every(10) });
 
-    await loadProjectSyncSchedule("jira", [githubSource("one"), jiraSource("https://a")], "p1");
+    await loadProjectSyncSchedule("JIRA", [githubSource("one"), jiraSource("https://a")], "p1");
 
     expect(mocks.getGithubRepositoryConfig).not.toHaveBeenCalled();
   });
@@ -197,7 +203,7 @@ describe("saveProjectSyncSchedule", () => {
 
   it("writes the schedule to every source of the connector", async () => {
     await saveProjectSyncSchedule(
-      "github",
+      "GITHUB",
       [githubSource("one"), githubSource("two"), jiraSource("https://a")],
       "p1",
       request,
@@ -214,7 +220,7 @@ describe("saveProjectSyncSchedule", () => {
 
   it("sends the Jira instance URL together with the schedule", async () => {
     await saveProjectSyncSchedule(
-      "jira",
+      "JIRA",
       [jiraSource("https://a.atlassian.net")],
       "p1",
       request,
@@ -234,7 +240,7 @@ describe("saveProjectSyncSchedule", () => {
 
     await expect(
       saveProjectSyncSchedule(
-        "github",
+        "GITHUB",
         [githubSource("one"), githubSource("two")],
         "p1",
         request,
@@ -246,7 +252,7 @@ describe("saveProjectSyncSchedule", () => {
 
   it("applies a Confluence schedule per connection of the project", async () => {
     await saveProjectSyncSchedule(
-      "confluence",
+      "CONFLUENCE",
       [confluenceSource("c1"), confluenceSource("c2")],
       "p1",
       request,

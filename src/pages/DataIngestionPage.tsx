@@ -27,21 +27,23 @@ import { toConnectorListItems } from "../features/connectors/data.ts";
 import { useConfluenceSync } from "../features/connectors/components/useConfluenceSync.ts";
 import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
+import { buildDataSources } from "../features/data-ingestion/buildSources.ts";
+import {
+  CONNECTORS,
+  SCHEDULED_SOURCE_SYSTEMS,
+} from "../features/data-ingestion/connectors/registry.ts";
+import type { SourceSystem } from "../features/data-ingestion/connectors/sourceSystems.ts";
 import {
   buildRunSourceLabels,
-  createConfluenceSourceFromConnection,
-  createConfluenceSourceFromInstance,
-  createJiraSourceFromInstance,
-  createUploadSourceFromInstance,
-  deriveSourceStatus,
-  formatDateTime,
   getRunSourceLabel,
-  getSourceStatusFromBackend,
   isRunInProgress,
-  SOURCE_META,
 } from "../features/data-ingestion/data.ts";
+import {
+  confluenceSpaceOf,
+  githubRepositoryOf,
+  jiraInstanceOf,
+} from "../features/data-ingestion/sourceDetails.ts";
 import type {
-  BackendProjectSourceStatus,
   DataSource,
   GithubRepositoryDetails,
   IngestionRun,
@@ -50,13 +52,11 @@ import type {
   PageMetadata,
   SectionKey,
   SourceInstanceIngestionStatus,
-  SourceSystem,
 } from "../features/data-ingestion/types.ts";
 import { SECTION_ORDER } from "../features/data-ingestion/types.ts";
 import {
   loadProjectSyncSchedule,
   saveProjectSyncSchedule,
-  type SyncSettingsProvider,
 } from "../features/data-ingestion/projectSyncSchedule.ts";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
@@ -85,7 +85,6 @@ import {
   type ConfluenceConnectionDto,
 } from "../services/sources/confluenceService.ts";
 import { projectService, type ProjectSource } from "../services/projectService.ts";
-import { parseGithubRepositoryReference } from "../services/sources/githubRepositoryInput.ts";
 
 /**
  * Wording for the project-wide sync-settings modal, per connector. `one` and
@@ -93,16 +92,11 @@ import { parseGithubRepositoryReference } from "../services/sources/githubReposi
  * "overwrites every … in this project" and the "updates all … in this project"
  * sentences.
  */
-const SYNC_SETTINGS_COPY: Record<
-  SyncSettingsProvider,
-  { label: string; one: string; many: string }
-> = {
-  github: { label: "GitHub", one: "GitHub repository", many: "GitHub repositories" },
-  jira: { label: "Jira", one: "Jira instance", many: "Jira instances" },
-  confluence: { label: "Confluence", one: "Confluence space", many: "Confluence spaces" },
-};
+function getSyncSettingsCopy(system: SourceSystem) {
+  const { label, noun } = CONNECTORS[system].meta;
 
-const SYNC_SETTINGS_PROVIDER_ORDER: SyncSettingsProvider[] = ["github", "jira", "confluence"];
+  return { label, one: `${label} ${noun.singular}`, many: `${label} ${noun.plural}` };
+}
 
 // How many of the project's newest runs feed the source cards and the overview,
 // independent of the run table's page and filter.
@@ -140,226 +134,6 @@ type RunSourceFilterOption = {
   sourceSystem: SourceSystem;
 };
 
-function toSourceSystem(value: string): SourceSystem | null {
-  const normalized = value.toUpperCase();
-
-  if (
-    normalized === "GITHUB" ||
-    normalized === "JIRA" ||
-    normalized === "UPLOAD" ||
-    normalized === "CONFLUENCE"
-  ) {
-    return normalized;
-  }
-
-  return null;
-}
-
-/**
- * Finds the GitHub status row (from `/api/v1/ingestion-sources/status`) that
- * belongs to a connected project source. A project source only carries an opaque
- * id and a display name, so we match on the repository id first, then on the
- * `"owner/name"` recoverable from the source's name or id.
- */
-function matchSourceInstance(
-  projectSource: ProjectSource,
-  instances: SourceInstanceIngestionStatus[],
-): SourceInstanceIngestionStatus | null {
-  const byRepositoryId = instances.find((instance) => instance.repositoryId === projectSource.id);
-  if (byRepositoryId) return byRepositoryId;
-
-  const reference =
-    parseGithubRepositoryReference(projectSource.name) ??
-    parseGithubRepositoryReference(projectSource.id);
-  if (!reference) return null;
-
-  const fullName = `${reference.owner}/${reference.name}`.toLowerCase();
-
-  return (
-    instances.find((instance) => instance.sourceId.toLowerCase() === fullName) ??
-    instances.find((instance) => `${instance.owner}/${instance.name}`.toLowerCase() === fullName) ??
-    null
-  );
-}
-
-function githubRepositoryFromInstance(
-  instance: SourceInstanceIngestionStatus,
-): GithubRepositoryDetails {
-  return {
-    owner: instance.owner ?? "",
-    name: instance.name ?? "",
-    repositoryId: instance.repositoryId,
-    fullName: instance.sourceId,
-    url: instance.sourceUrl,
-    enabled: instance.enabled,
-  };
-}
-
-/**
- * Builds the source cards for the Data Ingestion page. The project's connected
- * sources define which cards exist (and their stable `sourceId`, used for
- * selection and deep links); for GitHub, the status row is the authoritative
- * source of the repository identity, health, counters, total artifact count,
- * enabled flag and per-type sync times. GitHub sources without a status row (an
- * unresolvable repo) and uploads without one fall back to their source system's
- * latest run. Jira and Confluence sources are skipped here and built separately
- * from the status rows and connections, so a project source list that includes
- * them does not double them.
- */
-function buildProjectDataSources(
-  projectSources: ProjectSource[],
-  sourceInstances: SourceInstanceIngestionStatus[],
-  runs: IngestionRun[],
-  /** Connector id (lowercase, e.g. "github") -> globally enabled. */
-  connectorEnabledById: Map<string, boolean>,
-): DataSource[] {
-  const latestRunBySource = new Map<SourceSystem, IngestionRun>();
-  const sourceCountBySystem = new Map<SourceSystem, number>();
-
-  projectSources.forEach((projectSource) => {
-    const sourceSystem = toSourceSystem(projectSource.type);
-    if (!sourceSystem) return;
-
-    sourceCountBySystem.set(sourceSystem, (sourceCountBySystem.get(sourceSystem) ?? 0) + 1);
-  });
-
-  // Runs arrive newest-first, so the first hit per key is the latest.
-  const latestRunByRepository = new Map<string, IngestionRun>();
-
-  runs.forEach((run) => {
-    if (!latestRunBySource.has(run.sourceSystem)) {
-      latestRunBySource.set(run.sourceSystem, run);
-    }
-
-    [run.repositoryId, run.sourceId?.toLowerCase()].forEach((key) => {
-      if (key && !latestRunByRepository.has(key)) {
-        latestRunByRepository.set(key, run);
-      }
-    });
-  });
-
-  return projectSources.flatMap((projectSource): DataSource[] => {
-    const sourceSystem = toSourceSystem(projectSource.type);
-    if (!sourceSystem) return [];
-
-    // Jira and Confluence cards are built solely from the connector-neutral status rows.
-    if (sourceSystem === "JIRA" || sourceSystem === "CONFLUENCE") return [];
-    // Skip UPLOAD only when an authoritative status row already exists so the card
-    // does not vanish when artifact count is 0 or when run status fallback is needed.
-    if (sourceSystem === "UPLOAD" && sourceInstances.some((s) => s.sourceSystem === "UPLOAD")) {
-      return [];
-    }
-
-    const meta = SOURCE_META[sourceSystem];
-    const latestRun = latestRunBySource.get(sourceSystem);
-    const sharesSourceSystem = (sourceCountBySystem.get(sourceSystem) ?? 1) > 1;
-    const connectorEnabled = connectorEnabledById.get(sourceSystem.toLowerCase());
-    const instance =
-      sourceSystem === "GITHUB" ? matchSourceInstance(projectSource, sourceInstances) : null;
-
-    if (instance) {
-      const effectiveBackendStatus: BackendProjectSourceStatus =
-        instance.enabled === false ? "DISABLED" : instance.connectionStatus;
-      const hasErrors = instance.failedCount > 0;
-      const hasNeverSynced = instance.lastRunTime === null;
-
-      // Strictly this repository's own latest run. Falling back to the newest
-      // run of the source system (or the per-system aggregate) would let one
-      // failing repo colour every other GitHub card. The per-repo status
-      // endpoint is authoritative for health anyway; a run only adds the
-      // AI-sync stage, and having none loaded simply means "unknown".
-      const repositoryRun =
-        (instance.repositoryId ? latestRunByRepository.get(instance.repositoryId) : undefined) ??
-        latestRunByRepository.get(instance.sourceId.toLowerCase()) ??
-        null;
-      const runStatus = repositoryRun?.status ?? null;
-
-      return [
-        {
-          sourceId: projectSource.id,
-          sourceSystem,
-          name: projectSource.name,
-          type: meta.type,
-          icon: meta.icon,
-          status: getSourceStatusFromBackend(effectiveBackendStatus),
-          backendStatus: effectiveBackendStatus,
-          statusView: deriveSourceStatus({
-            backendStatus: effectiveBackendStatus,
-            runStatus,
-            aiSyncStatus: repositoryRun?.aiSyncStatus ?? null,
-            hasErrors,
-            hasNeverSynced,
-            connectorEnabled,
-          }),
-          artifacts: instance.artifactCount,
-          lastSync: formatDateTime(instance.lastRunTime),
-          errors: instance.failedCount,
-          description: meta.description,
-          lastRunAt: instance.lastRunTime,
-          latestIngestedCount: instance.ingestedCount,
-          latestUpdatedCount: instance.updatedCount,
-          deletedCount: instance.deletedCount,
-          totalArtifactCount: instance.artifactCount,
-          runIds: [],
-          sharesSourceSystem,
-          failedItems: instance.failedItems,
-          githubRepository: githubRepositoryFromInstance(instance),
-          lastCommitsSyncAt: instance.lastCommitsSyncAt,
-          lastIssuesSyncAt: instance.lastIssuesSyncAt,
-          lastPullRequestsSyncAt: instance.lastPullRequestsSyncAt,
-        },
-      ];
-    }
-
-    // Fallback for sources without a per-repo status row (uploads, or a repo
-    // whose connection could not be resolved): everything comes from the
-    // source system's latest run.
-    const backendStatus = projectSource.status;
-    const latestUpdatedCount = latestRun?.updatedCount ?? 0;
-    const failedItems = latestRun?.failedItems ?? [];
-    const errors = latestRun?.failedCount ?? failedItems.length;
-    const lastRunAt = latestRun?.startedAt ?? null;
-    const hasNeverSynced = lastRunAt === null;
-    const runStatus = latestRun?.status ?? null;
-    const latestIngestedCount = latestRun?.ingestedCount ?? 0;
-
-    return [
-      {
-        sourceId: projectSource.id,
-        sourceSystem,
-        name: projectSource.name,
-        type: meta.type,
-        icon: meta.icon,
-        status: getSourceStatusFromBackend(backendStatus),
-        backendStatus,
-        statusView: deriveSourceStatus({
-          backendStatus,
-          runStatus,
-          aiSyncStatus: latestRun?.aiSyncStatus ?? null,
-          hasErrors: errors > 0,
-          hasNeverSynced,
-          connectorEnabled,
-        }),
-        artifacts: latestIngestedCount,
-        lastSync: formatDateTime(lastRunAt),
-        errors,
-        description: meta.description,
-        lastRunAt,
-        latestIngestedCount,
-        latestUpdatedCount,
-        deletedCount: latestRun?.deletedCount ?? 0,
-        totalArtifactCount: 0,
-        runIds: [],
-        sharesSourceSystem,
-        failedItems,
-        githubRepository: null,
-        lastCommitsSyncAt: null,
-        lastIssuesSyncAt: null,
-        lastPullRequestsSyncAt: null,
-      },
-    ];
-  });
-}
 function hasSourceId(sources: DataSource[], sourceId: string) {
   return sources.some((source) => source.sourceId === sourceId);
 }
@@ -373,7 +147,7 @@ function hasSourceId(sources: DataSource[], sourceId: string) {
  * "Update data source" button open the repository rather than dropping the reader on the page
  * and leaving them to find it.
  *
- * Case-insensitive on the component, matching {@link matchSourceInstance}: GitHub treats owner
+ * Case-insensitive on the component: GitHub treats owner
  * and repository names that way, and the component string reaches us from the AI service.
  */
 function resolveRequestedSourceId(sources: DataSource[], requested: string): string | null {
@@ -381,7 +155,7 @@ function resolveRequestedSourceId(sources: DataSource[], requested: string): str
   if (hasSourceId(sources, requested)) return requested;
 
   const byComponent = sources.find(
-    (source) => source.githubRepository?.fullName.toLowerCase() === requested.toLowerCase(),
+    (source) => githubRepositoryOf(source)?.fullName.toLowerCase() === requested.toLowerCase(),
   );
 
   return byComponent?.sourceId ?? null;
@@ -447,7 +221,7 @@ export function DataIngestionPage() {
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false);
   const [isSyncSettingsModalOpen, setIsSyncSettingsModalOpen] = useState(false);
-  const [syncSettingsProvider, setSyncSettingsProvider] = useState<SyncSettingsProvider>("github");
+  const [syncSettingsSystem, setSyncSettingsSystem] = useState<SourceSystem>("GITHUB");
   // Whether the sources of the open sync-settings tab currently have different schedules.
   const [isSyncScheduleMixed, setIsSyncScheduleMixed] = useState(false);
   const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
@@ -746,68 +520,25 @@ export function DataIngestionPage() {
     [connectors],
   );
 
-  const sources = useMemo<DataSource[]>(() => {
-    const githubAndUpload = buildProjectDataSources(
+  const sources = useMemo<DataSource[]>(
+    () =>
+      buildDataSources({
+        projectSources,
+        statuses: sourceInstances,
+        jiraInstances,
+        confluenceConnections,
+        latestRuns,
+        connectorEnabledById,
+      }),
+    [
+      confluenceConnections,
+      connectorEnabledById,
+      jiraInstances,
+      latestRuns,
       projectSources,
       sourceInstances,
-      latestRuns,
-      connectorEnabledById,
-    );
-
-    // Jira cards are now driven by the connector-neutral status rows (health,
-    // counters, artifact total, last sync) — the same authoritative source as
-    // GitHub. The status endpoint carries no credential metadata, so the Jira
-    // instance DTOs are merged in by URL purely for the credential shown in the
-    // details panel and used by the update action.
-    const jiraInstanceByUrl = new Map(
-      jiraInstances.map((instance) => [instance.instanceUrl.toLowerCase(), instance]),
-    );
-
-    const jiraSources = sourceInstances
-      .filter((status) => status.sourceSystem === "JIRA")
-      .map((status) =>
-        createJiraSourceFromInstance(
-          status,
-          jiraInstanceByUrl.get(status.sourceId.toLowerCase()) ?? null,
-          connectorEnabledById.get("jira"),
-        ),
-      );
-
-    const confluenceSources = confluenceConnections.map((conn) => {
-      const status = sourceInstances.find(
-        (s) =>
-          s.sourceSystem === "CONFLUENCE" &&
-          (s.sourceId.toLowerCase() === `${conn.baseUrl}|${conn.spaceId}`.toLowerCase() ||
-            s.sourceId.toLowerCase() === conn.spaceId.toLowerCase() ||
-            s.sourceId.toLowerCase() === conn.id.toLowerCase()),
-      );
-      if (status) {
-        return createConfluenceSourceFromInstance(
-          status,
-          conn,
-          connectorEnabledById.get("confluence"),
-        );
-      }
-      return createConfluenceSourceFromConnection(
-        conn,
-        latestRuns,
-        connectorEnabledById.get("confluence"),
-      );
-    });
-
-    const uploadSources = sourceInstances
-      .filter((status) => status.sourceSystem === "UPLOAD")
-      .map((status) => createUploadSourceFromInstance(status));
-
-    return [...githubAndUpload, ...jiraSources, ...confluenceSources, ...uploadSources];
-  }, [
-    confluenceConnections,
-    connectorEnabledById,
-    jiraInstances,
-    latestRuns,
-    projectSources,
-    sourceInstances,
-  ]);
+    ],
+  );
 
   const totalArtifactCount = useMemo(
     () => sourceInstances.reduce((sum, s) => sum + s.artifactCount, 0),
@@ -851,23 +582,19 @@ export function DataIngestionPage() {
     () => new Set(sources.map((source) => source.sourceSystem)),
     [sources],
   );
-  const hasGithubSources = visibleSourceSystems.has("GITHUB");
-  const hasJiraSources = visibleSourceSystems.has("JIRA");
-  const hasConfluenceSources = visibleSourceSystems.has("CONFLUENCE");
-  // The connectors whose global sync policy can be edited right now: one tab per
-  // connector that actually has sources on this project.
-  const syncSettingsProviders = useMemo<SegmentedTabOption<SyncSettingsProvider>[]>(() => {
-    const hasSources: Record<SyncSettingsProvider, boolean> = {
-      github: hasGithubSources,
-      jira: hasJiraSources,
-      confluence: hasConfluenceSources,
-    };
-
-    return SYNC_SETTINGS_PROVIDER_ORDER.filter((provider) => hasSources[provider]).map(
-      (provider) => ({ value: provider, label: SYNC_SETTINGS_COPY[provider].label }),
-    );
-  }, [hasConfluenceSources, hasGithubSources, hasJiraSources]);
-  const syncSettingsCopy = SYNC_SETTINGS_COPY[syncSettingsProvider];
+  // The connectors whose sync policy can be edited project-wide right now: one tab
+  // per schedulable connector that actually has sources on this project.
+  const syncSettingsSystems = useMemo<SegmentedTabOption<SourceSystem>[]>(
+    () =>
+      SCHEDULED_SOURCE_SYSTEMS.filter((system) => visibleSourceSystems.has(system)).map(
+        (system) => ({ value: system, label: getSyncSettingsCopy(system).label }),
+      ),
+    [visibleSourceSystems],
+  );
+  const syncSettingsCopy = useMemo(
+    () => getSyncSettingsCopy(syncSettingsSystem),
+    [syncSettingsSystem],
+  );
 
   const sourceHealth = useMemo(() => {
     const count = (state: DataSource["statusView"]["state"]) =>
@@ -906,34 +633,18 @@ export function DataIngestionPage() {
   const runSourceOptions = useMemo<RunSourceFilterOption[]>(
     () =>
       sources.flatMap((source): RunSourceFilterOption[] => {
-        if (source.githubRepository?.repositoryId) {
-          return [
-            {
-              value: source.githubRepository.repositoryId,
-              label: source.name,
-              sourceSystem: "GITHUB",
-            },
-          ];
+        const repositoryId = githubRepositoryOf(source)?.repositoryId;
+        if (repositoryId) {
+          return [{ value: repositoryId, label: source.name, sourceSystem: "GITHUB" }];
         }
 
         if (source.sourceSystem === "JIRA") {
-          return [
-            {
-              value: source.sourceId,
-              label: source.name,
-              sourceSystem: "JIRA",
-            },
-          ];
+          return [{ value: source.sourceId, label: source.name, sourceSystem: "JIRA" }];
         }
 
-        if (source.sourceSystem === "CONFLUENCE" && source.confluenceSpace?.connectionId) {
-          return [
-            {
-              value: source.confluenceSpace.connectionId,
-              label: source.name,
-              sourceSystem: "CONFLUENCE",
-            },
-          ];
+        const connectionId = confluenceSpaceOf(source)?.connectionId;
+        if (connectionId) {
+          return [{ value: connectionId, label: source.name, sourceSystem: "CONFLUENCE" }];
         }
 
         return [];
@@ -1084,21 +795,20 @@ export function DataIngestionPage() {
   const handleUpdateSource = useCallback(
     async (source: DataSource) => {
       if (source.sourceSystem === "JIRA") {
-        if (!source.jiraInstance) {
+        const instance = jiraInstanceOf(source);
+        if (!instance) {
           throw new Error("Instance details are not available for this source.");
         }
 
-        await updateJiraInstance({
-          instanceUrl: source.jiraInstance.instanceUrl,
-        });
+        await updateJiraInstance({ instanceUrl: instance.instanceUrl });
         refreshAfterUpdate();
         return;
       }
 
       if (source.sourceSystem === "CONFLUENCE") {
-        // Use confluenceSpace.connectionId (the connection UUID) rather than
+        // Use the space's connectionId (the connection UUID) rather than
         // source.sourceId which may hold a raw status-row ref string.
-        const connectionId = source.confluenceSpace?.connectionId;
+        const connectionId = confluenceSpaceOf(source)?.connectionId;
         if (!connectionId) {
           throw new Error("Confluence connection ID is not available for this source.");
         }
@@ -1106,11 +816,12 @@ export function DataIngestionPage() {
         return;
       }
 
-      if (source.sourceSystem !== "GITHUB" || !source.githubRepository) {
+      const repository = githubRepositoryOf(source);
+      if (!repository) {
         throw new Error("Repository details are not available for this source.");
       }
 
-      await updateGithubRepository(source.githubRepository);
+      await updateGithubRepository(repository);
       refreshAfterUpdate();
     },
     [refreshAfterUpdate, syncConfluenceConnection],
@@ -1121,23 +832,23 @@ export function DataIngestionPage() {
   // the chosen schedule to each of them.
   const loadProjectSyncConfig = useCallback(async (): Promise<SyncScheduleConfig> => {
     const { config, isMixed } = await loadProjectSyncSchedule(
-      syncSettingsProvider,
+      syncSettingsSystem,
       sources,
       selectedProjectId || null,
     );
     setIsSyncScheduleMixed(isMixed);
 
     return { autoUpdate: config.autoUpdate, spec: config.schedule, nextSyncAt: null };
-  }, [selectedProjectId, sources, syncSettingsProvider]);
+  }, [selectedProjectId, sources, syncSettingsSystem]);
 
   const handleSaveProjectSyncConfig = useCallback(
     async (request: SyncScheduleRequest) => {
       await saveProjectSyncSchedule(
-        syncSettingsProvider,
+        syncSettingsSystem,
         sources,
         selectedProjectId || null,
         request,
-        SYNC_SETTINGS_COPY[syncSettingsProvider].many,
+        syncSettingsCopy.many,
       );
       // Deliberately does NOT reloadProjects(): changing sync schedules does not
       // affect the project switcher's data, and a project reload can transiently
@@ -1146,7 +857,14 @@ export function DataIngestionPage() {
       // page. See the note on refreshSourceDetails.
       await Promise.all([loadData(false), reloadSourceData()]);
     },
-    [loadData, reloadSourceData, selectedProjectId, sources, syncSettingsProvider],
+    [
+      loadData,
+      reloadSourceData,
+      selectedProjectId,
+      sources,
+      syncSettingsCopy.many,
+      syncSettingsSystem,
+    ],
   );
 
   const handleLoadGithubRepositoryConfig = useCallback(
@@ -1259,11 +977,12 @@ export function DataIngestionPage() {
   const handleUnlinkSource = useCallback(
     async (source: DataSource) => {
       if (source.sourceSystem === "JIRA") {
-        if (!source.jiraInstance || !selectedProjectId) {
+        const instance = jiraInstanceOf(source);
+        if (!instance || !selectedProjectId) {
           throw new Error("This source cannot be removed from the project.");
         }
 
-        await removeJiraInstanceFromProject(source.jiraInstance.instanceUrl, selectedProjectId);
+        await removeJiraInstanceFromProject(instance.instanceUrl, selectedProjectId);
 
         setSelectedSourceId(null);
         await refreshSourceDetails();
@@ -1271,7 +990,7 @@ export function DataIngestionPage() {
       }
 
       if (source.sourceSystem === "CONFLUENCE") {
-        const connectionId = source.confluenceSpace?.connectionId;
+        const connectionId = confluenceSpaceOf(source)?.connectionId;
 
         if (!connectionId || !selectedProjectId) {
           throw new Error("This source cannot be removed from the project.");
@@ -1284,9 +1003,9 @@ export function DataIngestionPage() {
         return;
       }
 
-      const repositoryId = source.githubRepository?.repositoryId;
+      const repositoryId = githubRepositoryOf(source)?.repositoryId;
 
-      if (source.sourceSystem !== "GITHUB" || !repositoryId || !selectedProjectId) {
+      if (!repositoryId || !selectedProjectId) {
         throw new Error("This repository cannot be removed from the project.");
       }
 
@@ -1441,12 +1160,12 @@ export function DataIngestionPage() {
                             <span className="min-w-0 truncate">Manage connectors</span>
                           </Button>
 
-                          {syncSettingsProviders.length > 0 ? (
+                          {syncSettingsSystems.length > 0 ? (
                             <Button
                               variant="secondary"
                               size="sm"
                               onClick={() => {
-                                setSyncSettingsProvider(syncSettingsProviders[0].value);
+                                setSyncSettingsSystem(syncSettingsSystems[0].value);
                                 setIsSyncSettingsModalOpen(true);
                               }}
                               icon={<CalendarClock className="h-4 w-4" />}
@@ -1599,12 +1318,12 @@ export function DataIngestionPage() {
         bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
         onClose={() => setIsSyncSettingsModalOpen(false)}
       >
-        {syncSettingsProviders.length > 1 ? (
+        {syncSettingsSystems.length > 1 ? (
           <div className="mb-5">
             <SegmentedTabs
-              value={syncSettingsProvider}
-              options={syncSettingsProviders}
-              onChange={setSyncSettingsProvider}
+              value={syncSettingsSystem}
+              options={syncSettingsSystems}
+              onChange={setSyncSettingsSystem}
               layoutId="sync-settings-provider-pill"
               ariaLabel="Sync settings connector"
             />
@@ -1612,8 +1331,8 @@ export function DataIngestionPage() {
         ) : null}
 
         <SyncScheduleSettings
-          key={syncSettingsProvider}
-          loadKey={syncSettingsProvider}
+          key={syncSettingsSystem}
+          loadKey={syncSettingsSystem}
           loadConfig={loadProjectSyncConfig}
           onSave={handleSaveProjectSyncConfig}
           showNextSync={false}

@@ -1,8 +1,9 @@
-import { ArrowRightLeft, GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import { ArrowRightLeft } from "lucide-react";
+import type { ReactNode } from "react";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
 import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
-import type { DraftSource, DraftSourceType } from "../../../projectSourcesDraft";
+import { CONNECTORS } from "../../../../data-ingestion/connectors/registry";
+import type { DraftSource } from "../../../projectSourcesDraft";
 
 /** The minimum a review row needs to render a person with their avatar. */
 export type ReviewPerson = {
@@ -28,20 +29,6 @@ type WizardReviewStepProps = {
   onEditDetails: () => void;
   onEditMembers: () => void;
   onEditSources: () => void;
-};
-
-const typeIcons: Record<DraftSourceType, ComponentType<{ className?: string }>> = {
-  GITHUB: GitBranch,
-  JIRA: Ticket,
-  UPLOAD: FileText,
-  CONFLUENCE: BookOpen,
-};
-
-const typeLabels: Record<DraftSourceType, string> = {
-  GITHUB: "GitHub",
-  JIRA: "Jira",
-  UPLOAD: "Upload",
-  CONFLUENCE: "Confluence",
 };
 
 function sourceTitle(source: DraftSource): string {
@@ -196,13 +183,13 @@ export function WizardReviewStep({
         ) : (
           <ul className="space-y-1.5">
             {sources.map((source) => {
-              const Icon = typeIcons[source.type];
+              const { icon: Icon, label } = CONNECTORS[source.type].meta;
 
               return (
                 <li key={source.id} className="flex items-center gap-2 text-app-text">
                   <Icon className="h-4 w-4 shrink-0 text-app-text-muted" />
                   <span className="truncate">{sourceTitle(source)}</span>
-                  <SourceTypeBadge type={typeLabels[source.type]} size="sm" />
+                  <SourceTypeBadge type={label} size="sm" />
                 </li>
               );
             })}

@@ -14,6 +14,7 @@ import {
   formatInstanceDomain,
   formatNumber,
 } from "../data.ts";
+import { confluenceSpaceOf, githubRepositoryOf, jiraInstanceOf } from "../sourceDetails.ts";
 import type { DataSource } from "../types.ts";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
@@ -99,21 +100,21 @@ export function SourceList({
                       {source.name}
                     </h3>
 
-                    {source.githubRepository?.owner && (
+                    {githubRepositoryOf(source)?.owner && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {source.githubRepository.owner}
+                        {githubRepositoryOf(source)?.owner}
                       </p>
                     )}
 
-                    {source.jiraInstance?.instanceUrl && (
+                    {jiraInstanceOf(source)?.instanceUrl && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {formatInstanceDomain(source.jiraInstance.instanceUrl)}
+                        {formatInstanceDomain(jiraInstanceOf(source)?.instanceUrl ?? "")}
                       </p>
                     )}
 
-                    {source.confluenceSpace?.baseUrl && (
+                    {confluenceSpaceOf(source)?.baseUrl && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {formatInstanceDomain(source.confluenceSpace.baseUrl)}
+                        {formatInstanceDomain(confluenceSpaceOf(source)?.baseUrl ?? "")}
                       </p>
                     )}
                   </div>

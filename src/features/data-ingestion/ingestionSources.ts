@@ -1,4 +1,4 @@
-import { createSourceFromStatusRow } from "./data.ts";
+import { createDataSourceFromStatus } from "./data.ts";
 import { getIngestionSourceStatuses } from "../../services/ingestionService.ts";
 
 /**
@@ -11,5 +11,5 @@ import { getIngestionSourceStatuses } from "../../services/ingestionService.ts";
 export async function fetchIngestionSources(projectId: string) {
   const instances = await getIngestionSourceStatuses(projectId);
 
-  return instances.map(createSourceFromStatusRow);
+  return instances.map(createDataSourceFromStatus);
 }

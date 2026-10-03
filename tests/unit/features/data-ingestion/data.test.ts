@@ -1,11 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  SOURCE_SYSTEMS,
   SOURCE_META,
-  createJiraSourceFromInstance,
-  createSourceFromStatusRow,
-  createConfluenceSourceFromConnection,
-  createConfluenceSourceFromInstance,
+  createDataSource,
+  createDataSourceFromStatus,
   buildRunSourceLabels,
   getRunSourceLabel,
   deriveConnectionStatus,
@@ -18,6 +15,13 @@ import {
   formatRunFinishedAt,
   formatNumber,
 } from "../../../../src/features/data-ingestion/data";
+import { CONNECTORS } from "../../../../src/features/data-ingestion/connectors/registry";
+import { SOURCE_SYSTEMS } from "../../../../src/features/data-ingestion/connectors/sourceSystems";
+import {
+  confluenceSpaceOf,
+  githubRepositoryOf,
+  jiraInstanceOf,
+} from "../../../../src/features/data-ingestion/sourceDetails";
 import type {
   ConnectionStatus,
   IngestionRun,
@@ -26,6 +30,24 @@ import type {
 } from "../../../../src/features/data-ingestion/types";
 import type { JiraInstanceDto } from "../../../../src/services/sources/jiraService";
 import type { ConfluenceConnectionDto } from "../../../../src/services/sources/confluenceService";
+
+const jiraCard = (
+  status: SourceInstanceIngestionStatus,
+  instance?: JiraInstanceDto | null,
+  connectorEnabled?: boolean,
+) =>
+  createDataSource({
+    definition: CONNECTORS.JIRA,
+    status,
+    connection: instance ?? null,
+    connectorEnabled,
+  });
+
+const confluenceCard = (
+  status: SourceInstanceIngestionStatus | null,
+  connection: ConfluenceConnectionDto,
+  latestRun?: IngestionRun | null,
+) => createDataSource({ definition: CONNECTORS.CONFLUENCE, status, connection, latestRun });
 
 describe("data-ingestion data helpers", () => {
   describe("SOURCE_SYSTEMS / SOURCE_META", () => {
@@ -152,7 +174,7 @@ describe("data-ingestion data helpers", () => {
     }
   });
 
-  describe("createJiraSourceFromInstance", () => {
+  describe("createDataSource for a Jira status row", () => {
     const status = (
       overrides: Partial<SourceInstanceIngestionStatus> = {},
     ): SourceInstanceIngestionStatus => ({
@@ -194,26 +216,24 @@ describe("data-ingestion data helpers", () => {
 
     for (const connectionStatus of cases) {
       it(`carries the ${connectionStatus} connection status`, () => {
-        const source = createJiraSourceFromInstance(status({ connectionStatus }));
+        const source = jiraCard(status({ connectionStatus }));
         expect(source.backendStatus).toBe(connectionStatus);
       });
     }
 
     it("overrides the status with DISABLED when the source is disabled", () => {
-      const source = createJiraSourceFromInstance(
-        status({ connectionStatus: "CONNECTED", enabled: false }),
-      );
+      const source = jiraCard(status({ connectionStatus: "CONNECTED", enabled: false }));
       expect(source.backendStatus).toBe("DISABLED");
       expect(source.statusView.state).toBe("disabled");
     });
 
-    it("carries the instance identity and merged credential in jiraInstance, not githubRepository", () => {
-      const source = createJiraSourceFromInstance(status(), instance());
+    it("carries the instance identity and merged credential in its Jira details", () => {
+      const source = jiraCard(status(), instance());
       expect(source.sourceSystem).toBe("JIRA");
       expect(source.sourceId).toBe("https://acme.atlassian.net");
       expect(source.name).toBe("Team board");
-      expect(source.githubRepository).toBeNull();
-      expect(source.jiraInstance).toEqual({
+      expect(githubRepositoryOf(source)).toBeNull();
+      expect(jiraInstanceOf(source)).toEqual({
         instanceUrl: "https://acme.atlassian.net",
         displayName: "Team board",
         credentialName: "default",
@@ -222,7 +242,7 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("takes counters and the real artifact total from the status row", () => {
-      const source = createJiraSourceFromInstance(status(), instance());
+      const source = jiraCard(status(), instance());
       expect(source.artifacts).toBe(128);
       expect(source.latestIngestedCount).toBe(42);
       expect(source.latestUpdatedCount).toBe(3);
@@ -233,9 +253,9 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("still renders with empty credentials when no instance DTO is matched", () => {
-      const source = createJiraSourceFromInstance(status());
+      const source = jiraCard(status());
       expect(source.artifacts).toBe(128);
-      expect(source.jiraInstance).toEqual({
+      expect(jiraInstanceOf(source)).toEqual({
         instanceUrl: "https://acme.atlassian.net",
         displayName: "Team board",
         credentialName: "",
@@ -244,25 +264,25 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("reports never-synced when the status row has no last run", () => {
-      const source = createJiraSourceFromInstance(status({ lastRunTime: null }));
+      const source = jiraCard(status({ lastRunTime: null }));
       expect(source.statusView.state).toBe("attention");
       expect(source.lastRunAt).toBeNull();
     });
     it("shows a synced badge after a successful Jira sync", () => {
-      const source = createJiraSourceFromInstance(status());
+      const source = jiraCard(status());
 
       expect(deriveSyncStatus(source).label).toBe("Synced");
     });
 
     it("surfaces a disabled Jira connector while preserving the synced badge", () => {
-      const source = createJiraSourceFromInstance(status(), instance(), false);
+      const source = jiraCard(status(), instance(), false);
 
       expect(source.statusView.label).toBe("Connector disabled");
       expect(deriveSyncStatus(source).label).toBe("Synced");
     });
   });
 
-  describe("createSourceFromStatusRow", () => {
+  describe("createDataSourceFromStatus", () => {
     const row = (
       overrides: Partial<SourceInstanceIngestionStatus>,
     ): SourceInstanceIngestionStatus => ({
@@ -289,14 +309,14 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("keeps GitHub repository details on a GitHub row", () => {
-      const source = createSourceFromStatusRow(row({}));
+      const source = createDataSourceFromStatus(row({}));
 
       expect(source.sourceSystem).toBe("GITHUB");
-      expect(source.githubRepository?.fullName).toBe("acme/monorepo");
+      expect(githubRepositoryOf(source)?.fullName).toBe("acme/monorepo");
     });
 
     it("maps a Jira row with the Jira identity and no GitHub details", () => {
-      const source = createSourceFromStatusRow(
+      const source = createDataSourceFromStatus(
         row({
           sourceSystem: "JIRA",
           sourceId: "https://acme.atlassian.net",
@@ -308,22 +328,22 @@ describe("data-ingestion data helpers", () => {
       );
 
       expect(source.sourceSystem).toBe("JIRA");
-      expect(source.githubRepository).toBeNull();
-      expect(source.jiraInstance?.instanceUrl).toBe("https://acme.atlassian.net");
+      expect(githubRepositoryOf(source)).toBeNull();
+      expect(jiraInstanceOf(source)?.instanceUrl).toBe("https://acme.atlassian.net");
     });
 
     it("maps a Confluence row and an upload row without GitHub details", () => {
-      const confluence = createSourceFromStatusRow(
+      const confluence = createDataSourceFromStatus(
         row({ sourceSystem: "CONFLUENCE", sourceId: "https://acme.atlassian.net|1" }),
       );
-      const upload = createSourceFromStatusRow(
+      const upload = createDataSourceFromStatus(
         row({ sourceSystem: "UPLOAD", sourceId: "uploads" }),
       );
 
       expect(confluence.sourceSystem).toBe("CONFLUENCE");
-      expect(confluence.githubRepository).toBeNull();
+      expect(githubRepositoryOf(confluence)).toBeNull();
       expect(upload.sourceSystem).toBe("UPLOAD");
-      expect(upload.githubRepository).toBeNull();
+      expect(githubRepositoryOf(upload)).toBeNull();
     });
   });
 
@@ -354,7 +374,7 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("shows Connected next to a spinning Syncing badge while a sync runs", () => {
-      const source = createJiraSourceFromInstance(jiraStatus({ connectionStatus: "UPDATING" }));
+      const source = jiraCard(jiraStatus({ connectionStatus: "UPDATING" }));
 
       const connection = deriveConnectionStatus(source);
       const sync = deriveSyncStatus(source);
@@ -366,21 +386,21 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("shows Connected next to Synced when healthy and idle", () => {
-      const source = createJiraSourceFromInstance(jiraStatus());
+      const source = jiraCard(jiraStatus());
 
       expect(deriveConnectionStatus(source).label).toBe("Connected");
       expect(deriveSyncStatus(source).label).toBe("Synced");
     });
 
     it("shows Disabled while keeping the last sync freshness", () => {
-      const source = createJiraSourceFromInstance(jiraStatus({ enabled: false }));
+      const source = jiraCard(jiraStatus({ enabled: false }));
 
       expect(deriveConnectionStatus(source).state).toBe("disabled");
       expect(deriveSyncStatus(source).label).toBe("Synced");
     });
 
     it("shows Connected next to Not synced before the first run", () => {
-      const source = createJiraSourceFromInstance(jiraStatus({ lastRunTime: null }));
+      const source = jiraCard(jiraStatus({ lastRunTime: null }));
 
       expect(deriveConnectionStatus(source).label).toBe("Connected");
       expect(deriveSyncStatus(source).label).toBe("Not synced");
@@ -406,7 +426,7 @@ describe("data-ingestion data helpers", () => {
     };
 
     it("resolves Confluence runs by composite baseUrl|spaceId, spaceKey, and connectionId", () => {
-      const source = createConfluenceSourceFromConnection(confluenceConn);
+      const source = confluenceCard(null, confluenceConn);
       const labels = buildRunSourceLabels([source]);
 
       expect(labels.get("conn-uuid-1")).toBe("DOCS");
@@ -437,7 +457,7 @@ describe("data-ingestion data helpers", () => {
       expect(getRunSourceLabel(runWithCompositeRef, labels)).toBe("DOCS");
     });
 
-    it("matches Confluence runs in createConfluenceSourceFromConnection using repositoryId", () => {
+    it("builds a Confluence card without a status row from the latest run", () => {
       const run: IngestionRun = {
         runId: "run-2",
         sourceSystem: "CONFLUENCE",
@@ -458,7 +478,7 @@ describe("data-ingestion data helpers", () => {
         aiSyncFailureReason: null,
       };
 
-      const source = createConfluenceSourceFromConnection(confluenceConn, [run]);
+      const source = confluenceCard(null, confluenceConn, run);
       expect(deriveSyncStatus(source).label).toBe("Synced");
       // A run only knows what it touched: the latest run's ingested count, never a total.
       expect(source.artifacts).toBe(5);
@@ -466,23 +486,21 @@ describe("data-ingestion data helpers", () => {
     });
 
     it("names the card from spaceName, falling back to spaceKey when there is none", () => {
-      expect(
-        createConfluenceSourceFromConnection({ ...confluenceConn, spaceName: "Docs Space" }).name,
-      ).toBe("Docs Space");
-      expect(
-        createConfluenceSourceFromConnection({ ...confluenceConn, spaceName: null }).name,
-      ).toBe("DOCS");
+      expect(confluenceCard(null, { ...confluenceConn, spaceName: "Docs Space" }).name).toBe(
+        "Docs Space",
+      );
+      expect(confluenceCard(null, { ...confluenceConn, spaceName: null }).name).toBe("DOCS");
     });
 
     it("carries spaceName and credentialName onto the source's confluenceSpace details", () => {
-      const source = createConfluenceSourceFromConnection({
+      const source = confluenceCard(null, {
         ...confluenceConn,
         spaceName: "Docs Space",
         credentialName: "team-cred",
       });
 
-      expect(source.confluenceSpace?.spaceName).toBe("Docs Space");
-      expect(source.confluenceSpace?.credentialName).toBe("team-cred");
+      expect(confluenceSpaceOf(source)?.spaceName).toBe("Docs Space");
+      expect(confluenceSpaceOf(source)?.credentialName).toBe("team-cred");
     });
 
     it("creates Confluence source from status instance", () => {
@@ -508,7 +526,7 @@ describe("data-ingestion data helpers", () => {
         lastPullRequestsSyncAt: null,
       };
 
-      const source = createConfluenceSourceFromInstance(status, confluenceConn);
+      const source = confluenceCard(status, confluenceConn);
       expect(source.sourceId).toBe("conn-uuid-1");
       expect(source.sourceSystem).toBe("CONFLUENCE");
       expect(source.name).toBe("DOCS");
@@ -539,14 +557,14 @@ describe("data-ingestion data helpers", () => {
         lastPullRequestsSyncAt: null,
       };
 
-      const source = createConfluenceSourceFromInstance(status, {
+      const source = confluenceCard(status, {
         ...confluenceConn,
         spaceName: "Docs Space",
         credentialName: "team-cred",
       });
 
-      expect(source.confluenceSpace?.spaceName).toBe("Docs Space");
-      expect(source.confluenceSpace?.credentialName).toBe("team-cred");
+      expect(confluenceSpaceOf(source)?.spaceName).toBe("Docs Space");
+      expect(confluenceSpaceOf(source)?.credentialName).toBe("team-cred");
     });
   });
 });
