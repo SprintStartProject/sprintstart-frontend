@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { AlertCircle, Check, Edit, FileText, Trash2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, Check, Edit, FileText, Trash2 } from "lucide-react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
@@ -7,16 +7,23 @@ import { adminUserService } from "../../../services/adminUserService";
 import { projectService } from "../../../services/projectService";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import {
+  getAvailableProjects,
   getDisplayName,
   getDraftDisplayName,
   getPermissionGroupVariant,
   getUserEditFormState,
   PERMISSION_GROUP_OPTIONS,
+  resolveUserProjects,
 } from "../data";
-import { getProjectsLeftOnMove } from "../projectMove";
+import {
+  canJoinMultipleProjects,
+  getProjectsLeftOnMove,
+  getRoleDowngradeConflicts,
+} from "../projectMove";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import type {
   AdminUser,
+  ProjectOverview,
   ProjectSummary,
   UpdateAdminUserRequest,
   UserEditFormState,
@@ -26,12 +33,19 @@ import { DetailRow } from "./DetailRow";
 import { DrawerCard } from "./DrawerCard";
 import { EditableDetailRow } from "./EditableDetailRow";
 import { EditableSelectDetailRow } from "./EditableSelectDetailRow";
-import { ProjectAccessPanel } from "./ProjectAccessPanel";
+import { MultiProjectAssignment } from "./MultiProjectAssignment";
+import { SingleProjectAssignment } from "./SingleProjectAssignment";
 import { UserStatusSection } from "./UserStatusSection";
 
 type UserDetailsDrawerProps = {
   user: AdminUser;
-  availableProjects: ProjectSummary[];
+  /**
+   * Every project with its manager, member and source counts. The drawer shows
+   * these for the user's own projects and offers the rest in the picker.
+   */
+  projects: ProjectOverview[];
+  /** The user directory, to give a project's manager the same avatar as elsewhere. */
+  users?: AdminUser[];
   isOpen: boolean;
   onClose: () => void;
   onOpenProjectDetails: (projectId: string) => void;
@@ -86,7 +100,8 @@ function ReadonlyEditRow({
 
 export function UserDetailsDrawer({
   user,
-  availableProjects,
+  projects,
+  users = [],
   isOpen,
   onClose,
   onOpenProjectDetails,
@@ -116,6 +131,9 @@ export function UserDetailsDrawer({
   const draftUser =
     draftUserState.userId === user.id ? draftUserState.draftUser : getUserEditFormState(user);
 
+  const availableProjects = useMemo(() => getAvailableProjects(projects), [projects]);
+  const usersById = useMemo(() => new Map(users.map((entry) => [entry.id, entry])), [users]);
+
   const enrichedAssignedProjects = useMemo(
     () =>
       user.projects.map((userProject) => {
@@ -124,6 +142,19 @@ export function UserDetailsDrawer({
       }),
     [user.projects, availableProjects],
   );
+
+  const assignedUserProjects = useMemo(
+    () => resolveUserProjects(enrichedAssignedProjects, projects),
+    [enrichedAssignedProjects, projects],
+  );
+
+  // The view follows the stored role, not the draft: the assignment is saved
+  // immediately, so it has to match what the backend currently enforces.
+  const canHaveSeveralProjects = canJoinMultipleProjects(user.permissionGroup);
+
+  const downgradeConflicts = isEditing
+    ? getRoleDowngradeConflicts(user, projects, draftUser.permissionGroup)
+    : null;
 
   const visibleTitle = isEditing ? getDraftDisplayName(user, draftUser) : getDisplayName(user);
 
@@ -447,6 +478,36 @@ export function UserDetailsDrawer({
                 options={PERMISSION_GROUP_OPTIONS}
               />
               <ReadonlyEditRow label="User ID" value={user.id} mono />
+
+              {downgradeConflicts && (
+                <div
+                  role="status"
+                  className="mt-3 rounded-2xl border border-app-warning-border bg-app-warning-bg p-4"
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold text-app-warning-text">
+                    <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    This role change leaves conflicts behind
+                  </div>
+                  <ul className="mt-2 list-disc space-y-1 pl-6 text-sm text-app-warning-text">
+                    {downgradeConflicts.projectCount > 0 && (
+                      <li>
+                        {getDisplayName(user)} is in {downgradeConflicts.projectCount} projects.
+                        Users may only be in one – remaining memberships are kept until you remove
+                        them.
+                      </li>
+                    )}
+                    {downgradeConflicts.managedProjects.length > 0 && (
+                      <li>
+                        {getDisplayName(user)} manages{" "}
+                        {downgradeConflicts.managedProjects
+                          .map((project) => project.name)
+                          .join(", ")}
+                        . Managers need the Project Manager role – reassign the manager afterwards.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
             </div>
           ) : (
             <dl>
@@ -461,14 +522,30 @@ export function UserDetailsDrawer({
         </DrawerCard>
 
         <DrawerCard bare index={2}>
-          <ProjectAccessPanel
-            assignedProjects={enrichedAssignedProjects}
-            availableProjects={availableProjects}
-            onOpenProjectDetails={onOpenProjectDetails}
-            onAssignProject={assignProjectToUser}
-            confirmAssign={confirmProjectAssignment}
-            onRemoveProject={removeProjectFromUser}
-          />
+          {canHaveSeveralProjects ? (
+            <MultiProjectAssignment
+              user={user}
+              assignedProjects={assignedUserProjects}
+              allProjects={projects}
+              usersById={usersById}
+              isAdmin={user.permissionGroup.trim().toUpperCase() === "ADMIN"}
+              onOpenProjectDetails={onOpenProjectDetails}
+              onAssignProject={assignProjectToUser}
+              confirmAssign={confirmProjectAssignment}
+              onRemoveProject={removeProjectFromUser}
+            />
+          ) : (
+            <SingleProjectAssignment
+              user={user}
+              assignedProjects={assignedUserProjects}
+              allProjects={projects}
+              usersById={usersById}
+              onOpenProjectDetails={onOpenProjectDetails}
+              onAssignProject={assignProjectToUser}
+              confirmAssign={confirmProjectAssignment}
+              onRemoveProject={removeProjectFromUser}
+            />
+          )}
         </DrawerCard>
       </div>
 

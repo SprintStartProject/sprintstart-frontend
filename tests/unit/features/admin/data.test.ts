@@ -13,7 +13,9 @@ import {
   getDraftDisplayName,
   enrichUsersWithProjectNames,
   filterAdminProjects,
+  filterAdminUsers,
   getManagerName,
+  resolveUserProjects,
   getSourceHealth,
   getSourceTypeLabel,
   groupSourcesByType,
@@ -94,9 +96,9 @@ describe("admin data helpers", () => {
   });
 
   describe("getPermissionGroupVariant", () => {
-    it("returns warning for ADMIN (case-insensitive)", () => {
-      expect(getPermissionGroupVariant("admin")).toBe("warning");
-      expect(getPermissionGroupVariant("ADMIN")).toBe("warning");
+    it("returns danger for ADMIN (case-insensitive)", () => {
+      expect(getPermissionGroupVariant("admin")).toBe("danger");
+      expect(getPermissionGroupVariant("ADMIN")).toBe("danger");
     });
 
     it("returns success for PROJECT_MANAGER", () => {
@@ -354,6 +356,45 @@ describe("admin data helpers", () => {
         state: "stale",
         label: "1 out of date",
       });
+    });
+  });
+
+  describe("filterAdminUsers", () => {
+    it("finds users without a project", () => {
+      const withProject = createAdminUser({ id: "a", projects: [{ id: "p", name: "P" }] });
+      const without = createAdminUser({ id: "b", projects: [] });
+
+      expect(filterAdminUsers([withProject, without], "", "no-project")).toEqual([without]);
+    });
+
+    it("offers the filter in the toolbar", () => {
+      expect(USER_FILTER_OPTIONS.map((option) => option.value)).toContain("no-project");
+    });
+  });
+
+  describe("resolveUserProjects", () => {
+    const overview = {
+      id: "p1",
+      name: "Renamed",
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+      industry: "",
+      industryConfidence: null,
+      industryCustom: false,
+    } satisfies ProjectOverview;
+
+    it("pairs each assigned project with its full record under the current name", () => {
+      expect(resolveUserProjects([{ id: "p1", name: "Old" }], [overview])).toEqual([
+        { id: "p1", name: "Renamed", overview },
+      ]);
+    });
+
+    it("keeps a project the list does not know, without a record", () => {
+      expect(resolveUserProjects([{ id: "gone", name: "Project gone" }], [overview])).toEqual([
+        { id: "gone", name: "Project gone", overview: null },
+      ]);
     });
   });
 

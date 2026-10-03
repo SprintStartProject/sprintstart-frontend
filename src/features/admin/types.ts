@@ -13,7 +13,8 @@ import type {
 import type { ProjectRole, Skill } from "../team-management/types";
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
-export type UserFilter = "all" | "enabled" | "disabled" | "onboarded" | "not-onboarded";
+export type UserFilter =
+  "all" | "enabled" | "disabled" | "onboarded" | "not-onboarded" | "no-project";
 export type AdminTab = "users" | "projects" | "skills" | "tokens";
 export type SkillStatusFilter = "all" | "ACTIVE" | "RETIRED";
 

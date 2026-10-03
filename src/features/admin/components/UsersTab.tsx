@@ -1,12 +1,12 @@
 import { createPortal } from "react-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { MouseEvent } from "react";
 import { ExternalLink, MoreVertical, Trash2, Users } from "lucide-react";
 import { getDisplayName } from "../data";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import type { AdminUser } from "../types";
+import type { AdminUser, ProjectOverview } from "../types";
 import { PermissionGroupBadge } from "./Badges";
 import { ProjectList } from "./ProjectList";
 import { SelectionCheckbox } from "./SelectionCheckbox";
@@ -14,6 +14,8 @@ import { TableHeader } from "./TableHeader";
 
 type UsersTabProps = {
   paginatedUsers: AdminUser[];
+  /** Used to mark the projects a user manages in the project column. */
+  projects?: ProjectOverview[];
   selectedUserIds: Set<string>;
   allVisibleUsersSelected: boolean;
   openUserMenuId: string | null;
@@ -53,6 +55,7 @@ function getMenuPosition(button: HTMLButtonElement): MenuPosition {
 
 export function UsersTab({
   paginatedUsers,
+  projects = [],
   selectedUserIds,
   allVisibleUsersSelected,
   openUserMenuId,
@@ -64,6 +67,20 @@ export function UsersTab({
   onRequestUserDeleteFromMenu,
 }: UsersTabProps) {
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
+
+  const managedProjectIdsByUser = useMemo(() => {
+    const byUser = new Map<string, Set<string>>();
+
+    for (const project of projects) {
+      if (!project.manager) continue;
+
+      const managed = byUser.get(project.manager.id) ?? new Set<string>();
+      managed.add(project.id);
+      byUser.set(project.manager.id, managed);
+    }
+
+    return byUser;
+  }, [projects]);
 
   const handleToggleUserContextMenu = (event: MouseEvent<HTMLButtonElement>, userId: string) => {
     const shouldOpen = openUserMenuId !== userId;
@@ -194,7 +211,10 @@ export function UsersTab({
               </div>
 
               <div className="relative z-10 min-w-0">
-                <ProjectList projects={user.projects} />
+                <ProjectList
+                  projects={user.projects}
+                  managedProjectIds={managedProjectIdsByUser.get(user.id)}
+                />
               </div>
             </div>
 

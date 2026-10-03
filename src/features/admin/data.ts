@@ -27,6 +27,7 @@ export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> = 
   { value: "disabled", label: "Disabled" },
   { value: "onboarded", label: "Onboarding completed" },
   { value: "not-onboarded", label: "Onboarding open" },
+  { value: "no-project", label: "Without project" },
 ];
 
 export function getDisplayName(user: AdminUser) {
@@ -131,7 +132,7 @@ export function getSourceTypeLabel(type: string): string {
 export function getPermissionGroupVariant(permissionGroup: string): BadgeVariant {
   const normalized = permissionGroup.toUpperCase();
 
-  if (normalized.includes("ADMIN")) return "warning";
+  if (normalized.includes("ADMIN")) return "danger";
   if (normalized.includes("PROJECT")) return "success";
   return "neutral";
 }
@@ -248,6 +249,29 @@ export function getAvailableProjects(projects: ProjectOverview[]): ProjectSummar
 }
 
 /**
+ * A project a user is assigned to, with the full project record when the
+ * project list has it. `overview` is `null` for a stale id, so views can show
+ * the name they know without inventing a manager or member count.
+ */
+export type UserProject = ProjectSummary & {
+  overview: ProjectOverview | null;
+};
+
+/** Pairs each assigned project summary with its full record from the project list. */
+export function resolveUserProjects(
+  assigned: ProjectSummary[],
+  projects: ProjectOverview[],
+): UserProject[] {
+  const projectsById = new Map(projects.map((project) => [project.id, project]));
+
+  return assigned.map((summary) => {
+    const overview = projectsById.get(summary.id) ?? null;
+
+    return { id: summary.id, name: overview?.name ?? summary.name, overview };
+  });
+}
+
+/**
  * Fills in each user's assigned projects with their names.
  *
  * The user endpoint only returns `projectIds`, so the names have to come from
@@ -314,7 +338,8 @@ export function filterAdminUsers(
       (userFilter === "enabled" && user.enabled) ||
       (userFilter === "disabled" && !user.enabled) ||
       (userFilter === "onboarded" && user.hasCompletedOnboarding) ||
-      (userFilter === "not-onboarded" && !user.hasCompletedOnboarding);
+      (userFilter === "not-onboarded" && !user.hasCompletedOnboarding) ||
+      (userFilter === "no-project" && user.projects.length === 0);
 
     return matchesSearch && matchesFilter;
   });

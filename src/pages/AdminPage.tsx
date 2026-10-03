@@ -13,7 +13,6 @@ import {
   filterAdminProjects,
   filterAdminUsers,
   filterSkills,
-  getAvailableProjects,
   getDisplayName,
   getPaginatedProjects,
   getPaginatedSkills,
@@ -195,8 +194,6 @@ export function AdminPage() {
       void loadSkillPool();
     }
   }, [activeTab, loadSkillPool]);
-
-  const availableProjects = useMemo(() => getAvailableProjects(projects), [projects]);
 
   const filteredUsers = useMemo(() => {
     return filterAdminUsers(users, searchValue, userFilter);
@@ -693,6 +690,7 @@ export function AdminPage() {
 
                   <UsersTab
                     paginatedUsers={paginatedUsers}
+                    projects={projects}
                     selectedUserIds={selectedUserIds}
                     allVisibleUsersSelected={allVisibleUsersSelected}
                     openUserMenuId={openUserMenuId}
@@ -807,7 +805,8 @@ export function AdminPage() {
       {selectedUser && (
         <UserDetailsDrawer
           user={selectedUser}
-          availableProjects={availableProjects}
+          projects={projects}
+          users={users}
           isOpen={isDrawerOpen}
           onClose={closeDetails}
           onOpenProjectDetails={openProjectDetailsFromUserDrawer}
