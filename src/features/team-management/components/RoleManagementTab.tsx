@@ -508,9 +508,8 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
         </button>
       </div>
 
-      {/* Members take the room, skills sit in a narrow column
-                            beside them: the member grid is the part that grows
-                            with the team, the skill list stays short. */}
+      {/* Members take the room, skills sit in a narrow column beside them: the member list is
+          the part that grows with the team, the skill list stays short. */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_28rem]">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold text-app-text">Members</h4>
@@ -519,7 +518,9 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
             {selectedUserIds.length} selected.
           </p>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+          {/* A list like every other in the area, one row per person: tick to give the role,
+              untick to take it away. */}
+          <ul className="mt-4 divide-y divide-app-border-muted overflow-hidden rounded-xl border border-app-border bg-app-surface">
             {membersForAssignment.map((user) => {
               const isChecked = selectedUserIds.includes(user.userId);
               const heldBefore = originalUserIds.includes(user.userId);
@@ -531,83 +532,105 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
               const isBeingRemoved = !isChecked && heldBefore;
               const fullName = `${user.firstname} ${user.lastname}`;
 
+              const progress = Math.round((user.progressPercentage ?? 0) * 100);
+
               return (
-                <label
-                  key={user.userId}
-                  className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors ${
-                    isBeingAdded
-                      ? "border-app-success-border bg-app-success-bg"
-                      : isBeingRemoved
-                        ? "border-app-danger-border bg-app-danger-bg"
-                        : isChecked
-                          ? "border-app-brand bg-app-brand-soft"
-                          : "border-app-border bg-app-bg hover:border-app-brand-border-strong hover:bg-app-surface-hover"
-                  }`}
-                >
-                  {/* The real control, kept for
+                <li key={user.userId}>
+                  <label
+                    className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors ${
+                      isBeingAdded
+                        ? "bg-app-success-bg"
+                        : isBeingRemoved
+                          ? "bg-app-danger-bg"
+                          : isChecked
+                            ? "bg-app-brand-soft/60 hover:bg-app-brand-soft"
+                            : "hover:bg-app-surface-hover"
+                    }`}
+                  >
+                    {/* The real control, kept for
                                                                 keyboard and screen readers;
                                                                 the box beside it is what is
                                                                 actually seen, because a
                                                                 native checkbox cannot show
                                                                 three different marks. */}
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    disabled={savingAssignment}
-                    onChange={() => toggleUser(user.userId)}
-                    className="peer sr-only"
-                  />
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={savingAssignment}
+                      onChange={() => toggleUser(user.userId)}
+                      className="peer sr-only"
+                    />
 
-                  <span
-                    aria-hidden="true"
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-app-focus ${
-                      isBeingAdded
-                        ? "border-app-success-border bg-app-success-bg text-app-success-text"
-                        : isBeingRemoved
-                          ? "border-app-danger-border bg-app-danger-bg text-app-danger-text"
-                          : isChecked
-                            ? "border-app-brand bg-app-brand text-app-text-inverse"
-                            : "border-app-border bg-app-surface"
-                    }`}
-                  >
-                    {isBeingAdded ? (
-                      <Plus className="h-3.5 w-3.5" />
-                    ) : isBeingRemoved ? (
-                      <Minus className="h-3.5 w-3.5" />
-                    ) : isChecked ? (
-                      <Check className="h-3.5 w-3.5" />
-                    ) : null}
-                  </span>
-
-                  <UserAvatar
-                    profileIcon={user.profileIcon}
-                    fallbackName={fullName}
-                    seed={user.userId}
-                    size={40}
-                  />
-
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-app-text">
-                      {fullName}
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-app-focus ${
+                        isBeingAdded
+                          ? "border-app-success-border bg-app-success-bg text-app-success-text"
+                          : isBeingRemoved
+                            ? "border-app-danger-border bg-app-danger-bg text-app-danger-text"
+                            : isChecked
+                              ? "border-app-brand bg-app-brand text-app-text-inverse"
+                              : "border-app-border bg-app-surface"
+                      }`}
+                    >
+                      {isBeingAdded ? (
+                        <Plus className="h-3.5 w-3.5" />
+                      ) : isBeingRemoved ? (
+                        <Minus className="h-3.5 w-3.5" />
+                      ) : isChecked ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : null}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-app-text-muted">
-                      {isBeingAdded
-                        ? "Will be added"
-                        : isBeingRemoved
-                          ? "Will be removed"
-                          : user.roles.length === 0
-                            ? "No roles"
-                            : user.roles.map((role) => role.name).join(", ")}
+
+                    <UserAvatar
+                      profileIcon={user.profileIcon}
+                      fallbackName={fullName}
+                      seed={user.userId}
+                      size={32}
+                    />
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-app-text">
+                        {fullName}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-app-text-muted">
+                        {user.roles.length === 0
+                          ? "No roles"
+                          : user.roles.map((role) => role.name).join(", ")}
+                      </span>
                     </span>
-                  </span>
-                </label>
+
+                    {/* Where they are in onboarding — who is being given the role, not only
+                      their name. */}
+                    <span className="hidden w-32 shrink-0 text-right text-xs text-app-text-muted sm:block">
+                      <span className="block truncate">
+                        {user.currentPhase?.title ?? "Not started"}
+                      </span>
+                      <span className="block tabular-nums">{progress}% through</span>
+                    </span>
+
+                    {(isBeingAdded || isBeingRemoved) && (
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          isBeingAdded
+                            ? "bg-app-success-solid/15 text-app-success-text"
+                            : "bg-app-danger-solid/15 text-app-danger-text"
+                        }`}
+                      >
+                        {isBeingAdded ? "Will be added" : "Will be removed"}
+                      </span>
+                    )}
+                  </label>
+                </li>
               );
             })}
 
             {users.length === 0 && (
-              <p className="text-xs text-app-text-muted">No members in this project yet.</p>
+              <li className="px-3 py-3 text-xs text-app-text-muted">
+                No members in this project yet.
+              </li>
             )}
-          </div>
+          </ul>
 
           {/* Below the list, not above it: the buttons
                                     act on choices made in the list, so they

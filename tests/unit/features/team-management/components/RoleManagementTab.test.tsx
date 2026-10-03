@@ -110,7 +110,8 @@ describe("RoleManagementTab", () => {
     expect(await screen.findByTestId("skill-suggestion-panel")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Accept React" })).toBeChecked();
     expect(screen.getByText("The role builds the project UI")).toBeInTheDocument();
-    expect(screen.getAllByText("TypeScript")).toHaveLength(2);
+    // The role's row lists its skills too, beside the open panel and the suggestion review.
+    expect(screen.getAllByText("TypeScript")).toHaveLength(3);
     expect(mocks.suggestSkillsForRole).toHaveBeenCalledWith(role.id, {
       projectId: "project-1",
       industry: "Fintech",
