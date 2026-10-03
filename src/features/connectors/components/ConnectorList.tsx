@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronDown, Search, XCircle } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { EmptyState } from "../../../components/ui/EmptyState.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
-import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
+import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle.tsx";
 import { slidingIndicatorSpringToken } from "../../../styles/tokens";
 import type { ConnectorListItem } from "../types.ts";
 import { ConnectorSourcesSection } from "./ConnectorSourcesSection.tsx";

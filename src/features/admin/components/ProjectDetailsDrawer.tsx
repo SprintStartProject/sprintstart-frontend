@@ -33,7 +33,7 @@ import type {
   ProjectUser,
 } from "../types";
 import { AccessBadge } from "./Badges";
-import { DrawerCard } from "./DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { ProjectPeopleSection } from "./ProjectPeopleSection";
 import { SourceList } from "./SourceList";
 

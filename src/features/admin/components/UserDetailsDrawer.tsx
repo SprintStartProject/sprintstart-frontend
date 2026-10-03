@@ -23,7 +23,7 @@ import type {
 } from "../types";
 import { AccessBadge } from "./Badges";
 import { DetailRow } from "./DetailRow";
-import { DrawerCard } from "./DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { EditableDetailRow } from "./EditableDetailRow";
 import { EditableSelectDetailRow } from "./EditableSelectDetailRow";
 import { ProjectAccessPanel } from "./ProjectAccessPanel";

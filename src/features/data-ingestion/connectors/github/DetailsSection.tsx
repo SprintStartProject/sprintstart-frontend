@@ -1,4 +1,4 @@
-import { DrawerCard } from "../../../admin/components/DrawerCard.tsx";
+import { DrawerCard } from "../../../../components/ui/DrawerCard.tsx";
 import { InfoLinkRow, InfoRow } from "../../components/InfoRows.tsx";
 import { githubRepositoryOf } from "../../sourceDetails.ts";
 import type { DetailsSectionProps } from "../types.ts";

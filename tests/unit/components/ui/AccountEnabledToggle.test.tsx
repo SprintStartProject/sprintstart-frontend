@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AccountEnabledToggle } from "../../../../../src/features/admin/components/AccountEnabledToggle";
+import { AccountEnabledToggle } from "../../../../src/components/ui/AccountEnabledToggle";
 
 describe("AccountEnabledToggle", () => {
   const defaultProps = {

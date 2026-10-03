@@ -5,7 +5,7 @@ import { Input } from "../../../components/ui/Input.tsx";
 import { SaveButton } from "../../../components/ui/SaveButton.tsx";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs.tsx";
 import { useToast } from "../../../context/useToast.ts";
-import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
+import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle.tsx";
 import { formatDateTime } from "../data.ts";
 import type {
   ScheduleDayOfWeek,

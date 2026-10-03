@@ -4,7 +4,7 @@ import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
-import { DrawerCard } from "../../admin/components/DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { Field } from "../../../components/ui/Field";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Input } from "../../../components/ui/Input";

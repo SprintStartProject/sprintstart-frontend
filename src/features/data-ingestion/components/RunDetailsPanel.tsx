@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
-import { DrawerCard } from "../../admin/components/DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import {
   formatDateTime,
   formatInstanceDomain,
