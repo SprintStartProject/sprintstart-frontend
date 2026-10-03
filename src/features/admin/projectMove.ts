@@ -1,4 +1,4 @@
-import type { AdminUser, ProjectSummary } from "./types";
+import type { AdminUser, ProjectOverview, ProjectSummary } from "./types";
 
 // Both spellings the two data sources use for the manager-granting roles: project
 // members carry raw `GlobalUserRole` codes, while `AdminUser` exposes the
@@ -34,6 +34,62 @@ export function canJoinMultipleProjects(permissionGroup: string | undefined): bo
   return (
     permissionGroup !== undefined && MULTI_PROJECT_ROLES.has(permissionGroup.trim().toUpperCase())
   );
+}
+
+/** Ids of the projects `userId` is the assigned manager of. */
+export function getManagedProjectIds(projects: ProjectOverview[], userId: string): Set<string> {
+  return new Set(
+    projects.filter((project) => project.manager?.id === userId).map((project) => project.id),
+  );
+}
+
+/** What a role change from PM/admin to a regular user would leave inconsistent. */
+export type RoleDowngradeConflicts = {
+  /** How many projects the user is in; `0` when that is no problem (one project at most). */
+  projectCount: number;
+  /** Projects the user manages; a manager has to hold the PM or admin role. */
+  managedProjects: ProjectSummary[];
+};
+
+/**
+ * The conflicts of changing `user` to `nextPermissionGroup`, or `null` when the
+ * change is not a downgrade out of a multi-project role or leaves nothing behind.
+ *
+ * The backend only swaps the role: memberships and the manager assignment stay,
+ * which leaves a regular user in several projects or a manager without the
+ * role. The UI only warns, since the admin may clean up right afterwards.
+ */
+export function getRoleDowngradeConflicts(
+  user: AdminUser,
+  projects: ProjectOverview[],
+  nextPermissionGroup: string,
+): RoleDowngradeConflicts | null {
+  if (!canJoinMultipleProjects(user.permissionGroup)) return null;
+  if (canJoinMultipleProjects(nextPermissionGroup)) return null;
+
+  const projectIds = new Set([...user.projectIds, ...user.projects.map((project) => project.id)]);
+  const managedProjects = projects
+    .filter((project) => project.manager?.id === user.id)
+    .map(({ id, name }) => ({ id, name }));
+  const projectCount = projectIds.size > 1 ? projectIds.size : 0;
+
+  if (projectCount === 0 && managedProjects.length === 0) return null;
+
+  return { projectCount, managedProjects };
+}
+
+/**
+ * How many projects other than `projectId` the user belongs to.
+ *
+ * `projectIds` is what the user endpoint returns; `projects` is the named list
+ * filled in from it (or updated optimistically), so either may be the one that
+ * is populated.
+ */
+export function getOtherProjectCount(user: AdminUser, projectId: string): number {
+  const ids = new Set([...user.projectIds, ...user.projects.map((project) => project.id)]);
+  ids.delete(projectId);
+
+  return ids.size;
 }
 
 /** A person an assignment would move, with the projects they would leave. */
