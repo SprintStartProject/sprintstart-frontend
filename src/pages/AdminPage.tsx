@@ -10,11 +10,14 @@ import {
   areAllVisibleUsersSelected,
   filterAdminProjects,
   filterAdminUsers,
+  filterSkills,
   getAvailableProjects,
   getDisplayName,
   getPaginatedProjects,
+  getPaginatedSkills,
   getPaginatedUsers,
   getSafePage,
+  getSkillCategories,
   getTotalPages,
   removeUsersFromProjects,
   toggleSelectedUserId,
@@ -24,15 +27,19 @@ import { DEFAULT_ACCESS_SOURCE_FILTER } from "../features/access/components/Acce
 import { AdminMetrics } from "../features/admin/components/AdminMetrics";
 import { AdminPagination } from "../features/admin/components/AdminPagination";
 import { AdminProjectsToolbar } from "../features/admin/components/AdminProjectsToolbar";
+import { AdminSkillsToolbar } from "../features/admin/components/AdminSkillsToolbar";
 import { AdminUsersToolbar } from "../features/admin/components/AdminUsersToolbar";
 import { CreateProjectWizard } from "../features/admin/components/CreateProjectWizard";
 import { ProjectDetailsDrawer } from "../features/admin/components/ProjectDetailsDrawer";
 import { ProjectsTab } from "../features/admin/components/ProjectsTab";
+import { SkillDetailsDrawer } from "../features/admin/components/SkillDetailsDrawer";
+import { SkillsTab } from "../features/admin/components/SkillsTab";
 import { TabSwitcher } from "../features/admin/components/TabSwitcher";
 import { TokensTab } from "../features/admin/components/TokensTab";
 import { UserDetailsDrawer } from "../features/admin/components/UserDetailsDrawer";
 import { UsersTab } from "../features/admin/components/UsersTab";
 import { useAdminData } from "../features/admin/hooks/useAdminData";
+import { useSkillPool } from "../features/admin/hooks/useSkillPool";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ADMIN_TAB_ORDER } from "../features/admin/types";
@@ -41,6 +48,8 @@ import type {
   AdminTab,
   AdminUser,
   ProjectOverview,
+  Skill,
+  SkillStatusFilter,
   UserFilter,
 } from "../features/admin/types";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel";
@@ -62,6 +71,12 @@ export function AdminPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { reloadProjects } = useProjectContext();
+  // Skills is ADMIN-only: every mutation on it (create/update/retire) 403s for
+  // HR, so the tab itself is hidden rather than shown and failing on click.
+  const visibleAdminTabs = useMemo(
+    () => ADMIN_TAB_ORDER.filter((tab) => tab !== "skills" || profile?.permissionGroup === "ADMIN"),
+    [profile],
+  );
   /*
     `?tab=projects` opens the page on that section. The dashboard's Projects card links here,
     and without this it always landed on Users — a card about projects dropping the reader on
@@ -74,7 +89,7 @@ export function AdminPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     const requested = searchParams.get("tab");
-    return ADMIN_TAB_ORDER.find((tab) => tab === requested) ?? "users";
+    return visibleAdminTabs.find((tab) => tab === requested) ?? "users";
   });
 
   const tabParamConsumed = useRef(false);
@@ -91,6 +106,8 @@ export function AdminPage() {
   }, [searchParams, setSearchParams]);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+  const [isCreatingSkill, setIsCreatingSkill] = useState(false);
 
   const [searchValue, setSearchValue] = useState("");
   const [projectSearchValue, setProjectSearchValue] = useState("");
@@ -101,9 +118,17 @@ export function AdminPage() {
   const [accessSourceFilter, setAccessSourceFilter] = useState<string>(
     DEFAULT_ACCESS_SOURCE_FILTER,
   );
+  // Same reasoning as the filter above: the Skills tab unmounts when you
+  // leave it, so its search/filters live here instead of resetting on every
+  // visit.
+  const [skillSearchValue, setSkillSearchValue] = useState("");
+  const [skillStatusFilter, setSkillStatusFilter] = useState<SkillStatusFilter>("all");
+  const [skillCategoryFilter, setSkillCategoryFilter] = useState("all");
+  const [skillRoleFilter, setSkillRoleFilter] = useState("all");
 
   const [page, setPage] = useState(1);
   const [projectPage, setProjectPage] = useState(1);
+  const [skillPage, setSkillPage] = useState(1);
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
   const [userPendingDelete, setUserPendingDelete] = useState<AdminUser | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
@@ -148,6 +173,24 @@ export function AdminPage() {
     loadTokenNames,
   } = useAdminData();
 
+  const {
+    skills: skillPool,
+    roles: skillPoolRoles,
+    loadingState: skillPoolLoadingState,
+    errorMessage: skillPoolErrorMessage,
+    loadSkillPool,
+    upsertSkill,
+  } = useSkillPool();
+
+  // Lazy, like the tokens section: only fetched once this tab is actually
+  // opened. `loadSkillPool` itself no-ops on repeat calls unless forced, so
+  // switching back to the tab later does not refetch.
+  useEffect(() => {
+    if (activeTab === "skills") {
+      void loadSkillPool();
+    }
+  }, [activeTab, loadSkillPool]);
+
   const availableProjects = useMemo(() => getAvailableProjects(projects), [projects]);
 
   const filteredUsers = useMemo(() => {
@@ -171,6 +214,25 @@ export function AdminPage() {
   const paginatedProjects = useMemo(() => {
     return getPaginatedProjects(filteredProjects, safeProjectPage);
   }, [filteredProjects, safeProjectPage]);
+
+  const skillCategories = useMemo(() => getSkillCategories(skillPool), [skillPool]);
+
+  const filteredSkills = useMemo(() => {
+    return filterSkills(
+      skillPool,
+      skillSearchValue,
+      skillStatusFilter,
+      skillCategoryFilter,
+      skillRoleFilter,
+    );
+  }, [skillPool, skillSearchValue, skillStatusFilter, skillCategoryFilter, skillRoleFilter]);
+
+  const skillTotalPages = getTotalPages(filteredSkills.length);
+  const safeSkillPage = getSafePage(skillPage, skillTotalPages);
+
+  const paginatedSkills = useMemo(() => {
+    return getPaginatedSkills(filteredSkills, safeSkillPage);
+  }, [filteredSkills, safeSkillPage]);
 
   const allVisibleUsersSelected = areAllVisibleUsersSelected(paginatedUsers, selectedUserIds);
 
@@ -205,6 +267,8 @@ export function AdminPage() {
   const openUserDetails = (user: AdminUser) => {
     setOpenUserMenuId(null);
     setSelectedProject(null);
+    setSelectedSkill(null);
+    setIsCreatingSkill(false);
     setSelectedUser(user);
     setIsDrawerOpen(true);
   };
@@ -339,8 +403,33 @@ export function AdminPage() {
   const openProjectDetails = (project: ProjectOverview) => {
     setOpenUserMenuId(null);
     setSelectedUser(null);
+    setSelectedSkill(null);
+    setIsCreatingSkill(false);
     setSelectedProject(project);
     setIsDrawerOpen(true);
+  };
+
+  const openSkillDetails = (skill: Skill) => {
+    setOpenUserMenuId(null);
+    setSelectedUser(null);
+    setSelectedProject(null);
+    setIsCreatingSkill(false);
+    setSelectedSkill(skill);
+    setIsDrawerOpen(true);
+  };
+
+  const openCreateSkillDrawer = () => {
+    setOpenUserMenuId(null);
+    setSelectedUser(null);
+    setSelectedProject(null);
+    setSelectedSkill(null);
+    setIsCreatingSkill(true);
+    setIsDrawerOpen(true);
+  };
+
+  const handleSkillSaved = (updatedSkill: Skill) => {
+    upsertSkill(updatedSkill);
+    setSelectedSkill((current) => (current?.id === updatedSkill.id ? updatedSkill : current));
   };
 
   const openProjectDetailsFromUserDrawer = (projectId: string) => {
@@ -448,6 +537,8 @@ export function AdminPage() {
     drawerCloseTimeoutRef.current = setTimeout(() => {
       setSelectedUser(null);
       setSelectedProject(null);
+      setSelectedSkill(null);
+      setIsCreatingSkill(false);
     }, DRAWER_CLOSE_DELAY_MS);
   };
 
@@ -462,12 +553,22 @@ export function AdminPage() {
   // Two-finger swipe between the sections, for people who would rather not aim
   // at the bar.
   const swipeRef = useSwipeableTabs<AdminTab, HTMLElement>({
-    order: ADMIN_TAB_ORDER,
+    order: visibleAdminTabs,
     value: activeTab,
     onChange: handleTabChange,
   });
 
   const showInitialLoading = loadingState === "idle" || loadingState === "loading";
+  const isSkillsTabActive = activeTab === "skills";
+
+  const handleRefresh = () => {
+    if (isSkillsTabActive) {
+      void loadSkillPool(true);
+      return;
+    }
+
+    void refreshAdminData();
+  };
 
   return (
     // The swipe listens on the page rather than the panel: needing to be over
@@ -490,7 +591,7 @@ export function AdminPage() {
           <PageHeader
             icon={Terminal}
             title="Access Management"
-            subtitle="Manage users, projects and access tokens."
+            subtitle="Manage users, projects, access tokens and the skill pool."
             actions={<AdminMetrics userCount={users.length} projectCount={projects.length} />}
           />
         </div>
@@ -501,16 +602,22 @@ export function AdminPage() {
             box drew a second frame inside the page frame and made the tab bar
             look like it belonged to a widget rather than to the page. */}
         <div className="mb-6 flex items-center gap-3 sm:justify-between">
-          <TabSwitcher activeTab={activeTab} onChange={handleTabChange} />
+          <TabSwitcher activeTab={activeTab} onChange={handleTabChange} tabs={visibleAdminTabs} />
 
           <button
             type="button"
-            onClick={() => void refreshAdminData()}
-            disabled={isRefreshing}
+            onClick={handleRefresh}
+            disabled={isSkillsTabActive ? skillPoolLoadingState === "loading" : isRefreshing}
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Refresh admin data"
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${
+                (isSkillsTabActive ? skillPoolLoadingState === "loading" : isRefreshing)
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
           </button>
         </div>
 
@@ -546,7 +653,7 @@ export function AdminPage() {
           ) : (
             // Only the tab content slides; the loading and error states above
             // are not tabs and would otherwise animate on their way in too.
-            <SlidingTabPanel activeKey={activeTab} index={ADMIN_TAB_ORDER.indexOf(activeTab)}>
+            <SlidingTabPanel activeKey={activeTab} index={visibleAdminTabs.indexOf(activeTab)}>
               {activeTab === "users" ? (
                 <>
                   <AdminUsersToolbar
@@ -609,6 +716,52 @@ export function AdminPage() {
                     onPageChange={setProjectPage}
                   />
                 </>
+              ) : activeTab === "skills" ? (
+                <>
+                  <AdminSkillsToolbar
+                    skillCount={filteredSkills.length}
+                    searchValue={skillSearchValue}
+                    statusFilter={skillStatusFilter}
+                    categoryFilter={skillCategoryFilter}
+                    categoryOptions={skillCategories}
+                    roleFilter={skillRoleFilter}
+                    roleOptions={skillPoolRoles}
+                    onSearchChange={(value) => {
+                      setSkillSearchValue(value);
+                      setSkillPage(1);
+                    }}
+                    onStatusFilterChange={(value) => {
+                      setSkillStatusFilter(value);
+                      setSkillPage(1);
+                    }}
+                    onCategoryFilterChange={(value) => {
+                      setSkillCategoryFilter(value);
+                      setSkillPage(1);
+                    }}
+                    onRoleFilterChange={(value) => {
+                      setSkillRoleFilter(value);
+                      setSkillPage(1);
+                    }}
+                    onCreateSkill={openCreateSkillDrawer}
+                  />
+
+                  <SkillsTab
+                    skills={paginatedSkills}
+                    roles={skillPoolRoles}
+                    loadingState={skillPoolLoadingState}
+                    errorMessage={skillPoolErrorMessage}
+                    hasSearchQuery={skillSearchValue.trim().length > 0}
+                    totalCount={skillPool.length}
+                    onOpenSkillDetails={openSkillDetails}
+                    onRetryLoad={() => void loadSkillPool(true)}
+                  />
+
+                  <AdminPagination
+                    safePage={safeSkillPage}
+                    totalPages={skillTotalPages}
+                    onPageChange={setSkillPage}
+                  />
+                </>
               ) : (
                 <TokensTab
                   sourceFilter={accessSourceFilter}
@@ -620,7 +773,7 @@ export function AdminPage() {
         </div>
       </main>
 
-      {(selectedUser || selectedProject) && (
+      {(selectedUser || selectedProject || selectedSkill || isCreatingSkill) && (
         <button
           type="button"
           aria-label="Close details overlay"
@@ -658,6 +811,20 @@ export function AdminPage() {
           onProjectUpdated={handleProjectUpdated}
           onProjectDeleted={handleProjectDeleted}
           onMembershipsMoved={() => void refreshAdminData()}
+        />
+      )}
+
+      {(selectedSkill || isCreatingSkill) && (
+        // Keyed the same way as the project drawer, so switching between two
+        // skills (or into create mode) always starts from a fresh draft.
+        <SkillDetailsDrawer
+          key={selectedSkill?.id ?? "create-skill"}
+          skill={selectedSkill}
+          skills={skillPool}
+          roles={skillPoolRoles}
+          isOpen={isDrawerOpen}
+          onClose={closeDetails}
+          onSkillSaved={handleSkillSaved}
         />
       )}
 
