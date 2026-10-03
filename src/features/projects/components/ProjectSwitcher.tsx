@@ -6,7 +6,7 @@ import { ProjectSwitcherModal } from "./ProjectSwitcherModal";
 import { Badge } from "../../../components/ui/Badge";
 import { ShortcutHint } from "../../../components/ui/ShortcutHint";
 import { SWITCH_PROJECT_SHORTCUT, shortcutChord, useShortcutListener } from "../../shortcuts";
-import { monogramLetters, monogramTint } from "../projectMonogram";
+import { ProjectMonogram } from "./ProjectMonogram";
 import { hoverSpringToken } from "../../../styles/tokens";
 
 // The one spelling of the chord: the registry defines it, the hint below and the listener
@@ -76,12 +76,7 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         className="group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 px-[10px] text-left backdrop-blur-md transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
       >
         {selectedProject ? (
-          <span
-            aria-hidden="true"
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-xs font-semibold ${monogramTint(selectedProject.id)}`}
-          >
-            {monogramLetters(selectedProject.name)}
-          </span>
+          <ProjectMonogram projectId={selectedProject.id} name={selectedProject.name} size="sm" />
         ) : (
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-app-surface-muted">
             <FolderKanban className="h-[18px] w-[18px] text-app-text-muted" />

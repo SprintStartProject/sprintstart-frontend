@@ -1,11 +1,11 @@
-import { BadgeCheck, Key, Layers, Users, type LucideIcon } from "lucide-react";
+import { FolderKanban, GraduationCap, Key, Users, type LucideIcon } from "lucide-react";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs";
 import { ADMIN_TAB_ORDER, type AdminTab } from "../types";
 
 const TAB_META: Record<AdminTab, { label: string; icon: LucideIcon }> = {
   users: { label: "Users", icon: Users },
-  projects: { label: "Projects", icon: Layers },
-  skills: { label: "Skills", icon: BadgeCheck },
+  projects: { label: "Projects", icon: FolderKanban },
+  skills: { label: "Skills", icon: GraduationCap },
   tokens: { label: "Tokens", icon: Key },
 };
 

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertCircle, FileText, Folder, Link2, Loader2, Tag, Trash2 } from "lucide-react";
+import { AlertCircle, Database, FileText, Tag, Trash2 } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -7,8 +7,10 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
+import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
 import { ProjectIndustryPanel } from "../../projects/industry/ProjectIndustryPanel";
 import {
   getDisplayName,
@@ -294,11 +296,7 @@ export function ProjectDetailsDrawer({
         title={draftProject.name || visibleProject.name}
         closeAriaLabel="Close project details"
         widthClassName="w-full sm:w-[min(94vw,34rem)] lg:w-[min(72vw,58rem)]"
-        leading={
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand">
-            <Folder className="h-6 w-6" />
-          </div>
-        }
+        leading={<ProjectMonogram projectId={project.id} name={visibleProject.name} size="lg" />}
         badge={
           <>
             <AccessBadge variant="neutral">
@@ -331,7 +329,7 @@ export function ProjectDetailsDrawer({
         {isLoadingDetails ? (
           <div className="flex min-h-72 items-center justify-center">
             <div className="flex flex-col items-center gap-3 text-app-text-muted">
-              <Loader2 className="h-7 w-7 animate-spin text-app-brand" />
+              <Spinner size="lg" silent />
               <p className="text-sm">Loading project details...</p>
             </div>
           </div>
@@ -409,7 +407,7 @@ export function ProjectDetailsDrawer({
               />
             </DrawerCard>
 
-            <DrawerCard label="Connected sources" icon={Link2} index={3}>
+            <DrawerCard label="Connected sources" icon={Database} index={3}>
               <SourceList
                 sources={visibleProject.sources}
                 onOpenSourceDetails={

@@ -2,6 +2,7 @@ import type { BadgeVariant } from "../../components/ui/Badge";
 import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 import type { ProjectRole, Skill } from "../team-management/types";
 import { SOURCE_META } from "../data-ingestion/data";
+import type { SourceMeta, SourceSystem } from "../data-ingestion/types";
 import type {
   AdminUser,
   ProjectEditFormState,
@@ -64,6 +65,42 @@ export function pluralize(count: number, noun: string, plural = `${noun}s`): str
 }
 
 /**
+ * Shared Data Ingestion metadata (label, icon) for a project source's raw type
+ * string, or `null` for a type the frontend does not know — the backend also
+ * emits types such as `SONARQUBE` that have no ingestion UI.
+ */
+export function getSourceTypeMeta(type: string): SourceMeta | null {
+  const normalized = type.toUpperCase();
+
+  return normalized in SOURCE_META ? SOURCE_META[normalized as SourceSystem] : null;
+}
+
+export type SourceTypeGroup = {
+  /** Upper-cased raw type, the grouping key. */
+  type: string;
+  label: string;
+  count: number;
+};
+
+/** Sources collapsed to one entry per type, in order of first appearance. */
+export function groupSourcesByType(sources: Array<{ type: string }>): SourceTypeGroup[] {
+  const groups = new Map<string, SourceTypeGroup>();
+
+  for (const source of sources) {
+    const key = source.type.toUpperCase();
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.count += 1;
+    } else {
+      groups.set(key, { type: key, label: getSourceTypeLabel(source.type), count: 1 });
+    }
+  }
+
+  return Array.from(groups.values());
+}
+
+/**
  * Display label for a project source's raw type string.
  *
  * Known systems use the label from the shared `SOURCE_META`, so "GitHub" reads
@@ -71,11 +108,9 @@ export function pluralize(count: number, noun: string, plural = `${noun}s`): str
  * title-cased version of the raw value rather than disappearing.
  */
 export function getSourceTypeLabel(type: string): string {
-  const normalized = type.toUpperCase();
+  const meta = getSourceTypeMeta(type);
 
-  if (normalized in SOURCE_META) {
-    return SOURCE_META[normalized as keyof typeof SOURCE_META].type;
-  }
+  if (meta) return meta.type;
 
   return type
     .toLowerCase()

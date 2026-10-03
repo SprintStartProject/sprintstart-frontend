@@ -1,10 +1,11 @@
 import { createPortal } from "react-dom";
 import { useState } from "react";
 import type { MouseEvent } from "react";
-import { ExternalLink, MoreVertical, Trash2 } from "lucide-react";
+import { ExternalLink, MoreVertical, Trash2, Users } from "lucide-react";
 import { getDisplayName } from "../data";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Button } from "../../../components/ui/Button";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import type { AdminUser } from "../types";
 import { PermissionGroupBadge } from "./Badges";
 import { ProjectList } from "./ProjectList";
@@ -109,12 +110,9 @@ export function UsersTab({
 
   if (paginatedUsers.length === 0) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-6">
-        <p className="text-base font-medium text-app-text">No users found</p>
-        <p className="mt-1 text-sm text-app-text-muted">
-          Try another search term or change the filters.
-        </p>
-      </div>
+      <EmptyState icon={<Users className="h-8 w-8" aria-hidden="true" />} title="No users found">
+        Try another search term or change the filters.
+      </EmptyState>
     );
   }
 

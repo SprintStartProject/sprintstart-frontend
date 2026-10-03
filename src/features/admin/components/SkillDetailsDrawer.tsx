@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { BadgeCheck, Check, RotateCcw, ShieldCheck, Trash2, Users } from "lucide-react";
+import { Check, GraduationCap, RotateCcw, ShieldCheck, Trash2, Users } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -264,7 +264,7 @@ export function SkillDetailsDrawer({
         closeAriaLabel="Close skill details"
         leading={
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand">
-            <BadgeCheck className="h-6 w-6" />
+            <GraduationCap className="h-6 w-6" />
           </div>
         }
         badge={
@@ -312,7 +312,7 @@ export function SkillDetailsDrawer({
         }
       >
         <div className="space-y-4 sm:space-y-5">
-          <DrawerCard label="Details" icon={BadgeCheck} index={0}>
+          <DrawerCard label="Details" icon={GraduationCap} index={0}>
             <div className="space-y-4">
               <Field label="Name" error={nameError} disabled={isBusy}>
                 <Input

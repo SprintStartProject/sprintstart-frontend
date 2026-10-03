@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertCircle, Loader2, RefreshCw, Terminal } from "lucide-react";
+import { AlertCircle, RefreshCw, Terminal } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { AlertDialog } from "../components/ui/AlertDialog";
+import { Button } from "../components/ui/Button";
+import { Spinner } from "../components/ui/Spinner";
 import { SCROLL_CONTAINER_ATTRIBUTE } from "../components/ui/useScrollLock";
 import {
   DRAWER_CLOSE_DELAY_MS,
@@ -619,11 +621,12 @@ export function AdminPage() {
         <div className="mb-6 flex items-center gap-3 sm:justify-between">
           <TabSwitcher activeTab={activeTab} onChange={handleTabChange} tabs={visibleAdminTabs} />
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            iconOnly
             onClick={handleRefresh}
             disabled={isSkillsTabActive ? skillPoolLoadingState === "loading" : isRefreshing}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-60"
+            className="shrink-0"
             aria-label="Refresh admin data"
           >
             <RefreshCw
@@ -633,7 +636,7 @@ export function AdminPage() {
                   : ""
               }`}
             />
-          </button>
+          </Button>
         </div>
 
         {/* Clipped horizontally because the section content slides in from
@@ -644,7 +647,7 @@ export function AdminPage() {
           {showInitialLoading ? (
             <div className="flex min-h-96 items-center justify-center">
               <div className="flex flex-col items-center gap-3 text-app-text-muted">
-                <Loader2 className="h-8 w-8 animate-spin text-app-brand" />
+                <Spinner size="lg" silent />
                 <p className="text-sm">Loading admin data...</p>
               </div>
             </div>
@@ -656,13 +659,9 @@ export function AdminPage() {
                   Admin data could not be loaded
                 </h3>
                 <p className="mt-2 text-sm text-app-text-muted">{errorMessage}</p>
-                <button
-                  type="button"
-                  onClick={() => void refreshAdminData()}
-                  className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-app-text px-5 py-2.5 text-sm font-medium text-app-text-inverse transition-colors hover:opacity-90"
-                >
+                <Button variant="primary" onClick={() => void refreshAdminData()} className="mt-5">
                   Try again
-                </button>
+                </Button>
               </div>
             </div>
           ) : (

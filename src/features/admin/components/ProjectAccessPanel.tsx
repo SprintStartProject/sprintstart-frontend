@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { ExternalLink, FolderKanban, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useToast } from "../../../context/useToast";
+import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
 import type { ProjectSummary } from "../types";
 
 export type ProjectAccessPanelProps = {
@@ -246,7 +248,7 @@ export function ProjectAccessPanel({
                 prefersReducedMotion ? { duration: 0 } : { duration: 0.16, ease: "easeOut" }
               }
               style={{ maxHeight: pickerPlacement.maxHeight }}
-              className={`absolute right-0 z-30 flex w-[min(calc(100vw-2rem),22rem)] flex-col rounded-2xl border border-app-border bg-app-surface p-2.5 shadow-app-brand-lift ${
+              className={`absolute right-0 z-30 flex w-[min(calc(100vw-2rem),22rem)] flex-col rounded-2xl border border-app-border bg-app-surface p-2.5 shadow-lg ${
                 pickerPlacement.dropUp
                   ? "bottom-full mb-2 origin-bottom-right"
                   : "mt-2 origin-top-right"
@@ -278,9 +280,7 @@ export function ProjectAccessPanel({
                       disabled={hasPendingProjectChange}
                       className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all hover:border-app-brand-border-strong hover:bg-app-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-surface-muted text-app-text-muted transition-colors group-hover:bg-app-surface group-hover:text-app-brand">
-                        <Folder className="h-4 w-4" />
-                      </span>
+                      <ProjectMonogram projectId={project.id} name={project.name} size="sm" />
 
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-app-text">
@@ -292,7 +292,7 @@ export function ProjectAccessPanel({
                       </span>
 
                       {pendingProjectId === project.id ? (
-                        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-app-text-muted" />
+                        <Spinner size="md" silent className="shrink-0" />
                       ) : (
                         <Plus className="h-4 w-4 shrink-0 text-app-brand opacity-0 transition-opacity group-hover:opacity-100" />
                       )}
@@ -300,7 +300,7 @@ export function ProjectAccessPanel({
                   ))
                 ) : (
                   <div className="flex flex-col items-center gap-1.5 px-3 py-6 text-center">
-                    <Folder className="h-5 w-5 text-app-text-disabled" />
+                    <FolderKanban className="h-5 w-5 text-app-text-disabled" aria-hidden="true" />
                     <p className="text-sm text-app-text-muted">
                       {projectSearch.trim()
                         ? `No projects match "${projectSearch.trim()}".`
@@ -319,13 +319,11 @@ export function ProjectAccessPanel({
           assignedProjects.map((project) => (
             <div
               key={project.id}
-              className="rounded-2xl border border-app-border bg-app-surface-muted px-3 py-4 transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-app-brand-lift motion-reduce:hover:translate-y-0 sm:px-4"
+              className="rounded-2xl border border-app-border bg-app-surface-muted px-3 py-4 transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg motion-reduce:hover:translate-y-0 sm:px-4"
             >
               <div className="flex items-start justify-between gap-3 sm:gap-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-surface text-app-text-muted">
-                    <Folder className="h-4 w-4" />
-                  </div>
+                  <ProjectMonogram projectId={project.id} name={project.name} size="sm" />
 
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-app-text">{project.name}</p>

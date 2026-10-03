@@ -1,13 +1,10 @@
-import { ChevronRight, FileText, Folder, Tag, UserCog, Users } from "lucide-react";
-import {
-  getProjectSourcesCount,
-  getProjectUsersCount,
-  getSourceTypeLabel,
-  pluralize,
-} from "../data";
+import { ChevronRight, Database, FolderKanban, ShieldCheck, Tag, Users } from "lucide-react";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { getProjectSourcesCount, getProjectUsersCount, pluralize } from "../data";
 import type { ProjectManager } from "../../../services/projectService";
-import type { ProjectOverview, ProjectSource } from "../types";
-import { AccessBadge } from "./Badges";
+import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
+import type { ProjectOverview } from "../types";
+import { SourceTypeChips } from "./SourceTypeChips";
 
 type ProjectsTabProps = {
   filteredProjects: ProjectOverview[];
@@ -23,20 +20,6 @@ function getManagerName(manager: ProjectManager) {
   return fullName || manager.username;
 }
 
-function getSourceTypeBadges(sources: ProjectSource[]) {
-  const countsByType = new Map<string, number>();
-
-  sources.forEach((source) => {
-    countsByType.set(source.type, (countsByType.get(source.type) ?? 0) + 1);
-  });
-
-  return Array.from(countsByType.entries()).map(([type, count]) => ({
-    type,
-    count,
-    label: getSourceTypeLabel(type),
-  }));
-}
-
 export function ProjectsTab({
   filteredProjects,
   onOpenProjectDetails,
@@ -47,37 +30,22 @@ export function ProjectsTab({
     const noProjectsExist = totalCount !== undefined && totalCount === 0;
 
     return (
-      <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-app-border bg-app-surface px-6 text-center">
-        {noProjectsExist ? (
-          <>
-            <p className="text-base font-medium text-app-text">No projects yet</p>
-            <p className="mt-1 text-sm text-app-text-muted">
-              Create your first project to get started.
-            </p>
-          </>
-        ) : hasSearchQuery ? (
-          <>
-            <p className="text-base font-medium text-app-text">No projects found</p>
-            <p className="mt-1 text-sm text-app-text-muted">Try adjusting your search term.</p>
-          </>
-        ) : (
-          <>
-            <p className="text-base font-medium text-app-text">No projects found</p>
-            <p className="mt-1 text-sm text-app-text-muted">
-              Try another search term or create a new project first.
-            </p>
-          </>
-        )}
-      </div>
+      <EmptyState
+        icon={<FolderKanban className="h-8 w-8" aria-hidden="true" />}
+        title={noProjectsExist ? "No projects yet" : "No projects found"}
+      >
+        {noProjectsExist
+          ? "Create your first project to get started."
+          : hasSearchQuery
+            ? "Try adjusting your search term."
+            : "Try another search term or create a new project first."}
+      </EmptyState>
     );
   }
 
   return (
     <div className="space-y-3">
       {filteredProjects.map((project) => {
-        const sourceTypeBadges = getSourceTypeBadges(project.sources);
-        const visibleSourceTypeBadges = sourceTypeBadges.slice(0, 3);
-
         return (
           <button
             key={project.id}
@@ -91,9 +59,7 @@ export function ProjectsTab({
             aria-label={`Open details for ${project.name}`}
           >
             <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface-muted text-app-text-muted">
-                <Folder className="h-5 w-5" />
-              </div>
+              <ProjectMonogram projectId={project.id} name={project.name} size="md" />
 
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -106,23 +72,7 @@ export function ProjectsTab({
                   {project.description || "No project description available yet."}
                 </p>
 
-                {visibleSourceTypeBadges.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {visibleSourceTypeBadges.map((sourceType) => (
-                      <AccessBadge key={sourceType.type} variant="neutral">
-                        {sourceType.count > 1
-                          ? `${sourceType.label} (${sourceType.count})`
-                          : sourceType.label}
-                      </AccessBadge>
-                    ))}
-
-                    {sourceTypeBadges.length > visibleSourceTypeBadges.length && (
-                      <AccessBadge variant="neutral">
-                        +{sourceTypeBadges.length - visibleSourceTypeBadges.length}
-                      </AccessBadge>
-                    )}
-                  </div>
-                )}
+                <SourceTypeChips sources={project.sources} className="mt-3" />
 
                 <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-app-text-muted">
                   <span className="flex items-center gap-1.5">
@@ -130,13 +80,13 @@ export function ProjectsTab({
                     {pluralize(getProjectUsersCount(project), "member")}
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <FileText className="h-3.5 w-3.5" />
+                    <Database className="h-3.5 w-3.5" />
                     {pluralize(getProjectSourcesCount(project), "source")}
                   </span>
                   {/* Spelled out even when unset: a project without a manager
                       is the state an admin most needs to spot from the list. */}
                   <span className="flex min-w-0 items-center gap-1.5">
-                    <UserCog className="h-3.5 w-3.5 shrink-0" />
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">
                       {project.manager ? getManagerName(project.manager) : "No manager"}
                     </span>

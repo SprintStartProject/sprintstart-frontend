@@ -266,7 +266,7 @@ export function ProjectPeopleSection({
                   ? "border-app-danger-border bg-app-danger-bg opacity-75"
                   : row.isPendingAdd
                     ? "border-app-brand-border-strong bg-app-brand-soft"
-                    : "border-app-border bg-app-surface hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-app-brand-lift motion-reduce:hover:translate-y-0",
+                    : "border-app-border bg-app-surface hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg motion-reduce:hover:translate-y-0",
               ].join(" ")}
             >
               <UserAvatar

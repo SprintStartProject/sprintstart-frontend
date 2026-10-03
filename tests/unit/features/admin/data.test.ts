@@ -14,6 +14,7 @@ import {
   enrichUsersWithProjectNames,
   filterAdminProjects,
   getSourceTypeLabel,
+  groupSourcesByType,
   matchesUserSearch,
   pluralize,
 } from "../../../../src/features/admin/data";
@@ -310,6 +311,15 @@ describe("admin data helpers", () => {
       expect(pluralize(0, "member")).toBe("0 members");
       expect(pluralize(1, "member")).toBe("1 member");
       expect(pluralize(2, "source")).toBe("2 sources");
+    });
+  });
+
+  describe("groupSourcesByType", () => {
+    it("counts sources per type regardless of case, in order of first appearance", () => {
+      expect(groupSourcesByType([{ type: "JIRA" }, { type: "GITHUB" }, { type: "jira" }])).toEqual([
+        { type: "JIRA", label: "Jira", count: 2 },
+        { type: "GITHUB", label: "GitHub", count: 1 },
+      ]);
     });
   });
 
