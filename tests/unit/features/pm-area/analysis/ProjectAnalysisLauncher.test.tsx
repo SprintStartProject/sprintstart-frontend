@@ -98,21 +98,15 @@ function renderLauncher() {
   );
 }
 
-async function runAnalysis(
-  user: ReturnType<typeof userEvent.setup>,
-  beforeStart?: () => Promise<void>,
-) {
+/** The button starts a run straight away: there is nothing to choose any more. */
+async function runAnalysis(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /Analyse project/ }));
-  await beforeStart?.();
-  await user.click(screen.getByRole("button", { name: /Start analysis/ }));
-  // Each check shows for a moment on purpose, so the whole scan takes a couple of seconds.
   await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
 }
 
 /** Like `runAnalysis`, for a run in which a check fails: its results have no points breakdown. */
 async function runIncompleteAnalysis(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /Analyse project/ }));
-  await user.click(screen.getByRole("button", { name: /Start analysis/ }));
   await screen.findByText(/Could not run/, {}, { timeout: 8000 });
 }
 
@@ -199,7 +193,7 @@ describe("ProjectAnalysisLauncher", () => {
     mocks.industryCustom = false;
   });
 
-  it("reads everything at once without asking the AI, and lists what it found", async () => {
+  it("only reads — it never asks the AI to redo work — and lists what it found", async () => {
     const user = userEvent.setup();
     renderLauncher();
 
@@ -223,101 +217,17 @@ describe("ProjectAnalysisLauncher", () => {
     expect(health.getByText(/means nothing is open/)).toBeInTheDocument();
   }, 20000);
 
-  it("rescans the gaps and re-evaluates the industry only when asked to", async () => {
+  it("starts a new run straight away from the results", async () => {
     const user = userEvent.setup();
     renderLauncher();
 
-    await runAnalysis(user, async () => {
-      await user.click(screen.getByLabelText(/Rescan knowledge gaps/));
-      await user.click(screen.getByLabelText(/Re-evaluate the industry/));
-    });
-
-    expect(mocks.refreshKnowledgeGaps).toHaveBeenCalledWith("p1");
-    expect(mocks.evaluateProjectIndustry).toHaveBeenCalledWith("p1");
-  }, 20000);
-
-  it("suggests a gaps rescan when an import is newer than the last scan", async () => {
-    mocks.fetchKnowledgeGaps.mockResolvedValue({
-      gaps: [],
-      refreshedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    });
-    mocks.fetchIngestionSources.mockResolvedValue([
-      { name: "api", errors: 0, lastRunAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() },
-    ]);
-    const user = userEvent.setup();
-    renderLauncher();
-
-    // The launcher reads the gaps and sources before the button is pressed.
-    await waitFor(() => expect(mocks.fetchIngestionSources).toHaveBeenCalled());
-    await waitFor(() => expect(mocks.fetchKnowledgeGaps).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: /Analyse project/ }));
-
-    expect(await screen.findByLabelText(/Rescan knowledge gaps/)).toBeChecked();
-    expect(screen.getByText(/New data since the last scan/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Re-evaluate the industry/)).not.toBeChecked();
-  }, 20000);
-
-  it("does not suggest a gaps rescan when the gaps are newer than every import", async () => {
-    mocks.fetchKnowledgeGaps.mockResolvedValue({
-      gaps: [],
-      refreshedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    });
-    mocks.fetchIngestionSources.mockResolvedValue([
-      {
-        name: "api",
-        errors: 0,
-        lastRunAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      },
-    ]);
-    const user = userEvent.setup();
-    renderLauncher();
-
-    await waitFor(() => expect(mocks.fetchIngestionSources).toHaveBeenCalled());
-    await waitFor(() => expect(mocks.fetchKnowledgeGaps).toHaveBeenCalled());
-    await user.click(screen.getByRole("button", { name: /Analyse project/ }));
-
-    expect(await screen.findByLabelText(/Rescan knowledge gaps/)).not.toBeChecked();
-    expect(screen.getByText(/Up to date — scanned/)).toBeInTheDocument();
-  }, 20000);
-
-  it("asks what to refresh again before running again", async () => {
-    const user = userEvent.setup();
-    renderLauncher();
-
-    await runAnalysis(user, async () => {
-      await user.click(screen.getByLabelText(/Rescan knowledge gaps/));
-    });
-    expect(mocks.refreshKnowledgeGaps).toHaveBeenCalledTimes(1);
+    await runAnalysis(user);
+    expect(mocks.saveRun).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: /Run again/ }));
+    await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
 
-    // The same first step as the strip's button: the options and a start button, no run yet.
-    expect(await screen.findByLabelText(/Rescan knowledge gaps/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Start analysis/ })).toBeInTheDocument();
-    expect(mocks.refreshKnowledgeGaps).toHaveBeenCalledTimes(1);
-  }, 20000);
-
-  it("never re-evaluates an industry somebody set by hand", async () => {
-    mocks.industryCustom = true;
-    const user = userEvent.setup();
-    renderLauncher();
-
-    await runAnalysis(user, async () => {
-      await user.click(screen.getByLabelText(/Re-evaluate the industry/));
-    });
-
-    expect(mocks.evaluateProjectIndustry).not.toHaveBeenCalled();
-  }, 20000);
-
-  it("regroups the recurring questions only when asked to", async () => {
-    const user = userEvent.setup();
-    renderLauncher();
-
-    await runAnalysis(user, async () => {
-      await user.click(screen.getByLabelText(/Regroup recurring questions/));
-    });
-
-    expect(mocks.refreshFAQGroups).toHaveBeenCalledWith("p1");
+    await waitFor(() => expect(mocks.saveRun).toHaveBeenCalledTimes(2));
   }, 20000);
 
   it("takes the manager to where a finding can be acted on", async () => {
@@ -335,24 +245,27 @@ describe("ProjectAnalysisLauncher", () => {
     });
   }, 20000);
 
-  it("has no a11y violations, before the scan or on its results", async () => {
+  it("has no a11y violations on its results", async () => {
     const user = userEvent.setup();
     const { baseElement } = renderLauncher();
 
-    await user.click(screen.getByRole("button", { name: /Analyse project/ }));
-    expect(await axe(baseElement)).toHaveNoViolations();
-
-    await user.click(screen.getByRole("button", { name: /Start analysis/ }));
-    await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
+    await runAnalysis(user);
     expect(await axe(baseElement)).toHaveNoViolations();
   }, 30000);
 
   it("says what it is checking while it runs, and keeps a log", async () => {
+    // Held open, so the run stays in progress long enough to look at: with no artificial delay
+    // any more, it is otherwise over in a moment.
+    let releaseGaps: (value: { gaps: never[] }) => void = () => {};
+    mocks.fetchKnowledgeGaps.mockReturnValue(
+      new Promise((resolve) => {
+        releaseGaps = resolve;
+      }),
+    );
     const user = userEvent.setup();
     const { baseElement } = renderLauncher();
 
     await user.click(screen.getByRole("button", { name: /Analyse project/ }));
-    await user.click(screen.getByRole("button", { name: /Start analysis/ }));
 
     const now = within(await screen.findByRole("region", { name: "Now checking" }));
     expect(await now.findByText("Reading the documentation gaps")).toBeInTheDocument();
@@ -360,6 +273,7 @@ describe("ProjectAnalysisLauncher", () => {
     expect(await log.findByText(/Team & open items: 1 member ·/)).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
 
+    releaseGaps({ gaps: [] });
     await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
   }, 30000);
 
@@ -377,6 +291,13 @@ describe("ProjectAnalysisLauncher", () => {
     ).toBe(true);
     expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
     expect(dialog.getByText("No sources connected")).toBeInTheDocument();
+
+    // Not grouped by area: one list, most pressing first, each finding naming its area.
+    const all = within(dialog.getByRole("region", { name: "All areas findings" }));
+    const titles = all.getAllByRole("listitem").map((item) => item.textContent ?? "");
+    expect(titles[0]).toContain("1 skip request waiting for your answer");
+    expect(titles.findIndex((text) => text.includes("No sources connected"))).toBeGreaterThan(0);
+    expect(all.queryByRole("region", { name: "Team findings" })).not.toBeInTheDocument();
 
     const sources = areas.getByRole("button", { name: /Data sources/ });
     await user.click(sources);
@@ -579,15 +500,13 @@ describe("ProjectAnalysisLauncher", () => {
 
       // Complete, then incomplete, then complete again with the same answers.
       await runAnalysis(user);
-      await user.click(screen.getByRole("button", { name: /Run again/ }));
       mocks.listOpen.mockRejectedValueOnce(new Error("Backend unavailable"));
-      await user.click(screen.getByRole("button", { name: /Start analysis/ }));
+      await user.click(screen.getByRole("button", { name: /Run again/ }));
       await screen.findByText(/Could not run/, {}, { timeout: 8000 });
       // No comparison on the incomplete run.
       expect(screen.queryByText(/since the run|Same as the run/)).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /Run again/ }));
-      await user.click(screen.getByRole("button", { name: /Start analysis/ }));
       await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
 
       expect(screen.getByText(/Same as the run/)).toBeInTheDocument();

@@ -36,7 +36,7 @@ export type AnalysisTask = {
   id: FindingArea;
   label: string;
   status: AnalysisTaskStatus;
-  /** What the task did, in a few words: "Rescanned · 3 gaps", "Kept your industry". */
+  /** What the task did, in a few words: "7 members · 2 unread", "3 open". */
   note?: string;
   /** What the task is doing while it runs, in a sentence — shown under "Now checking". */
   activity?: string;
@@ -54,8 +54,8 @@ export type AnalysisLogEntry = {
   text: string;
 };
 
-/** What each check does, in the words the "Now checking" block uses — depends on the options. */
-function describeTask(id: FindingArea, options: AnalysisOptions): string {
+/** What each check does, in the words the "Now checking" block uses. */
+function describeTask(id: FindingArea): string {
   switch (id) {
     case "team":
       return "Reading the roster, open skip requests and unread feedback";
@@ -64,41 +64,15 @@ function describeTask(id: FindingArea, options: AnalysisOptions): string {
     case "escalations":
       return "Reading the questions the buddy passed on to a person";
     case "questions":
-      return options.regroupQuestions
-        ? "Asking the AI to regroup every recurring question"
-        : "Reading the recurring questions and what is on the rise";
+      return "Reading the recurring questions and what is on the rise";
     case "gaps":
-      return options.rescanGaps
-        ? "Asking the AI to rescan every component's documentation"
-        : "Reading the documentation gaps";
+      return "Reading the documentation gaps";
     case "ingestion":
       return "Checking every connected source's last sync";
     case "industry":
-      return options.reevaluateIndustry
-        ? "Re-evaluating the project's industry with the AI"
-        : "Reading the project's industry";
+      return "Reading the project's industry";
   }
 }
-
-/** The three refreshes that ask the AI to redo work; everything else is re-read either way. */
-export type AnalysisOptions = {
-  rescanGaps: boolean;
-  reevaluateIndustry: boolean;
-  /** Destructive — replaces the FAQ's entries — so it is never on by default. */
-  regroupQuestions: boolean;
-};
-
-/**
- * All off. Each refresh costs an AI call per run — the gaps rescan one per repository — and the
- * backend already redoes the gaps and the industry on its own after every import, so by default
- * an analysis only reads. The launcher turns the gaps rescan on when the gaps are behind the
- * newest import (see `gapScanState`).
- */
-export const DEFAULT_ANALYSIS_OPTIONS: AnalysisOptions = {
-  rescanGaps: false,
-  reevaluateIndustry: false,
-  regroupQuestions: false,
-};
 
 /** One finished analysis, as remembered for the next one to compare against. */
 export type AnalysisRunSummary = {
@@ -143,17 +117,6 @@ const TASKS: readonly Pick<AnalysisTask, "id" | "label">[] = [
   { id: "industry", label: "Industry" },
 ];
 
-/**
- * How long each check shows as running at the least, and how far apart they finish. The reads
- * are often done in a few hundred milliseconds; without a floor the whole scan flashes past
- * before anyone can see what was looked at.
- */
-const MIN_TASK_MS = 700;
-const STAGGER_MS = 260;
-const START_STAGGER_MS = 140;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 /** "1 member", "7 members". */
 function count(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
@@ -164,13 +127,18 @@ function errorNote(error: unknown): string {
 }
 
 /**
- * Runs a project analysis: every refresh the PM area offers, at once, then one list of what the
- * results say.
+ * Runs a project analysis: every part of the PM area read again at once, then one list of what
+ * the results say.
  *
  * Every read goes through the shared query cache (`fetchQuery` with `staleTime: 0`), so the cards
  * on the overview update in the same moment the analysis finishes — the analysis does not keep a
- * private copy that could disagree with them. The AI refreshes are opt-in per run (see
- * {@link AnalysisOptions}); the industry is never re-evaluated over one a person set by hand.
+ * private copy that could disagree with them.
+ *
+ * It only reads. It used to offer to rescan the knowledge gaps, re-evaluate the industry and
+ * regroup the questions with the AI, but the backend redoes the first two on its own after every
+ * import and the knowledge gaps and FAQ pages have their own buttons for the rare manual case — so
+ * the options cost an AI call per run and bought, as a rule, the same answer again. Gaps that are
+ * behind the newest import show up as a finding instead (see `buildFindings`).
  *
  * Every finished run is kept per project on the backend (see `projectAnalysisService`): the last
  * one's results can be opened again later, on any device and by any PM of the project, and the
@@ -179,11 +147,8 @@ function errorNote(error: unknown): string {
 export function useProjectAnalysis() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { selectedProjectId: projectId, selectedProject } = useProjectContext();
+  const { selectedProjectId: projectId } = useProjectContext();
   const viewerId = profile?.id ?? "";
-
-  const canEvaluateIndustry =
-    profile?.permissionGroup === "ADMIN" || (selectedProject?.isManaged ?? false);
 
   const [phase, setPhase] = useState<AnalysisPhase>("idle");
   const [log, setLog] = useState<AnalysisLogEntry[]>([]);
@@ -221,254 +186,214 @@ export function useProjectAnalysis() {
     });
   }, [viewerId, projectId]);
 
-  const run = useCallback(
-    async (options: AnalysisOptions) => {
-      if (!projectId) return;
-      const runId = ++runRef.current;
-      const current = () => runRef.current === runId;
+  const run = useCallback(async () => {
+    if (!projectId) return;
+    const runId = ++runRef.current;
+    const current = () => runRef.current === runId;
 
-      setPhase("running");
-      setFindings([]);
-      setScore(null);
-      const runsKey = queryKeys.projectAnalysis.runs(projectId);
-      // The history as it stands before this run. Not being able to read it costs the comparison,
-      // never the run.
-      const history =
-        queryClient.getQueryData<ProjectAnalysisRun[]>(runsKey) ??
-        (await queryClient
-          .fetchQuery({
-            queryKey: runsKey,
-            queryFn: () => projectAnalysisService.listRuns(projectId),
-          })
-          .catch(() => []));
+    setPhase("running");
+    setFindings([]);
+    setScore(null);
+    const runsKey = queryKeys.projectAnalysis.runs(projectId);
+    // The history as it stands before this run. Not being able to read it costs the comparison,
+    // never the run.
+    const history =
+      queryClient.getQueryData<ProjectAnalysisRun[]>(runsKey) ??
+      (await queryClient
+        .fetchQuery({
+          queryKey: runsKey,
+          queryFn: () => projectAnalysisService.listRuns(projectId),
+        })
+        .catch(() => []));
+    if (!current()) return;
+    const before = comparisonFor(history);
+    setPreviousRun(before);
+    // This run's tasks as they progress, kept here as well as in state so the stored record can
+    // be written from them once everything has settled.
+    let runTasks: AnalysisTask[] = TASKS.map((task) => ({ ...task, status: "pending" }));
+    setTasks(runTasks);
+    setLog([]);
+    setRunStartedAt(Date.now());
+    let logId = 0;
+    const addLog = (area: FindingArea, kind: AnalysisLogEntry["kind"], text: string) => {
       if (!current()) return;
-      const before = comparisonFor(history);
-      setPreviousRun(before);
-      // This run's tasks as they progress, kept here as well as in state so the stored record can
-      // be written from them once everything has settled.
-      let runTasks: AnalysisTask[] = TASKS.map((task) => ({ ...task, status: "pending" }));
+      const entry = { id: ++logId, at: Date.now(), area, kind, text };
+      setLog((entries) => [...entries, entry]);
+    };
+
+    const update = (id: FindingArea, patch: Partial<AnalysisTask>) => {
+      if (!current()) return;
+      runTasks = runTasks.map((task) => (task.id === id ? { ...task, ...patch } : task));
       setTasks(runTasks);
-      setLog([]);
-      setRunStartedAt(Date.now());
-      let logId = 0;
-      const addLog = (area: FindingArea, kind: AnalysisLogEntry["kind"], text: string) => {
-        if (!current()) return;
-        const entry = { id: ++logId, at: Date.now(), area, kind, text };
-        setLog((entries) => [...entries, entry]);
-      };
+    };
 
-      const update = (id: FindingArea, patch: Partial<AnalysisTask>) => {
-        if (!current()) return;
-        runTasks = runTasks.map((task) => (task.id === id ? { ...task, ...patch } : task));
-        setTasks(runTasks);
-      };
-
-      async function check<T>(
-        id: FindingArea,
-        work: () => Promise<{ value: T; note?: string; skipped?: boolean }>,
-      ): Promise<T | null> {
-        const index = TASKS.findIndex((task) => task.id === id);
-        const label = TASKS[index].label;
-        // Started a beat apart, so the log reads as a sequence rather than seven lines at once.
-        await sleep(index * START_STAGGER_MS);
-        if (!current()) return null;
-        const activity = describeTask(id, options);
-        update(id, { status: "running", activity, startedAt: Date.now() });
-        addLog(id, "start", activity);
-        const floor = sleep(MIN_TASK_MS + index * STAGGER_MS);
-        try {
-          const [result] = await Promise.all([work(), floor]);
-          const kind = result.skipped ? "skipped" : "done";
-          update(id, { status: kind, note: result.note, finishedAt: Date.now() });
-          addLog(id, kind, `${label}: ${result.note ?? "done"}`);
-          return result.value;
-        } catch (error) {
-          await floor;
-          const note = errorNote(error);
-          update(id, { status: "failed", note, finishedAt: Date.now() });
-          addLog(id, "failed", `${label} failed: ${note}`);
-          return null;
-        }
+    async function check<T>(
+      id: FindingArea,
+      work: () => Promise<{ value: T; note?: string; skipped?: boolean }>,
+    ): Promise<T | null> {
+      const label = TASKS.find((task) => task.id === id)?.label ?? id;
+      if (!current()) return null;
+      const activity = describeTask(id);
+      update(id, { status: "running", activity, startedAt: Date.now() });
+      addLog(id, "start", activity);
+      try {
+        const result = await work();
+        const kind = result.skipped ? "skipped" : "done";
+        update(id, { status: kind, note: result.note, finishedAt: Date.now() });
+        addLog(id, kind, `${label}: ${result.note ?? "done"}`);
+        return result.value;
+      } catch (error) {
+        const note = errorNote(error);
+        update(id, { status: "failed", note, finishedAt: Date.now() });
+        addLog(id, "failed", `${label} failed: ${note}`);
+        return null;
       }
+    }
 
-      const fresh = <T>(queryKey: readonly unknown[], queryFn: () => Promise<T>) =>
-        queryClient.fetchQuery({ queryKey, queryFn, staleTime: 0 });
+    const fresh = <T>(queryKey: readonly unknown[], queryFn: () => Promise<T>) =>
+      queryClient.fetchQuery({ queryKey, queryFn, staleTime: 0 });
 
-      const [team, onboarding, escalations, faq, gaps, sources, industry] = await Promise.all([
-        check("team", async () => {
-          // Never the forgiving `getTeamOverview`: its mock fallback would turn a failed read into
-          // findings about people who do not exist.
-          const roster = await fresh(queryKeys.teamOverview.filtered(projectId), () =>
-            getTeamOverviewOrThrow([projectId]),
-          );
-          const flagged = roster.filter((member) => member.hasFeedback);
-          const feedback = await Promise.allSettled(
-            flagged.map((member) =>
-              fresh(queryKeys.memberFeedback.byUser(member.userId), () =>
-                getUserOnboardingFeedback(member.userId),
-              ),
+    const [team, onboarding, escalations, faq, gaps, sources, industry] = await Promise.all([
+      check("team", async () => {
+        // Never the forgiving `getTeamOverview`: its mock fallback would turn a failed read into
+        // findings about people who do not exist.
+        const roster = await fresh(queryKeys.teamOverview.filtered(projectId), () =>
+          getTeamOverviewOrThrow([projectId]),
+        );
+        const flagged = roster.filter((member) => member.hasFeedback);
+        const feedback = await Promise.allSettled(
+          flagged.map((member) =>
+            fresh(queryKeys.memberFeedback.byUser(member.userId), () =>
+              getUserOnboardingFeedback(member.userId),
             ),
-          );
-          // A member whose feedback could not be read is not a member with nothing unread.
-          const unreadable = feedback.filter((result) => result.status === "rejected").length;
-          if (unreadable > 0) {
-            throw new Error(`Feedback of ${count(unreadable, "member")} could not be read`);
-          }
-          const feedbackByUser: Record<string, OnboardingFeedback[]> = {};
-          feedback.forEach((result, index) => {
-            if (result.status === "fulfilled") feedbackByUser[flagged[index].userId] = result.value;
-          });
-          const unread = Object.values(feedbackByUser).flat().filter(isUnread).length;
-          return {
-            value: { roster, feedbackByUser },
-            note: `${count(roster.length, "member")} · ${unread} unread`,
-          };
-        }),
-        check("onboarding", async () => {
-          const [metrics, attention] = await Promise.all([
-            fresh(queryKeys.onboardingMetrics.project(projectId), () =>
-              onboardingMetricsService.fetchProjectMetrics(projectId),
-            ),
-            fresh(queryKeys.attention.byProject(projectId), () =>
-              onboardingMetricsService.fetchAttention(projectId),
-            ),
-          ]);
-          return { value: { metrics, attention }, note: count(metrics.memberCount, "hire") };
-        }),
-        check("escalations", async () => {
-          const open = await fresh(queryKeys.knowledgeRequest.open(projectId), () =>
-            knowledgeRequestService.listOpen(projectId),
-          );
-          void queryClient.invalidateQueries({
-            queryKey: queryKeys.knowledgeRequest.openCount(projectId),
-          });
-          return { value: open, note: `${open.length} open` };
-        }),
-        check("questions", async () => {
-          let regrouped: number | null = null;
-          if (options.regroupQuestions) {
-            regrouped = (await insightsService.refreshFAQGroups(projectId)).groupCount;
-          }
-          const overview = await fresh(queryKeys.faq.groups(projectId), () =>
-            insightsService.fetchFAQGroups(projectId),
-          );
-          return {
-            value: overview,
-            note:
-              regrouped !== null
-                ? `Regrouped · ${regrouped} questions`
-                : `${overview.groups.length} tracked`,
-          };
-        }),
-        check("gaps", async () => {
-          let rescanned = false;
-          if (options.rescanGaps) {
-            await knowledgeGapService.refreshKnowledgeGaps(projectId);
-            rescanned = true;
-          }
-          const overview = await fresh(queryKeys.knowledgeGaps.overview(projectId), () =>
-            knowledgeGapService.fetchKnowledgeGaps(projectId),
-          );
-          const open = overview.gaps.filter((gap) => gap.severity !== "covered").length;
-          return { value: overview, note: `${rescanned ? "Rescanned · " : ""}${open} open` };
-        }),
-        check("ingestion", async () => {
-          const list = await fresh(queryKeys.ingestion.sourceStatuses(projectId), () =>
-            fetchIngestionSources(projectId),
-          );
-          return {
-            value: list.map((source) => ({
-              name: source.name,
-              errors: source.errors,
-              lastRunAt: source.lastRunAt,
-              backendStatus: source.backendStatus,
-            })),
-            note: count(list.length, "source"),
-          };
-        }),
-        check("industry", async () => {
-          const before = await projectService.getAccessibleProject(projectId);
-          const toIndustry = (
-            project: typeof before,
-            previous?: string | null,
-          ): AnalysisIndustry => ({
-            industry: project.industry,
-            confidence: project.industryConfidence,
-            custom: project.industryCustom,
-            ...(previous !== undefined ? { previous } : {}),
-          });
-
-          if (!options.reevaluateIndustry || !canEvaluateIndustry) {
-            return { value: toIndustry(before), note: "Checked", skipped: false };
-          }
-          // A person's choice outranks the model's: never evaluate over a hand-set industry.
-          if (before.industryCustom) {
-            return { value: toIndustry(before), note: "Kept your hand-set industry" };
-          }
-          await projectService.evaluateProjectIndustry(projectId);
-          const after = await projectService.getAccessibleProject(projectId);
-          return {
-            value: toIndustry(after, before.industry || null),
-            note: after.industry ? `Re-evaluated · ${after.industry}` : "Re-evaluated",
-          };
-        }),
-      ]);
-
-      if (!current()) return;
-
-      const result = buildFindings({
-        roster: team?.roster ?? null,
-        feedbackByUser: team?.feedbackByUser ?? {},
-        metrics: onboarding?.metrics ?? null,
-        attention: onboarding?.attention ?? null,
-        escalations,
-        faq,
-        gaps,
-        sources,
-        industry,
-      });
-      const finishedTasks = runTasks;
-      // A check that could not run made no findings, and the score only subtracts for findings —
-      // so scoring anyway would read "could not look" as "nothing wrong", and the more checks
-      // failed the better it would look. An incomplete run gets no score at all.
-      const complete = finishedTasks.every((task) => task.status !== "failed");
-      const nextScore = complete ? healthScore(result) : null;
-      const storedTasks = finishedTasks.map(({ id, label, status, note }) => ({
-        id,
-        label,
-        status,
-        ...(note !== undefined ? { note } : {}),
-      }));
-      // What the backend will keep, in the same shape — used as is when it cannot be reached, so
-      // the results can still be reopened in this session.
-      const local: ProjectAnalysisRun = {
-        id: `local-${runId}`,
-        at: new Date().toISOString(),
-        score: nextScore,
-        counts: countBySeverity(result),
-        failedChecks: finishedTasks.filter((task) => task.status === "failed").length,
-        findings: result,
-        tasks: storedTasks,
-      };
-      const saved = await projectAnalysisService
-        .saveRun(projectId, { score: nextScore, findings: result, tasks: storedTasks })
-        .catch((error: unknown) => {
-          console.warn(
-            "The project analysis could not be stored; it is kept for this session only",
-            error,
-          );
-          return local;
+          ),
+        );
+        // A member whose feedback could not be read is not a member with nothing unread.
+        const unreadable = feedback.filter((result) => result.status === "rejected").length;
+        if (unreadable > 0) {
+          throw new Error(`Feedback of ${count(unreadable, "member")} could not be read`);
+        }
+        const feedbackByUser: Record<string, OnboardingFeedback[]> = {};
+        feedback.forEach((result, index) => {
+          if (result.status === "fulfilled") feedbackByUser[flagged[index].userId] = result.value;
         });
-      if (!current()) return;
-      queryClient.setQueryData<ProjectAnalysisRun[]>(runsKey, (old) => [saved, ...(old ?? [])]);
+        const unread = Object.values(feedbackByUser).flat().filter(isUnread).length;
+        return {
+          value: { roster, feedbackByUser },
+          note: `${count(roster.length, "member")} · ${unread} unread`,
+        };
+      }),
+      check("onboarding", async () => {
+        const [metrics, attention] = await Promise.all([
+          fresh(queryKeys.onboardingMetrics.project(projectId), () =>
+            onboardingMetricsService.fetchProjectMetrics(projectId),
+          ),
+          fresh(queryKeys.attention.byProject(projectId), () =>
+            onboardingMetricsService.fetchAttention(projectId),
+          ),
+        ]);
+        return { value: { metrics, attention }, note: count(metrics.memberCount, "hire") };
+      }),
+      check("escalations", async () => {
+        const open = await fresh(queryKeys.knowledgeRequest.open(projectId), () =>
+          knowledgeRequestService.listOpen(projectId),
+        );
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.knowledgeRequest.openCount(projectId),
+        });
+        return { value: open, note: `${open.length} open` };
+      }),
+      check("questions", async () => {
+        const overview = await fresh(queryKeys.faq.groups(projectId), () =>
+          insightsService.fetchFAQGroups(projectId),
+        );
+        return { value: overview, note: `${overview.groups.length} tracked` };
+      }),
+      check("gaps", async () => {
+        const overview = await fresh(queryKeys.knowledgeGaps.overview(projectId), () =>
+          knowledgeGapService.fetchKnowledgeGaps(projectId),
+        );
+        const open = overview.gaps.filter((gap) => gap.severity !== "covered").length;
+        return { value: overview, note: `${open} open` };
+      }),
+      check("ingestion", async () => {
+        const list = await fresh(queryKeys.ingestion.sourceStatuses(projectId), () =>
+          fetchIngestionSources(projectId),
+        );
+        return {
+          value: list.map((source) => ({
+            name: source.name,
+            errors: source.errors,
+            lastRunAt: source.lastRunAt,
+            backendStatus: source.backendStatus,
+          })),
+          note: count(list.length, "source"),
+        };
+      }),
+      check("industry", async () => {
+        const project = await projectService.getAccessibleProject(projectId);
+        const industry: AnalysisIndustry = {
+          industry: project.industry,
+          confidence: project.industryConfidence,
+          custom: project.industryCustom,
+        };
+        return { value: industry, note: project.industry || "Not determined" };
+      }),
+    ]);
 
-      setFindings(result);
-      setScore(nextScore);
-      setPhase("done");
-      setRefreshRevision((revision) => revision + 1);
-    },
-    [canEvaluateIndustry, projectId, queryClient],
-  );
+    if (!current()) return;
+
+    const result = buildFindings({
+      roster: team?.roster ?? null,
+      feedbackByUser: team?.feedbackByUser ?? {},
+      metrics: onboarding?.metrics ?? null,
+      attention: onboarding?.attention ?? null,
+      escalations,
+      faq,
+      gaps,
+      sources,
+      industry,
+    });
+    const finishedTasks = runTasks;
+    // A check that could not run made no findings, and the score only subtracts for findings —
+    // so scoring anyway would read "could not look" as "nothing wrong", and the more checks
+    // failed the better it would look. An incomplete run gets no score at all.
+    const complete = finishedTasks.every((task) => task.status !== "failed");
+    const nextScore = complete ? healthScore(result) : null;
+    const storedTasks = finishedTasks.map(({ id, label, status, note }) => ({
+      id,
+      label,
+      status,
+      ...(note !== undefined ? { note } : {}),
+    }));
+    // What the backend will keep, in the same shape — used as is when it cannot be reached, so
+    // the results can still be reopened in this session.
+    const local: ProjectAnalysisRun = {
+      id: `local-${runId}`,
+      at: new Date().toISOString(),
+      score: nextScore,
+      counts: countBySeverity(result),
+      failedChecks: finishedTasks.filter((task) => task.status === "failed").length,
+      findings: result,
+      tasks: storedTasks,
+    };
+    const saved = await projectAnalysisService
+      .saveRun(projectId, { score: nextScore, findings: result, tasks: storedTasks })
+      .catch((error: unknown) => {
+        console.warn(
+          "The project analysis could not be stored; it is kept for this session only",
+          error,
+        );
+        return local;
+      });
+    if (!current()) return;
+    queryClient.setQueryData<ProjectAnalysisRun[]>(runsKey, (old) => [saved, ...(old ?? [])]);
+
+    setFindings(result);
+    setScore(nextScore);
+    setPhase("done");
+    setRefreshRevision((revision) => revision + 1);
+  }, [projectId, queryClient]);
 
   /** Whether the last run's results are there to be shown again. */
   const canOpenLast = stored !== null;
@@ -514,7 +439,6 @@ export function useProjectAnalysis() {
     openLast,
     previousRun,
     refreshRevision,
-    canEvaluateIndustry,
     run,
     reset,
   };

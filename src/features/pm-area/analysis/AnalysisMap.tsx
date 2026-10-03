@@ -37,17 +37,19 @@ type AnalysisMapProps = {
 const bySeverity = (a: Finding, b: Finding) =>
   SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
 
+/** Most pressing first; within a severity, in the order the areas are drawn. */
+const byImportance = (a: Finding, b: Finding) =>
+  bySeverity(a, b) || AREA_ORDER.indexOf(a.area) - AREA_ORDER.indexOf(b.area);
+
 /**
- * What the map shows for one selection: the findings fanned out (one area's, or every area's
- * grouped in area order so their curves do not cross), worst first, and every area's tally.
+ * What the map shows for one selection: the findings (one area's, or every area's in one list),
+ * most pressing first, and every area's tally.
  */
 function deriveMap(findings: readonly Finding[], selected: MapSelection) {
   const visible = findings;
   const shown =
     selected === null
-      ? AREA_ORDER.flatMap((area) =>
-          visible.filter((finding) => finding.area === area).sort(bySeverity),
-        )
+      ? [...visible].sort(byImportance)
       : visible.filter((finding) => finding.area === selected).sort(bySeverity);
   return {
     visible,
@@ -65,9 +67,20 @@ function curve(x1: number, y1: number, x2: number, y2: number): string {
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
 
-function FindingRow({ finding, onOpen }: { finding: Finding; onOpen: (to: string) => void }) {
+function FindingRow({
+  finding,
+  onOpen,
+  showArea = false,
+}: {
+  finding: Finding;
+  onOpen: (to: string) => void;
+  /** Names the finding's area — needed in the all-areas list, where nothing else says it. */
+  showArea?: boolean;
+}) {
   const severity = SEVERITY_META[finding.severity];
   const SeverityIcon = severity.icon;
+  const area = AREA_META[finding.area];
+  const AreaIcon = area.icon;
   const glowStyle = {
     boxShadow: `inset 3px 0 0 ${severity.glow}, 0 0 28px -14px ${severity.glow}`,
   };
@@ -81,6 +94,14 @@ function FindingRow({ finding, onOpen }: { finding: Finding; onOpen: (to: string
             <SeverityIcon aria-hidden="true" className="h-3 w-3" />
             {severity.label}
           </span>
+          {showArea && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${area.chip}`}
+            >
+              <AreaIcon aria-hidden="true" className="h-3 w-3" />
+              {area.label}
+            </span>
+          )}
         </span>
         <span className="mt-1 block text-sm font-semibold text-app-text">{finding.title}</span>
         <span className="mt-0.5 line-clamp-2 block text-xs leading-relaxed text-app-text-muted">
@@ -196,10 +217,11 @@ function AreaCard({
  * reaches), every area as a card beside it, and the findings fanning out on the right — each tied
  * back to its area by a luminous curve in the finding's severity.
  *
- * With no area chosen — how it opens — every finding is there at once, grouped by area with one
- * curve from each area, so the whole picture needs no choosing. Picking an area narrows the fan to
- * that area; picking it again lets go of it. Every card is a button. There is no filter on top:
- * the findings are ordered worst first, so what is going well sits at the end of each group.
+ * With no area chosen — how it opens — every finding is there at once in one list, most pressing
+ * first whatever its area, each naming its area; the whole picture needs no choosing. Picking an
+ * area narrows the list to that area and fans its findings out from the card; picking it again
+ * lets go of it. Every card is a button. There is no filter on top: what is going well sits at
+ * the end.
  *
  * The curves are measured off the rendered cards, so they follow the layout at any width; on a
  * phone, where the three columns stack, they are left out.
@@ -258,25 +280,11 @@ export function AnalysisMap({
       }
     }
 
-    if (selected === null) {
-      // One curve per area, to its group of findings: a curve to each of sixteen findings made a
-      // tangle that said less than the groups do.
-      for (const { area, worst } of areas) {
-        if (!worst) continue;
-        const fromRect = rect(anchor(`area-${area}`));
-        const toRect = rect(anchor(`group-${area}`));
-        if (!fromRect || !toRect) continue;
-        const [fx, fy] = rightMid(fromRect);
-        const [tx, ty] = leftMid(toRect);
-        lines.push({
-          key: `all-${area}`,
-          kind: "finding",
-          d: curve(fx, fy, tx, ty),
-          color: SEVERITY_META[worst].glow,
-          strong: true,
-        });
-      }
-    } else {
+    // With no area chosen the list is ordered by importance, not by area, so the areas' findings
+    // are interleaved: a curve from each area to each of its findings would cross every other
+    // one. The core's curves to the areas carry the picture there; the finding curves come with
+    // a chosen area.
+    if (selected !== null) {
       for (const finding of fanned) {
         const fromRect = rect(anchor(`area-${finding.area}`));
         const toRect = rect(anchor(`finding-${finding.id}`));
@@ -445,44 +453,18 @@ export function AnalysisMap({
               {`Nothing${selected === null ? "" : ` in ${heading.toLowerCase()}`} to report.`}
             </p>
           ) : selected === null ? (
-            <div className="space-y-5">
-              {areaStats
-                .filter(({ count }) => count > 0)
-                .map(({ area }) => {
-                  const meta = AREA_META[area];
-                  const Icon = meta.icon;
-                  const inArea = shown.filter((finding) => finding.area === area);
-                  return (
-                    <section key={area} aria-label={`${meta.label} findings`}>
-                      <h4
-                        data-anchor={`group-${area}`}
-                        className="mb-2 flex items-center gap-2 text-xs font-semibold text-app-text-muted"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`flex h-5 w-5 items-center justify-center rounded-md ${meta.chip}`}
-                        >
-                          <Icon className="h-3 w-3" />
-                        </span>
-                        {meta.label}
-                        <span className="font-normal text-app-text-subtle">{inArea.length}</span>
-                      </h4>
-                      <ul className="space-y-2">
-                        {inArea.map((finding, index) => (
-                          <motion.li
-                            key={`all-${finding.id}`}
-                            initial={reduceMotion ? false : { opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.35, delay: 0.1 + Math.min(index, 8) * 0.04 }}
-                          >
-                            <FindingRow finding={finding} onOpen={onOpenFinding} />
-                          </motion.li>
-                        ))}
-                      </ul>
-                    </section>
-                  );
-                })}
-            </div>
+            <ul className="space-y-2">
+              {shown.map((finding, index) => (
+                <motion.li
+                  key={`all-${finding.id}`}
+                  initial={reduceMotion ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.35, delay: 0.1 + Math.min(index, 12) * 0.04 }}
+                >
+                  <FindingRow finding={finding} onOpen={onOpenFinding} showArea />
+                </motion.li>
+              ))}
+            </ul>
           ) : (
             <ul className="space-y-2">
               {shown.map((finding, index) => (

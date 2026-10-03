@@ -13,6 +13,7 @@ import {
 } from "../features/pm-area/components/overview/InsightCards";
 import { TeamProgressCard } from "../features/pm-area/components/overview/TeamProgressCard";
 import { TeamPulseCard } from "../features/pm-area/components/overview/TeamPulseCard";
+import { TodayCard } from "../features/pm-area/components/overview/TodayCard";
 import { useOpenEscalationCount } from "../features/knowledge-request/useOpenEscalationCount";
 import { memberStage, waitingOn } from "../features/pm-area/memberStatus";
 import { useMemberPeek } from "../features/pm-area/useMemberPeek";
@@ -21,12 +22,16 @@ import { ProjectIndustryWidget } from "../features/projects/industry/ProjectIndu
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useQueryFetch } from "../hooks/useQueryFetch";
 import { isUnread } from "../features/pm-area/useMemberOpenItems";
-import { getUserOnboardingFeedback } from "../services/teamManagementService";
+import {
+  getUserOnboardingFeedback,
+  type OnboardingFeedback,
+} from "../services/teamManagementService";
 import { onboardingMetricsService } from "../services/onboardingMetricsService";
 import { queryKeys } from "../services/queryKeys";
 
 /**
- * The overview section of the PM workspace (see `PmWorkspace`): what needs the manager today, how the team is doing, and the
+ * The overview section of the PM workspace (see `PmWorkspace`): what needs the manager today (the
+ * project analysis's findings, see `TodayCard`), how the team is doing, and the
  * three insight readouts — each a click from the section it summarizes.
  *
  * Built around "does anybody need me" rather than a column of equal widgets. The old page gave
@@ -69,13 +74,16 @@ export function PmDashboardPage({
   // Each flagged member's own feedback, under the same key the member panel reads — so marking
   // one read in the panel refreshes this count too, and opening the panel after the overview
   // costs no second request.
+  const flaggedMembers = members.filter((member) => member.hasFeedback);
   const feedbackQueries = useQueries({
-    queries: members
-      .filter((member) => member.hasFeedback)
-      .map((member) => ({
-        queryKey: queryKeys.memberFeedback.byUser(member.userId),
-        queryFn: () => getUserOnboardingFeedback(member.userId),
-      })),
+    queries: flaggedMembers.map((member) => ({
+      queryKey: queryKeys.memberFeedback.byUser(member.userId),
+      queryFn: () => getUserOnboardingFeedback(member.userId),
+    })),
+  });
+  const feedbackByUser: Record<string, OnboardingFeedback[]> = {};
+  feedbackQueries.forEach((query, index) => {
+    if (query.data) feedbackByUser[flaggedMembers[index].userId] = query.data;
   });
 
   // What is open with the manager, counted as items rather than people: every pending skip
@@ -148,6 +156,16 @@ export function PmDashboardPage({
           to="/insights/onboarding"
         />
       </section>
+
+      {/* The project analysis's findings, worked out on every visit: what asks something of the
+          manager, most pressing first, straight under the figures. */}
+      <TodayCard
+        roster={figuresReady ? members : null}
+        feedbackByUser={feedbackByUser}
+        metrics={metrics ?? null}
+        attention={attention}
+        loading={rosterLoading || attentionLoading}
+      />
 
       <TeamPulseCard
         roster={members}

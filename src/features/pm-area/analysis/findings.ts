@@ -12,6 +12,7 @@ import {
   waitingOn,
 } from "../memberStatus";
 import { isUnread } from "../useMemberOpenItems";
+import { gapScanState } from "./analysisFreshness";
 
 /**
  * How much a finding asks of the manager. `good` is news worth knowing that asks nothing — a
@@ -400,6 +401,26 @@ function gapFindings(overview: KnowledgeGapOverview) {
   return findings;
 }
 
+/**
+ * Gaps computed before the newest import. The backend rescans on its own once an import is
+ * indexed, so this only shows when that rescan failed or is switched off — and the knowledge gaps
+ * page is where a manual rescan is started.
+ */
+function gapFreshnessFindings(overview: KnowledgeGapOverview, sources: AnalysisSource[]) {
+  if (gapScanState(overview, sources).kind !== "behind") return [];
+  return [
+    {
+      id: "gaps-behind",
+      severity: "info",
+      area: "gaps",
+      title: "Knowledge gaps are older than the latest import",
+      detail:
+        "The automatic rescan after the import has not run. Rescan on the knowledge gaps page.",
+      to: "/insights/knowledge-gaps",
+    } satisfies Finding,
+  ];
+}
+
 function ingestionFindings(sources: AnalysisSource[]) {
   if (sources.length === 0) {
     return [
@@ -533,6 +554,7 @@ export function buildFindings(input: AnalysisInput): Finding[] {
     ...(input.escalations ? escalationFindings(input.escalations) : []),
     ...(input.faq ? questionFindings(input.faq) : []),
     ...(input.gaps ? gapFindings(input.gaps) : []),
+    ...(input.gaps && input.sources ? gapFreshnessFindings(input.gaps, input.sources) : []),
     ...(input.sources ? ingestionFindings(input.sources) : []),
     ...(input.industry ? industryFindings(input.industry) : []),
   ];

@@ -2,21 +2,12 @@ import { CircleAlert, ScanSearch } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
-import { useQueryFetch } from "../../../hooks/useQueryFetch";
-import { knowledgeGapService } from "../../../services/knowledgeGapService";
-import { queryKeys } from "../../../services/queryKeys";
-import { fetchIngestionSources } from "../../data-ingestion/ingestionSources";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { RingGauge } from "../components/charts/RingGauge";
-import { gapScanState } from "./analysisFreshness";
 import { scoreVerdict } from "./findings";
 import { ProjectAnalysisDialog } from "./ProjectAnalysisDialog";
-import {
-  DEFAULT_ANALYSIS_OPTIONS,
-  useProjectAnalysis,
-  type AnalysisOptions,
-} from "./useProjectAnalysis";
+import { useProjectAnalysis } from "./useProjectAnalysis";
 
 /** The ring in the colour of the score's verdict, the same steps as `scoreVerdict`. */
 function scoreColor(score: number): string {
@@ -45,33 +36,9 @@ type ProjectAnalysisLauncherProps = {
  */
 export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncherProps) {
   const analysis = useProjectAnalysis();
-  const { selectedProject, selectedProjectId } = useProjectContext();
+  const { selectedProject } = useProjectContext();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [options, setOptions] = useState<AnalysisOptions>(DEFAULT_ANALYSIS_OPTIONS);
-
-  // The same cache entries the overview's cards read, so this costs no extra request on the
-  // overview — it only tells whether the gaps are behind the newest import.
-  const { data: gapsOverview } = useQueryFetch(
-    queryKeys.knowledgeGaps.overview(selectedProjectId),
-    () => knowledgeGapService.fetchKnowledgeGaps(selectedProjectId),
-    { enabled: Boolean(selectedProjectId) },
-  );
-  const { data: sources } = useQueryFetch(
-    queryKeys.ingestion.sourceStatuses(selectedProjectId),
-    () => fetchIngestionSources(selectedProjectId),
-    { enabled: Boolean(selectedProjectId) },
-  );
-  const gapScan = gapScanState(gapsOverview, sources);
-
-  /**
-   * Back to the choice of what to refresh, with the AI refreshes off — except the gaps rescan when
-   * the gaps are behind the newest import, the one case it would find something new.
-   */
-  const chooseOptions = () => {
-    setOptions({ ...DEFAULT_ANALYSIS_OPTIONS, rescanGaps: gapScan.kind === "behind" });
-    analysis.reset();
-  };
 
   const { refreshRevision } = analysis;
   useEffect(() => {
@@ -91,7 +58,7 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
 
   const start = () => {
     setIsOpen(true);
-    void analysis.run(options);
+    void analysis.run();
   };
 
   const openLast = () => {
@@ -151,9 +118,8 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
               setIsOpen(true);
               return;
             }
-            // The button always leads to a new run; the last results have their own way back.
-            chooseOptions();
-            setIsOpen(true);
+            // The button always starts a new run; the last results have their own way back (the ring).
+            start();
           }}
           data-testid="project-analysis-open"
         >
@@ -175,13 +141,9 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
         previousRun={analysis.previousRun}
         lastRun={lastRun}
         projectName={selectedProject?.name}
-        canEvaluateIndustry={analysis.canEvaluateIndustry}
-        gapScan={gapScan}
-        options={options}
-        onOptionsChange={setOptions}
         onStart={start}
         // Back to the options, as the strip's own button does -- the dialog stays open.
-        onRunAgain={chooseOptions}
+        onRunAgain={start}
         onOpenFinding={(to) => {
           setIsOpen(false);
           void navigate(to);
