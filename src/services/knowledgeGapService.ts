@@ -15,6 +15,7 @@ import type {
  * never be reached. Failures propagate; the caller decides what to show.
  */
 export const knowledgeGapService = {
+  /** Loads all detected knowledge gaps of a project, as last cached by the backend. */
   async fetchKnowledgeGaps(projectId: string): Promise<KnowledgeGapOverview> {
     return await apiClient.fetch<KnowledgeGapOverview>(
       `/api/v1/insights/knowledge-gaps?projectId=${encodeURIComponent(projectId)}`,
@@ -24,12 +25,7 @@ export const knowledgeGapService = {
   /**
    * Returns the gaps in a project whose component the signed-in user owns.
    *
-   * Deliberately without the mock fallback the panel reads use. This answers "what is on
-   * *you*", and a fixture standing in for that would put another user's components on the
-   * dashboard and make the empty state — the normal case — unreachable. A failure stays a
-   * failure, and the widget says so.
-   *
-   * The failure is logged here and rethrown, because `useFetch` reduces it to a boolean and
+   * The failure is logged here and rethrown, because `useQueryFetch` reduces it to a boolean and
    * leaves the cause to the loader by contract. Without this line the widget can only say
    * "could not load" and there is nothing anywhere saying whether that was a 403 (not a
    * member of the project), a 404 (a backend without this endpoint) or a 400 (no project
@@ -47,6 +43,7 @@ export const knowledgeGapService = {
     }
   },
 
+  /** Loads one knowledge gap with its details. */
   async fetchKnowledgeGap(projectId: string, gapId: string): Promise<KnowledgeGap> {
     return await apiClient.fetch<KnowledgeGap>(
       `/api/v1/insights/knowledge-gaps/${gapId}?projectId=${encodeURIComponent(projectId)}`,
@@ -54,10 +51,8 @@ export const knowledgeGapService = {
   },
 
   /**
-   * Triggers the backend to (re)detect knowledge gaps via the AI service.
-   *
-   * Unlike the fetch methods, this does not fall back to mock data: the caller
-   * needs to know whether the refresh actually succeeded, so errors propagate.
+   * Triggers the backend to (re)detect knowledge gaps via the AI service. Errors propagate,
+   * so the caller knows whether the refresh actually happened.
    *
    * @returns The number of gaps stored after the refresh.
    */

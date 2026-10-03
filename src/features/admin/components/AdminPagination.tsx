@@ -7,6 +7,13 @@ type AdminPaginationProps = {
   onPageChange: (page: number) => void;
 };
 
+/**
+ * Page controls under the admin tables; on mobile they collapse to previous/next around a page
+ * counter. Renders nothing for a single page.
+ *
+ * Does the same job as `ui/Pagination`. Which of the two stays is an open item in
+ * `docs/UI_DESIGN_DECISIONS.md`.
+ */
 export function AdminPagination({ safePage, totalPages, onPageChange }: AdminPaginationProps) {
   if (totalPages <= 1) return null;
 

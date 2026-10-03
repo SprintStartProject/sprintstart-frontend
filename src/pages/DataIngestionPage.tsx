@@ -445,6 +445,17 @@ function StatusBadge({
   );
 }
 
+/**
+ * The selected project's sources, their connectors and their ingestion runs, in the
+ * sections overview, sources and runs.
+ *
+ * Bound to `/data-ingestion`, open to `PM`, `HR` and `ADMIN` (`routePermissions` in
+ * `src/auth/accessPolicy.ts`). The route is wrapped in `ManagerAreaGuard`, which also
+ * requires a PM to manage the selected project. Jira instances are loaded separately from
+ * the other sources, because the backend does not report Jira as a project source.
+ * `?projectId=` switches the selected project once and is then removed from the URL;
+ * `?sourceId=` switches to the sources section and selects that source.
+ */
 export function DataIngestionPage() {
   const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();

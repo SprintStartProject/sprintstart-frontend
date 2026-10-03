@@ -12,6 +12,7 @@ import {
 
 export type SkipDecision = "accept" | "deny";
 
+/** Whether nobody has read a feedback item yet; the same reading as the team overview's flag. */
 export function isUnread(feedback: OnboardingFeedback): boolean {
   return feedback.read !== true && !feedback.readAt;
 }

@@ -74,6 +74,11 @@ const variantBlobs: Record<AuroraVariant, BlobConfig> = {
   ],
 };
 
+/** Extra pixels the canvas extends beyond the viewport on each side so the
+ *  interactive glow trail isn't clipped at the screen edges.
+ *  Half the maximum trail line width (90 px) is enough. */
+const OVERSCAN = 45;
+
 /**
  * Shared "Aurora Glass" page background.
  *
@@ -89,11 +94,6 @@ const variantBlobs: Record<AuroraVariant, BlobConfig> = {
  * Reads `isAuroraEnabled` from ThemeContext for reactive toggling
  * via Settings → Appearance — no page reload needed.
  */
-
-/** Extra pixels the canvas extends beyond the viewport on each side so the
- *  interactive glow trail isn't clipped at the screen edges.
- *  Half the maximum trail line width (90 px) is enough. */
-const OVERSCAN = 45;
 
 export function AuroraBackground({
   variant = "default",
@@ -121,7 +121,7 @@ export function AuroraBackground({
     glowIntensityRef.current = glowIntensity;
   }, [glowIntensity]);
 
-  // OVERSCAN is module-scoped (see below the component) — not reactive,
+  // OVERSCAN is module-scoped (see above the component) — not reactive,
   // so it is not in the useEffect dependency array.
 
   useEffect(() => {

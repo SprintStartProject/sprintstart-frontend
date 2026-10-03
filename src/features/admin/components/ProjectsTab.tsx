@@ -41,6 +41,12 @@ function getSourceTypeBadges(sources: ProjectSource[]) {
   }));
 }
 
+/**
+ * The project list of the admin page; a row opens the project drawer.
+ *
+ * The empty state tells three cases apart: no project exists at all (`totalCount` is 0), the
+ * search matched nothing, and anything else.
+ */
 export function ProjectsTab({
   filteredProjects,
   onOpenProjectDetails,

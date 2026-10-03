@@ -133,16 +133,20 @@ const UNDO_WINDOW_MS = 7000;
 const FOLD_THRESHOLD = 8;
 
 /**
- * Which cards the board is showing.
+ * The hire's board: their own cards and the buddy's, arranged in areas and stages and synced with
+ * the server. The onboarding path itself lives on the Onboarding page; the board only shows the
+ * current step of it, as a live `PATH_STEP` card. That card is `AI`-owned, so it counts as `buddy`.
  *
- * Not a search and not a sort — the one cut worth making by hand is *who put this here*, which is
- * the one thing a card's content never says on its own. Two sources, and they partition the board:
+ * The filter rail cuts by *who put a card here*, the one thing a card's content never says on its
+ * own (see `layout/boardFilters.ts`). Two sources, and they partition the board:
  *
  * - `buddy` — placed for the hire in conversation, contents read live.
  * - `mine` — everything they wrote themselves: their own notes, links and lists.
  *
  * Where a card sits in the process is a separate question, and the stages, the focus view and the
  * section tabs answer that one.
+ *
+ * Bound to `/board`, open to every permission group, not wrapped in `ManagerAreaGuard`.
  */
 export function BoardPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();

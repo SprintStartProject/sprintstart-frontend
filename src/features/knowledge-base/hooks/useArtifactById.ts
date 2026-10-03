@@ -8,8 +8,8 @@ import type { Artifact } from "../types";
  * Used as a fallback when an artifact is requested (e.g. from a deep link or search)
  * that is not currently present in the active page of artifacts.
  *
- * @param projectId UUID of the project.
- * @param artifactId UUID of the artifact to load.
+ * @param projectId - UUID of the project.
+ * @param artifactId - UUID of the artifact to load.
  */
 export function useArtifactById(projectId: string | null, artifactId: string | null) {
   return useQuery<Artifact | null>({

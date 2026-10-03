@@ -80,9 +80,9 @@ export const KB_SEARCH_DEBOUNCE_MS = 300;
  * router applies location changes inside a transition and a text field bound
  * straight to the URL would lag behind the keyboard.
  *
- * @param projectId The project to scope artifact fetching to. When null, no
+ * @param projectId - The project to scope artifact fetching to. When null, no
  *   fetch is attempted and the page should render its empty state.
- * @param options Forwarded to {@link useKnowledgeBaseUrlState}; the page passes
+ * @param options - Forwarded to {@link useKnowledgeBaseUrlState}; the page passes
  *   `projectSettled` so the initial project resolution does not clear a shared link.
  */
 export function useKnowledgeBase(

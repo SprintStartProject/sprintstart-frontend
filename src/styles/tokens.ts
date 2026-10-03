@@ -5,12 +5,12 @@ import type { TargetAndTransition, Transition, Variants } from "framer-motion";
  *
  * Use these for ALL `motion` components so the whole app shares one
  * "velocity" — elements bounce and settle at the same speed/stiffness.
- * Documented in `docs/animation_tokens.md`; implemented here as the single
- * source of truth.
+ * Documented in `docs/FRONTEND_ARCHITECTURE.md` §8; implemented here as the
+ * single source of truth.
  *
  * Usage:
  * ```tsx
- * import { centralSpringToken } from "@/styles/tokens";
+ * import { centralSpringToken } from "../styles/tokens.ts";
  * <motion.div transition={centralSpringToken} ... />
  * ```
  */

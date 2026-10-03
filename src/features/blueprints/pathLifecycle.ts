@@ -29,6 +29,11 @@ export type BlueprintLifecycle = {
   openId: string;
 };
 
+/**
+ * Reads a blueprint's {@link BlueprintLifecycle} off the row for its latest version, without asking
+ * for its history: a draft at version n means version n - 1 is in service, a draft at 0 means
+ * nothing is.
+ */
 export function lifecycleOf(latest: BlueprintPathOverview): BlueprintLifecycle {
   if (latest.status === "DRAFT") {
     return {
@@ -80,6 +85,7 @@ export const LIFECYCLE_GROUPS: {
   },
 ];
 
+/** The section a blueprint is listed under: retired, in service, or not in service yet. */
 export function groupKeyFor(lifecycle: BlueprintLifecycle): LifecycleGroupKey {
   if (lifecycle.retired) return "retired";
   return lifecycle.inService !== null ? "live" : "unpublished";

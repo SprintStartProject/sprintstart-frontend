@@ -135,7 +135,12 @@ function getStepStatusStyles(status: string) {
 }
 
 /**
- * A member's full profile, shown inside the PM workspace's Team section (`/team/:userId`).
+ * A member's full profile, shown inside the PM workspace's Team section.
+ *
+ * Rendered by `PmWorkspace` for `/team/:userId`; the workspace reads the param and passes it
+ * in as `userId`, so this page never calls `useParams()` itself. The route inherits the
+ * `/team-management` policy entry and its `ManagerAreaGuard`. The member is read through
+ * `getTeamMember`, which falls back to mock users when the team overview cannot be loaded.
  */
 export function TeamMemberDetailPage({ userId }: { userId?: string }) {
   const { selectedProjectId } = useProjectContext();

@@ -103,7 +103,7 @@ async function loadOne(queryClient: QueryClient, projectId: string): Promise<Pro
  * the only endpoint carrying both `hasFeedback` and the pending skip request,
  * so asking for it twice would buy nothing.
  *
- * @param projectIds Projects to load, as a comma-joined string so a new array
+ * @param projectIds - Projects to load, as a comma-joined string so a new array
  * with the same ids does not retrigger the fetch.
  */
 export function useProjectInsights(projectIds: string): Record<string, ProjectInsights> {

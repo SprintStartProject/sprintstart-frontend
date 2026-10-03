@@ -4,11 +4,6 @@ import type { CanonicalAnswer, KnowledgeRequest } from "../features/knowledge-re
 const BASE = "/api/v1/onboarding";
 
 /**
- * The buddy's growth loop. A hire escalates a question the buddy could not answer; a PM works the
- * inbox and answers it, minting a durable answer the buddy then serves. Mirrors the backend's
- * hire (`/me/...`) vs PM split — the PM calls are only reachable from PM-gated surfaces.
- */
-/**
  * Told when the open queue changes, so a badge showing its size can re-read at once instead of
  * waiting for the next navigation.
  *
@@ -20,6 +15,11 @@ type EscalationsChangedListener = () => void;
 
 const escalationsChangedListeners = new Set<EscalationsChangedListener>();
 
+/**
+ * Subscribes to changes of the open escalation queue.
+ *
+ * @returns A function that removes the listener again.
+ */
 export function onOpenEscalationsChanged(listener: EscalationsChangedListener): () => void {
   escalationsChangedListeners.add(listener);
   return () => {
@@ -47,6 +47,11 @@ let countEndpointMissingAt = 0;
 /** How long a 404 is taken as "this backend does not have it" before asking again. */
 const COUNT_ENDPOINT_RETRY_MS = 5 * 60 * 1000;
 
+/**
+ * The buddy's growth loop. A hire escalates a question the buddy could not answer; a PM works the
+ * inbox and answers it, minting a durable answer the buddy then serves. Mirrors the backend's
+ * hire (`/me/...`) vs PM split — the PM calls are only reachable from PM-gated surfaces.
+ */
 export const knowledgeRequestService = {
   /** Hire: flag a question the buddy could not answer to the project's PM. */
   async escalate(projectId: string, question: string): Promise<KnowledgeRequest> {
