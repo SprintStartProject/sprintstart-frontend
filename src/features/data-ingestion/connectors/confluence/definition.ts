@@ -88,6 +88,12 @@ export const confluenceConnector: ConnectorDefinition<
     connect: connectConfluenceDraft,
   },
 
+  connections: {
+    scope: "confluence",
+    live: true,
+    load: (projectId) => confluenceService.listConnections(projectId),
+  },
+
   actions: {
     // Confluence ingests synchronously, so the sync reports how it went itself.
     manualSync: {

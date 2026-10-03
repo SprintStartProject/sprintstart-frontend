@@ -10,7 +10,7 @@ import type { ConnectorDefinition } from "./types.ts";
 import { uploadConnector } from "./upload/definition.ts";
 
 /** The connection record each connector's cards are merged with. */
-type ConnectionOf = {
+export type ConnectionOf = {
   GITHUB: ProjectSource;
   JIRA: JiraInstanceDto;
   UPLOAD: ProjectSource;

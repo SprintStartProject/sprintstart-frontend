@@ -10,6 +10,7 @@ import {
 import { githubRepositoryOf } from "../../sourceDetails.ts";
 import type { GithubRepositoryDetails, SourceInstanceIngestionStatus } from "../../types.ts";
 import { requireProjectId } from "../actionContext.ts";
+import { projectSourceConnections } from "../projectSources.ts";
 import type { ConnectorDefinition } from "../types.ts";
 import { GithubDetailsSection } from "./DetailsSection.tsx";
 import { GithubOrgMetadataView } from "./OrgMetadataView.tsx";
@@ -74,6 +75,8 @@ export const githubConnector: ConnectorDefinition<ProjectSource, GithubDraftSour
     isSame: isSameGithubDraft,
     connect: connectGithubDraft,
   },
+
+  connections: projectSourceConnections,
 
   actions: {
     update: {

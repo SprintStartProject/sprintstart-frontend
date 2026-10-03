@@ -1331,6 +1331,9 @@ describe("DataIngestionPage", () => {
         await waitFor(() => {
           expect(sourcesSection().getAllByText("Syncing").length).toBeGreaterThan(0);
         });
+        // The reload is armed by the runs that are in flight, and the cards do not wait for
+        // them, so let the run table load before the clock moves.
+        expect(await screen.findByText("run-live")).toBeInTheDocument();
 
         // One poll tick reloads the statuses and the latest runs, not only the table.
         await vi.advanceTimersByTimeAsync(3100);

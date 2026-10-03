@@ -2,6 +2,7 @@ import { Ticket } from "lucide-react";
 import { connectorService } from "../../../../services/connectorService.ts";
 import {
   configureJiraInstance,
+  getJiraInstances,
   getJiraConfig,
   removeJiraInstanceFromProject,
   updateJiraInstance,
@@ -45,6 +46,12 @@ export const jiraConnector: ConnectorDefinition<JiraInstanceDto, JiraDraftSource
     detail: (draft) => draft.url,
     isSame: isSameJiraDraft,
     connect: connectJiraDraft,
+  },
+
+  connections: {
+    scope: "jira",
+    live: true,
+    load: (projectId) => getJiraInstances(projectId),
   },
 
   actions: {

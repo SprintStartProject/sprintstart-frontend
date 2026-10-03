@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalendarClock, Plug } from "lucide-react";
 import { Badge } from "../components/ui/Badge.tsx";
@@ -9,6 +10,7 @@ import { Pagination } from "../components/ui/Pagination.tsx";
 import { SegmentedTabs, type SegmentedTabOption } from "../components/ui/SegmentedTabs.tsx";
 import { DataIngestionHeader } from "../features/data-ingestion/components/DataIngestionHeader.tsx";
 import { DataIngestionLoadingState } from "../features/data-ingestion/components/DataIngestionLoadingState.tsx";
+import { WarningBanner } from "../features/data-ingestion/components/WarningBanner.tsx";
 import { DataIngestionSectionFilter } from "../features/data-ingestion/components/DataIngestionSectionFilter.tsx";
 import { OverviewSection } from "../features/data-ingestion/components/OverviewSection.tsx";
 import { RunDetailsPanel } from "../features/data-ingestion/components/RunDetailsPanel.tsx";
@@ -27,27 +29,21 @@ import { toConnectorListItems } from "../features/connectors/data.ts";
 import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import { buildDataSources } from "../features/data-ingestion/buildSources.ts";
+import { useIngestionData } from "../features/data-ingestion/hooks/useIngestionData.ts";
 import {
   CONNECTORS,
   SCHEDULED_SOURCE_SYSTEMS,
   getConnector,
 } from "../features/data-ingestion/connectors/registry.ts";
 import type { SourceSystem } from "../features/data-ingestion/connectors/sourceSystems.ts";
-import {
-  buildRunSourceLabels,
-  getRunSourceLabel,
-  isRunInProgress,
-} from "../features/data-ingestion/data.ts";
+import { buildRunSourceLabels, getRunSourceLabel } from "../features/data-ingestion/data.ts";
 import { githubRepositoryOf } from "../features/data-ingestion/sourceDetails.ts";
 import type {
   DataSource,
   IngestionRun,
   IngestionRunFilter,
-  LoadingState,
-  PageMetadata,
   SectionKey,
   SourceChange,
-  SourceInstanceIngestionStatus,
 } from "../features/data-ingestion/types.ts";
 import { SECTION_ORDER } from "../features/data-ingestion/types.ts";
 import {
@@ -56,18 +52,12 @@ import {
 } from "../features/data-ingestion/projectSyncSchedule.ts";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
-import { getIngestionRunsPage, getIngestionSourceStatuses } from "../services/ingestionService.ts";
+import { queryKeys } from "../services/queryKeys.ts";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import { getGithubPatNames } from "../services/sources/githubService.ts";
 import type { SyncScheduleConfig, SyncScheduleRequest } from "../services/sources/syncSchedule.ts";
-import { getJiraInstances, type JiraInstanceDto } from "../services/sources/jiraService.ts";
-import {
-  confluenceService,
-  type ConfluenceConnectionDto,
-} from "../services/sources/confluenceService.ts";
-import { projectService, type ProjectSource } from "../services/projectService.ts";
 
 /**
  * Wording for the project-wide sync-settings modal, per connector. `one` and
@@ -81,9 +71,9 @@ function getSyncSettingsCopy(system: SourceSystem) {
   return { label, one: `${label} ${noun.singular}`, many: `${label} ${noun.plural}` };
 }
 
-// How many of the project's newest runs feed the source cards and the overview,
-// independent of the run table's page and filter.
-const LATEST_RUNS_SIZE = 50;
+// How long a connect or an update keeps the page reloading, so the run it just
+// started shows up even though none was running yet when it was triggered.
+const POLLING_WINDOW_MS = 60_000;
 
 // Small enough that the run table stays scannable and pagination is actually
 // reachable rather than a single page of rows.
@@ -178,28 +168,10 @@ export function DataIngestionPage() {
   // would snap an open run drawer shut as soon as the user moved to another page.
   const [selectedRunSnapshot, setSelectedRunSnapshot] = useState<IngestionRun | null>(null);
 
-  const [runs, setRuns] = useState<IngestionRun[]>([]);
-  // The project's newest runs, unfiltered. The cards and the overview read these,
-  // so filtering or paging the run table never changes a source's status.
-  const [latestRuns, setLatestRuns] = useState<IngestionRun[]>([]);
-  const [runPageMeta, setRunPageMeta] = useState<PageMetadata | null>(null);
   const [runPageNumber, setRunPageNumber] = useState(1);
   const [runFilter, setRunFilter] = useState<RunFilterState>(DEFAULT_RUN_FILTER);
-  // Monotonic id of the newest run request, so out-of-order responses are dropped.
-  const runRequestIdRef = useRef(0);
-  const hasLoadedOnceRef = useRef(false);
-  const [projectSources, setProjectSources] = useState<ProjectSource[]>([]);
-  const [sourceInstances, setSourceInstances] = useState<SourceInstanceIngestionStatus[]>([]);
-  // Connected Jira instances for the selected project. They carry the credential
-  // the status rows lack, and are merged into the Jira cards by instance URL.
-  const [jiraInstances, setJiraInstances] = useState<JiraInstanceDto[]>([]);
-  const [confluenceConnections, setConfluenceConnections] = useState<ConfluenceConnectionDto[]>([]);
-  const [projectDataVersion, setProjectDataVersion] = useState(0);
-  const [sourceStatusErrorMessage, setSourceStatusErrorMessage] = useState<string | null>(null);
-  const [projectSourcesErrorMessage, setProjectSourcesErrorMessage] = useState<string | null>(null);
-  const [isProjectDataLoading, setIsProjectDataLoading] = useState(false);
-  const [loadingState, setLoadingState] = useState<LoadingState>("loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Set while a manual refresh is in flight, so the header can show it.
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false);
@@ -207,16 +179,11 @@ export function DataIngestionPage() {
   const [syncSettingsSystem, setSyncSettingsSystem] = useState<SourceSystem>("GITHUB");
   // Whether the sources of the open sync-settings tab currently have different schedules.
   const [isSyncScheduleMixed, setIsSyncScheduleMixed] = useState(false);
-  const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
-  const [pollingUntil, setPollingUntil] = useState<number | null>(null);
-  const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
-  const [connectorsLoadingState, setConnectorsLoadingState] = useState<LoadingState>("idle");
-  // Kept for the connectors *load* failure (shown inline in the connectors
-  // modal); the enable/disable toggle reports its outcome via a toast.
-  const [connectorsErrorMessage, setConnectorsErrorMessage] = useState<string | null>(null);
-  const [hasLoadedConnectors, setHasLoadedConnectors] = useState(false);
+  // When the window after a connect or an update opened; null while it is closed.
+  const [pollingWindowStartedAt, setPollingWindowStartedAt] = useState<number | null>(null);
   const [togglingConnectorId, setTogglingConnectorId] = useState<string | null>(null);
   const toast = useToast();
+  const queryClient = useQueryClient();
 
   // The project is chosen globally in the sidebar switcher. The `?projectId=`
   // search param is still honoured so deep links from the admin view land on
@@ -228,12 +195,6 @@ export function DataIngestionPage() {
 
   const requestedProjectId = searchParams.get("projectId") ?? "";
   const requestedSourceId = searchParams.get("sourceId") ?? "";
-
-  // Tracks the last project we loaded data for, so an in-place refresh (a
-  // `projectDataVersion` bump after saving) can reload without wiping the source
-  // list — clearing it would drop `selectedSource` and close an open details
-  // drawer mid-save. Only a real project switch resets the lists.
-  const loadedProjectIdRef = useRef<string | null>(null);
 
   // Applies a `?projectId=` deep link (e.g. opening a source from the admin
   // project view) and then drops the parameter again.
@@ -256,243 +217,99 @@ export function DataIngestionPage() {
     });
   }, [requestedProjectId, searchParams, selectedProjectId, setSearchParams, setSelectedProjectId]);
 
-  // A project's connected sources come from the project-scoped detail endpoint
-  // any member may reach, not from the admin-only project listing behind the
-  // switcher (which leaves `sources` empty for PM/member users). Sources and
-  // the artifact snapshot are fetched together so a project switch reveals the
-  // repo and its ingested files as one unit: the state is reset up front (no
-  // stale counts from the previous project) and a single loading flag covers
-  // both, so the list never renders "done but empty" while the heavier snapshot
-  // is still in flight.
-  useEffect(() => {
-    let isMounted = true;
-
-    // Deferred to a microtask so the resets below do not run synchronously in
-    // the effect body and cascade a render (same pattern as the provider).
-    void Promise.resolve().then(async () => {
-      if (!isMounted) return;
-
-      // Only a real project switch clears the current lists; an in-place refresh
-      // (same project, version bump) reloads without emptying them, so an open
-      // details drawer and its selection survive a save.
-      const isProjectSwitch = loadedProjectIdRef.current !== selectedProjectId;
-      loadedProjectIdRef.current = selectedProjectId;
-
-      if (isProjectSwitch) {
-        setProjectSources([]);
-        setSourceInstances([]);
-        setJiraInstances([]);
-        setConfluenceConnections([]);
-        setLatestRuns([]);
-      }
-      setProjectSourcesErrorMessage(null);
-      setSourceStatusErrorMessage(null);
-
-      if (!selectedProjectId) {
-        setIsProjectDataLoading(false);
-        return;
-      }
-
-      if (isProjectSwitch) {
-        setIsProjectDataLoading(true);
-      }
-
-      const [projectResult, sourceStatusResult, jiraResult, confluenceResult, latestRunsResult] =
-        await Promise.allSettled([
-          projectService.getAccessibleProject(selectedProjectId),
-          getIngestionSourceStatuses(selectedProjectId),
-          getJiraInstances(selectedProjectId),
-          confluenceService.listConnections(selectedProjectId),
-          getIngestionRunsPage({ projectId: selectedProjectId, size: LATEST_RUNS_SIZE }),
-        ]);
-
-      if (!isMounted) return;
-
-      if (projectResult.status === "fulfilled") {
-        setProjectSources(projectResult.value.sources);
-      } else {
-        setProjectSourcesErrorMessage(
-          projectResult.reason instanceof Error
-            ? projectResult.reason.message
-            : "Project sources could not be loaded.",
-        );
-      }
-
-      if (sourceStatusResult.status === "fulfilled") {
-        setSourceInstances(sourceStatusResult.value);
-      } else {
-        setSourceStatusErrorMessage(
-          sourceStatusResult.reason instanceof Error
-            ? sourceStatusResult.reason.message
-            : "Source status could not be loaded.",
-        );
-      }
-
-      // Jira and Confluence degrade quietly: a load failure (e.g. an HR user without
-      // the PM/ADMIN role the endpoint requires) must not blank the page or
-      // surface an error banner.
-      setJiraInstances(jiraResult.status === "fulfilled" ? jiraResult.value : []);
-      setConfluenceConnections(
-        confluenceResult.status === "fulfilled" ? confluenceResult.value : [],
-      );
-
-      // A failed fetch keeps the last-known runs; the run table reports its own errors.
-      if (latestRunsResult.status === "fulfilled") {
-        setLatestRuns(latestRunsResult.value.items);
-      }
-
-      setIsProjectDataLoading(false);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [projectDataVersion, selectedProjectId]);
-
   // Server-side query for the run history. Scoping by project is what keeps runs
   // from other projects' repositories out of the list; the backend resolves the
   // project to its connected repositories.
-  const buildRunQuery = useCallback(
-    (page: number): IngestionRunFilter => {
-      // The connector says which query parameter scopes its runs (repositoryId is
-      // the backend source-instance UUID, sourceRef the run's source reference).
-      const scope =
-        runFilter.sourceValue !== "ALL" && runFilter.sourceSystem
-          ? getConnector(runFilter.sourceSystem).runFilter?.param
-          : undefined;
+  const runQuery = useMemo<IngestionRunFilter>(() => {
+    // The connector says which query parameter scopes its runs (repositoryId is
+    // the backend source-instance UUID, sourceRef the run's source reference).
+    const scope =
+      runFilter.sourceValue !== "ALL" && runFilter.sourceSystem
+        ? getConnector(runFilter.sourceSystem).runFilter?.param
+        : undefined;
 
-      return {
-        page,
-        size: RUN_PAGE_SIZE,
-        projectId: selectedProjectId || undefined,
-        repositoryId: scope === "repositoryId" ? runFilter.sourceValue : undefined,
-        sourceRef: scope === "sourceRef" ? runFilter.sourceValue : undefined,
-        status: runFilter.status !== "ALL" ? runFilter.status : undefined,
-      };
-    },
-    [runFilter.sourceValue, runFilter.sourceSystem, runFilter.status, selectedProjectId],
+    return {
+      page: runPageNumber,
+      size: RUN_PAGE_SIZE,
+      projectId: selectedProjectId || undefined,
+      repositoryId: scope === "repositoryId" ? runFilter.sourceValue : undefined,
+      sourceRef: scope === "sourceRef" ? runFilter.sourceValue : undefined,
+      status: runFilter.status !== "ALL" ? runFilter.status : undefined,
+    };
+  }, [
+    runFilter.sourceValue,
+    runFilter.sourceSystem,
+    runFilter.status,
+    runPageNumber,
+    selectedProjectId,
+  ]);
+
+  // Everything the page is built from. While any run is in flight, or the window
+  // after a connect or an update is open, it is all reloaded every few seconds.
+  const {
+    statuses: sourceInstances,
+    latestRuns,
+    projectSources,
+    jiraInstances,
+    confluenceConnections,
+    runs,
+    runPageMeta,
+    isRunsPlaceholder,
+    isRunsLoading,
+    runsErrorMessage,
+    isProjectDataLoading,
+    statusErrorMessage: sourceStatusErrorMessage,
+    projectSourcesErrorMessage,
+  } = useIngestionData({
+    projectId: selectedProjectId || null,
+    runQuery,
+    isPollingWindowOpen: pollingWindowStartedAt !== null,
+  });
+
+  // Closes the window once it has run its course.
+  useEffect(() => {
+    if (pollingWindowStartedAt === null) return undefined;
+
+    const timeoutId = window.setTimeout(() => setPollingWindowStartedAt(null), POLLING_WINDOW_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [pollingWindowStartedAt]);
+
+  const openPollingWindow = () => setPollingWindowStartedAt(Date.now());
+
+  // The viewed page can fall out of range while the view is open (a filter
+  // narrowing the result set, runs being removed). Step back to the last page
+  // instead of showing an empty table; this re-runs the query.
+  useEffect(() => {
+    if (!runPageMeta || isRunsPlaceholder) return;
+
+    if (runPageMeta.totalPages >= 1 && runPageNumber > runPageMeta.totalPages) {
+      void Promise.resolve().then(() => setRunPageNumber(runPageMeta.totalPages));
+    }
+  }, [isRunsPlaceholder, runPageMeta, runPageNumber]);
+
+  // Reloads everything the page holds: the status rows, the connections, the runs
+  // and the connector list. A mutation calls this instead of reloading by hand, and
+  // the returned promise settles once the visible data is back.
+  const refreshIngestionData = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.ingestion.all() }),
+    [queryClient],
   );
 
-  // Loads exactly the page currently being viewed.
+  // The connector state decides whether a source reaches chat at all, so it is
+  // loaded with the page rather than only when the connectors modal opens --
+  // otherwise a globally disabled connector stays invisible while every card
+  // still claims "Connected".
   //
-  // Starting a repository update fires several overlapping refreshes (an
-  // immediate one, a delayed one, plus the 3s poll). Their responses can resolve
-  // out of order, and an older snapshot landing last would drop the runs that
-  // were just created -- which looked like new runs only appearing after a
-  // manual browser refresh. The sequence guard keeps the newest response.
-  const loadRuns = useCallback(
-    async (page: number) => {
-      const requestId = ++runRequestIdRef.current;
-      const result = await getIngestionRunsPage(buildRunQuery(page));
-
-      if (requestId !== runRequestIdRef.current) return;
-
-      // The viewed page can fall out of range while the view is open (a filter
-      // narrowing the result set, runs being removed). Step back to the last
-      // page instead of showing an empty table; this re-triggers the load.
-      if (result.page.totalPages >= 1 && page > result.page.totalPages) {
-        setRunPageNumber(result.page.totalPages);
-        return;
-      }
-
-      setRuns(result.items);
-      setRunPageMeta(result.page);
-    },
-    [buildRunQuery],
-  );
-
-  const loadData = useCallback(
-    async (showLoading = true) => {
-      if (showLoading) {
-        setLoadingState("loading");
-      }
-      setErrorMessage(null);
-
-      try {
-        await loadRuns(runPageNumber);
-        setLoadingState("success");
-      } catch (error) {
-        if (showLoading) {
-          setLoadingState("error");
-        }
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load ingestion data");
-      }
-    },
-    [loadRuns, runPageNumber],
-  );
-
-  // In-place refresh of everything the source cards are built from (status rows,
-  // Jira and Confluence connections, the project's latest runs) after a source
-  // mutation or a poll, without re-running the whole project fetch. Scoped to the
-  // selected project so a PM only sees their project's sources (the backend
-  // `projectId` filter).
-  const reloadSourceData = useCallback(async () => {
-    if (!selectedProjectId) {
-      setSourceInstances([]);
-      setJiraInstances([]);
-      setConfluenceConnections([]);
-      setLatestRuns([]);
-      return;
-    }
-
-    // The loads are independent: one failing must not stop the others from
-    // updating, and a failed in-place refresh leaves the last-known data in place
-    // rather than blanking the cards. The combined project-data effect surfaces
-    // load errors.
-    const [statusResult, jiraResult, confluenceResult, latestRunsResult] = await Promise.allSettled(
-      [
-        getIngestionSourceStatuses(selectedProjectId),
-        getJiraInstances(selectedProjectId),
-        confluenceService.listConnections(selectedProjectId),
-        getIngestionRunsPage({ projectId: selectedProjectId, size: LATEST_RUNS_SIZE }),
-      ],
-    );
-
-    if (statusResult.status === "fulfilled") setSourceInstances(statusResult.value);
-    if (jiraResult.status === "fulfilled") setJiraInstances(jiraResult.value);
-    if (confluenceResult.status === "fulfilled") setConfluenceConnections(confluenceResult.value);
-    if (latestRunsResult.status === "fulfilled") setLatestRuns(latestRunsResult.value.items);
-  }, [selectedProjectId]);
-
-  // Runs on mount and whenever the run query changes (project, filters or the
-  // selected page). Only the first load shows the page-level loading state, so
-  // paging and filtering refresh quietly.
-  useEffect(() => {
-    const showLoading = !hasLoadedOnceRef.current;
-    hasLoadedOnceRef.current = true;
-
-    void loadData(showLoading);
-  }, [loadData]);
-
-  // While any run of the project is in flight (in the table or among the latest
-  // runs) or the post-update window is open, the table, the status rows, the
-  // connections and the latest runs are all refreshed together, so the cards move
-  // from "Syncing" to "Synced" without a manual reload.
-  const hasRunningRun =
-    runs.some((run) => isRunInProgress(run.status)) ||
-    latestRuns.some((run) => isRunInProgress(run.status));
-
-  useEffect(() => {
-    const isPollingWindowActive = pollingUntil !== null && Date.now() < pollingUntil;
-
-    if (!hasRunningRun && !isPollingWindowActive) {
-      return undefined;
-    }
-
-    const intervalId = window.setInterval(() => {
-      const shouldStopPolling =
-        pollingUntil !== null && Date.now() >= pollingUntil && !hasRunningRun;
-
-      if (shouldStopPolling) {
-        setPollingUntil(null);
-        return;
-      }
-
-      void Promise.all([loadData(false), reloadSourceData()]);
-    }, 3000);
-
-    return () => window.clearInterval(intervalId);
-  }, [hasRunningRun, loadData, pollingUntil, reloadSourceData]);
+  // A failure is not retried and not reported on the page: the endpoint is
+  // PM/ADMIN-only, but HR may open this page, and an unknown connector state must
+  // not fake a disabled source. The connectors modal shows the failure.
+  const connectorsQuery = useQuery({
+    queryKey: queryKeys.ingestion.connectors(),
+    queryFn: async () => toConnectorListItems(await connectorService.listConnectors()),
+    retry: false,
+  });
+  const connectors = useMemo(() => connectorsQuery.data ?? [], [connectorsQuery.data]);
 
   const connectorEnabledById = useMemo(
     () => new Map(connectors.map((connector) => [connector.id.toLowerCase(), connector.enabled])),
@@ -626,76 +443,34 @@ export function DataIngestionPage() {
     setRunPageNumber(1);
   }, []);
 
-  const loadConnectors = useCallback(async () => {
-    setConnectorsLoadingState("loading");
-    setConnectorsErrorMessage(null);
-
-    try {
-      const response = await connectorService.listConnectors();
-      setConnectors(toConnectorListItems(response));
-      setHasLoadedConnectors(true);
-      setConnectorsLoadingState("success");
-    } catch (error) {
-      setConnectorsLoadingState("error");
-      setConnectorsErrorMessage(
-        error instanceof Error ? error.message : "Failed to load connectors",
-      );
-    }
-  }, []);
-
-  // The connector state decides whether a source reaches chat at all, so it is
-  // loaded with the page rather than only when the connectors modal opens —
-  // otherwise a globally disabled connector stays invisible while every card
-  // still claims "Connected".
-  //
-  // Failure is swallowed on purpose: the endpoint is PM/ADMIN-only, but HR may
-  // open this page. An unknown connector state must not fake a disabled source.
-  useEffect(() => {
-    void Promise.resolve().then(async () => {
-      try {
-        const response = await connectorService.listConnectors();
-        setConnectors(toConnectorListItems(response));
-        setHasLoadedConnectors(true);
-      } catch {
-        setConnectors([]);
-      }
-    });
-  }, []);
-
   const handleSectionChange = useCallback((section: SectionKey) => {
     setActiveSection(section);
   }, []);
 
-  const handleOpenConnectorsModal = useCallback(() => {
+  const handleOpenConnectorsModal = () => {
     setIsConnectorsModalOpen(true);
 
-    if (!hasLoadedConnectors && connectorsLoadingState !== "loading") {
-      void loadConnectors();
+    // A load that failed earlier (the list is not retried in the background) is tried
+    // again when the user asks for the modal.
+    if (connectorsQuery.isError) void connectorsQuery.refetch();
+  };
+
+  const handleToggleConnectorEnabled = async (connector: ConnectorListItem) => {
+    setTogglingConnectorId(connector.id);
+
+    try {
+      const response = await connectorService.setConnectorEnabled(connector.id, !connector.enabled);
+
+      queryClient.setQueryData<ConnectorListItem[]>(queryKeys.ingestion.connectors(), (current) =>
+        current?.map((item) => (item.id === connector.id ? { ...item, ...response } : item)),
+      );
+      toast.success(connector.enabled ? "Connector disabled" : "Connector enabled");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't update the connector.");
+    } finally {
+      setTogglingConnectorId(null);
     }
-  }, [connectorsLoadingState, hasLoadedConnectors, loadConnectors]);
-
-  const handleToggleConnectorEnabled = useCallback(
-    async (connector: ConnectorListItem) => {
-      setTogglingConnectorId(connector.id);
-
-      try {
-        const response = await connectorService.setConnectorEnabled(
-          connector.id,
-          !connector.enabled,
-        );
-
-        setConnectors((current) =>
-          current.map((item) => (item.id === connector.id ? { ...item, ...response } : item)),
-        );
-        toast.success(connector.enabled ? "Connector disabled" : "Connector enabled");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Couldn't update the connector.");
-      } finally {
-        setTogglingConnectorId(null);
-      }
-    },
-    [toast],
-  );
+  };
 
   const selectedSource = useMemo(() => {
     if (!selectedSourceId) return null;
@@ -703,61 +478,38 @@ export function DataIngestionPage() {
     return sources.find((source) => source.sourceId === selectedSourceId) ?? null;
   }, [selectedSourceId, sources]);
 
-  const loadGithubTokenNames = useCallback(() => {
-    void getGithubPatNames()
-      .then((tokenNames) => {
-        setGithubTokenNames(tokenNames);
-      })
-      .catch(() => {
-        setGithubTokenNames([]);
-      });
-  }, []);
+  // The tokens the add-source form discovers repositories with. Only asked for once
+  // the modal is open; a failure just leaves the list empty (the form loads its own).
+  const { data: githubTokenNames = [] } = useQuery({
+    queryKey: queryKeys.admin.githubTokenNames(),
+    queryFn: ({ signal }) => getGithubPatNames(signal),
+    enabled: isAddSourceModalOpen,
+    retry: false,
+  });
 
   // The wizard covers both connect paths (org discovery and a single repository),
   // so this is the only entry point.
-  const handleOpenAddSourceModal = () => {
-    setIsAddSourceModalOpen(true);
-    loadGithubTokenNames();
-  };
+  const handleOpenAddSourceModal = () => setIsAddSourceModalOpen(true);
 
-  // Runs after the wizard connects a source (GitHub repositories or a Jira
-  // instance): kick the polling window and refresh the page's data (the modal
+  // Runs after the wizard connects a source: opens the polling window, jumps to the
+  // sources list and reloads the page's data and the project switcher's (the modal
   // owns the confirming toast).
-  const handleDiscoveryConnected = useCallback(() => {
-    // The Add-source modal owns the "connected" toast; this only starts the
-    // polling window and jumps to the sources list.
-    setPollingUntil(Date.now() + 60000);
+  const handleDiscoveryConnected = () => {
+    openPollingWindow();
     setActiveSection("sources");
 
-    void Promise.all([loadData(false), reloadProjects(), reloadSourceData()]).then(() =>
-      setProjectDataVersion((version) => version + 1),
-    );
+    void Promise.all([refreshIngestionData(), reloadProjects()]);
+  };
 
-    window.setTimeout(() => {
-      void loadData(false);
-      void reloadProjects();
-      void reloadSourceData();
-      setProjectDataVersion((version) => version + 1);
-    }, 1500);
-  }, [loadData, reloadSourceData, reloadProjects]);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
 
-  // Shared post-update refresh: polling window + an immediate and a delayed
-  // reload, so a just-started run appears without a manual refresh.
-  const refreshAfterUpdate = useCallback(() => {
-    // The drawer that triggers the update owns the "Update started" toast, so
-    // this only kicks the polling window and refreshes the page data.
-    setPollingUntil(Date.now() + 60000);
-
-    void Promise.all([loadData(false), reloadSourceData()]).then(() =>
-      setProjectDataVersion((version) => version + 1),
-    );
-
-    window.setTimeout(() => {
-      void loadData(false);
-      void reloadSourceData();
-      setProjectDataVersion((version) => version + 1);
-    }, 1500);
-  }, [loadData, reloadSourceData]);
+    try {
+      await Promise.all([refreshIngestionData(), reloadProjects()]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // The sync-settings modal works on the selected project's sources only: it
   // reads the schedule of each of them, shows it when they all agree, and writes
@@ -785,53 +537,35 @@ export function DataIngestionPage() {
       // Deliberately does NOT reloadProjects(): changing sync schedules does not
       // affect the project switcher's data, and a project reload can transiently
       // reset the selected project (e.g. a slow managed-projects fetch), which
-      // makes the page-data effect treat it as a project switch and blank the
-      // page. See the note on refreshSourceDetails.
-      await Promise.all([loadData(false), reloadSourceData()]);
+      // blanks the page.
+      await refreshIngestionData();
     },
-    [
-      loadData,
-      reloadSourceData,
-      selectedProjectId,
-      sources,
-      syncSettingsCopy.many,
-      syncSettingsSystem,
-    ],
+    [refreshIngestionData, selectedProjectId, sources, syncSettingsCopy.many, syncSettingsSystem],
   );
-
-  // Refreshes just this page's data after a source-level mutation (enable/disable,
-  // "Refresh details"). It intentionally does NOT reloadProjects(): the switcher's
-  // project list is unaffected by these actions, and reloading it can transiently
-  // drop the selected project (a slow/failed managed-projects fetch resets the
-  // selection), which the page-data effect then reads as a project switch — it
-  // clears the source list, shows the initial loading skeleton and closes the
-  // open details drawer. That reset is what read as "the whole page reloads".
-  const refreshSourceDetails = useCallback(async () => {
-    await Promise.all([loadData(false), reloadSourceData()]);
-    setProjectDataVersion((version) => version + 1);
-  }, [loadData, reloadSourceData]);
 
   // The details panel runs its actions itself (through the source's connector
   // definition) and reports what it changed; this reloads what the cards are
-  // built from. An unlink also drops the selection, so the card disappears and
-  // the drawer closes.
-  const handleSourceChanged = useCallback(
-    async (change: SourceChange) => {
-      if (change === "updated") {
-        refreshAfterUpdate();
-        return;
-      }
+  // built from. An update also opens the polling window, so the run it started
+  // shows up and the card moves from "Syncing" to "Synced"; an unlink drops the
+  // selection, so the card disappears and the drawer closes.
+  //
+  // Deliberately does NOT reloadProjects(): the switcher's project list is
+  // unaffected by these actions, and reloading it can transiently drop the
+  // selected project (a slow or failed managed-projects fetch resets the
+  // selection), which reads as a project switch and closes the open drawer.
+  const handleSourceChanged = async (change: SourceChange) => {
+    if (change === "updated") {
+      openPollingWindow();
+    }
 
-      if (change === "unlinked") {
-        setSelectedSourceId(null);
-      }
+    if (change === "unlinked") {
+      setSelectedSourceId(null);
+    }
 
-      await refreshSourceDetails();
-    },
-    [refreshAfterUpdate, refreshSourceDetails],
-  );
+    await refreshIngestionData();
+  };
 
-  const isLoading = loadingState === "loading";
+  const isLoading = isRunsLoading || isRefreshing;
 
   // Two-finger swipe between the sections, for people who would rather not aim
   // at the bar.
@@ -879,35 +613,14 @@ export function DataIngestionPage() {
         <DataIngestionHeader
           isLoading={isLoading}
           onAddSource={handleOpenAddSourceModal}
-          onRefresh={() => {
-            void loadData();
-            void reloadProjects();
-            void reloadSourceData();
-            if (isConnectorsModalOpen) {
-              void loadConnectors();
-            }
-            setProjectDataVersion((version) => version + 1);
-          }}
+          onRefresh={() => void handleRefresh()}
         />
 
         <main ref={swipeRef} className="app-page-shell">
           <div className="space-y-8">
-            {errorMessage && (
-              <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-5 py-4 text-sm text-app-warning-text">
-                {errorMessage}
-              </div>
-            )}
-
-            {sourceStatusErrorMessage && (
-              <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-5 py-4 text-sm text-app-warning-text">
-                {sourceStatusErrorMessage}
-              </div>
-            )}
-
-            {projectSourcesErrorMessage && (
-              <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-5 py-4 text-sm text-app-warning-text">
-                {projectSourcesErrorMessage}
-              </div>
+            {[runsErrorMessage, sourceStatusErrorMessage, projectSourcesErrorMessage].map(
+              (message) =>
+                message ? <WarningBanner key={message}>{message}</WarningBanner> : null,
             )}
 
             <DataIngestionSectionFilter
@@ -1092,13 +805,17 @@ export function DataIngestionPage() {
         bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
         onClose={() => setIsConnectorsModalOpen(false)}
       >
-        {connectorsErrorMessage && (
-          <div className="mb-4 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-            {connectorsErrorMessage}
+        {connectorsQuery.isError && (
+          <div className="mb-4">
+            <WarningBanner compact>
+              {connectorsQuery.error instanceof Error
+                ? connectorsQuery.error.message
+                : "Failed to load connectors"}
+            </WarningBanner>
           </div>
         )}
 
-        {connectorsLoadingState === "loading" && !hasLoadedConnectors ? (
+        {connectorsQuery.isLoading ? (
           <ConnectorsLoadingState />
         ) : (
           <ConnectorList
@@ -1108,10 +825,7 @@ export function DataIngestionPage() {
             onToggleEnabled={(connector) => {
               void handleToggleConnectorEnabled(connector);
             }}
-            onSourcesSaved={() => {
-              void loadConnectors();
-              void reloadSourceData();
-            }}
+            onSourcesSaved={() => void refreshIngestionData()}
           />
         )}
       </Modal>

@@ -1,5 +1,6 @@
 import { FileText, Upload } from "lucide-react";
 import type { ProjectSource } from "../../../../services/projectService.ts";
+import { projectSourceConnections } from "../projectSources.ts";
 import type { ConnectorDefinition } from "../types.ts";
 import { UploadDraftForm } from "./DraftForm.tsx";
 import { connectUploadDraft, type UploadDraftSource } from "./draft.ts";
@@ -38,6 +39,7 @@ export const uploadConnector: ConnectorDefinition<ProjectSource, UploadDraftSour
     isSame: () => false,
     connect: connectUploadDraft,
   },
+  connections: projectSourceConnections,
   // There is no upstream to update, unlink from a project, switch or schedule.
   actions: {},
   DetailsSection: null,

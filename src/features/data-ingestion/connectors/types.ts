@@ -91,6 +91,28 @@ export type SourceActions = {
   };
 };
 
+/**
+ * How the page loads a connector's own records of a project's sources. A card is
+ * built from the status row, and merged with this record for what the row lacks
+ * (a credential, a connection id).
+ */
+export type ConnectionSupport<C> = {
+  /**
+   * Names what is loaded. Connectors that read the same endpoint name the same scope
+   * and so share one request and one cache entry.
+   */
+  scope: string;
+  load(projectId: string): Promise<C[]>;
+  /**
+   * What to tell the user when the load fails. Without it a failure is silent and the
+   * cards are built without these records, for endpoints a user may not be allowed to
+   * read (an HR user without the PM role Jira's instance list requires).
+   */
+  failureMessage?: string;
+  /** Whether the records change while ingestion runs, so they are reloaded with the status rows. */
+  live?: boolean;
+};
+
 /** What a connector's section of the details panel receives. */
 export type DetailsSectionProps = {
   source: DataSource;
@@ -225,6 +247,7 @@ export type ConnectorDefinition<C = unknown, D extends DraftSource = DraftSource
     isDefaultCitationSource?: boolean;
   };
   knowledgeBase: KnowledgeBaseSupport;
+  connections: ConnectionSupport<C>;
   actions: SourceActions;
   /** The connector's own card in the details panel (identity rows); null when it has none. */
   DetailsSection: ComponentType<DetailsSectionProps> | null;
