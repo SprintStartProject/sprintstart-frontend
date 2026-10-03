@@ -180,6 +180,7 @@ Everything else — `ui/Button`, `ui/Input`, `SpotlightCard`, `AuroraBackground`
 
 - **Keycloak** (`keycloak-js`) for IAM; dev requires a Keycloak user with a role (`USER` / `PM` / `HR` / `ADMIN`) and redirect-based login.
 - Route access is centralized in `auth/accessPolicy.ts` (`AppRoute` union + `canAccessRoute`) and enforced by `router/AuthGuard.tsx`. **New protected routes must be added to `AppRoute` + the permission map**, or they won't type-check / won't be access-controlled.
+- **The buddy has a hand-written map of these pages** (`AppGuide.kt` in the backend, served by the `get_app_guide` tool). A new, renamed or removed page, tab or tab URL parameter, or a changed sidebar/tab/button label it quotes, means updating that file in the same change. `appGuideRoutes.test.ts` fails when `accessPolicy.ts` gains a route the guide neither describes nor excludes on purpose (`src/features/buddy/appGuideRoutes.ts`).
 - See [docs/FRONTEND_ARCHITECTURE.md §4](./docs/FRONTEND_ARCHITECTURE.md#4-routing--access-control) for the full routing model (declarative `<Route element={...}>` API, not data-router loaders).
 
 ---

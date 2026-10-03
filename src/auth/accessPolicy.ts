@@ -158,8 +158,14 @@ export function getDefaultRoute(profile: UserProfile | null): AppRoute {
   return "/";
 }
 
+/**
+ * Every route the policy knows, at runtime. `AppRoute` is a type and vanishes on build, so anything
+ * that has to enumerate the routes — the buddy's app-guide coverage test, say — reads this.
+ */
+export const APP_ROUTES = Object.keys(routePermissions) as AppRoute[];
+
 export function getMatchingProtectedRoute(pathname: string): AppRoute | null {
-  const routes = Object.keys(routePermissions) as AppRoute[];
+  const routes = APP_ROUTES;
 
   const exactMatch = routes.find((route) => route === pathname);
 
