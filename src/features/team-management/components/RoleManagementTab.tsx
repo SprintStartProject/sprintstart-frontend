@@ -1,6 +1,6 @@
 import { Check, Minus, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
 import { SaveButton } from "../../../components/ui/SaveButton";
@@ -9,7 +9,7 @@ import { Textarea } from "../../../components/ui/Textarea";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { useAuth } from "../../../context/useAuth";
 import { useToast } from "../../../context/useToast";
-import { RoleCard } from "./RoleCard";
+import { RoleRow } from "./RoleRow";
 import { SkillSuggestionPanel } from "./SkillSuggestionPanel";
 import { skillSuggestionKey } from "../skillSuggestion";
 import {
@@ -105,22 +105,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     [roles, selectedRoleId],
   );
 
-  /**
-   * The roles column, and its height from just before the last open/close.
-   *
-   * Fading the panels in was not enough: the page still reached its new shape
-   * in a single frame -- the card grid collapsing to a chip row is a few
-   * hundred pixels -- and a fade laid over a jump still reads as a jump. So
-   * the two heights that change are animated instead: this column, from what
-   * it measured before the click to what it measures after, and the detail
-   * panel from zero to its content height. Everything below them then travels
-   * continuously rather than teleporting.
-   */
-  const rolesRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
-  const rolesHeightBeforeRef = useRef<number | null>(null);
-  const rolesControls = useAnimationControls();
-  const [isRolesResizing, setIsRolesResizing] = useState(false);
 
   // Mirrors `selectedRoleId`, but as a ref rather than state: a suggestion
   // request or an apply that is still in flight when the user switches (or
@@ -129,33 +114,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   // through the async function's closure would only ever see the value from
   // when the request started, not the live selection.
   const selectedRoleIdRef = useRef<string | null>(null);
-
-  function captureRolesHeight() {
-    rolesHeightBeforeRef.current = rolesRef.current?.offsetHeight ?? null;
-  }
-
-  useLayoutEffect(() => {
-    const element = rolesRef.current;
-    const heightBefore = rolesHeightBeforeRef.current;
-    rolesHeightBeforeRef.current = null;
-
-    if (!element || heightBefore === null) return;
-
-    const heightAfter = element.offsetHeight;
-    if (heightBefore === heightAfter) return;
-
-    // Clipped only while it runs: the cards' hover shadow would be cut off
-    // by a permanent `overflow: hidden`.
-    setIsRolesResizing(true);
-    rolesControls.set({ height: heightBefore });
-
-    void rolesControls.start({ height: heightAfter, transition: expandTransition }).then(() => {
-      // Back to `auto`, so later content changes size the column
-      // normally instead of being trapped at the measured height.
-      rolesControls.set({ height: "auto" });
-      setIsRolesResizing(false);
-    });
-  }, [expandTransition, rolesControls, selectedRoleId]);
 
   /**
    * Brings the opened role into view once it has finished expanding.
@@ -173,8 +131,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   }, [prefersReducedMotion]);
 
   function openRole(roleId: string) {
-    captureRolesHeight();
-
     if (selectedRoleId === roleId) {
       closeRole();
       return;
@@ -196,7 +152,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   }
 
   function closeRole() {
-    captureRolesHeight();
     selectedRoleIdRef.current = null;
     setSelectedRoleId(null);
     setShowSuggestionPanel(false);
@@ -523,24 +478,274 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   }, [originalUserIds, users]);
 
   // Worth surfacing on the overview: a member with no role is invisible in
-  // the role cards, so without this they are only found by going through
+  // the roles list, so without this they are only found by going through
   // every role and noticing who is missing.
   const usersWithoutRole = users.filter((user) => user.roles.length === 0);
 
   const roleToDelete = roles.find((role) => role.id === deleteRoleId);
   const skillToRetire = skills.find((skill) => skill.id === retireSkillId);
 
+  // The open role, expanded right under its row in the list. Everything about it lives in here --
+  // who holds it, and which skills it carries -- so working on a role never means looking at two
+  // places at once.
+  const roleDetail = selectedRole ? (
+    <section className="rounded-xl border border-app-border-muted bg-app-bg/40 p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          {/* The row right above already names the role and says what it does; the heading
+              stays for screen readers, who meet the panel without the row beside it. */}
+          <p className="text-sm font-semibold text-app-brand">Manage role</p>
+          <h3 className="sr-only">{selectedRole.name}</h3>
+        </div>
+
+        <button
+          type="button"
+          onClick={closeRole}
+          aria-label="Close role details"
+          className="shrink-0 rounded-lg p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Members take the room, skills sit in a narrow column
+                            beside them: the member grid is the part that grows
+                            with the team, the skill list stays short. */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_28rem]">
+        <div className="min-w-0">
+          <h4 className="text-sm font-semibold text-app-text">Members</h4>
+          <p className="mt-1 text-xs leading-relaxed text-app-text-muted">
+            Ticked members hold {selectedRole.name}. Untick to take it away —{" "}
+            {selectedUserIds.length} selected.
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+            {membersForAssignment.map((user) => {
+              const isChecked = selectedUserIds.includes(user.userId);
+              const heldBefore = originalUserIds.includes(user.userId);
+              // The two pending states,
+              // shown in the colour of
+              // the action they will
+              // perform on save.
+              const isBeingAdded = isChecked && !heldBefore;
+              const isBeingRemoved = !isChecked && heldBefore;
+              const fullName = `${user.firstname} ${user.lastname}`;
+
+              return (
+                <label
+                  key={user.userId}
+                  className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors ${
+                    isBeingAdded
+                      ? "border-app-success-border bg-app-success-bg"
+                      : isBeingRemoved
+                        ? "border-app-danger-border bg-app-danger-bg"
+                        : isChecked
+                          ? "border-app-brand bg-app-brand-soft"
+                          : "border-app-border bg-app-bg hover:border-app-brand-border-strong hover:bg-app-surface-hover"
+                  }`}
+                >
+                  {/* The real control, kept for
+                                                                keyboard and screen readers;
+                                                                the box beside it is what is
+                                                                actually seen, because a
+                                                                native checkbox cannot show
+                                                                three different marks. */}
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    disabled={savingAssignment}
+                    onChange={() => toggleUser(user.userId)}
+                    className="peer sr-only"
+                  />
+
+                  <span
+                    aria-hidden="true"
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-app-focus ${
+                      isBeingAdded
+                        ? "border-app-success-border bg-app-success-bg text-app-success-text"
+                        : isBeingRemoved
+                          ? "border-app-danger-border bg-app-danger-bg text-app-danger-text"
+                          : isChecked
+                            ? "border-app-brand bg-app-brand text-app-text-inverse"
+                            : "border-app-border bg-app-surface"
+                    }`}
+                  >
+                    {isBeingAdded ? (
+                      <Plus className="h-3.5 w-3.5" />
+                    ) : isBeingRemoved ? (
+                      <Minus className="h-3.5 w-3.5" />
+                    ) : isChecked ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : null}
+                  </span>
+
+                  <UserAvatar
+                    profileIcon={user.profileIcon}
+                    fallbackName={fullName}
+                    seed={user.userId}
+                    size={40}
+                  />
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-app-text">
+                      {fullName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-app-text-muted">
+                      {isBeingAdded
+                        ? "Will be added"
+                        : isBeingRemoved
+                          ? "Will be removed"
+                          : user.roles.length === 0
+                            ? "No roles"
+                            : user.roles.map((role) => role.name).join(", ")}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+
+            {users.length === 0 && (
+              <p className="text-xs text-app-text-muted">No members in this project yet.</p>
+            )}
+          </div>
+
+          {/* Below the list, not above it: the buttons
+                                    act on choices made in the list, so they
+                                    should be where the eye ends up rather than
+                                    where it started. */}
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleResetAssignment}
+              disabled={!hasAssignChanges || savingAssignment}
+              className="rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Reset
+            </button>
+
+            <SaveButton
+              dirty={hasAssignChanges}
+              saving={savingAssignment}
+              onClick={() => void handleSaveAssignment()}
+              label={`Save ${assignChangeCount} ${assignChangeCount === 1 ? "change" : "changes"}`}
+            />
+          </div>
+        </div>
+
+        <div className="min-w-0 border-t border-app-border pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-app-text">Skills</h4>
+            {canSuggestSkills && (
+              <Button
+                variant="secondary"
+                size="sm"
+                data-testid="suggest-skills-button"
+                loading={isSuggesting === selectedRole.id}
+                disabled={applyingSuggestions}
+                icon={<Sparkles className="h-3.5 w-3.5" />}
+                onClick={() => void requestSkillSuggestions(selectedRole.id)}
+              >
+                {showSuggestionPanel ? "Refresh suggestions" : "Suggest skills"}
+              </Button>
+            )}
+          </div>
+          <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
+            Skills of this role, shown in the skill assessment flow for assigned members.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {selectedRoleSkills.map((skill) => (
+              <span
+                key={skill.id}
+                aria-label={skill.name}
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${
+                  skill.status === "RETIRED"
+                    ? "border-app-warning-border bg-app-warning-bg text-app-warning-text"
+                    : "border-app-border bg-app-bg text-app-text"
+                }`}
+              >
+                {skill.name}
+                {skill.status === "RETIRED" ? (
+                  <>
+                    <span className="font-medium">Retired</span>
+                    <button
+                      type="button"
+                      aria-label={`Reactivate ${skill.name}`}
+                      onClick={() => void handleReactivateSkill(skill)}
+                      className="text-app-text-muted transition-colors hover:text-app-success-text"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={`Retire ${skill.name}`}
+                    onClick={() => setRetireSkillId(skill.id)}
+                    className="text-app-text-muted transition-colors hover:text-app-danger-text"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </span>
+            ))}
+
+            {selectedRoleSkills.length === 0 && (
+              <p className="text-xs text-app-text-muted">No skills added yet.</p>
+            )}
+          </div>
+          <div className="mt-4 space-y-2">
+            <label htmlFor="new-skill-name" className="sr-only">
+              Add skill to {selectedRole.name}
+            </label>
+            <Input
+              id="new-skill-name"
+              value={skillName}
+              onChange={(event) => setSkillName(event.target.value)}
+              placeholder="Add skill, e.g. React"
+            />
+
+            <div className="flex justify-end">
+              <Button
+                variant="primary"
+                onClick={() => void handleAddSkill()}
+                disabled={!skillName.trim()}
+                loading={addingSkill}
+              >
+                {addingSkill ? "Adding..." : "Add skill"}
+              </Button>
+            </div>
+          </div>
+          <AnimatePresence initial={false}>
+            {showSuggestionPanel && (
+              <SkillSuggestionPanel
+                currentSkills={selectedRoleSkills}
+                suggestions={skillSuggestions}
+                selectedKeys={selectedSuggestionKeys}
+                isLoading={isSuggesting === selectedRole.id}
+                isApplying={applyingSuggestions}
+                errorMessage={suggestionError}
+                onToggle={toggleSuggestion}
+                onApply={() => void handleApplySuggestions()}
+                onRetry={() => void requestSkillSuggestions(selectedRole.id)}
+                onClose={() => setShowSuggestionPanel(false)}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </section>
+  ) : null;
+
   return (
     <>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Spans both columns once a role is open, because the create
                     form beside it gives way to the open role's panel. */}
-        <motion.div
-          ref={rolesRef}
-          animate={rolesControls}
+        <div
           className={`relative min-w-0 lg:row-start-1 ${
             selectedRole ? "lg:col-span-2" : "lg:col-start-1"
-          } ${isRolesResizing ? "overflow-hidden" : ""}`}
+          }`}
         >
           <h3 className="text-sm font-semibold text-app-text">Roles</h3>
           <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
@@ -548,45 +753,50 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
             manage its skills and members.
           </p>
 
-          {/* Cards at rest, chips once a role is open: the open role
-                        then holds everything about itself in the panel below,
-                        so repeating it in a card would only take up room. */}
-          {/* The `key` drives the animation: changing it swaps the
-                        list, the outgoing shape shrinks away and the incoming
-                        cards grow in, while the column's measured height
-                        animates underneath.
-
-                        `mode="popLayout"` is what makes that measurement work:
-                        the outgoing copy is pulled out of flow before the
-                        height effect above reads the column, so it measures the
-                        new shape alone instead of a column briefly holding
-                        both. */}
-          <AnimatePresence initial={false} mode="popLayout">
-            <motion.div
-              key={selectedRole ? "chips" : "cards"}
-              exit={{ opacity: 0, scale: 0.94 }}
-              transition={expandTransition}
-              className={
-                selectedRole
-                  ? "flex flex-wrap gap-2"
-                  : "grid grid-cols-1 items-start gap-4 sm:grid-cols-2 xl:grid-cols-3"
-              }
-            >
-              {roles.map((role) => (
-                <RoleCard
-                  key={role.id}
-                  role={role}
-                  skills={getRoleSkills(role.id)}
-                  members={getRoleMembers(role.id)}
-                  compact={selectedRole !== null}
-                  selected={selectedRoleId === role.id}
-                  transition={expandTransition}
-                  onSelect={openRole}
-                  onRequestDelete={setDeleteRoleId}
-                />
-              ))}
-            </motion.div>
-          </AnimatePresence>
+          {/* One list, like the team, the questions and the gaps: a row per role, and the open
+              role's panel expanded right under its row. */}
+          {roles.length > 0 && (
+            <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+              <ul className="divide-y divide-app-border-muted px-3 py-1.5">
+                {roles.map((role) => {
+                  const open = selectedRoleId === role.id;
+                  return (
+                    <li key={role.id} className="py-0.5">
+                      <RoleRow
+                        role={role}
+                        skills={getRoleSkills(role.id)}
+                        members={getRoleMembers(role.id)}
+                        selected={open}
+                        onSelect={openRole}
+                        onRequestDelete={setDeleteRoleId}
+                      />
+                      <AnimatePresence initial={false}>
+                        {open && roleDetail && (
+                          // Height on the wrapper, padding inside: a padded element cannot
+                          // animate to zero height, it stops at its own padding.
+                          <motion.div
+                            key="role-detail"
+                            ref={detailRef}
+                            onAnimationComplete={() => {
+                              // Also fires for the exit, when there is nothing to scroll to.
+                              if (selectedRoleIdRef.current === role.id) scrollDetailIntoView();
+                            }}
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={expandTransition}
+                            className="min-w-0 overflow-hidden"
+                          >
+                            <div className="px-1 pt-1 pb-3">{roleDetail}</div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           {roles.length === 0 && (
             <p className="text-xs text-app-text-muted">No roles yet. Create one on the right.</p>
@@ -625,7 +835,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
               </div>
             </div>
           )}
-        </motion.div>
+        </div>
 
         {/* Only while nothing is open: the open role takes this slot,
                     so creating and managing never compete for attention. No
@@ -699,286 +909,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                 </div>
               </div>
             </motion.section>
-          )}
-        </AnimatePresence>
-
-        {/* The open role, as one card across both columns. Everything
-                    about it lives in here -- who holds it, and which skills it
-                    carries -- so working on a role never means looking at two
-                    places at once. */}
-        <AnimatePresence initial={false}>
-          {selectedRole && (
-            // Height on the wrapper, padding on the card inside: a
-            // padded element cannot animate to zero height, it
-            // stops at its own padding and pops the rest away.
-            <motion.div
-              key="role-detail"
-              ref={detailRef}
-              onAnimationComplete={() => {
-                // Also fires for the exit, when there is
-                // nothing left to scroll to.
-                if (selectedRole) scrollDetailIntoView();
-              }}
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={expandTransition}
-              className="min-w-0 overflow-hidden lg:col-span-2 lg:row-start-2"
-            >
-              <section className="rounded-2xl border border-app-brand bg-app-surface p-4 ring-1 ring-app-brand sm:p-6">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-base font-semibold text-app-brand">Manage role</p>
-                    <h3 className="mt-0.5 truncate text-sm font-semibold text-app-text">
-                      {selectedRole.name}
-                    </h3>
-                    {selectedRole.description && (
-                      <p className="mt-1 text-xs text-app-text-muted">{selectedRole.description}</p>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={closeRole}
-                    aria-label="Close role details"
-                    className="shrink-0 rounded-lg p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Members take the room, skills sit in a narrow column
-                            beside them: the member grid is the part that grows
-                            with the team, the skill list stays short. */}
-                <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_28rem]">
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-semibold text-app-text">Members</h4>
-                    <p className="mt-1 text-xs leading-relaxed text-app-text-muted">
-                      Ticked members hold {selectedRole.name}. Untick to take it away —{" "}
-                      {selectedUserIds.length} selected.
-                    </p>
-
-                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-                      {membersForAssignment.map((user) => {
-                        const isChecked = selectedUserIds.includes(user.userId);
-                        const heldBefore = originalUserIds.includes(user.userId);
-                        // The two pending states,
-                        // shown in the colour of
-                        // the action they will
-                        // perform on save.
-                        const isBeingAdded = isChecked && !heldBefore;
-                        const isBeingRemoved = !isChecked && heldBefore;
-                        const fullName = `${user.firstname} ${user.lastname}`;
-
-                        return (
-                          <label
-                            key={user.userId}
-                            className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors ${
-                              isBeingAdded
-                                ? "border-app-success-border bg-app-success-bg"
-                                : isBeingRemoved
-                                  ? "border-app-danger-border bg-app-danger-bg"
-                                  : isChecked
-                                    ? "border-app-brand bg-app-brand-soft"
-                                    : "border-app-border bg-app-bg hover:border-app-brand-border-strong hover:bg-app-surface-hover"
-                            }`}
-                          >
-                            {/* The real control, kept for
-                                                                keyboard and screen readers;
-                                                                the box beside it is what is
-                                                                actually seen, because a
-                                                                native checkbox cannot show
-                                                                three different marks. */}
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              disabled={savingAssignment}
-                              onChange={() => toggleUser(user.userId)}
-                              className="peer sr-only"
-                            />
-
-                            <span
-                              aria-hidden="true"
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-app-focus ${
-                                isBeingAdded
-                                  ? "border-app-success-border bg-app-success-bg text-app-success-text"
-                                  : isBeingRemoved
-                                    ? "border-app-danger-border bg-app-danger-bg text-app-danger-text"
-                                    : isChecked
-                                      ? "border-app-brand bg-app-brand text-app-text-inverse"
-                                      : "border-app-border bg-app-surface"
-                              }`}
-                            >
-                              {isBeingAdded ? (
-                                <Plus className="h-3.5 w-3.5" />
-                              ) : isBeingRemoved ? (
-                                <Minus className="h-3.5 w-3.5" />
-                              ) : isChecked ? (
-                                <Check className="h-3.5 w-3.5" />
-                              ) : null}
-                            </span>
-
-                            <UserAvatar
-                              profileIcon={user.profileIcon}
-                              fallbackName={fullName}
-                              seed={user.userId}
-                              size={40}
-                            />
-
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium text-app-text">
-                                {fullName}
-                              </span>
-                              <span className="mt-0.5 block truncate text-xs text-app-text-muted">
-                                {isBeingAdded
-                                  ? "Will be added"
-                                  : isBeingRemoved
-                                    ? "Will be removed"
-                                    : user.roles.length === 0
-                                      ? "No roles"
-                                      : user.roles.map((role) => role.name).join(", ")}
-                              </span>
-                            </span>
-                          </label>
-                        );
-                      })}
-
-                      {users.length === 0 && (
-                        <p className="text-xs text-app-text-muted">
-                          No members in this project yet.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Below the list, not above it: the buttons
-                                    act on choices made in the list, so they
-                                    should be where the eye ends up rather than
-                                    where it started. */}
-                    <div className="mt-4 flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={handleResetAssignment}
-                        disabled={!hasAssignChanges || savingAssignment}
-                        className="rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Reset
-                      </button>
-
-                      <SaveButton
-                        dirty={hasAssignChanges}
-                        saving={savingAssignment}
-                        onClick={() => void handleSaveAssignment()}
-                        label={`Save ${assignChangeCount} ${
-                          assignChangeCount === 1 ? "change" : "changes"
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 border-t border-app-border pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="text-sm font-semibold text-app-text">Skills</h4>
-                      {canSuggestSkills && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          data-testid="suggest-skills-button"
-                          loading={isSuggesting === selectedRole.id}
-                          disabled={applyingSuggestions}
-                          icon={<Sparkles className="h-3.5 w-3.5" />}
-                          onClick={() => void requestSkillSuggestions(selectedRole.id)}
-                        >
-                          {showSuggestionPanel ? "Refresh suggestions" : "Suggest skills"}
-                        </Button>
-                      )}
-                    </div>
-                    <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
-                      Skills of this role, shown in the skill assessment flow for assigned members.
-                    </p>
-
-                    <div className="flex flex-wrap gap-2">
-                      {selectedRoleSkills.map((skill) => (
-                        <span
-                          key={skill.id}
-                          aria-label={skill.name}
-                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${
-                            skill.status === "RETIRED"
-                              ? "border-app-warning-border bg-app-warning-bg text-app-warning-text"
-                              : "border-app-border bg-app-bg text-app-text"
-                          }`}
-                        >
-                          {skill.name}
-                          {skill.status === "RETIRED" ? (
-                            <>
-                              <span className="font-medium">Retired</span>
-                              <button
-                                type="button"
-                                aria-label={`Reactivate ${skill.name}`}
-                                onClick={() => void handleReactivateSkill(skill)}
-                                className="text-app-text-muted transition-colors hover:text-app-success-text"
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              aria-label={`Retire ${skill.name}`}
-                              onClick={() => setRetireSkillId(skill.id)}
-                              className="text-app-text-muted transition-colors hover:text-app-danger-text"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
-                        </span>
-                      ))}
-
-                      {selectedRoleSkills.length === 0 && (
-                        <p className="text-xs text-app-text-muted">No skills added yet.</p>
-                      )}
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      <label htmlFor="new-skill-name" className="sr-only">
-                        Add skill to {selectedRole.name}
-                      </label>
-                      <Input
-                        id="new-skill-name"
-                        value={skillName}
-                        onChange={(event) => setSkillName(event.target.value)}
-                        placeholder="Add skill, e.g. React"
-                      />
-
-                      <div className="flex justify-end">
-                        <Button
-                          variant="primary"
-                          onClick={() => void handleAddSkill()}
-                          disabled={!skillName.trim()}
-                          loading={addingSkill}
-                        >
-                          {addingSkill ? "Adding..." : "Add skill"}
-                        </Button>
-                      </div>
-                    </div>
-                    <AnimatePresence initial={false}>
-                      {showSuggestionPanel && (
-                        <SkillSuggestionPanel
-                          currentSkills={selectedRoleSkills}
-                          suggestions={skillSuggestions}
-                          selectedKeys={selectedSuggestionKeys}
-                          isLoading={isSuggesting === selectedRole.id}
-                          isApplying={applyingSuggestions}
-                          errorMessage={suggestionError}
-                          onToggle={toggleSuggestion}
-                          onApply={() => void handleApplySuggestions()}
-                          onRetry={() => void requestSkillSuggestions(selectedRole.id)}
-                          onClose={() => setShowSuggestionPanel(false)}
-                        />
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              </section>
-            </motion.div>
           )}
         </AnimatePresence>
       </div>
