@@ -125,6 +125,9 @@ export function SourceDetailsPanel({
   const [dinoActive, closeDino] = useSpaceOpensDino(isSyncing, dinoUnlocked, {
     keepActiveUntilExit: true,
   });
+  // Uploads have no upstream to re-ingest from, so they get no update action at
+  // all; the other sources have one, which is enabled once its identity is known.
+  const hasUpdateAction = source.sourceSystem !== "UPLOAD";
   // Update is available for a GitHub repo (needs owner/name), a Jira instance
   // (needs its URL), or a Confluence space (needs its ID).
   const canUpdate =
@@ -303,10 +306,10 @@ export function SourceDetailsPanel({
     try {
       await onRefreshDetails();
       setRefreshState("success");
-      toast.success("Repository details refreshed");
+      toast.success("Source details refreshed");
     } catch (error) {
       setRefreshState("error");
-      toast.error(error instanceof Error ? error.message : "Couldn't refresh repository details.");
+      toast.error(error instanceof Error ? error.message : "Couldn't refresh the source details.");
     }
   }, [onRefreshDetails, toast]);
 
@@ -351,35 +354,37 @@ export function SourceDetailsPanel({
         </>
       }
       footer={
-        <div className="grid w-full grid-cols-2 gap-3">
-          <Button
-            variant="primary"
-            onClick={() => {
-              void handleUpdateSource();
-            }}
-            disabled={!canUpdate || isRefreshing}
-            loading={isUpdating}
-            icon={
-              isJira ? (
-                <Ticket className="h-4 w-4" />
-              ) : isConfluence ? (
-                <BookOpen className="h-4 w-4" />
-              ) : (
-                <GitBranch className="h-4 w-4" />
-              )
-            }
-            title={
-              canUpdate
-                ? undefined
-                : isJira
-                  ? "Instance updates need the Jira instance URL."
-                  : isConfluence
-                    ? "Space updates need the Confluence space ID."
-                    : "Repository updates need GitHub owner and repository name."
-            }
-          >
-            {isJira ? "Update instance" : isConfluence ? "Update space" : "Update repo"}
-          </Button>
+        <div className={`grid w-full gap-3 ${hasUpdateAction ? "grid-cols-2" : "grid-cols-1"}`}>
+          {hasUpdateAction && (
+            <Button
+              variant="primary"
+              onClick={() => {
+                void handleUpdateSource();
+              }}
+              disabled={!canUpdate || isRefreshing}
+              loading={isUpdating}
+              icon={
+                isJira ? (
+                  <Ticket className="h-4 w-4" />
+                ) : isConfluence ? (
+                  <BookOpen className="h-4 w-4" />
+                ) : (
+                  <GitBranch className="h-4 w-4" />
+                )
+              }
+              title={
+                canUpdate
+                  ? undefined
+                  : isJira
+                    ? "Instance updates need the Jira instance URL."
+                    : isConfluence
+                      ? "Space updates need the Confluence space ID."
+                      : "Repository updates need GitHub owner and repository name."
+              }
+            >
+              {isJira ? "Update instance" : isConfluence ? "Update space" : "Update repo"}
+            </Button>
+          )}
 
           <Button
             variant="secondary"

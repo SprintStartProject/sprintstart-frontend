@@ -17,7 +17,10 @@ import {
   RunHistoryFilters,
   type RunStatusFilter,
 } from "../features/data-ingestion/components/RunHistoryFilters.tsx";
-import { GithubRepositorySyncSettings } from "../features/data-ingestion/components/GithubRepositorySyncSettings.tsx";
+import {
+  GithubRepositorySyncSettings,
+  type SyncScheduleConfig,
+} from "../features/data-ingestion/components/GithubRepositorySyncSettings.tsx";
 import { AddSourceModal } from "../features/data-ingestion/components/AddSourceModal.tsx";
 import { SourceDetailsPanel } from "../features/data-ingestion/components/SourceDetailsPanel.tsx";
 import { SourceList } from "../features/data-ingestion/components/SourceList.tsx";
@@ -56,6 +59,11 @@ import type {
   SourceSystem,
 } from "../features/data-ingestion/types.ts";
 import { SECTION_ORDER } from "../features/data-ingestion/types.ts";
+import {
+  loadProjectSyncSchedule,
+  saveProjectSyncSchedule,
+  type SyncSettingsProvider,
+} from "../features/data-ingestion/projectSyncSchedule.ts";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { SlidingTabPanel } from "../components/ui/SlidingTabPanel.tsx";
 import { getIngestionRunsPage, getIngestionSourceStatuses } from "../services/ingestionService.ts";
@@ -63,7 +71,6 @@ import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
 import {
-  configureAllGithubRepositories,
   configureGithubRepository,
   getGithubRepositoryConfig,
   getGithubPatNames,
@@ -72,7 +79,6 @@ import {
   type ConfigureGithubRepositoryRequest,
 } from "../services/sources/githubService.ts";
 import {
-  configureAllJiraInstances,
   configureJiraInstance,
   getJiraConfig,
   getJiraInstances,
@@ -88,27 +94,11 @@ import {
 import { projectService, type ProjectSource } from "../services/projectService.ts";
 import { parseGithubRepositoryReference } from "../services/sources/githubRepositoryInput.ts";
 
-const DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
-  autoUpdate: true,
-  schedule: { type: "INTERVAL", everyMinutes: 60 },
-};
-
-const DEFAULT_GLOBAL_JIRA_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
-  autoUpdate: true,
-  schedule: { type: "INTERVAL", everyMinutes: 60 },
-};
-
-const DEFAULT_GLOBAL_CONFLUENCE_SYNC_CONFIG: ConfigureGithubRepositoryRequest = {
-  autoUpdate: true,
-  schedule: { type: "INTERVAL", everyMinutes: 60 },
-};
-
-type SyncSettingsProvider = "github" | "jira" | "confluence";
-
 /**
- * Wording for the global sync-settings modal, per connector. `one` and `many`
- * name the connector's sources so the copy reads naturally in both the
- * "overwrites every connected …" and the "updates all connected …" sentences.
+ * Wording for the project-wide sync-settings modal, per connector. `one` and
+ * `many` name the connector's sources so the copy reads naturally in both the
+ * "overwrites every … in this project" and the "updates all … in this project"
+ * sentences.
  */
 const SYNC_SETTINGS_COPY: Record<
   SyncSettingsProvider,
@@ -120,6 +110,10 @@ const SYNC_SETTINGS_COPY: Record<
 };
 
 const SYNC_SETTINGS_PROVIDER_ORDER: SyncSettingsProvider[] = ["github", "jira", "confluence"];
+
+// How many of the project's newest runs feed the source cards and the overview,
+// independent of the run table's page and filter.
+const LATEST_RUNS_SIZE = 50;
 
 // Small enough that the run table stays scannable and pagination is actually
 // reachable rather than a single page of rows.
@@ -456,6 +450,9 @@ export function DataIngestionPage() {
   const [selectedRunSnapshot, setSelectedRunSnapshot] = useState<IngestionRun | null>(null);
 
   const [runs, setRuns] = useState<IngestionRun[]>([]);
+  // The project's newest runs, unfiltered. The cards and the overview read these,
+  // so filtering or paging the run table never changes a source's status.
+  const [latestRuns, setLatestRuns] = useState<IngestionRun[]>([]);
   const [runPageMeta, setRunPageMeta] = useState<PageMetadata | null>(null);
   const [runPageNumber, setRunPageNumber] = useState(1);
   const [runFilter, setRunFilter] = useState<RunFilterState>(DEFAULT_RUN_FILTER);
@@ -479,13 +476,9 @@ export function DataIngestionPage() {
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   const [isConnectorsModalOpen, setIsConnectorsModalOpen] = useState(false);
   const [isSyncSettingsModalOpen, setIsSyncSettingsModalOpen] = useState(false);
-  const [globalGithubSyncConfig, setGlobalGithubSyncConfig] =
-    useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_GITHUB_SYNC_CONFIG);
-  const [globalJiraSyncConfig, setGlobalJiraSyncConfig] =
-    useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_JIRA_SYNC_CONFIG);
-  const [globalConfluenceSyncConfig, setGlobalConfluenceSyncConfig] =
-    useState<ConfigureGithubRepositoryRequest>(DEFAULT_GLOBAL_CONFLUENCE_SYNC_CONFIG);
   const [syncSettingsProvider, setSyncSettingsProvider] = useState<SyncSettingsProvider>("github");
+  // Whether the sources of the open sync-settings tab currently have different schedules.
+  const [isSyncScheduleMixed, setIsSyncScheduleMixed] = useState(false);
   const [githubTokenNames, setGithubTokenNames] = useState<string[]>([]);
   const [pollingUntil, setPollingUntil] = useState<number | null>(null);
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
@@ -564,6 +557,7 @@ export function DataIngestionPage() {
         setSourceInstances([]);
         setJiraInstances([]);
         setConfluenceConnections([]);
+        setLatestRuns([]);
       }
       setProjectSourcesErrorMessage(null);
       setSourceStatusErrorMessage(null);
@@ -577,12 +571,13 @@ export function DataIngestionPage() {
         setIsProjectDataLoading(true);
       }
 
-      const [projectResult, sourceStatusResult, jiraResult, confluenceResult] =
+      const [projectResult, sourceStatusResult, jiraResult, confluenceResult, latestRunsResult] =
         await Promise.allSettled([
           projectService.getAccessibleProject(selectedProjectId),
           getIngestionSourceStatuses(selectedProjectId),
           getJiraInstances(selectedProjectId),
           confluenceService.listConnections(selectedProjectId),
+          getIngestionRunsPage({ projectId: selectedProjectId, size: LATEST_RUNS_SIZE }),
         ]);
 
       if (!isMounted) return;
@@ -614,6 +609,11 @@ export function DataIngestionPage() {
       setConfluenceConnections(
         confluenceResult.status === "fulfilled" ? confluenceResult.value : [],
       );
+
+      // A failed fetch keeps the last-known runs; the run table reports its own errors.
+      if (latestRunsResult.status === "fulfilled") {
+        setLatestRuns(latestRunsResult.value.items);
+      }
 
       setIsProjectDataLoading(false);
     });
@@ -697,38 +697,37 @@ export function DataIngestionPage() {
     [loadRuns, runPageNumber],
   );
 
-  // In-place refresh of the per-repo status (#5) after a source mutation, without
-  // re-running the whole project fetch. Scoped to the selected project so a PM
-  // only sees their project's repos (the backend `projectId` filter).
-  const reloadSourceStatuses = useCallback(async () => {
+  // In-place refresh of everything the source cards are built from (status rows,
+  // Jira and Confluence connections, the project's latest runs) after a source
+  // mutation or a poll, without re-running the whole project fetch. Scoped to the
+  // selected project so a PM only sees their project's sources (the backend
+  // `projectId` filter).
+  const reloadSourceData = useCallback(async () => {
     if (!selectedProjectId) {
       setSourceInstances([]);
       setJiraInstances([]);
+      setConfluenceConnections([]);
+      setLatestRuns([]);
       return;
     }
 
-    try {
-      const statuses = await getIngestionSourceStatuses(selectedProjectId);
-      setSourceInstances(statuses);
-    } catch {
-      // The combined project-data effect surfaces load errors; a failed in-place
-      // refresh should leave the last-known statuses in place rather than blank
-      // the cards.
-    }
+    // The loads are independent: one failing must not stop the others from
+    // updating, and a failed in-place refresh leaves the last-known data in place
+    // rather than blanking the cards. The combined project-data effect surfaces
+    // load errors.
+    const [statusResult, jiraResult, confluenceResult, latestRunsResult] = await Promise.allSettled(
+      [
+        getIngestionSourceStatuses(selectedProjectId),
+        getJiraInstances(selectedProjectId),
+        confluenceService.listConnections(selectedProjectId),
+        getIngestionRunsPage({ projectId: selectedProjectId, size: LATEST_RUNS_SIZE }),
+      ],
+    );
 
-    // Independent of the GitHub status refresh: a Jira/Confluence failure must not stop other
-    // statuses from updating.
-    try {
-      setJiraInstances(await getJiraInstances(selectedProjectId));
-    } catch {
-      // Keep the last-known Jira instances on a failed in-place refresh.
-    }
-
-    try {
-      setConfluenceConnections(await confluenceService.listConnections(selectedProjectId));
-    } catch {
-      // Keep the last-known Confluence connections on a failed in-place refresh.
-    }
+    if (statusResult.status === "fulfilled") setSourceInstances(statusResult.value);
+    if (jiraResult.status === "fulfilled") setJiraInstances(jiraResult.value);
+    if (confluenceResult.status === "fulfilled") setConfluenceConnections(confluenceResult.value);
+    if (latestRunsResult.status === "fulfilled") setLatestRuns(latestRunsResult.value.items);
   }, [selectedProjectId]);
 
   // Runs on mount and whenever the run query changes (project, filters or the
@@ -741,8 +740,15 @@ export function DataIngestionPage() {
     void loadData(showLoading);
   }, [loadData]);
 
+  // While any run of the project is in flight (in the table or among the latest
+  // runs) or the post-update window is open, the table, the status rows, the
+  // connections and the latest runs are all refreshed together, so the cards move
+  // from "Syncing" to "Synced" without a manual reload.
+  const hasRunningRun =
+    runs.some((run) => isRunInProgress(run.status)) ||
+    latestRuns.some((run) => isRunInProgress(run.status));
+
   useEffect(() => {
-    const hasRunningRun = runs.some((run) => isRunInProgress(run.status));
     const isPollingWindowActive = pollingUntil !== null && Date.now() < pollingUntil;
 
     if (!hasRunningRun && !isPollingWindowActive) {
@@ -751,20 +757,18 @@ export function DataIngestionPage() {
 
     const intervalId = window.setInterval(() => {
       const shouldStopPolling =
-        pollingUntil !== null &&
-        Date.now() >= pollingUntil &&
-        !runs.some((run) => isRunInProgress(run.status));
+        pollingUntil !== null && Date.now() >= pollingUntil && !hasRunningRun;
 
       if (shouldStopPolling) {
         setPollingUntil(null);
         return;
       }
 
-      void loadData(false);
+      void Promise.all([loadData(false), reloadSourceData()]);
     }, 3000);
 
     return () => window.clearInterval(intervalId);
-  }, [loadData, pollingUntil, runs]);
+  }, [hasRunningRun, loadData, pollingUntil, reloadSourceData]);
 
   const connectorEnabledById = useMemo(
     () => new Map(connectors.map((connector) => [connector.id.toLowerCase(), connector.enabled])),
@@ -775,7 +779,7 @@ export function DataIngestionPage() {
     const githubAndUpload = buildProjectDataSources(
       projectSources,
       sourceInstances,
-      runs,
+      latestRuns,
       connectorEnabledById,
     );
 
@@ -815,7 +819,7 @@ export function DataIngestionPage() {
       }
       return createConfluenceSourceFromConnection(
         conn,
-        runs,
+        latestRuns,
         connectorEnabledById.get("confluence"),
       );
     });
@@ -829,8 +833,8 @@ export function DataIngestionPage() {
     confluenceConnections,
     connectorEnabledById,
     jiraInstances,
+    latestRuns,
     projectSources,
-    runs,
     sourceInstances,
   ]);
 
@@ -1076,17 +1080,17 @@ export function DataIngestionPage() {
     setPollingUntil(Date.now() + 60000);
     setActiveSection("sources");
 
-    void Promise.all([loadData(false), reloadProjects(), reloadSourceStatuses()]).then(() =>
+    void Promise.all([loadData(false), reloadProjects(), reloadSourceData()]).then(() =>
       setProjectDataVersion((version) => version + 1),
     );
 
     window.setTimeout(() => {
       void loadData(false);
       void reloadProjects();
-      void reloadSourceStatuses();
+      void reloadSourceData();
       setProjectDataVersion((version) => version + 1);
     }, 1500);
-  }, [loadData, reloadSourceStatuses, reloadProjects]);
+  }, [loadData, reloadSourceData, reloadProjects]);
 
   // Shared post-update refresh: polling window + an immediate and a delayed
   // reload, so a just-started run appears without a manual refresh.
@@ -1095,16 +1099,16 @@ export function DataIngestionPage() {
     // this only kicks the polling window and refreshes the page data.
     setPollingUntil(Date.now() + 60000);
 
-    void Promise.all([loadData(false), reloadSourceStatuses()]).then(() =>
+    void Promise.all([loadData(false), reloadSourceData()]).then(() =>
       setProjectDataVersion((version) => version + 1),
     );
 
     window.setTimeout(() => {
       void loadData(false);
-      void reloadSourceStatuses();
+      void reloadSourceData();
       setProjectDataVersion((version) => version + 1);
     }, 1500);
-  }, [loadData, reloadSourceStatuses]);
+  }, [loadData, reloadSourceData]);
 
   const handleUpdateSource = useCallback(
     async (source: DataSource) => {
@@ -1141,81 +1145,38 @@ export function DataIngestionPage() {
     [refreshAfterUpdate, syncConfluenceConnection],
   );
 
-  const handleSaveGlobalGithubConfig = useCallback(
+  // The sync-settings modal works on the selected project's sources only: it
+  // reads the schedule of each of them, shows it when they all agree, and writes
+  // the chosen schedule to each of them.
+  const loadProjectSyncConfig = useCallback(async (): Promise<SyncScheduleConfig> => {
+    const { config, isMixed } = await loadProjectSyncSchedule(
+      syncSettingsProvider,
+      sources,
+      selectedProjectId || null,
+    );
+    setIsSyncScheduleMixed(isMixed);
+
+    return { autoUpdate: config.autoUpdate, spec: config.schedule, nextSyncAt: null };
+  }, [selectedProjectId, sources, syncSettingsProvider]);
+
+  const handleSaveProjectSyncConfig = useCallback(
     async (request: ConfigureGithubRepositoryRequest) => {
-      await configureAllGithubRepositories(request);
-      setGlobalGithubSyncConfig(request);
+      await saveProjectSyncSchedule(
+        syncSettingsProvider,
+        sources,
+        selectedProjectId || null,
+        request,
+        SYNC_SETTINGS_COPY[syncSettingsProvider].many,
+      );
       // Deliberately does NOT reloadProjects(): changing sync schedules does not
       // affect the project switcher's data, and a project reload can transiently
       // reset the selected project (e.g. a slow managed-projects fetch), which
       // makes the page-data effect treat it as a project switch and blank the
       // page. See the note on refreshSourceDetails.
-      await Promise.all([loadData(false), reloadSourceStatuses()]);
+      await Promise.all([loadData(false), reloadSourceData()]);
     },
-    [loadData, reloadSourceStatuses],
+    [loadData, reloadSourceData, selectedProjectId, sources, syncSettingsProvider],
   );
-
-  const handleSaveGlobalJiraConfig = useCallback(
-    async (request: ConfigureGithubRepositoryRequest) => {
-      await configureAllJiraInstances(request);
-      setGlobalJiraSyncConfig(request);
-      await Promise.all([loadData(false), reloadSourceStatuses()]);
-    },
-    [loadData, reloadSourceStatuses],
-  );
-
-  // Confluence has no "configure all" endpoint; the schedule lives on each
-  // connection, so the global policy is applied per connection. Every space is
-  // attempted even if one fails, and the failures are reported as one error so
-  // the form can show what did not go through.
-  const handleSaveGlobalConfluenceConfig = useCallback(
-    async (request: ConfigureGithubRepositoryRequest) => {
-      if (!selectedProjectId) {
-        throw new Error("Select a project before saving the sync schedule.");
-      }
-
-      const results = await Promise.allSettled(
-        confluenceConnections.map((connection) =>
-          confluenceService.configureSchedule(selectedProjectId, connection.id, {
-            schedule: request.schedule,
-            autoUpdate: request.autoUpdate,
-          }),
-        ),
-      );
-
-      const failed = results.filter((result) => result.status === "rejected").length;
-      if (failed > 0) {
-        throw new Error(
-          `Couldn't apply the schedule to ${failed} of ${results.length} Confluence spaces.`,
-        );
-      }
-
-      setGlobalConfluenceSyncConfig(request);
-      await Promise.all([loadData(false), reloadSourceStatuses()]);
-    },
-    [confluenceConnections, loadData, reloadSourceStatuses, selectedProjectId],
-  );
-
-  // Memoized because the schedule form reloads itself whenever `initialConfig`
-  // changes identity — a record rebuilt on every render would discard whatever
-  // the user had just selected.
-  const globalSyncConfigs = useMemo<Record<SyncSettingsProvider, ConfigureGithubRepositoryRequest>>(
-    () => ({
-      github: globalGithubSyncConfig,
-      jira: globalJiraSyncConfig,
-      confluence: globalConfluenceSyncConfig,
-    }),
-    [globalConfluenceSyncConfig, globalGithubSyncConfig, globalJiraSyncConfig],
-  );
-
-  const globalSyncSavers: Record<
-    SyncSettingsProvider,
-    (request: ConfigureGithubRepositoryRequest) => Promise<void>
-  > = {
-    github: handleSaveGlobalGithubConfig,
-    jira: handleSaveGlobalJiraConfig,
-    confluence: handleSaveGlobalConfluenceConfig,
-  };
 
   const handleLoadGithubRepositoryConfig = useCallback(
     async (repository: GithubRepositoryDetails) => {
@@ -1230,9 +1191,9 @@ export function DataIngestionPage() {
       // No reloadProjects(): see refreshSourceDetails — a per-repo sync-schedule
       // change never alters the project switcher, and reloading it can reset the
       // selected project and blank the page mid-save.
-      await Promise.all([loadData(false), reloadSourceStatuses()]);
+      await Promise.all([loadData(false), reloadSourceData()]);
     },
-    [loadData, reloadSourceStatuses],
+    [loadData, reloadSourceData],
   );
 
   const handleLoadJiraConfig = useCallback(
@@ -1245,9 +1206,9 @@ export function DataIngestionPage() {
       await configureJiraInstance({ instanceUrl, ...request });
       // Mirrors the GitHub path: no reloadProjects(), just refresh this page's
       // run list and per-source statuses so the next-sync time updates.
-      await Promise.all([loadData(false), reloadSourceStatuses()]);
+      await Promise.all([loadData(false), reloadSourceData()]);
     },
-    [loadData, reloadSourceStatuses],
+    [loadData, reloadSourceData],
   );
 
   // Confluence has no dedicated config endpoint: the connection itself carries
@@ -1279,9 +1240,9 @@ export function DataIngestionPage() {
         schedule: request.schedule,
         autoUpdate: request.autoUpdate,
       });
-      await Promise.all([loadData(false), reloadSourceStatuses()]);
+      await Promise.all([loadData(false), reloadSourceData()]);
     },
-    [loadData, reloadSourceStatuses, selectedProjectId],
+    [loadData, reloadSourceData, selectedProjectId],
   );
 
   // Refreshes just this page's data after a source-level mutation (enable/disable,
@@ -1292,9 +1253,9 @@ export function DataIngestionPage() {
   // clears the source list, shows the initial loading skeleton and closes the
   // open details drawer. That reset is what read as "the whole page reloads".
   const refreshSourceDetails = useCallback(async () => {
-    await Promise.all([loadData(false), reloadSourceStatuses()]);
+    await Promise.all([loadData(false), reloadSourceData()]);
     setProjectDataVersion((version) => version + 1);
-  }, [loadData, reloadSourceStatuses]);
+  }, [loadData, reloadSourceData]);
 
   // Enables/disables a connected repository as an ingestion source (the
   // connector allow/deny toggle), then refreshes so the drawer reflects it.
@@ -1417,7 +1378,7 @@ export function DataIngestionPage() {
           onRefresh={() => {
             void loadData();
             void reloadProjects();
-            void reloadSourceStatuses();
+            void reloadSourceData();
             if (isConnectorsModalOpen) {
               void loadConnectors();
             }
@@ -1466,7 +1427,7 @@ export function DataIngestionPage() {
                   <OverviewSection
                     sources={sources}
                     totalArtifactCount={totalArtifactCount}
-                    runs={runs}
+                    runs={latestRuns}
                     onNavigate={handleSectionChange}
                   />
                 ) : null}
@@ -1653,7 +1614,7 @@ export function DataIngestionPage() {
             }}
             onSourcesSaved={() => {
               void loadConnectors();
-              void reloadSourceStatuses();
+              void reloadSourceData();
             }}
           />
         )}
@@ -1662,7 +1623,7 @@ export function DataIngestionPage() {
       <Modal
         isOpen={isSyncSettingsModalOpen}
         title={`${syncSettingsCopy.label} Sync Settings`}
-        description={`Apply one sync policy to all connected ${syncSettingsCopy.many}.`}
+        description={`Apply one sync policy to all ${syncSettingsCopy.many} in this project.`}
         size="lg"
         bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
         onClose={() => setIsSyncSettingsModalOpen(false)}
@@ -1681,14 +1642,17 @@ export function DataIngestionPage() {
 
         <GithubRepositorySyncSettings
           key={syncSettingsProvider}
-          initialConfig={globalSyncConfigs[syncSettingsProvider]}
-          onSave={globalSyncSavers[syncSettingsProvider]}
+          loadKey={syncSettingsProvider}
+          loadConfig={loadProjectSyncConfig}
+          onSave={handleSaveProjectSyncConfig}
           showNextSync={false}
-          disclaimer={`Applying global settings overwrites the sync settings of every connected ${syncSettingsCopy.one}.`}
-          autoUpdateOnText={`Due checks update all connected ${syncSettingsCopy.many}.`}
-          autoUpdateOffText={`Due checks only mark connected ${syncSettingsCopy.many} out of date.`}
-          toggleAriaLabel={`Toggle global ${syncSettingsCopy.label} auto update`}
-          saveLabel="Apply globally"
+          disclaimer={`Applying these settings overwrites the sync settings of every ${syncSettingsCopy.one} in this project.${
+            isSyncScheduleMixed ? " These sources currently have different schedules." : ""
+          }`}
+          autoUpdateOnText={`Due checks update all ${syncSettingsCopy.many} in this project.`}
+          autoUpdateOffText={`Due checks only mark ${syncSettingsCopy.many} in this project out of date.`}
+          toggleAriaLabel={`Toggle ${syncSettingsCopy.label} auto update for this project`}
+          saveLabel="Apply to project"
         />
       </Modal>
 

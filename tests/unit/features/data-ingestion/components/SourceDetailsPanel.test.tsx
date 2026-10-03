@@ -323,7 +323,7 @@ describe("SourceDetailsPanel", () => {
 
     expect(onRefreshDetails).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      expect(screen.getByText("Repository details refreshed")).toBeInTheDocument();
+      expect(screen.getByText("Source details refreshed")).toBeInTheDocument();
     });
   });
 
@@ -337,6 +337,31 @@ describe("SourceDetailsPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: /Update repo/ })).toBeDisabled();
+  });
+
+  it("offers no update action for an upload source", () => {
+    const uploadSource: DataSource = {
+      ...mockSource,
+      sourceId: "upload-1",
+      sourceSystem: "UPLOAD",
+      name: "Uploaded Documentation",
+      type: "Upload",
+      githubRepository: null,
+    };
+
+    render(
+      <SourceDetailsPanel
+        source={uploadSource}
+        onUpdateSource={vi.fn().mockResolvedValue(undefined)}
+        onRefreshDetails={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // No disabled GitHub-labelled button either: the action simply does not exist.
+    expect(screen.queryByRole("button", { name: /Update/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/GitHub/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Refresh details/ })).toBeEnabled();
   });
 
   it("does not show the remove-from-project action without onUnlinkSource", () => {

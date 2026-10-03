@@ -57,10 +57,10 @@ export const INGESTION_RUN_LIMIT = 50;
 export const DETAILS_RUN_LIMIT = 10;
 
 /**
- * Turns one per-repo ingestion status row (`/api/v1/ingestion-sources/status`)
- * into a {@link DataSource}. This is the shared mapping used wherever sources
- * are shown per repository rather than per source system — the Data Ingestion
- * page overlays the project source's own id and display name on top of it.
+ * Turns one GitHub ingestion status row (`/api/v1/ingestion-sources/status`)
+ * into a {@link DataSource}. Wherever sources are shown per repository rather
+ * than per source system, this is the GitHub mapping; other systems go through
+ * {@link createSourceFromStatusRow}.
  */
 export function createSourceFromInstance(instance: SourceInstanceIngestionStatus): DataSource {
   const meta = SOURCE_META[instance.sourceSystem];
@@ -112,6 +112,24 @@ export function createSourceFromInstance(instance: SourceInstanceIngestionStatus
     lastIssuesSyncAt: instance.lastIssuesSyncAt,
     lastPullRequestsSyncAt: instance.lastPullRequestsSyncAt,
   };
+}
+
+/**
+ * Maps a status row with the mapper of its source system, so views that only
+ * have the status rows (dashboard, PM header, analysis) show a Jira, Confluence
+ * or upload source with its own identity instead of GitHub repository details.
+ */
+export function createSourceFromStatusRow(status: SourceInstanceIngestionStatus): DataSource {
+  switch (status.sourceSystem) {
+    case "JIRA":
+      return createJiraSourceFromInstance(status);
+    case "CONFLUENCE":
+      return createConfluenceSourceFromInstance(status);
+    case "UPLOAD":
+      return createUploadSourceFromInstance(status);
+    case "GITHUB":
+      return createSourceFromInstance(status);
+  }
 }
 
 /**
@@ -354,7 +372,7 @@ export function createConfluenceSourceFromConnection(
       hasNeverSynced,
       connectorEnabled,
     }),
-    artifacts: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
+    artifacts: latestRun?.ingestedCount ?? 0,
     lastSync: formatDateTime(latestRun?.finishedAt ?? latestRun?.startedAt),
     nextSync: connection.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
     errors: latestRun?.failedCount ?? 0,
@@ -363,7 +381,9 @@ export function createConfluenceSourceFromConnection(
     latestIngestedCount: latestRun?.ingestedCount ?? 0,
     latestUpdatedCount: latestRun?.updatedCount ?? 0,
     deletedCount: latestRun?.deletedCount ?? 0,
-    totalArtifactCount: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
+    // Without a status row the stored total is unknown; a run only knows what it
+    // touched, so the total stays 0 like the GitHub run fallback.
+    totalArtifactCount: 0,
     runIds: latestRun ? [latestRun.runId] : [],
     sharesSourceSystem: false,
     failedItems: latestRun?.failedItems ?? [],

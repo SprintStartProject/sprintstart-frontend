@@ -47,6 +47,83 @@ function createRunPage(items: unknown[] = [], overrides = {}) {
   };
 }
 
+/** The "latest runs" request behind the source cards: the project's newest runs, no filter. */
+type RunsFilter = { size?: number; status?: string };
+const isLatestRunsRequest = (filter: RunsFilter) =>
+  filter.size === 50 && filter.status === undefined;
+
+function githubConfig(overrides = {}) {
+  return {
+    id: "cfg-1",
+    repositoryOwner: "octocat",
+    repositoryName: "hello-world",
+    autoUpdate: true,
+    spec: { type: "INTERVAL", everyMinutes: 60 },
+    schedule: "every 60m",
+    nextSyncAt: null,
+    ...overrides,
+  };
+}
+
+function jiraConfig(overrides = {}) {
+  return {
+    instanceUrl: "https://team.atlassian.net",
+    autoUpdate: true,
+    spec: { type: "INTERVAL", everyMinutes: 60 },
+    schedule: "every 60m",
+    nextSyncAt: null,
+    ...overrides,
+  };
+}
+
+function githubStatusRow(name: string, repositoryId: string, overrides = {}) {
+  return {
+    sourceSystem: "GITHUB",
+    sourceId: `octocat/${name}`,
+    displayName: `octocat/${name}`,
+    repositoryId,
+    owner: "octocat",
+    name,
+    sourceUrl: `https://github.com/octocat/${name}`,
+    connectionStatus: "CONNECTED",
+    enabled: true,
+    lastRunTime: "2026-07-01T00:00:00Z",
+    ingestedCount: 5,
+    updatedCount: 0,
+    deletedCount: 0,
+    failedCount: 0,
+    failedItems: [],
+    artifactCount: 10,
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: null,
+    ...overrides,
+  };
+}
+
+function githubRun(runId: string, repositoryId: string, name: string, overrides = {}) {
+  return {
+    runId,
+    sourceSystem: "GITHUB",
+    sourceId: `octocat/${name}`,
+    owner: "octocat",
+    name,
+    repositoryId,
+    startedAt: "2026-07-05T10:00:00Z",
+    finishedAt: null,
+    ingestedCount: 0,
+    updatedCount: 0,
+    deletedCount: 0,
+    failedCount: 0,
+    status: "RUNNING",
+    failedItems: [],
+    failureReason: null,
+    aiSyncStatus: "NOT_APPLICABLE",
+    aiSyncFailureReason: null,
+    ...overrides,
+  };
+}
+
 const {
   mockGetIngestionRunsPage,
   mockGetIngestionStatus,
@@ -59,6 +136,8 @@ const {
   mockGetIngestionSourceStatuses,
   mockListConnectors,
   mockConfigureAllGithubRepositories,
+  mockGetGithubRepositoryConfig,
+  mockConfigureGithubRepository,
 } = vi.hoisted(() => ({
   mockGetIngestionRunsPage: vi.fn(),
   mockGetIngestionStatus: vi.fn(),
@@ -71,6 +150,8 @@ const {
   mockGetIngestionSourceStatuses: vi.fn(),
   mockListConnectors: vi.fn(),
   mockConfigureAllGithubRepositories: vi.fn(),
+  mockGetGithubRepositoryConfig: vi.fn(),
+  mockConfigureGithubRepository: vi.fn(),
 }));
 
 vi.mock("../../../src/services/ingestionService", () => ({
@@ -94,20 +175,30 @@ vi.mock("../../../src/services/sources/githubService", () => ({
   updateAllGithubRepositories: mockUpdateAllGithubRepositories,
   updateGithubRepository: mockUpdateGithubRepository,
   configureAllGithubRepositories: mockConfigureAllGithubRepositories,
+  getGithubRepositoryConfig: mockGetGithubRepositoryConfig,
+  configureGithubRepository: mockConfigureGithubRepository,
 }));
 
-const { mockGetJiraInstances, mockUpdateJiraInstance, mockConfigureAllJiraInstances } = vi.hoisted(
-  () => ({
-    mockGetJiraInstances: vi.fn(),
-    mockUpdateJiraInstance: vi.fn(),
-    mockConfigureAllJiraInstances: vi.fn(),
-  }),
-);
+const {
+  mockGetJiraInstances,
+  mockUpdateJiraInstance,
+  mockConfigureAllJiraInstances,
+  mockGetJiraConfig,
+  mockConfigureJiraInstance,
+} = vi.hoisted(() => ({
+  mockGetJiraInstances: vi.fn(),
+  mockUpdateJiraInstance: vi.fn(),
+  mockConfigureAllJiraInstances: vi.fn(),
+  mockGetJiraConfig: vi.fn(),
+  mockConfigureJiraInstance: vi.fn(),
+}));
 
 vi.mock("../../../src/services/sources/jiraService", () => ({
   getJiraInstances: mockGetJiraInstances,
   updateJiraInstance: mockUpdateJiraInstance,
   configureAllJiraInstances: mockConfigureAllJiraInstances,
+  getJiraConfig: mockGetJiraConfig,
+  configureJiraInstance: mockConfigureJiraInstance,
 }));
 
 vi.mock("../../../src/services/connectorService", async (importOriginal) => {
@@ -153,6 +244,10 @@ describe("DataIngestionPage", () => {
     mockUpdateJiraInstance.mockResolvedValue({ transactionId: "jira-tx" });
     mockConfigureAllGithubRepositories.mockResolvedValue(undefined);
     mockConfigureAllJiraInstances.mockResolvedValue(undefined);
+    mockGetGithubRepositoryConfig.mockResolvedValue(githubConfig());
+    mockConfigureGithubRepository.mockResolvedValue(undefined);
+    mockGetJiraConfig.mockResolvedValue(jiraConfig());
+    mockConfigureJiraInstance.mockResolvedValue(undefined);
     mockListConnectors.mockResolvedValue([]);
     selectProject();
   });
@@ -865,15 +960,24 @@ describe("DataIngestionPage", () => {
     // be discarded, otherwise freshly created runs disappear again until the
     // user reloads the browser.
     let resolveStale: ((value: unknown) => void) | undefined;
-    mockGetIngestionRunsPage
-      .mockResolvedValueOnce(createRunPage([run("old-run")]))
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveStale = resolve;
-          }),
-      )
-      .mockResolvedValueOnce(createRunPage([run("new-run")]));
+    const tableResponses = [
+      () => Promise.resolve(createRunPage([run("old-run")])),
+      () =>
+        new Promise((resolve) => {
+          resolveStale = resolve;
+        }),
+      () => Promise.resolve(createRunPage([run("new-run")])),
+    ];
+    mockGetIngestionRunsPage.mockImplementation((filter: RunsFilter) => {
+      // The cards' own latest-runs request is not part of the scripted table responses.
+      if (isLatestRunsRequest(filter)) return Promise.resolve(createRunPage());
+
+      return (
+        tableResponses.shift() ??
+        tableResponses[0] ??
+        (() => Promise.resolve(createRunPage()))
+      )();
+    });
 
     const user = userEvent.setup();
     render(
@@ -982,15 +1086,19 @@ describe("DataIngestionPage", () => {
       screen.queryByRole("tablist", { name: /sync settings connector/i }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("switch", { name: /toggle global jira auto update/i }));
-    await user.click(screen.getByRole("button", { name: /apply globally/i }));
+    await user.click(
+      await screen.findByRole("switch", { name: /toggle jira auto update for this project/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /apply to project/i }));
 
     await waitFor(() => {
-      expect(mockConfigureAllJiraInstances).toHaveBeenCalledWith({
+      expect(mockConfigureJiraInstance).toHaveBeenCalledWith({
+        instanceUrl: "https://team.atlassian.net",
         autoUpdate: false,
         schedule: { type: "INTERVAL", everyMinutes: 60 },
       });
     });
+    expect(mockConfigureAllJiraInstances).not.toHaveBeenCalled();
     expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
   });
 
@@ -1030,6 +1138,28 @@ describe("DataIngestionPage", () => {
           },
         ]),
       ),
+      http.get("/api/v1/confluence/projects/:projectId/connections/:connectionId", () =>
+        HttpResponse.json({
+          id: "conn-1",
+          projectId: "proj1",
+          baseUrl: "https://acme.atlassian.net",
+          spaceId: "123456",
+          spaceKey: "ENG",
+          spaceName: "Engineering",
+          credentialName: "default",
+          pageAllowlist: [],
+          pageDenylist: [],
+          credentialsConfigured: true,
+          createdAt: "2026-07-01T00:00:00Z",
+          updatedAt: "2026-07-01T00:00:00Z",
+          version: 1,
+          sourceEnabled: true,
+          autoUpdate: true,
+          spec: { type: "INTERVAL", everyMinutes: 60 },
+          schedule: "every 60m",
+          nextSyncAt: null,
+        }),
+      ),
       http.put(
         "/api/v1/confluence/projects/:projectId/connections/:connectionId/schedule",
         async ({ request, params }) => {
@@ -1051,8 +1181,12 @@ describe("DataIngestionPage", () => {
 
     expect(await screen.findByText("Confluence Sync Settings")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("switch", { name: /toggle global confluence auto update/i }));
-    await user.click(screen.getByRole("button", { name: /apply globally/i }));
+    await user.click(
+      await screen.findByRole("switch", {
+        name: /toggle confluence auto update for this project/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /apply to project/i }));
 
     await waitFor(() => {
       expect(scheduleRequests).toEqual([
@@ -1061,6 +1195,222 @@ describe("DataIngestionPage", () => {
           body: { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } },
         },
       ]);
+    });
+  });
+
+  describe("source cards", () => {
+    const statusRows = () => [githubStatusRow("hello-world", "repo-uuid")];
+
+    beforeEach(() => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [{ id: "src1", name: "octocat/hello-world", type: "GITHUB", status: "CONNECTED" }],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue(statusRows());
+    });
+
+    const sourcesSection = () => within(screen.getByRole("region", { name: "Sources" }));
+
+    it("keeps a card's status when the run table is filtered", async () => {
+      // The newest run of the repository is still running; the table filter below
+      // asks for failed runs only, which returns none.
+      mockGetIngestionRunsPage.mockImplementation((filter: RunsFilter) =>
+        Promise.resolve(
+          isLatestRunsRequest(filter) || filter.status === undefined
+            ? createRunPage([githubRun("run-live", "repo-uuid", "hello-world")])
+            : createRunPage(),
+        ),
+      );
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(sourcesSection().getAllByText("Syncing").length).toBeGreaterThan(0);
+      });
+
+      await user.click(screen.getByRole("combobox", { name: "Filter runs by status" }));
+      await user.click(await screen.findByRole("option", { name: "Failed" }));
+
+      await waitFor(() => {
+        expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+          expect.objectContaining({ status: "FAILED" }),
+        );
+      });
+      expect(screen.queryByText("run-live")).not.toBeInTheDocument();
+      expect(sourcesSection().getAllByText("Syncing").length).toBeGreaterThan(0);
+    });
+
+    it("refreshes the card while a run is in flight until it has finished", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // First answer: the repository is syncing. Every later answer: it has finished.
+        mockGetIngestionSourceStatuses
+          .mockResolvedValueOnce([
+            githubStatusRow("hello-world", "repo-uuid", { connectionStatus: "UPDATING" }),
+          ])
+          .mockResolvedValue(statusRows());
+        mockGetIngestionRunsPage
+          .mockResolvedValueOnce(createRunPage([githubRun("run-live", "repo-uuid", "hello-world")]))
+          .mockResolvedValueOnce(createRunPage([githubRun("run-live", "repo-uuid", "hello-world")]))
+          .mockResolvedValue(
+            createRunPage([
+              githubRun("run-live", "repo-uuid", "hello-world", {
+                status: "COMPLETED",
+                finishedAt: "2026-07-05T10:05:00Z",
+                aiSyncStatus: "SUCCEEDED",
+              }),
+            ]),
+          );
+
+        render(
+          <MemoryRouter>
+            <DataIngestionPage />
+          </MemoryRouter>,
+        );
+
+        await waitFor(() => {
+          expect(sourcesSection().getAllByText("Syncing").length).toBeGreaterThan(0);
+        });
+
+        // One poll tick reloads the statuses and the latest runs, not only the table.
+        await vi.advanceTimersByTimeAsync(3100);
+
+        await waitFor(() => {
+          expect(sourcesSection().queryByText("Syncing")).not.toBeInTheDocument();
+        });
+        expect(sourcesSection().getAllByText("Synced").length).toBeGreaterThan(0);
+        expect(mockGetIngestionSourceStatuses.mock.calls.length).toBeGreaterThan(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("project-wide sync settings", () => {
+    const twoRepositories = () => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [
+          { id: "src1", name: "octocat/one", type: "GITHUB", status: "CONNECTED" },
+          { id: "src2", name: "octocat/two", type: "GITHUB", status: "CONNECTED" },
+        ],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([
+        githubStatusRow("one", "repo-one"),
+        githubStatusRow("two", "repo-two"),
+      ]);
+    };
+
+    const openSyncSettings = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole("button", { name: /manage sync settings/i }));
+      expect(await screen.findByText("GitHub Sync Settings")).toBeInTheDocument();
+    };
+
+    it("applies the schedule to each repository of the project, not platform-wide", async () => {
+      twoRepositories();
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await openSyncSettings(user);
+      await user.click(
+        await screen.findByRole("switch", { name: /toggle github auto update for this project/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /apply to project/i }));
+
+      await waitFor(() => {
+        expect(mockConfigureGithubRepository).toHaveBeenCalledTimes(2);
+      });
+      const request = { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } };
+      expect(mockConfigureGithubRepository).toHaveBeenCalledWith(
+        expect.objectContaining({ owner: "octocat", name: "one" }),
+        request,
+      );
+      expect(mockConfigureGithubRepository).toHaveBeenCalledWith(
+        expect.objectContaining({ owner: "octocat", name: "two" }),
+        request,
+      );
+      expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
+    });
+
+    it("pre-fills the schedule the repositories already share", async () => {
+      twoRepositories();
+      mockGetGithubRepositoryConfig.mockResolvedValue(
+        githubConfig({ autoUpdate: true, spec: { type: "INTERVAL", everyMinutes: 15 } }),
+      );
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await openSyncSettings(user);
+
+      expect(await screen.findByRole("spinbutton", { name: /minutes/i })).toHaveValue(15);
+      expect(screen.queryByText(/different schedules/i)).not.toBeInTheDocument();
+    });
+
+    it("shows the default and a hint when the repositories have different schedules", async () => {
+      twoRepositories();
+      mockGetGithubRepositoryConfig
+        .mockResolvedValueOnce(githubConfig({ spec: { type: "INTERVAL", everyMinutes: 15 } }))
+        .mockResolvedValueOnce(githubConfig({ spec: { type: "INTERVAL", everyMinutes: 30 } }));
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await openSyncSettings(user);
+
+      expect(await screen.findByText(/different schedules/i)).toBeInTheDocument();
+      expect(screen.getByRole("spinbutton", { name: /minutes/i })).toHaveValue(60);
+    });
+
+    it("still applies the schedule to the other repositories when one save fails", async () => {
+      twoRepositories();
+      mockConfigureGithubRepository
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce(undefined);
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await openSyncSettings(user);
+      await user.click(
+        await screen.findByRole("switch", { name: /toggle github auto update for this project/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /apply to project/i }));
+
+      await waitFor(() => {
+        expect(mockConfigureGithubRepository).toHaveBeenCalledTimes(2);
+      });
     });
   });
 

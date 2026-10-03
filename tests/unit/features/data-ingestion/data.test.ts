@@ -5,6 +5,7 @@ import {
   INGESTION_RUN_LIMIT,
   DETAILS_RUN_LIMIT,
   createJiraSourceFromInstance,
+  createSourceFromStatusRow,
   createConfluenceSourceFromConnection,
   createConfluenceSourceFromInstance,
   buildRunSourceLabels,
@@ -323,6 +324,71 @@ describe("data-ingestion data helpers", () => {
     });
   });
 
+  describe("createSourceFromStatusRow", () => {
+    const row = (
+      overrides: Partial<SourceInstanceIngestionStatus>,
+    ): SourceInstanceIngestionStatus => ({
+      sourceSystem: "GITHUB",
+      sourceId: "acme/monorepo",
+      displayName: "acme/monorepo",
+      repositoryId: "repo-1",
+      owner: "acme",
+      name: "monorepo",
+      sourceUrl: "https://github.com/acme/monorepo",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-07-28T10:00:00Z",
+      ingestedCount: 1,
+      updatedCount: 0,
+      deletedCount: 0,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 10,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: null,
+      lastPullRequestsSyncAt: null,
+      ...overrides,
+    });
+
+    it("keeps GitHub repository details on a GitHub row", () => {
+      const source = createSourceFromStatusRow(row({}));
+
+      expect(source.sourceSystem).toBe("GITHUB");
+      expect(source.githubRepository?.fullName).toBe("acme/monorepo");
+    });
+
+    it("maps a Jira row with the Jira identity and no GitHub details", () => {
+      const source = createSourceFromStatusRow(
+        row({
+          sourceSystem: "JIRA",
+          sourceId: "https://acme.atlassian.net",
+          displayName: "Team board",
+          repositoryId: null,
+          owner: null,
+          name: null,
+        }),
+      );
+
+      expect(source.sourceSystem).toBe("JIRA");
+      expect(source.githubRepository).toBeNull();
+      expect(source.jiraInstance?.instanceUrl).toBe("https://acme.atlassian.net");
+    });
+
+    it("maps a Confluence row and an upload row without GitHub details", () => {
+      const confluence = createSourceFromStatusRow(
+        row({ sourceSystem: "CONFLUENCE", sourceId: "https://acme.atlassian.net|1" }),
+      );
+      const upload = createSourceFromStatusRow(
+        row({ sourceSystem: "UPLOAD", sourceId: "uploads" }),
+      );
+
+      expect(confluence.sourceSystem).toBe("CONFLUENCE");
+      expect(confluence.githubRepository).toBeNull();
+      expect(upload.sourceSystem).toBe("UPLOAD");
+      expect(upload.githubRepository).toBeNull();
+    });
+  });
+
   describe("deriveConnectionStatus / deriveSyncStatus", () => {
     const jiraStatus = (
       overrides: Partial<SourceInstanceIngestionStatus> = {},
@@ -456,7 +522,9 @@ describe("data-ingestion data helpers", () => {
 
       const source = createConfluenceSourceFromConnection(confluenceConn, [run]);
       expect(source.ingestionStatusLabel).toBe("Synced");
-      expect(source.artifacts).toBe(6);
+      // A run only knows what it touched: the latest run's ingested count, never a total.
+      expect(source.artifacts).toBe(5);
+      expect(source.totalArtifactCount).toBe(0);
     });
 
     it("names the card from spaceName, falling back to spaceKey when there is none", () => {
