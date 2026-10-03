@@ -62,8 +62,8 @@ type AddSourceModalProps = {
  * "Add sources" modal for the Data Ingestion page.
  *
  * Like the create-project wizard's Sources step, this stages a *list* of sources
- * across all three connectors (GitHub repositories, Jira instances, uploaded
- * files) and connects them together — instead of the old flow, which picked one
+ * across the connectors (GitHub repositories, Jira instances, Confluence spaces,
+ * uploaded files) and connects them together — instead of the old flow, which picked one
  * type, connected it live and closed, so only a single source type could be
  * added per opening.
  *
@@ -451,7 +451,7 @@ export function AddSourceModal({
   const modalDescription =
     isConnecting || isAddingSource
       ? undefined
-      : "Stage GitHub repositories, Jira instances and files, then connect them together.";
+      : "Stage GitHub repositories, Jira instances, Confluence spaces and files, then connect them together.";
 
   const connectLabel =
     sources.length > 0
@@ -632,7 +632,7 @@ export function AddSourceModal({
                       setSources((current) => setDraftSourceOwner(current, sourceId, ownerUserId))
                   : undefined
               }
-              emptyMessage="No sources yet. Add a GitHub repo, Jira instance, or files to start."
+              emptyMessage="No sources yet. Add a GitHub repo, Jira instance, Confluence space, or files to start."
             />
 
             <Button

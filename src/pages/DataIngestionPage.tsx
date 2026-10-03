@@ -17,10 +17,7 @@ import {
   RunHistoryFilters,
   type RunStatusFilter,
 } from "../features/data-ingestion/components/RunHistoryFilters.tsx";
-import {
-  GithubRepositorySyncSettings,
-  type SyncScheduleConfig,
-} from "../features/data-ingestion/components/GithubRepositorySyncSettings.tsx";
+import { SyncScheduleSettings } from "../features/data-ingestion/components/SyncScheduleSettings.tsx";
 import { AddSourceModal } from "../features/data-ingestion/components/AddSourceModal.tsx";
 import { SourceDetailsPanel } from "../features/data-ingestion/components/SourceDetailsPanel.tsx";
 import { SourceList } from "../features/data-ingestion/components/SourceList.tsx";
@@ -38,11 +35,8 @@ import {
   createUploadSourceFromInstance,
   deriveSourceStatus,
   formatDateTime,
-  getBackendSourceStatusLabel,
   getRunSourceLabel,
-  getSourceStatus,
   getSourceStatusFromBackend,
-  getSourceStatusLabel,
   isRunInProgress,
   SOURCE_META,
 } from "../features/data-ingestion/data.ts";
@@ -76,15 +70,14 @@ import {
   getGithubPatNames,
   removeRepositoryFromProject,
   updateGithubRepository,
-  type ConfigureGithubRepositoryRequest,
 } from "../services/sources/githubService.ts";
+import type { SyncScheduleConfig, SyncScheduleRequest } from "../services/sources/syncSchedule.ts";
 import {
   configureJiraInstance,
   getJiraConfig,
   getJiraInstances,
   removeJiraInstanceFromProject,
   updateJiraInstance,
-  type ConfigureJiraInstanceRequest,
   type JiraInstanceDto,
 } from "../services/sources/jiraService.ts";
 import {
@@ -121,12 +114,11 @@ const RUN_PAGE_SIZE = 10;
 
 type RunFilterState = {
   status: RunStatusFilter;
-  /** The selected source's `value` (GitHub repo id, Jira instance URL, or Confluence ID), or `"ALL"`. */
+  /** The selected source's `value` (GitHub repo id, Jira instance URL, or Confluence connection id), or `"ALL"`. */
   sourceValue: string;
   /**
-   * How to translate `sourceValue` into a query param: GitHub filters by
-   * `repositoryId`, Jira/Confluence by the connector-neutral `sourceRef`. Null while no
-   * specific source is selected.
+   * How to translate `sourceValue` into a query param: GitHub and Confluence filter by
+   * `repositoryId`, Jira by `sourceRef`. Null while no specific source is selected.
    */
   sourceSystem: SourceSystem | null;
 };
@@ -139,8 +131,8 @@ const DEFAULT_RUN_FILTER: RunFilterState = {
 
 /**
  * A source offered in the run-history filter. `value` is the GitHub repository
- * id, Jira instance URL, or Confluence space id; `sourceSystem` decides which
- * query param it maps to (repositoryId vs. sourceRef).
+ * id, Jira instance URL, or Confluence connection id; `sourceSystem` decides
+ * which query param it maps to (repositoryId vs. sourceRef).
  */
 type RunSourceFilterOption = {
   value: string;
@@ -163,23 +155,11 @@ function toSourceSystem(value: string): SourceSystem | null {
   return null;
 }
 
-function getIngestionStatusLabel(
-  hasNeverSynced: boolean,
-  hasErrors: boolean,
-  runStatus: IngestionRun["status"] | null,
-) {
-  if (!hasNeverSynced && !hasErrors && runStatus === null) {
-    return "Synced";
-  }
-
-  return getSourceStatusLabel(hasNeverSynced, hasErrors, runStatus);
-}
-
 /**
- * Finds the per-repo ingestion status (from `/api/v1/ingestion-sources/status`,
- * endpoint #5) that belongs to a connected project source. A project source only
- * carries an opaque id and a display name, so we match on the repository id
- * first, then on the `"owner/name"` recoverable from the source's name or id.
+ * Finds the GitHub status row (from `/api/v1/ingestion-sources/status`) that
+ * belongs to a connected project source. A project source only carries an opaque
+ * id and a display name, so we match on the repository id first, then on the
+ * `"owner/name"` recoverable from the source's name or id.
  */
 function matchSourceInstance(
   projectSource: ProjectSource,
@@ -218,13 +198,13 @@ function githubRepositoryFromInstance(
 /**
  * Builds the source cards for the Data Ingestion page. The project's connected
  * sources define which cards exist (and their stable `sourceId`, used for
- * selection and deep links); for GitHub, the per-repo status endpoint (#5) is
- * the authoritative source of the repository identity, health, counters, total
- * artifact count, enabled flag and per-type sync times — no longer reconstructed
- * from artifact metadata. Sources without a per-repo row (uploads, or an
- * unresolvable repo) fall back to their source system's latest run. Jira sources
- * are skipped here and built separately from the connector-neutral status rows,
- * so a project source list that includes Jira instances does not double them.
+ * selection and deep links); for GitHub, the status row is the authoritative
+ * source of the repository identity, health, counters, total artifact count,
+ * enabled flag and per-type sync times. GitHub sources without a status row (an
+ * unresolvable repo) and uploads without one fall back to their source system's
+ * latest run. Jira and Confluence sources are skipped here and built separately
+ * from the status rows and connections, so a project source list that includes
+ * them does not double them.
  */
 function buildProjectDataSources(
   projectSources: ProjectSource[],
@@ -303,9 +283,6 @@ function buildProjectDataSources(
           icon: meta.icon,
           status: getSourceStatusFromBackend(effectiveBackendStatus),
           backendStatus: effectiveBackendStatus,
-          statusLabel: getBackendSourceStatusLabel(effectiveBackendStatus),
-          ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, runStatus),
-          ingestionStatusLabel: getIngestionStatusLabel(hasNeverSynced, hasErrors, runStatus),
           statusView: deriveSourceStatus({
             backendStatus: effectiveBackendStatus,
             runStatus,
@@ -316,7 +293,6 @@ function buildProjectDataSources(
           }),
           artifacts: instance.artifactCount,
           lastSync: formatDateTime(instance.lastRunTime),
-          nextSync: "Not available",
           errors: instance.failedCount,
           description: meta.description,
           lastRunAt: instance.lastRunTime,
@@ -356,9 +332,6 @@ function buildProjectDataSources(
         icon: meta.icon,
         status: getSourceStatusFromBackend(backendStatus),
         backendStatus,
-        statusLabel: getBackendSourceStatusLabel(backendStatus),
-        ingestionStatus: getSourceStatus(hasNeverSynced, errors > 0, runStatus),
-        ingestionStatusLabel: getIngestionStatusLabel(hasNeverSynced, errors > 0, runStatus),
         statusView: deriveSourceStatus({
           backendStatus,
           runStatus,
@@ -369,7 +342,6 @@ function buildProjectDataSources(
         }),
         artifacts: latestIngestedCount,
         lastSync: formatDateTime(lastRunAt),
-        nextSync: "Not available",
         errors,
         description: meta.description,
         lastRunAt,
@@ -461,9 +433,8 @@ export function DataIngestionPage() {
   const hasLoadedOnceRef = useRef(false);
   const [projectSources, setProjectSources] = useState<ProjectSource[]>([]);
   const [sourceInstances, setSourceInstances] = useState<SourceInstanceIngestionStatus[]>([]);
-  // Connected Jira instances for the selected project. Jira is not a
-  // ProjectSourceProvider on the backend, so its instances never appear in
-  // `projectSources`/`sourceInstances` and are loaded separately here.
+  // Connected Jira instances for the selected project. They carry the credential
+  // the status rows lack, and are merged into the Jira cards by instance URL.
   const [jiraInstances, setJiraInstances] = useState<JiraInstanceDto[]>([]);
   const [confluenceConnections, setConfluenceConnections] = useState<ConfluenceConnectionDto[]>([]);
   const [projectDataVersion, setProjectDataVersion] = useState(0);
@@ -910,7 +881,7 @@ export function DataIngestionPage() {
       disabled: count("disabled"),
     };
   }, [sources]);
-  const canManageGithubSyncSettings =
+  const canManageSyncSettings =
     profile?.permissionGroup === "ADMIN" || profile?.permissionGroup === "PM";
 
   // Naming the documentation owner of a repository writes component ownership, and that
@@ -1160,7 +1131,7 @@ export function DataIngestionPage() {
   }, [selectedProjectId, sources, syncSettingsProvider]);
 
   const handleSaveProjectSyncConfig = useCallback(
-    async (request: ConfigureGithubRepositoryRequest) => {
+    async (request: SyncScheduleRequest) => {
       await saveProjectSyncSchedule(
         syncSettingsProvider,
         sources,
@@ -1186,7 +1157,7 @@ export function DataIngestionPage() {
   );
 
   const handleSaveGithubRepositoryConfig = useCallback(
-    async (repository: GithubRepositoryDetails, request: ConfigureGithubRepositoryRequest) => {
+    async (repository: GithubRepositoryDetails, request: SyncScheduleRequest) => {
       await configureGithubRepository(repository, request);
       // No reloadProjects(): see refreshSourceDetails — a per-repo sync-schedule
       // change never alters the project switcher, and reloading it can reset the
@@ -1202,7 +1173,7 @@ export function DataIngestionPage() {
   );
 
   const handleSaveJiraConfig = useCallback(
-    async (instanceUrl: string, request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">) => {
+    async (instanceUrl: string, request: SyncScheduleRequest) => {
       await configureJiraInstance({ instanceUrl, ...request });
       // Mirrors the GitHub path: no reloadProjects(), just refresh this page's
       // run list and per-source statuses so the next-sync time updates.
@@ -1231,7 +1202,7 @@ export function DataIngestionPage() {
   );
 
   const handleSaveConfluenceConfig = useCallback(
-    async (connectionId: string, request: ConfigureGithubRepositoryRequest) => {
+    async (connectionId: string, request: SyncScheduleRequest) => {
       if (!selectedProjectId) {
         throw new Error("Select a project before saving the sync schedule.");
       }
@@ -1458,7 +1429,7 @@ export function DataIngestionPage() {
                         )}
                       </div>
 
-                      {canManageGithubSyncSettings ? (
+                      {canManageSyncSettings ? (
                         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
                           <Button
                             variant="secondary"
@@ -1563,7 +1534,7 @@ export function DataIngestionPage() {
             source={source}
             onUpdateSource={handleUpdateSource}
             onRefreshDetails={refreshSourceDetails}
-            canManageSyncSettings={canManageGithubSyncSettings}
+            canManageSyncSettings={canManageSyncSettings}
             onLoadRepositoryConfig={handleLoadGithubRepositoryConfig}
             onSaveRepositoryConfig={handleSaveGithubRepositoryConfig}
             onLoadJiraConfig={handleLoadJiraConfig}
@@ -1640,7 +1611,7 @@ export function DataIngestionPage() {
           </div>
         ) : null}
 
-        <GithubRepositorySyncSettings
+        <SyncScheduleSettings
           key={syncSettingsProvider}
           loadKey={syncSettingsProvider}
           loadConfig={loadProjectSyncConfig}
@@ -1665,7 +1636,7 @@ export function DataIngestionPage() {
           canAssignOwners={canAssignComponentOwners}
           ingestBlockedReason={
             !selectedProjectId
-              ? "Select a project before connecting repositories."
+              ? "Select a project before connecting sources."
               : !canIngestIntoSelectedProject
                 ? `You can only connect sources to projects you manage. You are a member of "${selectedProject?.name ?? "this project"}" but not its project manager.`
                 : undefined

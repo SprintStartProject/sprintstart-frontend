@@ -1,5 +1,5 @@
 import { apiClient } from "../apiClient.ts";
-import type { GithubScheduleSpec } from "./githubService.ts";
+import type { ScheduleSpec, SyncScheduleRequest } from "./syncSchedule.ts";
 
 export type CreateConfluenceConnectionRequest = {
   baseUrl: string;
@@ -8,18 +8,6 @@ export type CreateConfluenceConnectionRequest = {
   credentialName: string;
   pageAllowlist?: string[];
   pageDenylist?: string[];
-};
-
-/**
- * Confluence connections are scheduled through the same shared spec as GitHub
- * repositories and Jira instances (interval, daily, weekly, monthly or cron),
- * so the schedule form is shared with them as well.
- */
-export type ScheduleSpec = GithubScheduleSpec;
-
-export type ConfigureConfluenceScheduleRequest = {
-  schedule: ScheduleSpec;
-  autoUpdate: boolean;
 };
 
 export type ConfluenceConnectionDto = {
@@ -147,7 +135,7 @@ export const confluenceService = {
   async configureSchedule(
     projectId: string,
     connectionId: string,
-    request: ConfigureConfluenceScheduleRequest,
+    request: SyncScheduleRequest,
   ): Promise<ConfluenceConnectionDto> {
     return apiClient.fetch<ConfluenceConnectionDto>(
       `/api/v1/confluence/projects/${encodeURIComponent(projectId)}/connections/${encodeURIComponent(connectionId)}/schedule`,

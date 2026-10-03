@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { GithubRepositorySyncSettings } from "../../../../../src/features/data-ingestion/components/GithubRepositorySyncSettings";
+import { SyncScheduleSettings } from "../../../../../src/features/data-ingestion/components/SyncScheduleSettings";
 import type { GithubRepositoryConfig } from "../../../../../src/services/sources/githubService";
 
 const UNSAVED = /you have unsaved changes/i;
@@ -19,7 +19,7 @@ function config(overrides: Partial<GithubRepositoryConfig> = {}): GithubReposito
   };
 }
 
-describe("GithubRepositorySyncSettings", () => {
+describe("SyncScheduleSettings", () => {
   it("clears the unsaved-changes hint after saving a weekly schedule", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue(undefined);
@@ -34,11 +34,7 @@ describe("GithubRepositorySyncSettings", () => {
       );
 
     render(
-      <GithubRepositorySyncSettings
-        loadKey="acme/monorepo"
-        loadConfig={loadConfig}
-        onSave={onSave}
-      />,
+      <SyncScheduleSettings loadKey="acme/monorepo" loadConfig={loadConfig} onSave={onSave} />,
     );
 
     const weeklyTab = await screen.findByRole("button", { name: "Weekly" });
@@ -67,7 +63,7 @@ describe("GithubRepositorySyncSettings", () => {
     const user = userEvent.setup();
 
     render(
-      <GithubRepositorySyncSettings
+      <SyncScheduleSettings
         loadKey="acme/monorepo"
         loadConfig={vi
           .fn()
@@ -94,7 +90,7 @@ describe("GithubRepositorySyncSettings", () => {
     const user = userEvent.setup();
 
     render(
-      <GithubRepositorySyncSettings
+      <SyncScheduleSettings
         loadKey="acme/monorepo"
         loadConfig={vi.fn().mockResolvedValue(config())}
         onSave={vi.fn().mockResolvedValue(undefined)}

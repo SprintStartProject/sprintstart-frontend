@@ -53,9 +53,6 @@ export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
   },
 };
 
-export const INGESTION_RUN_LIMIT = 50;
-export const DETAILS_RUN_LIMIT = 10;
-
 /**
  * Turns one GitHub ingestion status row (`/api/v1/ingestion-sources/status`)
  * into a {@link DataSource}. Wherever sources are shown per repository rather
@@ -79,9 +76,6 @@ export function createSourceFromInstance(instance: SourceInstanceIngestionStatus
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
     backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel: getSourceStatusLabel(hasNeverSynced, hasErrors, null),
     statusView: deriveSourceStatus({
       backendStatus,
       hasErrors,
@@ -89,7 +83,6 @@ export function createSourceFromInstance(instance: SourceInstanceIngestionStatus
     }),
     artifacts: instance.artifactCount,
     lastSync: formatDateTime(instance.lastRunTime),
-    nextSync: "Not available",
     errors: instance.failedCount,
     description: meta.description,
     lastRunAt: instance.lastRunTime,
@@ -163,12 +156,6 @@ export function createJiraSourceFromInstance(
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
     backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel:
-      !hasNeverSynced && !hasErrors
-        ? "Synced"
-        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
     statusView: deriveSourceStatus({
       backendStatus,
       hasErrors,
@@ -177,7 +164,6 @@ export function createJiraSourceFromInstance(
     }),
     artifacts: status.artifactCount,
     lastSync: formatDateTime(status.lastRunTime),
-    nextSync: "Not available",
     errors: status.failedCount,
     description: meta.description,
     lastRunAt: status.lastRunTime,
@@ -223,12 +209,6 @@ export function createUploadSourceFromInstance(status: SourceInstanceIngestionSt
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
     backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel:
-      !hasNeverSynced && !hasErrors
-        ? "Synced"
-        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
     statusView: deriveSourceStatus({
       backendStatus,
       hasErrors,
@@ -237,7 +217,6 @@ export function createUploadSourceFromInstance(status: SourceInstanceIngestionSt
     }),
     artifacts: status.artifactCount,
     lastSync: formatDateTime(status.lastRunTime),
-    nextSync: "Not available",
     errors: status.failedCount,
     description: meta.description,
     lastRunAt: status.lastRunTime,
@@ -280,12 +259,6 @@ export function createConfluenceSourceFromInstance(
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
     backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel:
-      !hasNeverSynced && !hasErrors
-        ? "Synced"
-        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
     statusView: deriveSourceStatus({
       backendStatus,
       hasErrors,
@@ -294,7 +267,6 @@ export function createConfluenceSourceFromInstance(
     }),
     artifacts: status.artifactCount,
     lastSync: formatDateTime(status.lastRunTime),
-    nextSync: connection?.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
     errors: status.failedCount,
     description: meta.description,
     lastRunAt: status.lastRunTime,
@@ -360,12 +332,6 @@ export function createConfluenceSourceFromConnection(
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
     backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, latestRun?.status ?? null),
-    ingestionStatusLabel:
-      !hasNeverSynced && !hasErrors
-        ? "Synced"
-        : getSourceStatusLabel(hasNeverSynced, hasErrors, latestRun?.status ?? null),
     statusView: deriveSourceStatus({
       backendStatus,
       hasErrors,
@@ -374,7 +340,6 @@ export function createConfluenceSourceFromConnection(
     }),
     artifacts: latestRun?.ingestedCount ?? 0,
     lastSync: formatDateTime(latestRun?.finishedAt ?? latestRun?.startedAt),
-    nextSync: connection.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
     errors: latestRun?.failedCount ?? 0,
     description: meta.description,
     lastRunAt: latestRun?.startedAt ?? null,
@@ -401,18 +366,6 @@ export function createConfluenceSourceFromConnection(
     lastIssuesSyncAt: null,
     lastPullRequestsSyncAt: null,
   };
-}
-
-export function getSourceStatus(
-  hasNeverSynced: boolean,
-  hasErrors: boolean,
-  runStatus?: IngestionRunStatus | null,
-): SourceStatus {
-  if (hasNeverSynced) return "warning";
-  if (isRunInProgress(runStatus)) return "running";
-  if (runStatus === "FAILED" || runStatus === "PARTIAL") return "warning";
-  if (hasErrors) return "warning";
-  return "connected";
 }
 
 export function getSourceStatusFromBackend(
@@ -608,20 +561,6 @@ export function deriveSyncStatus(source: DataSource): SourceStatusPresentation {
         tone: "danger",
         spinning: false,
       };
-}
-
-export function getSourceStatusLabel(
-  hasNeverSynced: boolean,
-  hasErrors: boolean,
-  runStatus?: IngestionRunStatus | null,
-) {
-  if (hasNeverSynced) return "Not synced";
-  if (isRunInProgress(runStatus)) return "Running";
-  if (runStatus === "FAILED") return "Failed";
-  if (runStatus === "PARTIAL") return "Partial";
-  if (hasErrors) return "Warning";
-  if (runStatus === "COMPLETED") return "Synced";
-  return "Connected";
 }
 
 export function getBackendSourceStatusLabel(backendStatus?: BackendProjectSourceStatus) {

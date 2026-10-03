@@ -130,12 +130,10 @@ const {
   mockConnectGithubRepository,
   mockDiscoverRepositories,
   mockGetGithubPatNames,
-  mockUpdateAllGithubRepositories,
   mockUpdateGithubRepository,
   mockGetAccessibleProject,
   mockGetIngestionSourceStatuses,
   mockListConnectors,
-  mockConfigureAllGithubRepositories,
   mockGetGithubRepositoryConfig,
   mockConfigureGithubRepository,
 } = vi.hoisted(() => ({
@@ -144,12 +142,10 @@ const {
   mockConnectGithubRepository: vi.fn(),
   mockDiscoverRepositories: vi.fn(),
   mockGetGithubPatNames: vi.fn(),
-  mockUpdateAllGithubRepositories: vi.fn(),
   mockUpdateGithubRepository: vi.fn(),
   mockGetAccessibleProject: vi.fn(),
   mockGetIngestionSourceStatuses: vi.fn(),
   mockListConnectors: vi.fn(),
-  mockConfigureAllGithubRepositories: vi.fn(),
   mockGetGithubRepositoryConfig: vi.fn(),
   mockConfigureGithubRepository: vi.fn(),
 }));
@@ -172,9 +168,7 @@ vi.mock("../../../src/services/sources/githubService", () => ({
   connectGithubRepository: mockConnectGithubRepository,
   discoverRepositories: mockDiscoverRepositories,
   getGithubPatNames: mockGetGithubPatNames,
-  updateAllGithubRepositories: mockUpdateAllGithubRepositories,
   updateGithubRepository: mockUpdateGithubRepository,
-  configureAllGithubRepositories: mockConfigureAllGithubRepositories,
   getGithubRepositoryConfig: mockGetGithubRepositoryConfig,
   configureGithubRepository: mockConfigureGithubRepository,
 }));
@@ -182,13 +176,11 @@ vi.mock("../../../src/services/sources/githubService", () => ({
 const {
   mockGetJiraInstances,
   mockUpdateJiraInstance,
-  mockConfigureAllJiraInstances,
   mockGetJiraConfig,
   mockConfigureJiraInstance,
 } = vi.hoisted(() => ({
   mockGetJiraInstances: vi.fn(),
   mockUpdateJiraInstance: vi.fn(),
-  mockConfigureAllJiraInstances: vi.fn(),
   mockGetJiraConfig: vi.fn(),
   mockConfigureJiraInstance: vi.fn(),
 }));
@@ -196,7 +188,6 @@ const {
 vi.mock("../../../src/services/sources/jiraService", () => ({
   getJiraInstances: mockGetJiraInstances,
   updateJiraInstance: mockUpdateJiraInstance,
-  configureAllJiraInstances: mockConfigureAllJiraInstances,
   getJiraConfig: mockGetJiraConfig,
   configureJiraInstance: mockConfigureJiraInstance,
 }));
@@ -229,7 +220,6 @@ describe("DataIngestionPage", () => {
       hasMore: false,
       resolvedOwnerType: "user",
     });
-    mockUpdateAllGithubRepositories.mockResolvedValue({ transactionId: "tx2" });
     mockUpdateGithubRepository.mockResolvedValue({ transactionId: "tx3" });
     mockGetAccessibleProject.mockResolvedValue({
       id: "proj1",
@@ -242,8 +232,6 @@ describe("DataIngestionPage", () => {
     mockGetIngestionSourceStatuses.mockResolvedValue([]);
     mockGetJiraInstances.mockResolvedValue([]);
     mockUpdateJiraInstance.mockResolvedValue({ transactionId: "jira-tx" });
-    mockConfigureAllGithubRepositories.mockResolvedValue(undefined);
-    mockConfigureAllJiraInstances.mockResolvedValue(undefined);
     mockGetGithubRepositoryConfig.mockResolvedValue(githubConfig());
     mockConfigureGithubRepository.mockResolvedValue(undefined);
     mockGetJiraConfig.mockResolvedValue(jiraConfig());
@@ -1098,8 +1086,6 @@ describe("DataIngestionPage", () => {
         schedule: { type: "INTERVAL", everyMinutes: 60 },
       });
     });
-    expect(mockConfigureAllJiraInstances).not.toHaveBeenCalled();
-    expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
   });
 
   it("applies the global sync schedule to every Confluence connection", async () => {
@@ -1348,7 +1334,6 @@ describe("DataIngestionPage", () => {
         expect.objectContaining({ owner: "octocat", name: "two" }),
         request,
       );
-      expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
     });
 
     it("pre-fills the schedule the repositories already share", async () => {

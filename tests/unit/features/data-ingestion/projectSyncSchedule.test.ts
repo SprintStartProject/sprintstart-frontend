@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  DEFAULT_PROJECT_SYNC_SCHEDULE,
   loadProjectSyncSchedule,
   saveProjectSyncSchedule,
 } from "../../../../src/features/data-ingestion/projectSyncSchedule";
+import { DEFAULT_SYNC_SCHEDULE } from "../../../../src/services/sources/syncSchedule";
 import type { DataSource } from "../../../../src/features/data-ingestion/types";
 
 const mocks = vi.hoisted(() => ({
@@ -100,7 +100,7 @@ describe("loadProjectSyncSchedule", () => {
       "p1",
     );
 
-    expect(result).toEqual({ config: DEFAULT_PROJECT_SYNC_SCHEDULE, isMixed: true });
+    expect(result).toEqual({ config: DEFAULT_SYNC_SCHEDULE, isMixed: true });
   });
 
   it("treats a differing auto-update flag as a difference", async () => {
@@ -148,7 +148,7 @@ describe("loadProjectSyncSchedule", () => {
       "p1",
     );
 
-    expect(result).toEqual({ config: DEFAULT_PROJECT_SYNC_SCHEDULE, isMixed: true });
+    expect(result).toEqual({ config: DEFAULT_SYNC_SCHEDULE, isMixed: true });
   });
 
   it("shows the default without a hint when no source has a schedule yet", async () => {
@@ -156,7 +156,7 @@ describe("loadProjectSyncSchedule", () => {
 
     const result = await loadProjectSyncSchedule("github", [githubSource("one")], "p1");
 
-    expect(result).toEqual({ config: DEFAULT_PROJECT_SYNC_SCHEDULE, isMixed: false });
+    expect(result).toEqual({ config: DEFAULT_SYNC_SCHEDULE, isMixed: false });
   });
 
   it("reads Jira instances by URL and Confluence connections through the project", async () => {

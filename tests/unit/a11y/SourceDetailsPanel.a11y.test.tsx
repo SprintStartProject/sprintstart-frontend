@@ -8,7 +8,6 @@ import type { DataSource } from "../../../src/features/data-ingestion/types";
 import { deriveSourceStatus } from "../../../src/features/data-ingestion/data";
 
 vi.mock("../../../src/services/ingestionService", () => ({
-  getIngestionRuns: vi.fn().mockResolvedValue([]),
   getIngestionStatus: vi.fn().mockResolvedValue([]),
 }));
 
@@ -18,9 +17,6 @@ const source: DataSource = {
   name: "GitHub Repository",
   type: "GitHub",
   status: "connected",
-  statusLabel: "Connected",
-  ingestionStatus: "connected",
-  ingestionStatusLabel: "Synced",
   statusView: deriveSourceStatus({ hasErrors: false, hasNeverSynced: false }),
   artifacts: 42,
   lastSync: "2026-07-01",

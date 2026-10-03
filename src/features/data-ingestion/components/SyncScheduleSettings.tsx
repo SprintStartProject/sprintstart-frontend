@@ -8,28 +8,20 @@ import { useToast } from "../../../context/useToast.ts";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
 import { formatDateTime } from "../data.ts";
 import type {
-  ConfigureGithubRepositoryRequest,
-  GithubRepositoryConfig,
-  GithubScheduleDayOfWeek,
-  GithubScheduleSpec,
-} from "../../../services/sources/githubService.ts";
+  ScheduleDayOfWeek,
+  ScheduleSpec,
+  SyncScheduleConfig,
+  SyncScheduleRequest,
+} from "../../../services/sources/syncSchedule.ts";
 
-type ScheduleType = GithubScheduleSpec["type"];
+type ScheduleType = ScheduleSpec["type"];
 
-/**
- * The minimal loaded-config shape this schedule form actually reads. Both
- * {@link GithubRepositoryConfig} and the Jira instance config
- * (`GetJiraInstanceConfigResponse`) satisfy it, so the same control drives the
- * GitHub repository and Jira instance sync schedules — the two connectors share
- * an identical schedule contract ({@link GithubScheduleSpec}).
- */
-export type SyncScheduleConfig = Pick<GithubRepositoryConfig, "autoUpdate" | "spec" | "nextSyncAt">;
-
-type GithubRepositorySyncSettingsProps = {
+type SyncScheduleSettingsProps = {
+  /** Reloads the form when it changes; pair it with `loadConfig`. */
   loadKey?: string;
   loadConfig?: () => Promise<SyncScheduleConfig>;
-  initialConfig?: ConfigureGithubRepositoryRequest;
-  onSave: (request: ConfigureGithubRepositoryRequest) => Promise<void>;
+  initialConfig?: SyncScheduleRequest;
+  onSave: (request: SyncScheduleRequest) => Promise<void>;
   disclaimer?: string;
   showNextSync?: boolean;
   autoUpdateOnText?: string;
@@ -46,7 +38,7 @@ const SCHEDULE_TYPES: SegmentedTabOption<ScheduleType>[] = [
   { value: "CUSTOM", label: "Custom" },
 ];
 
-const DAYS_OF_WEEK: GithubScheduleDayOfWeek[] = [
+const DAYS_OF_WEEK: ScheduleDayOfWeek[] = [
   "MONDAY",
   "TUESDAY",
   "WEDNESDAY",
@@ -57,22 +49,22 @@ const DAYS_OF_WEEK: GithubScheduleDayOfWeek[] = [
 ];
 
 /**
- * Compact GitHub sync control shared by the global modal and repository
- * details drawer. It intentionally exposes the day-to-day knobs PMs need:
- * whether due checks should perform an update, and the interval cadence.
+ * Compact sync-schedule control shared by the project-wide modal and the source
+ * details drawer of every connector. It intentionally exposes the day-to-day
+ * knobs PMs need: whether due checks should perform an update, and the cadence.
  */
-export function GithubRepositorySyncSettings({
+export function SyncScheduleSettings({
   loadKey,
   loadConfig,
   initialConfig,
   onSave,
   disclaimer,
   showNextSync = true,
-  autoUpdateOnText = "Due checks update this repository.",
-  autoUpdateOffText = "Due checks only mark this repository out of date.",
-  toggleAriaLabel = "Toggle repository auto update",
+  autoUpdateOnText = "Due checks update this source.",
+  autoUpdateOffText = "Due checks only mark this source out of date.",
+  toggleAriaLabel = "Toggle auto update",
   saveLabel = "Save",
-}: GithubRepositorySyncSettingsProps) {
+}: SyncScheduleSettingsProps) {
   const intervalInputId = useId();
   const timeInputId = useId();
   const dayOfMonthInputId = useId();
@@ -85,7 +77,7 @@ export function GithubRepositorySyncSettings({
   const [scheduleType, setScheduleType] = useState<ScheduleType>("INTERVAL");
   const [everyMinutes, setEveryMinutes] = useState("60");
   const [time, setTime] = useState("02:00:00");
-  const [daysOfWeek, setDaysOfWeek] = useState<GithubScheduleDayOfWeek[]>(["MONDAY"]);
+  const [daysOfWeek, setDaysOfWeek] = useState<ScheduleDayOfWeek[]>(["MONDAY"]);
   const [dayOfMonth, setDayOfMonth] = useState("1");
   const [cron, setCron] = useState("0 0 2 * * *");
   const [nextSyncAt, setNextSyncAt] = useState<string | null>(null);
@@ -489,7 +481,7 @@ type FormValues = {
   scheduleType: ScheduleType;
   everyMinutes: string;
   time: string;
-  daysOfWeek: GithubScheduleDayOfWeek[];
+  daysOfWeek: ScheduleDayOfWeek[];
   dayOfMonth: string;
   cron: string;
 };
@@ -509,10 +501,7 @@ const DEFAULT_FORM_VALUES: FormValues = {
  * (filling the fields the active schedule type does not use with defaults), so
  * the saved baseline is comparable to the live form for dirty detection.
  */
-function toFormValues(
-  autoUpdate: boolean,
-  spec: GithubRepositoryConfig["spec"] | ConfigureGithubRepositoryRequest["schedule"],
-): FormValues {
+function toFormValues(autoUpdate: boolean, spec: SyncScheduleConfig["spec"]): FormValues {
   const base: FormValues = { ...DEFAULT_FORM_VALUES, autoUpdate };
 
   if (!spec) return base;
@@ -594,15 +583,12 @@ type ScheduleSetters = {
   setScheduleType: (value: ScheduleType) => void;
   setEveryMinutes: (value: string) => void;
   setTime: (value: string) => void;
-  setDaysOfWeek: (value: GithubScheduleDayOfWeek[]) => void;
+  setDaysOfWeek: (value: ScheduleDayOfWeek[]) => void;
   setDayOfMonth: (value: string) => void;
   setCron: (value: string) => void;
 };
 
-function applyScheduleSpec(
-  spec: GithubRepositoryConfig["spec"] | ConfigureGithubRepositoryRequest["schedule"],
-  setters: ScheduleSetters,
-) {
+function applyScheduleSpec(spec: SyncScheduleConfig["spec"], setters: ScheduleSetters) {
   if (!spec) {
     setters.setScheduleType("INTERVAL");
     setters.setEveryMinutes("60");
@@ -643,10 +629,10 @@ function buildScheduleSpec({
   scheduleType: ScheduleType;
   everyMinutes: string;
   time: string;
-  daysOfWeek: GithubScheduleDayOfWeek[];
+  daysOfWeek: ScheduleDayOfWeek[];
   dayOfMonth: string;
   cron: string;
-}): GithubScheduleSpec {
+}): ScheduleSpec {
   switch (scheduleType) {
     case "INTERVAL": {
       const interval = Number(everyMinutes);
@@ -706,7 +692,7 @@ function normalizeTimeOutput(value: string) {
   throw new Error("Time must use HH:mm:ss.");
 }
 
-function toggleDay(selectedDays: GithubScheduleDayOfWeek[], day: GithubScheduleDayOfWeek) {
+function toggleDay(selectedDays: ScheduleDayOfWeek[], day: ScheduleDayOfWeek) {
   if (selectedDays.includes(day)) {
     return selectedDays.filter((selectedDay) => selectedDay !== day);
   }
@@ -714,7 +700,7 @@ function toggleDay(selectedDays: GithubScheduleDayOfWeek[], day: GithubScheduleD
   return [...selectedDays, day];
 }
 
-function formatDayLabel(day: GithubScheduleDayOfWeek) {
+function formatDayLabel(day: ScheduleDayOfWeek) {
   return day
     .slice(0, 3)
     .toLowerCase()

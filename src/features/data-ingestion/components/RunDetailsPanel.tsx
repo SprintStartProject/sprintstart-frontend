@@ -28,8 +28,8 @@ import type { AiSyncStatus, IngestionRun } from "../types.ts";
 type RunDetailsPanelProps = {
   run: IngestionRun;
   /**
-   * The repository the run ingested, resolved best-effort from the run's
-   * artifacts (the backend does not persist a repo on a run). Falls back to the
+   * The source the run ingested, resolved best-effort from the run's source
+   * reference and the connected sources' display names. Falls back to the
    * source-system label when the run produced no attributable artifacts.
    */
   sourceLabel?: string;
@@ -57,7 +57,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
   const runTone = getRunStatusTone(run.status) as Tone;
   const aiLabel = getAiSyncStatusLabel(run.aiSyncStatus);
   const duration = formatDuration(run.startedAt, run.finishedAt, run.status);
-  const repoLabel = sourceLabel ?? getSourceLabel(run.sourceSystem);
+  const runSourceLabel = sourceLabel ?? getSourceLabel(run.sourceSystem);
   const originRow = buildOriginRow(run);
   // Hero icon follows the run's source system (GitHub → GitBranch, Jira → Ticket,
   // Upload → FileText) so a Jira run never shows the GitHub glyph.
@@ -67,7 +67,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
     <DetailsSideDrawer
       isOpen
       onClose={onClose}
-      title={`Run · ${repoLabel}`}
+      title={`Run · ${runSourceLabel}`}
       closeAriaLabel="Close run details"
       zIndexClassName="z-50"
       showOverlay
@@ -116,7 +116,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
       <div className="mt-4 grid gap-4 sm:mt-5 lg:grid-cols-2">
         <DrawerCard label="Information" icon={Clock3} index={1}>
           <dl className="-my-1">
-            <InfoRow label="Repository" value={repoLabel} />
+            <InfoRow label="Source" value={runSourceLabel} />
             {originRow && <InfoRow label={originRow.label} value={originRow.value} />}
             <InfoRow label="Started" value={formatDateTime(run.startedAt)} />
             <InfoRow

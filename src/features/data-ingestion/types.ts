@@ -57,17 +57,15 @@ export type PageMetadata = {
   hasPrevious: boolean;
 };
 
-export type ArtifactPageMetadata = PageMetadata;
-
 export type ArtifactPage = {
   items: Artifact[];
-  page: ArtifactPageMetadata;
+  page: PageMetadata;
 };
 
 export type IngestionRun = {
   runId: string;
   sourceSystem: SourceSystem;
-  /** `"owner/name"` for GitHub runs; null for uploads and legacy runs. */
+  /** The run's source reference (`"owner/name"` for GitHub, the instance URL for Jira); null for uploads and legacy runs. */
   sourceId: string | null;
   owner: string | null;
   name: string | null;
@@ -87,20 +85,22 @@ export type IngestionRun = {
 };
 
 /**
- * Per-repo ingestion health from `/api/v1/ingestion-sources/status` — one row
- * per connected GitHub repository. This is the authoritative source for the
- * Data Ingestion source cards: it carries the repository identity, connection
- * status, enabled flag, the last run's counters, the total stored artifact
- * count and the per-artifact-type last-sync timestamps in a single call, so the
- * UI no longer has to reconstruct any of it from artifact metadata.
+ * Per-source ingestion health from `/api/v1/ingestion-sources/status` — one row
+ * per connected GitHub repository, Jira instance, Confluence space or upload
+ * source. This is the authoritative source for the Data Ingestion source cards:
+ * it carries the source identity, connection status, enabled flag, the last
+ * run's counters, the total stored artifact count and the per-artifact-type
+ * last-sync timestamps in a single call, so the UI does not have to reconstruct
+ * any of it from artifact metadata.
  */
 export type SourceInstanceIngestionStatus = {
   sourceSystem: SourceSystem;
   /**
-   * Stable, connector-neutral key: GitHub `"owner/name"`, Jira the instance URL.
+   * Key of the source within its system: GitHub `"owner/name"`, Jira the instance URL,
+   * Confluence the base URL and space.
    */
   sourceId: string;
-  /** Display name: GitHub `"owner/name"`, Jira the instance's display name. */
+  /** Display name: GitHub `"owner/name"`, otherwise the source's own display name. */
   displayName: string;
   /**
    * GitHub-only repository identity. Null for connector-neutral rows such as
@@ -201,8 +201,6 @@ export type ConfluenceSpaceSourceDetails = {
   credentialName?: string;
 };
 
-export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
-
 /**
  * The section the overview-first Data Ingestion page is filtered to. `overview`
  * is the dashboard view and shows everything (overview + sources + runs); the
@@ -218,8 +216,6 @@ export type SectionKey = "overview" | "sources" | "runs";
 export const SECTION_ORDER: SectionKey[] = ["overview", "sources", "runs"];
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
-
-export type ConnectState = "idle" | "loading" | "success" | "error";
 
 export type SourceStatus = "connected" | "running" | "warning" | "disabled";
 
@@ -281,14 +277,10 @@ export type SourceDetailsSource = {
   /** Confluence space identity; null/absent for non-Confluence sources. */
   confluenceSpace?: ConfluenceSpaceSourceDetails | null;
   description?: string;
-  nextSync?: string;
 };
 
 export type DataSource = SourceDetailsSource & {
   icon: LucideIcon;
-  statusLabel: string;
-  ingestionStatus: SourceStatus;
-  ingestionStatusLabel: string;
   /** The single unified status shown in the list and details drawer. */
   statusView: SourceStatusPresentation;
   lastRunAt: string | null;
@@ -302,10 +294,8 @@ export type DataSource = SourceDetailsSource & {
   failedItems: FailedArtifact[];
   githubRepository: GithubRepositoryDetails | null;
   confluenceSpace?: ConfluenceSpaceSourceDetails | null;
-  /** Per-artifact-type last-sync timestamps (GitHub, from endpoint #5). */
+  /** Per-artifact-type last-sync timestamps (from the status row). */
   lastCommitsSyncAt: string | null;
   lastIssuesSyncAt: string | null;
   lastPullRequestsSyncAt: string | null;
 };
-
-export type SourceConnectMeta = SourceMeta;

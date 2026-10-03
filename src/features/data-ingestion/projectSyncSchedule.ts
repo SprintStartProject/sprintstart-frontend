@@ -1,35 +1,32 @@
 import {
   configureGithubRepository,
   getGithubRepositoryConfig,
-  type ConfigureGithubRepositoryRequest,
-  type GithubScheduleSpec,
 } from "../../services/sources/githubService.ts";
 import { configureJiraInstance, getJiraConfig } from "../../services/sources/jiraService.ts";
 import { confluenceService } from "../../services/sources/confluenceService.ts";
+import {
+  DEFAULT_SYNC_SCHEDULE,
+  type ScheduleSpec,
+  type SyncScheduleRequest,
+} from "../../services/sources/syncSchedule.ts";
 import type { DataSource } from "./types.ts";
 
 /** The connectors whose sync schedule can be applied to a whole project at once. */
 export type SyncSettingsProvider = "github" | "jira" | "confluence";
 
-/** Shown in the project-wide form when the project's sources do not share one schedule. */
-export const DEFAULT_PROJECT_SYNC_SCHEDULE: ConfigureGithubRepositoryRequest = {
-  autoUpdate: true,
-  schedule: { type: "INTERVAL", everyMinutes: 60 },
-};
-
 /** The schedule to show in the project-wide form and whether the sources disagree on it. */
 export type ProjectSyncSchedule = {
-  config: ConfigureGithubRepositoryRequest;
+  config: SyncScheduleRequest;
   /** True when the sources have different schedules (or one could not be read). */
   isMixed: boolean;
 };
 
-type StoredSchedule = { autoUpdate: boolean; spec: GithubScheduleSpec | null };
+type StoredSchedule = { autoUpdate: boolean; spec: ScheduleSpec | null };
 
 /** One source of the project whose schedule is read and written. */
 type ScheduleTarget = {
   load: () => Promise<StoredSchedule>;
-  save: (request: ConfigureGithubRepositoryRequest) => Promise<void>;
+  save: (request: SyncScheduleRequest) => Promise<void>;
 };
 
 function toTargets(
@@ -124,7 +121,7 @@ export async function loadProjectSyncSchedule(
   const isMixed = hasUnreadable || new Set(stored.map(scheduleKey)).size > 1;
 
   if (isMixed || stored.length === 0 || !stored[0].spec) {
-    return { config: DEFAULT_PROJECT_SYNC_SCHEDULE, isMixed };
+    return { config: DEFAULT_SYNC_SCHEDULE, isMixed };
   }
 
   return { config: { autoUpdate: stored[0].autoUpdate, schedule: stored[0].spec }, isMixed };
@@ -141,7 +138,7 @@ export async function saveProjectSyncSchedule(
   provider: SyncSettingsProvider,
   sources: DataSource[],
   projectId: string | null,
-  request: ConfigureGithubRepositoryRequest,
+  request: SyncScheduleRequest,
   pluralNoun: string,
 ): Promise<void> {
   const targets = toTargets(provider, sources, projectId);

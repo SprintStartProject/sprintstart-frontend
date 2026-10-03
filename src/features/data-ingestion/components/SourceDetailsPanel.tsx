@@ -19,14 +19,12 @@ import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer"
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
 import { DrawerCard } from "../../admin/components/DrawerCard.tsx";
+import type { GithubRepositoryConfig } from "../../../services/sources/githubService.ts";
+import type { GetJiraInstanceConfigResponse } from "../../../services/sources/jiraService.ts";
 import type {
-  ConfigureGithubRepositoryRequest,
-  GithubRepositoryConfig,
-} from "../../../services/sources/githubService.ts";
-import type {
-  ConfigureJiraInstanceRequest,
-  GetJiraInstanceConfigResponse,
-} from "../../../services/sources/jiraService.ts";
+  SyncScheduleConfig,
+  SyncScheduleRequest,
+} from "../../../services/sources/syncSchedule.ts";
 import {
   deriveConnectionStatus,
   deriveSyncStatus,
@@ -35,10 +33,7 @@ import {
   SOURCE_META,
 } from "../data.ts";
 import type { DataSource, LoadingState } from "../types.ts";
-import {
-  GithubRepositorySyncSettings,
-  type SyncScheduleConfig,
-} from "./GithubRepositorySyncSettings.tsx";
+import { SyncScheduleSettings } from "./SyncScheduleSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 import { DinoGame } from "../../chatbot/components/DinoGame.tsx";
@@ -54,22 +49,16 @@ type SourceDetailsPanelProps = {
   ) => Promise<GithubRepositoryConfig>;
   onSaveRepositoryConfig?: (
     repository: NonNullable<DataSource["githubRepository"]>,
-    request: ConfigureGithubRepositoryRequest,
+    request: SyncScheduleRequest,
   ) => Promise<void>;
   /** Loads the sync schedule of a Jira instance (by URL) for the schedule form. */
   onLoadJiraConfig?: (instanceUrl: string) => Promise<GetJiraInstanceConfigResponse>;
   /** Saves the sync schedule of a Jira instance (by URL). */
-  onSaveJiraConfig?: (
-    instanceUrl: string,
-    request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">,
-  ) => Promise<void>;
+  onSaveJiraConfig?: (instanceUrl: string, request: SyncScheduleRequest) => Promise<void>;
   /** Loads the sync schedule of a Confluence space (by connection id). */
   onLoadConfluenceConfig?: (connectionId: string) => Promise<SyncScheduleConfig>;
   /** Saves the sync schedule of a Confluence space (by connection id). */
-  onSaveConfluenceConfig?: (
-    connectionId: string,
-    request: ConfigureGithubRepositoryRequest,
-  ) => Promise<void>;
+  onSaveConfluenceConfig?: (connectionId: string, request: SyncScheduleRequest) => Promise<void>;
   /** Enables/disables the source in the connector (allow/deny for ingestion). */
   onSetSourceEnabled?: (
     repository: NonNullable<DataSource["githubRepository"]>,
@@ -249,7 +238,7 @@ export function SourceDetailsPanel({
   }, [canManageRepositoryConfig, onLoadRepositoryConfig, repository]);
 
   const saveRepositoryConfig = useCallback(
-    async (request: ConfigureGithubRepositoryRequest) => {
+    async (request: SyncScheduleRequest) => {
       if (!canManageRepositoryConfig || !repository || !onSaveRepositoryConfig) {
         throw new Error("Repository sync config is not available.");
       }
@@ -564,10 +553,13 @@ export function SourceDetailsPanel({
 
       {canManageRepositoryConfig && repository && (
         <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
-          <GithubRepositorySyncSettings
+          <SyncScheduleSettings
             loadKey={repository.fullName}
             loadConfig={loadRepositoryConfig}
             onSave={saveRepositoryConfig}
+            autoUpdateOnText="Due checks update this repository."
+            autoUpdateOffText="Due checks only mark this repository out of date."
+            toggleAriaLabel="Toggle repository auto update"
           />
         </DrawerCard>
       )}
@@ -576,7 +568,7 @@ export function SourceDetailsPanel({
         <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
           {/* Same control as GitHub: the Jira instance sync schedule shares the
               identical schedule contract, only the load/save endpoints differ. */}
-          <GithubRepositorySyncSettings
+          <SyncScheduleSettings
             loadKey={jira.instanceUrl}
             loadConfig={() => onLoadJiraConfig(jira.instanceUrl)}
             onSave={(request) => onSaveJiraConfig(jira.instanceUrl, request)}
@@ -594,7 +586,7 @@ export function SourceDetailsPanel({
           <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
             {/* Same control again: Confluence connections carry the identical
                 schedule contract, only the load/save endpoints differ. */}
-            <GithubRepositorySyncSettings
+            <SyncScheduleSettings
               loadKey={confluence.connectionId}
               loadConfig={() => onLoadConfluenceConfig(confluence.connectionId)}
               onSave={(request) => onSaveConfluenceConfig(confluence.connectionId, request)}

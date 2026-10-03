@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   SOURCE_SYSTEMS,
   SOURCE_META,
-  INGESTION_RUN_LIMIT,
-  DETAILS_RUN_LIMIT,
   createJiraSourceFromInstance,
   createSourceFromStatusRow,
   createConfluenceSourceFromConnection,
@@ -12,8 +10,6 @@ import {
   getRunSourceLabel,
   deriveConnectionStatus,
   deriveSyncStatus,
-  getSourceStatus,
-  getSourceStatusLabel,
   getRunStatusLabel,
   getRunStatusTone,
   isRunInProgress,
@@ -47,13 +43,6 @@ describe("data-ingestion data helpers", () => {
     });
   });
 
-  describe("limits", () => {
-    it("exports sensible positive limits", () => {
-      expect(INGESTION_RUN_LIMIT).toBeGreaterThan(0);
-      expect(DETAILS_RUN_LIMIT).toBeGreaterThan(0);
-    });
-  });
-
   describe("isRunInProgress", () => {
     it("returns true for CONNECTED and RUNNING", () => {
       expect(isRunInProgress("CONNECTED")).toBe(true);
@@ -69,57 +58,6 @@ describe("data-ingestion data helpers", () => {
     it("returns false for null/undefined", () => {
       expect(isRunInProgress(null)).toBe(false);
       expect(isRunInProgress(undefined)).toBe(false);
-    });
-  });
-
-  describe("getSourceStatus", () => {
-    it("returns warning when the source has never synced", () => {
-      expect(getSourceStatus(true, false, "COMPLETED")).toBe("warning");
-    });
-
-    it("returns running when a run is in progress", () => {
-      expect(getSourceStatus(false, false, "RUNNING")).toBe("running");
-      expect(getSourceStatus(false, false, "CONNECTED")).toBe("running");
-    });
-
-    it("returns warning for FAILED and PARTIAL run statuses", () => {
-      expect(getSourceStatus(false, false, "FAILED")).toBe("warning");
-      expect(getSourceStatus(false, false, "PARTIAL")).toBe("warning");
-    });
-
-    it("returns warning when there are errors regardless of status", () => {
-      expect(getSourceStatus(false, true, "COMPLETED")).toBe("warning");
-    });
-
-    it("returns connected for a clean completed run", () => {
-      expect(getSourceStatus(false, false, "COMPLETED")).toBe("connected");
-    });
-  });
-
-  describe("getSourceStatusLabel", () => {
-    it("labels the never-synced state", () => {
-      expect(getSourceStatusLabel(true, false, null)).toBe("Not synced");
-    });
-
-    it("labels the running state", () => {
-      expect(getSourceStatusLabel(false, false, "RUNNING")).toBe("Running");
-    });
-
-    it("labels FAILED and PARTIAL", () => {
-      expect(getSourceStatusLabel(false, false, "FAILED")).toBe("Failed");
-      expect(getSourceStatusLabel(false, false, "PARTIAL")).toBe("Partial");
-    });
-
-    it("labels the error-warning state", () => {
-      expect(getSourceStatusLabel(false, true, "COMPLETED")).toBe("Warning");
-    });
-
-    it("labels COMPLETED as Synced", () => {
-      expect(getSourceStatusLabel(false, false, "COMPLETED")).toBe("Synced");
-    });
-
-    it("defaults to Connected for a clean connected status without errors", () => {
-      expect(getSourceStatusLabel(false, false, "COMPLETED")).toBe("Synced");
     });
   });
 
@@ -313,14 +251,14 @@ describe("data-ingestion data helpers", () => {
     it("shows a synced badge after a successful Jira sync", () => {
       const source = createJiraSourceFromInstance(status());
 
-      expect(source.ingestionStatusLabel).toBe("Synced");
+      expect(deriveSyncStatus(source).label).toBe("Synced");
     });
 
     it("surfaces a disabled Jira connector while preserving the synced badge", () => {
       const source = createJiraSourceFromInstance(status(), instance(), false);
 
       expect(source.statusView.label).toBe("Connector disabled");
-      expect(source.ingestionStatusLabel).toBe("Synced");
+      expect(deriveSyncStatus(source).label).toBe("Synced");
     });
   });
 
@@ -521,7 +459,7 @@ describe("data-ingestion data helpers", () => {
       };
 
       const source = createConfluenceSourceFromConnection(confluenceConn, [run]);
-      expect(source.ingestionStatusLabel).toBe("Synced");
+      expect(deriveSyncStatus(source).label).toBe("Synced");
       // A run only knows what it touched: the latest run's ingested count, never a total.
       expect(source.artifacts).toBe(5);
       expect(source.totalArtifactCount).toBe(0);
@@ -574,7 +512,7 @@ describe("data-ingestion data helpers", () => {
       expect(source.sourceId).toBe("conn-uuid-1");
       expect(source.sourceSystem).toBe("CONFLUENCE");
       expect(source.name).toBe("DOCS");
-      expect(source.ingestionStatusLabel).toBe("Synced");
+      expect(deriveSyncStatus(source).label).toBe("Synced");
       expect(source.artifacts).toBe(12);
     });
 

@@ -250,22 +250,6 @@ function buildArtifactQuery({
   return params.toString();
 }
 
-/**
- * Fetches the most recent ingestion runs.
- *
- * @param limit - Maximum number of ingestion runs to fetch. Must be between 1 and 100.
- * @returns A promise resolving to an array of IngestionRun objects.
- * @throws Error if the backend request fails.
- */
-export async function getIngestionRuns(limit = 50): Promise<IngestionRun[]> {
-  const safeLimit = clampLimit(limit);
-  const data = await apiClient.fetch<CanonicalIngestionRunResponse[]>(
-    `/api/v1/ingestion-runs?limit=${safeLimit}`,
-  );
-
-  return data.map(mapIngestionRun);
-}
-
 const DEFAULT_RUN_PAGE_SIZE = 20;
 const MAX_RUN_PAGE_SIZE = 100;
 
@@ -294,9 +278,9 @@ function buildRunPageQuery(filter: IngestionRunFilter): string {
 }
 
 /**
- * Fetches a filtered, paginated page of ingestion runs. Unlike
- * {@link getIngestionRuns}, each run carries its repository identity and the
- * server applies the {@link IngestionRunFilter} (repo, project, status, since).
+ * Fetches a filtered, paginated page of ingestion runs. Each run carries its
+ * repository identity and the server applies the {@link IngestionRunFilter}
+ * (repo, project, status, since).
  *
  * @throws Error if the backend request fails.
  */

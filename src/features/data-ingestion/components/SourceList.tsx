@@ -47,8 +47,8 @@ export function SourceList({
             <h3 className="text-lg font-semibold text-app-text">Connect your first source</h3>
 
             <p className="mt-2 max-w-md text-sm text-app-text-muted">
-              Discover repositories from a GitHub organization or user and connect them to start
-              ingesting artifacts into the knowledge base.
+              Connect a GitHub repository, Jira instance, Confluence space or uploaded files to
+              start ingesting artifacts into the knowledge base.
             </p>
 
             {onAddSource && (
