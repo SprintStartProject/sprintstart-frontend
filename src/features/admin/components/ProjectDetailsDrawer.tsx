@@ -43,11 +43,13 @@ import { getMovedUsers } from "../projectMove";
 import type {
   AdminProjectDetails,
   AdminUser,
+  DrawerBackLink,
   ProjectEditFormState,
   ProjectOverview,
   ProjectUser,
 } from "../types";
 import { AccessBadge } from "./Badges";
+import { DrawerBackButton } from "./DrawerBackButton";
 import { DrawerCard } from "./DrawerCard";
 import { ProjectPeopleSection } from "./ProjectPeopleSection";
 import { SourceList } from "./SourceList";
@@ -62,6 +64,10 @@ type ProjectDetailsDrawerProps = {
   onOpenSourceDetails?: (projectId: string, sourceId: string) => void;
   /** Opens the Data Ingestion page for this project; the shortcut is hidden without it. */
   onOpenDataIngestion?: (projectId: string) => void;
+  /** Opens a member's user details; members are not clickable without it. */
+  onOpenUser?: (userId: string) => void;
+  /** Shown when the drawer was opened from another one, e.g. from a user's projects. */
+  back?: DrawerBackLink;
   onProjectUpdated?: (updatedProject: AdminProjectDetails) => void;
   onProjectDeleted?: (projectId: string) => void;
   /**
@@ -96,6 +102,8 @@ export function ProjectDetailsDrawer({
   onClose,
   onOpenSourceDetails,
   onOpenDataIngestion,
+  onOpenUser,
+  back,
   onProjectUpdated,
   onProjectDeleted,
   onMembershipsMoved,
@@ -321,6 +329,7 @@ export function ProjectDetailsDrawer({
         closeAriaLabel="Close project details"
         widthClassName="w-full sm:w-[min(94vw,34rem)] lg:w-[min(72vw,58rem)]"
         leading={<ProjectMonogram projectId={project.id} name={visibleProject.name} size="lg" />}
+        actions={back ? <DrawerBackButton back={back} /> : undefined}
         badge={
           <>
             <AccessBadge variant="neutral">
@@ -460,6 +469,7 @@ export function ProjectDetailsDrawer({
                 snapshotKey={peopleSnapshotKey}
                 draft={activePeopleDraft}
                 onDraftChange={setPeopleDraft}
+                onOpenUser={onOpenUser}
               />
             </DrawerCard>
 

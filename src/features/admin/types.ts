@@ -26,6 +26,13 @@ export type SkillStatusFilter = "all" | "ACTIVE" | "RETIRED";
  */
 export const ADMIN_TAB_ORDER: AdminTab[] = ["users", "projects", "skills", "tokens"];
 
+/** Where a drawer that was opened from another drawer returns to. */
+export type DrawerBackLink = {
+  /** Already phrased for the button, e.g. "Back to Jane Doe". */
+  label: string;
+  onBack: () => void;
+};
+
 export type UserEditFormState = {
   email: string;
   firstName: string;

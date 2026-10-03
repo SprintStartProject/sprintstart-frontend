@@ -32,6 +32,17 @@ import { projectService } from "../../../../../src/services/projectService";
  */
 const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: ToastProvider });
 
+/**
+ * A drawer moves focus to its first control one animation frame after it opens.
+ * Mocked requests resolve long before that, so a test that starts typing right
+ * away can have the focus pulled out from under it mid-word. Waiting out the
+ * frame makes the typing tests deterministic.
+ */
+const settleDrawerFocus = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+
 const projectOverview: ProjectOverview = {
   id: "proj-1",
   name: "Alpha",
@@ -260,6 +271,42 @@ describe("ProjectDetailsDrawer", () => {
       expect(
         screen.queryByRole("button", { name: /Open in Data Ingestion/ }),
       ).not.toBeInTheDocument();
+    });
+
+    it("opens a member's user details from their row", async () => {
+      const user = userEvent.setup();
+      const onOpenUser = vi.fn();
+      renderWithDirectory({ onOpenUser });
+
+      await user.click(await screen.findByRole("button", { name: "Open Jane Test" }));
+
+      expect(onOpenUser).toHaveBeenCalledWith("u-1");
+    });
+
+    it("keeps member rows plain when the page gives no way to open a user", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      expect(screen.queryByRole("button", { name: "Open Jane Test" })).not.toBeInTheDocument();
+    });
+
+    it("offers a way back to the drawer it was opened from", async () => {
+      const user = userEvent.setup();
+      const onBack = vi.fn();
+      renderWithDirectory({ back: { label: "Back to Jane Test", onBack } });
+
+      await user.click(await screen.findByRole("button", { name: "Back to Jane Test" }));
+
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows no back button when it was opened directly", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      expect(screen.queryByRole("button", { name: /^Back to/ })).not.toBeInTheDocument();
     });
 
     it("copies the project id", async () => {
@@ -712,6 +759,7 @@ describe("ProjectDetailsDrawer", () => {
 
       await waitFor(() => expect(screen.getByText("Jane Doe")).toBeInTheDocument());
 
+      await settleDrawerFocus();
       await user.type(screen.getByRole("textbox", { name: "Search or add people" }), "tom");
       await user.click(screen.getByRole("button", { name: /Tom Fischer/ }));
 
@@ -736,6 +784,7 @@ describe("ProjectDetailsDrawer", () => {
 
       const search = screen.getByRole("textbox", { name: "Search or add people" });
 
+      await settleDrawerFocus();
       await user.type(search, "jane.doe");
       expect(screen.getByText("Jane Doe")).toBeInTheDocument();
       expect(screen.getByText("@jane.doe")).toBeInTheDocument();
@@ -760,6 +809,7 @@ describe("ProjectDetailsDrawer", () => {
       renderDrawer({ availableUsers: manyUsers });
 
       await waitFor(() => expect(screen.getByText("Jane Doe")).toBeInTheDocument());
+      await settleDrawerFocus();
       await user.type(screen.getByRole("textbox", { name: "Search or add people" }), "bulk");
 
       expect(await screen.findByText("Showing 6 of 8 – refine your search")).toBeInTheDocument();

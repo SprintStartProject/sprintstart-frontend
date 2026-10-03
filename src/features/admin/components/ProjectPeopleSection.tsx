@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRightLeft,
@@ -44,6 +45,8 @@ type ProjectPeopleSectionProps = {
   snapshotKey: string;
   draft: PeopleDraft;
   onDraftChange: (draft: PeopleDraft) => void;
+  /** Makes each person's name open their user details; rows are plain without it. */
+  onOpenUser?: (userId: string) => void;
 };
 
 type PersonIdentity = {
@@ -101,6 +104,36 @@ function PersonContact({ person, className }: { person: PersonIdentity; classNam
 }
 
 /**
+ * Avatar and name block of a row. A button when the row can open the person,
+ * so the whole block is one keyboard target with one accessible name instead of
+ * a clickable avatar and a clickable name saying the same thing twice.
+ */
+function RowIdentity({
+  onOpen,
+  label,
+  children,
+}: {
+  onOpen?: () => void;
+  label: string;
+  children: ReactNode;
+}) {
+  if (!onOpen) {
+    return <div className="flex min-w-0 flex-1 items-center gap-3">{children}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={label}
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
  * Combined member and project-manager management for one project.
  *
  * The project manager is a member with a role rather than a separate entity, so
@@ -118,6 +151,7 @@ export function ProjectPeopleSection({
   snapshotKey,
   draft,
   onDraftChange,
+  onOpenUser,
 }: ProjectPeopleSectionProps) {
   const [search, setSearch] = useState("");
   const prefersReducedMotion = useReducedMotion();
@@ -295,60 +329,65 @@ export function ProjectPeopleSection({
                     : "border-app-border bg-app-surface hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg motion-reduce:hover:translate-y-0",
               ].join(" ")}
             >
-              <UserAvatar
-                size={36}
-                profileIcon={row.profileIcon}
-                fallbackName={row.displayName}
-                seed={row.id}
-              />
+              <RowIdentity
+                onOpen={onOpenUser ? () => onOpenUser(row.id) : undefined}
+                label={`Open ${row.displayName}`}
+              >
+                <UserAvatar
+                  size={36}
+                  profileIcon={row.profileIcon}
+                  fallbackName={row.displayName}
+                  seed={row.id}
+                />
 
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span
-                    className={[
-                      "truncate text-sm font-semibold text-app-text",
-                      row.isPendingRemove ? "line-through" : "",
-                    ].join(" ")}
-                  >
-                    {row.displayName}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={[
+                        "truncate text-sm font-semibold text-app-text",
+                        row.isPendingRemove ? "line-through" : "",
+                      ].join(" ")}
+                    >
+                      {row.displayName}
+                    </span>
+
+                    {row.isManager ? (
+                      <Badge variant="brand">
+                        <ShieldCheck className="mr-1 h-3 w-3" />
+                        Manager
+                      </Badge>
+                    ) : (
+                      <Badge variant="neutral">Member</Badge>
+                    )}
                   </span>
 
-                  {row.isManager ? (
-                    <Badge variant="brand">
-                      <ShieldCheck className="mr-1 h-3 w-3" />
-                      Manager
-                    </Badge>
-                  ) : (
-                    <Badge variant="neutral">Member</Badge>
+                  <PersonContact person={row.person} className="text-xs text-app-text-muted" />
+
+                  {(row.isDisabled || row.otherProjectCount > 0) && (
+                    <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {row.isDisabled && (
+                        <Badge variant="danger" size="sm">
+                          <UserX className="mr-1 h-3 w-3" aria-hidden="true" />
+                          Disabled
+                        </Badge>
+                      )}
+
+                      {row.otherProjectCount > 0 && (
+                        <span className="text-xs text-app-text-muted">
+                          also in {pluralize(row.otherProjectCount, "project")}
+                        </span>
+                      )}
+                    </span>
+                  )}
+
+                  {row.movedFrom.length > 0 && (
+                    <span className="mt-1 flex items-start gap-1 text-xs font-medium text-app-warning-text">
+                      <ArrowRightLeft className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                      <span>Will be moved from {row.movedFrom.join(", ")}</span>
+                    </span>
                   )}
                 </span>
-
-                <PersonContact person={row.person} className="text-xs text-app-text-muted" />
-
-                {(row.isDisabled || row.otherProjectCount > 0) && (
-                  <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {row.isDisabled && (
-                      <Badge variant="danger" size="sm">
-                        <UserX className="mr-1 h-3 w-3" aria-hidden="true" />
-                        Disabled
-                      </Badge>
-                    )}
-
-                    {row.otherProjectCount > 0 && (
-                      <span className="text-xs text-app-text-muted">
-                        also in {pluralize(row.otherProjectCount, "project")}
-                      </span>
-                    )}
-                  </span>
-                )}
-
-                {row.movedFrom.length > 0 && (
-                  <span className="mt-1 flex items-start gap-1 text-xs font-medium text-app-warning-text">
-                    <ArrowRightLeft className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-                    <span>Will be moved from {row.movedFrom.join(", ")}</span>
-                  </span>
-                )}
-              </span>
+              </RowIdentity>
 
               <span className="flex shrink-0 items-center gap-1">
                 {canAssignManager &&

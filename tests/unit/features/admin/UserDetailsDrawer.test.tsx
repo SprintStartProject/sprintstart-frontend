@@ -163,6 +163,35 @@ describe("UserDetailsDrawer", () => {
     expect(onUserUpdated).not.toHaveBeenCalled();
   });
 
+  describe("coming from another drawer", () => {
+    it("offers a way back when it was opened from a project", async () => {
+      const onBack = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <UserDetailsDrawer
+          user={userDetails}
+          projects={[]}
+          isOpen
+          onClose={vi.fn()}
+          onOpenProjectDetails={vi.fn()}
+          onUserUpdated={vi.fn()}
+          onRequestDelete={vi.fn()}
+          back={{ label: "Back to Alpha", onBack }}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Back to Alpha" }));
+
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
+
+    it("has no back button otherwise", () => {
+      renderDrawer();
+
+      expect(screen.queryByRole("button", { name: /^Back to/ })).not.toBeInTheDocument();
+    });
+  });
+
   describe("a regular user", () => {
     it("sees exactly one project with a way to move it", () => {
       renderDrawer({ projects: [projectA], projectIds: ["proj-a"] });

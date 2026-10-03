@@ -78,9 +78,28 @@ export function AdminPage() {
     step-through of sections.
   */
   const [searchParams, setSearchParams] = useSearchParams();
+  /*
+    `?projectId=` and `?userId=` open that project's or user's drawer, so a link from elsewhere
+    (a dashboard card, a message) can land on the thing it talks about. They are handed off
+    exactly like `tab`: read once, then stripped. The drawer itself opens once the lists have
+    loaded, since it needs the record to show.
+  */
+  const [pendingDeepLink, setPendingDeepLink] = useState<{
+    projectId: string | null;
+    userId: string | null;
+  } | null>(() => {
+    const projectId = searchParams.get("projectId");
+    const userId = searchParams.get("userId");
+
+    return projectId || userId ? { projectId, userId } : null;
+  });
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     const requested = searchParams.get("tab");
-    return visibleAdminTabs.find((tab) => tab === requested) ?? "users";
+    const requestedTab = visibleAdminTabs.find((tab) => tab === requested);
+
+    if (requestedTab) return requestedTab;
+
+    return searchParams.get("projectId") ? "projects" : "users";
   });
 
   const tabParamConsumed = useRef(false);
@@ -89,10 +108,11 @@ export function AdminPage() {
     if (tabParamConsumed.current) return;
     tabParamConsumed.current = true;
 
-    if (!searchParams.has("tab")) return;
+    const handedOff = ["tab", "projectId", "userId"].filter((key) => searchParams.has(key));
+    if (handedOff.length === 0) return;
 
     const next = new URLSearchParams(searchParams);
-    next.delete("tab");
+    handedOff.forEach((key) => next.delete(key));
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
@@ -144,12 +164,22 @@ export function AdminPage() {
    * something within the close delay of the previous drawer lets the stale
    * timeout wipe the new selection and the drawer vanishes again.
    */
-  const cancelPendingDrawerClose = () => {
+  const cancelPendingDrawerClose = useCallback(() => {
     if (drawerCloseTimeoutRef.current !== null) {
       clearTimeout(drawerCloseTimeoutRef.current);
       drawerCloseTimeoutRef.current = null;
     }
-  };
+  }, []);
+
+  /**
+   * The drawer a drawer was opened from (a user's project, a project's member).
+   * Drawers replace each other, so this is what lets the new one offer a way
+   * back. Only one step is kept: going back clears it, and opening anything
+   * unrelated from the page does too.
+   */
+  const [drawerOrigin, setDrawerOrigin] = useState<{ kind: "user" | "project"; id: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     return () => {
@@ -194,6 +224,32 @@ export function AdminPage() {
       void loadSkillPool();
     }
   }, [activeTab, loadSkillPool]);
+
+  // Opens the drawer a `?projectId=` / `?userId=` link asked for. It waits for
+  // the lists, and a link to something that no longer exists simply opens
+  // nothing rather than an error — the page underneath is still the right place.
+  //
+  // Done while rendering rather than in an effect: this is state derived from
+  // data arriving, and it settles in one extra render because the link is
+  // cleared as it is applied. No drawer can be closing yet, so there is no
+  // pending close to cancel.
+  if (pendingDeepLink && loadingState === "success") {
+    const linkedProject = pendingDeepLink.projectId
+      ? projects.find((entry) => entry.id === pendingDeepLink.projectId)
+      : undefined;
+    const linkedUser = pendingDeepLink.userId
+      ? users.find((entry) => entry.id === pendingDeepLink.userId)
+      : undefined;
+
+    setPendingDeepLink(null);
+
+    if (linkedProject || linkedUser) {
+      setSelectedProject(linkedProject ?? null);
+      setSelectedUser(linkedProject ? null : (linkedUser ?? null));
+      setActiveTab(linkedProject ? "projects" : "users");
+      setIsDrawerOpen(true);
+    }
+  }
 
   const filteredUsers = useMemo(() => {
     return filterAdminUsers(users, searchValue, userFilter);
@@ -268,6 +324,7 @@ export function AdminPage() {
 
   const openUserDetails = (user: AdminUser) => {
     cancelPendingDrawerClose();
+    setDrawerOrigin(null);
     setOpenUserMenuId(null);
     setSelectedProject(null);
     setSelectedSkill(null);
@@ -405,6 +462,7 @@ export function AdminPage() {
 
   const openProjectDetails = (project: ProjectOverview) => {
     cancelPendingDrawerClose();
+    setDrawerOrigin(null);
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedSkill(null);
@@ -415,6 +473,7 @@ export function AdminPage() {
 
   const openSkillDetails = (skill: Skill) => {
     cancelPendingDrawerClose();
+    setDrawerOrigin(null);
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedProject(null);
@@ -425,6 +484,7 @@ export function AdminPage() {
 
   const openCreateSkillDrawer = () => {
     cancelPendingDrawerClose();
+    setDrawerOrigin(null);
     setOpenUserMenuId(null);
     setSelectedUser(null);
     setSelectedProject(null);
@@ -445,6 +505,7 @@ export function AdminPage() {
 
     cancelPendingDrawerClose();
     setOpenUserMenuId(null);
+    setDrawerOrigin(selectedUser ? { kind: "user", id: selectedUser.id } : null);
     setActiveTab("projects");
     setProjectSearchValue("");
     setProjectPage(1);
@@ -452,6 +513,61 @@ export function AdminPage() {
     setSelectedProject(project);
     setIsDrawerOpen(true);
   };
+
+  const openUserDetailsFromProjectDrawer = (userId: string) => {
+    const user = users.find((currentUser) => currentUser.id === userId);
+
+    if (!user) return;
+
+    cancelPendingDrawerClose();
+    setOpenUserMenuId(null);
+    setDrawerOrigin(selectedProject ? { kind: "project", id: selectedProject.id } : null);
+    setActiveTab("users");
+    setSelectedProject(null);
+    setSelectedUser(user);
+    setIsDrawerOpen(true);
+  };
+
+  // The label is looked up live, so a rename shows up and a deleted origin
+  // simply offers no way back instead of a button that does nothing.
+  const drawerOriginName = useMemo(() => {
+    if (!drawerOrigin) return null;
+
+    if (drawerOrigin.kind === "user") {
+      const originUser = users.find((entry) => entry.id === drawerOrigin.id);
+
+      return originUser ? getDisplayName(originUser) : null;
+    }
+
+    return projects.find((entry) => entry.id === drawerOrigin.id)?.name ?? null;
+  }, [drawerOrigin, users, projects]);
+
+  const goBackToDrawerOrigin = () => {
+    if (!drawerOrigin) return;
+
+    if (drawerOrigin.kind === "user") {
+      const originUser = users.find((entry) => entry.id === drawerOrigin.id);
+
+      if (originUser) {
+        setActiveTab("users");
+        openUserDetails(originUser);
+      }
+
+      return;
+    }
+
+    const originProject = projects.find((entry) => entry.id === drawerOrigin.id);
+
+    if (originProject) {
+      setActiveTab("projects");
+      openProjectDetails(originProject);
+    }
+  };
+
+  const drawerBackLink =
+    drawerOrigin && drawerOriginName
+      ? { label: `Back to ${drawerOriginName}`, onBack: goBackToDrawerOrigin }
+      : undefined;
 
   const handleProjectDeleted = useCallback(
     (projectId: string) => {
@@ -544,6 +660,7 @@ export function AdminPage() {
 
   const closeDetails = () => {
     setOpenUserMenuId(null);
+    setDrawerOrigin(null);
     setIsDrawerOpen(false);
 
     cancelPendingDrawerClose();
@@ -810,6 +927,7 @@ export function AdminPage() {
           isOpen={isDrawerOpen}
           onClose={closeDetails}
           onOpenProjectDetails={openProjectDetailsFromUserDrawer}
+          back={drawerOrigin?.kind === "project" ? drawerBackLink : undefined}
           onUserUpdated={handleUserUpdated}
           onRequestDelete={requestUserDelete}
           onMembershipsMoved={() => void refreshAdminData()}
@@ -828,6 +946,8 @@ export function AdminPage() {
           onClose={closeDetails}
           onOpenSourceDetails={openSourceDetails}
           onOpenDataIngestion={openDataIngestion}
+          onOpenUser={openUserDetailsFromProjectDrawer}
+          back={drawerOrigin?.kind === "user" ? drawerBackLink : undefined}
           onProjectUpdated={handleProjectUpdated}
           onProjectDeleted={handleProjectDeleted}
           onMembershipsMoved={() => void refreshAdminData()}

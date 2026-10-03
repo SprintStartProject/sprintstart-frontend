@@ -23,6 +23,7 @@ import {
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import type {
   AdminUser,
+  DrawerBackLink,
   ProjectOverview,
   ProjectSummary,
   UpdateAdminUserRequest,
@@ -30,6 +31,7 @@ import type {
 } from "../types";
 import { AccessBadge } from "./Badges";
 import { DetailRow } from "./DetailRow";
+import { DrawerBackButton } from "./DrawerBackButton";
 import { DrawerCard } from "./DrawerCard";
 import { EditableDetailRow } from "./EditableDetailRow";
 import { EditableSelectDetailRow } from "./EditableSelectDetailRow";
@@ -49,6 +51,8 @@ type UserDetailsDrawerProps = {
   isOpen: boolean;
   onClose: () => void;
   onOpenProjectDetails: (projectId: string) => void;
+  /** Shown when the drawer was opened from another one, e.g. from a project's members. */
+  back?: DrawerBackLink;
   onUserUpdated: (updatedUser: AdminUser) => void;
   onRequestDelete: (user: AdminUser) => void;
   /**
@@ -105,6 +109,7 @@ export function UserDetailsDrawer({
   isOpen,
   onClose,
   onOpenProjectDetails,
+  back,
   onUserUpdated,
   onRequestDelete,
   onMembershipsMoved,
@@ -389,6 +394,8 @@ export function UserDetailsDrawer({
       }
       actions={
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {back && <DrawerBackButton back={back} />}
+
           <Button
             variant="secondary"
             onClick={startEditing}

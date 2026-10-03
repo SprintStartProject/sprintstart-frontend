@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { AdminPage } from "../../../src/pages/AdminPage";
 import { DRAWER_CLOSE_DELAY_MS } from "../../../src/features/admin/data";
 import type { AdminUser, ProjectSummary } from "../../../src/services/adminUserService";
@@ -115,18 +115,42 @@ vi.mock("../../../src/features/admin/components/TokensTab", () => ({
   TokensTab: () => <div data-testid="tokens-tab" />,
 }));
 
+type DrawerBack = { label: string; onBack: () => void };
+
 vi.mock("../../../src/features/admin/components/UserDetailsDrawer", () => ({
-  UserDetailsDrawer: (props: { user: AdminUser | null; isOpen: boolean }) => (
+  UserDetailsDrawer: (props: {
+    user: AdminUser | null;
+    isOpen: boolean;
+    back?: DrawerBack;
+    onOpenProjectDetails: (projectId: string) => void;
+  }) => (
     <div data-testid="user-details-drawer">
-      {props.isOpen && props.user ? <span>{props.user.firstName} Details</span> : null}
+      {props.isOpen && props.user ? (
+        <>
+          <span>{props.user.firstName} Details</span>
+          <button onClick={() => props.onOpenProjectDetails("proj1")}>Open its project</button>
+          {props.back && <button onClick={props.back.onBack}>{props.back.label}</button>}
+        </>
+      ) : null}
     </div>
   ),
 }));
 
 vi.mock("../../../src/features/admin/components/ProjectDetailsDrawer", () => ({
-  ProjectDetailsDrawer: (props: { project: AdminProject | null; isOpen: boolean }) => (
+  ProjectDetailsDrawer: (props: {
+    project: AdminProject | null;
+    isOpen: boolean;
+    back?: DrawerBack;
+    onOpenUser?: (userId: string) => void;
+  }) => (
     <div data-testid="project-details-drawer">
-      {props.isOpen && props.project ? <span>{props.project.name} Details</span> : null}
+      {props.isOpen && props.project ? (
+        <>
+          <span>{props.project.name} Details</span>
+          <button onClick={() => props.onOpenUser?.("1")}>Open its member</button>
+          {props.back && <button onClick={props.back.onBack}>{props.back.label}</button>}
+        </>
+      ) : null}
     </div>
   ),
 }));
@@ -427,6 +451,125 @@ describe("AdminPage", () => {
       await waitForCloseDelay();
 
       expect(screen.getByText("Project Alpha Details")).toBeInTheDocument();
+    });
+  });
+
+  describe("deep links", () => {
+    function LocationProbe() {
+      const location = useLocation();
+
+      return <p data-testid="location">{`${location.pathname}${location.search}`}</p>;
+    }
+
+    function renderAt(url: string) {
+      render(
+        <MemoryRouter initialEntries={[url]}>
+          <AdminPage />
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+    }
+
+    it("opens the project named in ?projectId= on the projects tab and strips the param", async () => {
+      renderAt("/admin?projectId=proj1");
+
+      expect(await screen.findByText("Project Alpha Details")).toBeInTheDocument();
+      expect(screen.getByTestId("projects-tab")).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/admin$/));
+    });
+
+    it("opens the user named in ?userId= and strips the param", async () => {
+      renderAt("/admin?userId=2");
+
+      expect(await screen.findByText("Jane Details")).toBeInTheDocument();
+      expect(screen.getByTestId("users-tab")).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/admin$/));
+    });
+
+    it("lets ?tab= and the drawer link combine without leaving anything in the URL", async () => {
+      renderAt("/admin?tab=projects&projectId=proj1");
+
+      expect(await screen.findByText("Project Alpha Details")).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/admin$/));
+    });
+
+    it("opens nothing for an id that does not exist, but still cleans the URL", async () => {
+      renderAt("/admin?projectId=nope&userId=nobody");
+
+      // A project link still lands on the projects tab, where the project would have been.
+      await waitFor(() => expect(screen.getByTestId("projects-tab")).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/admin$/));
+      expect(screen.queryByText(/Details$/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("moving between drawers", () => {
+    function renderPage() {
+      render(
+        <MemoryRouter>
+          <AdminPage />
+        </MemoryRouter>,
+      );
+    }
+
+    it("goes from a user to their project and back again", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByText("View John"));
+      await user.click(await screen.findByRole("button", { name: "Open its project" }));
+
+      expect(await screen.findByText("Project Alpha Details")).toBeInTheDocument();
+      expect(screen.queryByText("John Details")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Back to John Doe" }));
+
+      expect(await screen.findByText("John Details")).toBeInTheDocument();
+      expect(screen.queryByText("Project Alpha Details")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Back to/ })).not.toBeInTheDocument();
+    });
+
+    it("goes from a project to one of its members and back again", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole("button", { name: "Projects" }));
+      await user.click(await screen.findByText("Open Project Alpha"));
+      await user.click(await screen.findByRole("button", { name: "Open its member" }));
+
+      expect(await screen.findByText("John Details")).toBeInTheDocument();
+      expect(screen.getByTestId("users-tab")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Back to Project Alpha" }));
+
+      expect(await screen.findByText("Project Alpha Details")).toBeInTheDocument();
+      expect(screen.getByTestId("projects-tab")).toBeInTheDocument();
+    });
+
+    it("offers no way back to a drawer opened straight from the lists", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByText("View John"));
+
+      expect(await screen.findByText("John Details")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Back to/ })).not.toBeInTheDocument();
+    });
+
+    it("forgets where it came from once the drawer is closed", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByText("View John"));
+      await user.click(await screen.findByRole("button", { name: "Open its project" }));
+      await screen.findByText("Project Alpha Details");
+
+      await user.click(screen.getByRole("button", { name: "Close details overlay" }));
+      await user.click(screen.getByRole("button", { name: "Users" }));
+      await user.click(await screen.findByText("View Jane"));
+
+      expect(await screen.findByText("Jane Details")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Back to/ })).not.toBeInTheDocument();
     });
   });
 
