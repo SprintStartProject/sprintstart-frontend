@@ -7,9 +7,13 @@ import { emptyDraft, isAnswered, toSubmission, type DraftAnswer } from "../../ch
 import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../../types";
 import { CheckQuestionCard } from "../CheckQuestionCard";
 import { ConfettiBurst } from "../ConfettiBurst";
+import { AskTheBuddy } from "../../../buddy/components/AskTheBuddy";
+import { askAboutQuestion, askAboutWrongAnswer } from "../../buddyDrafts";
 
 type Props = {
   question: OnboardingQuestionEndpoint;
+  /** The phase the question belongs to, named in what the buddy is asked about it. */
+  phaseTitle: string;
   /** After a graded attempt; `correct` and `onboardingCompleted` come from the backend. */
   onAnswered: (result: QuestionAttemptResult) => Promise<void> | void;
   continueLabel: string;
@@ -22,7 +26,13 @@ type Props = {
  * The same grading as before, without the dialog: a wrong answer is offered again right there, and a
  * correct one moves on the way a finished step does.
  */
-export function QuestionWorkspace({ question, onAnswered, continueLabel, onContinue }: Props) {
+export function QuestionWorkspace({
+  question,
+  phaseTitle,
+  onAnswered,
+  continueLabel,
+  onContinue,
+}: Props) {
   const toast = useToast();
   const [draft, setDraft] = useState<DraftAnswer>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
@@ -95,9 +105,26 @@ export function QuestionWorkspace({ question, onAnswered, continueLabel, onConti
             <span className="block text-xs font-normal text-app-text-muted">
               Look at the answer below and try again.
             </span>
+            {/* Where another guess used to be the only thing on offer. The buddy is not given the
+                answer, so this is help with the material -- what a wrong answer calls for. */}
+            <AskTheBuddy
+              question={askAboutWrongAnswer(question, phaseTitle)}
+              label="Go through it with your buddy"
+            />
           </p>
         </div>
-      ) : null}
+      ) : (
+        // Before an attempt, and quiet: guessing costs nothing here, so this is an offer rather
+        // than a nudge. Louder on a question already answered wrong on an earlier visit.
+        <AskTheBuddy
+          question={askAboutQuestion(question, phaseTitle)}
+          label={
+            question.status === "RETRY"
+              ? "Go through this with your buddy"
+              : "Not sure? Ask your buddy to explain the material"
+          }
+        />
+      )}
 
       <CheckQuestionCard
         question={question}

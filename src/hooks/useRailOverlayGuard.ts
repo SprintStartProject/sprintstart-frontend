@@ -17,8 +17,8 @@ import { useState } from "react";
  * One way only. Widening again does not reopen anything — somebody who put the rail away meant
  * it, and the stored preference is what decides the next visit.
  *
- * @param isOverlay Whether the rail is currently a drawer over the conversation.
- * @param close Puts it away. Called only on the column → drawer crossing.
+ * @param isOverlay - Whether the rail is currently a drawer over the conversation.
+ * @param close - Puts it away. Called only on the column → drawer crossing.
  */
 export function useRailOverlayGuard(isOverlay: boolean, close: () => void): void {
   const [wasOverlay, setWasOverlay] = useState(isOverlay);

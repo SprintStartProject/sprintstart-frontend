@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
-import { Select } from "../../../components/ui/Select.tsx";
+import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 import {
   MultiSelectFilter,
   type MultiSelectFilterSection,
@@ -117,6 +117,11 @@ export interface ArtifactFiltersProps {
    */
   onSelectModeChange?: (on: boolean) => void;
 }
+
+const SORT_OPTIONS: FilterSelectOption<ArtifactSort>[] = ARTIFACT_SORT_ORDER.map((value) => ({
+  value,
+  label: SORT_LABELS[value],
+}));
 
 const ICON_CLASS = "h-4 w-4 shrink-0 text-app-text-muted";
 
@@ -419,19 +424,13 @@ export function ArtifactFilters({
           {onSortChange && (
             // The field style is `w-full`, so the width lives on a wrapper, as the filter's does.
             <div className="w-44 shrink-0">
-              <Select
-                size="sm"
+              <FilterSelect
+                label="Sort artifacts"
                 value={sort}
-                onChange={(event) => onSortChange(event.target.value as ArtifactSort)}
-                aria-label="Sort artifacts"
-                data-testid="kb-sort"
-              >
-                {ARTIFACT_SORT_ORDER.map((option) => (
-                  <option key={option} value={option}>
-                    {SORT_LABELS[option]}
-                  </option>
-                ))}
-              </Select>
+                options={SORT_OPTIONS}
+                onChange={onSortChange}
+                testId="kb-sort"
+              />
             </div>
           )}
 

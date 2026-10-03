@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Tag,
   Trash2,
+  TriangleAlert,
   Users,
 } from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
@@ -531,7 +532,7 @@ export function ProjectDetailsDrawer({
             </DrawerCard>
 
             {canManageLifecycle && (
-              <DrawerCard label="Danger zone" variant="danger" index={4}>
+              <DrawerCard label="Danger zone" icon={TriangleAlert} variant="danger" index={4}>
                 <p className="text-sm text-app-danger-text">
                   Deleting a project removes it and all of its user assignments. Connected sources
                   are kept and stay available to other projects.

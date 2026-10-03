@@ -38,6 +38,10 @@ export const MEMBER_STEP_PARAM = "step";
  */
 export const MEMBER_PHASE_PARAM = "phase";
 
+/**
+ * Whether a URL belongs to the PM workspace. `PageTransition` uses it to treat moves between
+ * workspace sections as one page, since the workspace animates those itself.
+ */
 export function isPmWorkspacePath(pathname: string): boolean {
   return PM_WORKSPACE_PATHS.some((pattern) => matchPath(pattern, pathname) !== null);
 }

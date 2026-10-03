@@ -9,12 +9,20 @@ import { SourceStatusChip } from "../../data-ingestion/components/SourceStatusCh
 import { SourceSyncBadge } from "../../data-ingestion/components/SourceSyncBadge";
 import { SourceTypeBadge } from "../../data-ingestion/components/SourceTypeBadge";
 import { getSourceTypeMeta } from "../data";
+import { IconTile } from "../../../components/ui/IconTile";
 
 type SourceListProps = {
   sources: ProjectSource[];
   onOpenSourceDetails?: (sourceId: string) => void;
 };
 
+/**
+ * A project's sources as cards in the project drawer.
+ *
+ * The status badges come from the same helpers as on the Data Ingestion page, so a source is
+ * described the same way on both screens. With `onOpenSourceDetails` each card is a link to the
+ * source's details.
+ */
 export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
   if (sources.length === 0) {
     return (
@@ -44,9 +52,7 @@ export function SourceList({ sources, onOpenSourceDetails }: SourceListProps) {
         const content = (
           <>
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-surface">
-                <Icon className="h-5 w-5 text-app-text-muted" />
-              </div>
+              <IconTile icon={Icon} size="xl" tone="neutral" />
 
               <div className="min-w-0 flex-1">
                 <p className="text-sm leading-5 font-semibold break-words text-app-text">

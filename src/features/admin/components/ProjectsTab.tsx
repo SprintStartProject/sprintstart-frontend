@@ -92,12 +92,16 @@ function MemberStack({
 }
 
 /**
- * Project cards for the Projects tab.
+/**
+ * Project cards for the Projects tab; a card opens the project drawer.
  *
  * Each card answers the questions an admin scans a list for without opening it:
  * who manages the project, who is in it, and whether its sources are healthy. A
  * missing manager gets a warning badge rather than plain text, since that is the
  * gap most worth catching from the list.
+ *
+ * The empty state tells three cases apart: no project exists at all (`totalCount` is 0), the
+ * search matched nothing, and anything else.
  */
 export function ProjectsTab({
   filteredProjects,

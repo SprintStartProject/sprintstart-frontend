@@ -89,7 +89,7 @@ export const knowledgeService = {
    * and an empty project are different statements, and callers deciding whether to hide the
    * onboarding entry treat them differently.
    *
-   * @param projectId UUID of the project.
+   * @param projectId - UUID of the project.
    */
   async hasIngestedContent(projectId: string): Promise<boolean> {
     const response = await apiClient.fetch<{ items?: Artifact[] }>(
@@ -107,8 +107,8 @@ export const knowledgeService = {
    * preview card wants the newest handful of rows and nothing else, so it must
    * not drag facet counts or a full page size along with it.
    *
-   * @param projectId UUID of the project to scope the listing.
-   * @param limit Maximum number of artifacts to return.
+   * @param projectId - UUID of the project to scope the listing.
+   * @param limit - Maximum number of artifacts to return.
    * @returns The first page of artifacts, or an empty array on failure.
    */
   async getRecentArtifacts(projectId: string, limit = 4): Promise<Artifact[]> {
@@ -126,8 +126,9 @@ export const knowledgeService = {
   /**
    * Fetches a paginated, server-side filtered page of artifacts for a project.
    *
-   * @param projectId UUID of the project.
-   * @param params Filter criteria (see `buildFilterQuery`) plus the list-only page, size and sort.
+   * @param projectId - UUID of the project.
+   * @param params - Filter criteria (see `buildFilterQuery`) plus the list-only page, size and
+   *   sort.
    */
   async getArtifactPage(
     projectId: string,
@@ -152,8 +153,8 @@ export const knowledgeService = {
    * paging or order: `page`, `size` and `sort` are ignored even when present in `params`, because
    * a count must not depend on which page is on screen or how it is ordered.
    *
-   * @param projectId UUID of the project.
-   * @param params Active filter criteria to calculate dynamic facet counts.
+   * @param projectId - UUID of the project.
+   * @param params - Active filter criteria to calculate dynamic facet counts.
    */
   async getArtifactFacets(
     projectId: string,
@@ -171,8 +172,8 @@ export const knowledgeService = {
    * An empty `ids` list resolves locally without a request. A response without `aiAvailable`
    * (older backend) is read as unavailable, so no status is ever guessed.
    *
-   * @param projectId UUID of the project.
-   * @param artifactIds Ingestion ids of the artifacts on screen.
+   * @param projectId - UUID of the project.
+   * @param artifactIds - Ingestion ids of the artifacts on screen.
    */
   async getArtifactAiStatus(
     projectId: string,
@@ -190,8 +191,8 @@ export const knowledgeService = {
   /**
    * Fetches metadata for a single artifact by ID within a project.
    *
-   * @param projectId UUID of the project.
-   * @param artifactId UUID of the artifact.
+   * @param projectId - UUID of the project.
+   * @param artifactId - UUID of the artifact.
    */
   async getArtifactById(projectId: string, artifactId: string): Promise<Artifact> {
     return apiClient.fetch<Artifact>(`/api/v1/projects/${projectId}/artifacts/${artifactId}`);
@@ -203,8 +204,8 @@ export const knowledgeService = {
    * Bypasses `apiClient.fetch` (which JSON-parses) because the backend returns
    * raw bytes with a `Content-Type` header, not a JSON envelope.
    *
-   * @param projectId UUID of the project that scopes the artifact.
-   * @param artifactId UUID of the artifact whose content should be retrieved.
+   * @param projectId - UUID of the project that scopes the artifact.
+   * @param artifactId - UUID of the artifact whose content should be retrieved.
    * @returns The raw content text and its effective mime type.
    */
   async getArtifactContent(
@@ -259,10 +260,10 @@ export const knowledgeService = {
    * `error` events. The summary is rendered incrementally as tokens arrive, improving
    * perceived performance versus the previous blocking JSON response.
    *
-   * @param projectId  UUID of the project to check access.
-   * @param artifactId UUID of the artifact to summarize.
-   * @param handlers   Callbacks invoked for each streamed event.
-   * @param signal     Optional AbortSignal to cancel the in-flight stream.
+   * @param projectId - UUID of the project to check access.
+   * @param artifactId - UUID of the artifact to summarize.
+   * @param handlers - Callbacks invoked for each streamed event.
+   * @param signal - Optional AbortSignal to cancel the in-flight stream.
    * @returns Resolves once the `done` event is received; rejects with {@link ApiError}
    * on a non-2xx HTTP response (e.g. 403, 404, 503 indexing) so callers can retry
    * based on `status`, or rejects with a plain `Error` on an in-stream `error` event
@@ -366,7 +367,7 @@ export const knowledgeService = {
    * An id the new shape reports in neither list is counted as failed: a
    * deletion nobody confirmed must not be shown as a success.
    *
-   * @param uploadIds Upload UUIDs (`Artifact.sourceId`), not ingestion ids.
+   * @param uploadIds - Upload UUIDs (`Artifact.sourceId`), not ingestion ids.
    * @throws ApiError on a non-2xx response; per-item failures do not throw.
    */
   async deleteUploads(
@@ -407,9 +408,9 @@ export const knowledgeService = {
    * backend rule -- the delete action stays hidden from the remaining groups
    * instead of handing them a button that returns 403.
    *
-   * @param projectId  UUID of the project that scopes the deletion.
-   * @param artifactId UUID of the uploaded artifact to remove.
-   * @param removerId  UUID of the authenticated user requesting the deletion.
+   * @param projectId - UUID of the project that scopes the deletion.
+   * @param artifactId - UUID of the uploaded artifact to remove.
+   * @param removerId - UUID of the authenticated user requesting the deletion.
    *   Sent for symmetry with the upload contract, but ignored by the backend,
    *   which resolves the remover from the JWT subject.
    * @throws ApiError on a non-2xx response (e.g. 403 if the caller lacks access
@@ -425,8 +426,8 @@ export const knowledgeService = {
   /**
    * Uploads an array of files sequentially to the backend ingestion service.
    *
-   * @param projectId UUID of the project.
-   * @param files Array of physical File objects selected by the user.
+   * @param projectId - UUID of the project.
+   * @param files - Array of physical File objects selected by the user.
    * @returns Array of results indicating success or failure per file.
    */
   async uploadDocuments(

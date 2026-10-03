@@ -83,7 +83,7 @@ div.kcFormGroupClass {
 
 /* Same focus treatment as the app's shared Input (fieldStyles.ts):
    brand-colored border + a visible `--app-focus` ring, never just
-   `outline: none` with nothing to replace it (AGENTS.md §9). */
+   `outline: none` with nothing to replace it (FRONTEND_CODING_STANDARDS.md §5). */
 .pf-c-form-control:focus {
   outline: none;
   border-color: var(--color-app-brand-border-strong);
@@ -137,18 +137,17 @@ div.kcFormGroupClass {
   transition:
     background-color 0.15s ease,
     box-shadow 0.15s ease,
-    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform 0.15s ease-out;
 }
 
-/* Same "grows slightly on hover, settles back on press" feel as `ui/Button`'s
-   `buttonHoverMotion` (whileHover: scale 1.03, whileTap: scale 0.97) — a CSS
-   transform instead of framer-motion, since this is a plain form `<input>`
-   shared by every generated Keycloak page, not a `motion.button`. The
-   back-out easing approximates the spring's slight overshoot. */
+/* Same feedback as a `primary` `ui/Button`: hover changes colour and adds the brand lift
+   shadow, it does not grow; press shrinks to 0.97, like `buttonHoverMotion`'s `whileTap`.
+   A CSS transform instead of framer-motion, since this is a plain form `<input>` shared by
+   every generated Keycloak page, not a `motion.button`. The easing does not overshoot, like
+   the damped spring of the token. */
 .kcButtonClass.pf-c-button:hover {
   background: var(--color-app-brand-hover);
   box-shadow: var(--shadow-app-brand-lift);
-  transform: scale(1.03);
 }
 
 .kcButtonClass.pf-c-button:active {
@@ -168,10 +167,9 @@ div.kcFormGroupClass {
 }
 
 /* Respect the OS-level motion preference, same as the app's `buttonHoverMotion`
-   consumers (`ui/Button` checks `useReducedMotion`) — a growing button on
-   hover is exactly the kind of motion that setting asks to remove. */
+   consumers (`ui/Button` checks `useReducedMotion`): the press shrink is the only
+   transform left, so that is what the setting turns off. */
 @media (prefers-reduced-motion: reduce) {
-  .kcButtonClass.pf-c-button:hover,
   .kcButtonClass.pf-c-button:active {
     transform: none;
   }

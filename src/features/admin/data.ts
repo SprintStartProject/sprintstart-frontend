@@ -20,6 +20,10 @@ export const PAGE_SIZE = 8;
 // reason `PanelPresence` does: unmounting sooner would cut the slide off
 // halfway and the drawer would appear to vanish rather than glide away.
 export const DRAWER_CLOSE_DELAY_MS = SIDE_PANEL_SLIDE_MS + 30;
+/**
+ * The permission groups the user drawer offers, as the labels `adminUserService` maps them to and
+ * from. `HR` is not among them, so the drawer cannot make a user HR.
+ */
 export const PERMISSION_GROUP_OPTIONS = ["Admin", "User", "Project Manager"] as const;
 
 export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> = [
@@ -31,6 +35,7 @@ export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> = 
   { value: "no-project", label: "Without project" },
 ];
 
+/** The user's full name, falling back to the username and then the email when it is empty. */
 export function getDisplayName(user: AdminUser) {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
   return fullName || user.username || user.email;
@@ -130,6 +135,10 @@ export function getSourceTypeLabel(type: string): string {
     .join(" ");
 }
 
+/**
+ * Badge colour for a permission group label (`Admin`, `Project Manager`, `HR`, `User`). Matches by
+ * substring, so it also accepts the backend values `ADMIN` and `PROJECT_MANAGER`, but not `PM`.
+ */
 export function getPermissionGroupVariant(permissionGroup: string): BadgeVariant {
   const normalized = permissionGroup.toUpperCase();
 
@@ -138,6 +147,7 @@ export function getPermissionGroupVariant(permissionGroup: string): BadgeVariant
   return "neutral";
 }
 
+/** Badge colour for a project source's connection status; an unknown status gets `brand`. */
 export function getSourceStatusVariant(status: string): BadgeVariant {
   const normalizedStatus = status.trim().toUpperCase();
 
@@ -225,6 +235,7 @@ export function getUserEditFormState(user: AdminUser): UserEditFormState {
   };
 }
 
+/** {@link getDisplayName} for the drawer while editing: reads the names from the unsaved draft. */
 export function getDraftDisplayName(user: AdminUser, draftUser: UserEditFormState) {
   const fullName = [draftUser.firstName, draftUser.lastName].filter(Boolean).join(" ");
 
@@ -240,6 +251,7 @@ export function getProjectEditFormState(
   };
 }
 
+/** Every project as id and name, sorted by name, for the project pickers in the drawers. */
 export function getAvailableProjects(projects: ProjectOverview[]): ProjectSummary[] {
   return projects
     .map((project) => ({
@@ -308,6 +320,12 @@ export function enrichUsersWithProjectNames(
   });
 }
 
+/**
+ * Narrows the user table to the search text and the status filter.
+ *
+ * The search is a case-insensitive substring match over nearly every field of a user, including
+ * ids, roles and project names, so an admin can paste any id they have to hand.
+ */
 export function filterAdminUsers(
   users: AdminUser[],
   searchValue: string,
@@ -409,6 +427,7 @@ export function getTotalPages(itemCount: number, pageSize = PAGE_SIZE) {
   return Math.max(1, Math.ceil(itemCount / pageSize));
 }
 
+/** Clamps the current page to the last one, e.g. after a filter or a delete shortened the list. */
 export function getSafePage(page: number, totalPages: number) {
   return Math.min(page, totalPages);
 }
@@ -449,6 +468,10 @@ export function toggleSelectedUserId(selectedUserIds: Set<string>, userId: strin
   return nextSelectedUserIds;
 }
 
+/**
+ * The "select all" checkbox: selects or clears only the users on the current page and leaves the
+ * selection on other pages as it is.
+ */
 export function toggleVisibleUserSelection(
   selectedUserIds: Set<string>,
   visibleUsers: AdminUser[],
@@ -465,6 +488,10 @@ export function toggleVisibleUserSelection(
   return nextSelectedUserIds;
 }
 
+/**
+ * Takes deleted users out of every project's member list, so the projects tab does not show them
+ * until the next reload.
+ */
 export function removeUsersFromProjects(
   projects: ProjectOverview[],
   userIdsToRemove: Set<string>,

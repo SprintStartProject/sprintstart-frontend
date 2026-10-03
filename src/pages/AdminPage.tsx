@@ -59,6 +59,16 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { adminUserService } from "../services/adminUserService";
 import { projectService } from "../services/projectService";
 
+/**
+ * Administration of users, projects and stored access tokens, as three tabs.
+ *
+ * Bound to `/admin`, open to `HR` and `ADMIN` (`routePermissions` in
+ * `src/auth/accessPolicy.ts`). The route is not wrapped in `ManagerAreaGuard`; the sidebar
+ * and the dashboard widgets only link here for groups that may open it. In the project
+ * drawer, editing the industry, assigning a project manager and deleting the project are
+ * `ADMIN` only. `?tab=projects` opens the page on that tab once and is then removed from
+ * the URL.
+ */
 export function AdminPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();

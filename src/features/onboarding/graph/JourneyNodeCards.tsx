@@ -165,10 +165,6 @@ function emphasisClass({ emphasis, selected, dragging }: JourneyNodeRenderState)
 }
 
 /**
- * What a step carries beyond its state -- a skip request, the member's feedback -- as small pills on
- * the card's top edge, so they can be seen without opening anything.
- */
-/**
  * A small pulsing dot: something changed here since the member last looked.
  *
  * Only pulses where motion is welcome; the colour and the "New" label carry it otherwise.
@@ -184,6 +180,10 @@ export function UpdateDot({ className = "bg-white" }: { className?: string }) {
   );
 }
 
+/**
+ * What a step carries beyond its state -- a skip request, the member's feedback -- as small pills on
+ * the card's top edge, so they can be seen without opening anything.
+ */
 export function ItemFlags({
   item,
   inline = false,
@@ -281,12 +281,18 @@ export function ItemNodeCard({
   render,
   isNext = false,
   showUpdates = false,
+  number,
 }: {
   item: PhaseItem;
   state: ItemState;
   render: JourneyNodeRenderState;
   isNext?: boolean;
   showUpdates?: boolean;
+  /**
+   * The number the item carries on the list and in the buddy's replies (see `itemNumbers`), so a
+   * node here can be talked about by the number the hire can see on it.
+   */
+  number?: number;
 }) {
   const minutes = item.kind === "step" ? item.step.estimatedMinutes : null;
   const isQuestion = item.kind === "question";
@@ -316,6 +322,9 @@ export function ItemNodeCard({
               : "text-app-text"
           }`}
         >
+          {number !== undefined ? (
+            <span className="mr-1 font-mono font-normal text-app-text-subtle">#{number}</span>
+          ) : null}
           {item.title}
         </p>
       </div>

@@ -33,6 +33,9 @@ import { queryKeys } from "../services/queryKeys";
  * ingestion health the top row and made a manager scroll past it to find a skip request. Now the
  * "Waiting on you" figure says how many answers are owed, and the team card below lists the
  * people who need the manager first, each opening in the side panel where it can be acted on.
+ *
+ * Rendered by `PmWorkspace` for `/pm-dashboard`. Open to `PM`, `HR` and `ADMIN`; the workspace
+ * is wrapped in `ManagerAreaGuard`, so a PM must manage the selected project.
  */
 export function PmDashboardPage({
   analysisRevision = 0,

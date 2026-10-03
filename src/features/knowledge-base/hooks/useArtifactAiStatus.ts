@@ -31,8 +31,8 @@ function toStatusMap(
  *   backend or the AI when either is struggling.
  * - Polls every 10 s only while some item is `PROCESSING`, and stops once none is.
  *
- * @param projectId Active project, or null before one is chosen.
- * @param artifactIds Ingestion ids of the visible page, in any stable order.
+ * @param projectId - Active project, or null before one is chosen.
+ * @param artifactIds - Ingestion ids of the visible page, in any stable order.
  * @returns Status per artifact id, or `null` when no chip may be drawn: the AI was unavailable
  *   (`aiAvailable: false`), the request failed, or it has not answered yet. Ids missing from the
  *   map (outside the project) get no chip either.

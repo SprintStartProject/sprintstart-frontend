@@ -57,7 +57,7 @@ export interface OrgMetadataMember {
  * that is not a plain object (e.g. `"123"`). This lets callers own the empty state
  * without co-opting the "nothing here" of a failed parse.
  *
- * @param json The raw `artifact.metadata` string (may be omitted).
+ * @param json - The raw `artifact.metadata` string (may be omitted).
  * @returns The parsed org metadata, or `null` when the input is not usable.
  */
 export function parseOrgMetadata(

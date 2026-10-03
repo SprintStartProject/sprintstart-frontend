@@ -266,6 +266,7 @@ export const onboardingService = {
 
   // ── FEEDBACK ──────────────────────────────────────────────
 
+  /** Sends the caller's feedback on one step: whether it helped, plus a free-text message. */
   async submitFeedback(stepId: string, helpful: boolean, message: string): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/feedback`, {
       method: "POST",
@@ -275,12 +276,17 @@ export const onboardingService = {
 
   // ── TASKS ─────────────────────────────────────────────────
 
+  /** Loads the tasks of one step on the caller's own path. */
   async fetchTasks(stepId: string): Promise<OnboardingTaskEndpoint[]> {
     return await apiClient.fetch<OnboardingTaskEndpoint[]>(
       `/api/v1/onboarding/me/steps/${stepId}/tasks`,
     );
   },
 
+  /**
+   * Checks or unchecks one of the caller's tasks. The endpoint replaces the whole task, so
+   * position, title and description are sent back unchanged along with `finished`.
+   */
   async updateTask(task: OnboardingTaskEndpoint, finished: boolean): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/tasks/${task.id}`, {
       method: "PUT",
@@ -295,6 +301,7 @@ export const onboardingService = {
 
   // ── RESOURCES ─────────────────────────────────────────────
 
+  /** Loads the reference resources of one step on the caller's own path. */
   async fetchResources(stepId: string): Promise<OnboardingResourceEndpoint[]> {
     return await apiClient.fetch<OnboardingResourceEndpoint[]>(
       `/api/v1/onboarding/me/steps/${stepId}/resources`,

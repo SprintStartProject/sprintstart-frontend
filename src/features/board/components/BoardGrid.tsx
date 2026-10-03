@@ -28,7 +28,6 @@ import { NoteCard } from "./NoteCard";
 import { ArrivalStepsCard } from "./ArrivalStepsCard";
 import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
 import { PathStepCard } from "./PathStepCard";
-import { PathToFirstContributionCard } from "./PathToFirstContributionCard";
 import { SuggestedTasksCard } from "./SuggestedTasksCard";
 import { TaskPoolCard } from "./TaskPoolCard";
 import { BoardCardContext } from "./boardCardControls";
@@ -494,8 +493,6 @@ function BoardCardView({
   // somebody to wire one up later and wonder why nothing shows.
   const props = { card, ...shared };
   switch (card.content.kind) {
-    case "PATH_TO_FIRST_CONTRIBUTION":
-      return <PathToFirstContributionCard content={card.content} {...props} />;
     case "ARRIVAL_STEPS":
       return <ArrivalStepsCard content={card.content} {...props} />;
     case "OPEN_PULL_REQUESTS":
@@ -563,6 +560,10 @@ function BoardCardView({
   }
 }
 
+/** Stand-ins for a board rendered without undo state — one with no writes to report. */
+const NO_IDS: ReadonlySet<string> = new Set();
+const NO_NOTICES: ReadonlyMap<string, BoardUndoNotice> = new Map();
+
 /**
  * The board's layout: cards in board order, packed into columns, rearrangeable by dragging.
  *
@@ -588,10 +589,6 @@ function BoardCardView({
  * board some people cannot arrange at all. Both send the whole resulting order, because that is
  * what the board now looks like.
  */
-/** Stand-ins for a board rendered without undo state — one with no writes to report. */
-const NO_IDS: ReadonlySet<string> = new Set();
-const NO_NOTICES: ReadonlyMap<string, BoardUndoNotice> = new Map();
-
 export function BoardGrid({
   board,
   onDismiss,
@@ -923,19 +920,6 @@ export function BoardGrid({
   );
 
   /**
-   * The areas that carry stages of their own: a named set of cards that is not all due at once.
-   *
-   * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
-   * this exists for — one set somebody wrote in one sitting, deliberately spread across the
-   * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
-   * "Now" around cards marked Later, and splitting it across the bands would take a thing with a
-   * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
-   * the same fold, one level in.
-   *
-   * They lead, above the bands. An area is a decision somebody made about what belongs together,
-   * and the bands are the board's own answer to when; the named thing goes first.
-   */
-  /**
    * The areas with nothing drawn in them.
    *
    * They have no box in the grid — the grid is built by walking the cards — which used to be fine,
@@ -951,6 +935,19 @@ export function BoardGrid({
     [board.cards, groups],
   );
 
+  /**
+   * The areas that carry stages of their own: a named set of cards that is not all due at once.
+   *
+   * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
+   * this exists for — one set somebody wrote in one sitting, deliberately spread across the
+   * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
+   * "Now" around cards marked Later, and splitting it across the bands would take a thing with a
+   * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
+   * the same fold, one level in.
+   *
+   * They lead, above the bands. An area is a decision somebody made about what belongs together,
+   * and the bands are the board's own answer to when; the named thing goes first.
+   */
   const spanningGroups = useMemo<Block[]>(() => {
     if (!banding) return [];
 
@@ -1142,13 +1139,6 @@ export function BoardGrid({
     );
   };
 
-  /**
-   * One block: a card, or an area with its cards stacked inside it.
-   *
-   * `wide` is only true for a block that broke the run — an area holding a diagram. It packs that
-   * area's members into columns of their own, because the reason it took the full width was that
-   * something in it needed the room, not that the area did.
-   */
   /** One item inside a column or an area: a card, or a sequence somebody has spread out. */
   const renderItem = (item: Item) => {
     if (item.kind === "card") return renderCard(item.card);
@@ -1188,6 +1178,13 @@ export function BoardGrid({
     </div>
   );
 
+  /**
+   * One block: a card, or an area with its cards inside it.
+   *
+   * An area whose cards span several stages (see `spanningGroups`) is folded by stage inside
+   * itself. Any other area lays its items out in a grid of its own, `span` columns wide, so cards
+   * in an area can sit next to each other.
+   */
   const renderBlock = (block: Block, blockIndex: number, span: number) => {
     if (block.kind !== "group") return renderItem(block);
 
@@ -1571,20 +1568,6 @@ function BoardCardCell({
     : null;
 
   /**
-   * Opens the pile when the card itself is clicked.
-   *
-   * The chip in the header is still the real control — it is what a keyboard reaches, what a screen
-   * reader announces, and what carries `aria-expanded`. This is the pointer shortcut beside it:
-   * the card *looks* like a pile, so clicking the pile should open it, and hunting for a chip to do
-   * something the whole card is depicting is the kind of small friction nobody reports and
-   * everybody feels.
-   *
-   * Three things it stays out of the way of: anything that already does something when clicked
-   * (see {@link INTERACTIVE_WITHIN_CARD}), the click that ends a drag while the board is being
-   * arranged, and the click that ends a text selection — releasing after selecting a line is not a
-   * request to rearrange the page under it.
-   */
-  /**
    * Folds a card, or opens a folded one, on a double click anywhere on it.
    *
    * The fold button is a four-pixel target that only appears on hover, at the far end of a cluster
@@ -1617,6 +1600,9 @@ function BoardCardCell({
     onToggleCollapsed(card.id);
   }
 
+  /** Where a resize drag started, and from which size. Null when nothing is being dragged. */
+  const resizeStart = useRef<{ x: number; y: number; size: CardSize } | null>(null);
+
   /**
    * The cards behind this one, nearest first — the ones the fanned sheets name.
    *
@@ -1624,9 +1610,6 @@ function BoardCardCell({
    * run. Two at most, because there are two sheets: a third strip would be a card the eye has to
    * work to read on a pile that is already asking for a click.
    */
-  /** Where a resize drag started, and from which size. Null when nothing is being dragged. */
-  const resizeStart = useRef<{ x: number; y: number; size: CardSize } | null>(null);
-
   const behind = useMemo(() => {
     if (!stack) return [];
 
@@ -1652,6 +1635,20 @@ function BoardCardCell({
       });
   }, [stack]);
 
+  /**
+   * Opens the pile when the card itself is clicked.
+   *
+   * The chip in the header is still the real control — it is what a keyboard reaches, what a screen
+   * reader announces, and what carries `aria-expanded`. This is the pointer shortcut beside it:
+   * the card *looks* like a pile, so clicking the pile should open it, and hunting for a chip to do
+   * something the whole card is depicting is the kind of small friction nobody reports and
+   * everybody feels.
+   *
+   * Three things it stays out of the way of: anything that already does something when clicked
+   * (see {@link INTERACTIVE_WITHIN_CARD}), the click that ends a drag while the board is being
+   * arranged, and the click that ends a text selection — releasing after selecting a line is not a
+   * request to rearrange the page under it.
+   */
   function handleStackClick(event: ReactMouseEvent<HTMLDivElement>) {
     if (!stack || isArranging || !onToggleStack) return;
     // The second click of a double click, which would otherwise open the pile and shut it again.

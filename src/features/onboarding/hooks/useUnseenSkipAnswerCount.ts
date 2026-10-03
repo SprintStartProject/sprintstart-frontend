@@ -13,7 +13,7 @@ import { onSkipAnswerSeen, unseenSkipAnswerCount } from "../skipAnswers";
  * like the other sidebar markers) and again the moment the onboarding page marks an answer seen, so
  * the marker goes as soon as the step is opened.
  *
- * @param refreshKey Changing this asks for a recheck; callers pass the current route.
+ * @param refreshKey - Changing this asks for a recheck; callers pass the current route.
  */
 export function useUnseenSkipAnswerCount(
   userId: string | undefined,

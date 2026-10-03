@@ -73,12 +73,6 @@ export function stageOrder(stage: BoardStage): number {
 }
 
 /**
- * One card's place in the process: its stage, what it waits on, and whether it was ticked off.
- *
- * Everything is optional because a board with no structure at all is the honest starting state —
- * an entry only exists once somebody has said something about that card.
- */
-/**
  * Who put a card behind another one.
  *
  * Two different claims used to be written into the same list. "The team says you cannot touch
@@ -91,6 +85,10 @@ export function stageOrder(stage: BoardStage): number {
  * - `BUDDY` — from a generated path. Named on the card so it does not look like the hire's own
  *   doing, but still theirs to clear: the buddy is an assistant, not an authority.
  * - `HIRE` — theirs, and the only kind their own controls write.
+ *
+ * Nothing writes `TEAM` or `BUDDY` any more: card blueprints and the generator that copied the path
+ * onto the board were retired when the onboarding path became the one plan (#311). Boards arranged
+ * before then still hold such edges, and they keep their meaning.
  */
 export type DependencySource = "TEAM" | "BUDDY" | "HIRE";
 
@@ -102,6 +100,12 @@ export function isRemovableByHire(dependency: CardDependency): boolean {
   return dependency.source !== "TEAM";
 }
 
+/**
+ * One card's place in the process: its stage, what it waits on, and whether it was ticked off.
+ *
+ * Everything is optional because a board with no structure at all is the honest starting state —
+ * an entry only exists once somebody has said something about that card.
+ */
 export type CardStructure = {
   stage?: BoardStage;
   /**
@@ -251,7 +255,6 @@ export function isSelfReporting(card: BoardCard): boolean {
   switch (card.content.kind) {
     case "CHECKLIST":
     case "ARRIVAL_STEPS":
-    case "PATH_TO_FIRST_CONTRIBUTION":
       return true;
     case "PATH_STEP":
       // A degraded card (`reason` set) or a live step that simply has no tasks would otherwise be
@@ -282,10 +285,6 @@ export function cardProgress(card: BoardCard): { done: number; total: number } |
     case "ARRIVAL_STEPS": {
       const total = content.steps.length;
       return { done: total - content.outstandingCount, total };
-    }
-    case "PATH_TO_FIRST_CONTRIBUTION": {
-      const total = content.moments.length;
-      return { done: content.moments.filter((moment) => moment.reachedAt !== null).length, total };
     }
     case "PATH_STEP": {
       const total = content.tasks.length;

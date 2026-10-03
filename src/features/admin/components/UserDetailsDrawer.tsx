@@ -102,6 +102,15 @@ function ReadonlyEditRow({
   );
 }
 
+/**
+ * One user in the admin page's side drawer: profile fields, permission group, account access and
+ * project memberships, with an edit mode and the delete action.
+ *
+ * Edits are held in a draft until saved; a failed save is reported as a toast, the inline errors
+ * are only the field validation. Assigning a project that would take a regular user out of their
+ * other projects (see `getProjectsLeftOnMove`) asks first, and `onMembershipsMoved` tells the
+ * page to reload the member lists that changed.
+ */
 export function UserDetailsDrawer({
   user,
   projects,
