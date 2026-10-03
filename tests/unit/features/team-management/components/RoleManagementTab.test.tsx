@@ -291,6 +291,29 @@ describe("RoleManagementTab", () => {
     expect(screen.queryByText("Suggestions could not be loaded")).not.toBeInTheDocument();
   });
 
+  it("adds the skills picked in the form as soon as the role exists", async () => {
+    const user = userEvent.setup();
+    const onDataChanged = vi.fn().mockResolvedValue(undefined);
+    render(<RoleManagementTab roles={[]} users={[]} onDataChanged={onDataChanged} />);
+
+    await user.click(screen.getByRole("button", { name: "New role" }));
+    await user.type(screen.getByLabelText("Name"), "Frontend");
+    // One from the catalog, picked from what the typing offers, and one new by Enter.
+    await user.type(screen.getByLabelText("Skills"), "Type");
+    await user.click(await screen.findByRole("button", { name: "TypeScript" }));
+    await user.type(screen.getByLabelText("Skills"), "GraphQL{Enter}");
+    // No AI round on top this time.
+    await user.click(screen.getByLabelText(/Also suggest skills with AI/));
+    await user.click(screen.getByRole("button", { name: "Create role" }));
+
+    await waitFor(() =>
+      expect(mocks.acceptSkillSuggestion).toHaveBeenCalledWith(role.id, { skillId: "skill-1" }),
+    );
+    expect(mocks.acceptSkillSuggestion).toHaveBeenCalledWith(role.id, { name: "GraphQL" });
+    await screen.findByText("Role created with 2 skills");
+    expect(mocks.suggestSkillsForRole).not.toHaveBeenCalled();
+  });
+
   describe("the roles list", () => {
     it("searches roles by name, skill or member", async () => {
       const user = userEvent.setup();

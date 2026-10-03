@@ -11,6 +11,8 @@ import { useAuth } from "../../../context/useAuth";
 import { useToast } from "../../../context/useToast";
 import type { FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
+import { Checkbox } from "../../../components/ui/Checkbox";
+import { NewRoleSkillsInput, type PendingSkill } from "./NewRoleSkillsInput";
 import { RoleRow } from "./RoleRow";
 import { SkillSuggestionPanel } from "./SkillSuggestionPanel";
 import { skillSuggestionKey } from "../skillSuggestion";
@@ -118,6 +120,10 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   // Creating is a button in the toolbar that opens the form at the top of the list, rather than a
   // column of its own beside it: the list gets the full width, like every other list here.
   const [showCreate, setShowCreate] = useState(false);
+  // Skills picked in the create form, added the moment the role exists, and whether the AI is
+  // asked for more on top.
+  const [newRoleSkills, setNewRoleSkills] = useState<PendingSkill[]>([]);
+  const [suggestOnCreate, setSuggestOnCreate] = useState(true);
   // The open role's member list: a search and who to show.
   const [memberQuery, setMemberQuery] = useState("");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
@@ -219,19 +225,45 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     try {
       const newRole = await createProjectRole(roleName.trim(), roleDescription.trim());
 
+      // The skills picked in the form, one after another: each answer is the role's whole
+      // skill list, so the last one that worked is the list to show. One that fails does not
+      // undo the role or the others; it is named afterwards so it can be added in the panel.
+      let roleSkills: Skill[] | null = null;
+      const failedSkills: string[] = [];
+      for (const pending of newRoleSkills) {
+        try {
+          roleSkills = await acceptSkillSuggestion(
+            newRole.id,
+            pending.skillId ? { skillId: pending.skillId } : { name: pending.name },
+          );
+        } catch {
+          failedSkills.push(pending.name);
+        }
+      }
+      if (roleSkills) replaceRoleSkills(newRole.id, roleSkills);
+
+      const addedCount = newRoleSkills.length - failedSkills.length;
       setRoleName("");
       setRoleDescription("");
+      setNewRoleSkills([]);
       setShowCreate(false);
       await onDataChanged();
       openRole(newRole.id);
-      toast.success("Role created");
+      toast.success(
+        addedCount > 0
+          ? `Role created with ${addedCount} ${addedCount === 1 ? "skill" : "skills"}`
+          : "Role created",
+      );
+      if (failedSkills.length > 0) {
+        toast.error(`Couldn't add ${failedSkills.join(", ")}. Add it in the role's panel.`);
+      }
 
       // HR can create roles but the suggest endpoint is ADMIN/PM-only; firing
       // it for HR would 403 and show an unrecoverable error in the panel with
       // no button to dismiss it. Not awaited: the AI round-trip should not
       // keep the create button (and its "Creating role…" label) busy once the
       // role already exists and is open -- the panel has its own spinner.
-      if (canSuggestSkills) {
+      if (canSuggestSkills && suggestOnCreate) {
         void requestSkillSuggestions(newRole.id);
       }
     } catch (error) {
@@ -615,8 +647,10 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
           </p>
 
           {/* Search and narrow the people, for a team too large to scan. */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <div className="min-w-0 flex-1 sm:max-w-56">
+          {/* Search on a line of its own, the filters under it: side by side they were squeezed
+              into the members column. */}
+          <div className="mt-4 space-y-2">
+            <div className="min-w-0">
               <Input
                 size="sm"
                 icon={<Search className="h-4 w-4" />}
@@ -1035,11 +1069,32 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                         placeholder="What this role is responsible for"
                       />
                     </div>
-                    <div className="flex items-center justify-between gap-3 sm:col-span-2">
-                      <p className="text-xs text-app-text-muted">
-                        A new role can start with AI-suggested skills; it opens right away to review
-                        them and assign members.
-                      </p>
+                    <div className="sm:col-span-2">
+                      <NewRoleSkillsInput
+                        catalog={skills}
+                        value={newRoleSkills}
+                        onChange={setNewRoleSkills}
+                        disabled={creatingRole}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+                      {canSuggestSkills ? (
+                        <label
+                          htmlFor="new-role-suggest"
+                          className="flex cursor-pointer items-center gap-2 text-xs text-app-text-muted"
+                        >
+                          <Checkbox
+                            id="new-role-suggest"
+                            checked={suggestOnCreate}
+                            onChange={(event) => setSuggestOnCreate(event.target.checked)}
+                          />
+                          Also suggest skills with AI — to review once the role is open
+                        </label>
+                      ) : (
+                        <p className="text-xs text-app-text-muted">
+                          The role opens right away to assign members.
+                        </p>
+                      )}
                       <Button
                         variant="primary"
                         onClick={() => void handleCreateRole()}
