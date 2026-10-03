@@ -719,6 +719,7 @@ export function AdminPage() {
 
                   <ProjectsTab
                     filteredProjects={paginatedProjects}
+                    users={users}
                     hasSearchQuery={projectSearchValue.trim().length > 0}
                     totalCount={projects.length}
                     onOpenProjectDetails={openProjectDetails}

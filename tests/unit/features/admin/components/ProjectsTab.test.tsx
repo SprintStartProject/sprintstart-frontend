@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ProjectsTab } from "../../../../../src/features/admin/components/ProjectsTab";
-import type { ProjectOverview } from "../../../../../src/features/admin/types";
+import type { AdminUser, ProjectOverview } from "../../../../../src/features/admin/types";
 
 const projects: ProjectOverview[] = [
   {
@@ -87,6 +87,136 @@ describe("ProjectsTab", () => {
     render(<ProjectsTab filteredProjects={projects} onOpenProjectDetails={vi.fn()} />);
 
     expect(screen.getAllByText("No manager")).toHaveLength(2);
+  });
+
+  it("flags a project without a manager with a warning badge", () => {
+    const withManager: ProjectOverview = {
+      ...projects[0],
+      id: "proj-3",
+      name: "Gamma",
+      manager: {
+        id: "user-7",
+        username: "jane.doe",
+        email: "jane@example.com",
+        firstName: "Jane",
+        lastName: "Doe",
+      },
+    };
+
+    render(
+      <ProjectsTab filteredProjects={[projects[0], withManager]} onOpenProjectDetails={vi.fn()} />,
+    );
+
+    expect(screen.getAllByText("No manager")).toHaveLength(1);
+    expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+  });
+
+  describe("source health", () => {
+    const withSources = (sources: ProjectOverview["sources"]): ProjectOverview => ({
+      ...projects[0],
+      sources,
+    });
+
+    it("says all synced when every source is connected", () => {
+      render(<ProjectsTab filteredProjects={[projects[0]]} onOpenProjectDetails={vi.fn()} />);
+
+      expect(screen.getByText("All synced")).toBeInTheDocument();
+    });
+
+    it("counts the sources that need attention", () => {
+      render(
+        <ProjectsTab
+          filteredProjects={[
+            withSources([
+              { id: "s1", name: "A", type: "GITHUB", status: "CONNECTED" },
+              { id: "s2", name: "B", type: "JIRA", status: "FAILED" },
+            ]),
+          ]}
+          onOpenProjectDetails={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("1 needs attention")).toBeInTheDocument();
+      expect(screen.queryByText("All synced")).not.toBeInTheDocument();
+    });
+
+    it("treats a disabled source as needing attention", () => {
+      render(
+        <ProjectsTab
+          filteredProjects={[
+            withSources([
+              { id: "s1", name: "A", type: "GITHUB", status: "DISABLED" },
+              { id: "s2", name: "B", type: "JIRA", status: "ERROR" },
+            ]),
+          ]}
+          onOpenProjectDetails={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("2 need attention")).toBeInTheDocument();
+    });
+
+    it("says so when a project has no sources", () => {
+      render(<ProjectsTab filteredProjects={[projects[1]]} onOpenProjectDetails={vi.fn()} />);
+
+      expect(screen.getByText("No sources")).toBeInTheDocument();
+    });
+  });
+
+  describe("member avatars", () => {
+    const makeUsers = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `m-${index}`,
+        username: `member${index}`,
+        email: `member${index}@x.com`,
+        projectRoles: [],
+      }));
+
+    const makeAdminUser = (id: string, firstName: string, lastName: string) =>
+      ({
+        id,
+        username: `${firstName}.${lastName}`.toLowerCase(),
+        email: "",
+        firstName,
+        lastName,
+        profileIcon: null,
+      }) as unknown as AdminUser;
+
+    it("stacks the first four members and counts the rest", () => {
+      render(
+        <ProjectsTab
+          filteredProjects={[{ ...projects[0], users: makeUsers(7) }]}
+          onOpenProjectDetails={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("+3")).toBeInTheDocument();
+      expect(screen.getByText("7 members")).toBeInTheDocument();
+      expect(screen.getAllByRole("img", { name: /^Avatar for member/ })).toHaveLength(4);
+    });
+
+    it("shows no overflow chip for four members or fewer", () => {
+      render(
+        <ProjectsTab
+          filteredProjects={[{ ...projects[0], users: makeUsers(4) }]}
+          onOpenProjectDetails={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByText(/^\+\d/)).not.toBeInTheDocument();
+    });
+
+    it("names the avatars from the user directory", () => {
+      render(
+        <ProjectsTab
+          filteredProjects={[{ ...projects[0], users: makeUsers(1) }]}
+          users={[makeAdminUser("m-0", "Mia", "Wagner")]}
+          onOpenProjectDetails={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole("img", { name: "Avatar for Mia Wagner" })).toBeInTheDocument();
+    });
   });
 
   it("calls onOpenProjectDetails with the project when a card is clicked", async () => {

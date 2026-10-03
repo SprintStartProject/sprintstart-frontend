@@ -1,7 +1,7 @@
 import type { BadgeVariant } from "../../components/ui/Badge";
 import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 import type { ProjectRole, Skill } from "../team-management/types";
-import { SOURCE_META } from "../data-ingestion/data";
+import { deriveSourceStatus, SOURCE_META } from "../data-ingestion/data";
 import type { SourceMeta, SourceSystem } from "../data-ingestion/types";
 import type {
   AdminUser,
@@ -137,6 +137,64 @@ export function getSourceStatusVariant(status: string): BadgeVariant {
   if (normalizedStatus === "DISCONNECTED") return "neutral";
 
   return "brand";
+}
+
+export type SourceHealthState = "none" | "healthy" | "syncing" | "stale" | "attention";
+
+export type SourceHealth = {
+  state: SourceHealthState;
+  total: number;
+  /** Sources that failed, are disconnected or switched off. */
+  attentionCount: number;
+  syncingCount: number;
+  /** Sources the backend flags as behind their upstream. */
+  staleCount: number;
+  label: string;
+};
+
+/**
+ * One-line health of a project's sources, for lists that cannot show each source.
+ *
+ * Built on the same {@link deriveSourceStatus} the Data Ingestion page uses, so a
+ * source reads as healthy or not identically in both places. A disabled source
+ * counts as needing attention: it silently stops feeding the knowledge base.
+ * "Out of date" is kept apart from failures on purpose — with auto-update off it
+ * is the expected state between syncs and must not look like a fault.
+ */
+export function getSourceHealth(sources: Array<{ status: string }>): SourceHealth {
+  let attentionCount = 0;
+  let syncingCount = 0;
+  let staleCount = 0;
+
+  for (const source of sources) {
+    const { state } = deriveSourceStatus({
+      backendStatus: source.status,
+      hasErrors: false,
+      hasNeverSynced: false,
+    });
+
+    if (state === "attention" || state === "disabled") attentionCount += 1;
+    else if (state === "syncing") syncingCount += 1;
+    else if (state === "stale") staleCount += 1;
+  }
+
+  const base = { total: sources.length, attentionCount, syncingCount, staleCount };
+
+  if (sources.length === 0) return { ...base, state: "none", label: "No sources" };
+
+  if (attentionCount > 0) {
+    return {
+      ...base,
+      state: "attention",
+      label: attentionCount === 1 ? "1 needs attention" : `${attentionCount} need attention`,
+    };
+  }
+
+  if (syncingCount > 0) return { ...base, state: "syncing", label: "Syncing" };
+
+  if (staleCount > 0) return { ...base, state: "stale", label: `${staleCount} out of date` };
+
+  return { ...base, state: "healthy", label: "All synced" };
 }
 
 export function getProjectUsersCount(project: { users: unknown[] }) {

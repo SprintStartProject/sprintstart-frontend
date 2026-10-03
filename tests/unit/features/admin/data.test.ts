@@ -13,6 +13,7 @@ import {
   getDraftDisplayName,
   enrichUsersWithProjectNames,
   filterAdminProjects,
+  getSourceHealth,
   getSourceTypeLabel,
   groupSourcesByType,
   matchesUserSearch,
@@ -311,6 +312,47 @@ describe("admin data helpers", () => {
       expect(pluralize(0, "member")).toBe("0 members");
       expect(pluralize(1, "member")).toBe("1 member");
       expect(pluralize(2, "source")).toBe("2 sources");
+    });
+  });
+
+  describe("getSourceHealth", () => {
+    it("reports no sources", () => {
+      expect(getSourceHealth([])).toMatchObject({ state: "none", label: "No sources" });
+    });
+
+    it("is healthy when every source is connected", () => {
+      expect(getSourceHealth([{ status: "CONNECTED" }, { status: "CONNECTED" }])).toMatchObject({
+        state: "healthy",
+        label: "All synced",
+      });
+    });
+
+    it("counts failed, disconnected and disabled sources as needing attention", () => {
+      const health = getSourceHealth([
+        { status: "FAILED" },
+        { status: "DISCONNECTED" },
+        { status: "DISABLED" },
+        { status: "CONNECTED" },
+      ]);
+
+      expect(health).toMatchObject({
+        state: "attention",
+        attentionCount: 3,
+        label: "3 need attention",
+      });
+    });
+
+    it("lets attention win over syncing, and keeps out-of-date apart from failures", () => {
+      expect(getSourceHealth([{ status: "UPDATING" }, { status: "ERROR" }]).state).toBe(
+        "attention",
+      );
+      expect(getSourceHealth([{ status: "UPDATING" }, { status: "CONNECTED" }]).state).toBe(
+        "syncing",
+      );
+      expect(getSourceHealth([{ status: "OUT_OF_DATE" }, { status: "CONNECTED" }])).toMatchObject({
+        state: "stale",
+        label: "1 out of date",
+      });
     });
   });
 
