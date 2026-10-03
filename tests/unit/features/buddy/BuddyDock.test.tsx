@@ -62,6 +62,7 @@ function renderDock(
           setActionDraft={vi.fn()}
           suggestions={suggestions}
           newConversation={newConversation}
+          isOpening={false}
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}

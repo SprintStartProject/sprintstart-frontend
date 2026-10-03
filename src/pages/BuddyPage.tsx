@@ -39,7 +39,7 @@ import { surfaceFromPathname } from "../components/common/assistantSurfaces";
  * second at the first, and a screen reader that announced two different names for one region
  * would be describing two things that do not exist.
  */
-const RAIL_LABEL = "Conversations";
+const RAIL_LABEL = "Your conversations";
 
 /** The rail region's id — the toggle's `aria-controls` points at it. */
 const RAIL_ID = "buddy-rail";
@@ -54,7 +54,10 @@ const RAIL_OPEN_KEY = "buddyRailOpen";
 /** `null` when the hire has never said either way — see the auto-open in `BuddyMentorHome`. */
 function readRailOpen(): boolean | null {
   try {
-    const stored = localStorage.getItem(RAIL_OPEN_KEY);
+    // Read through the pre-rename key once: the rail used to be the PM-replies panel
+    // (`buddyPmRepliesOpen`), and a rename must not throw away a choice already made.
+    const stored =
+      localStorage.getItem(RAIL_OPEN_KEY) ?? localStorage.getItem("buddyPmRepliesOpen");
 
     return stored === null ? null : stored === "true";
   } catch {

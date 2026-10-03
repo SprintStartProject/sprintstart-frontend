@@ -447,7 +447,7 @@ describe("BuddyPage", () => {
 
       // A column, and an answer is waiting, so it opens itself.
       const rail = await screen.findByRole("complementary", {
-        name: "Conversations",
+        name: "Your conversations",
       });
       await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "false"));
 
@@ -457,7 +457,7 @@ describe("BuddyPage", () => {
 
       // Put away, not taken away: the control that brings it back is on screen, with the count
       // read from the same list the rail is holding.
-      expect(screen.getByTitle("Conversations")).toBeInTheDocument();
+      expect(screen.getByTitle("Your conversations")).toBeInTheDocument();
     } finally {
       viewport.restore();
     }
@@ -475,12 +475,12 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    const toggle = await screen.findByTitle("Conversations");
+    const toggle = await screen.findByTitle("Your conversations");
     expect(toggle.className).not.toMatch(/(^|\s)hidden(\s|$)/);
 
     await user.click(toggle);
 
-    const rail = await screen.findByRole("complementary", { name: "Conversations" });
+    const rail = await screen.findByRole("complementary", { name: "Your conversations" });
     expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
   });
 
@@ -499,7 +499,7 @@ describe("BuddyPage", () => {
       // A column, and there is an answer waiting: the rail opens itself, which is the promise
       // `FlagToPmButton` makes. Closing it is therefore the choice worth remembering here.
       const rail = await screen.findByRole("complementary", {
-        name: "Conversations",
+        name: "Your conversations",
       });
       // Scoped to the rail: the drawer backdrop says the same words, and below `md` it is the
       // one you press. jsdom computes no layout, so both are in the document here.
@@ -512,9 +512,9 @@ describe("BuddyPage", () => {
 
       // Back to the control that reopens it, rather than to the rail deciding again. The rail
       // itself stays mounted — that is what keeps its scroll — but out of the tree while shut.
-      expect(await screen.findByTitle("Conversations")).toBeInTheDocument();
+      expect(await screen.findByTitle("Your conversations")).toBeInTheDocument();
       expect(
-        screen.queryByRole("complementary", { name: "Conversations" }),
+        screen.queryByRole("complementary", { name: "Your conversations" }),
       ).not.toBeInTheDocument();
     } finally {
       restoreViewport();
@@ -532,16 +532,20 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     const first = renderPage();
 
-    await user.click(await screen.findByTitle("Conversations"));
-    expect(await screen.findByRole("complementary", { name: "Conversations" })).toBeInTheDocument();
+    await user.click(await screen.findByTitle("Your conversations"));
+    expect(
+      await screen.findByRole("complementary", { name: "Your conversations" }),
+    ).toBeInTheDocument();
 
     first.unmount();
     renderPage();
 
     // Still mounted — the rail never unmounts, so its list keeps its scroll — but shut, and
     // the control that brings it back is the one on screen.
-    expect(await screen.findByTitle("Conversations")).toBeInTheDocument();
-    expect(screen.queryByRole("complementary", { name: "Conversations" })).not.toBeInTheDocument();
+    expect(await screen.findByTitle("Your conversations")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("complementary", { name: "Your conversations" }),
+    ).not.toBeInTheDocument();
   });
 
   /**
@@ -575,7 +579,7 @@ describe("BuddyPage", () => {
     });
 
     // ...open the rail (there is something to switch to now), and pick the older one.
-    await user.click(await screen.findByTitle("Conversations"));
+    await user.click(await screen.findByTitle("Your conversations"));
     await user.click(await screen.findByRole("button", { name: "Getting started" }));
 
     // Its transcript comes back, read by id.

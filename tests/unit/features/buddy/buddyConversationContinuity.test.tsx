@@ -224,4 +224,183 @@ describe("buddy conversation continuity", () => {
     expect(result.current.messages.some((message) => message.content === "Hi!")).toBe(true);
     expect(opened).toBe(0);
   });
+
+  /**
+   * The list is otherwise read once at open and edited locally from there — so a conversation
+   * the backend has just named from its first message would read "New conversation" in the
+   * rail until a reload. The completed turn on an untitled row is what must bring the name in.
+   */
+  it("re-reads the conversation list once a first message writes its title", async () => {
+    let titled = false;
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/sessions", () =>
+        HttpResponse.json({
+          sessions: [
+            {
+              id: "session-1",
+              title: titled ? "Where do I start?" : "",
+              userId: "1",
+              projectId: null,
+              createdAt: "2026-09-30T09:00:00.000Z",
+            },
+          ],
+        }),
+      ),
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => oneTokenStream("Welcome back!")),
+      http.post("/api/v1/onboarding/me/buddy/messages", () => {
+        // The backend names the conversation from this first message.
+        titled = true;
+        return oneTokenStream("Hi!");
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+
+    await waitFor(() => {
+      expect(result.current.isOpening).toBe(false);
+    });
+    expect(result.current.sessions[0].title).toBe("");
+
+    await act(async () => {
+      await result.current.sendMessage("where do I start?");
+    });
+
+    await waitFor(() => {
+      expect(result.current.sessions[0].title).toBe("Where do I start?");
+    });
+  });
+
+  /**
+   * The create is a round trip, and the composer does not wait for it. A send that begins while
+   * it is in flight reads the session ref synchronously, so it lands in the conversation being
+   * left — and the switch's clears would wipe its optimistic turn while the answer streamed
+   * into a thread nobody is looking at. The send wins: nothing is adopted.
+   */
+  it("does not adopt a new conversation over a turn that began while it was being created", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => oneTokenStream("Welcome back!")),
+      http.post("/api/v1/onboarding/me/buddy/sessions", async () => {
+        await delay(80);
+        return HttpResponse.json({ id: "s-new" }, { status: 201 });
+      }),
+      http.post("/api/v1/onboarding/me/buddy/messages", () => oneTokenStream("Hi!")),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    await waitFor(() => {
+      expect(result.current.isOpening).toBe(false);
+    });
+
+    let creating: Promise<void> = Promise.resolve();
+    await act(async () => {
+      creating = result.current.newConversation();
+      // The create is in flight (80 ms stub); a turn begins inside that window.
+      await delay(10);
+      await result.current.sendMessage("hello?");
+    });
+    await act(async () => {
+      await creating;
+    });
+
+    // Nothing was adopted and nothing was cleared: the turn the hire actually made is still
+    // the thread, and the conversation being left is still the one on screen.
+    expect(result.current.currentSessionId).toBe("session-1");
+    expect(result.current.sessions.map((session) => session.id)).toEqual(["session-1"]);
+    expect(result.current.messages.some((message) => message.content === "hello?")).toBe(true);
+    expect(result.current.messages.some((message) => message.content === "Hi!")).toBe(true);
+  });
+
+  /**
+   * The banner's "Try again" must redo what actually failed. It used to run the opening read,
+   * which no-ops out of a loaded conversation — so the banner cleared and nothing else happened.
+   */
+  it("retries a failed new conversation as itself, not the opening read", async () => {
+    let attempts = 0;
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => oneTokenStream("Welcome back!")),
+      http.post("/api/v1/onboarding/me/buddy/sessions", () => {
+        attempts += 1;
+        return attempts === 1
+          ? new HttpResponse(null, { status: 500 })
+          : HttpResponse.json({ id: "s-new" }, { status: 201 });
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    await waitFor(() => {
+      expect(result.current.isOpening).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.newConversation();
+    });
+    expect(result.current.openError).toMatch(/new conversation/);
+    expect(result.current.currentSessionId).toBe("session-1");
+
+    await act(async () => {
+      await result.current.retryOpen();
+    });
+
+    expect(result.current.openError).toBeNull();
+    expect(result.current.currentSessionId).toBe("s-new");
+    expect(attempts).toBe(2);
+  });
+
+  /**
+   * "New conversation" must not stack identical empty rows. With a still-untouched newest
+   * conversation already around — the state a press leaves, since a hire who leaves it and
+   * presses again used to get another — the press brings that one back instead; the next
+   * reload would open it anyway, so creating a twin for it only made the pile.
+   */
+  it("brings back an untouched conversation instead of stacking another empty one", async () => {
+    let creates = 0;
+    server.use(
+      http.get("/api/v1/onboarding/me/buddy/sessions", () =>
+        HttpResponse.json({
+          sessions: [
+            {
+              id: "s-1",
+              title: "Getting started",
+              userId: "1",
+              projectId: null,
+              createdAt: "2026-09-29T10:00:00.000Z",
+            },
+          ],
+        }),
+      ),
+      http.post("/api/v1/onboarding/me/buddy/sessions", () => {
+        creates += 1;
+        return HttpResponse.json({ id: "s-new" }, { status: 201 });
+      }),
+      http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
+      http.post("/api/v1/onboarding/me/buddy/open/stream", () => oneTokenStream("Welcome back!")),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    await waitFor(() => {
+      expect(result.current.currentSessionId).toBe("s-1");
+    });
+
+    // Nothing untouched exists yet, so this press creates the one empty conversation...
+    await act(async () => {
+      await result.current.newConversation();
+    });
+    expect(result.current.currentSessionId).toBe("s-new");
+    expect(creates).toBe(1);
+
+    // ...and coming back to an older conversation later, pressing again brings that same
+    // untouched one back rather than creating a second.
+    await act(async () => {
+      await result.current.selectSession("s-1");
+    });
+    await act(async () => {
+      await result.current.newConversation();
+    });
+
+    expect(result.current.currentSessionId).toBe("s-new");
+    expect(creates).toBe(1);
+  });
 });

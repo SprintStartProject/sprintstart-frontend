@@ -49,6 +49,7 @@ type BuddyDockProps = Pick<
   | "setActionDraft"
   | "suggestions"
   | "newConversation"
+  | "isOpening"
   | "isGreeting"
   | "isDeciding"
   | "teamProjectId"
@@ -142,6 +143,7 @@ function BuddyDockImpl({
   dinoGameActive = false,
   onDinoGameExit,
   newConversation,
+  isOpening,
   isGreeting,
   isDeciding,
   teamProjectId,
@@ -279,7 +281,7 @@ function BuddyDockImpl({
           {/* Hire conversation ↔ team conversations. Rendered by the caller (the widget), like
                     every other session-driven piece here, so the dock needs no project context
                     of its own. `max-w-full min-w-0` keeps a long project name from pushing the
-                    fresh-visit control out of a 384 px window. */}
+                    new-conversation control out of a 384 px window. */}
           {headerControl && <div className="max-w-[11rem] min-w-0 shrink-0">{headerControl}</div>}
 
           {/* Same control, same words and the same promise as the one on `/buddy`: the window is
@@ -292,15 +294,15 @@ function BuddyDockImpl({
                     The hire's surface only — team mode has one conversation per project and
                     nothing to start.
 
-                    Withdrawn while a turn is in flight. A new conversation clears the thread,
-                    but the click cannot call back the request already streaming into it: that
-                    stream's callbacks still hold the shared conversation, so its tool events
-                    would land in the new one — "Checking your progress…" beneath an empty
-                    thread — and its completion would clear the new one's thinking state.
-                    Offering the control only between turns is the cheap half of that fix;
-                    aborting the stream is the other half and belongs in the session, alongside
-                    the same gap on `BuddyPage`. */}
-          {hasUserMessage && !isBusy && teamProjectId === null && (
+                    Withdrawn while a turn is in flight, and while a conversation is opening:
+                    a new conversation clears the thread, but the click cannot call back the
+                    request already streaming into it — that stream's callbacks still hold the
+                    shared conversation, so its tool events would land in the new one
+                    ("Checking your progress…" beneath an empty thread) — and an open's read is
+                    on its way into the very thread this click would clear. Offering the control
+                    only between turns is the cheap half of that fix; aborting the stream is the
+                    other half and belongs in the session, alongside the same gap on `BuddyPage`. */}
+          {hasUserMessage && !isBusy && !isOpening && teamProjectId === null && (
             <Button
               variant="ghost"
               size="xs"

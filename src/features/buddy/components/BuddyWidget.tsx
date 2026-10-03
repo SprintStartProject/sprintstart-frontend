@@ -358,6 +358,7 @@ export function BuddyWidget() {
             dinoGameActive={dinoGameActive}
             onDinoGameExit={closeDinoGame}
             newConversation={newConversation}
+            isOpening={isOpening}
             isGreeting={isGreeting}
             isDeciding={isDeciding}
             teamProjectId={teamProjectId}
