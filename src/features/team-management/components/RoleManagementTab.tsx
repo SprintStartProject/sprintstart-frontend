@@ -1,4 +1,4 @@
-import { Check, Minus, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
+import { Check, Minus, Plus, RotateCcw, Search, Sparkles, Trash2, UserX, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
@@ -9,6 +9,8 @@ import { Textarea } from "../../../components/ui/Textarea";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { useAuth } from "../../../context/useAuth";
 import { useToast } from "../../../context/useToast";
+import type { FilterSelectOption } from "../../../components/ui/FilterSelect";
+import { PmFilterChip, PmListToolbar } from "../../pm-area/components/PmListToolbar";
 import { RoleRow } from "./RoleRow";
 import { SkillSuggestionPanel } from "./SkillSuggestionPanel";
 import { skillSuggestionKey } from "../skillSuggestion";
@@ -28,6 +30,26 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { useRoleSkillSuggestions } from "../useRoleSkillSuggestions";
 import { isSkillLinkedToRole } from "../types";
 import type { ProjectRole, Skill, SkillSuggestion, TeamOverviewUser } from "../types";
+
+type RoleSort = "name" | "members" | "skills";
+
+const ROLE_SORT_OPTIONS: FilterSelectOption<RoleSort>[] = [
+  { value: "name", label: "Name" },
+  { value: "members", label: "Most members" },
+  { value: "skills", label: "Most skills" },
+];
+
+/** The roles worth a look: nobody holds them, or they carry no skills to assess. */
+type RoleGapFilter = "no-members" | "no-skills";
+
+/** Who the open role's member list shows. */
+type MemberFilter = "all" | "holds" | "without";
+
+/** Names in a sentence: the first few, then a count. */
+function nameList(names: string[], max = 3): string {
+  const shown = names.slice(0, max).join(", ");
+  return names.length > max ? `${shown} +${names.length - max}` : shown;
+}
 
 type RoleManagementTabProps = {
   /** Roles of the current project, owned by the page so both tabs agree. */
@@ -89,6 +111,17 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   const [originalUserIds, setOriginalUserIds] = useState<string[]>([]);
   const [savingAssignment, setSavingAssignment] = useState(false);
 
+  // The list's toolbar, the same one the team, the questions and the gaps have.
+  const [roleQuery, setRoleQuery] = useState("");
+  const [roleSort, setRoleSort] = useState<RoleSort>("name");
+  const [roleGapFilter, setRoleGapFilter] = useState<RoleGapFilter | null>(null);
+  // Creating is a button in the toolbar that opens the form at the top of the list, rather than a
+  // column of its own beside it: the list gets the full width, like every other list here.
+  const [showCreate, setShowCreate] = useState(false);
+  // The open role's member list: a search and who to show.
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
+
   useEffect(() => {
     async function loadSkills() {
       setSkills(await getSkills());
@@ -149,6 +182,8 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     setSelectedUserIds(assignedUserIds);
     setOriginalUserIds(assignedUserIds);
     setSkillName("");
+    setMemberQuery("");
+    setMemberFilter("all");
   }
 
   function closeRole() {
@@ -186,6 +221,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
       setRoleName("");
       setRoleDescription("");
+      setShowCreate(false);
       await onDataChanged();
       openRole(newRole.id);
       toast.success("Role created");
@@ -482,6 +518,66 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   // every role and noticing who is missing.
   const usersWithoutRole = users.filter((user) => user.roles.length === 0);
 
+  const rolesWithoutMembers = roles.filter((role) => getRoleMembers(role.id).length === 0).length;
+  const rolesWithoutSkills = roles.filter((role) => getRoleSkills(role.id).length === 0).length;
+
+  /**
+   * The roles the toolbar leaves: searched by name, description, skill or member, narrowed to a
+   * gap, and sorted. The open role always stays, so narrowing never closes what is being worked
+   * on.
+   */
+  const visibleRoles = useMemo(() => {
+    const query = roleQuery.trim().toLowerCase();
+    const matches = roles.filter((role) => {
+      if (role.id === selectedRoleId) return true;
+      const roleMembers = getRoleMembers(role.id);
+      const roleSkills = getRoleSkills(role.id);
+      if (roleGapFilter === "no-members" && roleMembers.length > 0) return false;
+      if (roleGapFilter === "no-skills" && roleSkills.length > 0) return false;
+      if (query === "") return true;
+      return [
+        role.name,
+        role.description ?? "",
+        ...roleSkills.map((skill) => skill.name),
+        ...roleMembers.map((member) => `${member.firstname} ${member.lastname}`),
+      ].some((text) => text.toLowerCase().includes(query));
+    });
+
+    return [...matches].sort((first, second) => {
+      if (roleSort === "members") {
+        const diff = getRoleMembers(second.id).length - getRoleMembers(first.id).length;
+        if (diff !== 0) return diff;
+      }
+      if (roleSort === "skills") {
+        const diff = getRoleSkills(second.id).length - getRoleSkills(first.id).length;
+        if (diff !== 0) return diff;
+      }
+      return first.name.localeCompare(second.name);
+    });
+  }, [getRoleMembers, getRoleSkills, roleGapFilter, roleQuery, roleSort, roles, selectedRoleId]);
+
+  const listNarrowed = roleQuery.trim() !== "" || roleGapFilter !== null || roleSort !== "name";
+
+  /** The open role's member list after its search and filter. */
+  const visibleMembers = useMemo(() => {
+    const heldOriginally = new Set(originalUserIds);
+    const query = memberQuery.trim().toLowerCase();
+    return membersForAssignment.filter((user) => {
+      if (memberFilter === "holds" && !heldOriginally.has(user.userId)) return false;
+      if (memberFilter === "without" && user.roles.length > 0) return false;
+      if (query === "") return true;
+      return `${user.firstname} ${user.lastname}`.toLowerCase().includes(query);
+    });
+  }, [memberFilter, memberQuery, membersForAssignment, originalUserIds]);
+
+  // What deleting the role would take away, for the confirmation to say before it happens.
+  const deleteImpact = deleteRoleId
+    ? {
+        members: getRoleMembers(deleteRoleId).map((user) => `${user.firstname} ${user.lastname}`),
+        skills: getRoleSkills(deleteRoleId).length,
+      }
+    : null;
+
   const roleToDelete = roles.find((role) => role.id === deleteRoleId);
   const skillToRetire = skills.find((skill) => skill.id === retireSkillId);
 
@@ -518,10 +614,45 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
             {selectedUserIds.length} selected.
           </p>
 
+          {/* Search and narrow the people, for a team too large to scan. */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="min-w-0 flex-1 sm:max-w-56">
+              <Input
+                size="sm"
+                icon={<Search className="h-4 w-4" />}
+                aria-label="Search members"
+                placeholder="Search members…"
+                value={memberQuery}
+                onChange={(event) => setMemberQuery(event.target.value)}
+              />
+            </div>
+            <div role="group" aria-label="Show members" className="flex flex-wrap gap-2">
+              <PmFilterChip
+                active={memberFilter === "all"}
+                onClick={() => setMemberFilter("all")}
+                label="All"
+                count={users.length}
+              />
+              <PmFilterChip
+                active={memberFilter === "holds"}
+                onClick={() => setMemberFilter("holds")}
+                label="Has this role"
+                count={originalUserIds.length}
+              />
+              <PmFilterChip
+                active={memberFilter === "without"}
+                onClick={() => setMemberFilter("without")}
+                label="Without a role"
+                count={usersWithoutRole.length}
+                flagged
+              />
+            </div>
+          </div>
+
           {/* A list like every other in the area, one row per person: tick to give the role,
               untick to take it away. */}
-          <ul className="mt-4 divide-y divide-app-border-muted overflow-hidden rounded-xl border border-app-border bg-app-surface">
-            {membersForAssignment.map((user) => {
+          <ul className="mt-3 divide-y divide-app-border-muted overflow-hidden rounded-xl border border-app-border bg-app-surface">
+            {visibleMembers.map((user) => {
               const isChecked = selectedUserIds.includes(user.userId);
               const heldBefore = originalUserIds.includes(user.userId);
               // The two pending states,
@@ -625,10 +756,14 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
               );
             })}
 
-            {users.length === 0 && (
+            {users.length === 0 ? (
               <li className="px-3 py-3 text-xs text-app-text-muted">
                 No members in this project yet.
               </li>
+            ) : (
+              visibleMembers.length === 0 && (
+                <li className="px-3 py-3 text-xs text-app-text-muted">Nobody matches.</li>
+              )
             )}
           </ul>
 
@@ -762,26 +897,167 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        {/* Spans both columns once a role is open, because the create
-                    form beside it gives way to the open role's panel. */}
-        <div
-          className={`relative min-w-0 lg:row-start-1 ${
-            selectedRole ? "lg:col-span-2" : "lg:col-start-1"
-          }`}
-        >
-          <h3 className="text-sm font-semibold text-app-text">Roles</h3>
-          <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
-            {roles.length} {roles.length === 1 ? "role" : "roles"} in this project. Select one to
-            manage its skills and members.
-          </p>
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold text-app-text">Roles</h3>
+        <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
+          {roles.length} {roles.length === 1 ? "role" : "roles"} in this project. Select one to
+          manage its skills and members.
+        </p>
 
-          {/* One list, like the team, the questions and the gaps: a row per role, and the open
-              role's panel expanded right under its row. */}
-          {roles.length > 0 && (
-            <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+        <PmListToolbar<RoleSort>
+          search={{
+            label: "Search roles",
+            placeholder: "Search by role, skill or member…",
+            value: roleQuery,
+            onChange: setRoleQuery,
+          }}
+          filtersLabel="Filter roles"
+          filters={
+            <>
+              <PmFilterChip
+                active={roleGapFilter === "no-members"}
+                onClick={() =>
+                  setRoleGapFilter((current) => (current === "no-members" ? null : "no-members"))
+                }
+                label="No members"
+                count={rolesWithoutMembers}
+                flagged
+              />
+              <PmFilterChip
+                active={roleGapFilter === "no-skills"}
+                onClick={() =>
+                  setRoleGapFilter((current) => (current === "no-skills" ? null : "no-skills"))
+                }
+                label="No skills"
+                count={rolesWithoutSkills}
+                flagged
+              />
+            </>
+          }
+          shown={visibleRoles.length}
+          total={roles.length}
+          onReset={
+            listNarrowed
+              ? () => {
+                  setRoleQuery("");
+                  setRoleGapFilter(null);
+                  setRoleSort("name");
+                }
+              : undefined
+          }
+          extra={
+            <Button
+              variant="primary"
+              size="sm"
+              icon={showCreate ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              onClick={() => setShowCreate((open) => !open)}
+              aria-expanded={showCreate}
+            >
+              {showCreate ? "Cancel" : "New role"}
+            </Button>
+          }
+          sort={{
+            label: "Sort roles",
+            value: roleSort,
+            options: ROLE_SORT_OPTIONS,
+            onChange: setRoleSort,
+          }}
+        />
+
+        {/* Members nobody has given a role yet: a hint above the list rather than a section of
+            its own under it. With a role open, one press shows them in its member list. */}
+        {usersWithoutRole.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-app-warning-border bg-app-warning-bg px-3 py-2 text-xs text-app-warning-text">
+            <UserX aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+            <span className="font-semibold">{usersWithoutRole.length} without a role:</span>
+            <span className="min-w-0 truncate">
+              {nameList(usersWithoutRole.map((user) => `${user.firstname} ${user.lastname}`))}
+            </span>
+            {selectedRole ? (
+              <button
+                type="button"
+                onClick={() => setMemberFilter("without")}
+                className="ml-auto shrink-0 rounded-md px-1 font-semibold underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              >
+                Show them in {selectedRole.name}
+              </button>
+            ) : (
+              <span className="ml-auto shrink-0 text-app-text-muted">
+                Open a role to give it to them.
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* One list, like the team, the questions and the gaps: a row per role, the open role's
+            panel expanded right under its row, and a new role's form at the top. */}
+        {(roles.length > 0 || showCreate) && (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-app-border bg-app-surface">
+            <AnimatePresence initial={false}>
+              {showCreate && (
+                <motion.section
+                  key="create-role"
+                  aria-label="New role"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={expandTransition}
+                  className="overflow-hidden border-b border-app-border-muted"
+                >
+                  <div className="grid gap-3 p-4 sm:grid-cols-[14rem_minmax(0,1fr)] sm:items-start">
+                    <div>
+                      <label
+                        htmlFor="new-role-name"
+                        className="mb-1 block text-xs font-medium text-app-text-muted"
+                      >
+                        Name
+                      </label>
+                      <Input
+                        id="new-role-name"
+                        value={roleName}
+                        onChange={(event) => setRoleName(event.target.value)}
+                        placeholder="e.g. Backend"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="new-role-description"
+                        className="mb-1 block text-xs font-medium text-app-text-muted"
+                      >
+                        Description
+                      </label>
+                      <Textarea
+                        id="new-role-description"
+                        value={roleDescription}
+                        onChange={(event) => setRoleDescription(event.target.value)}
+                        minRows={1}
+                        maxRows={6}
+                        placeholder="What this role is responsible for"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 sm:col-span-2">
+                      <p className="text-xs text-app-text-muted">
+                        A new role can start with AI-suggested skills; it opens right away to review
+                        them and assign members.
+                      </p>
+                      <Button
+                        variant="primary"
+                        onClick={() => void handleCreateRole()}
+                        disabled={!roleName.trim()}
+                        loading={creatingRole}
+                        icon={<Plus className="h-4 w-4" />}
+                      >
+                        {creatingRole ? "Creating role…" : "Create role"}
+                      </Button>
+                    </div>
+                  </div>
+                </motion.section>
+              )}
+            </AnimatePresence>
+
+            {visibleRoles.length > 0 ? (
               <ul className="divide-y divide-app-border-muted px-3 py-1.5">
-                {roles.map((role) => {
+                {visibleRoles.map((role) => {
                   const open = selectedRoleId === role.id;
                   return (
                     <li key={role.id} className="py-0.5">
@@ -818,122 +1094,21 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
                   );
                 })}
               </ul>
-            </div>
-          )}
+            ) : (
+              roles.length > 0 && (
+                <p className="p-6 text-center text-sm text-app-text-muted">
+                  No roles match these filters.
+                </p>
+              )
+            )}
+          </div>
+        )}
 
-          {roles.length === 0 && (
-            <p className="text-xs text-app-text-muted">No roles yet. Create one on the right.</p>
-          )}
-
-          {/* Only on the overview: while a role is open the member
-                        list below already shows everyone, with their roles. */}
-          {!selectedRole && usersWithoutRole.length > 0 && (
-            <div className="mt-6 border-t border-app-border pt-6">
-              <h4 className="text-sm font-semibold text-app-text">Without a role</h4>
-              <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
-                {usersWithoutRole.length}{" "}
-                {usersWithoutRole.length === 1 ? "member is" : "members are"} not assigned to any
-                role yet. Open a role to give it to them.
-              </p>
-
-              <div className="flex flex-wrap gap-2">
-                {usersWithoutRole.map((user) => {
-                  const fullName = `${user.firstname} ${user.lastname}`;
-
-                  return (
-                    <span
-                      key={user.userId}
-                      className="inline-flex max-w-full items-center gap-2 rounded-xl border border-app-border bg-app-surface px-2 py-1.5"
-                    >
-                      <UserAvatar
-                        profileIcon={user.profileIcon}
-                        fallbackName={fullName}
-                        seed={user.userId}
-                        size={24}
-                      />
-                      <span className="truncate text-sm font-medium text-app-text">{fullName}</span>
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Only while nothing is open: the open role takes this slot,
-                    so creating and managing never compete for attention. No
-                    card around it -- a divider is enough to set the column
-                    apart, and a panel floating next to plain content made the
-                    two halves read as unrelated. */}
-        {/* `mode="popLayout"` so the form leaves the grid the moment
-                    it starts moving: kept in flow it would still occupy the
-                    right column while the roles column is already widening
-                    into it, and the two would sit on top of each other for the
-                    length of the slide. */}
-        <AnimatePresence initial={false} mode="popLayout">
-          {!selectedRole && (
-            <motion.section
-              key="create-role"
-              initial={{ opacity: 0, x: 48 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 48 }}
-              transition={expandTransition}
-              className="min-w-0 border-t border-app-border pt-6 lg:col-start-2 lg:row-start-1 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6"
-            >
-              <h3 className="text-sm font-semibold text-app-text">Create role</h3>
-              <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
-                A new role can start with AI-suggested skills; open it to review skills and assign
-                members.
-              </p>
-
-              <div className="space-y-3">
-                <div>
-                  <label
-                    htmlFor="new-role-name"
-                    className="mb-1 block text-xs font-medium text-app-text-muted"
-                  >
-                    Name
-                  </label>
-                  <Input
-                    id="new-role-name"
-                    value={roleName}
-                    onChange={(event) => setRoleName(event.target.value)}
-                    placeholder="e.g. Backend"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="new-role-description"
-                    className="mb-1 block text-xs font-medium text-app-text-muted"
-                  >
-                    Description
-                  </label>
-                  <Textarea
-                    id="new-role-description"
-                    value={roleDescription}
-                    onChange={(event) => setRoleDescription(event.target.value)}
-                    minRows={2}
-                    maxRows={8}
-                    placeholder="What this role is responsible for"
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    variant="primary"
-                    onClick={() => void handleCreateRole()}
-                    disabled={!roleName.trim()}
-                    loading={creatingRole}
-                    icon={<Plus className="h-4 w-4" />}
-                  >
-                    {creatingRole ? "Creating role…" : "Create role"}
-                  </Button>
-                </div>
-              </div>
-            </motion.section>
-          )}
-        </AnimatePresence>
+        {roles.length === 0 && !showCreate && (
+          <p className="mt-3 text-xs text-app-text-muted">
+            No roles yet. Create the first one with “New role”.
+          </p>
+        )}
       </div>
 
       <AlertDialog
@@ -946,9 +1121,31 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
               {roleToDelete?.name ?? skillToRetire?.name ?? "this item"}
             </span>
             ?
-            {retireSkillId
-              ? " Existing assessments remain available, but the skill can no longer be assigned or assessed."
-              : " This action cannot be undone."}
+            {retireSkillId ? (
+              " Existing assessments remain available, but the skill can no longer be assigned or assessed."
+            ) : (
+              <>
+                {deleteImpact && deleteImpact.members.length > 0 && (
+                  <>
+                    {" "}
+                    {deleteImpact.members.length === 1
+                      ? "1 member loses"
+                      : `${deleteImpact.members.length} members lose`}{" "}
+                    this role: {nameList(deleteImpact.members)}.
+                  </>
+                )}
+                {deleteImpact && deleteImpact.skills > 0 && (
+                  <>
+                    {" "}
+                    {deleteImpact.skills === 1
+                      ? "Its 1 skill stays"
+                      : `Its ${deleteImpact.skills} skills stay`}{" "}
+                    in the catalog, no longer linked to the role.
+                  </>
+                )}{" "}
+                This action cannot be undone.
+              </>
+            )}
           </>
         }
         confirmLabel={retireSkillId ? "Retire" : "Delete"}

@@ -1,4 +1,4 @@
-import { ChevronDown, Layers, Trash2 } from "lucide-react";
+import { ChevronDown, Layers, Trash2, TriangleAlert } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Button } from "../../../components/ui/Button";
 import type { ProjectRole, Skill, TeamOverviewUser } from "../types";
@@ -80,9 +80,18 @@ export function RoleRow({
       <span className="pointer-events-none relative min-w-0 flex-1">
         <span className="flex items-center gap-2">
           <span className="truncate text-sm font-semibold text-app-text">{role.name}</span>
-          <span className="shrink-0 rounded-full bg-app-surface-muted px-2 py-0.5 text-[11px] font-medium text-app-text-muted tabular-nums">
-            {members.length} {members.length === 1 ? "member" : "members"}
-          </span>
+          {/* A role nobody holds is a gap worth seeing from the list: warning colour, an icon
+              and the words, never the colour alone. */}
+          {members.length === 0 ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-app-warning-bg px-2 py-0.5 text-[11px] font-medium text-app-warning-text">
+              <TriangleAlert aria-hidden="true" className="h-3 w-3" />
+              No members yet
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-full bg-app-surface-muted px-2 py-0.5 text-[11px] font-medium text-app-text-muted tabular-nums">
+              {members.length} {members.length === 1 ? "member" : "members"}
+            </span>
+          )}
           {retiredCount > 0 && (
             <span className="shrink-0 rounded-full bg-app-warning-bg px-2 py-0.5 text-[11px] font-medium text-app-warning-text">
               {retiredCount} retired
@@ -111,7 +120,10 @@ export function RoleRow({
             </span>
           )}
           {skills.length === 0 && (
-            <span className="text-[11px] text-app-text-subtle">No skills yet</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-app-warning-text">
+              <TriangleAlert aria-hidden="true" className="h-3 w-3" />
+              No skills yet — hires in this role have nothing to assess
+            </span>
           )}
         </span>
       </span>
