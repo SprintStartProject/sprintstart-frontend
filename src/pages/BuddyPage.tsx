@@ -402,6 +402,10 @@ function BuddyMentorHome() {
                 currentSessionId={currentSessionId}
                 disabled={isBusy || isOpening || isGreeting || isDeciding}
                 onSelect={selectConversation}
+                // The rail's one cross, at its top: the replies panel used to carry one
+                // mid-rail, which read as closing that section alone — and a conversations-only
+                // rail had no way out at all. See the list's own `onClose`.
+                onClose={() => setRailOpen(false)}
                 // The cap only exists to leave the PM replies their share of the rail; with
                 // none to show, the conversations are the whole rail.
                 className={replies.hasAny ? "max-h-[45%] shrink-0" : "min-h-0 flex-1"}
@@ -409,7 +413,7 @@ function BuddyMentorHome() {
 
               {replies.hasAny && (
                 <div className="min-h-0 flex-1">
-                  <BuddyPmReplies {...replies} onClose={() => setRailOpen(false)} />
+                  <BuddyPmReplies {...replies} />
                 </div>
               )}
             </div>

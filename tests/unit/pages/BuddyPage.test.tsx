@@ -501,9 +501,9 @@ describe("BuddyPage", () => {
       const rail = await screen.findByRole("complementary", {
         name: "Your conversations",
       });
-      // Scoped to the rail: the drawer backdrop says the same words, and below `md` it is the
-      // one you press. jsdom computes no layout, so both are in the document here.
-      await user.click(within(rail).getByRole("button", { name: "Close the PM replies" }));
+      // Scoped to the rail's own cross: the drawer backdrop says the same words, and below `md`
+      // it is the one you press. jsdom computes no layout, so both are in the document here.
+      await user.click(within(rail).getByRole("button", { name: "Close your conversations" }));
 
       await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
 
@@ -516,6 +516,41 @@ describe("BuddyPage", () => {
       expect(
         screen.queryByRole("complementary", { name: "Your conversations" }),
       ).not.toBeInTheDocument();
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  /**
+   * The way out of the rail from `md` up: while it is open the toggle that opened it is gone
+   * and the drawer's backdrop only exists below `md`, so the rail's own cross has to be there
+   * for a hire with conversations and no replies. Same words as the backdrop, because it is
+   * the same act.
+   */
+  it("closes the rail from the conversations list", async () => {
+    const restoreViewport = reportDesktopViewport();
+
+    try {
+      pmRepliesState.hasAny = false;
+      vi.mocked(getSessions).mockResolvedValue([
+        { ...defaultSession, title: "Getting started" },
+        { ...defaultSession, id: "s2" },
+      ]);
+
+      const user = userEvent.setup();
+      renderPage();
+
+      // Open the rail the way a hire does: there is something to switch to, so the toggle is
+      // offered; nothing is waiting from a PM, so it did not open itself.
+      await user.click(await screen.findByTitle("Your conversations"));
+
+      const rail = await screen.findByRole("complementary", { name: "Your conversations" });
+      await user.click(within(rail).getByRole("button", { name: "Close your conversations" }));
+
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
+
+      // Back to the control that brings it again.
+      expect(await screen.findByTitle("Your conversations")).toBeInTheDocument();
     } finally {
       restoreViewport();
     }
