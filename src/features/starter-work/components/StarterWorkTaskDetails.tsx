@@ -18,6 +18,7 @@ import { DrawerCard } from "../../admin/components/DrawerCard";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { orientationService } from "../../../services/orientationService";
 import { queryKeys } from "../../../services/queryKeys";
@@ -107,11 +108,7 @@ export function StarterWorkTaskDetails({
       onClose={onClose}
       showOverlay
       title={task.title}
-      leading={
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand-text">
-          <Target className="h-5 w-5" aria-hidden="true" />
-        </span>
-      }
+      leading={<IconTile icon={Target} size="xl" tone="brand" />}
       actions={
         task.sourceUrl ? (
           <a

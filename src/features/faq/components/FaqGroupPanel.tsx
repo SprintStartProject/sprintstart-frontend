@@ -4,6 +4,7 @@ import { EmptyState } from "../../../components/ui/EmptyState";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { SidePanel } from "../../../components/ui/SidePanel";
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { insightsService } from "../../../services/faqService";
 import { queryKeys } from "../../../services/queryKeys";
@@ -139,11 +140,7 @@ export function FaqGroupPanel({ groupId, group, onClose }: FaqGroupPanelProps) {
           onClose={onClose}
           title={group?.title ?? "Recurring question"}
           description={group?.question}
-          leading={
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand-text">
-              <MessageSquareMore aria-hidden="true" className="h-5 w-5" />
-            </span>
-          }
+          leading={<IconTile icon={MessageSquareMore} size="xl" tone="brand" />}
           widthClassName="w-full sm:w-[34rem]"
           contentClassName="px-4 py-5 sm:px-6"
           closeAriaLabel="Close question details"

@@ -4,6 +4,7 @@ import { ChevronsUpDown, FolderKanban, ShieldCheck } from "lucide-react";
 import { useProjectContext } from "../useProjectContext";
 import { ProjectSwitcherModal } from "./ProjectSwitcherModal";
 import { Badge } from "../../../components/ui/Badge";
+import { IconTile } from "../../../components/ui/IconTile";
 import { ShortcutHint } from "../../../components/ui/ShortcutHint";
 import { SWITCH_PROJECT_SHORTCUT, shortcutChord, useShortcutListener } from "../../shortcuts";
 import { monogramLetters, monogramTint } from "../projectMonogram";
@@ -78,14 +79,12 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         {selectedProject ? (
           <span
             aria-hidden="true"
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-xs font-semibold ${monogramTint(selectedProject.id)}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${monogramTint(selectedProject.id)}`}
           >
             {monogramLetters(selectedProject.name)}
           </span>
         ) : (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-app-surface-muted">
-            <FolderKanban className="h-[18px] w-[18px] text-app-text-muted" />
-          </span>
+          <IconTile icon={FolderKanban} size="lg" tone="neutral" />
         )}
 
         <span className="flex min-w-0 flex-col gap-[3px]">

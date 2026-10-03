@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, Check, Flag } from "lucide-react";
 import { AutoResizeTextarea } from "../../../components/ui/AutoResizeTextarea";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { knowledgeRequestService } from "../../../services/knowledgeRequestService";
 
@@ -108,9 +109,7 @@ export function FlagToPmButton({
           className="shadow-card w-full rounded-2xl border border-app-border bg-app-surface p-4"
         >
           <div className="mb-3 flex items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand">
-              <Flag className="h-4 w-4" aria-hidden="true" />
-            </span>
+            <IconTile icon={Flag} size="md" tone="brand" />
             <label
               htmlFor={fieldId}
               className="text-xs font-semibold tracking-wide text-app-text-muted uppercase"

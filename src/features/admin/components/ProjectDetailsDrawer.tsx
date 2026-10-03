@@ -1,5 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertCircle, FileText, Folder, Link2, Loader2, Tag, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  FileText,
+  Folder,
+  Link2,
+  Loader2,
+  Tag,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -7,6 +16,7 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
 import { ProjectIndustryPanel } from "../../projects/industry/ProjectIndustryPanel";
@@ -293,11 +303,7 @@ export function ProjectDetailsDrawer({
         title={draftProject.name || visibleProject.name}
         closeAriaLabel="Close project details"
         widthClassName="w-full sm:w-[min(94vw,34rem)] lg:w-[min(72vw,58rem)]"
-        leading={
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand">
-            <Folder className="h-6 w-6" />
-          </div>
-        }
+        leading={<IconTile icon={Folder} size="2xl" tone="brand" />}
         badge={
           <>
             <AccessBadge variant="neutral">
@@ -420,7 +426,7 @@ export function ProjectDetailsDrawer({
             </DrawerCard>
 
             {canManageLifecycle && (
-              <DrawerCard label="Danger zone" variant="danger" index={4}>
+              <DrawerCard label="Danger zone" icon={TriangleAlert} variant="danger" index={4}>
                 <p className="text-sm text-app-danger-text">
                   Deleting a project removes it and all of its user assignments. Connected sources
                   are kept and stay available to other projects.
