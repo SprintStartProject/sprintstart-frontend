@@ -1,4 +1,4 @@
-import type { FilterSelectOption } from "../../components/ui/FilterSelect";
+import type { FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 
 /**
  * A staged source's documentation owner, as the pickers offer it.

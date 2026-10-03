@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
-import type { IconComponent } from "../../../components/icons/types.ts";
-import { IconTile } from "../../../components/ui/IconTile";
+import type { IconComponent } from "../icons/types.ts";
+import { IconTile } from "./IconTile.tsx";
 
 type DrawerCardProps = {
   /** Uppercase section label shown in the card header. Omit for a headerless card. */

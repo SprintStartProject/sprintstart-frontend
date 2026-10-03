@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "../../components/icons/types.ts";
 import type { ConnectorDto, ConnectorSource } from "../../services/connectorService.ts";
 
 export type { ConnectorDto, ConnectorSource } from "../../services/connectorService.ts";
@@ -14,7 +14,7 @@ export type LoadingState = "idle" | "loading" | "success" | "error";
 export type ConnectorMeta = {
   label: string;
   description: string;
-  icon: LucideIcon;
+  icon: IconComponent;
 };
 
 /**

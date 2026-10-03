@@ -2,7 +2,8 @@ import type { BadgeVariant } from "../../components/ui/Badge";
 import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
 import type { ProjectRole, Skill } from "../team-management/types";
 import { deriveSourceStatus, SOURCE_META } from "../data-ingestion/data";
-import type { SourceMeta, SourceSystem } from "../data-ingestion/types";
+import { toSourceSystem } from "../data-ingestion/connectors/sourceSystems";
+import type { SourceMeta } from "../data-ingestion/types";
 import type { ProjectManager } from "../../services/projectService";
 import type {
   AdminUser,
@@ -85,9 +86,9 @@ export function pluralize(count: number, noun: string, plural = `${noun}s`): str
  * emits types such as `SONARQUBE` that have no ingestion UI.
  */
 export function getSourceTypeMeta(type: string): SourceMeta | null {
-  const normalized = type.toUpperCase();
+  const system = toSourceSystem(type);
 
-  return normalized in SOURCE_META ? SOURCE_META[normalized as SourceSystem] : null;
+  return system ? SOURCE_META[system] : null;
 }
 
 export type SourceTypeGroup = {

@@ -6,7 +6,7 @@ import { Button } from "../../../components/ui/Button";
 import { IconTile } from "../../../components/ui/IconTile";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { useToast } from "../../../context/useToast";
-import { DrawerCard } from "../../admin/components/DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { STEP_LABELS, STEP_ORDER } from "../steps";
 import { useOrientationDraft, type DraftStep } from "../hooks/useOrientationDraft";
 import type { AuthorOrientationInput, OrientationPacket, OrientationStep } from "../types";

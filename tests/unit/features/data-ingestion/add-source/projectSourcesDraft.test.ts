@@ -15,30 +15,30 @@ import {
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
-} from "../../../../src/features/admin/projectSourcesDraft";
-import { knowledgeGapService } from "../../../../src/services/knowledgeGapService";
+} from "../../../../../src/features/data-ingestion/add-source/projectSourcesDraft";
+import { knowledgeGapService } from "../../../../../src/services/knowledgeGapService";
 import {
   addRepositoryToProject,
   connectGithubRepository,
-} from "../../../../src/services/sources/githubService";
-import { connectJiraInstance } from "../../../../src/services/sources/jiraService";
-import { knowledgeService } from "../../../../src/services/knowledgeService";
-import type { DiscoverySelection } from "../../../../src/features/data-ingestion/components/GithubRepositoryDiscovery";
+} from "../../../../../src/services/sources/githubService";
+import { connectJiraInstance } from "../../../../../src/services/sources/jiraService";
+import { knowledgeService } from "../../../../../src/services/knowledgeService";
+import type { DiscoverySelection } from "../../../../../src/features/data-ingestion/components/GithubRepositoryDiscovery";
 
-vi.mock("../../../../src/services/sources/githubService", () => ({
+vi.mock("../../../../../src/services/sources/githubService", () => ({
   connectGithubRepository: vi.fn(),
   addRepositoryToProject: vi.fn(),
 }));
 
-vi.mock("../../../../src/services/sources/jiraService", () => ({
+vi.mock("../../../../../src/services/sources/jiraService", () => ({
   connectJiraInstance: vi.fn(),
 }));
 
-vi.mock("../../../../src/services/knowledgeService", () => ({
+vi.mock("../../../../../src/services/knowledgeService", () => ({
   knowledgeService: { uploadDocuments: vi.fn() },
 }));
 
-vi.mock("../../../../src/services/knowledgeGapService", () => ({
+vi.mock("../../../../../src/services/knowledgeGapService", () => ({
   knowledgeGapService: { setComponentOwners: vi.fn() },
 }));
 

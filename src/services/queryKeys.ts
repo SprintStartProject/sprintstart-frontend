@@ -1,3 +1,4 @@
+import type { IngestionRunFilter } from "../features/data-ingestion/types";
 import type { KnowledgeListParams } from "../features/knowledge-base/types";
 
 /**
@@ -104,7 +105,23 @@ export const queryKeys = {
     count: (projectId: string) => ["pm-attention", "count", projectId] as const,
   },
   ingestion: {
+    // Everything the Data Ingestion page holds, so one invalidation after a source mutation or
+    // a connect refreshes the cards, the run table and the connector list together.
+    all: () => ["ingestion"] as const,
+    // The dashboard's per-source rows. The raw status rows the page builds its cards from are
+    // `statuses` below: same endpoint, but a different shape under the key.
     sourceStatuses: (projectId: string) => ["ingestion", "source-statuses", projectId] as const,
+    statuses: (projectId: string) => ["ingestion", "statuses", projectId] as const,
+    // The project's newest runs, unfiltered: what the cards and the overview read.
+    latestRuns: (projectId: string) => ["ingestion", "latest-runs", projectId] as const,
+    // One page of the run table; the filter carries project, status, source and page.
+    runsPage: (filter: IngestionRunFilter) => ["ingestion", "runs-page", filter] as const,
+    // A connector's own records of the project's sources. Connectors that read the same
+    // endpoint name the same scope.
+    connections: (scope: string, projectId: string) =>
+      ["ingestion", "connections", scope, projectId] as const,
+    // The platform's connectors and whether each is enabled. Not project-scoped.
+    connectors: () => ["ingestion", "connectors"] as const,
   },
   knowledgeRequest: {
     open: (projectId: string) => ["knowledge-request", "open", projectId] as const,

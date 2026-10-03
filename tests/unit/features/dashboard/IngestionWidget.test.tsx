@@ -54,6 +54,43 @@ describe("IngestionWidget", () => {
     expect(screen.queryByText("Could not load the ingestion status.")).not.toBeInTheDocument();
   });
 
+  it("lists a Jira source by its display name with its artifact total", async () => {
+    const project = createSelectableProject({ id: "1" });
+    mocks.projectContext = createProjectContextValue({
+      projects: [project],
+      selectedProject: project,
+      selectedProjectId: "1",
+    });
+    mocks.getIngestionSourceStatuses.mockResolvedValue([
+      {
+        sourceSystem: "JIRA",
+        sourceId: "https://acme.atlassian.net",
+        displayName: "Team board",
+        repositoryId: null,
+        owner: null,
+        name: null,
+        sourceUrl: "https://acme.atlassian.net",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-28T10:00:00Z",
+        ingestedCount: 4,
+        updatedCount: 0,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 20,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: "2026-07-28T10:00:00Z",
+        lastPullRequestsSyncAt: null,
+      },
+    ]);
+
+    renderWidget();
+
+    expect(await screen.findByText("Team board")).toBeInTheDocument();
+    expect(screen.getByText(/20 artifacts/)).toBeInTheDocument();
+  });
+
   it("does not ask for source statuses before a project is confirmed", () => {
     // The boot window: an id is absent, and no list has vouched for anything. Asking now
     // would send an empty `projectId` — an unfiltered, cross-project answer.

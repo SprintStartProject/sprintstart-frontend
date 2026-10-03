@@ -19,7 +19,7 @@ function makeRun(overrides: Partial<IngestionRun> = {}): IngestionRun {
     deletedCount: 0,
     failedCount: 3,
     status: "PARTIAL",
-    failedItems: [{ artifactIdentifier: "FILE: broken.md", reason: "Parse error" }],
+    failedItems: [{ artifactType: "FILE", reference: "broken.md", reason: "Parse error" }],
     failureReason: null,
     aiSyncStatus: "SUCCEEDED",
     aiSyncFailureReason: null,
@@ -95,7 +95,7 @@ describe("RunDetailsPanel", () => {
     render(<RunDetailsPanel run={makeRun()} onClose={vi.fn()} />);
 
     expect(screen.getByText("Failed items (1)")).toBeInTheDocument();
-    expect(screen.getByText("FILE: broken.md")).toBeInTheDocument();
+    expect(screen.getByText("File: broken.md")).toBeInTheDocument();
     expect(screen.getByText("Parse error")).toBeInTheDocument();
   });
 

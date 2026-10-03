@@ -16,7 +16,7 @@ import {
   updateSkill,
   type CreateSkillRequest,
 } from "../../../services/teamManagementService";
-import { DrawerCard } from "./DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { SelectionCheckbox } from "./SelectionCheckbox";
 import { StatusChip } from "./StatusChip";
 import type { ProjectRole, Skill } from "../types";
