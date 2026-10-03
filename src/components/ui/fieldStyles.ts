@@ -28,7 +28,7 @@ const normalBorderClasses = "border-app-border focus:border-app-brand-border-str
 
 /**
  * An invalid control is outlined in red *and* keeps its error text below it, so
- * the state is never carried by color alone (AGENTS.md §7 / standards §5).
+ * the state is never carried by color alone (FRONTEND_CODING_STANDARDS.md §5).
  */
 const invalidBorderClasses = "border-app-danger-border focus:border-app-danger-solid";
 

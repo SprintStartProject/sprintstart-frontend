@@ -16,7 +16,7 @@ export const onboardingMetricsService = {
    * Derived on request on the backend — there is no pipeline to fall behind — so
    * an empty `hires` list means "no hires yet", not a stale cache.
    *
-   * @param projectId The project to read metrics for.
+   * @param projectId - The project to read metrics for.
    * @throws ApiError 403 when the caller lacks the role.
    */
   async fetchProjectMetrics(projectId: string): Promise<ProjectOnboardingMetrics> {
@@ -29,8 +29,8 @@ export const onboardingMetricsService = {
    * One hire's onboarding timeline on a project (PM/HR/ADMIN). The project read
    * already embeds every hire's timeline, so this is only for a focused view.
    *
-   * @param projectId The project the hire belongs to.
-   * @param userId The hire.
+   * @param projectId - The project the hire belongs to.
+   * @param userId - The hire.
    * @throws ApiError 404 when the user is not a member of the project.
    */
   async fetchHireTimeline(projectId: string, userId: string): Promise<HireTimeline> {
@@ -45,7 +45,7 @@ export const onboardingMetricsService = {
    * Drives the buddy's proactive nudges, e.g. `longestOpenWaitHours`, how long
    * their pull request has been waiting.
    *
-   * @param projectId The project whose timeline to read.
+   * @param projectId - The project whose timeline to read.
    * @throws ApiError 404 when the caller is not a member of the project.
    */
   async fetchMyTimeline(projectId: string): Promise<HireTimeline> {
@@ -60,7 +60,7 @@ export const onboardingMetricsService = {
    * is. Composed from the same derivation as the rest of the metrics, so it
    * never disagrees with the hire's own view.
    *
-   * @param projectId The project to read the attention list for.
+   * @param projectId - The project to read the attention list for.
    */
   async fetchAttention(projectId: string): Promise<ProjectAttention> {
     return await apiClient.fetch<ProjectAttention>(

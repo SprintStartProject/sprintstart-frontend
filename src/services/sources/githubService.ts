@@ -228,6 +228,7 @@ export async function getGithubPatNames(signal?: AbortSignal): Promise<string[]>
   return apiClient.fetch<string[]>("/api/v1/github/pat", { signal });
 }
 
+/** Stores a new GitHub personal access token under `name`. The secret is never read back. */
 export async function addGithubPat(name: string, token: string): Promise<void> {
   await apiClient.fetch<void>("/api/v1/github/pat", {
     method: "POST",
@@ -235,6 +236,7 @@ export async function addGithubPat(name: string, token: string): Promise<void> {
   });
 }
 
+/** Replaces the secret of the stored token `name`, keeping its name. */
 export async function updateGithubPat(name: string, newToken: string): Promise<void> {
   await apiClient.fetch<void>("/api/v1/github/pat/update", {
     method: "PUT",
@@ -242,6 +244,7 @@ export async function updateGithubPat(name: string, newToken: string): Promise<v
   });
 }
 
+/** Deletes the stored token `name`. The backend exposes this as a `PUT`, not a `DELETE`. */
 export async function deleteGithubPat(name: string): Promise<void> {
   await apiClient.fetch<void>("/api/v1/github/pat/delete", {
     method: "PUT",
@@ -303,6 +306,11 @@ export async function removeRepositoryFromProject(
   );
 }
 
+/**
+ * Starts an update of one connected repository, identified by owner and name.
+ *
+ * @returns The transaction id of the started update; the update itself runs in the backend.
+ */
 export async function updateGithubRepository(
   request: UpdateGithubRepositoryRequest,
 ): Promise<UpdateGithubRepositoryResponse> {

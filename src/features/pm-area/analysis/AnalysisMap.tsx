@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, CheckCircle2, CircleAlert } from "lucide-react";
 import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { IconTile, type IconTileTone } from "../../../components/ui/IconTile";
 import { AREA_META, AREA_ORDER, SEVERITY_META, SEVERITY_RANK } from "./analysisMeta";
 import type { Finding, FindingArea } from "./findings";
 import { NeonRing } from "./NeonRing";
@@ -118,7 +119,7 @@ function FindingRow({ finding, onOpen }: { finding: Finding; onOpen: (to: string
 function AreaCard({
   anchor,
   icon: Icon,
-  chip,
+  tone,
   glow,
   label,
   count,
@@ -129,7 +130,7 @@ function AreaCard({
 }: {
   anchor: string;
   icon: typeof CheckCircle2;
-  chip: string;
+  tone: IconTileTone;
   glow: string;
   label: string;
   count: number;
@@ -154,12 +155,7 @@ function AreaCard({
         selected ? { boxShadow: `0 0 30px -10px ${glow}, inset 0 0 0 1px ${glow}` } : undefined
       }
     >
-      <span
-        aria-hidden="true"
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${chip}`}
-      >
-        <Icon className="h-4 w-4" />
-      </span>
+      <IconTile icon={Icon} size="md" tone={tone} />
       <span className="min-w-0 flex-1">
         <span className="block text-base leading-tight font-bold text-app-text tabular-nums">
           {failed ? (
@@ -409,7 +405,7 @@ export function AnalysisMap({
                 key={area}
                 anchor={`area-${area}`}
                 icon={meta.icon}
-                chip={meta.chip}
+                tone={meta.tone}
                 glow={meta.glow}
                 label={meta.label}
                 count={count}

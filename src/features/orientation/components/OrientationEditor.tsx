@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence } from "framer-motion";
 import { ChevronDown, ExternalLink, PencilLine, Plus, Save, Undo2, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { useToast } from "../../../context/useToast";
 import { DrawerCard } from "../../../components/ui/DrawerCard";
@@ -116,11 +117,7 @@ export function OrientationEditor({
             </a>
           ) : undefined
         }
-        leading={
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand-text">
-            <PencilLine className="h-5 w-5" aria-hidden="true" />
-          </span>
-        }
+        leading={<IconTile icon={PencilLine} size="xl" tone="brand" />}
         badge={<span className="text-sm text-app-text-muted">For &ldquo;{taskTitle}&rdquo;</span>}
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">

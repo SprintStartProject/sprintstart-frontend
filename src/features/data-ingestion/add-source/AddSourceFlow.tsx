@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "../../../components/ui/Button.tsx";
+import { IconTile } from "../../../components/ui/IconTile.tsx";
 import { SourceTypeStep } from "../components/SourceTypeStep.tsx";
 import { getConnector } from "../connectors/registry.ts";
 import type { DraftSource } from "../connectors/draft.ts";
@@ -48,9 +49,7 @@ function DetailHeader({ type, onBack }: { type: SourceSystem; onBack: () => void
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft">
-        <Icon size={22} className="text-app-brand" aria-hidden="true" />
-      </div>
+      <IconTile icon={Icon} size="xl" tone="brand" />
 
       <div>
         <p className="text-[15px] font-semibold text-app-text">{meta.label}</p>

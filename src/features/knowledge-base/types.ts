@@ -90,7 +90,11 @@ export interface SummaryStreamHandlers {
 }
 
 /**
- * Filter classification for direct uploaded artifact formats.
+ * File formats a reader can narrow *uploaded* artifacts to.
+ *
+ * Not a source type and not an artifact type: an upload's format only exists
+ * for uploads, so this facet is offered only while `UPLOAD` is part of the
+ * source selection (see `useKnowledgeBase`).
  */
 export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
 

@@ -938,7 +938,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         role="application"
         aria-label={ariaLabel}
         aria-roledescription="graph"
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the canvas is the focusable widget, see above
         tabIndex={0}
         // While a node is open as a page over the graph, the graph is not there to be used: its
         // nodes, the minimap and the zoom toolbar would otherwise all still be tab stops behind

@@ -29,7 +29,14 @@ vi.mock("../../../../src/features/buddy/components/BuddyMarkdown", () => ({
 
 vi.mock("../../../../src/services/buddyService", () => ({
   getMessages: vi.fn(),
-  // The visit has history, so nothing greets — see `ensureOpened`.
+  // One conversation, read once — its id rides on every request the page makes.
+  getSessions: vi
+    .fn()
+    .mockResolvedValue([
+      { id: "session-1", title: "", projectId: null, createdAt: "2026-09-30T09:00:00Z" },
+    ]),
+  createSession: vi.fn().mockResolvedValue("session-2"),
+  // The conversation has history, so nothing greets — see `ensureOpened`.
   streamOpenBuddy: vi.fn(() => Promise.resolve()),
   streamMessage: vi.fn(),
   performAction: vi.fn(),
@@ -189,6 +196,9 @@ describe("the buddy's floating window", () => {
     await user.click(await screen.findByLabelText("Open buddy chat"));
     const field = await screen.findByLabelText("Message");
     await waitFor(() => expect(vi.mocked(getMessages)).toHaveBeenCalled());
+    // The call is not the arrival: the history lands a few ticks later and re-renders the widget
+    // once, which on a slow runner falls inside the typing below and reads as a keystroke.
+    await screen.findByText(/Reply \*\*15\*\*/);
 
     markdown.mockClear();
     const before = floatingRenders.count;

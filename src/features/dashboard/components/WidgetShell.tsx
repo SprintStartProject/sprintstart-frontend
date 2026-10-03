@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 
 /**
@@ -102,9 +103,7 @@ export function WidgetShell({
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <Icon className="h-3.5 w-3.5" />
-          </span>
+          <IconTile icon={Icon} size="sm" tone="accent" />
           <span className="truncate text-sm font-semibold text-app-text">{title}</span>
         </div>
 

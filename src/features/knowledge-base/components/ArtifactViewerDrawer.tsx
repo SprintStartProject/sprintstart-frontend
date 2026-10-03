@@ -272,6 +272,7 @@ const STATIC_MARKDOWN_COMPONENTS = {
           wrapLines={true}
           customStyle={{ margin: 0, padding: "1rem", backgroundColor: "var(--color-app-bg)" }}
         >
+          {/* react-markdown passes a code block's text as its children, never an object. */}
           {/* eslint-disable-next-line @typescript-eslint/no-base-to-string */}
           {String(children).replace(/\n$/, "")}
         </SyntaxHighlighter>
@@ -330,6 +331,7 @@ function createMarkdownComponents(highlightLines?: number[]) {
             wrapLines={true}
             customStyle={{ margin: 0, padding: "1rem", backgroundColor: "var(--color-app-bg)" }}
           >
+            {/* react-markdown passes a code block's text as its children, never an object. */}
             {/* eslint-disable-next-line @typescript-eslint/no-base-to-string */}
             {String(children).replace(/\n$/, "")}
           </SyntaxHighlighter>

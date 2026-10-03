@@ -8,9 +8,6 @@ import { queryClient } from "../services/queryClient";
 import { clearSigningOut, markSigningOut } from "../bootSplash";
 import { buildRedirectUri, clearRedirectTarget, storeRedirectTarget } from "../auth/redirectUtils";
 /**
- * Provider component that manages the global authentication state via Keycloak.
- */
-/**
  * Whether a URL fragment is an OIDC response rather than somebody's link to a heading.
  *
  * Keycloak puts its answer in the fragment -- `code`/`state` on success, `error` on refusal -- and
@@ -27,6 +24,18 @@ function isOidcResponseHash(hash: string): boolean {
   );
 }
 
+/**
+ * Owns the app's sign-in state and exposes it through `useAuth`.
+ *
+ * On mount it runs Keycloak's silent `check-sso` and then loads the backend profile. A
+ * user Keycloak knows but the backend has no profile for yet is retried five times, one
+ * second apart, and treated as unauthenticated after that. A failed init also clears a
+ * spent OIDC response from the URL hash, so a reload starts a clean flow.
+ *
+ * `status` starts as `signingOut` instead of `loading` when the boot script flagged a
+ * logout return, so `AuthGuard` keeps that load blank. `logout` clears the query cache and
+ * the stored redirect target before handing over to Keycloak.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   // The boot script (index.html) detects a logout return, or a failed silent SSO check,
   // before React mounts and leaves this flag for the first render to pick up, so the guard
@@ -40,7 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     /**
-     * Initializes Keycloak and sets up the authentication status.
+     * Initializes Keycloak and loads the backend profile of the signed-in user.
+     *
+     * The profile is retried a few times, because a user who has just signed in for the
+     * first time may not exist in the backend yet. Without a profile the user counts as
+     * signed out and ends up on the login page.
      */
     const initAuth = async () => {
       if (isInitialized.current) return;
@@ -72,8 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfile(data);
             setStatus("authenticated");
           } else {
-            // User exists in Keycloak but not in Backend DB yet
-            // In a real app, we might trigger a registration or show a setup page
+            // Signed in at Keycloak, but still no backend profile after the retries: treated
+            // as signed out, so the user ends up on the login page.
             console.warn(
               "User authenticated in Keycloak but no profile found in backend after retries.",
             );

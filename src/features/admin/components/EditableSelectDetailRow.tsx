@@ -8,6 +8,13 @@ type EditableSelectDetailRowProps = {
   options: readonly string[];
 };
 
+/**
+ * A drawer row in edit mode with the label beside a dropdown, the select counterpart of
+ * `EditableDetailRow`.
+ *
+ * Shows `value` even when it is not one of `options` (an `HR` user's permission group, for
+ * example), but once another option is picked that value cannot be chosen again.
+ */
 export function EditableSelectDetailRow({
   label,
   value,

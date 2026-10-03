@@ -19,6 +19,10 @@ export type GithubDraftSource = DraftSourceBase & {
   repositoryId?: string;
 };
 
+/**
+ * Stages a GitHub repository. With a `repositoryId` the repository is already ingested elsewhere
+ * and connecting only links it to the project; without one it is fetched and ingested.
+ */
 export function createDraftSource(
   owner: string,
   name: string,

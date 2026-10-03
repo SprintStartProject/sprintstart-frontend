@@ -63,6 +63,8 @@ const PAT_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
  * personal configuration (profile, appearance, access tokens) in one
  * predictable place. The PAT section is only shown to PM/HR/ADMIN. A hidden
  * dino-game easter-egg (triple-click the cogwheel) lives in its own hook.
+ *
+ * Bound to `/settings`, open to every permission group; `/profile` redirects here.
  */
 export function SettingsPage() {
   const { profile } = useAuth();

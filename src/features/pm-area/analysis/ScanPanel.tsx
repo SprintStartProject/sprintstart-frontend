@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, CircleDashed, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { IconTile } from "../../../components/ui/IconTile";
 import { AREA_META } from "./analysisMeta";
 import type { AnalysisLogEntry, AnalysisTask } from "./useProjectAnalysis";
 
@@ -96,12 +97,7 @@ export function ScanPanel({ tasks, log, startedAt }: ScanPanelProps) {
                   className="flex items-start gap-3 rounded-xl border border-app-border-muted bg-app-surface-muted/60 px-3 py-2"
                   style={{ boxShadow: `inset 3px 0 0 ${meta.glow}` }}
                 >
-                  <span
-                    aria-hidden="true"
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${meta.chip}`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                  </span>
+                  <IconTile icon={Icon} size="sm" tone={meta.tone} className="mt-0.5" />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2 text-sm font-medium text-app-text">
                       {task.label}

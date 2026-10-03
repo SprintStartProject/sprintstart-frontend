@@ -25,6 +25,10 @@ export function isValidConfluenceSpaceId(spaceId: string): boolean {
   return /^\d+$/.test(spaceId.trim());
 }
 
+/**
+ * Stages a Confluence space. Without a display name it is called `Confluence Space <spaceId>`;
+ * check the space ID with {@link isValidConfluenceSpaceId} first.
+ */
 export function createConfluenceDraft(params: {
   displayName?: string;
   baseUrl: string;

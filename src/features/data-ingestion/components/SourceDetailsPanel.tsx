@@ -14,6 +14,7 @@ import { Spinner } from "../../../components/ui/Spinner";
 import { useToast } from "../../../context/useToast";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
+import { IconTile } from "../../../components/ui/IconTile";
 import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle.tsx";
 import { DrawerCard } from "../../../components/ui/DrawerCard.tsx";
 import { getConnector } from "../connectors/registry.ts";
@@ -232,11 +233,7 @@ export function SourceDetailsPanel({
       closeAriaLabel="Close source details"
       zIndexClassName="z-50"
       showOverlay
-      leading={
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
-          <Icon className="h-6 w-6" />
-        </div>
-      }
+      leading={<IconTile icon={Icon} size="2xl" tone="neutral" />}
       badge={
         <>
           <SourceTypeBadge type={source.type} />

@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
 import type { IconComponent } from "../icons/types.ts";
+import { IconTile } from "./IconTile.tsx";
 
 type DrawerCardProps = {
   /** Uppercase section label shown in the card header. Omit for a headerless card. */
@@ -66,9 +67,7 @@ export function DrawerCard({
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             {Icon && (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand">
-                <Icon className="h-4 w-4" />
-              </span>
+              <IconTile icon={Icon} size="md" tone={variant === "danger" ? "danger" : "brand"} />
             )}
             {label && (
               <p className={`text-xs font-semibold tracking-wide uppercase ${labelTone}`}>

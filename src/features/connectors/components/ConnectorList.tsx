@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, ChevronDown, Search, XCircle } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { EmptyState } from "../../../components/ui/EmptyState.tsx";
+import { IconTile } from "../../../components/ui/IconTile.tsx";
 import { Input } from "../../../components/ui/Input.tsx";
 import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle.tsx";
 import { slidingIndicatorSpringToken } from "../../../styles/tokens";
@@ -145,9 +146,7 @@ export function ConnectorList({
                       aria-expanded={isExpanded}
                       className="relative z-10 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-surface-muted text-app-text-muted">
-                        <Icon className="h-5 w-5" />
-                      </span>
+                      <IconTile icon={Icon} size="lg" tone="neutral" />
 
                       <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-medium text-app-text">
                         {connector.meta.label}
@@ -248,9 +247,7 @@ function ConnectorDetail({ connector, projectId, onSourcesSaved }: ConnectorDeta
       }
     >
       <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-app-surface-muted text-app-text-muted">
-          <Icon className="h-5 w-5" />
-        </span>
+        <IconTile icon={Icon} size="xl" tone="neutral" />
 
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-app-text">{connector.meta.label}</p>

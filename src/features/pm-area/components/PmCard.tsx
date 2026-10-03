@@ -2,15 +2,8 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { IconTile } from "../../../components/ui/IconTile";
 
-/**
- * The surface every PM section draws its blocks on.
- *
- * Same frame as the dashboard widgets (`WidgetShell`): a rounded-2xl card, a gradient icon chip
- * beside a small semibold title, the soft brand glow in the corner. The PM area used to wrap
- * whole sections in `SpotlightCard`s with their own `text-lg` headings inside, which made it the
- * one area of the app that looked like a different product.
- */
 /**
  * The colour a PM block is recognised by. Each section has one — Team is brand, Onboarding cyan,
  * Questions indigo, Knowledge gaps pink, Escalations purple — and its cards, figures and chips use
@@ -19,30 +12,6 @@ import { Link } from "react-router-dom";
  */
 export type PmTone =
   "brand" | "cyan" | "indigo" | "pink" | "purple" | "warning" | "success" | "neutral";
-
-/** Icon chip in a card header. Brand keeps the gradient every widget in the app uses. */
-const TONE_CHIP: Record<PmTone, string> = {
-  brand: "bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm",
-  cyan: "bg-app-cyan-bg text-app-cyan-text",
-  indigo: "bg-app-indigo-bg text-app-indigo-text",
-  pink: "bg-app-pink-bg text-app-pink-text",
-  purple: "bg-app-purple-bg text-app-purple-text",
-  warning: "bg-app-warning-bg text-app-warning-text",
-  success: "bg-app-success-bg text-app-success-text",
-  neutral: "bg-app-neutral-bg text-app-neutral-text",
-};
-
-/** The same tones, soft, for the small chips inside figures and rows. */
-const PM_TONE_SOFT: Record<PmTone, string> = {
-  brand: "bg-app-brand-soft text-app-brand-text",
-  cyan: "bg-app-cyan-bg text-app-cyan-text",
-  indigo: "bg-app-indigo-bg text-app-indigo-text",
-  pink: "bg-app-pink-bg text-app-pink-text",
-  purple: "bg-app-purple-bg text-app-purple-text",
-  warning: "bg-app-warning-bg text-app-warning-text",
-  success: "bg-app-success-bg text-app-success-text",
-  neutral: "bg-app-neutral-bg text-app-neutral-text",
-};
 
 /** The corner glow, in the card's own colour. */
 const TONE_GLOW: Record<PmTone, string> = {
@@ -56,6 +25,14 @@ const TONE_GLOW: Record<PmTone, string> = {
   neutral: "bg-app-brand/5",
 };
 
+/**
+ * The surface every PM section draws its blocks on.
+ *
+ * Same frame as the dashboard widgets (`WidgetShell`): a rounded-2xl card, a gradient icon chip
+ * beside a small semibold title, the soft brand glow in the corner. The PM area used to wrap
+ * whole sections in `SpotlightCard`s with their own `text-lg` headings inside, which made it the
+ * one area of the app that looked like a different product.
+ */
 export function PmCard({
   children,
   className = "",
@@ -128,11 +105,8 @@ export function PmCardHeader({
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2">
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${TONE_CHIP[tone]}`}
-        >
-          <Icon aria-hidden="true" className="h-3.5 w-3.5" />
-        </span>
+        {/* Brand keeps the gradient every widget in the app uses. */}
+        <IconTile icon={Icon} size="sm" tone={tone === "brand" ? "accent" : tone} />
         <h2 className="min-w-0 truncate text-sm font-semibold text-app-text">{title}</h2>
         {/* Gives way before the title does: on a narrow card a long meta line ("7 members · 1
             through onboarding") used to keep its full width and push the title out of sight. */}
@@ -211,20 +185,14 @@ export function PmStat({
   // 7rem tall with a 3xl number, which gave four small figures a whole band of the page.
   const body = (
     <>
-      <span
-        aria-hidden="true"
-        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-          attention ? PM_TONE_SOFT.warning : PM_TONE_SOFT[tone]
-        }`}
-      >
-        <Icon className="h-4 w-4" />
+      <IconTile icon={Icon} size="lg" tone={attention ? "warning" : tone} className="relative">
         {attention && (
           <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-app-warning-solid opacity-60 motion-reduce:animate-none" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-app-warning-solid ring-2 ring-app-surface" />
           </span>
         )}
-      </span>
+      </IconTile>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="text-xl leading-none font-bold tracking-tight text-app-text tabular-nums">

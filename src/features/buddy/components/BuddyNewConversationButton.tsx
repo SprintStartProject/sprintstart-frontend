@@ -3,14 +3,10 @@ import { MessageSquarePlus } from "lucide-react";
 /**
  * "Start a new conversation", as a standing control on the buddy page.
  *
- * The third way to do one thing, and each of the three exists because the other two are not
- * always there:
- *
- * - The **visit divider** carries the same action, but is only drawn when there *is* a divider —
- *   a first visit has nothing above the line, so nothing on screen offers to start over.
- * - **`Alt+N`** always works, and is invisible to anybody who has not been told about it.
- * - This button is the one that is simply *there*, which is what a hire looking for it will
- *   find.
+ * The second of two visible ways to do one thing — the third is the dock's own copy of this
+ * control, floating over every other page: the **`Alt+N`** chord always works but is invisible
+ * to anybody who has not been told about it, and this button is the one that is simply *there*,
+ * which is what a hire looking for it will find.
  *
  * Floating over the transcript rather than sitting in the page header: the header is shared
  * with Chat, and a control that appeared and vanished as you crossed between the two halves
@@ -18,10 +14,9 @@ import { MessageSquarePlus } from "lucide-react";
  * `RailToggle`, on the opposite side, so the two never meet.
  *
  * Withdrawn mid-turn by its caller, for the reason `BuddyDock` withdraws its own copy:
- * `startFreshVisit` clears the thread and greets, but cannot call back a request already
- * streaming into it.
+ * `newConversation` clears the thread, but cannot call back a request already streaming into it.
  */
-export function BuddyFreshVisitButton({
+export function BuddyNewConversationButton({
   onClick,
   shortcut,
 }: {

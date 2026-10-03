@@ -26,7 +26,7 @@ const STICK_THRESHOLD_PX = 120;
  * act of joining the end of the conversation: staying put would hide both what they just wrote
  * and the reply to it, which reads as the buddy having ignored them.
  *
- * @param messages The transcript. Its identity changes whenever it grows.
+ * @param messages - The transcript. Its identity changes whenever it grows.
  */
 export function useStickToBottom(messages: readonly { role: string }[]) {
   const containerRef = useRef<HTMLDivElement>(null);

@@ -73,12 +73,6 @@ export function stageOrder(stage: BoardStage): number {
 }
 
 /**
- * One card's place in the process: its stage, what it waits on, and whether it was ticked off.
- *
- * Everything is optional because a board with no structure at all is the honest starting state —
- * an entry only exists once somebody has said something about that card.
- */
-/**
  * Who put a card behind another one.
  *
  * Two different claims used to be written into the same list. "The team says you cannot touch
@@ -106,6 +100,12 @@ export function isRemovableByHire(dependency: CardDependency): boolean {
   return dependency.source !== "TEAM";
 }
 
+/**
+ * One card's place in the process: its stage, what it waits on, and whether it was ticked off.
+ *
+ * Everything is optional because a board with no structure at all is the honest starting state —
+ * an entry only exists once somebody has said something about that card.
+ */
 export type CardStructure = {
   stage?: BoardStage;
   /**

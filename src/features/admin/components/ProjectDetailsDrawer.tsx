@@ -1,5 +1,17 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { AlertCircle, FileText, Folder, Link2, Loader2, Tag, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ChevronRight,
+  Copy,
+  Database,
+  FileText,
+  ShieldCheck,
+  Tag,
+  Trash2,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -7,14 +19,18 @@ import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
 import { Textarea } from "../../../components/ui/Textarea";
 import { SaveButton } from "../../../components/ui/SaveButton";
+import { Spinner } from "../../../components/ui/Spinner";
 import { useToast } from "../../../context/useToast";
 import { projectService } from "../../../services/projectService";
+import { ProjectMonogram } from "../../projects/components/ProjectMonogram";
 import { ProjectIndustryPanel } from "../../projects/industry/ProjectIndustryPanel";
 import {
   getDisplayName,
+  getManagerName,
   getProjectEditFormState,
   getProjectSourcesCount,
   getProjectUsersCount,
+  pluralize,
 } from "../data";
 import {
   applyPeopleChanges,
@@ -28,11 +44,13 @@ import { getMovedUsers } from "../projectMove";
 import type {
   AdminProjectDetails,
   AdminUser,
+  DrawerBackLink,
   ProjectEditFormState,
   ProjectOverview,
   ProjectUser,
 } from "../types";
 import { AccessBadge } from "./Badges";
+import { DrawerBackButton } from "./DrawerBackButton";
 import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { ProjectPeopleSection } from "./ProjectPeopleSection";
 import { SourceList } from "./SourceList";
@@ -45,6 +63,12 @@ type ProjectDetailsDrawerProps = {
   canManageLifecycle?: boolean;
   onClose: () => void;
   onOpenSourceDetails?: (projectId: string, sourceId: string) => void;
+  /** Opens the Data Ingestion page for this project; the shortcut is hidden without it. */
+  onOpenDataIngestion?: (projectId: string) => void;
+  /** Opens a member's user details; members are not clickable without it. */
+  onOpenUser?: (userId: string) => void;
+  /** Shown when the drawer was opened from another one, e.g. from a user's projects. */
+  back?: DrawerBackLink;
   onProjectUpdated?: (updatedProject: AdminProjectDetails) => void;
   onProjectDeleted?: (projectId: string) => void;
   /**
@@ -78,6 +102,9 @@ export function ProjectDetailsDrawer({
   canManageLifecycle = false,
   onClose,
   onOpenSourceDetails,
+  onOpenDataIngestion,
+  onOpenUser,
+  back,
   onProjectUpdated,
   onProjectDeleted,
   onMembershipsMoved,
@@ -94,6 +121,8 @@ export function ProjectDetailsDrawer({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+  // A navigation out of the drawer, held while the unsaved-changes dialog asks.
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const toast = useToast();
 
   const [draftProject, setDraftProject] = useState<ProjectEditFormState>(() =>
@@ -171,6 +200,28 @@ export function ProjectDetailsDrawer({
   const discardChanges = () => {
     setSaveErrorMessage("");
     resetDrafts(visibleProject);
+  };
+
+  /**
+   * Runs a navigation that leaves the drawer (a member, the way back, Data
+   * Ingestion, a source). The drawer is replaced or the page changes, which
+   * drops the staged edits, so with changes pending it asks first.
+   */
+  const leaveDrawer = (navigate: () => void) => {
+    if (!hasPendingChanges) {
+      navigate();
+      return;
+    }
+
+    setPendingNavigation(() => navigate);
+  };
+
+  const confirmLeaveDrawer = () => {
+    const navigate = pendingNavigation;
+
+    setPendingNavigation(null);
+    discardChanges();
+    navigate?.();
   };
 
   const updateDraftField = (field: keyof ProjectEditFormState, value: string) => {
@@ -267,6 +318,15 @@ export function ProjectDetailsDrawer({
     }
   };
 
+  const copyProjectId = async () => {
+    try {
+      await navigator.clipboard.writeText(project.id);
+      toast.success("Project ID copied");
+    } catch {
+      toast.error("Couldn't copy the project ID.");
+    }
+  };
+
   const confirmDeleteProject = async () => {
     setIsDeleting(true);
 
@@ -293,19 +353,33 @@ export function ProjectDetailsDrawer({
         title={draftProject.name || visibleProject.name}
         closeAriaLabel="Close project details"
         widthClassName="w-full sm:w-[min(94vw,34rem)] lg:w-[min(72vw,58rem)]"
-        leading={
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand">
-            <Folder className="h-6 w-6" />
-          </div>
+        leading={<ProjectMonogram projectId={project.id} name={visibleProject.name} size="lg" />}
+        actions={
+          back ? (
+            <DrawerBackButton back={{ ...back, onBack: () => leaveDrawer(back.onBack) }} />
+          ) : undefined
         }
         badge={
           <>
             <AccessBadge variant="neutral">
-              {memberCount > 0 ? `${memberCount} members` : "No members"}
+              <Users className="mr-1 h-3 w-3" aria-hidden="true" />
+              {memberCount > 0 ? pluralize(memberCount, "member") : "No members"}
             </AccessBadge>
             <AccessBadge variant={sourceCount > 0 ? "success" : "neutral"}>
-              {sourceCount > 0 ? `${sourceCount} sources` : "No sources"}
+              <Database className="mr-1 h-3 w-3" aria-hidden="true" />
+              {sourceCount > 0 ? pluralize(sourceCount, "source") : "No sources"}
             </AccessBadge>
+            {visibleProject.manager ? (
+              <AccessBadge variant="brand">
+                <ShieldCheck className="mr-1 h-3 w-3" aria-hidden="true" />
+                {`Manager: ${getManagerName(visibleProject.manager)}`}
+              </AccessBadge>
+            ) : (
+              <AccessBadge variant="danger">
+                <AlertTriangle className="mr-1 h-3 w-3" aria-hidden="true" />
+                No manager
+              </AccessBadge>
+            )}
           </>
         }
         footer={
@@ -330,7 +404,7 @@ export function ProjectDetailsDrawer({
         {isLoadingDetails ? (
           <div className="flex min-h-72 items-center justify-center">
             <div className="flex flex-col items-center gap-3 text-app-text-muted">
-              <Loader2 className="h-7 w-7 animate-spin text-app-brand" />
+              <Spinner size="lg" silent />
               <p className="text-sm">Loading project details...</p>
             </div>
           </div>
@@ -377,6 +451,25 @@ export function ProjectDetailsDrawer({
                     placeholder="No project description yet."
                   />
                 </Field>
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-app-border bg-app-surface-muted py-1 pr-1 pl-4">
+                  <div className="min-w-0">
+                    <p className="text-xs text-app-text-muted">Project ID</p>
+                    <p className="truncate font-mono text-xs text-app-text" title={project.id}>
+                      {project.id}
+                    </p>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={() => void copyProjectId()}
+                    aria-label="Copy project ID"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </DrawerCard>
 
@@ -405,22 +498,41 @@ export function ProjectDetailsDrawer({
                 snapshotKey={peopleSnapshotKey}
                 draft={activePeopleDraft}
                 onDraftChange={setPeopleDraft}
+                onOpenUser={
+                  onOpenUser ? (userId) => leaveDrawer(() => onOpenUser(userId)) : undefined
+                }
               />
             </DrawerCard>
 
-            <DrawerCard label="Connected sources" icon={Link2} index={3}>
+            <DrawerCard
+              label="Connected sources"
+              icon={Database}
+              index={3}
+              headerAccessory={
+                onOpenDataIngestion ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => leaveDrawer(() => onOpenDataIngestion(project.id))}
+                    trailingIcon={<ChevronRight className="h-4 w-4" />}
+                  >
+                    Open in Data Ingestion
+                  </Button>
+                ) : undefined
+              }
+            >
               <SourceList
                 sources={visibleProject.sources}
                 onOpenSourceDetails={
                   onOpenSourceDetails
-                    ? (sourceId) => onOpenSourceDetails(project.id, sourceId)
+                    ? (sourceId) => leaveDrawer(() => onOpenSourceDetails(project.id, sourceId))
                     : undefined
                 }
               />
             </DrawerCard>
 
             {canManageLifecycle && (
-              <DrawerCard label="Danger zone" variant="danger" index={4}>
+              <DrawerCard label="Danger zone" icon={TriangleAlert} variant="danger" index={4}>
                 <p className="text-sm text-app-danger-text">
                   Deleting a project removes it and all of its user assignments. Connected sources
                   are kept and stay available to other projects.
@@ -464,6 +576,19 @@ export function ProjectDetailsDrawer({
         confirmLabel="Move and save"
         onClose={() => setIsMoveDialogOpen(false)}
         onConfirm={() => void saveChanges()}
+      />
+
+      <AlertDialog
+        isOpen={pendingNavigation !== null}
+        variant="danger"
+        title="Discard unsaved changes?"
+        description={`Leaving this project drops ${
+          pendingChangeCount === 1 ? "1 unsaved change" : `${pendingChangeCount} unsaved changes`
+        }.`}
+        confirmLabel="Discard and leave"
+        cancelLabel="Keep editing"
+        onClose={() => setPendingNavigation(null)}
+        onConfirm={confirmLeaveDrawer}
       />
 
       <AlertDialog

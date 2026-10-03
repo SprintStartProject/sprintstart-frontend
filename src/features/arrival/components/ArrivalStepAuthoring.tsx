@@ -10,6 +10,7 @@ import { InfoHint } from "../../../components/ui/InfoHint";
 import { Input } from "../../../components/ui/Input";
 import { Spinner } from "../../../components/ui/Spinner";
 import { Textarea } from "../../../components/ui/Textarea";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useToast } from "../../../context/useToast";
 import { useArrivalAuthoring } from "../hooks/useArrivalAuthoring";
 import { howStepGetsDone } from "../howItsDone";
@@ -352,11 +353,7 @@ function EditStepDrawer({
       onClose={onClose}
       showOverlay
       title="Edit step"
-      leading={
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
-          <Pencil className="h-6 w-6" aria-hidden="true" />
-        </div>
-      }
+      leading={<IconTile icon={Pencil} size="2xl" tone="neutral" />}
       badge={
         <>
           {isOverride && (

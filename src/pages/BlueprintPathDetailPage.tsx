@@ -244,7 +244,15 @@ function LifecycleNotice({
 const EDITOR_MODE_ORDER = ["list", "graph"] as const;
 type EditorMode = (typeof EDITOR_MODE_ORDER)[number];
 
-/** Authors one Blueprint path and its reusable phases, content, and knowledge checks. */
+/**
+ * Authors one Blueprint path and its reusable phases, content, and knowledge checks.
+ *
+ * Bound to `/blueprints/:pathId`, which shares the `/blueprints` policy entry: open to `PM`,
+ * `HR` and `ADMIN`, wrapped in `ManagerAreaGuard`, so a PM must manage the selected project.
+ * The path belongs to the selected project, or to the global scope with `?scope=global`,
+ * which only an `ADMIN` gets. `location.state.reopen` asks the page to open a phase or node by
+ * itself once the path has loaded.
+ */
 export function BlueprintPathDetailPage() {
   const { pathId } = useParams();
   const navigate = useNavigate();
@@ -338,8 +346,10 @@ export function BlueprintPathDetailPage() {
    * and why a reload appeared to fix it: a reload starts in list mode, and the graph was fetched
    * again on the way back.
    *
-   * Merging here rather than at each call site means no caller can forget. **Backend TODO:** the
-   * three fields on the nested phase response would remove the second request entirely.
+   * Merging here rather than at each call site means no caller can forget.
+   *
+   * TODO(backend): the three fields on the nested phase response would remove the second request
+   * entirely.
    */
   const loadPath = useCallback(
     async (showLoading = true) => {

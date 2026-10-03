@@ -18,7 +18,7 @@ type UseAttentionResult = {
  * dashboard, so it stays consistent with the hire's own view. It is a read-only
  * list: acting on it means talking to the person, not clicking something here.
  *
- * @param projectId The selected project, or empty string when none is chosen.
+ * @param projectId - The selected project, or empty string when none is chosen.
  */
 export function useAttention(projectId: string): UseAttentionResult {
   const queryClient = useQueryClient();

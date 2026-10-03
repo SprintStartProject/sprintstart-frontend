@@ -6,8 +6,8 @@ import type { CSSProperties } from "react";
  * above the anchor when there's no room below. Shared by the citation popover
  * and the per-file citation detail chip so positioning stays consistent.
  *
- * @param rect  Bounding rect of the anchor element.
- * @param width Desired popover width in px (defaults to 320).
+ * @param rect - Bounding rect of the anchor element.
+ * @param width - Desired popover width in px (defaults to 320).
  */
 export function getCitationPopoverStyle(rect: DOMRect, width = 320): CSSProperties {
   const WIDTH = width;

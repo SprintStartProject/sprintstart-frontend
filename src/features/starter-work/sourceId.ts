@@ -70,6 +70,11 @@ export function stripRedundantIssuePrefix(title: string, numberLabel: string | n
   return rest || title;
 }
 
+/**
+ * Splits a raw `sourceId` such as `github:owner/repo:ISSUE:103` into tracker, owner, repo and the
+ * trailing number, as described at the top of this module. A purely numeric last segment becomes
+ * `#103`; any other last segment is kept as it is, e.g. a Jira key.
+ */
 export function parseCandidateSource(sourceId: string): ParsedSource {
   const parts = sourceId.split(":");
   const trackerCode = parts[0] ?? "";

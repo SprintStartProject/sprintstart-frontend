@@ -13,25 +13,24 @@ orchestrates business domain events and AI retrieval services, and uses **Keyclo
 
 ---
 
-## Tech Stack
+## Documentation
 
-| Area                      | Technology                                                                                      |
-| ------------------------- | ----------------------------------------------------------------------------------------------- |
-| UI framework              | **React 19**                                                                                    |
-| Routing                   | **React Router v7**                                                                             |
-| Language                  | **TypeScript** (strict, `verbatimModuleSyntax`)                                                 |
-| Build tooling             | **Vite 8** (`@vitejs/plugin-react`, `@tailwindcss/vite`)                                        |
-| Styling                   | **Tailwind CSS v4** (semantic design tokens, light/dark themes via `ThemeProvider`)             |
-| Animation                 | **Framer Motion 12** (centralized spring tokens, `<AnimatePresence>`)                           |
-| Authentication            | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11**           |
-| Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter`       |
-| Icons                     | `lucide-react`                                                                                  |
-| Unit testing              | **Vitest 4** + **Testing Library** (`jsdom`, `msw` ^2.14, `vitest-axe`)                         |
-| Component dev             | **Storybook 10**                                                                                |
-| Linting / formatting      | **ESLint 9** (flat config: `typescript-eslint`, `react`, `react-hooks`, `jsx-a11y`, `prettier`) |
+This README covers features, setup and commands. Everything else has exactly one
+home under `docs/`:
 
-> The project pins a custom Keycloak login theme. Running `npm install`
-> automatically executes `keycloakify sync-extensions` (see `postinstall`).
+- [FRONTEND_ARCHITECTURE.md](./docs/FRONTEND_ARCHITECTURE.md): tech stack, source
+  layout, routing and access control, state and TanStack Query, services, reverse
+  proxy, design system, build, deployment, Keycloak login theme.
+- [FRONTEND_CODING_STANDARDS.md](./docs/FRONTEND_CODING_STANDARDS.md): TypeScript,
+  React, styling and UI primitives, responsive design, accessibility, animation,
+  formatting and linting.
+- [FRONTEND_DOCUMENTATION_GUIDELINES.md](./docs/FRONTEND_DOCUMENTATION_GUIDELINES.md):
+  TSDoc and comment rules.
+- [testing_strategy.md](./docs/testing_strategy.md): Vitest, MSW, a11y tests and the
+  test setup.
+- [UI_DESIGN_DECISIONS.md](./docs/UI_DESIGN_DECISIONS.md): why the UI rules exist,
+  and the open UI consistency items.
+- [AGENTS.md](./AGENTS.md): short entry point for humans and AI agents.
 
 ---
 
@@ -44,85 +43,21 @@ self-contained under `src/features/` and surfaced through dedicated routes:
 - **AI Assistant / Chatbot** — A streaming chat interface (Server-Sent Events) that answers questions grounded in the indexed knowledge base. Supports multiple conversations, chat history, and inline **citations** back to the source artifacts (files, lines, PDF pages). Responses render Markdown, syntax-highlighted code blocks, and math (KaTeX).
 - **Knowledge Base** — Browse, search, and upload indexed **artifacts** (commits, files, issues, pull requests, documents) ingested from GitHub, Jira, or direct uploads. Each artifact can be summarized on demand via a streamed, citation-backed AI summary.
 - **Onboarding** — Personalized, AI-generated onboarding **paths** composed of phases, steps, tasks, and resources (video, document, task, link). Includes phase **knowledge checks** (multiple choice + short-text, AI-graded), a **skip-request** review workflow, step feedback, and phase locking until prerequisites pass.
-- **Data Ingestion** — Connect data sources (GitHub, Jira, Upload), trigger ingestion runs, track run status (running / completed / partial / failed), inspect failed artifacts, and review run history with pagination.
-- **Connectors** — Manage project connectors and their source allow/deny lists (GitHub, extensible to Jira).
-- **Team Management** — A project-manager view of the team: onboarding progress, current phase/step, project roles, skills (beginner → expert), and per-user skill assessments. Supports filtering and sorting (progress, step duration) and a per-member detail page. Includes the **Skill Wizard** (`/skill-wizard`) for authoring skills linked to project roles.
+- **Data Ingestion** — Connect data sources (GitHub, Jira, Confluence, Upload), trigger ingestion runs, track run status (running / completed / partial / failed), inspect failed artifacts, and review run history with pagination.
+- **Connectors** — Part of the Data Ingestion page: the project's connectors and their source allow/deny lists. GitHub and Confluence have their own labels and icons, any other connector the backend reports is shown with generic metadata.
+- **Team Management** — A project-manager view of the team: onboarding progress, current phase/step, project roles, skills (beginner → expert), and per-user skill assessments. Supports filtering and sorting (progress, step duration) and a per-member detail page. Users rate themselves on the skills linked to their project roles in the **Skill Wizard** (`/skill-wizard`).
 - **PM Dashboard** — A project-manager overview surface for monitoring team onboarding trajectories, velocity, and skill acquisition.
-- **Admin** — User management (enable/disable, onboarding status, permission groups), project management (sources, members, project managers), API token management, and authoring of phase-check questions/options plus attempt review.
+- **Admin** — User management (enable/disable, onboarding status, permission groups), project management (sources, members, project managers), and API token management.
 - **Insights — Knowledge Gaps** — AI-detected missing documentation per component, with severity (high / medium / low), component owners, and refresh tracking.
 - **Insights — FAQ** — AI-generated clusters of frequently asked questions and the documents that answer them.
-- **Settings & Profile** — Central configuration hub with tabs for user profile management (avatar, display name, password update), appearance (light/dark/system theme), chat preferences, moments toggles, and access tokens (GitHub PAT / Jira credential management for authorized roles).
+- **Insights — Knowledge Requests** — Questions escalated by hires, collected in an inbox where PMs answer them.
+- **Insights — Onboarding** — Onboarding progress per hire and the hires that need attention.
+- **Board** — The hire's own board of cards, areas and stages, synced with the server.
+- **AI Buddy** — An AI companion next to the chat that holds a conversation and keeps drafts. It proposes changes the hire confirms first: edits to their board, progress on their onboarding path (completing steps and tasks, answering knowledge checks, adding a step, requesting a skip), and flagging a question to their PM. The onboarding path can open a conversation about a step or question.
+- **Blueprints** — Onboarding path blueprints for PMs, edited as a graph and kept in versions.
+- **Hire Setup** — Arrival steps and the starter task pool with its review, as tabs of one page.
+- **Settings & Profile** — Central configuration page with sections for the user profile (avatar, display name, password), appearance (light/dark/system theme, visual effects and optional extras), and access tokens (GitHub PATs and Atlassian credentials, for authorized roles).
 - **Moments & Easter Eggs** — Gamified celebrations (confetti, achievement moments, sound effects) and interactive easter eggs (the dino waiting-game, `2048` behind the dashboard header icon, Space Invaders behind the 404 page's rocket).
-
----
-
-## Architecture
-
-The codebase follows a **feature-first** organization: domain code lives in
-`src/features/<name>/` (each with its own `components/`, optional `hooks/`, and
-`types.ts`), while only genuinely shared code lives in the top-level folders.
-
-```
-src/
-├── features/            # Self-contained domain slices
-│   ├── admin/           # User, project & token management
-│   ├── chatbot/         # Streaming AI assistant (SSE prompt stream)
-│   ├── connectors/      # Connector + source allow/deny management
-│   ├── dashboard/       # Dashboard hero & NextStepWidget
-│   ├── data-ingestion/  # Sources, ingestion runs, artifact tables
-│   ├── easter-eggs/     # Easter eggs: egg shell + game registry, the
-│   │                    # effect bus, phrases and the dino waiting-game
-│   ├── faq/             # AI FAQ clusters (insights)
-│   ├── knowledge-base/  # Artifact browsing + streamed summaries + file upload
-│   ├── knowledge-gaps/  # AI-detected documentation gaps (insights)
-│   ├── moments/         # Celebrations, confetti, rocket animations
-│   ├── onboarding/      # AI onboarding paths, knowledge checks, skip workflow
-│   ├── profile/         # Profile form components
-│   ├── projects/        # Multi-project switching & global ProjectContext
-│   ├── settings/        # User settings tabs, themes & credentials
-│   └── team-management/ # Team overview, member detail, Skill Wizard
-├── pages/               # Route-level views (one per user-facing flow)
-├── router/              # React Router v7 config + AuthGuard
-├── auth/                # Access policy (AppRoute union, canAccessRoute)
-├── context/             # Global providers (AuthProvider, ThemeProvider, ChatProvider)
-├── services/            # Backend communication (one module per domain; SSE streaming via sse.ts)
-├── components/          # Shared UI: common/, layout/, ui/ primitives
-├── config/              # Integration config (keycloak.ts)
-├── hooks/               # Shared hooks
-├── styles/              # Global CSS + semantic design tokens + centralized spring tokens
-├── mocks/               # Dev mock datasets and fallback fixtures
-└── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated — do not hand-edit)
-```
-
-**Key conventions**
-
-- **Routing & access control** — Protected routes are wrapped in `AuthGuard`;
-  route access is centralized in `auth/accessPolicy.ts` (`AppRoute` union +
-  `canAccessRoute`). Four permission groups are enforced: `USER`, `PM`, `HR`, and `ADMIN`.
-- **API layer & proxying** — All backend communication goes through `src/services/`
-  (typed responses; SSE for streaming). Nothing addresses the backend or Keycloak by
-  absolute URL: both are reached through the frontend's own origin and resolved by a
-  reverse proxy, which differs per deployment target:
-
-  | Route   | Vite dev (`vite.config.ts`) | Docker (`nginx.conf`)       | Kubernetes (`k8s/frontend/01-configmap.yaml`) |
-  | ------- | --------------------------- | --------------------------- | --------------------------------------------- |
-  | `/api`  | `127.0.0.1:8080`            | `host.docker.internal:8080` | `sprintstart-backend:8080`                    |
-  | `/v1`   | `127.0.0.1:8080`            | not proxied                 | `sprintstart-backend:8080`                    |
-  | `/auth` | `127.0.0.1:8081`            | `host.docker.internal:8081` | not proxied                                   |
-
-  The gaps are real, not omissions in this table. `/v1` is currently unused by the
-  SPA, so its absence in Docker costs nothing today. The missing `/auth` route under
-  Kubernetes does matter: `config/keycloak.ts` builds the Keycloak URL as
-  `window.location.origin + /auth`, and the ingress forwards everything to the
-  frontend service, so that path would fall through to the SPA. Adding a route
-  before relying on the Kubernetes manifests is tracked separately.
-
-- **Design system** — One shared semantic palette (CSS variables → Tailwind
-  `app-*` classes) defined in `src/styles/index.css`. Always use tokens, never
-  hardcode colors. Light/dark is controlled via the `.dark` class managed by `ThemeProvider`.
-- **Accessibility** — Targets WCAG 2.1 AA; meaning is never conveyed by color
-  alone (icons + labels back every status). E2E-targeted elements declare
-  `data-testid`.
 
 ---
 
@@ -130,7 +65,9 @@ src/
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v20 or higher recommended)
+- [Node.js](https://nodejs.org/) 20.19+ or 22.12+ (the minimum Vite 8 accepts). CI and the
+  Docker image use Node 24, which is the safe choice. On Node 25 or newer the tests need a flag,
+  see [Local pitfalls](#local-pitfalls).
 - npm (the project ships a `package-lock.json` and a `postinstall` hook for Keycloakify)
 
 ### Installation
@@ -157,17 +94,10 @@ cp .env.example .env
 VITE_KEYCLOAK_CLIENT_ID=sprintstart-frontend
 ```
 
-> **Note on Reverse Proxying:**
-> You do not need to configure API or Keycloak authority URLs. Requests go to the
-> frontend's own origin and are forwarded from there. Running `npm run dev`, Vite
-> proxies:
->
-> - `/api` & `/v1` → `http://127.0.0.1:8080` (Spring Boot backend)
-> - `/auth` → `http://127.0.0.1:8081` (Keycloak IAM)
->
-> Under `docker compose up`, Nginx forwards `/api` and `/auth` to
-> `host.docker.internal` on the same two ports. See the routing table under
-> [Architecture](#architecture) for how the targets differ per deployment.
+> **No URLs to configure.** Requests go to the frontend's own origin and a reverse
+> proxy forwards them to the backend (`:8080`) and Keycloak (`:8081`), so both have
+> to be running locally. The routes per deployment target are in
+> [FRONTEND_ARCHITECTURE.md §6.4](./docs/FRONTEND_ARCHITECTURE.md#64-reverse-proxy).
 
 ---
 
@@ -190,6 +120,16 @@ VITE_KEYCLOAK_CLIENT_ID=sprintstart-frontend
 | **Build Keycloak Theme**     | `npm run build-keycloak-theme` (Builds JAR via Keycloakify & Maven)                     |
 | **Docker Full Stack**        | `docker compose up --build` (Nginx container serving SPA at `http://localhost:3000`)    |
 
+### Local pitfalls
+
+**Node 25 or newer breaks about 480 tests**, while CI (Linux, Node 24) stays green. Node
+brings its own `localStorage`, which is undefined without `--localstorage-file` and hides the
+one jsdom provides. Run the tests with the built-in one switched off:
+
+```bash
+NODE_OPTIONS=--no-experimental-webstorage npm run test
+```
+
 ---
 
 ## 🛠️ Developer Notes
@@ -208,16 +148,16 @@ The application uses **Keycloak** for Identity and Access Management. When devel
 3. **Assign Roles**:
    - Go to the user's **Role mapping** tab -> **Assign role**.
    - Filter by realm roles and assign the appropriate role for testing:
-     - `USER` — Standard developer onboarding and chat access.
-     - `PM` — Project Manager (access to PM dashboard, team management, skill wizard, data ingestion).
-     - `HR` — Human Resources (team management, project overview).
-     - `ADMIN` — System Administrator (full user/project management, token configuration, system administration).
+     - `USER` — The hire's surfaces: dashboard, onboarding, chat, AI buddy, board, knowledge
+       base and settings.
+     - `PM` — Everything `USER` has, plus the PM workspace (PM dashboard, team management,
+       insights), data ingestion, blueprints and hire setup. All of these except hire setup
+       are only open for a project the PM manages.
+     - `HR` — The same pages as `PM`, without the project-manager check, plus the admin page.
+       Some of them are read-only for HR (answering knowledge requests, acting in hire setup).
+     - `ADMIN` — Everything, including the admin-only project actions (industry, assigning a
+       project manager, deleting a project).
+   - The skill wizard (`/skill-wizard`) is open to every role. `AuthGuard` sends a user there
+     when their project roles have skills they have not assessed yet.
+   - Which role may open which route is defined in `src/auth/accessPolicy.ts`.
 4. **Log In**: Open [http://localhost:5173](http://localhost:5173). You will be redirected to the Keycloak login screen, authenticate, and return to the application.
-
----
-
-## Testing & Mocking Strategy
-
-- **HTTP Mocking in Tests**: Unit and component tests use **MSW (Mock Service Worker)** via `setupServer` in `tests/unit/setup/msw-handlers.ts` to intercept `fetch` and SSE streams.
-- **Service Resilience**: Services are designed with graceful fallback handling to allow UI development to proceed smoothly even when backend modules are evolving.
-- For complete details on testing conventions, coverage expectations, and axe-core rules, consult [docs/testing_strategy.md](./docs/testing_strategy.md).

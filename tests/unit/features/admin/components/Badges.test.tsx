@@ -23,10 +23,10 @@ describe("Badges", () => {
     expect(screen.getByText("Default").className).toContain("bg-app-brand-soft");
   });
 
-  it("PermissionGroupBadge maps Admin to the warning variant", () => {
+  it("PermissionGroupBadge maps Admin to the danger variant", () => {
     render(<PermissionGroupBadge permissionGroup="Admin" />);
     const badge = screen.getByText("Admin");
-    expect(badge.className).toContain("bg-app-warning-bg");
+    expect(badge.className).toContain("bg-app-danger-bg");
   });
 
   it("PermissionGroupBadge maps Project Manager to the success variant", () => {

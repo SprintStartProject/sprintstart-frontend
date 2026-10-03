@@ -1,3 +1,4 @@
+import { IconTile } from "../../../components/ui/IconTile";
 import { CONNECTOR_LIST } from "../connectors/registry.ts";
 import type { SourceSystem } from "../connectors/sourceSystems.ts";
 
@@ -48,12 +49,7 @@ export function SourceTypeStep({
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-app-bg-soft">
-                    <Icon
-                      size={20}
-                      className={isSelected ? "text-app-brand" : "text-app-text-muted"}
-                    />
-                  </div>
+                  <IconTile icon={Icon} size="xl" tone={isSelected ? "brand" : "neutral"} />
                 </div>
 
                 <p className="mt-3 text-sm font-semibold text-app-text">{meta.label}</p>

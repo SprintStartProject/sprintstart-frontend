@@ -12,6 +12,7 @@ import {
 import type { ReactNode } from "react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { DrawerCard } from "../../../components/ui/DrawerCard";
+import { IconTile } from "../../../components/ui/IconTile";
 import {
   formatDateTime,
   formatInstanceDomain,
@@ -72,11 +73,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
       closeAriaLabel="Close run details"
       zIndexClassName="z-50"
       showOverlay
-      leading={
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
-          <SourceIcon className="h-6 w-6" />
-        </div>
-      }
+      leading={<IconTile icon={SourceIcon} size="2xl" tone="neutral" />}
       badge={
         <>
           <Chip tone={runTone}>{getRunStatusLabel(run.status)}</Chip>

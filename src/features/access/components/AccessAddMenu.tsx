@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import type { AccessConnector } from "../types";
 
 type AccessAddMenuProps = {
@@ -80,8 +81,6 @@ export function AccessAddMenu({ connectors, onSelect }: AccessAddMenuProps) {
           aria-label="Choose a source"
         >
           {connectors.map((connector) => {
-            const Icon = connector.icon;
-
             return (
               <button
                 key={connector.id}
@@ -90,9 +89,7 @@ export function AccessAddMenu({ connectors, onSelect }: AccessAddMenuProps) {
                 data-testid={`access-add-source-${connector.id}`}
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-surface-muted">
-                  <Icon className="h-4 w-4 text-app-text-muted" aria-hidden />
-                </span>
+                <IconTile icon={connector.icon} size="md" tone="neutral" />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium text-app-text">
                     {connector.label}

@@ -4,16 +4,78 @@ import type { BuddyStreamHandlers, ProposalRisk } from "../features/buddy/types"
 import type { BuddyMessage } from "../features/buddy/types";
 
 /**
- * Retrieves the current visit's buddy messages, oldest first (the window since the mentor last
- * updated its memory — not the whole transcript).
+ * Names the conversation a call is about, on the query string — the shape the read and open
+ * endpoints take their target in.
  *
- * @param teamProjectId Pass to read the *team-mode* conversation with a managed project instead
- *   of the hire's own — the backend keeps the two as separate conversations.
+ * Hand-joined rather than `URLSearchParams.size`, and skipped parts are left out entirely:
+ * an absent parameter is what the backend reads as "the caller's own conversation".
  */
-export async function getMessages(teamProjectId?: string): Promise<BuddyMessage[]> {
-  const query = teamProjectId ? `?teamProjectId=${encodeURIComponent(teamProjectId)}` : "";
+function buddyQuery(parts: { sessionId?: string; teamProjectId?: string }): string {
+  const params: string[] = [];
 
-  return await apiClient.fetch<BuddyMessage[]>(`/api/v1/onboarding/me/buddy/messages${query}`);
+  if (parts.sessionId) params.push(`sessionId=${encodeURIComponent(parts.sessionId)}`);
+  if (parts.teamProjectId) params.push(`teamProjectId=${encodeURIComponent(parts.teamProjectId)}`);
+
+  return params.length > 0 ? `?${params.join("&")}` : "";
+}
+
+/**
+ * One conversation the hire owns: its id, its title (empty until the first message writes
+ * one) and when it was started. Newest first, as the backend orders them.
+ */
+export interface BuddySessionSummary {
+  id: string;
+  title: string;
+  projectId: string | null;
+  createdAt: string;
+}
+
+/**
+ * The hire's conversations, newest first.
+ *
+ * Read before every opening: the client picks the one to show — the most recent, or the one
+ * it was last in — and names it on every request that follows.
+ */
+export async function getSessions(): Promise<BuddySessionSummary[]> {
+  const response = await apiClient.fetch<{ sessions: BuddySessionSummary[] }>(
+    `/api/v1/onboarding/me/buddy/sessions`,
+  );
+
+  return response.sessions;
+}
+
+/**
+ * Starts a conversation for the hire and returns its id.
+ *
+ * No project is named, deliberately: the hire's conversation is not one project's, and the
+ * backend already scopes retrieval to every project they are on. A conversation created by
+ * "new conversation" therefore behaves exactly like the first one.
+ */
+export async function createSession(): Promise<string> {
+  const response = await apiClient.fetch<{ id: string }>(`/api/v1/onboarding/me/buddy/sessions`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+
+  return response.id;
+}
+
+/**
+ * Retrieves one conversation's messages, oldest first (the window since its last opening —
+ * not the whole transcript).
+ *
+ * @param sessionId - The conversation to read. Required for the hire's own conversations — the
+ *   backend answers `400` without one.
+ * @param teamProjectId - Pass to read the *team-mode* conversation with a managed project
+ *   instead; the backend keeps the two apart and team reads name no session.
+ */
+export async function getMessages(
+  sessionId: string | undefined,
+  teamProjectId?: string,
+): Promise<BuddyMessage[]> {
+  return await apiClient.fetch<BuddyMessage[]>(
+    `/api/v1/onboarding/me/buddy/messages${buddyQuery({ sessionId, teamProjectId })}`,
+  );
 }
 
 /** One suggested next step attached to a buddy greeting — one click sends `question`. */
@@ -66,17 +128,18 @@ export interface BuddyOpeningHandlers {
  * Opening twice without the hire saying anything is the same visit: the greeting already there is
  * replayed whole and no model is called.
  *
- * @param handlers How the streamed greeting is received.
- * @param teamProjectId Pass to open a *team-mode* visit with a managed project instead of the
+ * @param handlers - How the streamed greeting is received.
+ * @param sessionId - The conversation to open. Required for the hire's own conversations.
+ * @param teamProjectId - Pass to open a *team-mode* visit with a managed project instead of the
  *   hire's own conversation — the backend greets a manager about their team there.
  */
 export async function streamOpenBuddy(
   handlers: BuddyOpeningHandlers,
+  sessionId: string | undefined,
   teamProjectId?: string,
 ): Promise<void> {
-  const query = teamProjectId ? `?teamProjectId=${encodeURIComponent(teamProjectId)}` : "";
   const outcome = await readBuddyStream(
-    `/api/v1/onboarding/me/buddy/open/stream${query}`,
+    `/api/v1/onboarding/me/buddy/open/stream${buddyQuery({ sessionId, teamProjectId })}`,
     undefined,
     (chunk) => {
       switch (chunk.type) {
@@ -424,22 +487,24 @@ async function readBuddyStream(
 /**
  * Sends a message to the user's persistent buddy and streams the grounded reply.
  *
- * @param content The message to send.
- * @param handlers Helper operations handling the output of the buddy's response.
- * @param teamProjectId Pass to speak in *team mode* about a managed project instead of the hire's
+ * @param content - The message to send.
+ * @param handlers - Helper operations handling the output of the buddy's response.
+ * @param sessionId - The conversation to speak into. Required for the hire's own conversations.
+ * @param teamProjectId - Pass to speak in *team mode* about a managed project instead of the hire's
  *   own conversation. Sent in the body, not the query string — the backend's contract puts the
- *   team target on the POST body and leaves the hire's own conversation the body-less default.
+ *   team target on the POST body and leaves the hire's own conversation to `sessionId`.
  */
 export async function streamMessage(
   content: string,
   handlers: BuddyStreamHandlers,
+  sessionId: string | undefined,
   teamProjectId?: string,
 ): Promise<void> {
   const outcome = await readBuddyStream(
     `/api/v1/onboarding/me/buddy/messages`,
-    // Omitted, never null: the backend treats an absent field as the hire's own conversation,
-    // and carrying `teamProjectId: null` would send a field the contract does not have.
-    teamProjectId ? { content, teamProjectId } : { content },
+    // Omitted, never null: a team target replaces the conversation, and carrying
+    // `teamProjectId: null` would send a field the contract does not have.
+    teamProjectId ? { content, teamProjectId } : { content, sessionId },
     (event) => {
       switch (event.type) {
         case "tool_use":

@@ -1,6 +1,7 @@
 import { BookOpen, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DrawerCard } from "../../../components/ui/DrawerCard.tsx";
+import { IconTile } from "../../../components/ui/IconTile.tsx";
 import {
   knowledgeBaseHrefFor,
   knowledgeBaseScopeLabelFor,
@@ -32,9 +33,7 @@ export function KnowledgeBaseLinkCard({
         to={knowledgeBaseHrefFor(source)}
         className="group flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface p-5 transition-colors hover:border-app-brand-border hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none sm:p-6"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand">
-          <BookOpen className="h-4 w-4" aria-hidden="true" />
-        </span>
+        <IconTile icon={BookOpen} size="md" tone="brand" />
 
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-app-text">

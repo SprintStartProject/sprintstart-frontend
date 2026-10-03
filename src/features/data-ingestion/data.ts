@@ -127,6 +127,10 @@ export function createDataSourceFromStatus(status: SourceInstanceIngestionStatus
   return createDataSource({ definition: getConnector(status.sourceSystem), status });
 }
 
+/**
+ * A source's status from the status the backend reports for a project source. A missing or
+ * unknown value reads as `warning`, not as connected.
+ */
 export function getSourceStatusFromBackend(
   backendStatus?: BackendProjectSourceStatus,
 ): SourceStatus {
@@ -322,6 +326,10 @@ export function deriveSyncStatus(source: DataSource): SourceStatusPresentation {
       };
 }
 
+/**
+ * The words for a backend source status. A missing or unknown value reads as "Connected", unlike
+ * {@link getSourceStatusFromBackend}, which treats it as a warning.
+ */
 export function getBackendSourceStatusLabel(backendStatus?: BackendProjectSourceStatus) {
   switch (backendStatus) {
     case "CONNECTED":
@@ -363,6 +371,7 @@ export function getRunStatusTone(status: IngestionRunStatus) {
   return "warning";
 }
 
+/** Whether a run is still going. `CONNECTED` counts as running, as in {@link getRunStatusLabel}. */
 export function isRunInProgress(status?: IngestionRunStatus | null) {
   return status === "CONNECTED" || status === "RUNNING";
 }

@@ -331,6 +331,10 @@ export async function getIngestionSourceStatuses(
   return data.map(mapSourceInstanceStatus);
 }
 
+/**
+ * Loads one page of a project's ingested artifacts. `options` carries the 1-based page, the
+ * page size and an optional filter.
+ */
 export async function getProjectArtifacts(
   projectId: string,
   options: GetProjectArtifactsOptions = {},
@@ -340,6 +344,10 @@ export async function getProjectArtifacts(
   return apiClient.fetch<ArtifactPage>(`/api/v1/projects/${projectId}/artifacts?${query}`);
 }
 
+/**
+ * Loads every artifact of a project: the first page of 100, then all remaining pages in
+ * parallel. The number of requests grows with the project's artifact count.
+ */
 export async function getProjectArtifactSnapshot(
   projectId: string,
 ): Promise<{ artifacts: Artifact[]; totalElements: number }> {
