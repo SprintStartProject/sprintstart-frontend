@@ -50,5 +50,5 @@ export const CHAT_SOURCE_SYSTEMS: readonly SourceSystem[] = CONNECTOR_LIST.filte
 
 /** The source systems whose sources can be put on a sync schedule. */
 export const SCHEDULED_SOURCE_SYSTEMS: readonly SourceSystem[] = CONNECTOR_LIST.filter(
-  (definition) => definition.supportsSchedule,
+  (definition) => definition.actions.schedule !== undefined,
 ).map((definition) => definition.meta.system);

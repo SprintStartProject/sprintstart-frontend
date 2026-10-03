@@ -308,3 +308,11 @@ export type DataSource = {
   failedItems: FailedArtifact[];
   details: SourceDetails;
 };
+
+/**
+ * What the details panel changed about a source, so the page knows what to
+ * reload: `updated` started (or finished) a re-ingestion and also opens the
+ * polling window, `changed` is any other edit or a manual refresh, `unlinked`
+ * removed the source from the project.
+ */
+export type SourceChange = "updated" | "changed" | "unlinked";

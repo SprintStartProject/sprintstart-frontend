@@ -11,7 +11,8 @@ import {
   SOURCE_SYSTEMS,
   toSourceSystem,
 } from "../../../../../src/features/data-ingestion/connectors/sourceSystems";
-import { SOURCE_META } from "../../../../../src/features/data-ingestion/data";
+import { createDataSource, SOURCE_META } from "../../../../../src/features/data-ingestion/data";
+import type { SourceInstanceIngestionStatus } from "../../../../../src/features/data-ingestion/types";
 import { getConnectorMeta } from "../../../../../src/features/connectors/data";
 
 describe("connector registry", () => {
@@ -87,5 +88,88 @@ describe("connector registry", () => {
     expect(toSourceSystem("github")).toBe("GITHUB");
     expect(toSourceSystem("Confluence")).toBe("CONFLUENCE");
     expect(toSourceSystem("bitbucket")).toBeNull();
+  });
+
+  describe("actions", () => {
+    const status: SourceInstanceIngestionStatus = {
+      sourceSystem: "GITHUB",
+      sourceId: "acme/monorepo",
+      displayName: "acme/monorepo",
+      repositoryId: "repo-1",
+      owner: "acme",
+      name: "monorepo",
+      sourceUrl: "https://github.com/acme/monorepo",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: null,
+      ingestedCount: 0,
+      updatedCount: 0,
+      deletedCount: 0,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 0,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: null,
+      lastPullRequestsSyncAt: null,
+    };
+
+    it("gives uploads no action, no identity card and no run filter", () => {
+      expect(CONNECTORS.UPLOAD.actions).toEqual({});
+      expect(CONNECTORS.UPLOAD.DetailsSection).toBeNull();
+      expect(CONNECTORS.UPLOAD.runFilter).toBeUndefined();
+    });
+
+    it("gives every other connector an identity card, an update or a sync, and a schedule", () => {
+      for (const system of ["GITHUB", "JIRA", "CONFLUENCE"] as const) {
+        const { actions, DetailsSection } = CONNECTORS[system];
+
+        expect(DetailsSection).not.toBeNull();
+        expect(actions.update ?? actions.manualSync).toBeDefined();
+        expect(actions.unlink).toBeDefined();
+        expect(actions.setEnabled).toBeDefined();
+        expect(actions.schedule).toBeDefined();
+      }
+    });
+
+    it("runs a connector's update either in the background or to completion, never both", () => {
+      for (const { actions } of CONNECTOR_LIST) {
+        expect(actions.update !== undefined && actions.manualSync !== undefined).toBe(false);
+      }
+      expect(CONNECTORS.CONFLUENCE.actions.manualSync).toBeDefined();
+    });
+
+    it("offers no action on a card whose source could not be resolved", () => {
+      const unresolved = createDataSource({
+        definition: CONNECTORS.GITHUB,
+        status: null,
+        connection: { id: "ps-1", name: "acme/monorepo", type: "GITHUB", status: "CONNECTED" },
+      });
+      const { update, unlink, setEnabled, schedule } = CONNECTORS.GITHUB.actions;
+
+      expect(update?.isAvailable(unresolved)).toBe(false);
+      expect(unlink?.isAvailable(unresolved)).toBe(false);
+      expect(setEnabled?.isAvailable(unresolved)).toBe(false);
+      expect(schedule?.isAvailable(unresolved)).toBe(false);
+    });
+
+    it("scopes the run history by repository id for GitHub and by source reference for Jira", () => {
+      const github = createDataSource({ definition: CONNECTORS.GITHUB, status });
+      const jira = createDataSource({
+        definition: CONNECTORS.JIRA,
+        status: { ...status, sourceSystem: "JIRA", sourceId: "https://acme.atlassian.net" },
+      });
+
+      expect(CONNECTORS.GITHUB.runFilter?.param).toBe("repositoryId");
+      expect(CONNECTORS.GITHUB.runFilter?.valueOf(github)).toBe("repo-1");
+      expect(CONNECTORS.JIRA.runFilter?.param).toBe("sourceRef");
+      expect(CONNECTORS.JIRA.runFilter?.valueOf(jira)).toBe("https://acme.atlassian.net");
+      expect(CONNECTORS.CONFLUENCE.runFilter?.param).toBe("repositoryId");
+    });
+
+    it("names the unlink cost in each connector's own words", () => {
+      expect(CONNECTORS.GITHUB.actions.unlink?.removalHint).toMatch(/repository/);
+      expect(CONNECTORS.JIRA.actions.unlink?.removalHint).toMatch(/instance/);
+      expect(CONNECTORS.CONFLUENCE.actions.unlink?.removalHint).toMatch(/from scratch/);
+    });
   });
 });

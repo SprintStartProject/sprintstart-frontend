@@ -41,7 +41,14 @@ describe("SourceDetailsPanel Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <SourceDetailsPanel source={source} onClose={vi.fn()} />
+        <SourceDetailsPanel
+          source={source}
+          projectId="p1"
+          canManage
+          canUnlink
+          onChanged={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
       </MemoryRouter>,
     );
 

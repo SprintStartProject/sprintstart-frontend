@@ -24,13 +24,13 @@ import { SourceList } from "../features/data-ingestion/components/SourceList.tsx
 import { ConnectorList } from "../features/connectors/components/ConnectorList.tsx";
 import { ConnectorsLoadingState } from "../features/connectors/components/ConnectorsLoadingState.tsx";
 import { toConnectorListItems } from "../features/connectors/data.ts";
-import { useConfluenceSync } from "../features/connectors/components/useConfluenceSync.ts";
 import type { ConnectorListItem } from "../features/connectors/types.ts";
 import { connectorService } from "../services/connectorService.ts";
 import { buildDataSources } from "../features/data-ingestion/buildSources.ts";
 import {
   CONNECTORS,
   SCHEDULED_SOURCE_SYSTEMS,
+  getConnector,
 } from "../features/data-ingestion/connectors/registry.ts";
 import type { SourceSystem } from "../features/data-ingestion/connectors/sourceSystems.ts";
 import {
@@ -38,19 +38,15 @@ import {
   getRunSourceLabel,
   isRunInProgress,
 } from "../features/data-ingestion/data.ts";
-import {
-  confluenceSpaceOf,
-  githubRepositoryOf,
-  jiraInstanceOf,
-} from "../features/data-ingestion/sourceDetails.ts";
+import { githubRepositoryOf } from "../features/data-ingestion/sourceDetails.ts";
 import type {
   DataSource,
-  GithubRepositoryDetails,
   IngestionRun,
   IngestionRunFilter,
   LoadingState,
   PageMetadata,
   SectionKey,
+  SourceChange,
   SourceInstanceIngestionStatus,
 } from "../features/data-ingestion/types.ts";
 import { SECTION_ORDER } from "../features/data-ingestion/types.ts";
@@ -64,22 +60,9 @@ import { getIngestionRunsPage, getIngestionSourceStatuses } from "../services/in
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useProjectContext } from "../features/projects/useProjectContext.ts";
-import {
-  configureGithubRepository,
-  getGithubRepositoryConfig,
-  getGithubPatNames,
-  removeRepositoryFromProject,
-  updateGithubRepository,
-} from "../services/sources/githubService.ts";
+import { getGithubPatNames } from "../services/sources/githubService.ts";
 import type { SyncScheduleConfig, SyncScheduleRequest } from "../services/sources/syncSchedule.ts";
-import {
-  configureJiraInstance,
-  getJiraConfig,
-  getJiraInstances,
-  removeJiraInstanceFromProject,
-  updateJiraInstance,
-  type JiraInstanceDto,
-} from "../services/sources/jiraService.ts";
+import { getJiraInstances, type JiraInstanceDto } from "../services/sources/jiraService.ts";
 import {
   confluenceService,
   type ConfluenceConnectionDto,
@@ -243,8 +226,6 @@ export function DataIngestionPage() {
   const { selectedProject, selectedProjectId, setSelectedProjectId, reloadProjects } =
     useProjectContext();
 
-  const { syncConnection: syncConfluenceConnection } = useConfluenceSync(selectedProjectId);
-
   const requestedProjectId = searchParams.get("projectId") ?? "";
   const requestedSourceId = searchParams.get("sourceId") ?? "";
 
@@ -373,21 +354,19 @@ export function DataIngestionPage() {
   // project to its connected repositories.
   const buildRunQuery = useCallback(
     (page: number): IngestionRunFilter => {
-      const hasSource = runFilter.sourceValue !== "ALL";
+      // The connector says which query parameter scopes its runs (repositoryId is
+      // the backend source-instance UUID, sourceRef the run's source reference).
+      const scope =
+        runFilter.sourceValue !== "ALL" && runFilter.sourceSystem
+          ? getConnector(runFilter.sourceSystem).runFilter?.param
+          : undefined;
 
       return {
         page,
         size: RUN_PAGE_SIZE,
         projectId: selectedProjectId || undefined,
-        // GitHub and Confluence scope by repositoryId (filtering on backend sourceInstanceId UUID);
-        // Jira scopes by the run's sourceInstanceRef via sourceRef (instance URL).
-        repositoryId:
-          hasSource &&
-          (runFilter.sourceSystem === "GITHUB" || runFilter.sourceSystem === "CONFLUENCE")
-            ? runFilter.sourceValue
-            : undefined,
-        sourceRef:
-          hasSource && runFilter.sourceSystem === "JIRA" ? runFilter.sourceValue : undefined,
+        repositoryId: scope === "repositoryId" ? runFilter.sourceValue : undefined,
+        sourceRef: scope === "sourceRef" ? runFilter.sourceValue : undefined,
         status: runFilter.status !== "ALL" ? runFilter.status : undefined,
       };
     },
@@ -627,27 +606,15 @@ export function DataIngestionPage() {
 
   const runSourceLabels = useMemo(() => buildRunSourceLabels(sources), [sources]);
 
-  // Sources offered in the run filter, from the project's connected sources: a
-  // GitHub repo filters by its repositoryId, a Jira instance by its URL
-  // (sourceId), which the query maps to sourceRef.
+  // Sources offered in the run filter, from the project's connected sources. Each
+  // connector says which query parameter scopes its runs and by which value; a
+  // source whose connector cannot tell its runs apart is not offered.
   const runSourceOptions = useMemo<RunSourceFilterOption[]>(
     () =>
       sources.flatMap((source): RunSourceFilterOption[] => {
-        const repositoryId = githubRepositoryOf(source)?.repositoryId;
-        if (repositoryId) {
-          return [{ value: repositoryId, label: source.name, sourceSystem: "GITHUB" }];
-        }
+        const value = getConnector(source.sourceSystem).runFilter?.valueOf(source);
 
-        if (source.sourceSystem === "JIRA") {
-          return [{ value: source.sourceId, label: source.name, sourceSystem: "JIRA" }];
-        }
-
-        const connectionId = confluenceSpaceOf(source)?.connectionId;
-        if (connectionId) {
-          return [{ value: connectionId, label: source.name, sourceSystem: "CONFLUENCE" }];
-        }
-
-        return [];
+        return value ? [{ value, label: source.name, sourceSystem: source.sourceSystem }] : [];
       }),
     [sources],
   );
@@ -792,41 +759,6 @@ export function DataIngestionPage() {
     }, 1500);
   }, [loadData, reloadSourceData]);
 
-  const handleUpdateSource = useCallback(
-    async (source: DataSource) => {
-      if (source.sourceSystem === "JIRA") {
-        const instance = jiraInstanceOf(source);
-        if (!instance) {
-          throw new Error("Instance details are not available for this source.");
-        }
-
-        await updateJiraInstance({ instanceUrl: instance.instanceUrl });
-        refreshAfterUpdate();
-        return;
-      }
-
-      if (source.sourceSystem === "CONFLUENCE") {
-        // Use the space's connectionId (the connection UUID) rather than
-        // source.sourceId which may hold a raw status-row ref string.
-        const connectionId = confluenceSpaceOf(source)?.connectionId;
-        if (!connectionId) {
-          throw new Error("Confluence connection ID is not available for this source.");
-        }
-        await syncConfluenceConnection(connectionId, () => refreshAfterUpdate());
-        return;
-      }
-
-      const repository = githubRepositoryOf(source);
-      if (!repository) {
-        throw new Error("Repository details are not available for this source.");
-      }
-
-      await updateGithubRepository(repository);
-      refreshAfterUpdate();
-    },
-    [refreshAfterUpdate, syncConfluenceConnection],
-  );
-
   // The sync-settings modal works on the selected project's sources only: it
   // reads the schedule of each of them, shows it when they all agree, and writes
   // the chosen schedule to each of them.
@@ -867,73 +799,6 @@ export function DataIngestionPage() {
     ],
   );
 
-  const handleLoadGithubRepositoryConfig = useCallback(
-    async (repository: GithubRepositoryDetails) => {
-      return getGithubRepositoryConfig(repository);
-    },
-    [],
-  );
-
-  const handleSaveGithubRepositoryConfig = useCallback(
-    async (repository: GithubRepositoryDetails, request: SyncScheduleRequest) => {
-      await configureGithubRepository(repository, request);
-      // No reloadProjects(): see refreshSourceDetails — a per-repo sync-schedule
-      // change never alters the project switcher, and reloading it can reset the
-      // selected project and blank the page mid-save.
-      await Promise.all([loadData(false), reloadSourceData()]);
-    },
-    [loadData, reloadSourceData],
-  );
-
-  const handleLoadJiraConfig = useCallback(
-    async (instanceUrl: string) => getJiraConfig(instanceUrl),
-    [],
-  );
-
-  const handleSaveJiraConfig = useCallback(
-    async (instanceUrl: string, request: SyncScheduleRequest) => {
-      await configureJiraInstance({ instanceUrl, ...request });
-      // Mirrors the GitHub path: no reloadProjects(), just refresh this page's
-      // run list and per-source statuses so the next-sync time updates.
-      await Promise.all([loadData(false), reloadSourceData()]);
-    },
-    [loadData, reloadSourceData],
-  );
-
-  // Confluence has no dedicated config endpoint: the connection itself carries
-  // the schedule, so the form reads it straight off the connection DTO.
-  const handleLoadConfluenceConfig = useCallback(
-    async (connectionId: string) => {
-      if (!selectedProjectId) {
-        throw new Error("Select a project before loading the sync schedule.");
-      }
-
-      const connection = await confluenceService.getConnection(selectedProjectId, connectionId);
-
-      return {
-        autoUpdate: connection.autoUpdate ?? false,
-        spec: connection.spec ?? null,
-        nextSyncAt: connection.nextSyncAt ?? null,
-      };
-    },
-    [selectedProjectId],
-  );
-
-  const handleSaveConfluenceConfig = useCallback(
-    async (connectionId: string, request: SyncScheduleRequest) => {
-      if (!selectedProjectId) {
-        throw new Error("Select a project before saving the sync schedule.");
-      }
-
-      await confluenceService.configureSchedule(selectedProjectId, connectionId, {
-        schedule: request.schedule,
-        autoUpdate: request.autoUpdate,
-      });
-      await Promise.all([loadData(false), reloadSourceData()]);
-    },
-    [loadData, reloadSourceData, selectedProjectId],
-  );
-
   // Refreshes just this page's data after a source-level mutation (enable/disable,
   // "Refresh details"). It intentionally does NOT reloadProjects(): the switcher's
   // project list is unaffected by these actions, and reloading it can transiently
@@ -946,75 +811,24 @@ export function DataIngestionPage() {
     setProjectDataVersion((version) => version + 1);
   }, [loadData, reloadSourceData]);
 
-  // Enables/disables a connected repository as an ingestion source (the
-  // connector allow/deny toggle), then refreshes so the drawer reflects it.
-  const handleSetSourceEnabled = useCallback(
-    async (repository: GithubRepositoryDetails, enabled: boolean) => {
-      await connectorService.patchConnectorSources("github", [
-        { sourceId: repository.fullName, enabled },
-      ]);
-      await refreshSourceDetails();
-    },
-    [refreshSourceDetails],
-  );
-
-  // Jira instances are gated through the same generic connector endpoint as
-  // GitHub: the JiraConnector's patchSource flips `sourceEnabled` and the AI
-  // service is notified, keyed by the instance URL.
-  const handleSetJiraSourceEnabled = useCallback(
-    async (instanceUrl: string, enabled: boolean) => {
-      await connectorService.patchConnectorSources("jira", [{ sourceId: instanceUrl, enabled }]);
-      await refreshSourceDetails();
-    },
-    [refreshSourceDetails],
-  );
-
-  // Removes a source's link to the selected project (the DELETE counterpart to
-  // linking it via the Add Source flow), keyed per connector: a repository id
-  // for GitHub, the instance URL for Jira, the connection id for Confluence. The
-  // source and its artifacts are kept; only this project stops using it. Closes
-  // the drawer and refreshes the project-scoped lists so the card disappears.
-  const handleUnlinkSource = useCallback(
-    async (source: DataSource) => {
-      if (source.sourceSystem === "JIRA") {
-        const instance = jiraInstanceOf(source);
-        if (!instance || !selectedProjectId) {
-          throw new Error("This source cannot be removed from the project.");
-        }
-
-        await removeJiraInstanceFromProject(instance.instanceUrl, selectedProjectId);
-
-        setSelectedSourceId(null);
-        await refreshSourceDetails();
+  // The details panel runs its actions itself (through the source's connector
+  // definition) and reports what it changed; this reloads what the cards are
+  // built from. An unlink also drops the selection, so the card disappears and
+  // the drawer closes.
+  const handleSourceChanged = useCallback(
+    async (change: SourceChange) => {
+      if (change === "updated") {
+        refreshAfterUpdate();
         return;
       }
 
-      if (source.sourceSystem === "CONFLUENCE") {
-        const connectionId = confluenceSpaceOf(source)?.connectionId;
-
-        if (!connectionId || !selectedProjectId) {
-          throw new Error("This source cannot be removed from the project.");
-        }
-
-        await confluenceService.deleteConnection(selectedProjectId, connectionId);
-
+      if (change === "unlinked") {
         setSelectedSourceId(null);
-        await refreshSourceDetails();
-        return;
       }
 
-      const repositoryId = githubRepositoryOf(source)?.repositoryId;
-
-      if (!repositoryId || !selectedProjectId) {
-        throw new Error("This repository cannot be removed from the project.");
-      }
-
-      await removeRepositoryFromProject(repositoryId, selectedProjectId);
-
-      setSelectedSourceId(null);
       await refreshSourceDetails();
     },
-    [refreshSourceDetails, selectedProjectId],
+    [refreshAfterUpdate, refreshSourceDetails],
   );
 
   const isLoading = loadingState === "loading";
@@ -1251,18 +1065,10 @@ export function DataIngestionPage() {
         {(source) => (
           <SourceDetailsPanel
             source={source}
-            onUpdateSource={handleUpdateSource}
-            onRefreshDetails={refreshSourceDetails}
-            canManageSyncSettings={canManageSyncSettings}
-            onLoadRepositoryConfig={handleLoadGithubRepositoryConfig}
-            onSaveRepositoryConfig={handleSaveGithubRepositoryConfig}
-            onLoadJiraConfig={handleLoadJiraConfig}
-            onSaveJiraConfig={handleSaveJiraConfig}
-            onLoadConfluenceConfig={handleLoadConfluenceConfig}
-            onSaveConfluenceConfig={handleSaveConfluenceConfig}
-            onSetSourceEnabled={handleSetSourceEnabled}
-            onSetJiraSourceEnabled={handleSetJiraSourceEnabled}
-            onUnlinkSource={canIngestIntoSelectedProject ? handleUnlinkSource : undefined}
+            projectId={selectedProjectId || null}
+            canManage={canManageSyncSettings}
+            canUnlink={canIngestIntoSelectedProject}
+            onChanged={handleSourceChanged}
             onClose={closeSourceDetails}
           />
         )}

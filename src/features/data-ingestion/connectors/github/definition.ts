@@ -1,7 +1,17 @@
 import { GitBranch } from "lucide-react";
 import type { ProjectSource } from "../../../../services/projectService.ts";
+import { connectorService } from "../../../../services/connectorService.ts";
+import {
+  configureGithubRepository,
+  getGithubRepositoryConfig,
+  removeRepositoryFromProject,
+  updateGithubRepository,
+} from "../../../../services/sources/githubService.ts";
+import { githubRepositoryOf } from "../../sourceDetails.ts";
 import type { GithubRepositoryDetails, SourceInstanceIngestionStatus } from "../../types.ts";
+import { requireProjectId } from "../actionContext.ts";
 import type { ConnectorDefinition } from "../types.ts";
+import { GithubDetailsSection } from "./DetailsSection.tsx";
 
 function repositoryFromStatus(status: SourceInstanceIngestionStatus): GithubRepositoryDetails {
   return {
@@ -30,8 +40,63 @@ export const githubConnector: ConnectorDefinition<ProjectSource> = {
         "Commits, files, issues and pull request metadata from connected GitHub repositories.",
     },
   },
-  supportsSchedule: true,
   chat: { filterable: true },
+  DetailsSection: GithubDetailsSection,
+  runFilter: {
+    param: "repositoryId",
+    valueOf: (source) => githubRepositoryOf(source)?.repositoryId ?? null,
+  },
+
+  actions: {
+    update: {
+      isAvailable: (source) => githubRepositoryOf(source) !== null,
+      unavailableReason: "Repository updates need GitHub owner and repository name.",
+      async run(source) {
+        const repository = githubRepositoryOf(source);
+        if (!repository) throw new Error("Repository details are not available for this source.");
+
+        await updateGithubRepository(repository);
+      },
+    },
+    unlink: {
+      isAvailable: (source) => Boolean(githubRepositoryOf(source)?.repositoryId),
+      // A repository is shared between projects and only loses the project
+      // association, so re-linking restores it as it was.
+      removalHint: "The repository and its artifacts are kept. You can re-link it later.",
+      async run(source, context) {
+        const repositoryId = githubRepositoryOf(source)?.repositoryId;
+        if (!repositoryId) throw new Error("This repository cannot be removed from the project.");
+
+        await removeRepositoryFromProject(repositoryId, requireProjectId(context, "removing it"));
+      },
+    },
+    setEnabled: {
+      isAvailable: (source) => githubRepositoryOf(source) !== null,
+      async run(source, enabled) {
+        const repository = githubRepositoryOf(source);
+        if (!repository) throw new Error("Repository details are not available for this source.");
+
+        await connectorService.patchConnectorSources("github", [
+          { sourceId: repository.fullName, enabled },
+        ]);
+      },
+    },
+    schedule: {
+      isAvailable: (source) => githubRepositoryOf(source) !== null,
+      async load(source) {
+        const repository = githubRepositoryOf(source);
+        if (!repository) throw new Error("Repository sync config is not available.");
+
+        return getGithubRepositoryConfig(repository);
+      },
+      async save(source, request) {
+        const repository = githubRepositoryOf(source);
+        if (!repository) throw new Error("Repository sync config is not available.");
+
+        await configureGithubRepository(repository, request);
+      },
+    },
+  },
 
   identity(status, projectSource) {
     if (projectSource) return { sourceId: projectSource.id, name: projectSource.name };
@@ -55,6 +120,16 @@ export const githubConnector: ConnectorDefinition<ProjectSource> = {
       pullRequests: status?.lastPullRequestsSyncAt ?? null,
     },
   }),
+
+  // GitHub exposes one timestamp per resource type.
+  resourceSyncTimes: (details) =>
+    details.system === "GITHUB"
+      ? [
+          { label: "Commits", value: details.syncTimes.commits },
+          { label: "Issues", value: details.syncTimes.issues },
+          { label: "Pull requests", value: details.syncTimes.pullRequests },
+        ]
+      : [],
 
   runReferences: (details) =>
     details.system === "GITHUB" && details.repository ? [details.repository.fullName] : [],

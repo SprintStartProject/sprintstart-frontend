@@ -1,16 +1,10 @@
 import {
-  configureGithubRepository,
-  getGithubRepositoryConfig,
-} from "../../services/sources/githubService.ts";
-import { configureJiraInstance, getJiraConfig } from "../../services/sources/jiraService.ts";
-import { confluenceService } from "../../services/sources/confluenceService.ts";
-import {
   DEFAULT_SYNC_SCHEDULE,
   type ScheduleSpec,
   type SyncScheduleRequest,
 } from "../../services/sources/syncSchedule.ts";
+import { getConnector } from "./connectors/registry.ts";
 import type { SourceSystem } from "./connectors/sourceSystems.ts";
-import { confluenceSpaceOf, githubRepositoryOf, jiraInstanceOf } from "./sourceDetails.ts";
 import type { DataSource } from "./types.ts";
 
 /** The schedule to show in the project-wide form and whether the sources disagree on it. */
@@ -28,63 +22,27 @@ type ScheduleTarget = {
   save: (request: SyncScheduleRequest) => Promise<void>;
 };
 
+/**
+ * The project's sources of one connector that have a schedule to read and write,
+ * through the connector's own `schedule` action. A connector without one, or a
+ * source that cannot be resolved to its upstream, has no target.
+ */
 function toTargets(
   system: SourceSystem,
   sources: DataSource[],
   projectId: string | null,
 ): ScheduleTarget[] {
-  const ofSystem = sources.filter((source) => source.sourceSystem === system);
+  const schedule = getConnector(system).actions.schedule;
+  if (!schedule) return [];
 
-  switch (system) {
-    case "GITHUB":
-      return ofSystem.flatMap((source) => {
-        const repository = githubRepositoryOf(source);
-        if (!repository) return [];
+  const context = { projectId };
 
-        return [
-          {
-            load: () => getGithubRepositoryConfig(repository),
-            save: (request) => configureGithubRepository(repository, request),
-          },
-        ];
-      });
-    case "JIRA":
-      return ofSystem.flatMap((source) => {
-        const instanceUrl = jiraInstanceOf(source)?.instanceUrl;
-        if (!instanceUrl) return [];
-
-        return [
-          {
-            load: () => getJiraConfig(instanceUrl),
-            save: (request) => configureJiraInstance({ instanceUrl, ...request }),
-          },
-        ];
-      });
-    case "CONFLUENCE":
-      return ofSystem.flatMap((source) => {
-        const connectionId = confluenceSpaceOf(source)?.connectionId;
-        if (!connectionId) return [];
-        if (!projectId) throw new Error("Select a project before using the sync schedule.");
-
-        return [
-          {
-            load: async () => {
-              const connection = await confluenceService.getConnection(projectId, connectionId);
-
-              return { autoUpdate: connection.autoUpdate ?? false, spec: connection.spec ?? null };
-            },
-            save: async (request) => {
-              await confluenceService.configureSchedule(projectId, connectionId, {
-                schedule: request.schedule,
-                autoUpdate: request.autoUpdate,
-              });
-            },
-          },
-        ];
-      });
-    case "UPLOAD":
-      return [];
-  }
+  return sources
+    .filter((source) => source.sourceSystem === system && schedule.isAvailable(source))
+    .map((source) => ({
+      load: () => schedule.load(source, context),
+      save: (request) => schedule.save(source, request, context),
+    }));
 }
 
 /**

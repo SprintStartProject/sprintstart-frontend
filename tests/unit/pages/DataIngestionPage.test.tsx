@@ -136,6 +136,7 @@ const {
   mockListConnectors,
   mockGetGithubRepositoryConfig,
   mockConfigureGithubRepository,
+  mockRemoveRepositoryFromProject,
 } = vi.hoisted(() => ({
   mockGetIngestionRunsPage: vi.fn(),
   mockGetIngestionStatus: vi.fn(),
@@ -148,6 +149,7 @@ const {
   mockListConnectors: vi.fn(),
   mockGetGithubRepositoryConfig: vi.fn(),
   mockConfigureGithubRepository: vi.fn(),
+  mockRemoveRepositoryFromProject: vi.fn(),
 }));
 
 vi.mock("../../../src/services/ingestionService", () => ({
@@ -171,6 +173,7 @@ vi.mock("../../../src/services/sources/githubService", () => ({
   updateGithubRepository: mockUpdateGithubRepository,
   getGithubRepositoryConfig: mockGetGithubRepositoryConfig,
   configureGithubRepository: mockConfigureGithubRepository,
+  removeRepositoryFromProject: mockRemoveRepositoryFromProject,
 }));
 
 const {
@@ -234,6 +237,10 @@ describe("DataIngestionPage", () => {
     mockUpdateJiraInstance.mockResolvedValue({ transactionId: "jira-tx" });
     mockGetGithubRepositoryConfig.mockResolvedValue(githubConfig());
     mockConfigureGithubRepository.mockResolvedValue(undefined);
+    mockRemoveRepositoryFromProject.mockResolvedValue({
+      repositoryId: "repo-uuid",
+      projectIds: [],
+    });
     mockGetJiraConfig.mockResolvedValue(jiraConfig());
     mockConfigureJiraInstance.mockResolvedValue(undefined);
     mockListConnectors.mockResolvedValue([]);
@@ -566,6 +573,63 @@ describe("DataIngestionPage", () => {
     // repository's full name.
     const panel = await screen.findByRole("dialog");
     expect(within(panel).getByText("Ingestion")).toBeInTheDocument();
+  });
+
+  it("starts an update from the drawer and reloads the project's sources", async () => {
+    mockGetIngestionSourceStatuses.mockResolvedValue([githubStatusRow("hello-world", "repo-uuid")]);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/data-ingestion?sourceId=octocat/hello-world"]}>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    const panel = await screen.findByRole("dialog");
+    const callsBefore = mockGetIngestionSourceStatuses.mock.calls.length;
+    await user.click(within(panel).getByRole("button", { name: /Update repo/ }));
+
+    await waitFor(() => {
+      expect(mockUpdateGithubRepository).toHaveBeenCalledWith(
+        expect.objectContaining({ owner: "octocat", name: "hello-world" }),
+      );
+    });
+    await waitFor(() => {
+      expect(mockGetIngestionSourceStatuses.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+  });
+
+  it("closes the drawer once the source was removed from the project", async () => {
+    mockGetIngestionSourceStatuses.mockResolvedValue([githubStatusRow("hello-world", "repo-uuid")]);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/data-ingestion?sourceId=octocat/hello-world"]}>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    const panel = await screen.findByRole("dialog");
+    // After the removal the project has no sources left.
+    mockGetIngestionSourceStatuses.mockResolvedValue([]);
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+    });
+
+    await user.click(within(panel).getByRole("button", { name: /Remove from project/ }));
+    await user.click(await screen.findByRole("button", { name: /^Remove$/ }));
+
+    await waitFor(() => {
+      expect(mockRemoveRepositoryFromProject).toHaveBeenCalledWith("repo-uuid", "proj1");
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 
   it("opens nothing for a component that is not connected", async () => {
