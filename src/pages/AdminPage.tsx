@@ -60,19 +60,23 @@ export function AdminPage() {
     A hand-off, not a permanent part of the URL: it seeds the tab once and is then stripped, so
     the tab bar keeps behaving exactly as before and the back button does not turn into a
     step-through of sections.
+
+    Consumed whenever it arrives, not only on mount: the buddy links to `/admin?tab=projects`
+    in place, and somebody already on this page would otherwise keep their tab while the
+    parameter sat in the URL.
   */
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
-    const requested = searchParams.get("tab");
-    return ADMIN_TAB_ORDER.find((tab) => tab === requested) ?? "users";
-  });
-
-  const tabParamConsumed = useRef(false);
+  const requestedTab = ADMIN_TAB_ORDER.find((tab) => tab === searchParams.get("tab"));
+  const [activeTab, setActiveTab] = useState<AdminTab>(requestedTab ?? "users");
+  // Adjusted during render rather than in the effect below: the tab follows a new request in
+  // the same paint, and forgetting the request once stripped lets the same link work twice.
+  const [handledTab, setHandledTab] = useState(requestedTab);
+  if (requestedTab !== handledTab) {
+    setHandledTab(requestedTab);
+    if (requestedTab) setActiveTab(requestedTab);
+  }
 
   useEffect(() => {
-    if (tabParamConsumed.current) return;
-    tabParamConsumed.current = true;
-
     if (!searchParams.has("tab")) return;
 
     const next = new URLSearchParams(searchParams);
