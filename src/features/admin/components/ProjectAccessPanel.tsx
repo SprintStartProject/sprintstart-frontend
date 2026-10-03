@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ExternalLink, Folder, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { ExternalLink, Folder, FolderKanban, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { Input } from "../../../components/ui/Input";
 import { useToast } from "../../../context/useToast";
 import type { ProjectSummary } from "../types";
@@ -26,6 +27,13 @@ type ProjectPickerState = {
   isOpen: boolean;
 };
 
+/**
+ * The user drawer's project memberships: the assigned projects, a searchable picker to assign
+ * another one, and a remove action per project.
+ *
+ * The panel does not know the one-project rule. The drawer passes `confirmAssign`, which asks
+ * before an assignment that would move a user out of their other projects.
+ */
 export function ProjectAccessPanel({
   assignedProjects,
   availableProjects,
@@ -216,11 +224,14 @@ export function ProjectAccessPanel({
   return (
     <div className="rounded-2xl border border-app-border bg-app-surface p-4 sm:p-5">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
-            Projects
-          </p>
-          <p className="mt-1 text-sm text-app-text-muted">Changes are saved immediately.</p>
+        <div className="flex items-start gap-2.5">
+          <IconTile icon={FolderKanban} size="md" tone="brand" />
+          <div>
+            <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
+              Projects
+            </p>
+            <p className="mt-1 text-sm text-app-text-muted">Changes are saved immediately.</p>
+          </div>
         </div>
 
         <div className="relative" ref={pickerAnchorRef}>
@@ -278,9 +289,12 @@ export function ProjectAccessPanel({
                       disabled={hasPendingProjectChange}
                       className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all hover:border-app-brand-border-strong hover:bg-app-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-surface-muted text-app-text-muted transition-colors group-hover:bg-app-surface group-hover:text-app-brand">
-                        <Folder className="h-4 w-4" />
-                      </span>
+                      <IconTile
+                        icon={Folder}
+                        size="lg"
+                        tone="neutral"
+                        className="transition-colors group-hover:bg-app-surface group-hover:text-app-brand"
+                      />
 
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-app-text">
@@ -319,9 +333,7 @@ export function ProjectAccessPanel({
             >
               <div className="flex items-start justify-between gap-3 sm:gap-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-app-surface text-app-text-muted">
-                    <Folder className="h-4 w-4" />
-                  </div>
+                  <IconTile icon={Folder} size="lg" tone="brand" />
 
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-app-text">{project.name}</p>

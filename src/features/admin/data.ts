@@ -1,10 +1,12 @@
 import type { BadgeVariant } from "../../components/ui/Badge";
 import { SIDE_PANEL_SLIDE_MS } from "../../styles/tokens";
+import type { ProjectRole, Skill } from "../team-management/types";
 import type {
   AdminUser,
   ProjectEditFormState,
   ProjectOverview,
   ProjectSummary,
+  SkillStatusFilter,
   UserEditFormState,
   UserFilter,
 } from "./types";
@@ -14,6 +16,10 @@ export const PAGE_SIZE = 8;
 // reason `PanelPresence` does: unmounting sooner would cut the slide off
 // halfway and the drawer would appear to vanish rather than glide away.
 export const DRAWER_CLOSE_DELAY_MS = SIDE_PANEL_SLIDE_MS + 30;
+/**
+ * The permission groups the user drawer offers, as the labels `adminUserService` maps them to and
+ * from. `HR` is not among them, so the drawer cannot make a user HR.
+ */
 export const PERMISSION_GROUP_OPTIONS = ["Admin", "User", "Project Manager"] as const;
 
 export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> = [
@@ -24,11 +30,16 @@ export const USER_FILTER_OPTIONS: Array<{ value: UserFilter; label: string }> = 
   { value: "not-onboarded", label: "Onboarding open" },
 ];
 
+/** The user's full name, falling back to the username and then the email when it is empty. */
 export function getDisplayName(user: AdminUser) {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
   return fullName || user.username || user.email;
 }
 
+/**
+ * Badge colour for a permission group label (`Admin`, `Project Manager`, `HR`, `User`). Matches by
+ * substring, so it also accepts the backend values `ADMIN` and `PROJECT_MANAGER`, but not `PM`.
+ */
 export function getPermissionGroupVariant(permissionGroup: string): BadgeVariant {
   const normalized = permissionGroup.toUpperCase();
 
@@ -37,6 +48,7 @@ export function getPermissionGroupVariant(permissionGroup: string): BadgeVariant
   return "neutral";
 }
 
+/** Badge colour for a project source's connection status; an unknown status gets `brand`. */
 export function getSourceStatusVariant(status: string): BadgeVariant {
   const normalizedStatus = status.trim().toUpperCase();
 
@@ -66,6 +78,7 @@ export function getUserEditFormState(user: AdminUser): UserEditFormState {
   };
 }
 
+/** {@link getDisplayName} for the drawer while editing: reads the names from the unsaved draft. */
 export function getDraftDisplayName(user: AdminUser, draftUser: UserEditFormState) {
   const fullName = [draftUser.firstName, draftUser.lastName].filter(Boolean).join(" ");
 
@@ -81,6 +94,7 @@ export function getProjectEditFormState(
   };
 }
 
+/** Every project as id and name, sorted by name, for the project pickers in the drawers. */
 export function getAvailableProjects(projects: ProjectOverview[]): ProjectSummary[] {
   return projects
     .map((project) => ({
@@ -126,6 +140,12 @@ export function enrichUsersWithProjectNames(
   });
 }
 
+/**
+ * Narrows the user table to the search text and the status filter.
+ *
+ * The search is a case-insensitive substring match over nearly every field of a user, including
+ * ids, roles and project names, so an admin can paste any id they have to hand.
+ */
 export function filterAdminUsers(
   users: AdminUser[],
   searchValue: string,
@@ -163,6 +183,10 @@ export function filterAdminUsers(
   });
 }
 
+/**
+ * Narrows the project table to the search text: a case-insensitive substring match over the
+ * project's own fields and those of its sources and members.
+ */
 export function filterAdminProjects(
   projects: ProjectOverview[],
   projectSearchValue: string,
@@ -194,6 +218,7 @@ export function getTotalPages(itemCount: number, pageSize = PAGE_SIZE) {
   return Math.max(1, Math.ceil(itemCount / pageSize));
 }
 
+/** Clamps the current page to the last one, e.g. after a filter or a delete shortened the list. */
 export function getSafePage(page: number, totalPages: number) {
   return Math.min(page, totalPages);
 }
@@ -234,6 +259,10 @@ export function toggleSelectedUserId(selectedUserIds: Set<string>, userId: strin
   return nextSelectedUserIds;
 }
 
+/**
+ * The "select all" checkbox: selects or clears only the users on the current page and leaves the
+ * selection on other pages as it is.
+ */
 export function toggleVisibleUserSelection(
   selectedUserIds: Set<string>,
   visibleUsers: AdminUser[],
@@ -250,6 +279,10 @@ export function toggleVisibleUserSelection(
   return nextSelectedUserIds;
 }
 
+/**
+ * Takes deleted users out of every project's member list, so the projects tab does not show them
+ * until the next reload.
+ */
 export function removeUsersFromProjects(
   projects: ProjectOverview[],
   userIdsToRemove: Set<string>,
@@ -258,4 +291,52 @@ export function removeUsersFromProjects(
     ...project,
     users: project.users.filter((user) => !userIdsToRemove.has(user.id)),
   }));
+}
+
+export const SKILL_STATUS_FILTER_OPTIONS: Array<{ value: SkillStatusFilter; label: string }> = [
+  { value: "all", label: "All statuses" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "RETIRED", label: "Retired" },
+];
+
+/** Role names a skill is linked to, in the order `roles` lists them. */
+export function getSkillRoleNames(skill: Skill, roles: ProjectRole[]): string[] {
+  const roleNamesById = new Map(roles.map((role) => [role.id, role.name]));
+
+  return skill.roleIds
+    .map((roleId) => roleNamesById.get(roleId))
+    .filter((name): name is string => Boolean(name));
+}
+
+/** Every distinct category currently in use, alphabetically. */
+export function getSkillCategories(skills: Skill[]): string[] {
+  return Array.from(
+    new Set(skills.flatMap((skill) => (skill.category ? [skill.category] : []))),
+  ).sort((left, right) => left.localeCompare(right));
+}
+
+export function filterSkills(
+  skills: Skill[],
+  searchValue: string,
+  statusFilter: SkillStatusFilter,
+  categoryFilter: string,
+  roleFilter: string,
+): Skill[] {
+  const normalizedSearch = searchValue.trim().toLowerCase();
+
+  return skills.filter((skill) => {
+    const matchesSearch =
+      normalizedSearch.length === 0 || skill.name.toLowerCase().includes(normalizedSearch);
+    const matchesStatus = statusFilter === "all" || skill.status === statusFilter;
+    const matchesCategory = categoryFilter === "all" || skill.category === categoryFilter;
+    const matchesRole = roleFilter === "all" || skill.roleIds.includes(roleFilter);
+
+    return matchesSearch && matchesStatus && matchesCategory && matchesRole;
+  });
+}
+
+export function getPaginatedSkills(skills: Skill[], page: number, pageSize = PAGE_SIZE): Skill[] {
+  const startIndex = (page - 1) * pageSize;
+
+  return skills.slice(startIndex, startIndex + pageSize);
 }

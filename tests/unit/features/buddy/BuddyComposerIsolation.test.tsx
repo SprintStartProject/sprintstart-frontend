@@ -189,6 +189,9 @@ describe("the buddy's floating window", () => {
     await user.click(await screen.findByLabelText("Open buddy chat"));
     const field = await screen.findByLabelText("Message");
     await waitFor(() => expect(vi.mocked(getMessages)).toHaveBeenCalled());
+    // The call is not the arrival: the history lands a few ticks later and re-renders the widget
+    // once, which on a slow runner falls inside the typing below and reads as a keystroke.
+    await screen.findByText(/Reply \*\*15\*\*/);
 
     markdown.mockClear();
     const before = floatingRenders.count;

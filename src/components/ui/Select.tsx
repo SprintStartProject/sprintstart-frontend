@@ -16,10 +16,13 @@ export type SelectProps = SelectOwnProps & Omit<SelectHTMLAttributes<HTMLSelectE
  * `Input`, so a form mixing the two does not look assembled from two kits.
  *
  * Deliberately native: the OS renders the open list, which means it is
- * scrollable, searchable by typing and correct on touch for free. Reach for
- * `FilterSelect` instead only when the closed control has to carry custom
- * styling that a native select cannot express — it rebuilds the popup in React
- * and pays for that in code and in accessibility work.
+ * scrollable, searchable by typing and correct on touch for free. This is the
+ * dropdown for forms and editors.
+ *
+ * Filter and sort dropdowns in toolbars and filter bars use `FilterSelect`
+ * instead, so every filter row opens the same app-styled list. It rebuilds the
+ * popup in React and pays for that in code and in accessibility work, which is
+ * why it is not the default for forms.
  */
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
   {

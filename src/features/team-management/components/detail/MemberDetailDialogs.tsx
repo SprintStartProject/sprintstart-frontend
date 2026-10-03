@@ -9,6 +9,10 @@ type MemberDetailDialogsProps = {
   onConfirmRoleRemove: (role: ProjectRole) => void;
 };
 
+/**
+ * The confirmation dialogs of a member's profile page; at the moment only the one for removing a
+ * project role from the member.
+ */
 export function MemberDetailDialogs({
   firstName,
   roleToRemove,

@@ -9,6 +9,9 @@ import { Rocket } from "lucide-react";
  * Catch-all 404 page. Shows a "not found" message with a dashboard link
  * and a small easter-egg teaser: a rocket that opens the Space Invaders
  * game for whoever notices it while they are stranded here.
+ *
+ * Bound to the catch-all `*` route, so `AuthGuard` still sends unauthenticated users to
+ * `/login` first.
  */
 export function NotFoundPage() {
   const navigate = useNavigate();

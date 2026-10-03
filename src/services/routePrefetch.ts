@@ -68,6 +68,13 @@ function prefetchRouteModule(path: string): void {
       return;
   }
 }
+/**
+ * Warms the page module of `path` and, for routes with one dominant read, its main query.
+ *
+ * Project-scoped reads are skipped while `projectId` is `null`, since their query keys need
+ * the project. Fire and forget: nothing is awaited, and a failed prefetch only means the page
+ * loads its data itself.
+ */
 export function prefetchRoute(
   queryClient: QueryClient,
   path: string,

@@ -10,6 +10,7 @@
 import { AlertTriangle, CheckCircle2, Database, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { IconTile } from "../../../components/ui/IconTile";
 import { Spinner } from "../../../components/ui/Spinner";
 import { fetchIngestionSources } from "../ingestionSources.ts";
 import { formatNumber } from "../data.ts";
@@ -166,16 +167,9 @@ export function IngestionStatusWidget() {
 
           <ul className="-mx-2 divide-y divide-app-border-muted">
             {visible.map((source) => {
-              const Icon = source.icon;
-
               return (
                 <li key={source.sourceId} className="flex items-center gap-3 px-2 py-2">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-surface-muted text-app-text-muted"
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
+                  <IconTile icon={source.icon} size="md" tone="muted" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-app-text">
                       {source.name}

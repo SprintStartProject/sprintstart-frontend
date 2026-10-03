@@ -67,25 +67,6 @@ function writeRailOpen(open: boolean): void {
 }
 
 /**
- * The buddy's home: the hire's onboarding front door, as one conversation.
- *
- * The buddy is not a feature of the onboarding — it *is* the onboarding. The mentor answers
- * from the docs *and* from the hire's own state, and renders what it opens (like a task's
- * orientation packet) in the thread rather than navigating away.
- *
- * **It is a conversation with somebody, and it is built to feel like one.** Earlier passes at
- * this page tried to make it look like the rest of the app by putting the chat in a card and
- * standing a column of widgets next to it — "Ask about", "Not getting anywhere?" — and what
- * came out was a dashboard about a conversation rather than a conversation. Everything those
- * boxes held has moved to where a person would expect it: the things worth asking sit above the
- * box they fill, sending a question to a person hangs off that question, and the record of what
- * was sent stands in a rail beside the conversation rather than on top of it.
- *
- * The dock (`BuddyWidget`, mounted app-wide) shares the same one buddy session, so a hire can
- * pick the conversation up from anywhere and grow it into this page when it needs room.
- */
-
-/**
  * The page's shape, shared by the mentor and the no-project state so nothing moves between
  * them.
  *
@@ -467,6 +448,28 @@ function BuddyMentorHome() {
   );
 }
 
+/**
+ * The buddy's home: the hire's onboarding front door, as one conversation.
+ *
+ * The buddy is not a feature of the onboarding — it *is* the onboarding. The mentor answers
+ * from the docs *and* from the hire's own state, and renders what it opens (like a task's
+ * orientation packet) in the thread rather than navigating away.
+ *
+ * **It is a conversation with somebody, and it is built to feel like one.** Earlier passes at
+ * this page tried to make it look like the rest of the app by putting the chat in a card and
+ * standing a column of widgets next to it — "Ask about", "Not getting anywhere?" — and what
+ * came out was a dashboard about a conversation rather than a conversation. Everything those
+ * boxes held has moved to where a person would expect it: the things worth asking sit above the
+ * box they fill, sending a question to a person hangs off that question, and the record of what
+ * was sent stands in a rail beside the conversation rather than on top of it.
+ *
+ * The dock (`BuddyWidget`, mounted app-wide) shares the same one buddy session, so a hire can
+ * pick the conversation up from anywhere and grow it into this page when it needs room.
+ *
+ * Bound to `/buddy`, open to every permission group, and rendered inside `AssistantShell`
+ * next to the chat. A user without a selected project gets an empty state instead of the
+ * conversation.
+ */
 export function BuddyPage() {
   const { selectedProjectId, isLoading } = useProjectContext();
 

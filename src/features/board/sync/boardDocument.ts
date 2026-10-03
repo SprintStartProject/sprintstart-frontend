@@ -144,6 +144,11 @@ export function isEmptyDocument(document: BoardDocument): boolean {
   );
 }
 
+/**
+ * A document in the server's spelling, ready to send: card widths and highlight colours in upper
+ * case (`NARROW`, `YELLOW`), and the colour names keyed the same way. Everything else goes as it
+ * is. The way back is {@link fromWire}.
+ */
 export function toWire(document: BoardDocument): BoardDocumentWire {
   return {
     ...document,

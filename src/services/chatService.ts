@@ -10,7 +10,7 @@ import type { Chat, ChatMessage, StreamHandlers } from "../features/chatbot/type
  * Chats created before the backend scoped them belong to no project and are
  * therefore in no list; they stay reachable by id.
  *
- * @param projectId The project whose chats to list.
+ * @param projectId - The project whose chats to list.
  * @throws Error if the backend request fails
  */
 export async function getMyChats(projectId: string) {
@@ -23,7 +23,7 @@ export async function getMyChats(projectId: string) {
 /**
  * Creates a new chat for the authenticated user inside a project.
  *
- * @param projectId The project the chat belongs to. The backend rejects a project
+ * @param projectId - The project the chat belongs to. The backend rejects a project
  *   the caller has no access to, and every prompt is answered from that project's
  *   corpus only.
  * @returns The backend returns `{ id }`.
@@ -38,7 +38,7 @@ export async function createChat(projectId: string) {
 /**
  * Deletes an existing chat and all of its messages for the authenticated user.
  *
- * @param chatId The unique identifier of the chat to delete.
+ * @param chatId - The unique identifier of the chat to delete.
  */
 export async function deleteChat(chatId: string): Promise<void> {
   await apiClient.fetch<void>(`/api/v1/chats/me/${chatId}`, {
@@ -49,7 +49,7 @@ export async function deleteChat(chatId: string): Promise<void> {
 /**
  * Retrieves all messages from a specific chat owned by the authenticated user.
  *
- * @param chatId The chat the messages belong to.
+ * @param chatId - The chat the messages belong to.
  * @note The backend's `ChatMessageResponse` omits `id` — we generate stable
  *   client-side ids here so React keys and the streaming-message tracking work.
  */
@@ -122,13 +122,13 @@ function localDayEnd(date: string): string | undefined {
 /**
  * Creates a new prompt and handles the chat response.
  *
- * @param chatId The chat the prompt is created in.
- * @param text The content of the prompt.
- * @param sourceSystems The specified systems the AI may use to generate an answer.
- * @param from The start of the time period specifying when the documents used for generating the answer were uploaded.
- * @param to The end of the time period specifying when the documents used for generating the answer were uploaded.
- * @param handlers Helper operations handling the output of the chat response.
- * @param signal Optional `AbortSignal` — when aborted, the stream stops cleanly
+ * @param chatId - The chat the prompt is created in.
+ * @param text - The content of the prompt.
+ * @param sourceSystems - The specified systems the AI may use to generate an answer.
+ * @param from - Start of the upload period of the documents the answer may be based on.
+ * @param to - End of the upload period of the documents the answer may be based on.
+ * @param handlers - Helper operations handling the output of the chat response.
+ * @param signal - Optional `AbortSignal` — when aborted, the stream stops cleanly
  *   and `handlers.onDone` is called (partial content stays visible). Pass a
  *   signal from an `AbortController` to implement a "Stop" button.
  */

@@ -29,7 +29,7 @@ export { MIN_REFRESH_INTERVAL_MS };
  * The freshness machinery -- rate limiting, revalidating on tab focus, surviving StrictMode's
  * double-invoke -- lives in {@link useRateLimitedRead}.
  *
- * @param refreshKey Changing this asks for a recheck -- the caller passes the current route, so
+ * @param refreshKey - Changing this asks for a recheck -- the caller passes the current route, so
  * switching views refreshes the count. Rate-limited by {@link MIN_REFRESH_INTERVAL_MS}.
  */
 export function usePmAttentionCount(

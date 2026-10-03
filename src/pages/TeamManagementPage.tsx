@@ -186,6 +186,9 @@ function RosterSkeleton() {
  *
  * The status filter lives in the URL (`?filter=`), which is what lets the overview's figures
  * link straight to "who is waiting on you" instead of to the unfiltered team.
+ *
+ * Rendered by `PmWorkspace` for `/team-management`. Open to `PM`, `HR` and `ADMIN`; the
+ * workspace is wrapped in `ManagerAreaGuard`, so a PM must manage the selected project.
  */
 export function TeamManagementPage() {
   const { selectedProjectId } = useProjectContext();

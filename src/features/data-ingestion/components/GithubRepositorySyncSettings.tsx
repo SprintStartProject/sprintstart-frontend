@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Input } from "../../../components/ui/Input.tsx";
 import { SaveButton } from "../../../components/ui/SaveButton.tsx";
 import { SegmentedTabs, type SegmentedTabOption } from "../../../components/ui/SegmentedTabs.tsx";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useToast } from "../../../context/useToast.ts";
 import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
 import { formatDateTime } from "../data.ts";
@@ -284,9 +285,7 @@ export function GithubRepositorySyncSettings({
           fields below it. */}
       <div className="flex items-center justify-between gap-4 rounded-2xl border border-app-border bg-app-surface-muted p-4">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-app-surface text-app-text-muted">
-            <RefreshCw className="h-4.5 w-4.5" />
-          </span>
+          <IconTile icon={RefreshCw} size="lg" tone="neutral" />
 
           <div className="min-w-0">
             <p className="text-sm font-semibold text-app-text">Auto update</p>

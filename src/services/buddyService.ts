@@ -7,7 +7,7 @@ import type { BuddyMessage } from "../features/buddy/types";
  * Retrieves the current visit's buddy messages, oldest first (the window since the mentor last
  * updated its memory — not the whole transcript).
  *
- * @param teamProjectId Pass to read the *team-mode* conversation with a managed project instead
+ * @param teamProjectId - Pass to read the *team-mode* conversation with a managed project instead
  *   of the hire's own — the backend keeps the two as separate conversations.
  */
 export async function getMessages(teamProjectId?: string): Promise<BuddyMessage[]> {
@@ -66,8 +66,8 @@ export interface BuddyOpeningHandlers {
  * Opening twice without the hire saying anything is the same visit: the greeting already there is
  * replayed whole and no model is called.
  *
- * @param handlers How the streamed greeting is received.
- * @param teamProjectId Pass to open a *team-mode* visit with a managed project instead of the
+ * @param handlers - How the streamed greeting is received.
+ * @param teamProjectId - Pass to open a *team-mode* visit with a managed project instead of the
  *   hire's own conversation — the backend greets a manager about their team there.
  */
 export async function streamOpenBuddy(
@@ -424,9 +424,9 @@ async function readBuddyStream(
 /**
  * Sends a message to the user's persistent buddy and streams the grounded reply.
  *
- * @param content The message to send.
- * @param handlers Helper operations handling the output of the buddy's response.
- * @param teamProjectId Pass to speak in *team mode* about a managed project instead of the hire's
+ * @param content - The message to send.
+ * @param handlers - Helper operations handling the output of the buddy's response.
+ * @param teamProjectId - Pass to speak in *team mode* about a managed project instead of the hire's
  *   own conversation. Sent in the body, not the query string — the backend's contract puts the
  *   team target on the POST body and leaves the hire's own conversation the body-less default.
  * @param currentPage The app path the sender is on (`/team-management`), so the buddy's app

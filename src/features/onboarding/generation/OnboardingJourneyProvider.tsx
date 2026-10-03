@@ -38,7 +38,7 @@ const CONNECTION_LOST =
  * A phase that genuinely failed is reported by the stream's `error` event, which ends the whole
  * generation -- that is the signal this does not have to guess at.
  *
- * **Backend TODO:** a structured state on the stage event would remove the guessing entirely.
+ * TODO(backend): a structured state on the stage event would remove the guessing entirely.
  */
 function phaseStateOf(detail: string): GenerationPhaseProgress["state"] {
   if (/^waiting/i.test(detail)) return "waiting";

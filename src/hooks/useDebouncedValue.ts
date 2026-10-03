@@ -10,8 +10,8 @@ import { useEffect, useState } from "react";
  * The first render returns `value` unchanged: there is nothing to wait for before anything has
  * been typed, and a deep-linked value must not be held back by a needless delay.
  *
- * @param value The live value, e.g. the current text of an input.
- * @param delayMs How long `value` must stay unchanged before it is returned.
+ * @param value - The live value, e.g. the current text of an input.
+ * @param delayMs - How long `value` must stay unchanged before it is returned.
  * @returns The last value that stayed unchanged for `delayMs`.
  */
 export function useDebouncedValue<T>(value: T, delayMs: number): T {

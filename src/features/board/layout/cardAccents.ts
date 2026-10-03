@@ -20,7 +20,7 @@ import type { BoardCardKind } from "../types";
  * colours are deliberately left out: `success`, `warning` and `danger` carry a fixed meaning in
  * this app, and an arrival card sitting in amber would read as a problem whether or not anything
  * was outstanding. Green is out for the same reason even as a decoration, which is why the cool
- * end of this set is cyan rather than teal. Per AGENTS.md §7 the colour is never the message here:
+ * end of this set is cyan rather than teal. Per FRONTEND_CODING_STANDARDS.md §5 the colour is never the message here:
  * the glyph and the title carry it, and the accent only helps you find the card again.
  *
  * **Four places, one colour.** The accent used to be a glyph and a bloom so faint that a board of

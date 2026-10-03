@@ -15,8 +15,17 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
   return { useProjectContext: () => createProjectContextValue() };
 });
 
+const authMock = vi.hoisted(() => ({ permissionGroup: undefined as string | undefined }));
+
 vi.mock("../../../src/context/useAuth", () => ({
-  useAuth: () => ({ profile: { id: "admin1", firstName: "Admin", lastName: "User" } }),
+  useAuth: () => ({
+    profile: {
+      id: "admin1",
+      firstName: "Admin",
+      lastName: "User",
+      permissionGroup: authMock.permissionGroup,
+    },
+  }),
 }));
 
 const { mockGetUsers, mockDeleteUser, mockGetProjects, mockGetGithubPatNames } = vi.hoisted(() => ({
@@ -169,6 +178,7 @@ describe("AdminPage", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    authMock.permissionGroup = undefined;
     mockGetUsers.mockResolvedValue(mockUsers);
     mockDeleteUser.mockResolvedValue({ id: "1", deleted: true });
     mockGetProjects.mockResolvedValue(mockProjects);
@@ -392,6 +402,47 @@ describe("AdminPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("John Details")).toBeInTheDocument();
+    });
+  });
+
+  it("shows the Skills tab for an ADMIN", async () => {
+    authMock.permissionGroup = "ADMIN";
+    render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Skills" })).toBeInTheDocument();
+    });
+  });
+
+  it("hides the Skills tab for HR", async () => {
+    authMock.permissionGroup = "HR";
+    render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("users-tab")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("button", { name: "Skills" })).not.toBeInTheDocument();
+  });
+
+  it("ignores a ?tab=skills link for a non-ADMIN viewer", async () => {
+    authMock.permissionGroup = "HR";
+    render(
+      <MemoryRouter initialEntries={["/admin?tab=skills"]}>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("users-tab")).toBeInTheDocument();
     });
   });
 });

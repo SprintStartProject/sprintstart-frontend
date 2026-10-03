@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { IconTile } from "../../../components/ui/IconTile";
 import { Spinner } from "../../../components/ui/Spinner";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { AccessConnector } from "../types";
@@ -78,9 +79,7 @@ export function AccessConnectorGroup({
           own — and the one in the header claimed to be about GitHub while the
           other claimed to be about credentials in general. */}
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface-muted">
-          <Icon className="h-4 w-4 text-app-text-muted" aria-hidden />
-        </div>
+        <IconTile icon={Icon} size="lg" tone="neutral" />
 
         <div className="min-w-0">
           <p className="text-sm font-semibold text-app-text">{connector.label}</p>

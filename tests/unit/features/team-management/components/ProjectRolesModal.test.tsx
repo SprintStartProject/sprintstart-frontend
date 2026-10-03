@@ -124,7 +124,9 @@ describe("ProjectRolesModal", () => {
     await user.type(screen.getByPlaceholderText("Add skill, e.g. React"), "React");
     await user.click(screen.getByRole("button", { name: "Add" }));
 
-    await waitFor(() => expect(createSkill).toHaveBeenCalledWith("React", ["r1"]));
+    await waitFor(() =>
+      expect(createSkill).toHaveBeenCalledWith({ name: "React", roleIds: ["r1"] }),
+    );
   });
 
   it("reactivates a retired skill", async () => {

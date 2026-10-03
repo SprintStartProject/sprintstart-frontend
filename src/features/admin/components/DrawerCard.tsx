@@ -1,12 +1,13 @@
 import { motion, useReducedMotion } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import type { IconComponent } from "../../../components/icons/types.ts";
+import { IconTile } from "../../../components/ui/IconTile";
 
 type DrawerCardProps = {
   /** Uppercase section label shown in the card header. Omit for a headerless card. */
   label?: string;
-  /** Optional lucide icon rendered in a soft tile beside the label. */
-  icon?: LucideIcon;
+  /** Optional icon (lucide or a brand logo) rendered in a soft tile beside the label. */
+  icon?: IconComponent;
   /** Position in the body stack, so cards reveal in sequence when the drawer opens. */
   index?: number;
   /** Optional trailing content in the header row (counts, actions). */
@@ -66,9 +67,7 @@ export function DrawerCard({
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             {Icon && (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand">
-                <Icon className="h-4 w-4" />
-              </span>
+              <IconTile icon={Icon} size="md" tone={variant === "danger" ? "danger" : "brand"} />
             )}
             {label && (
               <p className={`text-xs font-semibold tracking-wide uppercase ${labelTone}`}>

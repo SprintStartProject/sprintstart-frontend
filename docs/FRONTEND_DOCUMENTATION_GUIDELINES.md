@@ -8,7 +8,7 @@ This document defines the strict documentation standards for the React and TypeS
 > **Related docs**
 >
 > - [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) — system architecture (routing, services, state, design system, animation).
-> - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) §9 — documentation rules summary.
+> - [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) — coding rules, including accessibility labels and `data-testid` (§5) and animation (§6).
 > - [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
 
 ---
@@ -31,19 +31,20 @@ This document defines the strict documentation standards for the React and TypeS
 
 ### Views & Page-Level Components
 
-You MUST document all page-level or view-level components. Describe the view's responsibility, route context, and its main sub-components.
+You MUST document all page-level or view-level components. Describe the view's responsibility, the user flow it belongs to, its route context, and the backend, auth, routing or state dependencies it relies on.
+
+Start with what the view is for. Don't open with the component name, it is already
+on the line below.
 
 ```tsx
 /**
- * RoleSelectionView
+ * The hire's onboarding path, shown either as a list of phases or as the journey graph.
  *
- * Allows users to select their working area during the onboarding process.
- * Bound to the `/onboarding/select-role` route.
- *
- * The selected role is stored in the backend and used to generate
- * a personalized onboarding path.
+ * Bound to `/onboarding` and `/onboarding/:stepId`. `AuthGuard` blocks both once the
+ * user has completed onboarding. Generating a path is not this page's job:
+ * `OnboardingJourneyProvider` owns it, so leaving the page does not cancel it.
  */
-export function RoleSelectionView() { ... }
+export function OnBoardingPage() { ... }
 ```
 
 ### Reusable UI Components
@@ -52,10 +53,10 @@ Document reusable components when their purpose or usage context is not immediat
 
 ```tsx
 /**
- * TaskCard
+ * Summary card for an onboarding task inside the onboarding phase dashboard.
  *
- * Displays a summary card for an onboarding task inside the onboarding phase dashboard.
- * Includes interactive hover state transitions using spring motion configurations.
+ * Reused in the hire's own view and in the PM's member detail, so it must not assume
+ * that the viewer is the hire.
  */
 export function TaskCard(props: TaskCardProps) { ... }
 ```
@@ -72,6 +73,7 @@ Document the props of components when:
 - The meaning of a prop is not obvious.
 - The prop influences complex behavior.
 - The prop contains callback functions.
+- The prop value must follow backend or auth-related constraints.
 
 ```tsx
 type TaskCardProps = {
@@ -96,29 +98,26 @@ _Do not_ document obvious props like `id`, `className`, or `children` unless add
 
 ### React Router v7 Routes
 
-This codebase uses React Router v7's **declarative `<Route element={...}>` API**
-guarded by an `AuthGuard` wrapper component — **not** the data-router
-`loader`/`action` APIs. There are no `LoaderFunctionArgs` or route loaders in the
-codebase. (See [FRONTEND_ARCHITECTURE.md §4](./FRONTEND_ARCHITECTURE.md#4-routing--access-control)
-for the full routing model.)
+How routing and the guards work is described in
+[FRONTEND_ARCHITECTURE.md §4](./FRONTEND_ARCHITECTURE.md#4-routing--access-control).
 
 Document route components with their route path, the `AppRoute` literal they
 correspond to in `src/auth/accessPolicy.ts`, the permission groups allowed to
-access them, and any auth/redirect behavior the `AuthGuard` enforces for them:
+access them, and which guard enforces that. `AuthGuard` only handles login, the
+skill-assessment redirect and the onboarding block; role and project checks by URL
+are done by `ManagerAreaGuard` in `AppRouter.tsx`, and only for the routes wrapped
+in it.
 
 ```tsx
 /**
- * AdminPage
+ * The selected project's sources, their connectors and their ingestion runs.
  *
- * The admin dashboard. Bound to the `/admin` route (`AppRoute` literal in
- * `src/auth/accessPolicy.ts`). Accessible only to `HR` and `ADMIN` permission
- * groups (see `routePermissions`).
- *
- * `AuthGuard` redirects unauthenticated users to `/login` and authenticated
- * users without the required group to their default route via
- * `getDefaultRoute(profile)`.
+ * Bound to `/data-ingestion`, open to `PM`, `HR` and `ADMIN` (`routePermissions` in
+ * `src/auth/accessPolicy.ts`). The route is wrapped in `ManagerAreaGuard`, which
+ * additionally requires a PM to manage the selected project and otherwise redirects
+ * to `getDefaultRoute(profile)`.
  */
-export function AdminPage() { ... }
+export function DataIngestionPage() { ... }
 ```
 
 For sub-routes with dynamic params, document the param shape and where the value
@@ -126,29 +125,36 @@ comes from:
 
 ```tsx
 /**
- * TeamMemberDetailPage
+ * One hire's progress, roles and skills, for the people who manage them.
  *
- * Bound to `/team/:userId`. The `userId` path param is read via `useParams()`
- * and fetches the member's detail from `teamManagementService`. Linked from
- * `TeamManagementPage`'s member cards.
+ * Rendered by `PmWorkspace` for `/team/:userId`; the workspace reads the param and
+ * passes it in as `userId`, so this page never calls `useParams()` itself.
  */
-export function TeamMemberDetailPage() { ... }
+export function TeamMemberDetailPage({ userId }: { userId?: string }) { ... }
 ```
 
 ---
 
 ## 4. Functions and Business Logic
 
-Functions MUST be documented whenever they contain business logic or behavior that is not immediately obvious.
+Functions MUST be documented whenever they contain business logic or behavior that is not immediately obvious. That includes:
+
+- Permission or role rules.
+- Conditional user flows.
+- Data transformations.
+- Backend contract assumptions.
+- Error handling decisions.
+- Temporary limitations or known backend gaps.
 
 ### Async Operations & User Actions
 
 ```tsx
 /**
- * Loads the current user profile when the application starts.
+ * Initializes Keycloak and loads the backend profile of the signed-in user.
  *
- * The result determines whether the user can access protected routes
- * or needs to complete the role selection first.
+ * The profile is retried a few times, because a user who has just signed in for the
+ * first time may not exist in the backend yet. Without a profile the user counts as
+ * signed out and ends up on the login page.
  */
 const initAuth = async () => { ... };
 ```
@@ -171,6 +177,11 @@ export async function fetchOnboardingPath(userId: string): Promise<OnboardingPat
 
 ## 5. Hooks and Effects
 
+### Custom hooks
+
+Document a custom hook when it encapsulates business behavior, backend calls,
+authorization state, routing behavior, or non-trivial state synchronization.
+
 ### `useEffect` Documentation
 
 Simple effects DO NOT require documentation.
@@ -181,17 +192,14 @@ You MUST document effects when:
 - They depend on multiple conditions.
 - Their execution timing is critical to the business logic.
 
-```tsx
-useEffect(() => {
-  /**
-   * Loads the onboarding path once the authenticated user profile is available.
-   * The backend requires the user ID to return the correct path.
-   */
-  const loadPath = async () => { ... };
+An effect is not an exported symbol, so it gets a plain comment above it, not a TSDoc
+block:
 
-  if (profile?.id) {
-    void loadPath();
-  }
+```tsx
+// Waits for the profile: the backend needs the user ID to return the right path.
+useEffect(() => {
+  if (!profile?.id) return;
+  void loadPath(profile.id);
 }, [profile?.id]);
 ```
 
@@ -203,53 +211,73 @@ useEffect(() => {
 
 Document layout transitions, spring tokens, and why `<AnimatePresence>` is used in a specific context.
 
-> [!NOTE]
-> All Framer Motion transition presets are centralized in
-> [`src/styles/tokens.ts`](../src/styles/tokens.ts) — import the tokens you need
-> rather than inlining ad-hoc spring configs. See
-> [FRONTEND_ARCHITECTURE.md §8](./FRONTEND_ARCHITECTURE.md#8-animation-system-framer-motion-12)
-> for the full reference (13 presets including `buttonHoverMotion` for consistent
-> button feedback, `modalBackdropVariants` for dialogs, etc.).
+Which tokens to use and how to set up `<AnimatePresence>` is in
+[FRONTEND_CODING_STANDARDS.md §6](./FRONTEND_CODING_STANDARDS.md#6-animation-framer-motion-12).
+The comment explains the choice the rule leaves open, such as why a list uses
+`popLayout`. Inside JSX it has to be written as `{/* ... */}`:
 
 ```tsx
-/**
- * AnimatePresence wrapper handles layout transitions as items
- * are deleted from the dashboard list.
- *
- * Utilizes centralized transition config `centralSpringToken` to prevent
- * jittery animations on mobile devices.
- */
-<AnimatePresence mode="popLayout">
-  {tasks.map((task) => (
-    <motion.div
-      layout
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={centralSpringToken}
-      key={task.id}
-    >
-      <TaskCard task={task} />
-    </motion.div>
-  ))}
-</AnimatePresence>
+<div className="grid gap-4">
+  {/* popLayout lets the remaining cards close the gap while a deleted one is still
+      animating out, instead of jumping once the exit has finished. */}
+  <AnimatePresence mode="popLayout">
+    {tasks.map((task) => (
+      <motion.div
+        layout
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={centralSpringToken}
+        key={task.id}
+      >
+        <TaskCard task={task} />
+      </motion.div>
+    ))}
+  </AnimatePresence>
+</div>
 ```
 
 ---
 
-## 7. Accessibility & Testing Labels
+## 7. Tags and Markers
 
-Interactive components MUST declare labels to support assistive devices and automated tests.
+### Tags
 
-- **`aria-label`**: Required on buttons or links that contain only graphic icons.
-- **`data-testid`**: Required on key interactive items (role selections, chat submit buttons) targeted by tests.
+Use a tag only when it adds something the signature does not already say.
+
+- **`@param name - Description.`** With the hyphen, as TSDoc defines it. Only for
+  parameters whose meaning is not clear from name and type.
+- **`@returns Description.`** When the type does not say enough, e.g. what `null` or
+  an empty list means.
+- **`@throws ErrorType when ...`** Name the condition, and for an `ApiError` the
+  status code: `@throws ApiError 404 when the skill does not exist.` A function that
+  catches every failure and never throws says so in its summary instead.
+- **`{@link symbol}`** To refer to another function, type or component, so the editor
+  can jump to it.
 
 ```tsx
 /**
- * Menu toggle button. Contains only a Lucide icon, requiring
- * an aria-label for screen-reader compliance.
+ * Replaces the complete list of skills linked to a project role.
+ *
+ * @param skillIds - Every skill the role should have afterwards, not only the new ones.
+ * @returns The role's skills after the change.
+ * @throws ApiError 404 when the role or one of the skills does not exist.
  */
-<button onClick={toggleSidebar} aria-label="Toggle navigation menu" data-testid="sidebar-toggle">
-  <MenuIcon />
-</button>
+export async function updateRoleSkills(roleId: string, skillIds: string[]): Promise<Skill[]> { ... }
+```
+
+### Backend gaps
+
+Code that works around a missing backend feature gets a `TODO(backend):` paragraph in
+its TSDoc. Say what is missing (an endpoint, a field, a status) and what can be removed
+once it exists. Use exactly this marker, so all of them can be found with one search.
+
+```tsx
+/**
+ * How many onboarding items wait on the project manager in one project.
+ *
+ * TODO(backend): there is no count endpoint, so this reads the team overview and the
+ * feedback list and counts here. Once one exists, only the body of this function changes.
+ */
+export async function getPmAttentionCount(projectId: string): Promise<PmAttentionCount> { ... }
 ```
 
 ---

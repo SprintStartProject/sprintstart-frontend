@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { IconTileTone } from "../../../components/ui/IconTile";
 import type { FindingArea, FindingSeverity } from "./findings";
 
 /** The order areas are drawn in, everywhere in the analysis. */
@@ -32,47 +33,54 @@ export const AREA_ORDER = [
  */
 export const AREA_META: Record<
   FindingArea,
-  { label: string; icon: LucideIcon; chip: string; glow: string }
+  { label: string; icon: LucideIcon; tone: IconTileTone; chip: string; glow: string }
 > = {
   team: {
     label: "Team",
     icon: Users,
+    tone: "brand",
     chip: "bg-app-brand-soft text-app-brand-text",
     glow: "var(--brand-text)",
   },
   onboarding: {
     label: "Onboarding",
     icon: Gauge,
+    tone: "cyan",
     chip: "bg-app-cyan-bg text-app-cyan-text",
     glow: "var(--cyan-text)",
   },
   escalations: {
     label: "Escalations",
     icon: Inbox,
+    tone: "purple",
     chip: "bg-app-purple-bg text-app-purple-text",
     glow: "var(--purple-text)",
   },
   questions: {
     label: "Questions",
     icon: MessageSquareMore,
+    tone: "indigo",
     chip: "bg-app-indigo-bg text-app-indigo-text",
     glow: "var(--indigo-text)",
   },
   gaps: {
     label: "Knowledge gaps",
     icon: ShieldAlert,
+    tone: "pink",
     chip: "bg-app-pink-bg text-app-pink-text",
     glow: "var(--pink-text)",
   },
   ingestion: {
     label: "Data sources",
     icon: Database,
+    tone: "neutral",
     chip: "bg-app-neutral-bg text-app-neutral-text",
     glow: "var(--neutral-text)",
   },
   industry: {
     label: "Industry",
     icon: Tag,
+    tone: "neutral",
     chip: "bg-app-neutral-bg text-app-neutral-text",
     glow: "var(--neutral-text)",
   },

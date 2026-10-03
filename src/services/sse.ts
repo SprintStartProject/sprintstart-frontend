@@ -16,7 +16,7 @@
 /**
  * Async generator that yields each SSE `data:` event parsed from the stream.
  *
- * @param stream The raw response body (or any `ReadableStream<Uint8Array>`).
+ * @param stream - The raw response body (or any `ReadableStream<Uint8Array>`).
  * @returns Yields one parsed JSON payload per `data:` line. The generator
  *   completes when the stream ends naturally. If the underlying `reader.read()`
  *   throws (e.g. an `AbortError` when the caller aborts the `fetch`), the error
