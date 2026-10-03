@@ -934,12 +934,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   return (
     <>
       <div className="min-w-0">
-        <h3 className="text-sm font-semibold text-app-text">Roles</h3>
-        <p className="mt-1 mb-3 text-xs leading-relaxed text-app-text-muted">
-          {roles.length} {roles.length === 1 ? "role" : "roles"} in this project. Select one to
-          manage its skills and members.
-        </p>
-
         <PmListToolbar<RoleSort>
           search={{
             label: "Search roles",

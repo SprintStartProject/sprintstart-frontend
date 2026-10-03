@@ -13,7 +13,6 @@ import {
 } from "../features/pm-area/components/overview/InsightCards";
 import { TeamProgressCard } from "../features/pm-area/components/overview/TeamProgressCard";
 import { TeamPulseCard } from "../features/pm-area/components/overview/TeamPulseCard";
-import { TodayCard } from "../features/pm-area/components/overview/TodayCard";
 import { useOpenEscalationCount } from "../features/knowledge-request/useOpenEscalationCount";
 import { memberStage, waitingOn } from "../features/pm-area/memberStatus";
 import { useMemberPeek } from "../features/pm-area/useMemberPeek";
@@ -22,26 +21,24 @@ import { ProjectIndustryWidget } from "../features/projects/industry/ProjectIndu
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useQueryFetch } from "../hooks/useQueryFetch";
 import { isUnread } from "../features/pm-area/useMemberOpenItems";
-import {
-  getUserOnboardingFeedback,
-  type OnboardingFeedback,
-} from "../services/teamManagementService";
+import { getUserOnboardingFeedback } from "../services/teamManagementService";
 import { onboardingMetricsService } from "../services/onboardingMetricsService";
 import { queryKeys } from "../services/queryKeys";
 
 /**
- * The overview section of the PM workspace (see `PmWorkspace`): what needs the manager today (the
- * project analysis's findings, see `TodayCard`), how the team is doing, and the
+ * The overview section of the PM workspace (see `PmWorkspace`): what needs the manager today, how the team is doing, and the
  * three insight readouts — each a click from the section it summarizes.
  *
  * Built around "does anybody need me" rather than a column of equal widgets. The old page gave
  * ingestion health the top row and made a manager scroll past it to find a skip request. Now the
  * "Waiting on you" figure says how many answers are owed, and the team card below lists the
  * people who need the manager first, each opening in the side panel where it can be acted on.
+ *
+ * Rendered by `PmWorkspace` for `/pm-dashboard`. Open to `PM`, `HR` and `ADMIN`; the workspace
+ * is wrapped in `ManagerAreaGuard`, so a PM must manage the selected project.
  */
 export function PmDashboardPage({
   analysisRevision = 0,
-  onOpenAnalysis,
 }: {
   /**
    * Bumped by every finished project analysis (its button sits beside the workspace's tabs). The
@@ -49,8 +46,6 @@ export function PmDashboardPage({
    * remounted to read the project again; everything else reads the cache the analysis refreshed.
    */
   analysisRevision?: number;
-  /** Opens the full project analysis — where the strip's "+N more" leads. */
-  onOpenAnalysis?: () => void;
 } = {}) {
   const { selectedProjectId } = useProjectContext();
   const { openMember } = useMemberPeek();
@@ -77,16 +72,13 @@ export function PmDashboardPage({
   // Each flagged member's own feedback, under the same key the member panel reads — so marking
   // one read in the panel refreshes this count too, and opening the panel after the overview
   // costs no second request.
-  const flaggedMembers = members.filter((member) => member.hasFeedback);
   const feedbackQueries = useQueries({
-    queries: flaggedMembers.map((member) => ({
-      queryKey: queryKeys.memberFeedback.byUser(member.userId),
-      queryFn: () => getUserOnboardingFeedback(member.userId),
-    })),
-  });
-  const feedbackByUser: Record<string, OnboardingFeedback[]> = {};
-  feedbackQueries.forEach((query, index) => {
-    if (query.data) feedbackByUser[flaggedMembers[index].userId] = query.data;
+    queries: members
+      .filter((member) => member.hasFeedback)
+      .map((member) => ({
+        queryKey: queryKeys.memberFeedback.byUser(member.userId),
+        queryFn: () => getUserOnboardingFeedback(member.userId),
+      })),
   });
 
   // What is open with the manager, counted as items rather than people: every pending skip
@@ -159,17 +151,6 @@ export function PmDashboardPage({
           to="/insights/onboarding"
         />
       </section>
-
-      {/* One line under the figures: the project analysis's most pressing findings, worked out on
-          every visit — a briefing, not another card. */}
-      <TodayCard
-        roster={figuresReady ? members : null}
-        feedbackByUser={feedbackByUser}
-        metrics={metrics ?? null}
-        attention={attention}
-        loading={rosterLoading || attentionLoading}
-        onOpenAnalysis={onOpenAnalysis}
-      />
 
       <TeamPulseCard
         roster={members}

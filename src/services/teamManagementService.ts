@@ -19,12 +19,12 @@ import type {
 
 // The fixture predates the `projects` list and still carries a single
 // `project`, so it goes through the same normalization as an API response.
-let mockUsers = (teamOverviewMock.users as unknown as BackendTeamOverviewUser[]).map((user) => ({
+const mockUsers = (teamOverviewMock.users as unknown as BackendTeamOverviewUser[]).map((user) => ({
   ...user,
   projects: toTeamOverviewProjects(user),
 }));
 
-let mockProjectRoles: ProjectRole[] = Array.from(
+const mockProjectRoles: ProjectRole[] = Array.from(
   new Map(mockUsers.flatMap((user) => user.roles).map((role) => [role.id, role])).values(),
 );
 
@@ -51,7 +51,7 @@ function normalizeSkill(skill: LegacySkill): Skill {
   };
 }
 
-let mockSkills = (skillsMock.skills as LegacySkill[]).map(normalizeSkill);
+const mockSkills = (skillsMock.skills as LegacySkill[]).map(normalizeSkill);
 
 /**
  * Team-overview user as the API actually sends it.
@@ -211,75 +211,44 @@ export async function getProjectRoles(): Promise<ProjectRole[]> {
   }
 }
 
+/**
+ * No mock fallback, like {@link deleteProjectRole}: answering a failed write by changing the mock
+ * data told the caller it worked while the backend never changed — and the next reload undid it.
+ * A failure reaches the caller, which says so.
+ */
 export async function createProjectRole(name: string, description: string): Promise<ProjectRole> {
-  try {
-    return await apiClient.fetch<ProjectRole>("/api/v1/projectRoles", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        description,
-      }),
-    });
-  } catch {
-    const newRole: ProjectRole = {
-      id: `mock-role-${Date.now()}`,
+  return await apiClient.fetch<ProjectRole>("/api/v1/projectRoles", {
+    method: "POST",
+    body: JSON.stringify({
       name,
       description,
-    };
-
-    mockProjectRoles = [...mockProjectRoles, newRole];
-
-    return newRole;
-  }
+    }),
+  });
 }
 
+/**
+ * No mock fallback, like {@link deleteProjectRole}: answering a failed write by changing the mock
+ * data told the caller it worked while the backend never changed — and the next reload undid it.
+ * A failure reaches the caller, which says so.
+ */
 export async function assignProjectRoleToUser(userId: string, roleId: string): Promise<void> {
-  try {
-    await apiClient.fetch(`/api/v1/users/${userId}/project-roles`, {
-      method: "POST",
-      body: JSON.stringify({
-        roleId: roleId,
-      }),
-    });
-
-    return;
-  } catch {
-    const role = mockProjectRoles.find((projectRole) => projectRole.id === roleId);
-
-    if (!role) return;
-
-    mockUsers = mockUsers.map((user) => {
-      if (user.userId !== userId) return user;
-
-      const alreadyAssigned = user.roles.some((userRole) => userRole.id === roleId);
-
-      if (alreadyAssigned) return user;
-
-      return {
-        ...user,
-        roles: [...user.roles, role],
-      };
-    });
-  }
+  await apiClient.fetch(`/api/v1/users/${userId}/project-roles`, {
+    method: "POST",
+    body: JSON.stringify({
+      roleId: roleId,
+    }),
+  });
 }
 
+/**
+ * No mock fallback, like {@link deleteProjectRole}: answering a failed write by changing the mock
+ * data told the caller it worked while the backend never changed — and the next reload undid it.
+ * A failure reaches the caller, which says so.
+ */
 export async function unassignProjectRoleFromUser(userId: string, roleId: string): Promise<void> {
-  try {
-    await apiClient.fetch(`/api/v1/users/${userId}/project-roles/${roleId}`, {
-      method: "DELETE",
-    });
-
-    return;
-  } catch {
-    mockUsers = mockUsers.map((user) => {
-      if (user.userId !== userId) return user;
-
-      return {
-        ...user,
-        roles: user.roles.filter((role) => role.id !== roleId),
-      };
-    });
-  }
+  await apiClient.fetch(`/api/v1/users/${userId}/project-roles/${roleId}`, {
+    method: "DELETE",
+  });
 }
 
 /** What waits on the project manager in one project, as the sidebar counts it. */
@@ -718,74 +687,42 @@ export async function updateRoleSkills(roleId: string, skillIds: string[]): Prom
   return response.map(toSkill);
 }
 
+/**
+ * No mock fallback, like {@link deleteProjectRole}: answering a failed write by changing the mock
+ * data told the caller it worked while the backend never changed — and the next reload undid it.
+ * A failure reaches the caller, which says so.
+ */
 export async function reactivateSkill(
-  skillId: string,
+  _skillId: string,
   name: string,
   roleIds: string[],
 ): Promise<Skill> {
-  try {
-    const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        roleIds,
-      }),
-    });
-
-    return toSkill(response);
-  } catch {
-    mockSkills = mockSkills.map((s) =>
-      s.id === skillId ? { ...s, status: "ACTIVE" as const } : s,
-    );
-
-    return (
-      mockSkills.find((s) => s.id === skillId) ?? {
-        id: skillId,
-        name,
-        roleIds,
-        status: "ACTIVE",
-        universal: false,
-      }
-    );
-  }
-}
-
-export async function createSkill(name: string, roleIds: string[]): Promise<Skill> {
-  try {
-    const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        roleIds,
-      }),
-    });
-
-    return toSkill(response);
-  } catch {
-    const existing = mockSkills.find(
-      (s) => s.name.toLowerCase() === name.toLowerCase() && s.status === "RETIRED",
-    );
-
-    if (existing) {
-      const reactivated: Skill = { ...existing, roleIds, status: "ACTIVE" };
-
-      mockSkills = mockSkills.map((s) => (s.id === existing.id ? reactivated : s));
-
-      return reactivated;
-    }
-
-    const newSkill: Skill = {
-      id: `mock-skill-${Date.now()}`,
+  const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
+    method: "POST",
+    body: JSON.stringify({
       name,
       roleIds,
-      status: "ACTIVE",
-      universal: false,
-    };
+    }),
+  });
 
-    mockSkills = [...mockSkills, newSkill];
+  return toSkill(response);
+}
 
-    return newSkill;
-  }
+/**
+ * No mock fallback, like {@link deleteProjectRole}: answering a failed write by changing the mock
+ * data told the caller it worked while the backend never changed — and the next reload undid it.
+ * A failure reaches the caller, which says so.
+ */
+export async function createSkill(name: string, roleIds: string[]): Promise<Skill> {
+  const response = await apiClient.fetch<SkillResponseDto>("/api/v1/admin/skills", {
+    method: "POST",
+    body: JSON.stringify({
+      name,
+      roleIds,
+    }),
+  });
+
+  return toSkill(response);
 }
 
 /**
@@ -803,18 +740,15 @@ export async function deleteProjectRole(roleId: string): Promise<void> {
   });
 }
 
+/**
+ * No mock fallback, like {@link deleteProjectRole}: answering a failed write by changing the mock
+ * data told the caller it worked while the backend never changed — and the next reload undid it.
+ * A failure reaches the caller, which says so.
+ */
 export async function deleteSkill(skillId: string): Promise<void> {
-  try {
-    await apiClient.fetch(`/api/v1/admin/skills/${skillId}`, {
-      method: "DELETE",
-    });
-
-    return;
-  } catch {
-    mockSkills = mockSkills.map((skill) =>
-      skill.id === skillId ? { ...skill, status: "RETIRED" } : skill,
-    );
-  }
+  await apiClient.fetch(`/api/v1/admin/skills/${skillId}`, {
+    method: "DELETE",
+  });
 }
 
 // Removed mock role functions
@@ -825,7 +759,7 @@ export type CreateSkillAssessmentRequest = {
   level: SkillLevel;
 };
 
-let mockSkillAssessments: CreateSkillAssessmentRequest[] = [];
+const mockSkillAssessments: CreateSkillAssessmentRequest[] = [];
 
 const skillAssessmentPromptStatePrefix = "skill-assessment-prompt-state";
 
@@ -865,29 +799,22 @@ export async function hasCompletedSkillAssessment(userId: string): Promise<boole
   }
 }
 
+/**
+ * No mock fallback, like {@link deleteProjectRole}: answering a failed write by changing the mock
+ * data told the caller it worked while the backend never changed — and the next reload undid it.
+ * A failure reaches the caller, which says so.
+ */
 export async function saveUserSkillAssessments(
   assessments: CreateSkillAssessmentRequest[],
 ): Promise<void> {
-  try {
-    for (const assessment of assessments) {
-      await apiClient.fetch("/api/v1/me/skill/assess", {
-        method: "POST",
-        body: JSON.stringify({
-          skillId: assessment.skillId,
-          level: assessment.level,
-        }),
-      });
-    }
-  } catch {
-    mockSkillAssessments = mockSkillAssessments.filter(
-      (assessment) =>
-        !assessments.some(
-          (incoming) =>
-            incoming.userId === assessment.userId && incoming.skillId === assessment.skillId,
-        ),
-    );
-
-    mockSkillAssessments = [...mockSkillAssessments, ...assessments];
+  for (const assessment of assessments) {
+    await apiClient.fetch("/api/v1/me/skill/assess", {
+      method: "POST",
+      body: JSON.stringify({
+        skillId: assessment.skillId,
+        level: assessment.level,
+      }),
+    });
   }
 }
 
