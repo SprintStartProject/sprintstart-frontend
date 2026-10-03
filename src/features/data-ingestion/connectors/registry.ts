@@ -1,6 +1,7 @@
 import type { ProjectSource } from "../../../services/projectService.ts";
 import type { ConfluenceConnectionDto } from "../../../services/sources/confluenceService.ts";
 import type { JiraInstanceDto } from "../../../services/sources/jiraService.ts";
+import type { DraftSourceOf } from "./draft.ts";
 import { confluenceConnector } from "./confluence/definition.ts";
 import { githubConnector } from "./github/definition.ts";
 import { jiraConnector } from "./jira/definition.ts";
@@ -21,7 +22,9 @@ type ConnectionOf = {
  * with a definition plus one entry here; the record type makes a missing entry a
  * compile error.
  */
-export const CONNECTORS: { [S in SourceSystem]: ConnectorDefinition<ConnectionOf[S]> } = {
+export const CONNECTORS: {
+  [S in SourceSystem]: ConnectorDefinition<ConnectionOf[S], DraftSourceOf[S]>;
+} = {
   GITHUB: githubConnector,
   JIRA: jiraConnector,
   UPLOAD: uploadConnector,

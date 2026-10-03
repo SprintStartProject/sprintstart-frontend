@@ -12,6 +12,8 @@ import type { GithubRepositoryDetails, SourceInstanceIngestionStatus } from "../
 import { requireProjectId } from "../actionContext.ts";
 import type { ConnectorDefinition } from "../types.ts";
 import { GithubDetailsSection } from "./DetailsSection.tsx";
+import { GithubDraftForm } from "./DraftForm.tsx";
+import { connectGithubDraft, isSameGithubDraft, type GithubDraftSource } from "./draft.ts";
 
 function repositoryFromStatus(status: SourceInstanceIngestionStatus): GithubRepositoryDetails {
   return {
@@ -25,7 +27,7 @@ function repositoryFromStatus(status: SourceInstanceIngestionStatus): GithubRepo
 }
 
 /** A GitHub repository, connected to a project and ingested per repository. */
-export const githubConnector: ConnectorDefinition<ProjectSource> = {
+export const githubConnector: ConnectorDefinition<ProjectSource, GithubDraftSource> = {
   meta: {
     system: "GITHUB",
     connectorId: "github",
@@ -45,6 +47,20 @@ export const githubConnector: ConnectorDefinition<ProjectSource> = {
   runFilter: {
     param: "repositoryId",
     valueOf: (source) => githubRepositoryOf(source)?.repositoryId ?? null,
+  },
+
+  draft: {
+    DraftForm: GithubDraftForm,
+    formHint: "Pick the repositories to index, then add them to your source list.",
+    title: (draft) => `${draft.owner}/${draft.name}`,
+    detail: (draft) => draft.tokenName,
+    // A repository ingested elsewhere is linked rather than fetched, so "Not connected yet"
+    // would misdescribe it.
+    pendingNote: (draft) => (draft.repositoryId ? "Already ingested, will be linked" : null),
+    // The knowledge-gaps analysis keys a repository's component by `owner/name`.
+    ownerComponent: (draft) => `${draft.owner}/${draft.name}`,
+    isSame: isSameGithubDraft,
+    connect: connectGithubDraft,
   },
 
   actions: {

@@ -9,6 +9,12 @@ import { confluenceSpaceOf } from "../../sourceDetails.ts";
 import { requireProjectId } from "../actionContext.ts";
 import type { ConnectorDefinition, ManualSyncOutcome } from "../types.ts";
 import { ConfluenceDetailsSection } from "./DetailsSection.tsx";
+import { ConfluenceDraftForm } from "./DraftForm.tsx";
+import {
+  connectConfluenceDraft,
+  isSameConfluenceDraft,
+  type ConfluenceDraftSource,
+} from "./draft.ts";
 
 /** Turns the synchronous Confluence ingestion result into the outcome every connector reports. */
 function toOutcome(result: ConfluenceIngestionResult): ManualSyncOutcome {
@@ -36,7 +42,10 @@ function toOutcome(result: ConfluenceIngestionResult): ManualSyncOutcome {
 }
 
 /** A Confluence space, connected to a project through its own connection record. */
-export const confluenceConnector: ConnectorDefinition<ConfluenceConnectionDto> = {
+export const confluenceConnector: ConnectorDefinition<
+  ConfluenceConnectionDto,
+  ConfluenceDraftSource
+> = {
   meta: {
     system: "CONFLUENCE",
     connectorId: "confluence",
@@ -56,6 +65,15 @@ export const confluenceConnector: ConnectorDefinition<ConfluenceConnectionDto> =
   runFilter: {
     param: "repositoryId",
     valueOf: (source) => confluenceSpaceOf(source)?.connectionId ?? null,
+  },
+
+  draft: {
+    DraftForm: ConfluenceDraftForm,
+    formHint: "Point to your Confluence space and pick a credential, then add it to the list.",
+    title: (draft) => draft.displayName,
+    detail: (draft) => `${draft.baseUrl} (${draft.spaceId})`,
+    isSame: isSameConfluenceDraft,
+    connect: connectConfluenceDraft,
   },
 
   actions: {

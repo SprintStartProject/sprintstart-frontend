@@ -1,18 +1,9 @@
-import {
-  AlertCircle,
-  BookOpen,
-  Check,
-  FileText,
-  GitBranch,
-  Loader2,
-  RefreshCw,
-  Trash2,
-  Ticket,
-} from "lucide-react";
-import { Button } from "../../../components/ui/Button";
-import { FilterSelect } from "../../../components/ui/FilterSelect";
-import { NO_OWNER_OPTION, type SourceOwnerOption } from "../sourceOwners";
-import type { DraftSource, DraftSourceStatus } from "../projectSourcesDraft";
+import { AlertCircle, Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Button } from "../../../components/ui/Button.tsx";
+import { FilterSelect } from "../../../components/ui/FilterSelect.tsx";
+import { getConnector } from "../connectors/registry.ts";
+import { NO_OWNER_OPTION, type SourceOwnerOption } from "./sourceOwners.ts";
+import type { DraftSource, DraftSourceStatus } from "./projectSourcesDraft.ts";
 
 type StagedSourceListProps = {
   sources: DraftSource[];
@@ -46,21 +37,11 @@ const statusLabels: Record<DraftSourceStatus, string> = {
   failed: "Failed",
 };
 
-/** The resting icon shown before a run, chosen by source type. */
+/** The resting icon shown before a run, the connector's own. */
 function TypeIcon({ source }: { source: DraftSource }) {
-  if (source.type === "JIRA") {
-    return <Ticket className="h-4 w-4 text-app-text-muted" />;
-  }
+  const { icon: Icon } = getConnector(source.type).meta;
 
-  if (source.type === "UPLOAD") {
-    return <FileText className="h-4 w-4 text-app-text-muted" />;
-  }
-
-  if (source.type === "CONFLUENCE") {
-    return <BookOpen className="h-4 w-4 text-app-text-muted" />;
-  }
-
-  return <GitBranch className="h-4 w-4 text-app-text-muted" />;
+  return <Icon className="h-4 w-4 text-app-text-muted" />;
 }
 
 function StatusIcon({ source }: { source: DraftSource }) {
@@ -79,38 +60,25 @@ function StatusIcon({ source }: { source: DraftSource }) {
   return <TypeIcon source={source} />;
 }
 
-/** Primary line: the human name of the source, by type. */
+/** Primary line: the human name of the source, as its connector words it. */
 function sourceTitle(source: DraftSource): string {
-  if (source.type === "GITHUB") return `${source.owner}/${source.name}`;
-
-  return source.displayName;
+  return getConnector(source.type).draft.title(source);
 }
 
 /**
  * Secondary line shown when the source is not in a failed state: the instance
- * URL for Jira, the staged file count for an upload, or the credential for a
+ * URL for Jira, the staged file count for an upload, the credential for a
  * GitHub repository.
  */
 function sourceDetail(source: DraftSource): string {
-  if (source.type === "UPLOAD") {
-    return source.files.length === 1 ? "1 file" : `${source.files.length} files`;
-  }
-
-  if (source.type === "JIRA") {
-    return source.url;
-  }
-
-  if (source.type === "CONFLUENCE") {
-    return `${source.baseUrl} (${source.spaceId})`;
-  }
-
-  return source.tokenName;
+  return getConnector(source.type).draft.detail(source);
 }
 
 /**
- * The status line under the title. A staged GitHub repository that is already
- * ingested elsewhere is linked rather than fetched, so "Not connected yet" would
- * misdescribe it — it says so instead, before and after the run.
+ * The status line under the title. A staged source that is linked rather than
+ * fetched (a GitHub repository that is already ingested elsewhere) would be
+ * misdescribed by "Not connected yet", so its connector's own note replaces it —
+ * and the same goes for the line after the run.
  *
  * Saying so afterwards matters as much as before: a linked source finishes
  * instantly and starts no ingestion, so a plain "Connected" leaves the PM
@@ -118,8 +86,9 @@ function sourceDetail(source: DraftSource): string {
  * worked at all.
  */
 function statusDescription(source: DraftSource): string {
-  if (source.status === "pending" && source.type === "GITHUB" && source.repositoryId) {
-    return "Already ingested, will be linked";
+  if (source.status === "pending") {
+    const note = getConnector(source.type).draft.pendingNote?.(source);
+    if (note) return note;
   }
 
   // The connect worked and the ownership write did not; see `ownerAssignmentFailed`. Said on
@@ -137,6 +106,11 @@ function statusDescription(source: DraftSource): string {
   }
 
   return `${statusLabels[source.status]} · ${sourceDetail(source)}`;
+}
+
+/** The knowledge-gap component an owner staged on the row is assigned to; null when it has none. */
+function ownerComponentOf(source: DraftSource): string | null {
+  return getConnector(source.type).draft.ownerComponent?.(source) ?? null;
 }
 
 /**
@@ -197,9 +171,9 @@ export function StagedSourceList({
             {/* Only while the source is still staged: once it has connected the assignment has
                 already been written, and a control that no longer changes anything is worse
                 than none. The owner is then changed from the knowledge-gaps page. */}
-            {canPickOwner && source.type === "GITHUB" && source.status !== "connected" && (
+            {canPickOwner && ownerComponentOf(source) && source.status !== "connected" && (
               <FilterSelect
-                label={`Owner of ${source.owner}/${source.name}`}
+                label={`Owner of ${ownerComponentOf(source)}`}
                 value={source.ownerUserId ?? ""}
                 options={ownerChoices}
                 onChange={(ownerUserId) => onOwnerChange?.(source.id, ownerUserId)}

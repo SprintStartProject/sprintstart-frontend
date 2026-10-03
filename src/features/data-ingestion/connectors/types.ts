@@ -10,6 +10,7 @@ import type {
   SourceDetails,
   SourceInstanceIngestionStatus,
 } from "../types.ts";
+import type { DraftConnectOutcome, DraftSource } from "./draft.ts";
 import type { SourceSystem } from "./sourceSystems.ts";
 
 /** How a connector presents itself wherever its sources are named. */
@@ -104,6 +105,67 @@ export type RunFilter = {
   valueOf(source: DataSource): string | null;
 };
 
+/** What the host of an add-source form knows that the form cannot find out itself. */
+export type DraftFormContext = {
+  /**
+   * The project the sources are added to, so discovery can flag what is already
+   * connected to it. Null in the create-project wizard, where no project exists yet.
+   */
+  projectId: string | null;
+  projectName?: string;
+  /** GitHub token names the host has already loaded, used until the form's own list arrives. */
+  tokenNames: string[];
+};
+
+/** What a connector's add-source form receives. */
+export type DraftFormProps<D> = {
+  context: DraftFormContext;
+  isBusy: boolean;
+  /**
+   * Reports the sources the form currently describes: several at once for a
+   * multi-select, one for a plain form, none while it is incomplete. Called on
+   * mount and whenever the answer changes, so the host can enable "Add to list".
+   */
+  onDraftsChange: (drafts: D[]) => void;
+  /** Enter in a field stages the source (guarded by the host), matching "Add to list". */
+  onSubmit: () => void;
+  /** Told when the desktop credential companion opens or closes, so the modal can slide left. */
+  onCompanionOpenChange?: (open: boolean) => void;
+};
+
+/**
+ * How a source of a connector is staged before it is connected: the form that
+ * captures it, how the staged row reads, whether two rows are the same source and
+ * what connecting one does. The functions are declared as methods, like on
+ * {@link ConnectorDefinition}, so a definition for one draft type stays assignable
+ * to the registry's view.
+ */
+export type DraftSupport<D> = {
+  /**
+   * The form that captures what is needed to stage a source. It holds its own state.
+   * A plain function type rather than `ComponentType`, so a form for one draft type
+   * stays assignable to the registry's view of all of them.
+   */
+  DraftForm: (props: DraftFormProps<D>) => ReactNode;
+  /** One-line brief under the form's header. */
+  formHint: string;
+  /** Primary line of a staged row. */
+  title(draft: D): string;
+  /** Secondary line of a staged row that has not failed. */
+  detail(draft: D): string;
+  /** The status line of a row that is not connected yet, when it differs from the default. */
+  pendingNote?(draft: D): string | null;
+  /**
+   * The knowledge-gap component an owner staged on the row is assigned to. A
+   * connector without it has no owner picker on its rows.
+   */
+  ownerComponent?(draft: D): string | null;
+  /** Whether two staged rows point at the same underlying source, used to dedupe on add. */
+  isSame(left: D, right: D): boolean;
+  /** Connects the staged source to the project and reports what that did beyond succeeding. */
+  connect(draft: D, projectId: string): Promise<DraftConnectOutcome>;
+};
+
 /**
  * Everything the data ingestion UI needs to know about one connector. Adding a
  * connector means adding a definition and registering it in `registry.ts`; the
@@ -113,11 +175,12 @@ export type RunFilter = {
  *
  * @typeParam C - The connector's own connection record the card is merged with
  *   (a project source, a Jira instance, a Confluence connection).
+ * @typeParam D - The connector's staged source.
  *
  * The functions are declared as methods on purpose: that keeps a definition for
  * one connection record assignable to the registry's connection-agnostic view.
  */
-export type ConnectorDefinition<C = unknown> = {
+export type ConnectorDefinition<C = unknown, D extends DraftSource = DraftSource> = {
   meta: ConnectorMeta;
   chat: {
     /** Whether the chat's source filter can scope a question to this connector. */
@@ -128,6 +191,8 @@ export type ConnectorDefinition<C = unknown> = {
   DetailsSection: ComponentType<DetailsSectionProps> | null;
   /** How the run history is scoped to one source; absent when runs cannot be told apart. */
   runFilter?: RunFilter;
+  /** How a source is staged and connected from the add-source flow. */
+  draft: DraftSupport<D>;
   /** The card's selection key and display name. */
   identity(
     status: SourceInstanceIngestionStatus | null,

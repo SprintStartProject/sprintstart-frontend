@@ -1,23 +1,17 @@
-import { Badge } from "../../../components/ui/Badge.tsx";
-import { SOURCE_SYSTEMS } from "../connectors/sourceSystems.ts";
-import { SOURCE_META } from "../data.ts";
-import type { SourceSystem } from "../types.ts";
+import { CONNECTOR_LIST } from "../connectors/registry.ts";
+import type { SourceSystem } from "../connectors/sourceSystems.ts";
 
 /**
  * Source-type picker used by the "Add source" wizard and the project-creation
  * wizard. Each card carries its own description so the differences between the
- * options -- the actual decision being made here -- are visible. Which
- * connectors count as available depends on the context (`availableTypes`): both
- * wizards now wire GitHub, Jira, Upload and Confluence, but any connector left
- * out of `availableTypes` still renders with a "Soon" badge instead of being
- * hidden.
+ * options -- the actual decision being made here -- are visible. It offers every
+ * connector in the registry, each of which brings its own add-source form.
  */
 export function SourceTypeStep({
   selectedType,
   onSelectType,
   heading = "Source type",
   description,
-  availableTypes = ["GITHUB"],
 }: {
   selectedType: SourceSystem;
   onSelectType: (system: SourceSystem) => void;
@@ -25,12 +19,6 @@ export function SourceTypeStep({
   heading?: string;
   /** Optional sub-line under the heading, e.g. to explain that this is optional. */
   description?: string;
-  /**
-   * Source systems that are connectable in this context. Any system not listed
-   * still renders (so the option stays visible) but shows a "Soon" badge.
-   * Defaults to GitHub-only, matching the project-creation wizard.
-   */
-  availableTypes?: readonly SourceSystem[];
 }) {
   return (
     <div className="space-y-5">
@@ -44,17 +32,15 @@ export function SourceTypeStep({
             source types a three-column grid leaves a single card stranded on the
             second row, and the cards carry a description each. */}
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {SOURCE_SYSTEMS.map((sourceSystem) => {
-            const meta = SOURCE_META[sourceSystem];
+          {CONNECTOR_LIST.map(({ meta }) => {
             const Icon = meta.icon;
-            const isSelected = selectedType === sourceSystem;
-            const isAvailable = availableTypes.includes(sourceSystem);
+            const isSelected = selectedType === meta.system;
 
             return (
               <button
-                key={sourceSystem}
+                key={meta.system}
                 type="button"
-                onClick={() => onSelectType(sourceSystem)}
+                onClick={() => onSelectType(meta.system)}
                 className={`rounded-2xl border p-4 text-left transition ${
                   isSelected
                     ? "border-app-brand bg-app-brand-soft"
@@ -68,15 +54,9 @@ export function SourceTypeStep({
                       className={isSelected ? "text-app-brand" : "text-app-text-muted"}
                     />
                   </div>
-
-                  {!isAvailable && (
-                    <Badge variant="neutral" size="sm">
-                      Soon
-                    </Badge>
-                  )}
                 </div>
 
-                <p className="mt-3 text-sm font-semibold text-app-text">{meta.type}</p>
+                <p className="mt-3 text-sm font-semibold text-app-text">{meta.label}</p>
                 <p className="mt-1 text-xs leading-relaxed text-app-text-muted">
                   {meta.description}
                 </p>

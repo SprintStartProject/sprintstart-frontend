@@ -11,9 +11,11 @@ import { jiraInstanceOf } from "../../sourceDetails.ts";
 import { requireProjectId } from "../actionContext.ts";
 import type { ConnectorDefinition } from "../types.ts";
 import { JiraDetailsSection } from "./DetailsSection.tsx";
+import { JiraDraftForm } from "./DraftForm.tsx";
+import { connectJiraDraft, isSameJiraDraft, type JiraDraftSource } from "./draft.ts";
 
 /** A Jira instance, identified by its URL and ingested as a whole. */
-export const jiraConnector: ConnectorDefinition<JiraInstanceDto> = {
+export const jiraConnector: ConnectorDefinition<JiraInstanceDto, JiraDraftSource> = {
   meta: {
     system: "JIRA",
     connectorId: "jira",
@@ -27,6 +29,15 @@ export const jiraConnector: ConnectorDefinition<JiraInstanceDto> = {
   DetailsSection: JiraDetailsSection,
   // A Jira run is scoped by its source reference, which is the instance URL.
   runFilter: { param: "sourceRef", valueOf: (source) => source.sourceId },
+
+  draft: {
+    DraftForm: JiraDraftForm,
+    formHint: "Point to your Jira instance and pick a credential, then add it to the list.",
+    title: (draft) => draft.displayName,
+    detail: (draft) => draft.url,
+    isSame: isSameJiraDraft,
+    connect: connectJiraDraft,
+  },
 
   actions: {
     update: {
