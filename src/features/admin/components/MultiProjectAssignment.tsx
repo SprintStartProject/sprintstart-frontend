@@ -98,7 +98,7 @@ export function MultiProjectAssignment({
           disabled={isBusy || isManaged}
           aria-label={
             isManaged
-              ? `Remove ${project.name} — remove as manager first`
+              ? `Remove ${project.name} (remove as manager first)`
               : `Remove ${project.name}`
           }
           title={isManaged ? "Remove as manager first" : undefined}

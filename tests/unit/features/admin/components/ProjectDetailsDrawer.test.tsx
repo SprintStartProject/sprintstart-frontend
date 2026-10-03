@@ -309,6 +309,37 @@ describe("ProjectDetailsDrawer", () => {
       expect(screen.queryByRole("button", { name: /^Back to/ })).not.toBeInTheDocument();
     });
 
+    it("asks before leaving with unsaved changes and stays when told to keep editing", async () => {
+      const user = userEvent.setup();
+      const onOpenUser = vi.fn();
+      renderWithDirectory({ onOpenUser });
+
+      await screen.findByText("Jane Test");
+      await user.type(screen.getByLabelText(/^Description/), "!");
+      await user.click(screen.getByRole("button", { name: "Open Jane Test" }));
+
+      expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+      expect(onOpenUser).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Keep editing" }));
+
+      expect(onOpenUser).not.toHaveBeenCalled();
+      expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+    });
+
+    it("leaves once the discard is confirmed", async () => {
+      const user = userEvent.setup();
+      const onBack = vi.fn();
+      renderWithDirectory({ back: { label: "Back to Jane Test", onBack } });
+
+      await screen.findByText("Jane Test");
+      await user.type(screen.getByLabelText(/^Description/), "!");
+      await user.click(screen.getByRole("button", { name: "Back to Jane Test" }));
+      await user.click(screen.getByRole("button", { name: "Discard and leave" }));
+
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
+
     it("copies the project id", async () => {
       const user = userEvent.setup();
       renderWithDirectory();
@@ -812,7 +843,9 @@ describe("ProjectDetailsDrawer", () => {
       await settleDrawerFocus();
       await user.type(screen.getByRole("textbox", { name: "Search or add people" }), "bulk");
 
-      expect(await screen.findByText("Showing 6 of 8 – refine your search")).toBeInTheDocument();
+      expect(
+        await screen.findByText("Showing 6 of 8. Refine your search to see more."),
+      ).toBeInTheDocument();
     });
 
     it("discards staged changes", async () => {

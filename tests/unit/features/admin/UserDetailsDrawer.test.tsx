@@ -322,7 +322,7 @@ describe("UserDetailsDrawer", () => {
       renderDrawer(manager, [overview(projectA, "123"), overview(projectB, "boss-1")]);
 
       expect(
-        screen.getByRole("button", { name: "Remove Alpha — remove as manager first" }),
+        screen.getByRole("button", { name: "Remove Alpha (remove as manager first)" }),
       ).toBeDisabled();
       expect(screen.getByRole("button", { name: "Remove Beta" })).toBeEnabled();
     });

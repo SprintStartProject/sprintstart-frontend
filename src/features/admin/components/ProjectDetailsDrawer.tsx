@@ -120,6 +120,8 @@ export function ProjectDetailsDrawer({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+  // A navigation out of the drawer, held while the unsaved-changes dialog asks.
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const toast = useToast();
 
   const [draftProject, setDraftProject] = useState<ProjectEditFormState>(() =>
@@ -197,6 +199,28 @@ export function ProjectDetailsDrawer({
   const discardChanges = () => {
     setSaveErrorMessage("");
     resetDrafts(visibleProject);
+  };
+
+  /**
+   * Runs a navigation that leaves the drawer (a member, the way back, Data
+   * Ingestion, a source). The drawer is replaced or the page changes, which
+   * drops the staged edits, so with changes pending it asks first.
+   */
+  const leaveDrawer = (navigate: () => void) => {
+    if (!hasPendingChanges) {
+      navigate();
+      return;
+    }
+
+    setPendingNavigation(() => navigate);
+  };
+
+  const confirmLeaveDrawer = () => {
+    const navigate = pendingNavigation;
+
+    setPendingNavigation(null);
+    discardChanges();
+    navigate?.();
   };
 
   const updateDraftField = (field: keyof ProjectEditFormState, value: string) => {
@@ -329,7 +353,11 @@ export function ProjectDetailsDrawer({
         closeAriaLabel="Close project details"
         widthClassName="w-full sm:w-[min(94vw,34rem)] lg:w-[min(72vw,58rem)]"
         leading={<ProjectMonogram projectId={project.id} name={visibleProject.name} size="lg" />}
-        actions={back ? <DrawerBackButton back={back} /> : undefined}
+        actions={
+          back ? (
+            <DrawerBackButton back={{ ...back, onBack: () => leaveDrawer(back.onBack) }} />
+          ) : undefined
+        }
         badge={
           <>
             <AccessBadge variant="neutral">
@@ -469,7 +497,9 @@ export function ProjectDetailsDrawer({
                 snapshotKey={peopleSnapshotKey}
                 draft={activePeopleDraft}
                 onDraftChange={setPeopleDraft}
-                onOpenUser={onOpenUser}
+                onOpenUser={
+                  onOpenUser ? (userId) => leaveDrawer(() => onOpenUser(userId)) : undefined
+                }
               />
             </DrawerCard>
 
@@ -482,7 +512,7 @@ export function ProjectDetailsDrawer({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onOpenDataIngestion(project.id)}
+                    onClick={() => leaveDrawer(() => onOpenDataIngestion(project.id))}
                     trailingIcon={<ChevronRight className="h-4 w-4" />}
                   >
                     Open in Data Ingestion
@@ -494,7 +524,7 @@ export function ProjectDetailsDrawer({
                 sources={visibleProject.sources}
                 onOpenSourceDetails={
                   onOpenSourceDetails
-                    ? (sourceId) => onOpenSourceDetails(project.id, sourceId)
+                    ? (sourceId) => leaveDrawer(() => onOpenSourceDetails(project.id, sourceId))
                     : undefined
                 }
               />
@@ -545,6 +575,19 @@ export function ProjectDetailsDrawer({
         confirmLabel="Move and save"
         onClose={() => setIsMoveDialogOpen(false)}
         onConfirm={() => void saveChanges()}
+      />
+
+      <AlertDialog
+        isOpen={pendingNavigation !== null}
+        variant="danger"
+        title="Discard unsaved changes?"
+        description={`Leaving this project drops ${
+          pendingChangeCount === 1 ? "1 unsaved change" : `${pendingChangeCount} unsaved changes`
+        }.`}
+        confirmLabel="Discard and leave"
+        cancelLabel="Keep editing"
+        onClose={() => setPendingNavigation(null)}
+        onConfirm={confirmLeaveDrawer}
       />
 
       <AlertDialog

@@ -512,7 +512,8 @@ export function ProjectPeopleSection({
 
           {addableMatches.length > addableUsers.length && (
             <p className="mt-2 px-3 text-xs text-app-text-muted">
-              Showing {addableUsers.length} of {addableMatches.length} – refine your search
+              Showing {addableUsers.length} of {addableMatches.length}. Refine your search to see
+              more.
             </p>
           )}
         </div>

@@ -499,7 +499,7 @@ export function UserDetailsDrawer({
                     {downgradeConflicts.projectCount > 0 && (
                       <li>
                         {getDisplayName(user)} is in {downgradeConflicts.projectCount} projects.
-                        Users may only be in one – remaining memberships are kept until you remove
+                        Users may only be in one, but the extra memberships stay until you remove
                         them.
                       </li>
                     )}
@@ -509,7 +509,8 @@ export function UserDetailsDrawer({
                         {downgradeConflicts.managedProjects
                           .map((project) => project.name)
                           .join(", ")}
-                        . Managers need the Project Manager role – reassign the manager afterwards.
+                        . Managers need the Project Manager role, so reassign the manager
+                        afterwards.
                       </li>
                     )}
                   </ul>

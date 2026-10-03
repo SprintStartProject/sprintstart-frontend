@@ -95,7 +95,7 @@ export function SingleProjectAssignment({
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
             Users may only be in one project. {name} is in{" "}
-            {pluralize(assignedProjects.length, "project")} – remove the extra ones.
+            {pluralize(assignedProjects.length, "project")}. Remove the extra ones.
           </p>
         </div>
       )}
