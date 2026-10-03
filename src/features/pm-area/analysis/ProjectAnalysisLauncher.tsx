@@ -1,5 +1,5 @@
 import { CircleAlert, ScanSearch } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
@@ -23,6 +23,11 @@ type ProjectAnalysisLauncherProps = {
    * read their data again. The rest of the overview already updates through the cache.
    */
   onRefreshed?: (revision: number) => void;
+  /**
+   * Bumped from outside to open the analysis with a fresh run — the overview's "+N more". A run
+   * already going is shown instead of started again.
+   */
+  runRequest?: number;
 };
 
 /**
@@ -34,7 +39,10 @@ type ProjectAnalysisLauncherProps = {
  * going with the dialog closed and the button can say so. The last run's results stay a click away
  * (the ring) — also after a reload and on another device, since they are kept on the backend.
  */
-export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncherProps) {
+export function ProjectAnalysisLauncher({
+  onRefreshed,
+  runRequest = 0,
+}: ProjectAnalysisLauncherProps) {
   const analysis = useProjectAnalysis();
   const { selectedProject } = useProjectContext();
   const navigate = useNavigate();
@@ -46,6 +54,16 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
   }, [refreshRevision, onRefreshed]);
 
   const running = analysis.phase === "running";
+
+  // Only a change of the request starts a run, not the value it mounts with.
+  const handledRequest = useRef(runRequest);
+  const { run } = analysis;
+  useEffect(() => {
+    if (runRequest === handledRequest.current) return;
+    handledRequest.current = runRequest;
+    setIsOpen(true);
+    if (!running) void run();
+  }, [runRequest, running, run]);
   const lastRun = analysis.lastRun;
   // What the ring stands for, in words: its accessible name and its tooltip.
   const lastRunSummary = !lastRun

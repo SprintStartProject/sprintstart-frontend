@@ -1,4 +1,5 @@
-import { ArrowUpRight, CheckCircle2, CircleAlert, ListChecks } from "lucide-react";
+import { CheckCircle2, CircleAlert, ListChecks } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryFetch } from "../../../../hooks/useQueryFetch";
 import { insightsService } from "../../../../services/faqService";
@@ -12,57 +13,51 @@ import { useProjectContext } from "../../../projects/useProjectContext";
 import type { TeamOverviewUser } from "../../../team-management/types";
 import { AREA_META, SEVERITY_META } from "../../analysis/analysisMeta";
 import { buildFindings, type Finding } from "../../analysis/findings";
-import { PmCard, PmCardHeader } from "../PmCard";
 
-/** How many findings the card lists; the rest are a count and a pointer to the full analysis. */
-const ROWS = 5;
+/** The most findings the strip shows; fewer when the line is too narrow for them. */
+const MAX_SHOWN = 4;
+/** The gap between pills (`gap-2`), for the measurement. */
+const PILL_GAP_PX = 8;
 
-function TodayRow({ finding }: { finding: Finding }) {
+/**
+ * One finding as a pill: the severity's icon and tint, and the title. The detail is its tooltip —
+ * the strip stays one line high.
+ */
+function TodayPill({
+  finding,
+  measureOnly = false,
+}: {
+  finding: Finding;
+  /** Drawn only to be measured: inert, no link, nothing announced. */
+  measureOnly?: boolean;
+}) {
   const severity = SEVERITY_META[finding.severity];
   const SeverityIcon = severity.icon;
   const area = AREA_META[finding.area];
-  const AreaIcon = area.icon;
   const body = (
     <>
-      <span
-        aria-hidden="true"
-        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${area.chip}`}
-      >
-        <AreaIcon className="h-3.5 w-3.5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="text-sm font-semibold text-app-text">{finding.title}</span>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${severity.badge}`}
-          >
-            <SeverityIcon aria-hidden="true" className="h-3 w-3" />
-            {severity.label}
-          </span>
-        </span>
-        <span className="mt-0.5 block truncate text-xs text-app-text-muted">
-          {area.label} · {finding.detail}
-        </span>
-      </span>
-      {finding.to && (
-        <ArrowUpRight
-          aria-hidden="true"
-          className="mt-1 h-4 w-4 shrink-0 text-app-text-subtle transition group-hover:text-app-text"
-        />
-      )}
+      <SeverityIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{finding.title}</span>
     </>
   );
-  const className = "group flex items-start gap-3 rounded-xl px-2 py-2";
+  const className = `inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${severity.badge}`;
+  const label = `${severity.label}, ${area.label}: ${finding.title}`;
+
+  if (measureOnly) return <span className={className}>{body}</span>;
 
   return finding.to ? (
     <Link
       to={finding.to}
-      className={`${className} transition-colors hover:bg-app-surface-muted focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+      title={finding.detail}
+      aria-label={label}
+      className={`${className} transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
     >
       {body}
     </Link>
   ) : (
-    <div className={className}>{body}</div>
+    <span title={finding.detail} aria-label={label} className={className}>
+      {body}
+    </span>
   );
 }
 
@@ -85,6 +80,7 @@ export function TodayCard({
   metrics,
   attention,
   loading,
+  onOpenAnalysis,
 }: {
   /** The team as the overview shows it; `null` while loading or when it could not be read. */
   roster: TeamOverviewUser[] | null;
@@ -94,6 +90,8 @@ export function TodayCard({
   attention: ProjectAttention | null;
   /** The team or its attention list is still loading. */
   loading: boolean;
+  /** Opens the full project analysis — where "+N more" leads. */
+  onOpenAnalysis?: () => void;
 }) {
   const { selectedProjectId } = useProjectContext();
   const enabled = Boolean(selectedProjectId);
@@ -142,50 +140,120 @@ export function TodayCard({
     industry: null,
   }).filter((finding) => finding.severity !== "good");
 
-  const shown = findings.slice(0, ROWS);
+  // As many of the most pressing findings as fit on the line whole, up to four: measured off an
+  // invisible copy of the pills, so a wide screen shows four and a narrow one fewer — never a pill
+  // cut in half. At least one is always shown (it truncates if it has to).
+  const candidates = findings.slice(0, MAX_SHOWN);
+  const candidateKey = candidates.map((finding) => finding.id).join("|");
+  const slotRef = useRef<HTMLDivElement | null>(null);
+  const measureRef = useRef<HTMLUListElement | null>(null);
+  const [fitting, setFitting] = useState(MAX_SHOWN);
+
+  useLayoutEffect(() => {
+    const slot = slotRef.current;
+    const measure = measureRef.current;
+    if (!slot || !measure) return;
+    const fit = () => {
+      const available = slot.clientWidth;
+      // No layout to go by (a test environment, a hidden tab): show them all.
+      if (available === 0) {
+        setFitting(MAX_SHOWN);
+        return;
+      }
+      let used = 0;
+      let count = 0;
+      for (const item of Array.from(measure.children) as HTMLElement[]) {
+        const width = item.offsetWidth + (count > 0 ? PILL_GAP_PX : 0);
+        if (used + width > available) break;
+        used += width;
+        count += 1;
+      }
+      setFitting(Math.max(1, count));
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(slot);
+    return () => observer.disconnect();
+  }, [candidateKey]);
+
+  const shown = candidates.slice(0, fitting);
   const more = findings.length - shown.length;
-  const urgent = findings.some((finding) => finding.severity === "critical");
 
   return (
-    <PmCard aria-label="What needs you today" tone={urgent ? "warning" : "brand"}>
-      <PmCardHeader
-        icon={ListChecks}
-        tone={urgent ? "warning" : "brand"}
-        title="What needs you today"
-        meta={reading ? undefined : findings.length === 1 ? "1 open" : `${findings.length} open`}
-      />
+    <section
+      aria-label="What needs you today"
+      // Always one line: fewer pills on a narrow screen rather than a strip wrapped into a block.
+      className="flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface px-4 py-2.5"
+    >
+      <h2 className="flex shrink-0 items-center gap-1.5 text-xs font-semibold whitespace-nowrap text-app-text">
+        <ListChecks aria-hidden="true" className="h-4 w-4 text-app-brand-text" />
+        {/* Icon only on a phone, where the words would leave no room for a pill. */}
+        <span className="max-sm:sr-only">Needs you today</span>
+      </h2>
 
       {reading && findings.length === 0 ? (
-        <p className="text-sm text-app-text-muted">Reading the project…</p>
+        <p className="truncate text-xs text-app-text-muted">Reading the project…</p>
       ) : findings.length === 0 && !failed ? (
-        <p className="flex items-center gap-2 text-sm text-app-text-muted">
-          <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-app-success-text" />
+        <p className="flex items-center gap-1.5 text-xs text-app-text-muted">
+          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 text-app-success-text" />
           Nothing needs you today.
         </p>
       ) : (
         <>
-          {shown.length > 0 && (
-            <ul className="-mx-2 space-y-0.5">
-              {shown.map((finding) => (
-                <li key={finding.id}>
-                  <TodayRow finding={finding} />
+          <div ref={slotRef} className="relative min-w-0 flex-1">
+            {/* The measuring copy: every candidate at its natural width, invisible and inert. */}
+            <ul
+              ref={measureRef}
+              aria-hidden="true"
+              inert
+              className="pointer-events-none invisible absolute top-0 left-0 flex gap-2"
+            >
+              {candidates.map((finding) => (
+                <li key={finding.id} className="max-w-[24rem] shrink-0">
+                  <TodayPill finding={finding} measureOnly />
                 </li>
               ))}
             </ul>
-          )}
-          {more > 0 && (
-            <p className="mt-2 text-xs text-app-text-muted">
-              {more === 1 ? "1 more" : `${more} more`} in the project analysis.
-            </p>
-          )}
+            {shown.length > 0 && (
+              <ul className="flex min-w-0 items-center gap-2">
+                {shown.map((finding, index) => (
+                  <li
+                    key={finding.id}
+                    // The last one shown may shrink and truncate; the others keep their width.
+                    className={`max-w-[24rem] ${index === shown.length - 1 ? "min-w-0" : "shrink-0"}`}
+                  >
+                    <TodayPill finding={finding} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {more > 0 &&
+            (onOpenAnalysis ? (
+              <button
+                type="button"
+                onClick={onOpenAnalysis}
+                className="shrink-0 rounded-md px-1 text-xs font-medium whitespace-nowrap text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                aria-label={`${more} more — open the project analysis`}
+              >
+                +{more} more
+              </button>
+            ) : (
+              <span className="shrink-0 text-xs whitespace-nowrap text-app-text-muted">
+                +{more} more
+              </span>
+            ))}
           {failed && (
-            <p className="mt-2 flex items-center gap-2 text-xs text-app-text-muted">
+            <span
+              className="flex shrink-0 items-center gap-1 text-xs text-app-text-muted"
+              title="Some parts could not be read, so this may be missing something."
+            >
               <CircleAlert aria-hidden="true" className="h-3.5 w-3.5 text-app-warning-text" />
-              Some parts could not be read, so this list may be missing something.
-            </p>
+              Incomplete
+            </span>
           )}
         </>
       )}
-    </PmCard>
+    </section>
   );
 }

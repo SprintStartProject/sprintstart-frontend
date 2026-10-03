@@ -118,7 +118,11 @@ type ResolvedSection = {
   hasOwnPanel: boolean;
 };
 
-function resolveSection(pathname: string, analysisRevision: number): ResolvedSection {
+function resolveSection(
+  pathname: string,
+  analysisRevision: number,
+  onOpenAnalysis: () => void,
+): ResolvedSection {
   const member = matchPath("/team/:userId", pathname);
   if (member?.params.userId) {
     return {
@@ -177,7 +181,9 @@ function resolveSection(pathname: string, analysisRevision: number): ResolvedSec
   return {
     section: "overview",
     viewKey: "overview",
-    content: <PmDashboardPage analysisRevision={analysisRevision} />,
+    content: (
+      <PmDashboardPage analysisRevision={analysisRevision} onOpenAnalysis={onOpenAnalysis} />
+    ),
     hasOwnPanel: false,
   };
 }
@@ -209,7 +215,15 @@ export function PmWorkspace() {
   // Bumped by every finished project analysis, for the overview cards that keep their data
   // outside the shared query cache (the industry card) to read it again.
   const [analysisRevision, setAnalysisRevision] = useState(0);
-  const { section, viewKey, content, hasOwnPanel } = resolveSection(pathname, analysisRevision);
+  // Bumped when the overview asks for the full analysis ("+N more" under the figures): the
+  // launcher owns the run, so it is told to start one rather than the overview starting it.
+  const [analysisRequest, setAnalysisRequest] = useState(0);
+  const requestAnalysis = useCallback(() => setAnalysisRequest((request) => request + 1), []);
+  const { section, viewKey, content, hasOwnPanel } = resolveSection(
+    pathname,
+    analysisRevision,
+    requestAnalysis,
+  );
   const viewCounts = usePmSectionViewCounts(section);
   const panelOpen = hasOwnPanel || searchParams.has(MEMBER_PEEK_PARAM);
   // A member's full profile is somewhere a manager reads and works, not a stop on the way to the
@@ -410,7 +424,10 @@ export function PmWorkspace() {
                 animate={{ opacity: launcherShown ? 1 : 0 }}
                 transition={{ duration: prefersReducedMotion ? 0 : SLIDING_PANEL_SECONDS }}
               >
-                <ProjectAnalysisLauncher onRefreshed={setAnalysisRevision} />
+                <ProjectAnalysisLauncher
+                  onRefreshed={setAnalysisRevision}
+                  runRequest={analysisRequest}
+                />
               </motion.div>
             </div>
 

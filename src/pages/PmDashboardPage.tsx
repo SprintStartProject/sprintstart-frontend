@@ -41,6 +41,7 @@ import { queryKeys } from "../services/queryKeys";
  */
 export function PmDashboardPage({
   analysisRevision = 0,
+  onOpenAnalysis,
 }: {
   /**
    * Bumped by every finished project analysis (its button sits beside the workspace's tabs). The
@@ -48,6 +49,8 @@ export function PmDashboardPage({
    * remounted to read the project again; everything else reads the cache the analysis refreshed.
    */
   analysisRevision?: number;
+  /** Opens the full project analysis — where the strip's "+N more" leads. */
+  onOpenAnalysis?: () => void;
 } = {}) {
   const { selectedProjectId } = useProjectContext();
   const { openMember } = useMemberPeek();
@@ -157,14 +160,15 @@ export function PmDashboardPage({
         />
       </section>
 
-      {/* The project analysis's findings, worked out on every visit: what asks something of the
-          manager, most pressing first, straight under the figures. */}
+      {/* One line under the figures: the project analysis's most pressing findings, worked out on
+          every visit — a briefing, not another card. */}
       <TodayCard
         roster={figuresReady ? members : null}
         feedbackByUser={feedbackByUser}
         metrics={metrics ?? null}
         attention={attention}
         loading={rosterLoading || attentionLoading}
+        onOpenAnalysis={onOpenAnalysis}
       />
 
       <TeamPulseCard
