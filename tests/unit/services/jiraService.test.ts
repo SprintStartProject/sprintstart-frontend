@@ -2,14 +2,11 @@ import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../setup/vitest.setup";
 import {
-  configureAllJiraInstances,
   configureJiraInstance,
   connectJiraInstance,
-  getAllJiraConfigs,
   getJiraConfig,
   getJiraInstances,
   removeJiraInstanceFromProject,
-  updateAllJiraInstances,
   updateJiraInstance,
 } from "../../../src/services/sources/jiraService";
 
@@ -116,43 +113,9 @@ describe("jiraService instance endpoints", () => {
 
     expect(response.transactionId).toBe("tx-1");
   });
-
-  it("updateAllJiraInstances returns one transaction id per instance", async () => {
-    server.use(
-      http.post("/api/v1/jira/update-all", () =>
-        HttpResponse.json([{ transactionId: "tx-1" }, { transactionId: "tx-2" }]),
-      ),
-    );
-
-    const responses = await updateAllJiraInstances();
-
-    expect(responses).toHaveLength(2);
-    expect(responses.map((r) => r.transactionId)).toEqual(["tx-1", "tx-2"]);
-  });
 });
 
 describe("jiraService config endpoints", () => {
-  it("getAllJiraConfigs lists every instance config", async () => {
-    server.use(
-      http.get("/api/v1/jira/config", () =>
-        HttpResponse.json([
-          {
-            instanceUrl: "https://acme.atlassian.net",
-            autoUpdate: true,
-            spec: { type: "DAILY", time: "02:00" },
-            schedule: "0 0 2 * * *",
-            nextSyncAt: "2026-01-02T02:00:00Z",
-          },
-        ]),
-      ),
-    );
-
-    const configs = await getAllJiraConfigs();
-
-    expect(configs).toHaveLength(1);
-    expect(configs[0].autoUpdate).toBe(true);
-  });
-
   it("removeJiraInstanceFromProject sends a DELETE with query params", async () => {
     let capturedUrl: URL | null = null;
 
@@ -207,34 +170,6 @@ describe("jiraService config endpoints", () => {
     );
 
     await expect(getJiraConfig(instanceUrl)).rejects.toThrow();
-  });
-
-  it("configureAllJiraInstances sends the typed global schedule payload", async () => {
-    expect.assertions(1);
-
-    server.use(
-      http.put("/api/v1/jira/config", async ({ request }) => {
-        expect(await request.json()).toEqual({
-          autoUpdate: true,
-          schedule: {
-            type: "WEEKLY",
-            time: "09:00",
-            daysOfWeek: ["MONDAY", "THURSDAY"],
-          },
-        });
-
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-
-    await configureAllJiraInstances({
-      autoUpdate: true,
-      schedule: {
-        type: "WEEKLY",
-        time: "09:00",
-        daysOfWeek: ["MONDAY", "THURSDAY"],
-      },
-    });
   });
 
   it("configureJiraInstance targets one instance via the request body", async () => {

@@ -1,21 +1,18 @@
 import { useId } from "react";
 import type { ReactNode } from "react";
 import {
-  BookOpen,
   File,
   FileCode,
   FileText,
   FolderGit2,
-  GitBranch,
   Image as ImageIcon,
   Languages,
   ListChecks,
   RefreshCw,
   Search,
-  Ticket,
-  Upload,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { CONNECTOR_LIST } from "../../data-ingestion/connectors/registry.ts";
 import { Input } from "../../../components/ui/Input";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect.tsx";
 import {
@@ -125,12 +122,12 @@ const SORT_OPTIONS: FilterSelectOption<ArtifactSort>[] = ARTIFACT_SORT_ORDER.map
 
 const ICON_CLASS = "h-4 w-4 shrink-0 text-app-text-muted";
 
-const SOURCE_ICONS: Record<SourceSystem, ReactNode> = {
-  GITHUB: <GitBranch className={ICON_CLASS} aria-hidden="true" />,
-  JIRA: <Ticket className={ICON_CLASS} aria-hidden="true" />,
-  CONFLUENCE: <BookOpen className={ICON_CLASS} aria-hidden="true" />,
-  UPLOAD: <Upload className={ICON_CLASS} aria-hidden="true" />,
-};
+const SOURCE_ICONS = Object.fromEntries(
+  CONNECTOR_LIST.map(({ meta, knowledgeBase: { icon: Icon } }) => [
+    meta.system,
+    <Icon key={meta.system} className={ICON_CLASS} aria-hidden="true" />,
+  ]),
+) as Record<SourceSystem, ReactNode>;
 
 const FORMAT_ICONS: Record<UploadFormat, ReactNode> = {
   PDF: <FileText className={ICON_CLASS} aria-hidden="true" />,

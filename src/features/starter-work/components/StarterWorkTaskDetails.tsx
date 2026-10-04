@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
-import { DrawerCard } from "../../admin/components/DrawerCard";
-import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
+import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { IconTile } from "../../../components/ui/IconTile";

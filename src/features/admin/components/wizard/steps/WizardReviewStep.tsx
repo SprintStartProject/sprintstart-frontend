@@ -1,8 +1,9 @@
-import { ArrowRightLeft, GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import { ArrowRightLeft } from "lucide-react";
+import type { ReactNode } from "react";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
 import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
-import type { DraftSource, DraftSourceType } from "../../../projectSourcesDraft";
+import { getConnector } from "../../../../data-ingestion/connectors/registry";
+import type { DraftSource } from "../../../../data-ingestion/add-source/projectSourcesDraft";
 
 /** The minimum a review row needs to render a person with their avatar. */
 export type ReviewPerson = {
@@ -29,24 +30,6 @@ type WizardReviewStepProps = {
   onEditMembers: () => void;
   onEditSources: () => void;
 };
-
-const typeIcons: Record<DraftSourceType, ComponentType<{ className?: string }>> = {
-  GITHUB: GitBranch,
-  JIRA: Ticket,
-  UPLOAD: FileText,
-  CONFLUENCE: BookOpen,
-};
-
-const typeLabels: Record<DraftSourceType, string> = {
-  GITHUB: "GitHub",
-  JIRA: "Jira",
-  UPLOAD: "Upload",
-  CONFLUENCE: "Confluence",
-};
-
-function sourceTitle(source: DraftSource): string {
-  return source.type === "GITHUB" ? `${source.owner}/${source.name}` : source.displayName;
-}
 
 function PersonChip({ person, suffix }: { person: ReviewPerson; suffix?: string }) {
   const movedFrom = person.movedFrom?.join(", ");
@@ -196,13 +179,14 @@ export function WizardReviewStep({
         ) : (
           <ul className="space-y-1.5">
             {sources.map((source) => {
-              const Icon = typeIcons[source.type];
+              const { meta, draft } = getConnector(source.type);
+              const { icon: Icon, label } = meta;
 
               return (
                 <li key={source.id} className="flex items-center gap-2 text-app-text">
                   <Icon className="h-4 w-4 shrink-0 text-app-text-muted" />
-                  <span className="truncate">{sourceTitle(source)}</span>
-                  <SourceTypeBadge type={typeLabels[source.type]} size="sm" />
+                  <span className="truncate">{draft.title(source)}</span>
+                  <SourceTypeBadge type={label} size="sm" />
                 </li>
               );
             })}
