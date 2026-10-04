@@ -1800,7 +1800,10 @@ export function BlueprintPathDetailPage() {
   return (
     // The swipe listens on the page, not on the bar: a gesture that only works while the pointer is
     // over a 20rem control reads as broken everywhere else.
-    <main ref={swipeRef} className="mx-auto w-full max-w-6xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">
+    <main
+      ref={swipeRef}
+      className="mx-auto w-full max-w-[calc(72rem+2*var(--app-page-gutter))] space-y-7 px-(--app-page-gutter) py-8"
+    >
       <AlertDialog
         isOpen={pendingDelete !== null}
         title={

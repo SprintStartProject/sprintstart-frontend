@@ -236,7 +236,10 @@ export function BlueprintPathsPage() {
   return (
     // The swipe listens on the page rather than on the bar: having to be over the control to change
     // scope makes the gesture feel like it only works in one corner.
-    <main ref={swipeRef} className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+    <main
+      ref={swipeRef}
+      className="mx-auto w-full max-w-[calc(72rem+2*var(--app-page-gutter))] space-y-8 px-(--app-page-gutter) py-8"
+    >
       <PageHeader
         icon={Layers3}
         title="Blueprint paths"

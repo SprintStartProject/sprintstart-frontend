@@ -440,9 +440,15 @@ body {
   }
 }
 
+/* Fluid from `lg` up rather than a flat 10rem. The page beside the sidebar is the window minus
+   286px, and two fixed 160px gutters took another 320px of it: at 1024px that left ~420px of
+   page, at 1280px ~660px, which is what squeezed the dashboard's quarter-row cards to ~150px and
+   pushed their content out of the frame. This grows with the window instead — 2rem at 1024px,
+   ~3.2rem at 1280px, ~4.1rem at 1440px, ~6.8rem at 1920px — and caps at the old 10rem on very
+   wide screens, where the calm margin was the point. */
 @media (min-width: 1024px) {
   :root {
-    --app-page-gutter: 10rem;
+    --app-page-gutter: clamp(2rem, 9vw - 4rem, 10rem);
     --app-page-block-gutter: 2.5rem;
   }
 }
@@ -472,6 +478,16 @@ html[data-sidebar-resizing] .app-sidebar-eases {
   padding-right: var(--app-page-gutter);
 }
 
+/* A page that parks a tool rail in its right-hand gutter (the board). The rail is ~58px from the
+   window's edge; the fluid gutter is only 2rem at 1024px, so without this the rail sat on top of
+   the cards. At least 5rem on that side, the gutter itself once it is wider. Unlayered like
+   `.app-page-frame`, which a Tailwind padding utility could not override. */
+@media (min-width: 1024px) {
+  .app-page-frame.app-page-frame--rail {
+    padding-right: max(5rem, var(--app-page-gutter));
+  }
+}
+
 /* When a page opens a rail on its left, collapse the left gutter so the rail
    opens *into* the empty gutter space instead of pushing the content right and
    leaving a gap between the app sidebar and the page. Put it on the content
@@ -484,17 +500,14 @@ html[data-sidebar-resizing] .app-sidebar-eases {
   padding-left: 1.5rem;
 }
 
+/* The admin page's frame is the page gutter now. It had a narrower one of its own below 1280px,
+   from when the page gutter was a flat 10rem from 1024px and left its tables no room; the
+   fluid gutter does that job for every page, and the separate rule only left admin at 16px on
+   a phone where everything else has 20px. Kept as a name so the page does not have to change. */
 .admin-page-frame {
   width: 100%;
-  padding-left: clamp(1rem, 4vw, 2rem);
-  padding-right: clamp(1rem, 4vw, 2rem);
-}
-
-@media (min-width: 1280px) {
-  .admin-page-frame {
-    padding-left: var(--app-page-gutter);
-    padding-right: var(--app-page-gutter);
-  }
+  padding-left: var(--app-page-gutter);
+  padding-right: var(--app-page-gutter);
 }
 
 .app-page-shell {

@@ -351,14 +351,10 @@ describe("AddCardForm", () => {
 });
 
 describe("the three offers", () => {
-  it("names them in the row above the board and shows only glyphs in the margin rail", () => {
+  it("shows glyphs named by their label, for the board's tool rail", () => {
     const onPick = vi.fn();
-    const { rerender } = render(<AddCardTriggers onPick={onPick} active={null} />);
-    expect(screen.getByRole("button", { name: "Note" })).toBeInTheDocument();
+    render(<AddCardTriggers onPick={onPick} active={null} vertical />);
 
-    // The rail lives in a 10rem page margin, which three words do not fit into — and it runs down
-    // that margin rather than across it, so the glyphs stack.
-    rerender(<AddCardTriggers onPick={onPick} active={null} compact vertical />);
     fireEvent.click(screen.getByRole("button", { name: /add a note/i }));
 
     expect(onPick).toHaveBeenCalledWith("NOTE");

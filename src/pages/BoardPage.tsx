@@ -36,6 +36,7 @@ import { nextUp } from "../features/board/layout/nextUp";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
 import { readPathWindowShown, writePathWindowShown } from "../features/board/layout/pathWindowFold";
 import { readTaskPoolShown, writeTaskPoolShown } from "../features/board/layout/taskPoolShown";
@@ -131,6 +132,12 @@ const UNDO_WINDOW_MS = 7000;
  * is "forty cards appeared and I do not know where to start".
  */
 const FOLD_THRESHOLD = 8;
+
+/**
+ * The rule between groups on the tool rail: a short horizontal line while the rail stands up the
+ * margin from `lg` up, a short vertical one while it lies across the page above the cards.
+ */
+const RAIL_SEPARATOR_CLASS = "mx-0.5 h-6 w-px bg-app-border lg:mx-0 lg:my-0.5 lg:h-px lg:w-6";
 
 /**
  * The hire's board: their own cards and the buddy's, arranged in areas and stages and synced with
@@ -862,11 +869,19 @@ export function BoardPage() {
   /**
    * The gutters the page draws in.
    *
-   * Focus mode trades the 10rem page gutter for a margin wide enough to keep the tool rail off the
+   * Outside focus mode it is the page gutter, widened on the right from `lg` up to clear the tool
+   * rail parked there (`app-page-frame--rail`): the gutter is fluid now, and at 1024px it is only
+   * 2rem. Focus mode trades the page gutter for a margin wide enough to keep the tool rail off the
    * cards and no wider — the whole reason somebody expands the board is that the gutters were space
    * they were not using, and giving them back at the same width would be the button doing nothing.
    */
-  const frameClass = isFocused ? "px-4 sm:px-6 lg:pr-20 lg:pl-6" : "app-page-frame";
+  // The rail's own groups lay themselves out by a prop, not by CSS, so the rail has to know
+  // which way it is standing: up the margin from `lg`, across the page below it.
+  const isRailVertical = useMediaQuery("(min-width: 1024px)");
+
+  const frameClass = isFocused
+    ? "px-4 sm:px-6 lg:pr-20 lg:pl-6"
+    : "app-page-frame app-page-frame--rail";
 
   return (
     <div className="min-h-screen">
@@ -894,20 +909,6 @@ export function BoardPage() {
                   </Button>
                 ) : (
                   <>
-                    {/* The one switch from the rail worth a copy here, for the widths where
-                        there is no margin to put a rail in. `lg:hidden` rather than a second
-                        implementation: one state, two places it can be reached from. */}
-                    <Button
-                      variant="secondary"
-                      iconOnly
-                      className="lg:hidden"
-                      onClick={startArranging}
-                      disabled={!board}
-                      title="Plan the board"
-                      aria-label="Plan the board"
-                    >
-                      <ListTree className="h-4 w-4" aria-hidden="true" />
-                    </Button>
                     <Button
                       variant="secondary"
                       onClick={refresh}
@@ -926,17 +927,14 @@ export function BoardPage() {
       )}
 
       <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
-        {/*
-          On the board rather than in the header. The header was a place for furniture about the
-          page; this is about the work, and it belongs where the work is.
-        */}
-        {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
-        {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
-            space: the board is a column of cards and the margin is where a hand rests. So the
-            offers live there — always in reach, never in the way, and out of the row above the
-            board where they were competing with the controls that decide what is *shown*.
+        {/* The page keeps a margin either side from `lg` up (at least 5rem on the right here, see
+            `frameClass`), and on this page it is dead space: the board is a column of cards and
+            the margin is where a hand rests. So the offers live there — always in reach, never in
+            the way, and out of the row above the board where they were competing with the
+            controls that decide what is *shown*.
             Absolute rather than a column of its own, so nothing about the board's own width or its
-            two-column packing changes; hidden below `lg`, where there is no margin to sit in.
+            two-column packing changes. Below `lg` there is no margin to sit in, and it lies across
+            the page above the cards instead.
 
             It stays up while the board is being arranged, which it did not use to: arranging is now
             one of the switches on it, and a switch that takes its own rail off the screen leaves
@@ -948,17 +946,24 @@ export function BoardPage() {
               // Centred on the viewport once the page is the whole screen. With the header gone
               // there is nothing at the top for it to hang under, and a rail pinned to a corner of
               // a screen this wide is a long way from wherever the pointer is.
+              //
+              // Below `lg` there is no margin to park it in, so it is the same rail lying flat in
+              // the page above the cards -- not a second, smaller set of controls.
               isFocused
-                ? "fixed top-1/2 right-3 z-20 hidden -translate-y-1/2 lg:block"
-                : "absolute top-6 right-3 z-20 hidden lg:top-8 lg:block"
+                ? "z-20 lg:fixed lg:top-1/2 lg:right-3 lg:-translate-y-1/2"
+                : "z-20 lg:absolute lg:top-8 lg:right-3"
             }
           >
             <div
+              // A group, not a toolbar: `toolbar` promises one tab stop with arrow keys between the
+              // buttons, and every button here is its own tab stop.
+              role="group"
+              aria-label="Board tools"
               className={[
-                "flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur",
+                "flex w-fit max-w-full flex-row flex-wrap items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur lg:flex-col lg:flex-nowrap",
                 // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
                 // itself on a short screen rather than losing its last buttons off the bottom.
-                isFocused ? "max-h-[calc(100vh-2rem)] overflow-y-auto" : "sticky top-6",
+                isFocused ? "lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto" : "lg:sticky lg:top-6",
               ].join(" ")}
             >
               {/* Widest change first: expanding takes the app's own navigation and this page's
@@ -981,7 +986,7 @@ export function BoardPage() {
                 )}
               </Button>
 
-              <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+              <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
 
               {/* Planning and making an area are the two ways of changing the board's *shape*,
                   which is why they sit together and away from the three that add something to it.
@@ -1056,8 +1061,12 @@ export function BoardPage() {
                   a different button in the same group rather than the same one again. */}
               {allCards.length > 2 && (
                 <>
-                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-                  <BoardFilterTriggers value={filter} onChange={setFilter} compact vertical />
+                  <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
+                  <BoardFilterTriggers
+                    value={filter}
+                    onChange={setFilter}
+                    vertical={isRailVertical}
+                  />
                 </>
               )}
 
@@ -1067,20 +1076,32 @@ export function BoardPage() {
                 sections={markSections}
                 selectedId={shownSectionId}
                 onSelect={setSectionId}
-                vertical
+                vertical={isRailVertical}
               />
 
               {/* Nothing is added to a board somebody is rearranging: the three forms open over the
                   cards, which is exactly where the arranging is happening. */}
               {!isArranging && (
                 <>
-                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-                  <AddCardTriggers onPick={setAddingKind} active={addingKind} compact vertical />
+                  <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
+                  <AddCardTriggers
+                    onPick={setAddingKind}
+                    active={addingKind}
+                    vertical={isRailVertical}
+                  />
                 </>
               )}
             </div>
           </div>
         )}
+
+        {/*
+          On the board rather than in the header. The header was a place for furniture about the
+          page; this is about the work, and it belongs where the work is. After the rail in the
+          source: from `lg` up the rail is out of flow and the order does not show, but below it
+          the rail lies across the page and belongs above everything it acts on, this included.
+        */}
+        {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
 
         {!selectedProjectId && !projectsLoading ? (
           <EmptyState
@@ -1130,31 +1151,10 @@ export function BoardPage() {
               ) : (
                 <span />
               )}
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* The rail in the margin takes over from `lg` up, where there is a margin to
-                      put it in. Below that these are the only offers on the page — and there is
-                      room for the words, which the rail's glyphs do without. */}
-                {allCards.length > 2 && (
-                  <BoardFilterTriggers value={filter} onChange={setFilter} className="lg:hidden" />
-                )}
-
-                {/* Same reason as the filter beside it: the rail these live in only exists from
-                    `lg` up, and a colour you can only filter by on a laptop is a colour half the
-                    board's readers do not have. */}
-                <MarkFilterRail
-                  sections={markSections}
-                  selectedId={shownSectionId}
-                  onSelect={setSectionId}
-                  className="lg:hidden"
-                />
-
-                <AddCardTriggers onPick={setAddingKind} active={addingKind} className="lg:hidden" />
-              </div>
             </div>
 
-            {/* Over the board rather than in the rail: the rail is 10rem of page margin, which is
-                room for a few glyphs and not for a form. */}
+            {/* Over the board rather than in the rail: the rail is page margin, which is room for a
+                few glyphs and not for a form. */}
             {addingKind && (
               <AddCardForm kind={addingKind} onAdd={addCard} onClose={() => setAddingKind(null)} />
             )}

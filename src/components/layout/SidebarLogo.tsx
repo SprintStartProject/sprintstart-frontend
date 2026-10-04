@@ -18,10 +18,11 @@ const TOGGLE_REPEAT_GUARD_MS = 600;
 type SidebarLogoProps = {
   className?: string;
   /**
-   * Makes the badge fold and unfold the desktop sidebar, with a tooltip saying which. Left out
-   * on the mobile header, where the badge stays decoration with its egg.
+   * Makes the badge toggle the sidebar, with a tooltip saying which way. `kind` picks the words:
+   * the desktop sidebar *folds* to icons ("Expand" / "Collapse"), the drawer below `lg` *opens*
+   * and *closes* — the same words as the menu button beside it in the header.
    */
-  sidebarToggle?: { collapsed: boolean; onToggle: () => void };
+  sidebarToggle?: { collapsed: boolean; onToggle: () => void; kind?: "fold" | "drawer" };
 };
 const MARK_SIZE = 28;
 
@@ -310,7 +311,13 @@ export function SidebarLogo({ className = "", sidebarToggle }: SidebarLogoProps)
               hintAt.side === "right" ? "-translate-y-1/2" : ""
             }`}
           >
-            {sidebarToggle.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            {sidebarToggle.kind === "drawer"
+              ? sidebarToggle.collapsed
+                ? "Open sidebar"
+                : "Close sidebar"
+              : sidebarToggle.collapsed
+                ? "Expand sidebar"
+                : "Collapse sidebar"}
             <ShortcutHint
               keys={shortcutChord(SIDEBAR_TOGGLE_SHORTCUT)}
               className="border-app-border text-app-text-muted"

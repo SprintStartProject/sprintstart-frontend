@@ -19,15 +19,15 @@ type ChatEmptyStateProps = {
 function SupportingContent({ onPickSuggestion }: ChatEmptyStateProps) {
   return (
     <>
-      <h1 className="mb-2 text-2xl font-bold text-app-text sm:text-3xl">
+      <h1 className="mb-2 shrink-0 text-2xl font-bold text-app-text sm:text-3xl">
         How can I help you today?
       </h1>
 
-      <p className="mb-6 max-w-md text-sm text-app-text-muted">
+      <p className="mb-6 max-w-md shrink-0 text-sm text-app-text-muted">
         Ask anything about your project&apos;s codebase, documentation, or onboarding process.
       </p>
 
-      <div className="flex max-w-xl flex-wrap justify-center gap-2">
+      <div className="flex max-w-xl shrink-0 flex-wrap justify-center gap-2">
         {SUGGESTIONS.map((s) => (
           <button
             key={s}
@@ -50,7 +50,12 @@ function SupportingContent({ onPickSuggestion }: ChatEmptyStateProps) {
  */
 export function ChatEmptyState({ onPickSuggestion }: ChatEmptyStateProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+    // `min-h-0` so the column is the scroller's height and no taller, which is what lets the
+    // mirror below give way; `justify-center-safe` so that if the real content alone is still
+    // taller, it overflows downwards into the scroller rather than off the top, where nothing
+    // can scroll back to it. That was the narrow-window bug: the chips stacked, the mirror
+    // doubled their height, and the centred column cut off its own top.
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center-safe p-5 text-center sm:p-8">
       {/* An invisible copy of the heading/description/chips, stacked
           above the bot. `justify-center` centres this whole column, and
           the bot is its first, much shorter element — with real content
@@ -67,7 +72,10 @@ export function ChatEmptyState({ onPickSuggestion }: ChatEmptyStateProps) {
           engine. The margin matches the real gap below the bot — the
           symmetry only holds if the space *above* the mirror's height is
           the same as the space *below* the real content's twin. */}
-      <div aria-hidden="true" className="invisible -mb-2">
+      {/* It shrinks first, and to nothing if it must (`min-h-0`): the symmetry is worth having
+          while there is room for it, and none of what is real should be squeezed out for it.
+          Everything after it keeps its size (`shrink-0`). */}
+      <div aria-hidden="true" className="invisible -mb-2 min-h-0 shrink overflow-hidden">
         <SupportingContent onPickSuggestion={onPickSuggestion} />
       </div>
 
@@ -82,7 +90,7 @@ export function ChatEmptyState({ onPickSuggestion }: ChatEmptyStateProps) {
           gap, which is why shrinking it here used to barely register.
           Pulling the heading up into that dead space is what actually
           closes the distance. */}
-      <div className="-mb-2">
+      <div className="-mb-2 shrink-0">
         <SleepyBot size={76} tracksPointer className="text-app-brand-text" />
       </div>
 

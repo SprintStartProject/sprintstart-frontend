@@ -320,11 +320,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
         </span>
       </div>
 
-      <div
-        className={`relative grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 ${
-          isWide ? "lg:grid-cols-2" : ""
-        }`}
-      >
+      <div className="relative grid flex-1 grid-cols-1 gap-5 @min-[24rem]:grid-cols-2 @min-[24rem]:gap-6">
         <section aria-label="Knowledge gaps">
           <ColumnHeading
             label="Knowledge gaps"
@@ -334,7 +330,12 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
           {/* At full width the ring and the component list sit side by side and close
               together: they are two views of the same analysis, and giving each an equal
               third of the card left the ring stranded in the middle of its own column. */}
-          <div className={`flex ${isWide ? "items-center gap-5" : "flex-col items-center gap-3"}`}>
+          {/* Only where the card is wide enough for both: in the two-column form of the wide
+              card each half is under 300px, and the list beside the ring got ~70px, which cut
+              every component name to a few letters. There it is the medium form. */}
+          <div
+            className={`flex flex-col items-center gap-3 ${isWide ? "@3xl:flex-row @3xl:gap-5" : ""}`}
+          >
             <div className="flex shrink-0 flex-col items-center gap-2">
               <GapRing summary={summary} />
 
@@ -362,7 +363,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
               </p>
             ) : (
               isWide && (
-                <div className="min-w-0 flex-1">
+                <div className="hidden min-w-0 flex-1 @3xl:block">
                   <p className="mb-2 text-xs font-medium text-app-text-muted">Needs documenting</p>
                   <GapList gaps={gaps} />
                 </div>
@@ -373,7 +374,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
 
         <section
           aria-label="Recurring questions"
-          className="border-t border-app-border-muted pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6"
+          className="border-t border-app-border-muted pt-5 @min-[24rem]:border-t-0 @min-[24rem]:border-l @min-[24rem]:pt-0 @min-[24rem]:pl-6"
         >
           <ColumnHeading
             label="Recurring questions"
