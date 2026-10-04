@@ -19,8 +19,8 @@ export type DinoCompletionProps = {
  * just the badge colour) carries the outcome so it also reads correctly for
  * colour-blind and screen-reader users.
  *
- * @param finished True once the turn is no longer thinking/streaming.
- * @param outcome  How it ended; `null` (unknown) falls back to "Reply ready".
+ * @param finished - True once the turn is no longer thinking/streaming.
+ * @param outcome - How it ended; `null` (unknown) falls back to "Reply ready".
  */
 export function dinoCompletionProps(
   finished: boolean,

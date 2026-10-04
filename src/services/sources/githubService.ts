@@ -1,4 +1,5 @@
 import { ApiError, apiClient } from "../apiClient.ts";
+import type { SyncScheduleConfig, SyncScheduleRequest } from "./syncSchedule.ts";
 
 export type ConnectGithubRepositoryRequest = {
   owner: string;
@@ -61,17 +62,6 @@ export type DiscoverRepositoriesResult = {
   resolvedOwnerType: "org" | "user";
 };
 
-export type ConnectRepositoriesResult = {
-  /** Maps `"owner/name"` to the accepted ingestion transaction id. */
-  transactionIdsByRepositoryId: Record<string, string>;
-  /**
-   * The `"owner/name"` entries that reused an existing connection, so nothing
-   * was fetched for them. Carries no information about the projects those
-   * connections already belong to; see `ConnectGithubRepositoryResponse.wasReused`.
-   */
-  reusedRepositoryIds?: string[];
-};
-
 export type UpdateGithubRepositoryResponse = {
   transactionId: string;
 };
@@ -81,46 +71,11 @@ export type UpdateGithubRepositoryRequest = {
   name: string;
 };
 
-export type GithubScheduleDayOfWeek =
-  "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
-
-export type GithubScheduleSpec =
-  | {
-      type: "DAILY";
-      time: string;
-    }
-  | {
-      type: "WEEKLY";
-      time: string;
-      daysOfWeek: GithubScheduleDayOfWeek[];
-    }
-  | {
-      type: "MONTHLY";
-      time: string;
-      dayOfMonth: number;
-    }
-  | {
-      type: "INTERVAL";
-      everyMinutes: number;
-    }
-  | {
-      type: "CUSTOM";
-      cron: string;
-    };
-
-export type ConfigureGithubRepositoryRequest = {
-  autoUpdate: boolean;
-  schedule: GithubScheduleSpec;
-};
-
-export type GithubRepositoryConfig = {
+export type GithubRepositoryConfig = SyncScheduleConfig & {
   id: string;
   repositoryOwner: string;
   repositoryName: string;
-  autoUpdate: boolean;
-  spec: GithubScheduleSpec | null;
   schedule: string;
-  nextSyncAt: string | null;
 };
 
 /**
@@ -263,35 +218,6 @@ export async function discoverRepositories(
 }
 
 /**
- * Connects several repositories to one project in a single call, reusing the
- * backend batch endpoint (each repo still becomes its own source). Requires the
- * PM or ADMIN role and access to the target project.
- *
- * @param repositories - The repos to connect (owner + name each).
- * @param tokenName - The stored PAT used for every repo in the batch.
- * @param projectId - The project every repo is connected to.
- * @returns The accepted ingestion transaction ids keyed by `"owner/name"`.
- * @throws ApiError if the batch request fails.
- */
-export async function connectRepositories(
-  repositories: { owner: string; name: string }[],
-  tokenName: string,
-  projectId: string,
-): Promise<ConnectRepositoriesResult> {
-  return apiClient.fetch<ConnectRepositoriesResult>("/api/v1/github/connect/all", {
-    method: "POST",
-    body: JSON.stringify({
-      repositories: repositories.map((repository) => ({
-        owner: repository.owner,
-        name: repository.name,
-        tokenName,
-        projectId,
-      })),
-    }),
-  });
-}
-
-/**
  * Fetches the list of stored GitHub PAT names (without the secret value).
  *
  * Accepts an optional `AbortSignal` so callers can cancel a stale in-flight
@@ -302,6 +228,7 @@ export async function getGithubPatNames(signal?: AbortSignal): Promise<string[]>
   return apiClient.fetch<string[]>("/api/v1/github/pat", { signal });
 }
 
+/** Stores a new GitHub personal access token under `name`. The secret is never read back. */
 export async function addGithubPat(name: string, token: string): Promise<void> {
   await apiClient.fetch<void>("/api/v1/github/pat", {
     method: "POST",
@@ -309,6 +236,7 @@ export async function addGithubPat(name: string, token: string): Promise<void> {
   });
 }
 
+/** Replaces the secret of the stored token `name`, keeping its name. */
 export async function updateGithubPat(name: string, newToken: string): Promise<void> {
   await apiClient.fetch<void>("/api/v1/github/pat/update", {
     method: "PUT",
@@ -316,16 +244,11 @@ export async function updateGithubPat(name: string, newToken: string): Promise<v
   });
 }
 
+/** Deletes the stored token `name`. The backend exposes this as a `PUT`, not a `DELETE`. */
 export async function deleteGithubPat(name: string): Promise<void> {
   await apiClient.fetch<void>("/api/v1/github/pat/delete", {
     method: "PUT",
     body: JSON.stringify({ name }),
-  });
-}
-
-export async function updateAllGithubRepositories(): Promise<UpdateGithubRepositoryResponse[]> {
-  return apiClient.fetch<UpdateGithubRepositoryResponse[]>("/api/v1/github/update-all", {
-    method: "POST",
   });
 }
 
@@ -383,24 +306,16 @@ export async function removeRepositoryFromProject(
   );
 }
 
+/**
+ * Starts an update of one connected repository, identified by owner and name.
+ *
+ * @returns The transaction id of the started update; the update itself runs in the backend.
+ */
 export async function updateGithubRepository(
   request: UpdateGithubRepositoryRequest,
 ): Promise<UpdateGithubRepositoryResponse> {
   return apiClient.fetch<UpdateGithubRepositoryResponse>("/api/v1/github/update", {
     method: "POST",
-    body: JSON.stringify(request),
-  });
-}
-
-/**
- * Applies one schedule and auto-update policy to all connected GitHub repositories.
- * The backend converts the typed schedule payload into the stored cron expression.
- */
-export async function configureAllGithubRepositories(
-  request: ConfigureGithubRepositoryRequest,
-): Promise<void> {
-  await apiClient.fetch<void>("/api/v1/github/config", {
-    method: "PUT",
     body: JSON.stringify(request),
   });
 }
@@ -422,7 +337,7 @@ export async function getGithubRepositoryConfig(
  */
 export async function configureGithubRepository(
   repository: UpdateGithubRepositoryRequest,
-  request: ConfigureGithubRepositoryRequest,
+  request: SyncScheduleRequest,
 ): Promise<void> {
   const owner = encodeURIComponent(repository.owner);
   const name = encodeURIComponent(repository.name);

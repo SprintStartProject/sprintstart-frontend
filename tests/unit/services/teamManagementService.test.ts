@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getTeamOverview,
+  getTeamOverviewOrThrow,
   getTeamMember,
+  getPmAttentionCount,
   getProjectRoles,
   createProjectRole,
   acceptSkillSuggestion,
@@ -38,6 +40,127 @@ describe("teamManagementService", () => {
     const member = await getTeamMember("user1");
     expect(member).not.toBeNull();
     expect(member?.userId).toBe("user1");
+  });
+
+  describe("getPmAttentionCount", () => {
+    const member = (userId: string, skipStatus?: "PENDING" | "ACCEPTED") => ({
+      userId,
+      firstname: userId,
+      lastname: "",
+      roles: [],
+      progressPercentage: 0,
+      currentStep: skipStatus
+        ? {
+            id: `step-${userId}`,
+            title: "Step",
+            skip: { id: `skip-${userId}`, status: skipStatus },
+          }
+        : null,
+    });
+
+    it("adds pending skip requests and the project's unread feedback", async () => {
+      let requestedProject: string | null = null;
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", ({ request }) => {
+          requestedProject = new URL(request.url).searchParams.get("projectIds");
+          return HttpResponse.json({
+            content: [member("u1", "PENDING"), member("u2", "ACCEPTED"), member("u3")],
+          });
+        }),
+        http.get("/api/v1/admin/onboarding/feedback", () =>
+          HttpResponse.json([
+            { id: "f1", userId: "u2", message: "unclear", read: false },
+            { id: "f2", userId: "u3", message: "thanks", readAt: null },
+            { id: "f3", userId: "u3", message: "seen", read: true },
+            // Somebody from another project: the feedback list is not scoped by project.
+            { id: "f4", userId: "elsewhere", message: "hi", read: false },
+          ]),
+        ),
+      );
+
+      await expect(getPmAttentionCount("proj1")).resolves.toEqual({
+        pendingSkips: 1,
+        unreadFeedback: 2,
+        total: 3,
+      });
+      expect(requestedProject).toBe("proj1");
+    });
+
+    it("fails instead of counting mock members when the overview is unavailable", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () => new HttpResponse(null, { status: 500 })),
+        http.get("/api/v1/admin/onboarding/feedback", () => HttpResponse.json([])),
+      );
+
+      await expect(getPmAttentionCount("proj1")).rejects.toThrow();
+    });
+
+    it("fails instead of leaving feedback out when the feedback list is unavailable", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () =>
+          HttpResponse.json({ content: [member("u1", "PENDING")] }),
+        ),
+        http.get(
+          "/api/v1/admin/onboarding/feedback",
+          () => new HttpResponse(null, { status: 500 }),
+        ),
+      );
+
+      await expect(getPmAttentionCount("proj1")).rejects.toThrow();
+    });
+  });
+
+  describe("getTeamOverviewOrThrow", () => {
+    const member = (userId: string) => ({
+      userId,
+      firstname: userId,
+      lastname: "",
+      roles: [],
+      progressPercentage: 0,
+      currentStep: null,
+    });
+
+    it("flags the members with unread feedback, like getTeamOverview", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () =>
+          HttpResponse.json({ content: [member("u1"), member("u2")] }),
+        ),
+        http.get("/api/v1/admin/onboarding/feedback", () =>
+          HttpResponse.json([{ id: "f1", userId: "u2", message: "unclear", read: false }]),
+        ),
+      );
+
+      const overview = await getTeamOverviewOrThrow(["proj1"]);
+      expect(overview.map((user) => [user.userId, user.hasFeedback])).toEqual([
+        ["u1", false],
+        ["u2", true],
+      ]);
+    });
+
+    it("fails instead of returning mock members when the overview is unavailable", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () => new HttpResponse(null, { status: 500 })),
+        http.get("/api/v1/admin/onboarding/feedback", () => HttpResponse.json([])),
+      );
+
+      await expect(getTeamOverviewOrThrow(["proj1"])).rejects.toThrow();
+      // The forgiving variant still falls back, for the screens that only list the team.
+      await expect(getTeamOverview(undefined, undefined, ["proj1"])).resolves.not.toHaveLength(0);
+    });
+
+    it("fails instead of reading 'nothing unread' when the feedback list is unavailable", async () => {
+      server.use(
+        http.get("/api/v1/onboarding/team-overview", () =>
+          HttpResponse.json({ content: [member("u1")] }),
+        ),
+        http.get(
+          "/api/v1/admin/onboarding/feedback",
+          () => new HttpResponse(null, { status: 500 }),
+        ),
+      );
+
+      await expect(getTeamOverviewOrThrow(["proj1"])).rejects.toThrow();
+    });
   });
 
   it("getProjectRoles returns project roles", async () => {
@@ -232,7 +355,7 @@ describe("teamManagementService", () => {
     ]);
   });
 
-  it("createSkill posts roleIds to admin skill endpoint", async () => {
+  it("createSkill posts the request to the admin skill endpoint", async () => {
     let capturedBody: unknown;
     server.use(
       http.post("/api/v1/admin/skills", async ({ request }) => {
@@ -246,7 +369,7 @@ describe("teamManagementService", () => {
       }),
     );
 
-    const skill = await createSkill("React", ["role1"]);
+    const skill = await createSkill({ name: "React", roleIds: ["role1"] });
 
     expect(capturedBody).toEqual({
       name: "React",
@@ -254,6 +377,19 @@ describe("teamManagementService", () => {
     });
     expect(skill.roleIds).toEqual(["role1"]);
     expect(skill.status).toBe("ACTIVE");
+  });
+
+  it("createSkill propagates a duplicate-name conflict without a mock fallback", async () => {
+    server.use(
+      http.post("/api/v1/admin/skills", () =>
+        HttpResponse.json({ message: "Skill already exists" }, { status: 409 }),
+      ),
+    );
+
+    await expect(createSkill({ name: "React", roleIds: ["role1"] })).rejects.toMatchObject({
+      status: 409,
+      message: "Skill already exists",
+    });
   });
 
   it("reactivateSkill reactivates a retired skill through the admin endpoint", async () => {
@@ -280,6 +416,19 @@ describe("teamManagementService", () => {
     expect(skill.id).toBe("skill1");
   });
 
+  it("reactivateSkill propagates backend failures without a mock fallback", async () => {
+    server.use(
+      http.post("/api/v1/admin/skills", () =>
+        HttpResponse.json({ message: "Not allowed" }, { status: 403 }),
+      ),
+    );
+
+    await expect(reactivateSkill("skill1", "React", ["role1"])).rejects.toMatchObject({
+      status: 403,
+      message: "Not allowed",
+    });
+  });
+
   it("getSkillById fetches a single skill", async () => {
     server.use(
       http.get("/api/v1/skills/skill1", () =>
@@ -300,7 +449,7 @@ describe("teamManagementService", () => {
     expect(skill.status).toBe("ACTIVE");
   });
 
-  it("updateSkill patches a skill through the admin endpoint", async () => {
+  it("updateSkill patches a skill through the admin endpoint, category included", async () => {
     let capturedBody: unknown;
     server.use(
       http.patch("/api/v1/admin/skills/skill1", async ({ request }) => {
@@ -310,6 +459,7 @@ describe("teamManagementService", () => {
           name: "React",
           roleIds: ["role1", "role2"],
           status: "ACTIVE",
+          category: "ENGINEERING",
         });
       }),
     );
@@ -317,14 +467,30 @@ describe("teamManagementService", () => {
     const skill = await updateSkill("skill1", {
       name: "React",
       roleIds: ["role1", "role2"],
+      category: "ENGINEERING",
     });
 
     expect(capturedBody).toEqual({
       name: "React",
       roleIds: ["role1", "role2"],
+      category: "ENGINEERING",
     });
     expect(skill.roleIds).toEqual(["role1", "role2"]);
     expect(skill.name).toBe("React");
+    expect(skill.category).toBe("ENGINEERING");
+  });
+
+  it("updateSkill propagates a duplicate-name conflict without a mock fallback", async () => {
+    server.use(
+      http.patch("/api/v1/admin/skills/skill1", () =>
+        HttpResponse.json({ message: "Skill already exists" }, { status: 409 }),
+      ),
+    );
+
+    await expect(updateSkill("skill1", { name: "React", category: null })).rejects.toMatchObject({
+      status: 409,
+      message: "Skill already exists",
+    });
   });
 
   it("getSkillsByRoleId fetches skills linked to a role", async () => {
@@ -387,6 +553,19 @@ describe("teamManagementService", () => {
     await deleteSkill("skill1");
 
     expect(captured).toBe(true);
+  });
+
+  it("deleteSkill propagates backend failures without a mock fallback", async () => {
+    server.use(
+      http.delete("/api/v1/admin/skills/skill1", () =>
+        HttpResponse.json({ message: "Not allowed" }, { status: 403 }),
+      ),
+    );
+
+    await expect(deleteSkill("skill1")).rejects.toMatchObject({
+      status: 403,
+      message: "Not allowed",
+    });
   });
 
   it("saveUserSkillAssessments posts to current-user assessment endpoint", async () => {

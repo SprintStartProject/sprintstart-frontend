@@ -6,7 +6,6 @@ import { cardAccent } from "../../../../src/features/board/layout/cardAccents";
 import type { BoardCardKind } from "../../../../src/features/board/types";
 
 const KINDS: BoardCardKind[] = [
-  "PATH_TO_FIRST_CONTRIBUTION",
   "CURRENT_TASK",
   "DIAGRAM",
   "ARRIVAL_STEPS",

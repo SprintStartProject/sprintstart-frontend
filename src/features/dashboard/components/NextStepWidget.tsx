@@ -1,4 +1,5 @@
 import { Spinner } from "../../../components/ui/Spinner";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowRight, CircleHelp, Rocket, Signpost } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -201,9 +202,7 @@ export function NextStepWidget({
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <Icon className="h-3.5 w-3.5" />
-          </span>
+          <IconTile icon={Icon} size="sm" tone="accent" />
           <span className="text-sm font-semibold text-app-text">Your onboarding</span>
         </div>
 

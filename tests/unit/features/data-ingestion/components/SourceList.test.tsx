@@ -14,9 +14,6 @@ function createMockSource(overrides: Partial<DataSource> = {}): DataSource {
     type: "GitHub",
     icon: GitBranch,
     status: "connected",
-    statusLabel: "Synced",
-    ingestionStatus: "connected",
-    ingestionStatusLabel: "Synced",
     statusView: deriveSourceStatus({ hasErrors: false, hasNeverSynced: false }),
     artifacts: 10,
     lastSync: "2026-07-05",
@@ -25,14 +22,14 @@ function createMockSource(overrides: Partial<DataSource> = {}): DataSource {
     latestUpdatedCount: 3,
     totalArtifactCount: 10,
     deletedCount: 0,
-    runIds: [],
     sharesSourceSystem: false,
-    lastCommitsSyncAt: null,
-    lastIssuesSyncAt: null,
-    lastPullRequestsSyncAt: null,
     lastRunAt: "2026-07-05T10:00:00Z",
     failedItems: [],
-    githubRepository: null,
+    details: {
+      system: "GITHUB",
+      repository: null,
+      syncTimes: { commits: null, issues: null, pullRequests: null },
+    },
     description: "Indexes repositories, README files, pull requests.",
     ...overrides,
   };
@@ -75,12 +72,15 @@ describe("SourceList", () => {
         name: "Jira Project Board",
         type: "Jira",
         icon: Database,
-        githubRepository: null,
-        jiraInstance: {
-          instanceUrl: "https://acme.atlassian.net",
-          displayName: "Jira Project Board",
-          credentialName: "cred",
-          credentialUserEmail: "user@example.com",
+        details: {
+          system: "JIRA",
+          instance: {
+            instanceUrl: "https://acme.atlassian.net",
+            displayName: "Jira Project Board",
+            credentialName: "cred",
+            credentialUserEmail: "user@example.com",
+          },
+          syncTimes: { issues: null },
         },
       }),
     ];
@@ -194,14 +194,14 @@ describe("SourceList", () => {
       createMockSource({
         sourceSystem: "GITHUB",
         failedItems: [
-          { artifactIdentifier: "FILE: broken.md", reason: "Parse error" },
-          { artifactIdentifier: "FILE: missing.md", reason: "Not found" },
+          { artifactType: "FILE", reference: "broken.md", reason: "Parse error" },
+          { artifactType: "FILE", reference: "missing.md", reason: "Not found" },
         ],
       }),
     ];
 
     render(<SourceList sources={sources} selectedSourceId={null} onSelectSource={vi.fn()} />);
 
-    expect(screen.getAllByText(/2 failed items in latest status/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/2 items failed in the latest sync/).length).toBeGreaterThan(0);
   });
 });

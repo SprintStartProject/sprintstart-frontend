@@ -76,6 +76,14 @@ type StepDetailsPanelProps = {
   markingFeedbackId?: string | null;
 };
 
+/**
+ * One step of a member's onboarding path in the profile's side panel: its tasks (add, reorder,
+ * delete), the member's feedback on it, and the review of an open skip request.
+ *
+ * Holds no data of its own. `TeamMemberDetailPage` owns the step, the drafts and every request;
+ * the panel renders them and reports what the manager did. Optional callbacks switch their
+ * controls off when they are not given.
+ */
 export function StepDetailsPanel({
   step,
   tasks,
@@ -125,7 +133,7 @@ export function StepDetailsPanel({
           >
             {step.status.replace("_", " ")}
           </span>
-          <StepOriginBadge step={step} />
+          <StepOriginBadge step={step} viewer="reviewer" />
         </div>
       }
       panelBackgroundClassName="bg-app-surface"

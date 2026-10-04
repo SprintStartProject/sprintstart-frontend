@@ -1,6 +1,6 @@
 import { ShieldCheck } from "lucide-react";
-import { AccountEnabledToggle } from "./AccountEnabledToggle";
-import { DrawerCard } from "./DrawerCard";
+import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { StatusChip } from "./StatusChip";
 
 type UserStatusSectionProps = {

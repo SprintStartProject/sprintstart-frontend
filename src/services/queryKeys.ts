@@ -1,3 +1,4 @@
+import type { IngestionRunFilter } from "../features/data-ingestion/types";
 import type { KnowledgeListParams } from "../features/knowledge-base/types";
 
 /**
@@ -99,8 +100,28 @@ export const queryKeys = {
     // `projectId` is `null` for the unfiltered, org-wide read.
     filtered: (projectId: string | null) => ["team-overview", projectId ?? "all"] as const,
   },
+  pmAttention: {
+    // The sidebar's count of pending skip requests and unread feedback for one project.
+    count: (projectId: string) => ["pm-attention", "count", projectId] as const,
+  },
   ingestion: {
+    // Everything the Data Ingestion page holds, so one invalidation after a source mutation or
+    // a connect refreshes the cards, the run table and the connector list together.
+    all: () => ["ingestion"] as const,
+    // The dashboard's per-source rows. The raw status rows the page builds its cards from are
+    // `statuses` below: same endpoint, but a different shape under the key.
     sourceStatuses: (projectId: string) => ["ingestion", "source-statuses", projectId] as const,
+    statuses: (projectId: string) => ["ingestion", "statuses", projectId] as const,
+    // The project's newest runs, unfiltered: what the cards and the overview read.
+    latestRuns: (projectId: string) => ["ingestion", "latest-runs", projectId] as const,
+    // One page of the run table; the filter carries project, status, source and page.
+    runsPage: (filter: IngestionRunFilter) => ["ingestion", "runs-page", filter] as const,
+    // A connector's own records of the project's sources. Connectors that read the same
+    // endpoint name the same scope.
+    connections: (scope: string, projectId: string) =>
+      ["ingestion", "connections", scope, projectId] as const,
+    // The platform's connectors and whether each is enabled. Not project-scoped.
+    connectors: () => ["ingestion", "connectors"] as const,
   },
   knowledgeRequest: {
     open: (projectId: string) => ["knowledge-request", "open", projectId] as const,
@@ -113,5 +134,23 @@ export const queryKeys = {
   },
   onboardingMetrics: {
     project: (projectId: string) => ["onboarding-metrics", "project", projectId] as const,
+  },
+  memberFeedback: {
+    // Not project-scoped: feedback belongs to the member's path, and the admin endpoint answers
+    // for the member across projects.
+    byUser: (userId: string) => ["member-feedback", userId] as const,
+  },
+  projectRoles: {
+    // `getProjectRoles` takes no project argument, but the roles it returns are the selected
+    // project's, so the key still carries it — a switch must not serve the previous project's.
+    byProject: (projectId: string) => ["project-roles", projectId] as const,
+  },
+  memberSkills: {
+    byUser: (userId: string) => ["member-skills", userId] as const,
+  },
+  memberPath: {
+    // A member's full onboarding path as a PM reads it (phases with their steps) — what the
+    // member side panel counts "phase 2 of 4" from.
+    byUser: (userId: string) => ["member-path", userId] as const,
   },
 } as const;

@@ -20,4 +20,20 @@ describe("TabSwitcher Accessibility", () => {
     );
     expect(await axe(baseElement)).toHaveNoViolations();
   });
+
+  it("should not have any a11y violations with the Skills tab hidden for a non-ADMIN viewer", async () => {
+    const onChange = vi.fn();
+    const { baseElement } = render(
+      <MemoryRouter>
+        <main>
+          <TabSwitcher
+            activeTab="users"
+            onChange={onChange}
+            tabs={["users", "projects", "tokens"]}
+          />
+        </main>
+      </MemoryRouter>,
+    );
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
 });

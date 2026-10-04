@@ -19,7 +19,7 @@ export const boardService = {
    * first read, holding the cards relevant to the caller's track — so a hire on their first day
    * gets a board, not an empty state.
    *
-   * @param projectId The project the board belongs to.
+   * @param projectId - The project the board belongs to.
    * @throws ApiError 404 when the caller is not a member of that project.
    */
   async fetchBoard(projectId: string): Promise<Board> {
@@ -36,7 +36,7 @@ export const boardService = {
    * project that has moved comes back redrawn, and one that no longer supports the subject comes
    * back with no picture and a reason.
    *
-   * @param cardId The diagram card to revalidate.
+   * @param cardId - The diagram card to revalidate.
    * @throws ApiError 404 when it is not a diagram card on a board of theirs.
    */
   async refreshDiagram(cardId: string): Promise<DiagramContent> {
@@ -58,8 +58,8 @@ export const boardService = {
    * tick that was just made. Callers re-read instead — `PathStepCard` invalidates `myStatuses` and
    * the board query rather than rendering anything handed back here.
    *
-   * @param cardId The PATH_STEP card the task is shown on.
-   * @param taskId The task to tick.
+   * @param cardId - The PATH_STEP card the task is shown on.
+   * @param taskId - The task to tick.
    * @throws ApiError 404 when the card is not theirs, not a PATH_STEP card, its step is gone, or
    *   the task does not belong to that step.
    */
@@ -76,7 +76,7 @@ export const boardService = {
    * The buddy will not put it back: the backend keeps the dismissed row so both the baseline
    * and the mentor consult it before adding anything. The affordance says "remove", not "hide".
    *
-   * @param cardId The card to remove.
+   * @param cardId - The card to remove.
    * @throws ApiError 404 when it is not a card on a board of theirs.
    */
   async dismissCard(cardId: string): Promise<void> {
@@ -146,6 +146,28 @@ export const boardService = {
     return await apiClient.fetch<BoardCard>(
       `${BASE}/me/board/cards/${encodeURIComponent(cardId)}`,
       { method: "PATCH", body: JSON.stringify(request) },
+    );
+  },
+
+  /**
+   * Puts a card back to what it said before its most recent edit — the hire's or the buddy's.
+   *
+   * Restoring is itself an edit: the content being replaced becomes the new previous version, so an
+   * undo can be undone the same way, and the card records the hire as its author.
+   *
+   * @param cardId - The authored card to restore.
+   * @param replacedAt - The edit the hire saw and is undoing, echoed back exactly as
+   *   `previous.replacedAt` carried it. The server refuses with 409 when it is no longer the card's
+   *   latest edit — another tab, or a change older than this board read, replaced it in the
+   *   meantime — so a stale press can never throw away a change the hire never saw.
+   * @returns The card as it now reads, the same shape the board's cards carry.
+   * @throws ApiError 404 when it is not a card of theirs; 409 when there is nothing to restore, the
+   *   card is off their board, or it has been edited again since `replacedAt`.
+   */
+  async restorePrevious(cardId: string, replacedAt: string): Promise<BoardCard> {
+    return await apiClient.fetch<BoardCard>(
+      `${BASE}/me/board/cards/${encodeURIComponent(cardId)}/restore-previous`,
+      { method: "POST", body: JSON.stringify({ replacedAt }) },
     );
   },
 

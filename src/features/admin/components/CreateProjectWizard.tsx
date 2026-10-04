@@ -10,39 +10,27 @@ import {
   type AdminProjectDetails,
   type ProjectManager,
 } from "../../../services/projectService";
+import { AddSourceFlow } from "../../data-ingestion/add-source/AddSourceFlow";
+import { COMPANION_GAP, COMPANION_WIDTH } from "../../data-ingestion/add-source/CredentialSlot";
 import {
-  addDraftSource,
+  addDraftSources,
   connectDraftSources,
   connectOutcomeDescription,
-  createConfluenceDraft,
-  createDraftSourceFromDiscovery,
-  createJiraDraft,
-  createUploadDraft,
   hasFailedSources,
-  isValidConfluenceSpaceId,
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
-} from "../projectSourcesDraft";
-import { sortOwnerOptions } from "../sourceOwners";
-import type { DiscoverySelection } from "../../data-ingestion/components/GithubRepositoryDiscovery";
-import type { SourceSystem } from "../../data-ingestion/types";
-import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials";
-import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
-import { useGithubTokens } from "../../settings/hooks/useGithubTokens";
+} from "../../data-ingestion/add-source/projectSourcesDraft";
+import { sortOwnerOptions } from "../../data-ingestion/add-source/sourceOwners";
+import { useSourceDraftForm } from "../../data-ingestion/add-source/useSourceDraftForm";
 import { getDisplayName } from "../data";
+import { getMovedUsers } from "../projectMove";
 import type { AdminUser } from "../types";
 import { WizardDetailsStep } from "./wizard/steps/WizardDetailsStep";
 import { WizardMembersStep } from "./wizard/steps/WizardMembersStep";
 import { WizardSourcesStep } from "./wizard/steps/WizardSourcesStep";
 import { WizardReviewStep, type ReviewPerson } from "./wizard/steps/WizardReviewStep";
 import { WizardProvisioning } from "./wizard/steps/WizardProvisioning";
-import {
-  AddSourceFlow,
-  COMPANION_GAP,
-  COMPANION_WIDTH,
-  type AddSourceStep,
-} from "./wizard/sources/AddSourceFlow";
 
 type CreateProjectWizardProps = {
   isOpen: boolean;
@@ -62,6 +50,12 @@ type CreateProjectWizardProps = {
   onClose: () => void;
   /** Fired once the project exists, before any source finished connecting. */
   onProjectCreated: (project: AdminProjectDetails) => void;
+  /**
+   * Fired after members were assigned who were removed from other projects by
+   * it. Those projects' member lists are held elsewhere on the page and are
+   * stale by then, so the parent is expected to reload them.
+   */
+  onMembershipsMoved?: () => void;
 };
 
 /** The four editable steps plus the terminal provisioning screen. */
@@ -74,9 +68,6 @@ const STEP_INDEX: Record<Exclude<WizardPhase, "provisioning">, number> = {
   sources: 2,
   review: 3,
 };
-
-// All four connectors can now be staged from the add-source sub-flow.
-const AVAILABLE_SOURCE_TYPES: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
 
 /**
  * Transactional create-project wizard: everything is drafted locally across the
@@ -98,6 +89,7 @@ export function CreateProjectWizard({
   existingProjectNames = [],
   onClose,
   onProjectCreated,
+  onMembershipsMoved,
 }: CreateProjectWizardProps) {
   const [phase, setPhase] = useState<WizardPhase>("details");
 
@@ -121,43 +113,11 @@ export function CreateProjectWizard({
 
   const [sources, setSources] = useState<DraftSource[]>([]);
 
-  // Add-source sub-flow, shown over the Sources step. `addFlowKey` remounts the
-  // GitHub picker on each open so a new "Add source" starts from a clean slate.
-  const [isAddingSource, setIsAddingSource] = useState(false);
-  const [addStep, setAddStep] = useState<AddSourceStep>("type");
-  const [addType, setAddType] = useState<SourceSystem>("GITHUB");
-  const [addFlowKey, setAddFlowKey] = useState(0);
-  const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
-  const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
-
-  // The token list is owned here so an inline "add token" can refresh it and
-  // auto-select the new token. It falls back to the prop until it has loaded so
-  // discovery still works on the first open without waiting for the refetch.
-  const {
-    tokenNames: loadedTokenNames,
-    tokensLoaded,
-    loadTokenNames,
-    addTokenNameLocally,
-  } = useGithubTokens();
-  const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
-
-  const [jiraDisplayName, setJiraDisplayName] = useState("");
-  const [jiraUrl, setJiraUrl] = useState("");
-  const [jiraCredentialName, setJiraCredentialName] = useState("");
-
-  const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
-  const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
-  const [confluenceCredentialName, setConfluenceCredentialName] = useState("");
-
-  // Upload files staged in memory; uploaded during provisioning once a project
-  // id exists.
-  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  // Add-source sub-flow, shown over the Sources step.
+  const addForm = useSourceDraftForm();
 
   const [createdProjectId, setCreatedProjectId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // True while the desktop "add credential" companion is open, so the modal
-  // slides left to make room for it beside itself.
-  const [companionOpen, setCompanionOpen] = useState(false);
   // Guards the "discard unsaved work?" confirmation over a dirty wizard.
   const [confirmingClose, setConfirmingClose] = useState(false);
   const toast = useToast();
@@ -188,54 +148,6 @@ export function CreateProjectWizard({
     if (nameServerError) setNameServerError("");
   };
 
-  const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
-  const isConfluenceDetail = isAddingSource && addStep === "detail" && addType === "CONFLUENCE";
-  // Jira and Confluence share the same Atlassian credential store, so one
-  // instance of the hook backs both detail screens' pickers.
-  const {
-    credentials: jiraCredentials,
-    loaded: jiraCredentialsLoaded,
-    error: jiraCredentialsError,
-    isRefreshing: jiraCredentialsLoading,
-    reload: reloadJiraCredentials,
-    addCredentialLocally,
-  } = useAtlassianCredentials(isOpen && (isJiraDetail || isConfluenceDetail));
-
-  // The token list arrives asynchronously; adopt the first token as soon as it
-  // does (and heal a stale selection) so discovery is usable on the first open.
-  useEffect(() => {
-    if (effectiveTokenNames.length === 0) return;
-
-    void Promise.resolve().then(() => {
-      setGithubTokenName((current) =>
-        current && effectiveTokenNames.includes(current) ? current : effectiveTokenNames[0],
-      );
-    });
-  }, [effectiveTokenNames]);
-
-  // Same adoption pattern for the Jira and Confluence credential pickers:
-  // select the first stored credential once the list arrives, keeping a
-  // still-valid choice. Both fields share the list, so a credential just added
-  // from either detail screen is adopted here too.
-  useEffect(() => {
-    if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
-
-    void Promise.resolve().then(() => {
-      setJiraCredentialName((current) => {
-        if (jiraCredentials.length === 0) return "";
-        return current && jiraCredentials.some((credential) => credential.displayName === current)
-          ? current
-          : jiraCredentials[0].displayName;
-      });
-      setConfluenceCredentialName((current) => {
-        if (jiraCredentials.length === 0) return "";
-        return current && jiraCredentials.some((credential) => credential.displayName === current)
-          ? current
-          : jiraCredentials[0].displayName;
-      });
-    });
-  }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
-
   const loadManagerCandidates = useCallback(async () => {
     setIsLoadingCandidates(true);
     setCandidatesError("");
@@ -259,12 +171,6 @@ export function CreateProjectWizard({
     void Promise.resolve().then(loadManagerCandidates);
   }, [isOpen, loadManagerCandidates]);
 
-  const resetConfluenceDraftFields = () => {
-    setConfluenceBaseUrl("");
-    setConfluenceSpaceId("");
-    setConfluenceCredentialName("");
-  };
-
   const resetWizard = () => {
     setPhase("details");
     setName("");
@@ -276,27 +182,8 @@ export function CreateProjectWizard({
     setManagerId("");
     setSelectedUserIds(new Set());
     setSources([]);
-    setIsAddingSource(false);
-    setAddStep("type");
-    setAddType("GITHUB");
-    setGithubSelection([]);
-    resetJiraDraftFields();
-    resetConfluenceDraftFields();
-    setUploadFiles([]);
+    addForm.reset();
     setCreatedProjectId("");
-  };
-
-  const resetJiraDraftFields = () => {
-    setJiraDisplayName("");
-    setJiraUrl("");
-    setJiraCredentialName("");
-  };
-
-  const resetSourceDraftFields = () => {
-    setGithubSelection([]);
-    resetJiraDraftFields();
-    resetConfluenceDraftFields();
-    setUploadFiles([]);
   };
 
   const closeWizard = () => {
@@ -357,18 +244,29 @@ export function CreateProjectWizard({
     return { id: candidate.id, name: fullName || candidate.username };
   }, [users, managerCandidates, managerId]);
 
-  // Members shown on Review, excluding the manager (rendered separately there).
-  const reviewMembers = useMemo<ReviewPerson[]>(
-    () =>
-      users
-        .filter((user) => selectedUserIds.has(user.id) && user.id !== managerId)
-        .map((user) => ({
-          id: user.id,
-          name: getDisplayName(user),
-          profileIcon: user.profileIcon,
-        })),
-    [users, selectedUserIds, managerId],
+  // Picked members who are in other projects already and would be moved. The
+  // project does not exist yet, so no membership can match it: an empty target id
+  // makes every current project of a regular user count as one they leave.
+  const movedUsers = useMemo(
+    () => getMovedUsers(users, selectedUserIds, ""),
+    [users, selectedUserIds],
   );
+
+  // Members shown on Review, excluding the manager (rendered separately there).
+  const reviewMembers = useMemo<ReviewPerson[]>(() => {
+    const leavingByUserId = new Map(
+      movedUsers.map(({ user, leaving }) => [user.id, leaving.map((project) => project.name)]),
+    );
+
+    return users
+      .filter((user) => selectedUserIds.has(user.id) && user.id !== managerId)
+      .map((user) => ({
+        id: user.id,
+        name: getDisplayName(user),
+        profileIcon: user.profileIcon,
+        movedFrom: leavingByUserId.get(user.id),
+      }));
+  }, [users, selectedUserIds, managerId, movedUsers]);
 
   const memberCount = selectedUserIds.size + (managerId && !selectedUserIds.has(managerId) ? 1 : 0);
 
@@ -391,116 +289,11 @@ export function CreateProjectWizard({
 
   // --- Add-source sub-flow ---
 
-  const openAddSource = () => {
-    resetSourceDraftFields();
-    setAddType("GITHUB");
-    setAddStep("type");
-    setAddFlowKey((key) => key + 1);
-    setIsAddingSource(true);
-  };
-
-  const closeAddSource = () => {
-    setIsAddingSource(false);
-    resetSourceDraftFields();
-  };
-
-  const handleSelectAddType = (type: SourceSystem) => {
-    // A "Soon" type (not yet wired) is inert until its phase lands.
-    if (!AVAILABLE_SOURCE_TYPES.includes(type)) return;
-
-    setAddType(type);
-    setAddStep("detail");
-  };
-
-  const backToTypeGrid = () => {
-    setAddStep("type");
-    resetSourceDraftFields();
-  };
-
-  // Inline credential creation: adopt the new token/credential locally and
-  // select it right away, so a successful add is reflected even if the reload
-  // fails or is aborted; the reload then reconciles with the server.
-  const handleTokenSaved = async (tokenName: string) => {
-    addTokenNameLocally(tokenName);
-    setGithubTokenName(tokenName);
-    await loadTokenNames();
-  };
-
-  const handleCredentialSaved = async (credential: AtlassianCredentialDto) => {
-    addCredentialLocally(credential);
-    setJiraCredentialName(credential.displayName);
-    await reloadJiraCredentials();
-  };
-
-  const handleConfluenceCredentialSaved = async (credential: AtlassianCredentialDto) => {
-    addCredentialLocally(credential);
-    setConfluenceCredentialName(credential.displayName);
-    await reloadJiraCredentials();
-  };
-
-  const selectedJiraCredential = jiraCredentials.find(
-    (credential) => credential.displayName === jiraCredentialName,
-  );
-
-  const selectedConfluenceCredential = jiraCredentials.find(
-    (credential) => credential.displayName === confluenceCredentialName,
-  );
-
-  const canAddSource =
-    addType === "GITHUB"
-      ? githubSelection.length > 0
-      : addType === "JIRA"
-        ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
-        : addType === "UPLOAD"
-          ? uploadFiles.length > 0
-          : addType === "CONFLUENCE"
-            ? Boolean(
-                confluenceBaseUrl.trim() &&
-                isValidConfluenceSpaceId(confluenceSpaceId) &&
-                selectedConfluenceCredential,
-              )
-            : false;
-
   const commitAddSource = () => {
-    if (!canAddSource) return;
+    if (!addForm.canAdd) return;
 
-    if (addType === "GITHUB") {
-      setSources((current) =>
-        githubSelection.reduce(
-          (accumulated, selection) =>
-            addDraftSource(accumulated, createDraftSourceFromDiscovery(selection, githubTokenName)),
-          current,
-        ),
-      );
-    } else if (addType === "JIRA" && selectedJiraCredential) {
-      setSources((current) =>
-        addDraftSource(
-          current,
-          createJiraDraft({
-            displayName: jiraDisplayName.trim(),
-            url: jiraUrl.trim(),
-            userEmail: selectedJiraCredential.userEmail,
-            tokenName: selectedJiraCredential.displayName,
-          }),
-        ),
-      );
-    } else if (addType === "UPLOAD") {
-      const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
-      setSources((current) => addDraftSource(current, createUploadDraft(displayName, uploadFiles)));
-    } else if (addType === "CONFLUENCE" && selectedConfluenceCredential) {
-      setSources((current) =>
-        addDraftSource(
-          current,
-          createConfluenceDraft({
-            baseUrl: confluenceBaseUrl.trim(),
-            spaceId: confluenceSpaceId.trim(),
-            credentialName: selectedConfluenceCredential.displayName,
-          }),
-        ),
-      );
-    }
-
-    closeAddSource();
+    const drafts = addForm.commit();
+    setSources((current) => addDraftSources(current, drafts));
   };
 
   // --- Commit + provisioning ---
@@ -525,6 +318,8 @@ export function CreateProjectWizard({
       members = await projectService.assignUsersToProject(project.id, {
         userIds: [...selectedUserIds],
       });
+
+      if (movedUsers.length > 0) onMembershipsMoved?.();
     }
 
     // Setting the manager returns the full, backend-authoritative details
@@ -635,8 +430,8 @@ export function CreateProjectWizard({
   // keeping focus on the footer button they just pressed.
   const screenAnnouncement = isProvisioning
     ? "Creating project"
-    : isAddingSource
-      ? addStep === "type"
+    : addForm.isOpen
+      ? addForm.step === "type"
         ? "Add a source: choose a type"
         : "Add a source: enter the details"
       : `Step ${stepIndex + 1} of ${STEP_LABELS.length}: ${STEP_LABELS[stepIndex]}`;
@@ -650,7 +445,7 @@ export function CreateProjectWizard({
       return;
     }
     bodyRef.current?.focus();
-  }, [phase, isAddingSource, addStep]);
+  }, [phase, addForm.isOpen, addForm.step]);
 
   const goBack = () => {
     if (phase === "members") setPhase("details");
@@ -676,7 +471,7 @@ export function CreateProjectWizard({
   // closed first so the target step renders its own content, not the sub-flow.
   const goToStep = (index: number) => {
     if (isSubmitting) return;
-    if (isAddingSource) closeAddSource();
+    if (addForm.isOpen) addForm.close();
 
     const target = (["details", "members", "sources", "review"] as const)[index];
     if (target) setPhase(target);
@@ -698,12 +493,12 @@ export function CreateProjectWizard({
       );
     }
 
-    if (isAddingSource) {
-      if (addStep === "type") {
+    if (addForm.isOpen) {
+      if (addForm.step === "type") {
         return (
           <Button
             variant="secondary"
-            onClick={closeAddSource}
+            onClick={addForm.close}
             icon={<ArrowLeft className="h-4 w-4" />}
             className="sm:mr-auto"
           >
@@ -718,7 +513,7 @@ export function CreateProjectWizard({
         <Button
           variant="primary"
           onClick={commitAddSource}
-          disabled={!canAddSource}
+          disabled={!addForm.canAdd}
           icon={<Plus className="h-4 w-4" />}
         >
           Add to list
@@ -784,7 +579,7 @@ export function CreateProjectWizard({
         }
         size="xl"
         isDismissDisabled={isSubmitting || confirmingClose}
-        contentInsetRight={companionOpen ? COMPANION_WIDTH + COMPANION_GAP + 16 : 0}
+        contentInsetRight={addForm.companionOpen ? COMPANION_WIDTH + COMPANION_GAP + 16 : 0}
         onClose={requestClose}
         closeLabel="Close new project wizard"
         footer={footer}
@@ -828,60 +623,17 @@ export function CreateProjectWizard({
           )}
 
           {phase === "sources" &&
-            (isAddingSource ? (
+            (addForm.isOpen ? (
               <AddSourceFlow
-                key={addFlowKey}
-                step={addStep}
-                selectedType={addType}
-                availableTypes={AVAILABLE_SOURCE_TYPES}
-                onSelectType={handleSelectAddType}
-                onBack={backToTypeGrid}
-                onCompanionOpenChange={setCompanionOpen}
-                github={{
-                  tokenNames: effectiveTokenNames,
-                  tokenName: githubTokenName,
-                  onTokenNameChange: setGithubTokenName,
-                  onSelectionChange: setGithubSelection,
-                  onTokenSaved: handleTokenSaved,
-                }}
-                jira={{
-                  displayName: jiraDisplayName,
-                  url: jiraUrl,
-                  credentialName: jiraCredentialName,
-                  credentials: jiraCredentials,
-                  credentialsLoaded: jiraCredentialsLoaded,
-                  credentialsLoading: jiraCredentialsLoading,
-                  credentialsError: jiraCredentialsError,
-                  defaultUserEmail: null,
-                  onDisplayNameChange: setJiraDisplayName,
-                  onUrlChange: setJiraUrl,
-                  onCredentialNameChange: setJiraCredentialName,
-                  onSubmit: commitAddSource,
-                  onCredentialSaved: handleCredentialSaved,
-                }}
-                upload={{
-                  files: uploadFiles,
-                  onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
-                  onRemoveFile: (index) =>
-                    setUploadFiles((current) =>
-                      current.filter((_, position) => position !== index),
-                    ),
-                }}
-                confluence={{
-                  baseUrl: confluenceBaseUrl,
-                  spaceId: confluenceSpaceId,
-                  credentialName: confluenceCredentialName,
-                  credentials: jiraCredentials,
-                  credentialsLoaded: jiraCredentialsLoaded,
-                  credentialsLoading: jiraCredentialsLoading,
-                  credentialsError: jiraCredentialsError,
-                  defaultUserEmail: null,
-                  onBaseUrlChange: setConfluenceBaseUrl,
-                  onSpaceIdChange: setConfluenceSpaceId,
-                  onCredentialNameChange: setConfluenceCredentialName,
-                  onSubmit: commitAddSource,
-                  onCredentialSaved: handleConfluenceCredentialSaved,
-                }}
+                key={addForm.flowKey}
+                step={addForm.step}
+                selectedType={addForm.type}
+                onSelectType={addForm.selectType}
+                onBack={addForm.backToTypes}
+                context={{ projectId: null, tokenNames }}
+                onDraftsChange={addForm.reportDrafts}
+                onSubmit={commitAddSource}
+                onCompanionOpenChange={addForm.setCompanionOpen}
               />
             ) : (
               <WizardSourcesStep
@@ -893,7 +645,7 @@ export function CreateProjectWizard({
                 onOwnerChange={(sourceId, ownerUserId) =>
                   setSources((current) => setDraftSourceOwner(current, sourceId, ownerUserId))
                 }
-                onAddSource={openAddSource}
+                onAddSource={addForm.open}
               />
             ))}
 

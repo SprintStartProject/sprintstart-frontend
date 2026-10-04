@@ -8,7 +8,6 @@ import type { DataSource } from "../../../src/features/data-ingestion/types";
 import { deriveSourceStatus } from "../../../src/features/data-ingestion/data";
 
 vi.mock("../../../src/services/ingestionService", () => ({
-  getIngestionRuns: vi.fn().mockResolvedValue([]),
   getIngestionStatus: vi.fn().mockResolvedValue([]),
 }));
 
@@ -18,9 +17,6 @@ const source: DataSource = {
   name: "GitHub Repository",
   type: "GitHub",
   status: "connected",
-  statusLabel: "Connected",
-  ingestionStatus: "connected",
-  ingestionStatusLabel: "Synced",
   statusView: deriveSourceStatus({ hasErrors: false, hasNeverSynced: false }),
   artifacts: 42,
   lastSync: "2026-07-01",
@@ -29,15 +25,15 @@ const source: DataSource = {
   latestUpdatedCount: 5,
   totalArtifactCount: 42,
   deletedCount: 0,
-  runIds: [],
   sharesSourceSystem: false,
-  lastCommitsSyncAt: null,
-  lastIssuesSyncAt: null,
-  lastPullRequestsSyncAt: null,
   lastRunAt: "2026-07-01T00:00:00.000Z",
   icon: GitBranch,
   failedItems: [],
-  githubRepository: null,
+  details: {
+    system: "GITHUB",
+    repository: null,
+    syncTimes: { commits: null, issues: null, pullRequests: null },
+  },
   description: "Indexes repositories.",
 };
 
@@ -45,7 +41,14 @@ describe("SourceDetailsPanel Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <SourceDetailsPanel source={source} onClose={vi.fn()} />
+        <SourceDetailsPanel
+          source={source}
+          projectId="p1"
+          canManage
+          canUnlink
+          onChanged={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
       </MemoryRouter>,
     );
 

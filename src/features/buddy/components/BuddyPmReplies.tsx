@@ -1,4 +1,4 @@
-import { BookCheck, Clock, MessageSquareOff, X } from "lucide-react";
+import { BookCheck, Clock, MessageSquareOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { formatDateTime, formatWaiting, hasWaitedADay } from "../../knowledge-request/format";
 import type { PmReplies } from "../hooks/usePmReplies";
@@ -28,13 +28,11 @@ import type { PmReplies } from "../hooks/usePmReplies";
  *
  * Scoped to the hire, not to the selected project: these are their own questions, and hiding the
  * ones asked on another project would mean an answer silently never arriving.
+ *
+ * It carries no close control of its own: the rail's cross sits at the rail's top, and the one
+ * that used to live here — mid-panel — read as closing this section alone.
  */
-export function BuddyPmReplies({
-  answered,
-  waiting,
-  dismissed,
-  onClose,
-}: PmReplies & { onClose: () => void }) {
+export function BuddyPmReplies({ answered, waiting, dismissed }: PmReplies) {
   // Nothing to say is the common case — a hire who has never escalated should see no trace of a
   // feature they have not used. The page reads the same emptiness from `hasAny` and does not
   // offer the rail at all, so this guard is the backstop rather than the mechanism.
@@ -46,14 +44,6 @@ export function BuddyPmReplies({
         <h2 className="truncate text-sm font-bold tracking-wide text-app-text-muted uppercase">
           Sent to your PM
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close the PM replies"
-          className="shrink-0 rounded p-1 text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-5">

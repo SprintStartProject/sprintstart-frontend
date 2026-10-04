@@ -146,6 +146,33 @@ describe("useBuddyConversation — team mode", () => {
     expect(onLeft).not.toHaveBeenCalled();
   });
 
+  it("leaves the flag wording behind when the conversation switches", async () => {
+    // A draft belongs to the offer it was typed into, not to the tab: the conversation being
+    // switched to starts with no wording of its own, exactly like every other piece of state.
+    const onLeft = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ selection, onLeft }: { selection: ProjectSelectionSlice; onLeft?: () => void }) =>
+        useBuddyConversation(selection, onLeft),
+      { initialProps: { selection: sel("", false), onLeft }, wrapper: authWrapper },
+    );
+    await act(async () => {
+      await result.current.ensureOpened();
+    });
+
+    act(() => {
+      result.current.setActionDraft("m1:a1", "Who owns the staging box?");
+    });
+    expect(result.current.actionDrafts["m1:a1"]).toBe("Who owns the staging box?");
+
+    act(() => {
+      result.current.switchTeamProject("p1");
+      rerender({ selection: sel("p1", true), onLeft });
+    });
+
+    await waitFor(() => expect(result.current.actionDrafts).toEqual({}));
+    expect(result.current.teamProjectId).toBe("p1");
+  });
+
   it("persists the preference per user, restores it on remount, and leaves it audibly", async () => {
     localStorage.setItem("buddyTeamMode:user-1", "true");
     localStorage.setItem("buddyTeamMode:user-2", "true");
@@ -171,7 +198,8 @@ describe("useBuddyConversation — team mode", () => {
     expect(localStorage.getItem("buddyTeamMode:user-1")).toBe("false");
     expect(localStorage.getItem("buddyTeamMode:user-2")).toBe("true");
     expect(onLeft).not.toHaveBeenCalled();
-    await waitFor(() => expect(messagesUrl).toBe(""));
+    // Back in the hire's own surface, its conversation is read by session id.
+    await waitFor(() => expect(messagesUrl).toBe("?sessionId=session-1"));
   });
 
   it("does not inherit another user's team preference", () => {
@@ -206,8 +234,8 @@ describe("useBuddyConversation — team mode", () => {
     await waitFor(() => expect(result.current.isTeamMode).toBe(false));
     expect(result.current.teamProjectId).toBeNull();
     expect(onLeft).toHaveBeenCalledTimes(1);
-    // The hire conversation takes over, under no team param.
-    await waitFor(() => expect(messagesUrl).toBe(""));
+    // The hire conversation takes over, under its session id and no team param.
+    await waitFor(() => expect(messagesUrl).toBe("?sessionId=session-1"));
   });
 
   it("exits audibly when management of the selected project is lost", async () => {
@@ -230,7 +258,7 @@ describe("useBuddyConversation — team mode", () => {
     await waitFor(() => expect(result.current.isTeamMode).toBe(false));
     expect(result.current.teamProjectId).toBeNull();
     expect(onLeft).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(messagesUrl).toBe(""));
+    await waitFor(() => expect(messagesUrl).toBe("?sessionId=session-1"));
   });
 
   it("exits audibly on restore when there is no selection to bind to", async () => {
@@ -308,7 +336,7 @@ describe("useBuddyConversation — team mode", () => {
     // Refused: still the hire conversation, and nothing was asked of the selection.
     expect(setSelectedProjectId).not.toHaveBeenCalled();
     expect(result.current.isTeamMode).toBe(false);
-    expect(messagesUrl).toBe("");
+    expect(messagesUrl).toBe("?sessionId=session-1");
   });
 
   it("refuses a switch while a proposal decision is in flight", async () => {

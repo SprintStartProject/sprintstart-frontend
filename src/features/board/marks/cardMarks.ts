@@ -63,6 +63,12 @@ function toMark(value: unknown): CardMark | null {
   return { text: raw.text, color: toHighlightColor(raw.color) };
 }
 
+/**
+ * The hire's marks for one project, read from `localStorage`.
+ *
+ * Never throws. Storage from a newer version, broken JSON or a missing entry reads as no marks,
+ * and single malformed marks are dropped while the rest of the card's marks are kept.
+ */
 export function readCardMarks(projectId: string): CardMarks {
   if (!projectId) return {};
 

@@ -17,7 +17,10 @@ import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
 import { SaveToBoard } from "../features/board/save/SaveToBoard";
 import { chatLink } from "../features/board/generation/chatToCard";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer.tsx";
-import type { Artifact, ArtifactType, SourceSystem } from "../features/knowledge-base/types";
+import {
+  deriveArtifactFromCitation,
+  type CitationArtifactOpen,
+} from "../features/chatbot/citationArtifact.ts";
 import type { SelectedCitation } from "../context/ChatContext.ts";
 import { matchEggPhrase } from "../features/easter-eggs/lib/eggPhrases";
 import { playEggEffect } from "../features/easter-eggs/eggEffectBus";
@@ -36,58 +39,16 @@ import { surfaceFromPathname } from "../components/common/assistantSurfaces.ts";
 
 import "katex/dist/katex.min.css";
 
-type CitationArtifactOpen = {
-  artifactId: string;
-  filename: string;
-  sourceUrl?: string;
-  lines: number[];
-};
-
-function deriveArtifactFromCitation(citation: CitationArtifactOpen): Artifact {
-  const url = citation.sourceUrl?.toLowerCase() ?? "";
-  const name = citation.filename.toLowerCase();
-
-  let artifactType: ArtifactType = "FILE";
-  if (url.includes("/pull/") || name.startsWith("pr #") || name.startsWith("pull request")) {
-    artifactType = "PULL_REQUEST";
-  } else if (
-    url.includes("/issues/") ||
-    url.includes("/browse/") ||
-    name.startsWith("issue #") ||
-    name.startsWith("jira #")
-  ) {
-    artifactType = "ISSUE";
-  }
-
-  let sourceSystem: SourceSystem = "GITHUB";
-  if (url.includes("atlassian.net") || url.includes("/browse/") || name.startsWith("jira #")) {
-    sourceSystem = "JIRA";
-  }
-
-  const isMarkdown =
-    artifactType === "ISSUE" ||
-    artifactType === "PULL_REQUEST" ||
-    name.endsWith(".md") ||
-    name.endsWith(".markdown");
-
-  return {
-    id: citation.artifactId,
-    title: citation.filename,
-    artifactType,
-    sourceSystem,
-    sourceId: "",
-    sourceUrl: citation.sourceUrl || null,
-    mime: isMarkdown ? "text/markdown" : "text/plain",
-    language: isMarkdown ? "Markdown" : null,
-    ingestedAt: new Date().toISOString(),
-    lastChangedAt: null,
-    contentHash: null,
-    ingestionRunId: null,
-  };
-}
-
 /**
- * Displays the interface for communication with the chat.
+ * The AI assistant: a streamed conversation grounded in the selected project's sources, with
+ * citations that open the cited artifact, a rail of past conversations and date and source
+ * filters.
+ *
+ * Bound to `/chat` and `/chat/:id`, open to every permission group, and rendered inside
+ * `AssistantShell` next to the buddy. `useChat` reads the conversation from `:id`; on a bare
+ * `/chat` it opens the most recent conversation unless the navigation carries
+ * `state.newChat`, which is how "New chat" gets an empty one. Citations resolve against the
+ * project of the open conversation, not the one selected in the switcher.
  */
 export function ChatPage() {
   const { profile } = useAuth();
@@ -427,7 +388,7 @@ export function ChatPage() {
 
             {/* E1: AnimatePresence wraps dynamically added/removed
                             message rows so enter/exit animate smoothly (chat
-                            switch, new messages). Per AGENTS.md §11. */}
+                            switch, new messages). Per FRONTEND_CODING_STANDARDS.md §6. */}
             <AnimatePresence mode="popLayout">
               {messages.map((message, index) => (
                 <motion.div

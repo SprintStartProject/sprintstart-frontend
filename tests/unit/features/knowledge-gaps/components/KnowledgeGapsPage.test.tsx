@@ -191,26 +191,33 @@ describe("KnowledgeGapsPage", () => {
 
     const severityGroup = within(screen.getByRole("group", { name: "Filter gaps by severity" }));
 
-    expect(severityGroup.getByRole("button", { name: "High" })).toHaveAttribute(
+    // Nothing chosen by default: the list shows every severity without four chips lit up.
+    expect(severityGroup.getByRole("button", { name: /^High/ })).toHaveAttribute(
       "aria-pressed",
-      "true",
+      "false",
     );
     expect(screen.getByRole("combobox", { name: "Sort knowledge gaps" })).toHaveTextContent(
       "Severity",
     );
   });
 
-  it("filters gaps by severity when a filter is toggled off", async () => {
+  it("narrows gaps to a severity when its filter is chosen, and back when it is cleared", async () => {
     const user = userEvent.setup();
     renderPage();
 
     const highFilter = within(
       screen.getByRole("group", { name: "Filter gaps by severity" }),
-    ).getByRole("button", { name: "High" });
+    ).getByRole("button", { name: /^High/ });
+    await user.click(highFilter);
+
+    expect(highFilter).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Auth Service")).toBeInTheDocument();
+    expect(screen.queryByText("API Gateway")).not.toBeInTheDocument();
+
     await user.click(highFilter);
 
     expect(highFilter).toHaveAttribute("aria-pressed", "false");
-    expect(screen.queryByText("Auth Service")).not.toBeInTheDocument();
+    expect(screen.getByText("Auth Service")).toBeInTheDocument();
     expect(screen.getByText("API Gateway")).toBeInTheDocument();
   });
 
@@ -233,11 +240,32 @@ describe("KnowledgeGapsPage", () => {
 
     await user.click(
       within(screen.getByRole("group", { name: "Filter gaps by severity" })).getByRole("button", {
-        name: "High",
+        name: /^High/,
       }),
     );
 
     expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
+  });
+
+  it("narrows the list to a severity from its figure, and searches by component", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: /High severity/ }));
+    const severityGroup = within(screen.getByRole("group", { name: "Filter gaps by severity" }));
+    expect(severityGroup.getByRole("button", { name: /^High/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(severityGroup.getByRole("button", { name: /^Medium/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    await user.type(screen.getByRole("textbox", { name: "Search knowledge gaps" }), "gateway");
+    expect(screen.getByText("API Gateway")).toBeInTheDocument();
+    expect(screen.queryByText("Auth Service")).not.toBeInTheDocument();
   });
 });
 

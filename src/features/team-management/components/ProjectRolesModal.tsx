@@ -67,7 +67,7 @@ export function ProjectRolesModal({ open, onClose }: ProjectRolesModalProps) {
     if (!selectedRole || !skillName.trim()) return;
 
     try {
-      const newSkill = await createSkill(skillName.trim(), [selectedRole.id]);
+      const newSkill = await createSkill({ name: skillName.trim(), roleIds: [selectedRole.id] });
 
       setSkills((current) => {
         const exists = current.some((s) => s.id === newSkill.id);

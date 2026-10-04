@@ -73,6 +73,7 @@ export type SkillSuggestion = {
   chunkIds: string[];
 };
 
+/** Whether a skill belongs to a project role; a skill can belong to several (`roleIds`). */
 export function isSkillLinkedToRole(skill: Skill, roleId: string): boolean {
   return skill.roleIds.includes(roleId);
 }
@@ -87,8 +88,8 @@ export type TeamManagementTab = "members" | "roles";
 
 /**
  * Left-to-right order of the Team Management tabs. Single source of truth:
- * `TeamManagementTabSwitcher` renders in this order and `TeamManagementPage`
- * derives the slide direction from it, so the content always travels the same
+ * `TeamManagementPage` renders its tab bar in this order and derives the slide
+ * direction from it, so the content always travels the same
  * way the active pill does.
  */
 export const TEAM_MANAGEMENT_TAB_ORDER: TeamManagementTab[] = ["members", "roles"];

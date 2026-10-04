@@ -18,14 +18,15 @@ import type { DashboardLayout, DashboardWidgetId } from "./types";
  * trade for a preference: rebuilding a dashboard costs a minute, and a half-migrated one
  * would be a puzzle.
  */
-const LAYOUT_VERSION = 2;
+export const LAYOUT_VERSION = 2;
 
 /**
  * Keyed per user, because two people share a browser more often than a dashboard.
  *
- * Local storage rather than the backend: there is no endpoint for a per-user layout, and a
- * preference that follows the machine is closer to right than one that does not exist.
- * Moving it server-side later means replacing these two functions.
+ * Local storage, and no longer only local storage: `useDashboardLayoutSync.ts` sends the layout to
+ * `PUT /users/me/dashboard/layout` after every change and reads it back on arrival, so the
+ * arrangement follows the user to another machine. This is still where the client writes first and
+ * reads from, which keeps every gesture instant and a failed request free.
  */
 function storageKey(userId: string): string {
   return `sprintstart:dashboard-layout:${userId}`;
@@ -92,6 +93,52 @@ export function clearStoredLayout(userId: string): void {
 
   try {
     window.localStorage.removeItem(storageKey(userId));
+  } catch {
+    // See storeLayout.
+  }
+}
+
+/**
+ * Whether this browser's copy of the layout is exactly what the server had at the last exchange.
+ *
+ * What lets the sync tell a change that never made it up from a reset somewhere else, when the
+ * server has nothing: a local layout that is not in sync — never uploaded, or changed since and the
+ * upload failed — is the newer statement and is sent up; one that is in sync is a stale copy of a
+ * layout the user has since reset on another device, and must not bring it back.
+ *
+ * So it is cleared on every local change and set only after a request confirmed that both sides
+ * agree. Its own key rather than a field on the layout, because it has to describe "no layout" too:
+ * after a reset, nothing here and nothing there is in sync.
+ */
+function syncedKey(userId: string): string {
+  return `sprintstart:dashboard-layout-synced:${userId}`;
+}
+
+export function readLayoutSynced(userId: string): boolean {
+  if (!userId) return false;
+
+  try {
+    return window.localStorage.getItem(syncedKey(userId)) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function markLayoutSynced(userId: string): void {
+  if (!userId) return;
+
+  try {
+    window.localStorage.setItem(syncedKey(userId), "true");
+  } catch {
+    // See storeLayout.
+  }
+}
+
+export function markLayoutUnsynced(userId: string): void {
+  if (!userId) return;
+
+  try {
+    window.localStorage.removeItem(syncedKey(userId));
   } catch {
     // See storeLayout.
   }

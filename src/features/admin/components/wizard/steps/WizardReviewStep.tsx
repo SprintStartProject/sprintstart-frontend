@@ -1,14 +1,20 @@
-import { GitBranch, Ticket, FileText, BookOpen } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import { ArrowRightLeft } from "lucide-react";
+import type { ReactNode } from "react";
 import { UserAvatar } from "../../../../../components/common/UserAvatar";
 import { SourceTypeBadge } from "../../../../data-ingestion/components/SourceTypeBadge";
-import type { DraftSource, DraftSourceType } from "../../../projectSourcesDraft";
+import { getConnector } from "../../../../data-ingestion/connectors/registry";
+import type { DraftSource } from "../../../../data-ingestion/add-source/projectSourcesDraft";
 
 /** The minimum a review row needs to render a person with their avatar. */
 export type ReviewPerson = {
   id: string;
   name: string;
   profileIcon?: string | null;
+  /**
+   * Names of the projects this person would be removed from when the project is
+   * created. Only set for a regular user who is in other projects already.
+   */
+  movedFrom?: string[];
 };
 
 type WizardReviewStepProps = {
@@ -25,32 +31,28 @@ type WizardReviewStepProps = {
   onEditSources: () => void;
 };
 
-const typeIcons: Record<DraftSourceType, ComponentType<{ className?: string }>> = {
-  GITHUB: GitBranch,
-  JIRA: Ticket,
-  UPLOAD: FileText,
-  CONFLUENCE: BookOpen,
-};
-
-const typeLabels: Record<DraftSourceType, string> = {
-  GITHUB: "GitHub",
-  JIRA: "Jira",
-  UPLOAD: "Upload",
-  CONFLUENCE: "Confluence",
-};
-
-function sourceTitle(source: DraftSource): string {
-  return source.type === "GITHUB" ? `${source.owner}/${source.name}` : source.displayName;
-}
-
 function PersonChip({ person, suffix }: { person: ReviewPerson; suffix?: string }) {
+  const movedFrom = person.movedFrom?.join(", ");
+
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface py-0.5 pr-3 pl-0.5 text-xs text-app-text">
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border py-0.5 pr-3 pl-0.5 text-xs text-app-text ${
+        movedFrom
+          ? "border-app-warning-border bg-app-warning-bg"
+          : "border-app-border bg-app-surface"
+      }`}
+    >
       <UserAvatar profileIcon={person.profileIcon} fallbackName={person.name} size={20} />
       <span className="truncate">
         {person.name}
         {suffix && <span className="text-app-text-muted"> · {suffix}</span>}
       </span>
+      {movedFrom && (
+        <span className="inline-flex items-center gap-1 font-medium text-app-warning-text">
+          <ArrowRightLeft className="h-3 w-3 shrink-0" aria-hidden="true" />
+          from {movedFrom}
+        </span>
+      )}
     </span>
   );
 }
@@ -69,10 +71,10 @@ function ReviewBlock({
   return (
     <section className="overflow-hidden rounded-2xl border border-app-border">
       <header className="flex items-center justify-between border-b border-app-border bg-app-surface-muted px-4 py-2.5">
-        <h4 className="text-sm font-semibold text-app-text">
+        <h3 className="text-sm font-semibold text-app-text">
           {title}
           {count !== undefined && <span className="text-app-text-muted"> · {count}</span>}
-        </h4>
+        </h3>
         <button
           type="button"
           onClick={onEdit}
@@ -103,6 +105,7 @@ export function WizardReviewStep({
   onEditSources,
 }: WizardReviewStepProps) {
   const memberCount = members.length + (manager ? 1 : 0);
+  const movedMembers = members.filter((member) => member.movedFrom?.length);
 
   return (
     <div className="space-y-4">
@@ -150,11 +153,20 @@ export function WizardReviewStep({
         {memberCount === 0 ? (
           <span className="text-app-text-muted">No members</span>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {manager && <PersonChip person={manager} suffix="Manager" />}
-            {members.map((member) => (
-              <PersonChip key={member.id} person={member} />
-            ))}
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              {manager && <PersonChip person={manager} suffix="Manager" />}
+              {members.map((member) => (
+                <PersonChip key={member.id} person={member} />
+              ))}
+            </div>
+
+            {movedMembers.length > 0 && (
+              <p role="note" className="text-xs text-app-text-muted">
+                People marked with an arrow are moved out of their current projects. Their project
+                roles and onboarding progress are reset.
+              </p>
+            )}
           </div>
         )}
       </ReviewBlock>
@@ -167,13 +179,14 @@ export function WizardReviewStep({
         ) : (
           <ul className="space-y-1.5">
             {sources.map((source) => {
-              const Icon = typeIcons[source.type];
+              const { meta, draft } = getConnector(source.type);
+              const { icon: Icon, label } = meta;
 
               return (
                 <li key={source.id} className="flex items-center gap-2 text-app-text">
                   <Icon className="h-4 w-4 shrink-0 text-app-text-muted" />
-                  <span className="truncate">{sourceTitle(source)}</span>
-                  <SourceTypeBadge type={typeLabels[source.type]} size="sm" />
+                  <span className="truncate">{draft.title(source)}</span>
+                  <SourceTypeBadge type={label} size="sm" />
                 </li>
               );
             })}

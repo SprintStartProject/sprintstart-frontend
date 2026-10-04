@@ -9,7 +9,20 @@ import { AuthContext, type AuthContextType } from "../../../src/context/AuthCont
 
 vi.mock("../../../src/services/buddyService", () => ({
   getMessages: vi.fn().mockResolvedValue([]),
-  // An empty visit is the one case that still greets — see `ensureOpened`.
+  // One empty conversation, so the page settles in its loaded state — without these the
+  // opening resolve hits an undefined export and the a11y run only ever sees the error
+  // banner a missing mock leaves behind.
+  getSessions: vi.fn().mockResolvedValue([
+    {
+      id: "session-1",
+      title: "",
+      userId: "user-1",
+      projectId: null,
+      createdAt: "2026-09-30T09:00:00.000Z",
+    },
+  ]),
+  createSession: vi.fn().mockResolvedValue("session-2"),
+  // An empty conversation is the one case that still greets — see `ensureOpened`.
   streamOpenBuddy: vi.fn((handlers: { onDone: () => void }) => {
     handlers.onDone();
     return Promise.resolve();

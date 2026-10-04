@@ -1,10 +1,22 @@
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Search, Shield, ShieldCheck, UserMinus, UserPlus, Undo2, Users } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Search,
+  Shield,
+  ShieldCheck,
+  UserMinus,
+  UserPlus,
+  Undo2,
+  UserX,
+  Users,
+} from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { IconTile } from "../../../components/ui/IconTile";
 import type { ProjectManager } from "../../../services/projectService";
 import {
   resolvePeopleDraft,
@@ -13,9 +25,18 @@ import {
   stageToggleRemoveUser,
   type PeopleDraft,
 } from "../peopleDraft";
+import { matchesUserSearch, pluralize } from "../data";
+import {
+  canJoinMultipleProjects,
+  getOtherProjectCount,
+  getProjectsLeftOnMove,
+  isManagerEligible,
+} from "../projectMove";
 import type { AdminUser, ProjectUser } from "../types";
 
 type ProjectPeopleSectionProps = {
+  /** The project being edited; decides who a staged addition would move. */
+  projectId: string;
   members: ProjectUser[];
   manager: ProjectManager | null;
   availableUsers: AdminUser[];
@@ -25,38 +46,38 @@ type ProjectPeopleSectionProps = {
   snapshotKey: string;
   draft: PeopleDraft;
   onDraftChange: (draft: PeopleDraft) => void;
+  /** Makes each person's name open their user details; rows are plain without it. */
+  onOpenUser?: (userId: string) => void;
 };
+
+type PersonIdentity = {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  email?: string;
+};
+
+/** Search results shown at once; the rest are reached by narrowing the search. */
+const MAX_ADDABLE_USERS = 6;
 
 /** A person in the list, whether already assigned or only staged. */
 type PersonRow = {
   id: string;
   displayName: string;
-  secondaryLabel: string;
+  /** Identity fields, shown as `@username · email` and matched by the search box. */
+  person: PersonIdentity;
   profileIcon: string | null;
+  isDisabled: boolean;
+  /** Other projects the person is in; only counted for roles that may be in several. */
+  otherProjectCount: number;
   isManager: boolean;
   /** Whether the person may be assigned as manager (holds the PM/ADMIN role). */
   isManagerEligible: boolean;
   isPendingAdd: boolean;
   isPendingRemove: boolean;
+  /** Names of the projects a staged person would be removed from on save. */
+  movedFrom: string[];
 };
-
-// Both spellings the two data sources use for the manager-granting roles: members
-// carry raw `GlobalUserRole` codes, while `AdminUser` exposes the humanized
-// permission-group label.
-const MANAGER_ELIGIBLE_ROLES = new Set(["PM", "ADMIN", "PROJECT MANAGER", "PROJECT_MANAGER"]);
-
-/**
- * Whether any of the given role signals grants project-manager eligibility.
- *
- * The backend only accepts a manager who already holds the global PM (or ADMIN)
- * role and rejects anyone else with a bare 400, so the UI enforces the same rule
- * up front instead of letting the assignment fail with an opaque "Bad request".
- */
-function isManagerEligible(...roleSignals: Array<string | undefined>): boolean {
-  return roleSignals.some(
-    (signal) => signal !== undefined && MANAGER_ELIGIBLE_ROLES.has(signal.trim().toUpperCase()),
-  );
-}
 
 function getDisplayName(user: {
   firstName?: string;
@@ -72,8 +93,45 @@ function getDisplayName(user: {
   );
 }
 
-function matchesSearch(value: string, search: string) {
-  return value.toLowerCase().includes(search.trim().toLowerCase());
+/** `@username` and email side by side, each as its own span so both stay findable. */
+function PersonContact({ person, className }: { person: PersonIdentity; className?: string }) {
+  return (
+    <span className={["flex min-w-0 items-center gap-1.5", className].join(" ")}>
+      {person.username && <span className="shrink-0">@{person.username}</span>}
+      {person.username && person.email && <span aria-hidden="true">·</span>}
+      {person.email && <span className="truncate">{person.email}</span>}
+    </span>
+  );
+}
+
+/**
+ * Avatar and name block of a row. A button when the row can open the person,
+ * so the whole block is one keyboard target with one accessible name instead of
+ * a clickable avatar and a clickable name saying the same thing twice.
+ */
+function RowIdentity({
+  onOpen,
+  label,
+  children,
+}: {
+  onOpen?: () => void;
+  label: string;
+  children: ReactNode;
+}) {
+  if (!onOpen) {
+    return <div className="flex min-w-0 flex-1 items-center gap-3">{children}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={label}
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+    >
+      {children}
+    </button>
+  );
 }
 
 /**
@@ -85,6 +143,7 @@ function matchesSearch(value: string, search: string) {
  * so this component never writes to the backend itself.
  */
 export function ProjectPeopleSection({
+  projectId,
   members,
   manager,
   availableUsers,
@@ -93,6 +152,7 @@ export function ProjectPeopleSection({
   snapshotKey,
   draft,
   onDraftChange,
+  onOpenUser,
 }: ProjectPeopleSectionProps) {
   const [search, setSearch] = useState("");
   const prefersReducedMotion = useReducedMotion();
@@ -108,16 +168,30 @@ export function ProjectPeopleSection({
   );
 
   const rows = useMemo<PersonRow[]>(() => {
-    const assigned: PersonRow[] = members.map((member) => ({
-      id: member.id,
-      displayName: getDisplayName(member),
-      secondaryLabel: member.email || member.username,
-      profileIcon: member.profileIcon ?? null,
-      isManager: member.id === effectiveManagerId,
-      isManagerEligible: isManagerEligible(...member.roles),
-      isPendingAdd: false,
-      isPendingRemove: activeDraft.removedUserIds.has(member.id),
-    }));
+    // Only PM and admin can be in several projects, so a count for anyone else
+    // would be a leftover from before a role change rather than a fact.
+    const countOtherProjects = (user: AdminUser | undefined) =>
+      user && canJoinMultipleProjects(user.permissionGroup)
+        ? getOtherProjectCount(user, projectId)
+        : 0;
+
+    const assigned: PersonRow[] = members.map((member) => {
+      const knownUser = availableUsersById.get(member.id);
+
+      return {
+        id: member.id,
+        displayName: getDisplayName(member),
+        person: member,
+        profileIcon: member.profileIcon ?? null,
+        isDisabled: !member.enabled,
+        otherProjectCount: countOtherProjects(knownUser),
+        isManager: member.id === effectiveManagerId,
+        isManagerEligible: isManagerEligible(...member.roles),
+        isPendingAdd: false,
+        isPendingRemove: activeDraft.removedUserIds.has(member.id),
+        movedFrom: [],
+      };
+    });
 
     const staged: PersonRow[] = [...activeDraft.addedUserIds].flatMap((userId) => {
       const user = availableUsersById.get(userId);
@@ -127,12 +201,15 @@ export function ProjectPeopleSection({
         {
           id: user.id,
           displayName: getDisplayName(user),
-          secondaryLabel: user.email || user.username,
+          person: user,
           profileIcon: user.profileIcon ?? null,
+          isDisabled: !user.enabled,
+          otherProjectCount: countOtherProjects(user),
           isManager: user.id === effectiveManagerId,
           isManagerEligible: isManagerEligible(user.permissionGroup),
           isPendingAdd: true,
           isPendingRemove: false,
+          movedFrom: getProjectsLeftOnMove(user, projectId).map((project) => project.name),
         },
       ];
     });
@@ -150,14 +227,17 @@ export function ProjectPeopleSection({
         combined.push({
           id: effectiveManagerId,
           displayName: getDisplayName(managerUser),
-          secondaryLabel: managerUser.email || managerUser.username,
+          person: managerUser,
           profileIcon: knownUser?.profileIcon ?? null,
+          isDisabled: knownUser ? !knownUser.enabled : false,
+          otherProjectCount: countOtherProjects(knownUser),
           isManager: true,
           // Already the manager, so eligibility is moot — treat as eligible so
           // the demote control renders normally.
           isManagerEligible: true,
           isPendingAdd: false,
           isPendingRemove: false,
+          movedFrom: [],
         });
       }
     }
@@ -175,14 +255,11 @@ export function ProjectPeopleSection({
     activeDraft.removedUserIds,
     availableUsersById,
     effectiveManagerId,
+    projectId,
   ]);
 
   const visibleRows = useMemo(
-    () =>
-      rows.filter(
-        (row) =>
-          matchesSearch(row.displayName, search) || matchesSearch(row.secondaryLabel, search),
-      ),
+    () => rows.filter((row) => matchesUserSearch(row.person, search)),
     [rows, search],
   );
 
@@ -193,18 +270,15 @@ export function ProjectPeopleSection({
 
   // Non-members are only offered while searching, so the list does not open
   // with every user in the system.
-  const addableUsers = useMemo(() => {
+  const addableMatches = useMemo(() => {
     if (!search.trim()) return [];
 
     return availableUsers
       .filter((user) => !assignedIds.has(user.id))
-      .filter(
-        (user) =>
-          matchesSearch(getDisplayName(user), search) ||
-          matchesSearch(user.email || user.username, search),
-      )
-      .slice(0, 6);
+      .filter((user) => matchesUserSearch(user, search));
   }, [assignedIds, availableUsers, search]);
+
+  const addableUsers = addableMatches.slice(0, MAX_ADDABLE_USERS);
 
   const peopleCount = rows.filter((row) => !row.isPendingRemove).length;
   const managerCount = effectiveManagerId ? 1 : 0;
@@ -217,9 +291,7 @@ export function ProjectPeopleSection({
   return (
     <div>
       <div className="mb-4 flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand">
-          <Users className="h-4 w-4" />
-        </span>
+        <IconTile icon={Users} size="md" tone="brand" />
         <div>
           <p className="text-xs font-semibold tracking-wide text-app-text-muted uppercase">
             People
@@ -253,41 +325,68 @@ export function ProjectPeopleSection({
                   ? "border-app-danger-border bg-app-danger-bg opacity-75"
                   : row.isPendingAdd
                     ? "border-app-brand-border-strong bg-app-brand-soft"
-                    : "border-app-border bg-app-surface hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-app-brand-lift motion-reduce:hover:translate-y-0",
+                    : "border-app-border bg-app-surface hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-lg motion-reduce:hover:translate-y-0",
               ].join(" ")}
             >
-              <UserAvatar
-                size={36}
-                profileIcon={row.profileIcon}
-                fallbackName={row.displayName}
-                seed={row.id}
-              />
+              <RowIdentity
+                onOpen={onOpenUser ? () => onOpenUser(row.id) : undefined}
+                label={`Open ${row.displayName}`}
+              >
+                <UserAvatar
+                  size={36}
+                  profileIcon={row.profileIcon}
+                  fallbackName={row.displayName}
+                  seed={row.id}
+                />
 
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span
-                    className={[
-                      "truncate text-sm font-semibold text-app-text",
-                      row.isPendingRemove ? "line-through" : "",
-                    ].join(" ")}
-                  >
-                    {row.displayName}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={[
+                        "truncate text-sm font-semibold text-app-text",
+                        row.isPendingRemove ? "line-through" : "",
+                      ].join(" ")}
+                    >
+                      {row.displayName}
+                    </span>
+
+                    {row.isManager ? (
+                      <Badge variant="brand">
+                        <ShieldCheck className="mr-1 h-3 w-3" />
+                        Manager
+                      </Badge>
+                    ) : (
+                      <Badge variant="neutral">Member</Badge>
+                    )}
                   </span>
 
-                  {row.isManager ? (
-                    <Badge variant="brand">
-                      <ShieldCheck className="mr-1 h-3 w-3" />
-                      Manager
-                    </Badge>
-                  ) : (
-                    <Badge variant="neutral">Member</Badge>
+                  <PersonContact person={row.person} className="text-xs text-app-text-muted" />
+
+                  {(row.isDisabled || row.otherProjectCount > 0) && (
+                    <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {row.isDisabled && (
+                        <Badge variant="danger" size="sm">
+                          <UserX className="mr-1 h-3 w-3" aria-hidden="true" />
+                          Disabled
+                        </Badge>
+                      )}
+
+                      {row.otherProjectCount > 0 && (
+                        <span className="text-xs text-app-text-muted">
+                          also in {pluralize(row.otherProjectCount, "project")}
+                        </span>
+                      )}
+                    </span>
+                  )}
+
+                  {row.movedFrom.length > 0 && (
+                    <span className="mt-1 flex items-start gap-1 text-xs font-medium text-app-warning-text">
+                      <ArrowRightLeft className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                      <span>Will be moved from {row.movedFrom.join(", ")}</span>
+                    </span>
                   )}
                 </span>
-
-                <span className="block truncate text-xs text-app-text-muted">
-                  {row.secondaryLabel}
-                </span>
-              </span>
+              </RowIdentity>
 
               <span className="flex shrink-0 items-center gap-1">
                 {canAssignManager &&
@@ -402,15 +501,20 @@ export function ProjectPeopleSection({
                     <span className="block truncate text-sm font-semibold text-app-text">
                       {getDisplayName(user)}
                     </span>
-                    <span className="block truncate text-xs text-app-text-muted">
-                      {user.email || user.username}
-                    </span>
+                    <PersonContact person={user} className="text-xs text-app-text-muted" />
                   </span>
                   <UserPlus className="h-4 w-4 shrink-0 text-app-text-muted" />
                 </button>
               </motion.li>
             ))}
           </ul>
+
+          {addableMatches.length > addableUsers.length && (
+            <p className="mt-2 px-3 text-xs text-app-text-muted">
+              Showing {addableUsers.length} of {addableMatches.length}. Refine your search to see
+              more.
+            </p>
+          )}
         </div>
       )}
     </div>

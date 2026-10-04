@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useAuth } from "../../../context/useAuth";
 import { useMyKnowledgeGaps } from "../../knowledge-gaps/useMyKnowledgeGaps";
 import { useMyOnboardingStatus } from "../../onboarding/hooks/useMyOnboardingStatus";
@@ -6,6 +6,7 @@ import { useProjectContext } from "../../projects/useProjectContext";
 import { DASHBOARD_WIDGET_IDS, getAvailableWidgets } from "./catalog";
 import * as operations from "./layoutOperations";
 import { clearStoredLayout, readStoredLayout, storeLayout } from "./storage";
+import { useDashboardLayoutSync } from "./useDashboardLayoutSync";
 import type {
   DashboardLayout,
   DashboardWidgetDefinition,
@@ -59,7 +60,8 @@ export type DashboardLayoutController = {
  * Storage is only read while the user has not touched anything this session; from the first
  * edit on, `arrangedLayout` is the truth and storage is write-only. Every mutation writes
  * through immediately — there is no save button because there is nothing to lose: each
- * change is small, reversible, and the user is looking straight at the result.
+ * change is small, reversible, and the user is looking straight at the result. The server copy
+ * follows a moment later — see {@link useDashboardLayoutSync}.
  */
 export function useDashboardLayout(): DashboardLayoutController {
   const { profile } = useAuth();
@@ -90,6 +92,14 @@ export function useDashboardLayout(): DashboardLayoutController {
 
   const [arrangedLayout, setArrangedLayout] = useState<DashboardLayout | null>(null);
 
+  /*
+    Bumped when the server's layout has been written into storage, so this render reads it. The
+    value itself is never used — storage is the source, this only asks for the read to happen.
+  */
+  const [, setPulledRevision] = useState(0);
+  const onPulled = useCallback(() => setPulledRevision((revision) => revision + 1), []);
+  const sync = useDashboardLayoutSync(userId, onPulled);
+
   const availableWidgets = getAvailableWidgets({
     profile,
     canManageSelectedProject: canManageSelected,
@@ -111,6 +121,7 @@ export function useDashboardLayout(): DashboardLayoutController {
   function apply(next: DashboardLayout) {
     setArrangedLayout(next);
     storeLayout(userId, next);
+    sync.push(next);
   }
 
   /** A drag fires per pointer move; writing an unchanged layout would hammer storage. */
@@ -131,6 +142,7 @@ export function useDashboardLayout(): DashboardLayoutController {
 
     resetLayout: () => {
       clearStoredLayout(userId);
+      sync.reset();
       setArrangedLayout(null);
     },
   };

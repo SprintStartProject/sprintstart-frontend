@@ -28,7 +28,7 @@ export const NEW_CONVERSATION_CHORD = shortcutChord(NEW_CONVERSATION_SHORTCUT);
  * through typing into the wrong one. The cost is on macOS, where `Option+N` is the dead key
  * for `ñ` — worth naming, and the trade this app is happy with on a Windows-first team.
  *
- * @param enabled Leave false where there is nothing to start — an untouched buddy visit is
+ * @param enabled - Leave false where there is nothing to start — an untouched buddy visit is
  *   already the new conversation, and re-opening it would only replay the greeting. Both halves
  *   of the assistant also gate it on being the one on screen: the shell keeps the page being
  *   left mounted for the length of the slide, and this listener is on `window`, so during that

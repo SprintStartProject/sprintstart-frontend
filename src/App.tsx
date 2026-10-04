@@ -22,6 +22,7 @@ import { EggEffectsLayer } from "./features/easter-eggs/components/EggEffectsLay
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
+import { useBuddyPathSync } from "./features/buddy/hooks/useBuddyPathSync";
 import { GlobalShortcuts } from "./features/shortcuts";
 
 function AppContent() {
@@ -29,6 +30,7 @@ function AppContent() {
   const { showRocketPet } = useMoments();
   const { isFocused } = useFocusMode();
   useScrollRestoration();
+  useBuddyPathSync();
 
   // Signed in at all — the shell is drawn for anyone past the login screen, onboarding included.
   // `signingOut` stays out on purpose: it is the boot script's "this load is a logout return"
@@ -112,11 +114,15 @@ function AppContent() {
           screen — see momentStage.ts in the moments feature. */}
         <main
           data-moment-stage
-          className={`relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0 ${
+          className={`app-sidebar-eases relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0 ${
             // The sidebar is `fixed` from `lg` up (see SideBar), so it is out of
             // flow and the page has to leave its width free itself. In focus mode
-            // it slides away over the content, so the margin goes with it.
-            signedIn && !isFocused ? "lg:ml-[var(--app-sidebar-width)]" : ""
+            // it slides away over the content, so the margin goes with it. Its
+            // width can be changed and folded, so it is read from the variable
+            // the sidebar keeps, falling back to the default before it has run.
+            signedIn && !isFocused
+              ? "lg:ml-[var(--app-sidebar-desktop-width,var(--app-sidebar-width))]"
+              : ""
           }`}
         >
           <AppRouter />

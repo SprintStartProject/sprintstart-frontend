@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
-import { AccountEnabledToggle } from "../../../src/features/admin/components/AccountEnabledToggle";
+import { AccountEnabledToggle } from "../../../src/components/ui/AccountEnabledToggle";
 
 describe("AccountEnabledToggle Accessibility", () => {
   it("should not have any a11y violations", async () => {

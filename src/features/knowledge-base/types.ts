@@ -1,14 +1,12 @@
+import type { SourceSystem } from "../data-ingestion/connectors/sourceSystems.ts";
+
+export type { SourceSystem };
+
 /**
  * Defines the specific entity type of an artifact.
  * Used by the UI to determine icon representations and filtering logic.
  */
 export type ArtifactType = "COMMIT" | "FILE" | "ISSUE" | "PULL_REQUEST" | "PAGE" | "ORG_METADATA";
-
-/**
- * Origin source of the artifact data.
- * Used to route API calls (e.g., Github vs internal Uploads).
- */
-export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
 
 /**
  * Core business entity representing any indexed piece of knowledge.
@@ -92,7 +90,11 @@ export interface SummaryStreamHandlers {
 }
 
 /**
- * Filter classification for direct uploaded artifact formats.
+ * File formats a reader can narrow *uploaded* artifacts to.
+ *
+ * Not a source type and not an artifact type: an upload's format only exists
+ * for uploads, so this facet is offered only while `UPLOAD` is part of the
+ * source selection (see `useKnowledgeBase`).
  */
 export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
 

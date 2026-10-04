@@ -65,6 +65,7 @@ export function AutoResizeTextarea({
     // Re-run on window resize too, since line-wrapping can change.
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
+    // `resize` is a new function every render; `value` is what changes the height.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 

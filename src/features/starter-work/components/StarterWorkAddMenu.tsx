@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import { ChevronDown, Inbox, PenLine, Plus } from "lucide-react";
+import { IconTile } from "../../../components/ui/IconTile";
 
 type StarterWorkAddMenuProps = {
   /** HR reads the pool and can browse issues, but does not hand-author work. */
@@ -162,9 +163,7 @@ function MenuItem({
       onClick={onClick}
       className="flex w-full items-start gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-app-surface-hover"
     >
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-brand-soft text-app-brand-text">
-        <Icon className="h-4 w-4" aria-hidden="true" />
-      </span>
+      <IconTile icon={Icon} size="md" tone="brand" className="mt-0.5" />
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-app-text">{title}</span>
         <span className="block text-xs text-app-text-muted">{description}</span>

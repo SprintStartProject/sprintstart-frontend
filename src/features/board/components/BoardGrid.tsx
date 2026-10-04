@@ -28,7 +28,6 @@ import { NoteCard } from "./NoteCard";
 import { ArrivalStepsCard } from "./ArrivalStepsCard";
 import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
 import { PathStepCard } from "./PathStepCard";
-import { PathToFirstContributionCard } from "./PathToFirstContributionCard";
 import { SuggestedTasksCard } from "./SuggestedTasksCard";
 import { TaskPoolCard } from "./TaskPoolCard";
 import { BoardCardContext } from "./boardCardControls";
@@ -58,7 +57,7 @@ import {
   type CardSize,
   type CardSizes,
 } from "../layout/cardSizes";
-import type { AuthoredCardRequest, Board, BoardCard } from "../types";
+import type { AuthoredCardRequest, Board, BoardCard, BoardUndoNotice } from "../types";
 
 /** Two columns from Tailwind's `lg` up; one below it. The only width this grid branches on. */
 const TWO_COLUMN_QUERY = "(min-width: 1024px)";
@@ -341,6 +340,23 @@ type BoardGridProps = {
   onDismiss?: (cardId: string) => void;
   dismissingId?: string | null;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  /**
+   * Puts a card back to what it said before its most recent edit.
+   *
+   * The record of that edit lives on the card itself, not in a toast — a change the hire never saw
+   * is exactly what an undo exists to prevent, so the affordance cannot be something that expires
+   * with a timeout.
+   */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** The cards with an undo in flight, so their own strips can say they are working. */
+  restoringIds?: ReadonlySet<string>;
+  /** The cards being written to right now — an edit, or a tick, still on its way. */
+  savingIds?: ReadonlySet<string>;
+  /**
+   * What just happened to an undo, keyed to the card it happened on: a stale press's refusal, or
+   * the fact that a restore landed.
+   */
+  undoNotices?: ReadonlyMap<string, BoardUndoNotice>;
   /** Applies a whole new order. Absent when the board is not arrangeable. */
   onReorder?: (cardIds: string[]) => void;
   /**
@@ -449,21 +465,34 @@ type SharedProps = {
  * renders something visible rather than nothing: a card that silently disappears because the client
  * is a version behind is indistinguishable from the mentor never having placed it.
  */
+type BoardCardViewProps = SharedProps & {
+  onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring: boolean;
+  /** True while this card is being written to — an edit, or a tick, still on its way. */
+  saving: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice: BoardUndoNotice | null;
+};
+
 function BoardCardView({
   card,
   onEdit,
+  onRestorePrevious,
+  restoring,
+  saving,
+  undoNotice,
   origin,
   onCardAdded,
   ...shared
-}: SharedProps & { onEdit?: (cardId: string, request: AuthoredCardRequest) => void }) {
+}: BoardCardViewProps) {
   // Only the authored kinds take an origin — all three of them now, since a checklist minted from
   // a task is as found as a note taken from a paragraph. It is unpacked here rather than spread
   // with the rest: a live card was never found anywhere, and handing it a prop it ignores invites
   // somebody to wire one up later and wonder why nothing shows.
   const props = { card, ...shared };
   switch (card.content.kind) {
-    case "PATH_TO_FIRST_CONTRIBUTION":
-      return <PathToFirstContributionCard content={card.content} {...props} />;
     case "ARRIVAL_STEPS":
       return <ArrivalStepsCard content={card.content} {...props} />;
     case "OPEN_PULL_REQUESTS":
@@ -483,11 +512,43 @@ function BoardCardView({
     case "PATH_STEP":
       return <PathStepCard content={card.content} {...props} />;
     case "NOTE":
-      return <NoteCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
+      return (
+        <NoteCard
+          content={card.content}
+          onEdit={onEdit}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          saving={saving}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     case "LINK":
-      return <LinkCard content={card.content} origin={origin} {...props} />;
+      return (
+        <LinkCard
+          content={card.content}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          saving={saving}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     case "CHECKLIST":
-      return <ChecklistCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
+      return (
+        <ChecklistCard
+          content={card.content}
+          onEdit={onEdit}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          saving={saving}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     default:
       return (
         <section className="rounded-2xl border border-dashed border-app-border p-4">
@@ -498,6 +559,10 @@ function BoardCardView({
       );
   }
 }
+
+/** Stand-ins for a board rendered without undo state — one with no writes to report. */
+const NO_IDS: ReadonlySet<string> = new Set();
+const NO_NOTICES: ReadonlyMap<string, BoardUndoNotice> = new Map();
 
 /**
  * The board's layout: cards in board order, packed into columns, rearrangeable by dragging.
@@ -529,6 +594,10 @@ export function BoardGrid({
   onDismiss,
   dismissingId = null,
   onEdit,
+  onRestorePrevious,
+  restoringIds = NO_IDS,
+  savingIds = NO_IDS,
+  undoNotices = NO_NOTICES,
   onReorder,
   boardOrder,
   isArranging = false,
@@ -851,19 +920,6 @@ export function BoardGrid({
   );
 
   /**
-   * The areas that carry stages of their own: a named set of cards that is not all due at once.
-   *
-   * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
-   * this exists for — one set somebody wrote in one sitting, deliberately spread across the
-   * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
-   * "Now" around cards marked Later, and splitting it across the bands would take a thing with a
-   * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
-   * the same fold, one level in.
-   *
-   * They lead, above the bands. An area is a decision somebody made about what belongs together,
-   * and the bands are the board's own answer to when; the named thing goes first.
-   */
-  /**
    * The areas with nothing drawn in them.
    *
    * They have no box in the grid — the grid is built by walking the cards — which used to be fine,
@@ -879,6 +935,19 @@ export function BoardGrid({
     [board.cards, groups],
   );
 
+  /**
+   * The areas that carry stages of their own: a named set of cards that is not all due at once.
+   *
+   * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
+   * this exists for — one set somebody wrote in one sitting, deliberately spread across the
+   * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
+   * "Now" around cards marked Later, and splitting it across the bands would take a thing with a
+   * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
+   * the same fold, one level in.
+   *
+   * They lead, above the bands. An area is a decision somebody made about what belongs together,
+   * and the bands are the board's own answer to when; the named thing goes first.
+   */
   const spanningGroups = useMemo<Block[]>(() => {
     if (!banding) return [];
 
@@ -1043,6 +1112,10 @@ export function BoardGrid({
         onDismiss={onDismiss}
         dismissing={dismissingId === card.id}
         onEdit={onEdit}
+        onRestorePrevious={onRestorePrevious}
+        restoring={restoringIds.has(card.id)}
+        saving={savingIds.has(card.id)}
+        undoNotice={undoNotices.get(card.id) ?? null}
         registerElement={registerElement}
         onDragStart={() => {
           lastMoveAt.current = 0;
@@ -1066,13 +1139,6 @@ export function BoardGrid({
     );
   };
 
-  /**
-   * One block: a card, or an area with its cards stacked inside it.
-   *
-   * `wide` is only true for a block that broke the run — an area holding a diagram. It packs that
-   * area's members into columns of their own, because the reason it took the full width was that
-   * something in it needed the room, not that the area did.
-   */
   /** One item inside a column or an area: a card, or a sequence somebody has spread out. */
   const renderItem = (item: Item) => {
     if (item.kind === "card") return renderCard(item.card);
@@ -1112,6 +1178,13 @@ export function BoardGrid({
     </div>
   );
 
+  /**
+   * One block: a card, or an area with its cards inside it.
+   *
+   * An area whose cards span several stages (see `spanningGroups`) is folded by stage inside
+   * itself. Any other area lays its items out in a grid of its own, `span` columns wide, so cards
+   * in an area can sit next to each other.
+   */
   const renderBlock = (block: Block, blockIndex: number, span: number) => {
     if (block.kind !== "group") return renderItem(block);
 
@@ -1406,6 +1479,13 @@ type BoardCardCellProps = {
   onDismiss?: (cardId: string) => void;
   dismissing: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring: boolean;
+  /** True while this card is being written to — an edit, or a tick, still on its way. */
+  saving: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice: BoardUndoNotice | null;
   registerElement: (id: string, element: HTMLDivElement | null) => void;
   onDragStart: () => void;
   onDrag: () => void;
@@ -1460,6 +1540,10 @@ function BoardCardCell({
   onDismiss,
   dismissing,
   onEdit,
+  onRestorePrevious,
+  restoring,
+  saving,
+  undoNotice,
   registerElement,
   onDragStart,
   onDrag,
@@ -1483,20 +1567,6 @@ function BoardCardCell({
     ? (allCards.find((other) => other.id === predecessorId) ?? null)
     : null;
 
-  /**
-   * Opens the pile when the card itself is clicked.
-   *
-   * The chip in the header is still the real control — it is what a keyboard reaches, what a screen
-   * reader announces, and what carries `aria-expanded`. This is the pointer shortcut beside it:
-   * the card *looks* like a pile, so clicking the pile should open it, and hunting for a chip to do
-   * something the whole card is depicting is the kind of small friction nobody reports and
-   * everybody feels.
-   *
-   * Three things it stays out of the way of: anything that already does something when clicked
-   * (see {@link INTERACTIVE_WITHIN_CARD}), the click that ends a drag while the board is being
-   * arranged, and the click that ends a text selection — releasing after selecting a line is not a
-   * request to rearrange the page under it.
-   */
   /**
    * Folds a card, or opens a folded one, on a double click anywhere on it.
    *
@@ -1530,6 +1600,9 @@ function BoardCardCell({
     onToggleCollapsed(card.id);
   }
 
+  /** Where a resize drag started, and from which size. Null when nothing is being dragged. */
+  const resizeStart = useRef<{ x: number; y: number; size: CardSize } | null>(null);
+
   /**
    * The cards behind this one, nearest first — the ones the fanned sheets name.
    *
@@ -1537,9 +1610,6 @@ function BoardCardCell({
    * run. Two at most, because there are two sheets: a third strip would be a card the eye has to
    * work to read on a pile that is already asking for a click.
    */
-  /** Where a resize drag started, and from which size. Null when nothing is being dragged. */
-  const resizeStart = useRef<{ x: number; y: number; size: CardSize } | null>(null);
-
   const behind = useMemo(() => {
     if (!stack) return [];
 
@@ -1565,6 +1635,20 @@ function BoardCardCell({
       });
   }, [stack]);
 
+  /**
+   * Opens the pile when the card itself is clicked.
+   *
+   * The chip in the header is still the real control — it is what a keyboard reaches, what a screen
+   * reader announces, and what carries `aria-expanded`. This is the pointer shortcut beside it:
+   * the card *looks* like a pile, so clicking the pile should open it, and hunting for a chip to do
+   * something the whole card is depicting is the kind of small friction nobody reports and
+   * everybody feels.
+   *
+   * Three things it stays out of the way of: anything that already does something when clicked
+   * (see {@link INTERACTIVE_WITHIN_CARD}), the click that ends a drag while the board is being
+   * arranged, and the click that ends a text selection — releasing after selecting a line is not a
+   * request to rearrange the page under it.
+   */
   function handleStackClick(event: ReactMouseEvent<HTMLDivElement>) {
     if (!stack || isArranging || !onToggleStack) return;
     // The second click of a double click, which would otherwise open the pile and shut it again.
@@ -1852,6 +1936,10 @@ function BoardCardCell({
               onDismiss={onDismiss}
               dismissing={dismissing}
               onEdit={onEdit}
+              onRestorePrevious={onRestorePrevious}
+              restoring={restoring}
+              saving={saving}
+              undoNotice={undoNotice}
               origin={origin}
               onCardAdded={onCardAdded}
             />

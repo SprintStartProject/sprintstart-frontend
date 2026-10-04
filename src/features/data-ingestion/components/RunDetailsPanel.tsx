@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
-import { DrawerCard } from "../../admin/components/DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
+import { IconTile } from "../../../components/ui/IconTile";
 import {
   formatDateTime,
   formatInstanceDomain,
@@ -24,12 +25,13 @@ import {
   SOURCE_META,
 } from "../data.ts";
 import type { AiSyncStatus, IngestionRun } from "../types.ts";
+import { FailedItemList } from "./FailedItemList.tsx";
 
 type RunDetailsPanelProps = {
   run: IngestionRun;
   /**
-   * The repository the run ingested, resolved best-effort from the run's
-   * artifacts (the backend does not persist a repo on a run). Falls back to the
+   * The source the run ingested, resolved best-effort from the run's source
+   * reference and the connected sources' display names. Falls back to the
    * source-system label when the run produced no attributable artifacts.
    */
   sourceLabel?: string;
@@ -57,7 +59,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
   const runTone = getRunStatusTone(run.status) as Tone;
   const aiLabel = getAiSyncStatusLabel(run.aiSyncStatus);
   const duration = formatDuration(run.startedAt, run.finishedAt, run.status);
-  const repoLabel = sourceLabel ?? getSourceLabel(run.sourceSystem);
+  const runSourceLabel = sourceLabel ?? getSourceLabel(run.sourceSystem);
   const originRow = buildOriginRow(run);
   // Hero icon follows the run's source system (GitHub → GitBranch, Jira → Ticket,
   // Upload → FileText) so a Jira run never shows the GitHub glyph.
@@ -67,15 +69,11 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
     <DetailsSideDrawer
       isOpen
       onClose={onClose}
-      title={`Run · ${repoLabel}`}
+      title={`Run · ${runSourceLabel}`}
       closeAriaLabel="Close run details"
       zIndexClassName="z-50"
       showOverlay
-      leading={
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
-          <SourceIcon className="h-6 w-6" />
-        </div>
-      }
+      leading={<IconTile icon={SourceIcon} size="2xl" tone="neutral" />}
       badge={
         <>
           <Chip tone={runTone}>{getRunStatusLabel(run.status)}</Chip>
@@ -116,7 +114,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
       <div className="mt-4 grid gap-4 sm:mt-5 lg:grid-cols-2">
         <DrawerCard label="Information" icon={Clock3} index={1}>
           <dl className="-my-1">
-            <InfoRow label="Repository" value={repoLabel} />
+            <InfoRow label="Source" value={runSourceLabel} />
             {originRow && <InfoRow label={originRow.label} value={originRow.value} />}
             <InfoRow label="Started" value={formatDateTime(run.startedAt)} />
             <InfoRow
@@ -153,19 +151,7 @@ export function RunDetailsPanel({ run, sourceLabel, onClose }: RunDetailsPanelPr
           index={3}
           className="mt-4 sm:mt-5"
         >
-          <div className="space-y-3">
-            {run.failedItems.map((item) => (
-              <div
-                key={`${item.artifactIdentifier}-${item.reason}`}
-                className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
-              >
-                <p className="text-sm font-medium wrap-break-word text-app-warning-text">
-                  {item.artifactIdentifier}
-                </p>
-                <p className="mt-1 text-sm text-app-text-muted">{item.reason}</p>
-              </div>
-            ))}
-          </div>
+          <FailedItemList items={run.failedItems} />
         </DrawerCard>
       )}
     </DetailsSideDrawer>

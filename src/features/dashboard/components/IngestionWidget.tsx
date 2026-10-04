@@ -1,9 +1,9 @@
 import { Database } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
-import { getIngestionSourceStatuses } from "../../../services/ingestionService";
 import { queryKeys } from "../../../services/queryKeys";
-import { createSourceFromInstance, formatNumber } from "../../data-ingestion/data";
+import { formatNumber } from "../../data-ingestion/data";
+import { fetchIngestionSources } from "../../data-ingestion/ingestionSources";
 import type { DataSource } from "../../data-ingestion/types";
 import { useProjectContext } from "../../projects/useProjectContext";
 import type { DashboardWidgetSize } from "../layout/types";
@@ -18,18 +18,6 @@ import { WidgetShell } from "./WidgetShell";
  * the card's bottom edge. The wide card keeps a source to one line, so it has room for three.
  */
 const VISIBLE_SOURCE_COUNT: Record<DashboardWidgetSize, number> = { small: 0, medium: 2, wide: 3 };
-
-/**
- * One row per connected repository, scoped to the selected project — the same granularity
- * the Data Ingestion page shows. The per-source-system aggregate used previously collapsed
- * every GitHub repo into a single row, so a project with three connected repos reported
- * "1/1 synced".
- */
-async function fetchSources(projectId: string): Promise<DataSource[]> {
-  const instances = await getIngestionSourceStatuses(projectId);
-
-  return instances.map(createSourceFromInstance);
-}
 
 function metricsFor(sources: readonly DataSource[]): WidgetMetric[] {
   const synced = sources.filter((source) => source.lastRunAt !== null).length;
@@ -140,9 +128,9 @@ function SourceColumn({
 /**
  * Whether the project's connected sources are in sync.
  *
- * Reads the same endpoint as the Data Ingestion page, through the same
- * `createSourceFromInstance` mapping, so the dashboard and the page can never disagree about
- * what is connected or how much of it landed.
+ * Reads the same status endpoint as the Data Ingestion page and maps each row with the mapper of
+ * its source system (one row per connected repository, Jira instance, Confluence space or upload
+ * source), so a Jira row shows Jira's identity rather than GitHub repository details.
  *
  * `small` is the health check — how many sources, how much they brought in, what failed.
  * `medium` adds the sources themselves, because "one source is failing" is only useful once
@@ -158,7 +146,7 @@ export function IngestionWidget({ size }: { size: DashboardWidgetSize }) {
   // `?projectId=` deep link — ask about a project before any list has said it is reachable.
   const { data, loading, error } = useQueryFetch(
     queryKeys.ingestion.sourceStatuses(selectedProjectId),
-    () => fetchSources(selectedProjectId),
+    () => fetchIngestionSources(selectedProjectId),
     { enabled: hasSelectedProject },
   );
 

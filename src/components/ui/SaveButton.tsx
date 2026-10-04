@@ -27,7 +27,7 @@ type SaveButtonProps = {
  * changes so the state is never a guess: muted + disabled when clean, brand +
  * enabled the moment something is edited, and a spinner + "Saving…" while the
  * save is in flight. State is conveyed by icon **and** label, never color alone
- * (AGENTS.md §7), and it keeps a visible focus ring in both themes.
+ * (FRONTEND_CODING_STANDARDS.md §5), and it keeps a visible focus ring in both themes.
  *
  * On a successful save the caller resets `dirty` to false, which returns the
  * button to the muted "no unsaved changes" look.

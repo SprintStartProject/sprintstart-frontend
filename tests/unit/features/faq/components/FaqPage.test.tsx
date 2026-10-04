@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FaqPage } from "../../../../../src/features/faq/components/FaqPage";
@@ -105,9 +105,10 @@ describe("FaqPage", () => {
 
   it("renders the statistics header", () => {
     renderPage();
-    expect(screen.getByText("Questions tracked")).toBeInTheDocument();
-    expect(screen.getByText("Times asked")).toBeInTheDocument();
-    expect(screen.getByText("Picking up")).toBeInTheDocument();
+    const figures = within(screen.getByRole("region", { name: "Key figures" }));
+    expect(figures.getByText("Questions tracked")).toBeInTheDocument();
+    expect(figures.getByText("Times asked")).toBeInTheDocument();
+    expect(figures.getByText("Picking up")).toBeInTheDocument();
   });
 
   it("headlines each entry with its generated title", () => {
@@ -256,6 +257,53 @@ describe("FaqPage", () => {
     expect(screen.queryByText("Asked once only")).not.toBeInTheDocument();
   });
 
+  // Like Knowledge gaps: no "All" chip lit by default; the chip that is on turns off again.
+  it("starts with no filter chosen, and turns a chosen one off again", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const filters = within(screen.getByRole("group", { name: "Filter recurring questions" }));
+    expect(filters.queryByRole("button", { name: /^All/ })).not.toBeInTheDocument();
+    const recurring = filters.getByRole("button", { name: /Asked more than once/ });
+    expect(recurring).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(recurring);
+    expect(recurring).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("Asked once only")).not.toBeInTheDocument();
+
+    await user.click(recurring);
+    expect(recurring).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Asked once only")).toBeInTheDocument();
+  });
+
+  // The same toolbar as Team and Knowledge gaps: search, one filter at a time, reset.
+  it("searches the questions and resets the list in one go", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByRole("textbox", { name: "Search recurring questions" }), "deploy");
+    expect(screen.getByText("Deploying to production")).toBeInTheDocument();
+    expect(screen.queryByText("Understanding what X is")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    expect(screen.getByText("Understanding what X is")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
+  });
+
+  it("shows only what is picking up when that figure is chosen", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      within(screen.getByRole("region", { name: "Key figures" })).getByRole("button", {
+        name: /Picking up/,
+      }),
+    );
+
+    expect(screen.getByText("Asked once only")).toBeInTheDocument();
+    expect(screen.queryByText("Understanding what X is")).not.toBeInTheDocument();
+  });
+
   it("shows loading state", async () => {
     vi.mocked(useLiveFetch).mockReturnValue({ ...loaded, data: null, loading: true });
     renderPage();
@@ -268,7 +316,7 @@ describe("FaqPage", () => {
   it("reports a failed load as an error rather than an empty FAQ", () => {
     vi.mocked(useLiveFetch).mockReturnValueOnce({ ...loaded, data: null, error: true });
     renderPage();
-    expect(screen.getByText(/could not load the recurring questions/i)).toBeInTheDocument();
+    expect(screen.getByText(/recurring questions couldn.t be loaded/i)).toBeInTheDocument();
     expect(screen.queryByText(/No recurring questions yet/)).not.toBeInTheDocument();
     // Nothing to rebuild from when the current state is unknown.
     expect(screen.queryByRole("button", { name: /rebuild/i })).not.toBeInTheDocument();

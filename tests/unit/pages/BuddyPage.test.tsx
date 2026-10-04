@@ -24,6 +24,8 @@ vi.mock("../../../src/context/useAuth", () => ({
 
 vi.mock("../../../src/services/buddyService", () => ({
   getMessages: vi.fn().mockResolvedValue([]),
+  getSessions: vi.fn(),
+  createSession: vi.fn(),
   streamOpenBuddy: vi.fn((handlers: { onToken: (token: string) => void; onDone: () => void }) => {
     handlers.onToken("Welcome back!");
     handlers.onDone();
@@ -91,7 +93,25 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
   };
 });
 
-import { getMessages, streamOpenBuddy, streamMessage } from "../../../src/services/buddyService";
+import {
+  createSession,
+  getMessages,
+  getSessions,
+  streamOpenBuddy,
+  streamMessage,
+} from "../../../src/services/buddyService";
+
+/**
+ * The conversation the defaults put on screen: one, empty, so the page greets it. The id is
+ * what every request the page makes should carry — the tests that check that name it in their
+ * own mocks.
+ */
+const defaultSession = {
+  id: "s1",
+  title: "",
+  projectId: null,
+  createdAt: "2026-09-30T09:00:00.000Z",
+};
 
 function renderPage() {
   return render(
@@ -160,9 +180,12 @@ describe("BuddyPage", () => {
     window.localStorage.clear();
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     projectState.selectedProjectId = "p1";
-    // `clearAllMocks` drops the module mock's resolved values too, so the default — an empty
-    // visit, the case that greets — has to be restored per test.
+    // `clearAllMocks` drops the module mock's resolved values too, so the defaults — one empty
+    // conversation, the case that greets, and a second one for the control that asks for it —
+    // have to be restored per test.
     vi.mocked(getMessages).mockResolvedValue([]);
+    vi.mocked(getSessions).mockResolvedValue([defaultSession]);
+    vi.mocked(createSession).mockResolvedValue("s2");
   });
 
   it("shows the no-project state when the hire is not on a project yet", async () => {
@@ -176,15 +199,14 @@ describe("BuddyPage", () => {
   });
 
   /**
-   * The bug this replaced: the page opened a visit unconditionally, before reading anything. A
-   * visit ends when the hire speaks, so a later open writes a new opening marker and the
-   * message window starts from there — asking something in the dock and then opening the full
-   * page showed a greeting where the conversation had been.
-   *
-   * Reading first is the fix; *not* opening at all would have been a different bug, since the
-   * greeting is the only thing that reads the buddy's durable memory. So both, in order.
+   * The bug this replaced: the page opened a visit unconditionally, before reading anything, so
+   * asking something in the dock and then opening the full page showed a greeting where the
+   * conversation had been. Conversations are read now, and a conversation that already has
+   * words in it is never greeted again — the greeting belongs to the conversation, and a
+   * second one *under* the transcript is what the visit divider used to explain. Both are gone
+   * with the visit model.
    */
-  it("keeps the conversation on screen when the new visit opens under it", async () => {
+  it("keeps the conversation on screen, and does not greet again over it", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
       {
@@ -198,19 +220,17 @@ describe("BuddyPage", () => {
 
     expect(await screen.findByText("where do I start?")).toBeInTheDocument();
     expect(screen.getByText("With the setup guide.")).toBeInTheDocument();
-    // The greeting arrives under it, and says so.
-    expect(await screen.findByText("Welcome back!")).toBeInTheDocument();
-    expect(screen.getByText("New conversation")).toBeInTheDocument();
+    // No re-greeting, and no divider: reopening a conversation reads it.
+    expect(screen.queryByText("Welcome back!")).toBeNull();
+    expect(streamOpenBuddy).not.toHaveBeenCalled();
   });
 
   /**
-   * A visit ends when the hire speaks, so asking the backend to open again writes a fresh
-   * opening marker and the scrollback starts from there. That is all "New chat" is — there is
-   * no reset endpoint and none is needed. Nothing is deleted: the transcript stays in
-   * `buddy_messages` and the buddy's durable memory note, which the next greeting is written
-   * from, is untouched.
+   * A new conversation is created server-side and switched to, empty — the hire speaks first.
+   * Nothing is deleted: the conversation being left keeps its transcript, stays in the list,
+   * and the buddy's durable memory note, which the next greeting is written from, is untouched.
    */
-  it("starts a fresh visit from the divider, without losing what the buddy has learned", async () => {
+  it("starts a new conversation from the standing control", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
       {
@@ -223,22 +243,20 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    // The control lives on the line that already says "everything above here is the last
-    // conversation", so it only exists once there is such a line.
-    await user.click(await screen.findByTestId("buddy-clear-previous"));
+    await user.click(await screen.findByRole("button", { name: "Start a new conversation" }));
 
     await waitFor(() => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });
-    // The greeting is re-requested, which is what opens the new visit server-side.
-    expect(streamOpenBuddy).toHaveBeenCalled();
+    // Created and switched to — and not greeted: a new conversation starts empty.
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(streamOpenBuddy).not.toHaveBeenCalled();
   });
 
   /**
-   * The third way to start over, and the only one that is simply visible. The divider carries
-   * the same action but is only drawn once there is a previous conversation above the line, and
-   * `Alt+N` is invisible to anybody who was never told about it — so a hire looking for "start
-   * again" on a first visit had nothing on screen to find.
+   * The second visible way to start a conversation: the dock's own copy of this control floats
+   * over every other page, and `Alt+N` is invisible to anybody who was never told about it — so
+   * a hire looking for "start again" on this page needs one that is simply there.
    */
   it("offers a standing control once there is a conversation to leave behind", async () => {
     vi.mocked(getMessages).mockResolvedValue([
@@ -261,7 +279,7 @@ describe("BuddyPage", () => {
     expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
   });
 
-  it("starts the fresh visit from it, and says which chord does the same", async () => {
+  it("starts a new conversation from it, and says which chord does the same", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
     ]);
@@ -280,7 +298,7 @@ describe("BuddyPage", () => {
     await waitFor(() => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });
-    expect(streamOpenBuddy).toHaveBeenCalled();
+    expect(createSession).toHaveBeenCalledTimes(1);
   });
 
   /**
@@ -320,13 +338,13 @@ describe("BuddyPage", () => {
   });
 
   /**
-   * All three routes withdraw together while a reply is in flight, and they have to: they call
-   * one function. `startFreshVisit` clears the thread and greets, but cannot call back the
-   * request already streaming into it — that stream's callbacks hold the shared session, so its
-   * tool events land under the brand-new greeting and its completion clears the greeting's own
-   * thinking state. Leaving any one of the three live mid-turn would be a door onto that bug.
+   * Both routes withdraw together while a reply is in flight, and they have to: they call one
+   * function. `newConversation` clears the thread, but cannot call back the request already
+   * streaming into it — that stream's callbacks hold the shared session, so its tool events
+   * land in the new conversation and its completion clears its thinking state. Leaving either
+   * route live mid-turn would be a door onto that bug.
    */
-  it("withdraws every way of starting over while a reply is still arriving", async () => {
+  it("withdraws every way of starting a conversation while a reply is still arriving", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
       {
@@ -342,7 +360,6 @@ describe("BuddyPage", () => {
     renderPage();
 
     expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
-    expect(await screen.findByTestId("buddy-clear-previous")).toBeVisible();
 
     await user.type(screen.getByLabelText("Message"), "and after that?");
     await user.click(screen.getByLabelText("Send message"));
@@ -350,12 +367,12 @@ describe("BuddyPage", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
     });
-    expect(screen.queryByTestId("buddy-clear-previous")).toBeNull();
 
-    // The chord is gated on the same condition, so it is not a way around the other two.
+    // The chord is gated on the same condition, so it is not a way around the button.
     await user.keyboard("{Alt>}n{/Alt}");
 
     expect(screen.getByText("where do I start?")).toBeInTheDocument();
+    expect(createSession).not.toHaveBeenCalled();
   });
 
   /**
@@ -363,7 +380,7 @@ describe("BuddyPage", () => {
    * has focus on purpose — halfway through typing into the wrong conversation is exactly when
    * somebody reaches for it.
    */
-  it("starts a fresh visit on Alt+N", async () => {
+  it("starts a new conversation on Alt+N", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
     ]);
@@ -378,6 +395,7 @@ describe("BuddyPage", () => {
     await waitFor(() => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });
+    expect(createSession).toHaveBeenCalledTimes(1);
   });
 
   /**
@@ -410,8 +428,10 @@ describe("BuddyPage", () => {
 
     await user.keyboard("{Alt>}n{/Alt}");
 
-    // Still there: the visit was not restarted under the half the hire is actually looking at.
+    // Still there: the conversation was not restarted under the half the hire is actually
+    // looking at.
     expect(screen.getByText("where do I start?")).toBeInTheDocument();
+    expect(createSession).not.toHaveBeenCalled();
   });
 
   /**
@@ -427,7 +447,7 @@ describe("BuddyPage", () => {
 
       // A column, and an answer is waiting, so it opens itself.
       const rail = await screen.findByRole("complementary", {
-        name: "What you sent to your PM",
+        name: "Your conversations",
       });
       await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "false"));
 
@@ -437,7 +457,7 @@ describe("BuddyPage", () => {
 
       // Put away, not taken away: the control that brings it back is on screen, with the count
       // read from the same list the rail is holding.
-      expect(screen.getByTitle("What you sent to your PM")).toBeInTheDocument();
+      expect(screen.getByTitle("Your conversations")).toBeInTheDocument();
     } finally {
       viewport.restore();
     }
@@ -455,12 +475,12 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    const toggle = await screen.findByTitle("What you sent to your PM");
+    const toggle = await screen.findByTitle("Your conversations");
     expect(toggle.className).not.toMatch(/(^|\s)hidden(\s|$)/);
 
     await user.click(toggle);
 
-    const rail = await screen.findByRole("complementary", { name: "What you sent to your PM" });
+    const rail = await screen.findByRole("complementary", { name: "Your conversations" });
     expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
   });
 
@@ -479,11 +499,11 @@ describe("BuddyPage", () => {
       // A column, and there is an answer waiting: the rail opens itself, which is the promise
       // `FlagToPmButton` makes. Closing it is therefore the choice worth remembering here.
       const rail = await screen.findByRole("complementary", {
-        name: "What you sent to your PM",
+        name: "Your conversations",
       });
-      // Scoped to the rail: the drawer backdrop says the same words, and below `md` it is the
-      // one you press. jsdom computes no layout, so both are in the document here.
-      await user.click(within(rail).getByRole("button", { name: "Close the PM replies" }));
+      // Scoped to the rail's own cross: the drawer backdrop says the same words, and below `md`
+      // it is the one you press. jsdom computes no layout, so both are in the document here.
+      await user.click(within(rail).getByRole("button", { name: "Close your conversations" }));
 
       await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
 
@@ -492,10 +512,45 @@ describe("BuddyPage", () => {
 
       // Back to the control that reopens it, rather than to the rail deciding again. The rail
       // itself stays mounted — that is what keeps its scroll — but out of the tree while shut.
-      expect(await screen.findByTitle("What you sent to your PM")).toBeInTheDocument();
+      expect(await screen.findByTitle("Your conversations")).toBeInTheDocument();
       expect(
-        screen.queryByRole("complementary", { name: "What you sent to your PM" }),
+        screen.queryByRole("complementary", { name: "Your conversations" }),
       ).not.toBeInTheDocument();
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  /**
+   * The way out of the rail from `md` up: while it is open the toggle that opened it is gone
+   * and the drawer's backdrop only exists below `md`, so the rail's own cross has to be there
+   * for a hire with conversations and no replies. Same words as the backdrop, because it is
+   * the same act.
+   */
+  it("closes the rail from the conversations list", async () => {
+    const restoreViewport = reportDesktopViewport();
+
+    try {
+      pmRepliesState.hasAny = false;
+      vi.mocked(getSessions).mockResolvedValue([
+        { ...defaultSession, title: "Getting started" },
+        { ...defaultSession, id: "s2" },
+      ]);
+
+      const user = userEvent.setup();
+      renderPage();
+
+      // Open the rail the way a hire does: there is something to switch to, so the toggle is
+      // offered; nothing is waiting from a PM, so it did not open itself.
+      await user.click(await screen.findByTitle("Your conversations"));
+
+      const rail = await screen.findByRole("complementary", { name: "Your conversations" });
+      await user.click(within(rail).getByRole("button", { name: "Close your conversations" }));
+
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
+
+      // Back to the control that brings it again.
+      expect(await screen.findByTitle("Your conversations")).toBeInTheDocument();
     } finally {
       restoreViewport();
     }
@@ -512,9 +567,9 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     const first = renderPage();
 
-    await user.click(await screen.findByTitle("What you sent to your PM"));
+    await user.click(await screen.findByTitle("Your conversations"));
     expect(
-      await screen.findByRole("complementary", { name: "What you sent to your PM" }),
+      await screen.findByRole("complementary", { name: "Your conversations" }),
     ).toBeInTheDocument();
 
     first.unmount();
@@ -522,10 +577,49 @@ describe("BuddyPage", () => {
 
     // Still mounted — the rail never unmounts, so its list keeps its scroll — but shut, and
     // the control that brings it back is the one on screen.
-    expect(await screen.findByTitle("What you sent to your PM")).toBeInTheDocument();
+    expect(await screen.findByTitle("Your conversations")).toBeInTheDocument();
     expect(
-      screen.queryByRole("complementary", { name: "What you sent to your PM" }),
+      screen.queryByRole("complementary", { name: "Your conversations" }),
     ).not.toBeInTheDocument();
+  });
+
+  /**
+   * Conversations replace visits: once there is more than one, the rail lists them, and picking
+   * one reads it again. The list is what keeps "new conversation" from being one-way — the
+   * conversation you left is still there, one click away, transcript intact.
+   */
+  it("lists the conversations and switches between them", async () => {
+    vi.mocked(getSessions).mockResolvedValue([{ ...defaultSession, title: "Getting started" }]);
+    vi.mocked(getMessages).mockImplementation((sessionId) =>
+      Promise.resolve(
+        sessionId === "s1"
+          ? [
+              {
+                role: "USER" as const,
+                content: "where do I start?",
+                createdAt: "2026-08-24T10:00:00.000Z",
+              },
+            ]
+          : [],
+      ),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+
+    // Start a second one from the standing control...
+    await user.click(await screen.findByRole("button", { name: "Start a new conversation" }));
+    await waitFor(() => {
+      expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
+    });
+
+    // ...open the rail (there is something to switch to now), and pick the older one.
+    await user.click(await screen.findByTitle("Your conversations"));
+    await user.click(await screen.findByRole("button", { name: "Getting started" }));
+
+    // Its transcript comes back, read by id.
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+    expect(getMessages).toHaveBeenLastCalledWith("s1");
   });
 
   it("opens the mentor for a hire on a project", async () => {

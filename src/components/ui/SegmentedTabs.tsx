@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { dockMagnifySpringToken, slidingIndicatorSpringToken } from "../../styles/tokens";
 
 /** Matches the dock magnification of the sidebar, scaled down for dense bars. */
@@ -13,13 +13,35 @@ export type SegmentedTabOption<TValue extends string> = {
   /** Optional trailing count badge. */
   count?: number;
   /**
-   * Optional `data-testid` for end-to-end targeting, per AGENTS.md §5.
+   * Optional `data-testid` for end-to-end targeting, per FRONTEND_CODING_STANDARDS.md §5.
    *
    * Only for options whose label is not a stable handle — a provider switch
    * whose labels are product names, say. Prefer the accessible name where it
    * is stable, so the test asserts what a user can actually see.
    */
   testId?: string;
+  /**
+   * Views inside this option — Members and Roles inside Team, say. They are drawn only while the
+   * option is selected: the selected pill grows to hold them and folds them away again when
+   * another option is chosen, so a section's own views live in the one bar instead of a second
+   * slider under it.
+   */
+  subOptions?: SegmentedSubOption[];
+  /** Which of `subOptions` is selected. */
+  subValue?: string;
+  onSubChange?: (value: string) => void;
+  /** Accessible name of the group the sub-options form, e.g. "Team views". */
+  subAriaLabel?: string;
+};
+
+/**
+ * One view inside a {@link SegmentedTabOption}: a label and a count, one level down. No icon —
+ * the parent's already says what they are, and the grown pill has to fit the bar.
+ */
+export type SegmentedSubOption = {
+  value: string;
+  label: string;
+  count?: number;
 };
 
 type SegmentedTabsProps<TValue extends string> = {
@@ -79,6 +101,11 @@ type SegmentedTabsProps<TValue extends string> = {
  * swipe between tabs can do on a narrow bar -- would leave the reader with no
  * sign of where they are. The container is scrolled directly rather than
  * through `scrollIntoView`, which would also scroll the page vertically.
+ *
+ * **An option can hold views of its own** (`subOptions`). While it is selected the pill widens
+ * and they pop out beside its label, as smaller pills on the brand fill; choosing another option
+ * folds them away. A tab inside the tab, rather than a second bar further down that looks like a
+ * sibling and slides on its own.
  */
 export function SegmentedTabs<TValue extends string>({
   value,
@@ -150,8 +177,24 @@ export function SegmentedTabs<TValue extends string>({
       {options.map((option) => {
         const isActive = value === option.value;
         const isMagnified = !prefersReducedMotion && hovered === option.value;
+        const subOptions = option.subOptions ?? [];
+        // Grows only while selected, and only when there is more than one view to choose from.
+        const grown = isActive && subOptions.length > 1;
 
-        return (
+        const pill = (
+          <motion.span
+            aria-hidden="true"
+            layoutId={layoutId}
+            transition={prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken}
+            className={`absolute inset-0 ${
+              isCompact
+                ? "rounded-lg shadow-[0_4px_12px_-4px_var(--color-app-brand)]"
+                : "rounded-xl shadow-[0_6px_18px_-8px_var(--color-app-brand)]"
+            } bg-app-brand`}
+          />
+        );
+
+        const button = (
           <motion.button
             key={option.value}
             ref={isActive ? activeRef : undefined}
@@ -161,7 +204,9 @@ export function SegmentedTabs<TValue extends string>({
             onClick={() => onChange(option.value)}
             onHoverStart={() => setHovered(option.value)}
             onHoverEnd={() => setHovered((current) => (current === option.value ? null : current))}
-            animate={{ scale: isMagnified ? TAB_HOVER_SCALE : 1 }}
+            // The grown pill does not magnify: it is already the widest thing in the bar, and a
+            // label scaling inside a fill that does not would come apart from it.
+            animate={{ scale: isMagnified && !grown ? TAB_HOVER_SCALE : 1 }}
             transition={dockMagnifySpringToken}
             className={`group relative inline-flex ${
               wrap ? "min-w-fit" : "shrink-0"
@@ -171,19 +216,14 @@ export function SegmentedTabs<TValue extends string>({
                 : "gap-2 rounded-xl px-4 py-2 text-sm"
             } font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
               fullWidth && !wrap ? "flex-1" : ""
-            } ${isActive ? "text-white" : "text-app-text-muted hover:text-app-text"}`}
+            } ${grown ? (isCompact ? "pr-2" : "pr-2.5") : ""} ${
+              isActive ? "text-white" : "text-app-text-muted hover:text-app-text"
+            }`}
           >
             {isActive ? (
-              <motion.span
-                aria-hidden="true"
-                layoutId={layoutId}
-                transition={prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken}
-                className={`absolute inset-0 ${
-                  isCompact
-                    ? "rounded-lg shadow-[0_4px_12px_-4px_var(--color-app-brand)]"
-                    : "rounded-xl shadow-[0_6px_18px_-8px_var(--color-app-brand)]"
-                } bg-app-brand`}
-              />
+              grown ? null : (
+                pill
+              )
             ) : (
               <span
                 aria-hidden="true"
@@ -199,7 +239,8 @@ export function SegmentedTabs<TValue extends string>({
 
             <span className="relative z-10 leading-none">{option.label}</span>
 
-            {typeof option.count === "number" && (
+            {/* Once grown, the views carry their own counts; the section's would repeat one. */}
+            {typeof option.count === "number" && !grown && (
               // `leading-none` on both label and count is what
               // actually centres them: the count's smaller font
               // otherwise brings a smaller line box.
@@ -212,6 +253,73 @@ export function SegmentedTabs<TValue extends string>({
               </span>
             )}
           </motion.button>
+        );
+
+        if (subOptions.length <= 1) return button;
+
+        return (
+          <div
+            key={option.value}
+            className={`relative inline-flex ${wrap ? "min-w-fit" : "shrink-0"} items-center ${
+              fullWidth && !wrap ? "flex-1" : ""
+            }`}
+          >
+            {grown && pill}
+            {button}
+            <AnimatePresence initial={false}>
+              {grown && (
+                <motion.div
+                  key="views"
+                  role="group"
+                  aria-label={option.subAriaLabel ?? `${option.label} views`}
+                  initial={prefersReducedMotion ? false : { width: 0, opacity: 0 }}
+                  animate={{ width: "auto", opacity: 1 }}
+                  exit={prefersReducedMotion ? { opacity: 0 } : { width: 0, opacity: 0 }}
+                  transition={
+                    prefersReducedMotion
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 420, damping: 36 }
+                  }
+                  className="relative z-10 flex items-center overflow-hidden"
+                >
+                  <span aria-hidden="true" className="mr-1 h-4 w-px shrink-0 bg-white/30" />
+                  <span className={`flex items-center gap-0.5 ${isCompact ? "pr-0.5" : "pr-1"}`}>
+                    {subOptions.map((sub) => {
+                      const selected = (option.subValue ?? subOptions[0].value) === sub.value;
+                      return (
+                        <button
+                          key={sub.value}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => option.onSubChange?.(sub.value)}
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none ${
+                            isCompact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"
+                          } ${
+                            selected
+                              ? "bg-app-surface text-app-text shadow-sm"
+                              : "text-white/80 hover:bg-white/15 hover:text-white"
+                          }`}
+                        >
+                          <span className="leading-none">{sub.label}</span>
+                          {typeof sub.count === "number" && (
+                            <span
+                              className={`inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold tabular-nums ${
+                                selected
+                                  ? "bg-app-brand-soft text-app-brand-text"
+                                  : "bg-white/20 text-white"
+                              }`}
+                            >
+                              {sub.count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         );
       })}
     </div>

@@ -46,19 +46,9 @@ const BlueprintPathDetailPage = lazy(() =>
 const SkillWizardPage = lazy(() =>
   import("../pages/SkillWizardPage").then((module) => ({ default: module.SkillWizardPage })),
 );
-const TeamManagementPage = lazy(() =>
-  import("../pages/TeamManagementPage.tsx").then((module) => ({
-    default: module.TeamManagementPage,
-  })),
-);
-const TeamMemberDetailPage = lazy(() =>
-  import("../pages/TeamMemberDetailPage.tsx").then((module) => ({
-    default: module.TeamMemberDetailPage,
-  })),
-);
-const PmDashboardPage = lazy(() =>
-  import("../pages/PmDashboardPage.tsx").then((module) => ({
-    default: module.PmDashboardPage,
+const PmWorkspace = lazy(() =>
+  import("../features/pm-area/PmWorkspace.tsx").then((module) => ({
+    default: module.PmWorkspace,
   })),
 );
 const AdminPage = lazy(() =>
@@ -66,36 +56,6 @@ const AdminPage = lazy(() =>
 );
 const SettingsPage = lazy(() =>
   import("../pages/SettingsPage.tsx").then((module) => ({ default: module.SettingsPage })),
-);
-const FaqPage = lazy(() =>
-  import("../features/faq/components/FaqPage.tsx").then((module) => ({
-    default: module.FaqPage,
-  })),
-);
-const FaqDetailPage = lazy(() =>
-  import("../features/faq/components/FaqDetailPage.tsx").then((module) => ({
-    default: module.FaqDetailPage,
-  })),
-);
-const KnowledgeGapsPage = lazy(() =>
-  import("../features/knowledge-gaps/components/KnowledgeGapsPage.tsx").then((module) => ({
-    default: module.KnowledgeGapsPage,
-  })),
-);
-const KnowledgeGapsDetailPage = lazy(() =>
-  import("../features/knowledge-gaps/components/KnowledgeGapsDetailPage.tsx").then((module) => ({
-    default: module.KnowledgeGapsDetailPage,
-  })),
-);
-const KnowledgeRequestInboxPage = lazy(() =>
-  import("../features/knowledge-request/components/KnowledgeRequestInboxPage.tsx").then(
-    (module) => ({ default: module.KnowledgeRequestInboxPage }),
-  ),
-);
-const OnboardingMetricsPage = lazy(() =>
-  import("../features/onboarding-metrics/components/OnboardingMetricsPage.tsx").then((module) => ({
-    default: module.OnboardingMetricsPage,
-  })),
 );
 const BuddyPage = lazy(() =>
   import("../pages/BuddyPage").then((module) => ({ default: module.BuddyPage })),
@@ -133,6 +93,15 @@ function ManagerAreaGuard({ route, children }: { route: AppRoute; children: Reac
   return <>{children}</>;
 }
 
+/**
+ * Every route of the app, inside one `AuthGuard` and one shared `Suspense` fallback.
+ *
+ * Pages are lazy-loaded except `LoginPage` (see the comment on its import). Two layout
+ * routes group pages that share a header: `AssistantShell` for `/chat` and `/buddy`, and
+ * `PmWorkspace` for the PM area. Routes a user without access must not reach by URL are
+ * wrapped in `ManagerAreaGuard`; the others rely on the sidebar not offering them. Which
+ * groups may open which route is defined in `src/auth/accessPolicy.ts`.
+ */
 export function AppRouter() {
   return (
     <AuthGuard>
@@ -181,37 +150,28 @@ export function AppRouter() {
                 </ManagerAreaGuard>
               }
             />
-            <Route path="/team-management" element={<TeamManagementPage />} />
-            <Route path="/team/:userId" element={<TeamMemberDetailPage />} />
+            {/* The whole PM area is one layout route, like the assistant above: one header and
+              one tab bar that stay mounted while the sections slide underneath. The children
+              carry no elements -- `PmWorkspace` picks the section from the URL -- they are here
+              so every old address still matches. Guarded once for all of them: the access
+              policy gives every one of these routes the same groups and the same
+              manage-the-selected-project rule. */}
             <Route
-              path="/pm-dashboard"
               element={
                 <ManagerAreaGuard route="/pm-dashboard">
-                  <PmDashboardPage />
+                  <PmWorkspace />
                 </ManagerAreaGuard>
               }
-            />
+            >
+              <Route path="/pm-dashboard" />
+              <Route path="/team-management" />
+              <Route path="/team/:userId" />
+              <Route path="/insights/knowledge-requests" />
+              <Route path="/insights/onboarding" />
+              <Route path="/insights/faq/:groupId?" />
+              <Route path="/insights/knowledge-gaps/:gapId?" />
+            </Route>
             <Route path="/admin" element={<AdminPage />} />
-            <Route path="/insights/faq" element={<FaqPage />} />
-            <Route path="/insights/faq/:groupId" element={<FaqDetailPage />} />
-            <Route path="/insights/knowledge-gaps" element={<KnowledgeGapsPage />} />
-            <Route path="/insights/knowledge-gaps/:gapId" element={<KnowledgeGapsDetailPage />} />
-            <Route
-              path="/insights/knowledge-requests"
-              element={
-                <ManagerAreaGuard route="/insights/knowledge-requests">
-                  <KnowledgeRequestInboxPage />
-                </ManagerAreaGuard>
-              }
-            />
-            <Route
-              path="/insights/onboarding"
-              element={
-                <ManagerAreaGuard route="/insights/onboarding">
-                  <OnboardingMetricsPage />
-                </ManagerAreaGuard>
-              }
-            />
             {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
               in place of it: both ways in stay open. The buddy itself now sits with the chat,
               under `AssistantShell`. */}

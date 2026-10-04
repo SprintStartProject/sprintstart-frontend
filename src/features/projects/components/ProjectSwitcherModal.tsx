@@ -4,7 +4,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Input } from "../../../components/ui/Input";
 import { Modal } from "../../../components/ui/Modal";
 import { UserAvatar } from "../../../components/common/UserAvatar";
-import { monogramLetters, monogramTint } from "../projectMonogram";
+import { ProjectMonogram } from "./ProjectMonogram";
 import type { SelectableProject } from "../ProjectContext";
 
 type ProjectSwitcherModalProps = {
@@ -113,12 +113,7 @@ function ProjectCard({
         {/* The monogram keeps its own tint when the card is selected: it
             identifies the project, so it is the one thing on the card that
             should not change with selection state. */}
-        <span
-          aria-hidden="true"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold ${monogramTint(project.id)}`}
-        >
-          {monogramLetters(project.name)}
-        </span>
+        <ProjectMonogram projectId={project.id} name={project.name} size="md" />
 
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-semibold text-app-text">{project.name}</span>

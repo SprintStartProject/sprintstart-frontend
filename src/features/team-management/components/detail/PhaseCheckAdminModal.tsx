@@ -1,12 +1,3 @@
-// ============================================================
-// PhaseCheckAdminModal.tsx
-// ============================================================
-// PM/HR/Admin view of one phase's knowledge questions, with two
-// tabs: each question's attempts by this member, and an editor
-// for the questions themselves. Onboarding paths are per-user,
-// so editing here only affects this member's phase.
-// ============================================================
-
 import { useState, useEffect } from "react";
 import { Modal } from "../../../../components/ui/Modal";
 import { useToast } from "../../../../context/useToast";
@@ -148,6 +139,13 @@ function toPayload(drafts: QuestionDraft[]): UpsertQuestion[] {
   }));
 }
 
+/**
+ * PM/HR/ADMIN view of one phase's knowledge check for one member, in two tabs: the member's
+ * attempts per question, and an editor for the questions themselves.
+ *
+ * Onboarding paths are per user, so editing here only changes this member's phase. Saving with
+ * every question removed deletes the phase's whole check, which takes a second click.
+ */
 export function PhaseCheckAdminModal({
   userId,
   phaseId,

@@ -18,6 +18,68 @@ import type {
 } from "../features/onboarding/types";
 
 /**
+ * POSTs to a path-generation endpoint and hands its SSE events to `handlers`, for the member's own
+ * generation and a PM's rebuild of somebody else's alike.
+ */
+async function streamPathGeneration(
+  url: string,
+  handlers: OnboardingPersonalizeHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  try {
+    if (keycloak.authenticated) {
+      await keycloak.updateToken(30);
+    }
+  } catch (error) {
+    console.error("Failed to refresh Keycloak token for onboarding personalize", error);
+    void keycloak.login();
+    return;
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${keycloak.token}`,
+    },
+    signal,
+  });
+
+  if (!res.ok) {
+    handlers.onError?.(`HTTP error! status: ${res.status}`);
+    return;
+  }
+
+  const stream = res.body;
+  if (!stream) {
+    throw new Error("No response stream");
+  }
+
+  for await (const event of parseSSEStream<OnboardingPersonalizeEvent>(stream)) {
+    switch (event.type) {
+      case "stage":
+        handlers.onStage?.(event.name ?? "", event.detail);
+        break;
+      case "path":
+        if (event.path) {
+          handlers.onPath(event.path);
+        }
+        break;
+      case "done":
+        handlers.onDone();
+        return;
+      case "error":
+        handlers.onError?.(event.message ?? "Unknown error", event.reason ?? undefined);
+        return;
+    }
+  }
+
+  // Falling out of the loop means the body ended without `done` or `error`, which the backend
+  // never does on purpose. Reporting a finished path here told members their path was ready
+  // while it was still being built.
+  handlers.onInterrupted?.();
+}
+
+/**
  * Onboarding path, step, question and task CRUD.
  * Streams AI path generation over SSE; falls back to mock data on fetch
  * failures. Questions are answered one at a time and own their attempt history.
@@ -50,57 +112,32 @@ export const onboardingService = {
     handlers: OnboardingPersonalizeHandlers,
     signal?: AbortSignal,
   ): Promise<void> {
-    try {
-      if (keycloak.authenticated) {
-        await keycloak.updateToken(30);
-      }
-    } catch (error) {
-      console.error("Failed to refresh Keycloak token for onboarding personalize", error);
-      void keycloak.login();
-      return;
-    }
-
-    const res = await fetch(`/api/v1/projects/${projectId}/onboarding/me/path/personalize`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${keycloak.token}`,
-      },
+    await streamPathGeneration(
+      `/api/v1/projects/${projectId}/onboarding/me/path/personalize`,
+      handlers,
       signal,
-    });
+    );
+  },
 
-    if (!res.ok) {
-      handlers.onError?.(`HTTP error! status: ${res.status}`);
-      return;
-    }
-
-    const stream = res.body;
-    if (!stream) {
-      throw new Error("No response stream");
-    }
-
-    for await (const event of parseSSEStream<OnboardingPersonalizeEvent>(stream)) {
-      switch (event.type) {
-        case "stage":
-          handlers.onStage?.(event.name ?? "", event.detail);
-          break;
-        case "path":
-          if (event.path) {
-            handlers.onPath(event.path);
-          }
-          break;
-        case "done":
-          handlers.onDone();
-          return;
-        case "error":
-          handlers.onError?.(event.message ?? "Unknown error", event.reason ?? undefined);
-          return;
-      }
-    }
-
-    // Falling out of the loop means the body ended without `done` or `error`, which the backend
-    // never does on purpose. Reporting a finished path here told members their path was ready
-    // while it was still being built.
-    handlers.onInterrupted?.();
+  /**
+   * Rebuilds a member's onboarding path from the project's active blueprint -- the PM's side of
+   * `personalizePath`, which members may only use for their first path. Replaces the member's
+   * path, and their progress with it, once the generation finishes.
+   *
+   * Like `personalizePath`, the generation runs on the backend independently of this stream: the
+   * member's own onboarding page attaches to it, and aborting here only stops watching.
+   */
+  async rebuildMemberPath(
+    projectId: string,
+    userId: string,
+    handlers: OnboardingPersonalizeHandlers,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await streamPathGeneration(
+      `/api/v1/projects/${projectId}/onboarding/users/${userId}/path/personalize`,
+      handlers,
+      signal,
+    );
   },
 
   /**
@@ -229,6 +266,7 @@ export const onboardingService = {
 
   // ── FEEDBACK ──────────────────────────────────────────────
 
+  /** Sends the caller's feedback on one step: whether it helped, plus a free-text message. */
   async submitFeedback(stepId: string, helpful: boolean, message: string): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/feedback`, {
       method: "POST",
@@ -238,12 +276,17 @@ export const onboardingService = {
 
   // ── TASKS ─────────────────────────────────────────────────
 
+  /** Loads the tasks of one step on the caller's own path. */
   async fetchTasks(stepId: string): Promise<OnboardingTaskEndpoint[]> {
     return await apiClient.fetch<OnboardingTaskEndpoint[]>(
       `/api/v1/onboarding/me/steps/${stepId}/tasks`,
     );
   },
 
+  /**
+   * Checks or unchecks one of the caller's tasks. The endpoint replaces the whole task, so
+   * position, title and description are sent back unchanged along with `finished`.
+   */
   async updateTask(task: OnboardingTaskEndpoint, finished: boolean): Promise<void> {
     await apiClient.fetch(`/api/v1/onboarding/me/tasks/${task.id}`, {
       method: "PUT",
@@ -258,6 +301,7 @@ export const onboardingService = {
 
   // ── RESOURCES ─────────────────────────────────────────────
 
+  /** Loads the reference resources of one step on the caller's own path. */
   async fetchResources(stepId: string): Promise<OnboardingResourceEndpoint[]> {
     return await apiClient.fetch<OnboardingResourceEndpoint[]>(
       `/api/v1/onboarding/me/steps/${stepId}/resources`,

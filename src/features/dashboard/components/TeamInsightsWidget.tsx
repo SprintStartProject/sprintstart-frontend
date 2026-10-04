@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, ShieldAlert } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Spinner } from "../../../components/ui/Spinner";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { insightsService } from "../../../services/faqService";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
@@ -303,9 +304,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <ShieldAlert className="h-3.5 w-3.5" />
-          </span>
+          <IconTile icon={ShieldAlert} size="sm" tone="accent" />
           <span className="truncate text-sm font-semibold text-app-text">Team insights</span>
         </div>
 

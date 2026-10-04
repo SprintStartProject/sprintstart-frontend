@@ -32,6 +32,17 @@ import { projectService } from "../../../../../src/services/projectService";
  */
 const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: ToastProvider });
 
+/**
+ * A drawer moves focus to its first control one animation frame after it opens.
+ * Mocked requests resolve long before that, so a test that starts typing right
+ * away can have the focus pulled out from under it mid-word. Waiting out the
+ * frame makes the typing tests deterministic.
+ */
+const settleDrawerFocus = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+
 const projectOverview: ProjectOverview = {
   id: "proj-1",
   name: "Alpha",
@@ -121,6 +132,223 @@ describe("ProjectDetailsDrawer", () => {
     render(<ProjectDetailsDrawer project={projectOverview} isOpen={false} onClose={vi.fn()} />);
 
     expect(vi.mocked(projectService.getProjectById)).not.toHaveBeenCalled();
+  });
+
+  describe("overview and context", () => {
+    const member = (
+      id: string,
+      firstName: string,
+      roles: string[],
+      projectRoles: string[],
+      enabled = true,
+    ) => ({
+      id,
+      username: firstName.toLowerCase(),
+      email: `${firstName.toLowerCase()}@example.com`,
+      firstName,
+      lastName: "Test",
+      roles,
+      projectRoles,
+      enabled,
+    });
+
+    const directoryUser = (
+      id: string,
+      firstName: string,
+      permissionGroup: string,
+      projectIds: string[],
+      hasCompletedOnboarding: boolean,
+      enabled = true,
+    ) =>
+      ({
+        id,
+        username: firstName.toLowerCase(),
+        email: `${firstName.toLowerCase()}@example.com`,
+        firstName,
+        lastName: "Test",
+        permissionGroup,
+        projectIds,
+        projects: [],
+        enabled,
+        hasCompletedOnboarding,
+        profileIcon: null,
+      }) as unknown as AdminUser;
+
+    const directory = [
+      directoryUser("u-1", "Jane", "Admin", ["proj-1", "proj-2", "proj-3"], true),
+      directoryUser("u-2", "Tom", "User", ["proj-1"], false, false),
+      directoryUser("u-3", "Lea", "Project Manager", ["proj-1"], true),
+    ];
+
+    const healthDetails: AdminProjectDetails = {
+      ...projectDetails,
+      users: [
+        member("u-1", "Jane", ["ADMIN"], ["Backend Dev"]),
+        member("u-2", "Tom", ["USER"], [], false),
+        member("u-3", "Lea", ["PM"], []),
+      ],
+      sources: [
+        { id: "s1", name: "Repo A", type: "GITHUB", status: "CONNECTED" },
+        { id: "s2", name: "Board", type: "JIRA", status: "FAILED" },
+      ],
+    };
+
+    function renderWithDirectory(props: Record<string, unknown> = {}) {
+      vi.mocked(projectService.getProjectById).mockResolvedValue(healthDetails);
+
+      return render(
+        <ProjectDetailsDrawer
+          project={projectOverview}
+          availableUsers={directory}
+          isOpen={true}
+          onClose={vi.fn()}
+          {...props}
+        />,
+      );
+    }
+
+    it("marks a deactivated account on its row", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      expect(screen.getAllByText("Disabled")).toHaveLength(1);
+    });
+
+    it("says how many other projects an admin or PM is in, but not for a regular user", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      // Jane (admin) is in two projects besides this one; Lea (PM) and Tom are in only this one.
+      expect(screen.getByText("also in 2 projects")).toBeInTheDocument();
+      expect(screen.getAllByText(/^also in/)).toHaveLength(1);
+    });
+
+    it("names the manager in the header, or flags that there is none", async () => {
+      const { unmount } = renderWithDirectory();
+      expect(await screen.findByText("No manager")).toBeInTheDocument();
+      unmount();
+
+      vi.mocked(projectService.getProjectById).mockResolvedValue({
+        ...healthDetails,
+        manager: {
+          id: "u-1",
+          username: "jane",
+          email: "jane@example.com",
+          firstName: "Jane",
+          lastName: "Test",
+        },
+      });
+      render(
+        <ProjectDetailsDrawer
+          project={projectOverview}
+          availableUsers={directory}
+          isOpen={true}
+          onClose={vi.fn()}
+        />,
+      );
+
+      expect(await screen.findByText("Manager: Jane Test")).toBeInTheDocument();
+      expect(screen.queryByText("No manager")).not.toBeInTheDocument();
+    });
+
+    it("opens the project in Data Ingestion", async () => {
+      const user = userEvent.setup();
+      const onOpenDataIngestion = vi.fn();
+      renderWithDirectory({ onOpenDataIngestion });
+
+      await user.click(await screen.findByRole("button", { name: /Open in Data Ingestion/ }));
+
+      expect(onOpenDataIngestion).toHaveBeenCalledWith("proj-1");
+    });
+
+    it("hides the Data Ingestion shortcut when the page gives no way to open it", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      expect(
+        screen.queryByRole("button", { name: /Open in Data Ingestion/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("opens a member's user details from their row", async () => {
+      const user = userEvent.setup();
+      const onOpenUser = vi.fn();
+      renderWithDirectory({ onOpenUser });
+
+      await user.click(await screen.findByRole("button", { name: "Open Jane Test" }));
+
+      expect(onOpenUser).toHaveBeenCalledWith("u-1");
+    });
+
+    it("keeps member rows plain when the page gives no way to open a user", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      expect(screen.queryByRole("button", { name: "Open Jane Test" })).not.toBeInTheDocument();
+    });
+
+    it("offers a way back to the drawer it was opened from", async () => {
+      const user = userEvent.setup();
+      const onBack = vi.fn();
+      renderWithDirectory({ back: { label: "Back to Jane Test", onBack } });
+
+      await user.click(await screen.findByRole("button", { name: "Back to Jane Test" }));
+
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows no back button when it was opened directly", async () => {
+      renderWithDirectory();
+
+      await screen.findByText("Jane Test");
+
+      expect(screen.queryByRole("button", { name: /^Back to/ })).not.toBeInTheDocument();
+    });
+
+    it("asks before leaving with unsaved changes and stays when told to keep editing", async () => {
+      const user = userEvent.setup();
+      const onOpenUser = vi.fn();
+      renderWithDirectory({ onOpenUser });
+
+      await screen.findByText("Jane Test");
+      await user.type(screen.getByLabelText(/^Description/), "!");
+      await user.click(screen.getByRole("button", { name: "Open Jane Test" }));
+
+      expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+      expect(onOpenUser).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Keep editing" }));
+
+      expect(onOpenUser).not.toHaveBeenCalled();
+      expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+    });
+
+    it("leaves once the discard is confirmed", async () => {
+      const user = userEvent.setup();
+      const onBack = vi.fn();
+      renderWithDirectory({ back: { label: "Back to Jane Test", onBack } });
+
+      await screen.findByText("Jane Test");
+      await user.type(screen.getByLabelText(/^Description/), "!");
+      await user.click(screen.getByRole("button", { name: "Back to Jane Test" }));
+      await user.click(screen.getByRole("button", { name: "Discard and leave" }));
+
+      expect(onBack).toHaveBeenCalledTimes(1);
+    });
+
+    it("copies the project id", async () => {
+      const user = userEvent.setup();
+      renderWithDirectory();
+
+      await user.click(await screen.findByRole("button", { name: "Copy project ID" }));
+
+      expect(await screen.findByText("Project ID copied")).toBeInTheDocument();
+      await expect(navigator.clipboard.readText()).resolves.toBe("proj-1");
+    });
   });
 
   describe("project deletion", () => {
@@ -480,6 +708,7 @@ describe("ProjectDetailsDrawer", () => {
         lastName: "Doe",
         permissionGroup: "User",
         projectIds: ["proj-1"],
+        projects: [],
         projectNames: [],
         projectRoles: [],
         enabled: true,
@@ -493,6 +722,7 @@ describe("ProjectDetailsDrawer", () => {
         lastName: "Fischer",
         permissionGroup: "User",
         projectIds: [],
+        projects: [],
         projectNames: [],
         projectRoles: [],
         enabled: true,
@@ -560,6 +790,7 @@ describe("ProjectDetailsDrawer", () => {
 
       await waitFor(() => expect(screen.getByText("Jane Doe")).toBeInTheDocument());
 
+      await settleDrawerFocus();
       await user.type(screen.getByRole("textbox", { name: "Search or add people" }), "tom");
       await user.click(screen.getByRole("button", { name: /Tom Fischer/ }));
 
@@ -574,6 +805,47 @@ describe("ProjectDetailsDrawer", () => {
           userIds: ["u-2"],
         }),
       );
+    });
+
+    it("finds members and add suggestions by username, not just by email", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await waitFor(() => expect(screen.getByText("Jane Doe")).toBeInTheDocument());
+
+      const search = screen.getByRole("textbox", { name: "Search or add people" });
+
+      await settleDrawerFocus();
+      await user.type(search, "jane.doe");
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+      expect(screen.getByText("@jane.doe")).toBeInTheDocument();
+
+      await user.clear(search);
+      await user.type(search, "tom.fis");
+      expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Tom Fischer/ })).toBeInTheDocument();
+    });
+
+    it("says when only some of the matching users are listed", async () => {
+      const user = userEvent.setup();
+      const manyUsers = Array.from({ length: 8 }, (_, index) => ({
+        ...availableUsers[1],
+        id: `bulk-${index}`,
+        username: `bulk.user${index}`,
+        email: `bulk${index}@example.com`,
+        firstName: "Bulk",
+        lastName: `User ${index}`,
+      })) as unknown as AdminUser[];
+
+      renderDrawer({ availableUsers: manyUsers });
+
+      await waitFor(() => expect(screen.getByText("Jane Doe")).toBeInTheDocument());
+      await settleDrawerFocus();
+      await user.type(screen.getByRole("textbox", { name: "Search or add people" }), "bulk");
+
+      expect(
+        await screen.findByText("Showing 6 of 8. Refine your search to see more."),
+      ).toBeInTheDocument();
     });
 
     it("discards staged changes", async () => {

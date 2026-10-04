@@ -4,7 +4,7 @@ import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
 import { SelectionCheckbox } from "../../admin/components/SelectionCheckbox";
-import { readableTitle } from "../generation/pathToCards";
+import { readableTitle } from "../layout/cardNames";
 import { useBoardCardControls } from "./boardCardControls";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
@@ -13,14 +13,28 @@ import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutChecklist } from "../generation/cardQuestion";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";
-import type { AuthoredCardRequest, BoardCard, ChecklistContent, ChecklistItem } from "../types";
+import type {
+  AuthoredCardRequest,
+  BoardCard,
+  BoardUndoNotice,
+  ChecklistContent,
+  ChecklistItem,
+} from "../types";
 
 type ChecklistCardProps = {
   content: ChecklistContent;
-  card: Pick<BoardCard, "id" | "owner" | "placedAt">;
+  card: Pick<BoardCard, "id" | "owner" | "placedAt" | "previous" | "lastChange">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  /** Puts the card back to what it said before its latest edit. See `BoardCardFrame`. */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring?: boolean;
+  /** True while a write of this card is still on its way — see `CardEditHistory`'s `paused`. */
+  saving?: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice?: BoardUndoNotice | null;
   /**
    * Where this list came from, when it was made out of something — a task, most often.
    *
@@ -73,6 +87,10 @@ export function ChecklistCard({
   onDismiss,
   dismissing,
   onEdit,
+  onRestorePrevious,
+  restoring,
+  saving,
+  undoNotice,
   origin,
 }: ChecklistCardProps) {
   // A checklist's lines are written by the generator and read back from the server, so a highlight
@@ -134,8 +152,8 @@ export function ChecklistCard({
   return (
     <BoardCardFrame
       icon={CheckSquare}
-      // Stripped of the marker a generated card carries: it exists so a second generation run can
-      // recognise its own work, and it is never something the hire should read.
+      // Stripped of the invisible marker a card from the retired generator still carries -- see
+      // `layout/cardNames.ts`. It is never something the hire should read.
       title={
         content.title ? (
           // A checklist's name is written by whoever made the list — the generator, or the hire
@@ -150,6 +168,10 @@ export function ChecklistCard({
       subtitle={content.items.length > 0 ? `${done}/${content.items.length} done` : undefined}
       onDismiss={onDismiss}
       dismissing={dismissing}
+      onRestorePrevious={onRestorePrevious}
+      restoring={restoring}
+      paused={Boolean(saving)}
+      undoNotice={undoNotice}
     >
       {content.items.length === 0 ? (
         <EmptyState size="sm">Nothing on it yet.</EmptyState>
@@ -256,9 +278,8 @@ export function ChecklistCard({
           highlighted two lines has already said which part they are stuck on. */}
       <AskTheBuddy
         question={questionAboutChecklist(
-          // The readable title, for the same reason the header shows it: the marker is there so a
-          // generation run can recognise its own work, and it has no business in a sentence the
-          // hire is about to send.
+          // The readable title, for the same reason the header shows it: the marker has no
+          // business in a sentence the hire is about to send.
           content.title === null ? null : readableTitle(content.title),
           content.items.filter((item) => !item.done).length,
           marks.map((mark) => mark.text),
