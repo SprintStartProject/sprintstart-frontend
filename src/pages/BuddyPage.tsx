@@ -9,6 +9,7 @@ import {
   RailToggle,
   RAIL_DESKTOP_QUERY,
 } from "../components/layout/ConversationRail";
+import { useIsSmUp } from "../hooks/useIsSmUp";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
@@ -123,6 +124,8 @@ function BuddyPageShell({
     announceBuddyPageReady();
   }, []);
 
+  const hasFloatingControls = Boolean(railToggle || newConversationControl);
+
   return (
     <div className="flex min-h-0 flex-1 bg-app-bg">
       {rail}
@@ -137,7 +140,13 @@ function BuddyPageShell({
       >
         {railToggle}
         {newConversationControl}
-        {modeControl && <div className="app-page-frame shrink-0 pt-4">{modeControl}</div>}
+        {modeControl && (
+          <div
+            className={`app-page-frame shrink-0 ${hasFloatingControls ? "pt-14 xl:pt-4" : "pt-4"}`}
+          >
+            {modeControl}
+          </div>
+        )}
 
         {children}
       </div>
@@ -349,6 +358,8 @@ function BuddyMentorHome() {
    * role has pull requests. Hire-only, matching the fetch gate: a team-mode conversation would
    * otherwise show the heading over an empty list, since there is nothing team-scoped to load.
    */
+  const isSmUp = useIsSmUp();
+
   const aboveComposer = useMemo(
     () =>
       isHireMode && !hasUserMessage ? (
@@ -356,9 +367,10 @@ function BuddyMentorHome() {
           suggestions={suggestions}
           onPick={setDraft}
           heading="Not sure where to start?"
+          compact={!isSmUp}
         />
       ) : undefined,
-    [isHireMode, hasUserMessage, suggestions, setDraft],
+    [isHireMode, hasUserMessage, suggestions, setDraft, isSmUp],
   );
 
   // The keyboard half of the buttons that start a conversation. Gated the same way they are: a
