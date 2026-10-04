@@ -43,7 +43,7 @@ function AppearanceGroup({
  * intensity, Card Tilt) and optional extras (the rocket pet).
  *
  * Bound to the global {@link ThemeContext}; selecting an option persists it
- * via the provider. Each option shows an icon and a text label (AGENTS.md §7 —
+ * via the provider. Each option shows an icon and a text label (FRONTEND_CODING_STANDARDS.md §5 —
  * meaning never conveyed by colour alone).
  *
  * The classic-mode notice is the only way out of `style-classic` in the whole app. The mode

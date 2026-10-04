@@ -20,6 +20,15 @@ type SlidingTabPanelProps = {
 };
 
 /**
+ * How long one panel takes to slide out, in seconds and in milliseconds.
+ *
+ * Exported because a caller that scrolls to something inside the panel it just switched to has to
+ * wait for the switch -- the number used to be repeated there as a guess.
+ */
+export const SLIDING_PANEL_SECONDS = 0.18;
+export const SLIDING_PANEL_EXIT_MS = SLIDING_PANEL_SECONDS * 1000;
+
+/**
  * Slides tab content in from the side the user is moving towards, instead of
  * swapping it instantly.
  *
@@ -31,15 +40,6 @@ type SlidingTabPanelProps = {
  * Uses `mode="wait"` so the outgoing panel is gone before the incoming one
  * arrives -- overlapping two panels of different heights makes the page jump.
  */
-/**
- * How long one panel takes to slide out, in seconds and in milliseconds.
- *
- * Exported because a caller that scrolls to something inside the panel it just switched to has to
- * wait for the switch -- the number used to be repeated there as a guess.
- */
-export const SLIDING_PANEL_SECONDS = 0.18;
-export const SLIDING_PANEL_EXIT_MS = SLIDING_PANEL_SECONDS * 1000;
-
 export function SlidingTabPanel({ activeKey, index, children, className }: SlidingTabPanelProps) {
   const prefersReducedMotion = useReducedMotion();
   const [previousIndex, setPreviousIndex] = useState(index);

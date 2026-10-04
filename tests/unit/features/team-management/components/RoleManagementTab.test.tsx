@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   suggestSkillsForRole: vi.fn(),
   acceptSkillSuggestion: vi.fn(),
   createProjectRole: vi.fn(),
+  updateRoleSkills: vi.fn(),
 }));
 
 vi.mock("../../../../../src/context/useAuth", () => ({
@@ -38,6 +39,7 @@ vi.mock("../../../../../src/services/teamManagementService", async (importOrigin
     suggestSkillsForRole: mocks.suggestSkillsForRole,
     acceptSkillSuggestion: mocks.acceptSkillSuggestion,
     createProjectRole: mocks.createProjectRole,
+    updateRoleSkills: mocks.updateRoleSkills,
   };
 });
 
@@ -55,6 +57,22 @@ const acceptedSkill = {
   name: "React",
   roleIds: [role.id],
   status: "ACTIVE" as const,
+  category: "TECHNICAL",
+  universal: false,
+};
+const multiRoleSkill = {
+  id: "skill-3",
+  name: "SQL",
+  roleIds: [role.id, "role-2"],
+  status: "ACTIVE" as const,
+  category: "TECHNICAL",
+  universal: false,
+};
+const retiredSkill = {
+  id: "skill-4",
+  name: "jQuery",
+  roleIds: [role.id],
+  status: "RETIRED" as const,
   category: "TECHNICAL",
   universal: false,
 };
@@ -375,5 +393,62 @@ describe("RoleManagementTab", () => {
         await screen.findByText(/1 member loses this role: Ada Lovelace\./),
       ).toBeInTheDocument();
     });
+  });
+
+  it("removes a skill that holds other roles via a PUT of the remaining role skills", async () => {
+    mocks.getSkills.mockResolvedValue([multiRoleSkill]);
+    mocks.getSkillsByRoleId.mockResolvedValue([multiRoleSkill]);
+    mocks.updateRoleSkills.mockResolvedValue([]);
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role]} users={[]} onDataChanged={vi.fn()} />);
+
+    await openRole(user);
+    await user.click(
+      screen.getByRole("button", { name: `Remove ${multiRoleSkill.name} from role` }),
+    );
+
+    await waitFor(() => expect(mocks.updateRoleSkills).toHaveBeenCalledWith(role.id, []));
+    expect(await screen.findByText("Skill removed from role")).toBeInTheDocument();
+  });
+
+  it("disables removing a skill that would be left without any role", async () => {
+    mocks.getSkills.mockResolvedValue([existingSkill]);
+    mocks.getSkillsByRoleId.mockResolvedValue([existingSkill]);
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role]} users={[]} onDataChanged={vi.fn()} />);
+
+    await openRole(user);
+    const removeButton = screen.getByRole("button", {
+      name: `Remove ${existingSkill.name} from role`,
+    });
+
+    expect(removeButton).toBeDisabled();
+    expect(removeButton).toHaveAttribute(
+      "title",
+      "Only role of this skill. An admin can retire it in Access Management.",
+    );
+
+    await user.click(removeButton);
+    expect(mocks.updateRoleSkills).not.toHaveBeenCalled();
+  });
+
+  it("shows a retired skill as a plain badge, with no retire or reactivate controls", async () => {
+    mocks.getSkills.mockResolvedValue([retiredSkill]);
+    mocks.getSkillsByRoleId.mockResolvedValue([retiredSkill]);
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role]} users={[]} onDataChanged={vi.fn()} />);
+
+    await openRole(user);
+
+    expect(await screen.findByText("Retired")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `Reactivate ${retiredSkill.name}` }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `Retire ${retiredSkill.name}` }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `Remove ${retiredSkill.name} from role` }),
+    ).not.toBeInTheDocument();
   });
 });

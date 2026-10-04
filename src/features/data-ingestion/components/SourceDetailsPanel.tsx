@@ -1,44 +1,30 @@
 import {
   ArrowUp,
-  BookOpen,
   CalendarClock,
   Clock3,
   Database,
-  GitBranch,
   RefreshCw,
-  Ticket,
   Unlink,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../../components/ui/Button";
 import { Spinner } from "../../../components/ui/Spinner";
 import { useToast } from "../../../context/useToast";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
-import { AccountEnabledToggle } from "../../admin/components/AccountEnabledToggle.tsx";
-import { DrawerCard } from "../../admin/components/DrawerCard.tsx";
-import type {
-  ConfigureGithubRepositoryRequest,
-  GithubRepositoryConfig,
-} from "../../../services/sources/githubService.ts";
-import type {
-  ConfigureJiraInstanceRequest,
-  GetJiraInstanceConfigResponse,
-} from "../../../services/sources/jiraService.ts";
-import {
-  deriveConnectionStatus,
-  deriveSyncStatus,
-  formatDateTime,
-  formatNumber,
-  SOURCE_META,
-} from "../data.ts";
-import type { DataSource, LoadingState } from "../types.ts";
-import {
-  GithubRepositorySyncSettings,
-  type SyncScheduleConfig,
-} from "./GithubRepositorySyncSettings.tsx";
+import { IconTile } from "../../../components/ui/IconTile";
+import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle.tsx";
+import { DrawerCard } from "../../../components/ui/DrawerCard.tsx";
+import { getConnector } from "../connectors/registry.ts";
+import { deriveConnectionStatus, deriveSyncStatus, formatDateTime, formatNumber } from "../data.ts";
+import { useManualSync } from "../hooks/useManualSync.ts";
+import type { DataSource, LoadingState, SourceChange } from "../types.ts";
+import { FailedItemList } from "./FailedItemList.tsx";
+import { InfoRow } from "./InfoRows.tsx";
+import { KnowledgeBaseLinkCard } from "./KnowledgeBaseLinkCard.tsx";
+import { SyncScheduleSettings } from "./SyncScheduleSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 import { DinoGame } from "../../chatbot/components/DinoGame.tsx";
@@ -46,63 +32,35 @@ import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useD
 
 type SourceDetailsPanelProps = {
   source: DataSource;
-  onUpdateSource?: (source: DataSource) => Promise<void>;
-  onRefreshDetails?: () => Promise<void>;
-  canManageSyncSettings?: boolean;
-  onLoadRepositoryConfig?: (
-    repository: NonNullable<DataSource["githubRepository"]>,
-  ) => Promise<GithubRepositoryConfig>;
-  onSaveRepositoryConfig?: (
-    repository: NonNullable<DataSource["githubRepository"]>,
-    request: ConfigureGithubRepositoryRequest,
-  ) => Promise<void>;
-  /** Loads the sync schedule of a Jira instance (by URL) for the schedule form. */
-  onLoadJiraConfig?: (instanceUrl: string) => Promise<GetJiraInstanceConfigResponse>;
-  /** Saves the sync schedule of a Jira instance (by URL). */
-  onSaveJiraConfig?: (
-    instanceUrl: string,
-    request: Omit<ConfigureJiraInstanceRequest, "instanceUrl">,
-  ) => Promise<void>;
-  /** Loads the sync schedule of a Confluence space (by connection id). */
-  onLoadConfluenceConfig?: (connectionId: string) => Promise<SyncScheduleConfig>;
-  /** Saves the sync schedule of a Confluence space (by connection id). */
-  onSaveConfluenceConfig?: (
-    connectionId: string,
-    request: ConfigureGithubRepositoryRequest,
-  ) => Promise<void>;
-  /** Enables/disables the source in the connector (allow/deny for ingestion). */
-  onSetSourceEnabled?: (
-    repository: NonNullable<DataSource["githubRepository"]>,
-    enabled: boolean,
-  ) => Promise<void>;
-  /** Enables/disables a Jira instance as an ingestion source (by instance URL). */
-  onSetJiraSourceEnabled?: (instanceUrl: string, enabled: boolean) => Promise<void>;
+  /** The selected project, which the source's actions act within. */
+  projectId: string | null;
+  /** Whether the viewer may switch the source on and off and edit its sync schedule (PM or admin). */
+  canManage?: boolean;
   /**
-   * Removes the repository's link to the current project. Only passed when the
-   * caller is allowed to manage the project's sources; its presence gates the
-   * "Remove from project" action. The caller closes this drawer on success.
+   * Whether the viewer may remove the source from the project. Gates the
+   * "Remove from project" action.
    */
-  onUnlinkSource?: (source: DataSource) => Promise<void>;
+  canUnlink?: boolean;
+  /**
+   * Called after the panel changed something about the source, so the page can
+   * reload what its cards are built from. `unlinked` is followed by the page
+   * closing this drawer.
+   */
+  onChanged: (change: SourceChange) => Promise<void>;
   onClose: () => void;
 };
 
 /**
- * Slide-out panel showing the repository and ingestion details currently exposed by the backend.
+ * Slide-out panel showing the ingestion details of one source. The panel is the
+ * same for every connector: what differs (the identity card, which actions exist,
+ * the wording) comes from the source's connector definition.
  */
 export function SourceDetailsPanel({
   source,
-  onUpdateSource,
-  onRefreshDetails,
-  canManageSyncSettings = false,
-  onLoadRepositoryConfig,
-  onSaveRepositoryConfig,
-  onLoadJiraConfig,
-  onSaveJiraConfig,
-  onLoadConfluenceConfig,
-  onSaveConfluenceConfig,
-  onSetSourceEnabled,
-  onSetJiraSourceEnabled,
-  onUnlinkSource,
+  projectId,
+  canManage = false,
+  canUnlink = false,
+  onChanged,
   onClose,
 }: SourceDetailsPanelProps) {
   const [updateState, setUpdateState] = useState<LoadingState>("idle");
@@ -111,12 +69,11 @@ export function SourceDetailsPanel({
   const [unlinkState, setUnlinkState] = useState<LoadingState>("idle");
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
   const toast = useToast();
-  const Icon = SOURCE_META[source.sourceSystem].icon;
-  const repository = source.githubRepository;
-  const jira = source.jiraInstance ?? null;
-  const confluence = source.confluenceSpace ?? null;
-  const isJira = source.sourceSystem === "JIRA";
-  const isConfluence = source.sourceSystem === "CONFLUENCE";
+  const syncManually = useManualSync(projectId);
+  const definition = getConnector(source.sourceSystem);
+  const { meta, actions, DetailsSection } = definition;
+  const context = useMemo(() => ({ projectId }), [projectId]);
+  const Icon = meta.icon;
   const isUpdating = updateState === "loading";
   const isRefreshing = refreshState === "loading";
   const isSyncing = source.statusView.state === "syncing" || isUpdating;
@@ -125,166 +82,83 @@ export function SourceDetailsPanel({
   const [dinoActive, closeDino] = useSpaceOpensDino(isSyncing, dinoUnlocked, {
     keepActiveUntilExit: true,
   });
-  // Update is available for a GitHub repo (needs owner/name), a Jira instance
-  // (needs its URL), or a Confluence space (needs its ID).
-  const canUpdate =
-    onUpdateSource !== undefined &&
-    ((source.sourceSystem === "GITHUB" && repository !== null) ||
-      (isJira && jira !== null) ||
-      (isConfluence && Boolean(confluence?.connectionId)));
-  // GitHub and Jira start an asynchronous run, so "Update started" is the whole
-  // story here. Confluence ingests synchronously and its caller already reports
-  // the outcome (completed, partial or failed) — a second toast from here would
-  // duplicate it and, on a failed run, contradict it.
-  const reportsUpdateItself = isConfluence;
-  const canManageRepositoryConfig =
-    canManageSyncSettings &&
-    source.sourceSystem === "GITHUB" &&
-    repository !== null &&
-    onLoadRepositoryConfig !== undefined &&
-    onSaveRepositoryConfig !== undefined;
-  const canManageJiraConfig =
-    canManageSyncSettings &&
-    isJira &&
-    jira !== null &&
-    onLoadJiraConfig !== undefined &&
-    onSaveJiraConfig !== undefined;
-  const canManageConfluenceConfig =
-    canManageSyncSettings &&
-    isConfluence &&
-    Boolean(confluence?.connectionId) &&
-    onLoadConfluenceConfig !== undefined &&
-    onSaveConfluenceConfig !== undefined;
-  const canToggleEnabled =
-    canManageSyncSettings &&
-    source.sourceSystem === "GITHUB" &&
-    repository !== null &&
-    onSetSourceEnabled !== undefined;
-  const canToggleJiraEnabled =
-    canManageSyncSettings && isJira && jira !== null && onSetJiraSourceEnabled !== undefined;
-  // Jira has no per-source `enabled` field on the card; a disabled instance is
-  // exactly the one the status endpoint collapses to DISABLED.
-  const jiraEnabled = source.backendStatus !== "DISABLED";
+
+  // A source system without an update action (uploads have no upstream to
+  // re-ingest from) gets no button at all; the others have one, which is enabled
+  // once the source's identity is known. A synchronous sync reports its outcome
+  // itself; an update that runs in the background only starts.
+  const updateAction = actions.manualSync ?? actions.update;
+  const canUpdate = updateAction?.isAvailable(source) ?? false;
+  const reportsUpdateItself = actions.manualSync !== undefined;
+  const updateLabel = `Update ${meta.noun.singular}`;
+
+  const schedule = actions.schedule;
+  const canEditSchedule = canManage && schedule?.isAvailable(source) === true;
+  const setEnabled = actions.setEnabled;
+  const canToggleEnabled = canManage && setEnabled?.isAvailable(source) === true;
+  // A disabled source is exactly the one the status endpoint collapses to DISABLED.
+  const isEnabled = source.backendStatus !== "DISABLED";
   const isTogglingEnabled = enabledState === "loading";
-  // Authorization is presence-based — the parent only passes onUnlinkSource when
-  // the caller may manage the project's sources. GitHub needs the connection's
-  // repositoryId; Jira is identified by its instance URL, Confluence by its
-  // connection id.
-  const canUnlinkSource =
-    onUnlinkSource !== undefined &&
-    ((source.sourceSystem === "GITHUB" &&
-      repository !== null &&
-      repository.repositoryId !== null) ||
-      (isJira && jira !== null) ||
-      (isConfluence && Boolean(confluence?.connectionId)));
+  const unlink = actions.unlink;
+  const canUnlinkSource = canUnlink && unlink?.isAvailable(source) === true;
   const isUnlinking = unlinkState === "loading";
-  // Noun for the unlink copy: GitHub sources are repositories, Jira sources are
-  // instances, Confluence sources are spaces. Keeps each connector's wording
-  // accurate.
-  const removableNoun = isJira ? "instance" : isConfluence ? "space" : "repository";
-  // What removal actually costs, per connector. A GitHub repository and a Jira
-  // instance are shared between projects and only lose the project association,
-  // so re-linking restores the source as it was. A Confluence connection belongs
-  // to a single project, so removing it deletes the connection itself — the
-  // pages already ingested stay, but the space has to be set up again.
-  const removalHint = isConfluence
-    ? "The pages it already ingested are kept. Connecting the space again sets it up from scratch."
-    : `The ${removableNoun} and its artifacts are kept. You can re-link it later.`;
-  // GitHub exposes one timestamp per resource type; Jira refreshes issue data
-  // (including comments and change history) as one combined resource.
-  const hasResourceSyncTimes =
-    source.lastCommitsSyncAt !== null ||
-    source.lastIssuesSyncAt !== null ||
-    source.lastPullRequestsSyncAt !== null;
+  const removableNoun = meta.noun.singular;
+  const removalHint = unlink?.removalHint ?? "";
+  const resourceSyncTimes = definition.resourceSyncTimes(source.details);
+  const hasResourceSyncTimes = resourceSyncTimes.some(({ value }) => value !== null);
 
-  const handleToggleEnabled = useCallback(
-    async (enabled: boolean) => {
-      if (!repository || !onSetSourceEnabled) return;
+  const handleToggleEnabled = async (enabled: boolean) => {
+    if (!setEnabled) return;
 
-      setEnabledState("loading");
+    setEnabledState("loading");
 
-      try {
-        await onSetSourceEnabled(repository, enabled);
-        setEnabledState("success");
-        toast.success(enabled ? "Source enabled" : "Source disabled", {
-          description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
-        });
-      } catch (error) {
-        setEnabledState("error");
-        toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
-      }
-    },
-    [onSetSourceEnabled, repository, toast],
-  );
-
-  const handleToggleJiraEnabled = useCallback(
-    async (enabled: boolean) => {
-      if (!jira || !onSetJiraSourceEnabled) return;
-
-      setEnabledState("loading");
-
-      try {
-        await onSetJiraSourceEnabled(jira.instanceUrl, enabled);
-        setEnabledState("success");
-        toast.success(enabled ? "Source enabled" : "Source disabled", {
-          description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
-        });
-      } catch (error) {
-        setEnabledState("error");
-        toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
-      }
-    },
-    [jira, onSetJiraSourceEnabled, toast],
-  );
-
-  const loadRepositoryConfig = useCallback(async () => {
-    if (!canManageRepositoryConfig || !repository || !onLoadRepositoryConfig) {
-      throw new Error("Repository sync config is not available.");
+    try {
+      await setEnabled.run(source, enabled, context);
+      await onChanged("changed");
+      setEnabledState("success");
+      toast.success(enabled ? "Source enabled" : "Source disabled", {
+        description: enabled ? "Included in ingestion again." : "Excluded from ingestion.",
+      });
+    } catch (error) {
+      setEnabledState("error");
+      toast.error(error instanceof Error ? error.message : "Couldn't update the source.");
     }
+  };
 
-    return onLoadRepositoryConfig(repository);
-  }, [canManageRepositoryConfig, onLoadRepositoryConfig, repository]);
-
-  const saveRepositoryConfig = useCallback(
-    async (request: ConfigureGithubRepositoryRequest) => {
-      if (!canManageRepositoryConfig || !repository || !onSaveRepositoryConfig) {
-        throw new Error("Repository sync config is not available.");
-      }
-
-      await onSaveRepositoryConfig(repository, request);
-    },
-    [canManageRepositoryConfig, onSaveRepositoryConfig, repository],
-  );
-
-  const handleUpdateSource = useCallback(async () => {
-    if (!canUpdate || !onUpdateSource) return;
+  const handleUpdateSource = async () => {
+    if (!canUpdate) return;
 
     setUpdateState("loading");
 
     try {
-      await onUpdateSource(source);
-      setUpdateState("success");
-      if (!reportsUpdateItself) {
+      if (actions.manualSync) {
+        await syncManually(source);
+      } else if (actions.update) {
+        await actions.update.run(source, context);
         toast.success("Update started", {
           description: "Details refresh while ingestion runs.",
         });
       }
+
+      await onChanged("updated");
+      setUpdateState("success");
     } catch (error) {
       setUpdateState("error");
       if (!reportsUpdateItself) {
         toast.error(error instanceof Error ? error.message : "Couldn't start the update.");
       }
     }
-  }, [canUpdate, onUpdateSource, reportsUpdateItself, source, toast]);
+  };
 
-  const handleConfirmUnlink = useCallback(async () => {
-    if (!onUnlinkSource) return;
+  const handleConfirmUnlink = async () => {
+    if (!unlink) return;
 
     setUnlinkState("loading");
 
     try {
-      await onUnlinkSource(source);
-      // The parent closes this drawer on success, so there is nothing to reset
+      await unlink.run(source, context);
+      await onChanged("unlinked");
+      // The page closes this drawer on success, so there is nothing to reset
       // here — the component unmounts; the confirming toast lives at the root.
       toast.success("Removed from project");
     } catch (error) {
@@ -293,22 +167,20 @@ export function SourceDetailsPanel({
         error instanceof Error ? error.message : "Couldn't remove the source from the project.",
       );
     }
-  }, [onUnlinkSource, source, toast]);
+  };
 
-  const handleRefreshDetails = useCallback(async () => {
-    if (!onRefreshDetails) return;
-
+  const handleRefreshDetails = async () => {
     setRefreshState("loading");
 
     try {
-      await onRefreshDetails();
+      await onChanged("changed");
       setRefreshState("success");
-      toast.success("Repository details refreshed");
+      toast.success("Source details refreshed");
     } catch (error) {
       setRefreshState("error");
-      toast.error(error instanceof Error ? error.message : "Couldn't refresh repository details.");
+      toast.error(error instanceof Error ? error.message : "Couldn't refresh the source details.");
     }
-  }, [onRefreshDetails, toast]);
+  };
 
   const details = useMemo(() => {
     const artifactCount = source.totalArtifactCount ?? source.artifacts;
@@ -324,9 +196,34 @@ export function SourceDetailsPanel({
       lastSync,
       latestUpdatedCount: source.latestUpdatedCount,
       errors: source.errors,
-      runIds: source.runIds,
     };
   }, [source]);
+
+  // The row inside the connector's identity card: a switch for managers, plain
+  // text for everyone else.
+  const enabledRow: ReactNode = canToggleEnabled ? (
+    <div className="flex items-center gap-3 border-t border-app-border py-2.5">
+      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
+      <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
+        <span className="text-[13px] font-semibold text-app-text">
+          Include in ingestion
+          <span className="ml-1 font-normal text-app-text-subtle">
+            · sync this {meta.noun.singular} into the knowledge base
+          </span>
+        </span>
+        <AccountEnabledToggle
+          enabled={isEnabled}
+          disabled={isTogglingEnabled}
+          ariaLabel={`Toggle ingestion for ${source.name}`}
+          onChange={(next) => {
+            void handleToggleEnabled(next);
+          }}
+        />
+      </dd>
+    </div>
+  ) : (
+    <InfoRow label="Source" value={isEnabled ? "Enabled" : "Disabled"} />
+  );
 
   return (
     <DetailsSideDrawer
@@ -336,11 +233,7 @@ export function SourceDetailsPanel({
       closeAriaLabel="Close source details"
       zIndexClassName="z-50"
       showOverlay
-      leading={
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
-          <Icon className="h-6 w-6" />
-        </div>
-      }
+      leading={<IconTile icon={Icon} size="2xl" tone="neutral" />}
       badge={
         <>
           <SourceTypeBadge type={source.type} />
@@ -351,42 +244,28 @@ export function SourceDetailsPanel({
         </>
       }
       footer={
-        <div className="grid w-full grid-cols-2 gap-3">
-          <Button
-            variant="primary"
-            onClick={() => {
-              void handleUpdateSource();
-            }}
-            disabled={!canUpdate || isRefreshing}
-            loading={isUpdating}
-            icon={
-              isJira ? (
-                <Ticket className="h-4 w-4" />
-              ) : isConfluence ? (
-                <BookOpen className="h-4 w-4" />
-              ) : (
-                <GitBranch className="h-4 w-4" />
-              )
-            }
-            title={
-              canUpdate
-                ? undefined
-                : isJira
-                  ? "Instance updates need the Jira instance URL."
-                  : isConfluence
-                    ? "Space updates need the Confluence space ID."
-                    : "Repository updates need GitHub owner and repository name."
-            }
-          >
-            {isJira ? "Update instance" : isConfluence ? "Update space" : "Update repo"}
-          </Button>
+        <div className={`grid w-full gap-3 ${updateAction ? "grid-cols-2" : "grid-cols-1"}`}>
+          {updateAction && (
+            <Button
+              variant="primary"
+              onClick={() => {
+                void handleUpdateSource();
+              }}
+              disabled={!canUpdate || isRefreshing}
+              loading={isUpdating}
+              icon={<Icon className="h-4 w-4" />}
+              title={canUpdate ? undefined : updateAction.unavailableReason}
+            >
+              {updateLabel}
+            </Button>
+          )}
 
           <Button
             variant="secondary"
             onClick={() => {
               void handleRefreshDetails();
             }}
-            disabled={!onRefreshDetails || isUpdating}
+            disabled={isUpdating}
             loading={isRefreshing}
             icon={<RefreshCw className="h-4 w-4" />}
           >
@@ -454,167 +333,42 @@ export function SourceDetailsPanel({
         </div>
       </DrawerCard>
 
-      {isJira && jira && (
-        <DrawerCard label="Instance" icon={Icon} index={1} className="mt-4 sm:mt-5">
-          <dl className="-my-1">
-            <InfoRow label="Display name" value={jira.displayName} />
-            <InfoLinkRow label="URL" value={jira.instanceUrl} />
-            {canToggleJiraEnabled ? (
-              <div className="flex items-center gap-3 border-t border-app-border py-2.5">
-                <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
-                <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span className="text-[13px] font-semibold text-app-text">
-                    Include in ingestion
-                    <span className="ml-1 font-normal text-app-text-subtle">
-                      · sync this instance into the knowledge base
-                    </span>
-                  </span>
-                  <AccountEnabledToggle
-                    enabled={jiraEnabled}
-                    disabled={isTogglingEnabled}
-                    ariaLabel={`Toggle ingestion for ${jira.displayName}`}
-                    onChange={(next) => {
-                      void handleToggleJiraEnabled(next);
-                    }}
-                  />
-                </dd>
-              </div>
-            ) : (
-              <InfoRow label="Source" value={jiraEnabled ? "Enabled" : "Disabled"} />
-            )}
-          </dl>
-        </DrawerCard>
-      )}
+      {DetailsSection && <DetailsSection source={source} enabledRow={enabledRow} />}
 
-      {isConfluence && (
-        <DrawerCard label="Space" icon={Icon} index={1} className="mt-4 sm:mt-5">
-          <dl className="-my-1">
-            <InfoRow label="Space name" value={source.name} />
-            {confluence?.spaceKey && <InfoRow label="Space key" value={confluence.spaceKey} />}
-            {confluence?.baseUrl && <InfoLinkRow label="Base URL" value={confluence.baseUrl} />}
-            <InfoRow label="Space ID" value={confluence?.spaceId ?? source.sourceId} mono />
-            {confluence?.credentialName && (
-              <InfoRow label="Credential" value={confluence.credentialName} />
-            )}
-          </dl>
-        </DrawerCard>
-      )}
-
-      {source.sourceSystem === "GITHUB" && (
-        <DrawerCard label="Repository" icon={GitBranch} index={1} className="mt-4 sm:mt-5">
-          <dl className="-my-1">
-            <InfoRow label="Full name" value={repository?.fullName} />
-            <InfoRow label="Owner" value={repository?.owner} />
-            <InfoLinkRow label="URL" value={repository?.url} />
-            <InfoRow
-              label="Repository ID"
-              value={repository?.repositoryId ?? source.sourceId}
-              mono
-            />
-            {canToggleEnabled && repository ? (
-              <div className="flex items-center gap-3 border-t border-app-border py-2.5">
-                <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
-                <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span className="text-[13px] font-semibold text-app-text">
-                    Include in ingestion
-                    <span className="ml-1 font-normal text-app-text-subtle">
-                      · sync this repository into the knowledge base
-                    </span>
-                  </span>
-                  <AccountEnabledToggle
-                    enabled={repository.enabled !== false}
-                    disabled={isTogglingEnabled}
-                    ariaLabel={`Toggle ingestion for ${repository.fullName}`}
-                    onChange={(next) => {
-                      void handleToggleEnabled(next);
-                    }}
-                  />
-                </dd>
-              </div>
-            ) : (
-              <InfoRow label="Source" value={formatEnabled(repository?.enabled)} />
-            )}
-          </dl>
-        </DrawerCard>
+      {/* Only offered when there is something to list, so it never leads to an empty page. */}
+      {details.artifactCount > 0 && (
+        <KnowledgeBaseLinkCard source={source} artifactCount={details.artifactCount} index={2} />
       )}
 
       {hasResourceSyncTimes && (
-        <DrawerCard label="Last Synced" icon={Clock3} index={2} className="mt-4 sm:mt-5">
+        <DrawerCard label="Last Synced" icon={Clock3} index={3} className="mt-4 sm:mt-5">
           <dl className="-my-1">
-            {isJira ? (
-              <InfoRow label="Issues" value={formatDateTime(source.lastIssuesSyncAt)} />
-            ) : (
-              <>
-                <InfoRow label="Commits" value={formatDateTime(source.lastCommitsSyncAt)} />
-                <InfoRow label="Issues" value={formatDateTime(source.lastIssuesSyncAt)} />
-                <InfoRow
-                  label="Pull requests"
-                  value={formatDateTime(source.lastPullRequestsSyncAt)}
-                />
-              </>
-            )}
+            {resourceSyncTimes.map(({ label, value }) => (
+              <InfoRow key={label} label={label} value={formatDateTime(value)} />
+            ))}
           </dl>
         </DrawerCard>
       )}
 
-      {canManageRepositoryConfig && repository && (
-        <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
-          <GithubRepositorySyncSettings
-            loadKey={repository.fullName}
-            loadConfig={loadRepositoryConfig}
-            onSave={saveRepositoryConfig}
+      {canEditSchedule && schedule && (
+        <DrawerCard label="Sync Schedule" icon={CalendarClock} index={4} className="mt-4 sm:mt-5">
+          <SyncScheduleSettings
+            loadKey={source.sourceId}
+            loadConfig={() => schedule.load(source, context)}
+            onSave={async (request) => {
+              await schedule.save(source, request, context);
+              await onChanged("changed");
+            }}
+            autoUpdateOnText={`Due checks update this ${meta.noun.singular}.`}
+            autoUpdateOffText={`Due checks only mark this ${meta.noun.singular} out of date.`}
+            toggleAriaLabel={`Toggle ${meta.noun.singular} auto update`}
           />
         </DrawerCard>
       )}
-
-      {canManageJiraConfig && jira && onLoadJiraConfig && onSaveJiraConfig && (
-        <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
-          {/* Same control as GitHub: the Jira instance sync schedule shares the
-              identical schedule contract, only the load/save endpoints differ. */}
-          <GithubRepositorySyncSettings
-            loadKey={jira.instanceUrl}
-            loadConfig={() => onLoadJiraConfig(jira.instanceUrl)}
-            onSave={(request) => onSaveJiraConfig(jira.instanceUrl, request)}
-            autoUpdateOnText="Due checks update this Jira instance."
-            autoUpdateOffText="Due checks only mark this Jira instance out of date."
-            toggleAriaLabel="Toggle Jira instance auto update"
-          />
-        </DrawerCard>
-      )}
-
-      {canManageConfluenceConfig &&
-        confluence?.connectionId &&
-        onLoadConfluenceConfig &&
-        onSaveConfluenceConfig && (
-          <DrawerCard label="Sync Schedule" icon={CalendarClock} index={3} className="mt-4 sm:mt-5">
-            {/* Same control again: Confluence connections carry the identical
-                schedule contract, only the load/save endpoints differ. */}
-            <GithubRepositorySyncSettings
-              loadKey={confluence.connectionId}
-              loadConfig={() => onLoadConfluenceConfig(confluence.connectionId)}
-              onSave={(request) => onSaveConfluenceConfig(confluence.connectionId, request)}
-              autoUpdateOnText="Due checks update this Confluence space."
-              autoUpdateOffText="Due checks only mark this Confluence space out of date."
-              toggleAriaLabel="Toggle Confluence space auto update"
-            />
-          </DrawerCard>
-        )}
 
       {source.failedItems.length > 0 && (
-        <DrawerCard label="Failed Items" icon={XCircle} index={4} className="mt-4 sm:mt-5">
-          <div className="space-y-3">
-            {source.failedItems.map((item) => (
-              <div
-                key={`${item.artifactIdentifier}-${item.reason}`}
-                className="rounded-xl border border-app-warning-border bg-app-warning-bg px-4 py-3"
-              >
-                <p className="text-sm font-medium wrap-break-word text-app-warning-text">
-                  {item.artifactIdentifier}
-                </p>
-                <p className="mt-1 text-sm text-app-text-muted">{item.reason}</p>
-              </div>
-            ))}
-          </div>
+        <DrawerCard label="Failed Items" icon={XCircle} index={5} className="mt-4 sm:mt-5">
+          <FailedItemList items={source.failedItems} />
         </DrawerCard>
       )}
 
@@ -622,7 +376,7 @@ export function SourceDetailsPanel({
         <DrawerCard
           label="Project link"
           icon={Unlink}
-          index={5}
+          index={6}
           variant="danger"
           className="mt-4 sm:mt-5"
         >
@@ -687,55 +441,4 @@ function Tile({
       </p>
     </div>
   );
-}
-
-function InfoRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value?: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
-      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
-      <dd
-        className={`min-w-0 text-[13px] font-semibold wrap-break-word text-app-text ${
-          mono ? "font-mono text-xs font-medium" : ""
-        }`}
-      >
-        {value || "Not available"}
-      </dd>
-    </div>
-  );
-}
-
-function InfoLinkRow({ label, value }: { label: string; value?: string }) {
-  return (
-    <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
-      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
-      <dd className="min-w-0 text-[13px] font-semibold wrap-break-word">
-        {value ? (
-          <a
-            href={value}
-            target="_blank"
-            rel="noreferrer"
-            className="font-mono text-xs text-app-brand-text underline decoration-app-brand-border underline-offset-4 hover:text-app-brand"
-          >
-            {value}
-          </a>
-        ) : (
-          <span className="text-app-text">Not available</span>
-        )}
-      </dd>
-    </div>
-  );
-}
-
-function formatEnabled(value?: boolean | null) {
-  if (value === true) return "Enabled";
-  if (value === false) return "Disabled";
-  return "Not available";
 }

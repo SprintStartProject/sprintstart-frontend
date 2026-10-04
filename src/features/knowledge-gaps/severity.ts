@@ -59,7 +59,7 @@ export interface SeverityStyle {
 
 /**
  * Maps each severity to the four-step severity ramp in styles/index.css (see
- * AGENTS.md §7), running red → orange → amber → green.
+ * FRONTEND_CODING_STANDARDS.md §4), running red → orange → amber → green.
  *
  * Its own scale rather than the status roles, because there are four ordered
  * steps and only three status colors. It also frees `low` from green, which it

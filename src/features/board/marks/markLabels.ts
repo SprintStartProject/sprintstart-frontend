@@ -23,6 +23,12 @@ function storageKey(projectId: string): string {
 
 type Stored = { version: number; labels: unknown };
 
+/**
+ * The hire's names for the highlight colours of one project, read from `localStorage`.
+ *
+ * Never throws: anything unreadable reads as no names. Names are trimmed, and a blank one is
+ * dropped, so the colour falls back to its own word.
+ */
 export function readMarkLabels(projectId: string): MarkLabels {
   if (!projectId) return {};
 
@@ -53,6 +59,10 @@ export function readMarkLabels(projectId: string): MarkLabels {
   }
 }
 
+/**
+ * Stores the colour names and announces the write, so the board sync picks it up. A storage that
+ * refuses is not a reason to lose them on screen.
+ */
 export function writeMarkLabels(projectId: string, labels: MarkLabels): void {
   if (!projectId) return;
 

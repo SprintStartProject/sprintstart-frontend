@@ -109,7 +109,7 @@ export type AnalysisPhase = "idle" | "running" | "done";
 
 const TASKS: readonly Pick<AnalysisTask, "id" | "label">[] = [
   { id: "team", label: "Team & open items" },
-  { id: "onboarding", label: "Onboarding metrics" },
+  { id: "onboarding", label: "Contribution metrics" },
   { id: "escalations", label: "Escalation inbox" },
   { id: "questions", label: "Recurring questions" },
   { id: "gaps", label: "Knowledge gaps" },

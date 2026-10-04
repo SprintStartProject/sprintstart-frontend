@@ -1,4 +1,4 @@
-import { Check, Minus, Plus, RotateCcw, Search, Sparkles, Trash2, UserX, X } from "lucide-react";
+import { Check, Minus, Plus, Search, Sparkles, UserX, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
@@ -21,11 +21,10 @@ import {
   assignProjectRoleToUser,
   createProjectRole,
   deleteProjectRole,
-  deleteSkill,
   getSkills,
   getSkillsByRoleId,
-  reactivateSkill,
   unassignProjectRoleFromUser,
+  updateRoleSkills,
 } from "../../../services/teamManagementService";
 import { parseApiError } from "../../../services/apiError";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -101,7 +100,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
   const [addingSkill, setAddingSkill] = useState(false);
 
   const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null);
-  const [retireSkillId, setRetireSkillId] = useState<string | null>(null);
+  const [removingSkillId, setRemovingSkillId] = useState<string | null>(null);
   const [showSuggestionPanel, setShowSuggestionPanel] = useState(false);
   const [skillSuggestions, setSkillSuggestions] = useState<SkillSuggestion[]>([]);
   const [selectedSuggestionKeys, setSelectedSuggestionKeys] = useState<Set<string>>(new Set());
@@ -323,34 +322,34 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       setAddingSkill(false);
     }
   }
-  async function confirmRetireSkill() {
-    if (!retireSkillId) return;
+  /**
+   * Unlinks a skill from the open role, without retiring it globally.
+   *
+   * `updateRoleSkills` replaces the role's complete skill list, so the request carries
+   * every skill currently linked to this role minus the one being removed -- including
+   * retired ones, which stay linked even though they can no longer be picked here.
+   * Disabled from the caller when the skill would be left with no role at all, since the
+   * backend rejects that with a 400; the `parseApiError` toast is a safety net for a
+   * race (another tab removing the skill's last other role first), not the primary guard.
+   */
+  async function handleRemoveSkillFromRole(skill: Skill) {
+    if (!selectedRole || removingSkillId) return;
 
-    const skillId = retireSkillId;
-    setRetireSkillId(null);
+    const remainingSkillIds = selectedRoleSkills
+      .filter((candidate) => candidate.id !== skill.id)
+      .map((candidate) => candidate.id);
+
+    setRemovingSkillId(skill.id);
 
     try {
-      await deleteSkill(skillId);
+      const roleSkills = await updateRoleSkills(selectedRole.id, remainingSkillIds);
 
-      setSkills((current) =>
-        current.map((skill) =>
-          skill.id === skillId ? { ...skill, status: "RETIRED" as const } : skill,
-        ),
-      );
-      toast.success("Skill retired");
+      replaceRoleSkills(selectedRole.id, roleSkills);
+      toast.success("Skill removed from role");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't retire the skill.");
-    }
-  }
-
-  async function handleReactivateSkill(skill: Skill) {
-    try {
-      const updated = await reactivateSkill(skill.id, skill.name, skill.roleIds);
-
-      setSkills((current) => current.map((entry) => (entry.id === skill.id ? updated : entry)));
-      toast.success("Skill reactivated");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't reactivate the skill.");
+      toast.error(parseApiError(error, "Couldn't remove the skill from this role."));
+    } finally {
+      setRemovingSkillId(null);
     }
   }
 
@@ -616,7 +615,6 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     : null;
 
   const roleToDelete = roles.find((role) => role.id === deleteRoleId);
-  const skillToRetire = skills.find((skill) => skill.id === retireSkillId);
 
   // The open role, expanded right under its row in the list. Everything about it lives in here --
   // who holds it, and which skills it carries -- so working on a role never means looking at two
@@ -860,25 +858,21 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
               >
                 {skill.name}
                 {skill.status === "RETIRED" ? (
-                  <>
-                    <span className="font-medium">Retired</span>
-                    <button
-                      type="button"
-                      aria-label={`Reactivate ${skill.name}`}
-                      onClick={() => void handleReactivateSkill(skill)}
-                      className="text-app-text-muted transition-colors hover:text-app-success-text"
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                    </button>
-                  </>
+                  <span className="font-medium">Retired</span>
                 ) : (
                   <button
                     type="button"
-                    aria-label={`Retire ${skill.name}`}
-                    onClick={() => setRetireSkillId(skill.id)}
-                    className="text-app-text-muted transition-colors hover:text-app-danger-text"
+                    aria-label={`Remove ${skill.name} from role`}
+                    title={
+                      skill.roleIds.length === 1
+                        ? "Only role of this skill. An admin can retire it in Access Management."
+                        : undefined
+                    }
+                    disabled={skill.roleIds.length === 1 || removingSkillId === skill.id}
+                    onClick={() => void handleRemoveSkillFromRole(skill)}
+                    className="text-app-text-muted transition-colors hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-app-text-muted"
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <X className="h-3 w-3" />
                   </button>
                 )}
               </span>
@@ -1185,57 +1179,37 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       </div>
 
       <AlertDialog
-        isOpen={Boolean(deleteRoleId || retireSkillId)}
-        title={retireSkillId ? "Confirm retirement" : "Confirm deletion"}
+        isOpen={Boolean(deleteRoleId)}
+        title="Confirm deletion"
         description={
           <>
-            Are you sure you want to {retireSkillId ? "retire" : "delete"}{" "}
-            <span className="font-medium text-app-text">
-              {roleToDelete?.name ?? skillToRetire?.name ?? "this item"}
-            </span>
-            ?
-            {retireSkillId ? (
-              " Existing assessments remain available, but the skill can no longer be assigned or assessed."
-            ) : (
+            Are you sure you want to delete{" "}
+            <span className="font-medium text-app-text">{roleToDelete?.name ?? "this item"}</span>?
+            {deleteImpact && deleteImpact.members.length > 0 && (
               <>
-                {deleteImpact && deleteImpact.members.length > 0 && (
-                  <>
-                    {" "}
-                    {deleteImpact.members.length === 1
-                      ? "1 member loses"
-                      : `${deleteImpact.members.length} members lose`}{" "}
-                    this role: {nameList(deleteImpact.members)}.
-                  </>
-                )}
-                {deleteImpact && deleteImpact.skills > 0 && (
-                  <>
-                    {" "}
-                    {deleteImpact.skills === 1
-                      ? "Its 1 skill stays"
-                      : `Its ${deleteImpact.skills} skills stay`}{" "}
-                    in the catalog, no longer linked to the role.
-                  </>
-                )}{" "}
-                This action cannot be undone.
+                {" "}
+                {deleteImpact.members.length === 1
+                  ? "1 member loses"
+                  : `${deleteImpact.members.length} members lose`}{" "}
+                this role: {nameList(deleteImpact.members)}.
               </>
             )}
+            {deleteImpact && deleteImpact.skills > 0 && (
+              <>
+                {" "}
+                {deleteImpact.skills === 1
+                  ? "Its 1 skill stays"
+                  : `Its ${deleteImpact.skills} skills stay`}{" "}
+                in the catalog, no longer linked to the role.
+              </>
+            )}{" "}
+            This action cannot be undone.
           </>
         }
-        confirmLabel={retireSkillId ? "Retire" : "Delete"}
+        confirmLabel="Delete"
         variant="danger"
-        onClose={() => {
-          setDeleteRoleId(null);
-          setRetireSkillId(null);
-        }}
-        onConfirm={() => {
-          if (deleteRoleId) {
-            void confirmDeleteRole();
-          }
-
-          if (retireSkillId) {
-            void confirmRetireSkill();
-          }
-        }}
+        onClose={() => setDeleteRoleId(null)}
+        onConfirm={() => void confirmDeleteRole()}
       />
     </>
   );

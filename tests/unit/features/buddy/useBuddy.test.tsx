@@ -42,7 +42,7 @@ describe("useBuddy", () => {
    * moment a hire's session resolves, long before they click. Doing the work here is what makes
    * the click find the conversation already there.
    *
-   * It reads rather than opening blind; `buddyVisitContinuity` covers why that distinction is
+   * It reads rather than opening blind; `buddyConversationContinuity` covers why that distinction is
    * the whole ballgame.
    */
   it("starts closed, with the conversation already on its way", async () => {
@@ -358,8 +358,8 @@ describe("useBuddy", () => {
     });
   });
   /**
-   * The seam between the card and the hook. The card offers "Try again" on a hire action that
-   * came back "couldn't"; the hook has to let that second confirm through. Rendered-component
+   * The seam between the card and the hook. The card keeps a refused hire offer on screen — same
+   * button, same field — so the hook has to let that second confirm through. Rendered-component
    * tests mock `onConfirm`, so only a test at this level sees the two meet.
    */
   describe("confirming a resolved hire offer again", () => {
@@ -381,7 +381,14 @@ describe("useBuddy", () => {
       );
     }
 
-    async function confirmOnce(ok: boolean) {
+    async function confirmOnce(
+      ok: boolean,
+      /** Runs once the offer is on screen and before it is confirmed — for the draft tests below. */
+      beforeConfirm?: (
+        session: { setActionDraft: (key: string, text: string) => void },
+        key: string,
+      ) => void,
+    ) {
       let calls = 0;
       server.use(
         http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])),
@@ -409,6 +416,14 @@ describe("useBuddy", () => {
       });
       await waitFor(() => expect(hook.result.current.messages[1]?.actions?.[0]).toBeDefined());
 
+      // The key a card writes its field under: one action inside one message.
+      const key = `${hook.result.current.messages[1].id}:${hook.result.current.messages[1].actions![0].id}`;
+      if (beforeConfirm) {
+        act(() => {
+          beforeConfirm(hook.result.current, key);
+        });
+      }
+
       act(() => {
         hook.result.current.confirmAction(
           hook.result.current.messages[1].id,
@@ -421,14 +436,14 @@ describe("useBuddy", () => {
         expect(action?.ok).toBe(ok);
       });
 
-      return { result: hook.result, calls: () => calls };
+      return { result: hook.result, calls: () => calls, key };
     }
 
     it("sends a refused hire offer again when the hire retries it", async () => {
       const { result, calls } = await confirmOnce(false);
       expect(calls()).toBe(1);
 
-      // What the "Try again" button does: confirm the resolved action as it stands.
+      // What pressing the card's own button again does: confirm the resolved action as it stands.
       act(() => {
         result.current.confirmAction(
           result.current.messages[1].id,
@@ -455,6 +470,60 @@ describe("useBuddy", () => {
 
       expect(calls()).toBe(1);
       expect(result.current.messages[1].actions?.[0].status).toBe("resolved");
+    });
+
+    /**
+     * The field's wording lives in the session, not in the card — that is what lets it survive a
+     * closed dock and the hand-off to `/buddy` — so the session is what has to let go of it, too:
+     * a refusal keeps it (the card hands it straight back to be corrected), and once the offer
+     * went through it goes, because a card re-rendered later must not offer wording that has
+     * already left the product.
+     */
+    it("keeps the hire's wording for a refused offer and lets go of it once it went through", async () => {
+      const record = (
+        session: { setActionDraft: (key: string, text: string) => void },
+        key: string,
+      ) => {
+        session.setActionDraft(key, "Who owns the staging box?");
+      };
+
+      // One session, one offer, the way a hire meets it: refused first, then retried and sent.
+      const { result, key } = await confirmOnce(false, record);
+      expect(result.current.actionDrafts[key]).toBe("Who owns the staging box?");
+
+      // The retry is the same offer in the same conversation — the endpoint answers this time.
+      let retries = 0;
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/actions", () => {
+          retries += 1;
+          return HttpResponse.json({ ok: true, message: "Kept." });
+        }),
+      );
+      act(() => {
+        result.current.confirmAction(
+          result.current.messages[1].id,
+          result.current.messages[1].actions![0],
+        );
+      });
+      await waitFor(() => expect(result.current.messages[1].actions?.[0].ok).toBe(true));
+
+      expect(retries).toBe(1);
+      expect(result.current.actionDrafts).not.toHaveProperty(key);
+    });
+
+    /** The same reasoning one transition further: a new conversation leaves its offers behind. */
+    it("starts a new conversation without the flag wording of the conversation before", async () => {
+      const { result, key } = await confirmOnce(false, (session, key) => {
+        session.setActionDraft(key, "Who owns the staging box?");
+      });
+      expect(result.current.actionDrafts[key]).toBe("Who owns the staging box?");
+
+      await act(async () => {
+        await result.current.newConversation();
+      });
+
+      expect(result.current.messages).toHaveLength(0);
+      expect(result.current.actionDrafts).toEqual({});
     });
   });
 

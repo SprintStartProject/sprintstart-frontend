@@ -6,25 +6,34 @@ describe("ArtifactPageSizeSelect", () => {
   it("offers 20, 50 and 100 behind a visible label", () => {
     render(<ArtifactPageSizeSelect pageSize={20} onPageSizeChange={vi.fn()} />);
 
-    const select = screen.getByLabelText("Per page");
-    expect(select).toHaveValue("20");
-    const values = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
-    expect(values).toEqual(["20", "50", "100"]);
+    const select = screen.getByRole("combobox", { name: "Per page" });
+    expect(select).toHaveTextContent("20");
+
+    fireEvent.click(select);
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["20", "50", "100"]);
   });
 
   it("reports the chosen size as a number", () => {
     const onPageSizeChange = vi.fn();
     render(<ArtifactPageSizeSelect pageSize={20} onPageSizeChange={onPageSizeChange} />);
 
-    fireEvent.change(screen.getByTestId("kb-page-size"), { target: { value: "50" } });
+    fireEvent.click(screen.getByTestId("kb-page-size"));
+    fireEvent.click(screen.getByRole("option", { name: "50" }));
     expect(onPageSizeChange).toHaveBeenCalledWith(50);
   });
 
   it("shows a hand-edited size as its own option instead of misreporting it", () => {
     render(<ArtifactPageSizeSelect pageSize={35} onPageSizeChange={vi.fn()} />);
 
-    const select = screen.getByTestId<HTMLSelectElement>("kb-page-size");
-    expect(select).toHaveValue("35");
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(["20", "35", "50", "100"]);
+    const select = screen.getByTestId("kb-page-size");
+    expect(select).toHaveTextContent("35");
+
+    fireEvent.click(select);
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "20",
+      "35",
+      "50",
+      "100",
+    ]);
   });
 });

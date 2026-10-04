@@ -11,6 +11,12 @@ type StatusChipProps = {
   inactiveKind: "disabled" | "pending";
 };
 
+/**
+ * Badge for a yes/no state of a user, such as account access or onboarding.
+ *
+ * Always icon plus label, never colour alone: a check when active, otherwise a slash for
+ * `disabled` or a clock for `pending`.
+ */
 export function StatusChip({
   active,
   activeLabel,

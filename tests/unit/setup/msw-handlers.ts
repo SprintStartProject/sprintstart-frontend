@@ -680,4 +680,26 @@ export const handlers = [
   // keeps that request handled for the many tests that open the dock without being about the
   // chips; `useBuddySuggestions`' own suite mocks the service directly and never sees this.
   http.get("/api/v1/onboarding/me/buddy/suggestions", () => HttpResponse.json([])),
+  // Every surface that opens the buddy reads its conversation list first — the newest is
+  // opened, and an empty list would create one. One default conversation keeps the many tests
+  // that are not about conversations on the path they were written for: read it, and greet it
+  // while it is still empty. Tests about the list override the id or start from none.
+  http.get("/api/v1/onboarding/me/buddy/sessions", () =>
+    HttpResponse.json({
+      sessions: [
+        {
+          id: "session-1",
+          title: "",
+          userId: "1",
+          projectId: null,
+          createdAt: "2026-09-30T09:00:00.000Z",
+        },
+      ],
+    }),
+  ),
+  // "New conversation" tests assert on their own id where it matters; this is the default the
+  // rest gets, so the call resolves like the real backend's.
+  http.post("/api/v1/onboarding/me/buddy/sessions", () =>
+    HttpResponse.json({ id: "session-new" }, { status: 201 }),
+  ),
 ];

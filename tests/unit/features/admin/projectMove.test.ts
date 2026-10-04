@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   canJoinMultipleProjects,
+  getManagedProjectIds,
   getMovedUsers,
+  getOtherProjectCount,
   getProjectsLeftOnMove,
+  getRoleDowngradeConflicts,
   isManagerEligible,
 } from "../../../../src/features/admin/projectMove";
-import type { AdminUser } from "../../../../src/features/admin/types";
+import type { AdminUser, ProjectOverview } from "../../../../src/features/admin/types";
 
 function buildUser(overrides: Partial<AdminUser> = {}): AdminUser {
   return {
@@ -41,6 +44,100 @@ describe("isManagerEligible", () => {
 
   it("is true as soon as one signal qualifies", () => {
     expect(isManagerEligible("USER", "PM")).toBe(true);
+  });
+});
+
+const overview = (id: string, managerId?: string): ProjectOverview => ({
+  id,
+  name: `Project ${id}`,
+  description: "",
+  manager: managerId
+    ? { id: managerId, username: "m", email: "", firstName: "", lastName: "" }
+    : null,
+  sources: [],
+  users: [],
+  industry: "",
+  industryConfidence: null,
+  industryCustom: false,
+});
+
+describe("getManagedProjectIds", () => {
+  it("collects the projects the user is the manager of", () => {
+    const projects = [overview("a", "user-1"), overview("b", "other"), overview("c")];
+
+    expect(getManagedProjectIds(projects, "user-1")).toEqual(new Set(["a"]));
+  });
+});
+
+describe("getRoleDowngradeConflicts", () => {
+  const manager = buildUser({
+    permissionGroup: "Project Manager",
+    projects: [
+      { id: "a", name: "Project a" },
+      { id: "b", name: "Project b" },
+    ],
+    projectIds: ["a", "b"],
+  });
+
+  it("reports several memberships and managed projects when a PM becomes a user", () => {
+    const conflicts = getRoleDowngradeConflicts(manager, [overview("a", "user-1")], "User");
+
+    expect(conflicts).toEqual({
+      projectCount: 2,
+      managedProjects: [{ id: "a", name: "Project a" }],
+    });
+  });
+
+  it("is silent when the new role can still hold the memberships", () => {
+    expect(getRoleDowngradeConflicts(manager, [overview("a", "user-1")], "Admin")).toBeNull();
+  });
+
+  it("is silent for someone who was a regular user already", () => {
+    expect(getRoleDowngradeConflicts(buildUser(), [], "User")).toBeNull();
+  });
+
+  it("is silent when one project and no managing is all that is left", () => {
+    const single = buildUser({
+      permissionGroup: "Admin",
+      projects: [{ id: "a", name: "Project a" }],
+      projectIds: ["a"],
+    });
+
+    expect(getRoleDowngradeConflicts(single, [overview("a")], "User")).toBeNull();
+  });
+
+  it("still reports a managed project when only one membership is left", () => {
+    const single = buildUser({
+      permissionGroup: "Project Manager",
+      projects: [{ id: "a", name: "Project a" }],
+      projectIds: ["a"],
+    });
+
+    expect(getRoleDowngradeConflicts(single, [overview("a", "user-1")], "User")).toEqual({
+      projectCount: 0,
+      managedProjects: [{ id: "a", name: "Project a" }],
+    });
+  });
+});
+
+describe("getOtherProjectCount", () => {
+  it("counts the projects besides the given one", () => {
+    const user = buildUser({ projectIds: ["project-a", "project-b", "project-c"], projects: [] });
+
+    expect(getOtherProjectCount(user, "project-a")).toBe(2);
+    expect(getOtherProjectCount(user, "project-z")).toBe(3);
+  });
+
+  it("reads the named projects when the ids are not filled in, without double counting", () => {
+    const user = buildUser({
+      projectIds: ["project-a"],
+      projects: [
+        { id: "project-a", name: "A" },
+        { id: "project-b", name: "B" },
+      ],
+    });
+
+    expect(getOtherProjectCount(user, "project-a")).toBe(1);
   });
 });
 

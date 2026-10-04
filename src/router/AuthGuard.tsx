@@ -27,6 +27,22 @@ interface AuthGuardProps {
   children: ReactNode;
 }
 
+/**
+ * App-wide gate around every route: sign-in, the redirects around the Keycloak round trip,
+ * and the two places a user can be sent instead of the page they asked for.
+ *
+ * - Unauthenticated users go to `/login`. The requested path is stored first, so it can be
+ *   restored after Keycloak sends them back, also when Keycloak returns to `/` or strips
+ *   the hash fragment.
+ * - An authenticated user on `/login` goes to the stored target, or to `getDefaultRoute`.
+ * - A user with active skills linked to one of their project roles, who has neither done
+ *   the skill assessment nor dismissed the prompt, is sent to `/skill-wizard`.
+ * - A user who has completed onboarding is kept out of `/onboarding`.
+ *
+ * It does not check roles per route; blocking a route by role is `ManagerAreaGuard` in
+ * `AppRouter`. While auth or the skill assessment check is still running it renders the
+ * page skeleton, and nothing at all while a logout return settles.
+ */
 export function AuthGuard({ children }: AuthGuardProps) {
   const { status, profile } = useAuth();
   const location = useLocation();

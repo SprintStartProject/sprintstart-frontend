@@ -356,7 +356,7 @@ describe("teamManagementService", () => {
     ]);
   });
 
-  it("createSkill posts roleIds to admin skill endpoint", async () => {
+  it("createSkill posts the request to the admin skill endpoint", async () => {
     let capturedBody: unknown;
     server.use(
       http.post("/api/v1/admin/skills", async ({ request }) => {
@@ -370,7 +370,7 @@ describe("teamManagementService", () => {
       }),
     );
 
-    const skill = await createSkill("React", ["role1"]);
+    const skill = await createSkill({ name: "React", roleIds: ["role1"] });
 
     expect(capturedBody).toEqual({
       name: "React",
@@ -378,6 +378,19 @@ describe("teamManagementService", () => {
     });
     expect(skill.roleIds).toEqual(["role1"]);
     expect(skill.status).toBe("ACTIVE");
+  });
+
+  it("createSkill propagates a duplicate-name conflict without a mock fallback", async () => {
+    server.use(
+      http.post("/api/v1/admin/skills", () =>
+        HttpResponse.json({ message: "Skill already exists" }, { status: 409 }),
+      ),
+    );
+
+    await expect(createSkill({ name: "React", roleIds: ["role1"] })).rejects.toMatchObject({
+      status: 409,
+      message: "Skill already exists",
+    });
   });
 
   it("reactivateSkill reactivates a retired skill through the admin endpoint", async () => {
@@ -404,6 +417,19 @@ describe("teamManagementService", () => {
     expect(skill.id).toBe("skill1");
   });
 
+  it("reactivateSkill propagates backend failures without a mock fallback", async () => {
+    server.use(
+      http.post("/api/v1/admin/skills", () =>
+        HttpResponse.json({ message: "Not allowed" }, { status: 403 }),
+      ),
+    );
+
+    await expect(reactivateSkill("skill1", "React", ["role1"])).rejects.toMatchObject({
+      status: 403,
+      message: "Not allowed",
+    });
+  });
+
   it("getSkillById fetches a single skill", async () => {
     server.use(
       http.get("/api/v1/skills/skill1", () =>
@@ -424,7 +450,7 @@ describe("teamManagementService", () => {
     expect(skill.status).toBe("ACTIVE");
   });
 
-  it("updateSkill patches a skill through the admin endpoint", async () => {
+  it("updateSkill patches a skill through the admin endpoint, category included", async () => {
     let capturedBody: unknown;
     server.use(
       http.patch("/api/v1/admin/skills/skill1", async ({ request }) => {
@@ -434,6 +460,7 @@ describe("teamManagementService", () => {
           name: "React",
           roleIds: ["role1", "role2"],
           status: "ACTIVE",
+          category: "ENGINEERING",
         });
       }),
     );
@@ -441,14 +468,30 @@ describe("teamManagementService", () => {
     const skill = await updateSkill("skill1", {
       name: "React",
       roleIds: ["role1", "role2"],
+      category: "ENGINEERING",
     });
 
     expect(capturedBody).toEqual({
       name: "React",
       roleIds: ["role1", "role2"],
+      category: "ENGINEERING",
     });
     expect(skill.roleIds).toEqual(["role1", "role2"]);
     expect(skill.name).toBe("React");
+    expect(skill.category).toBe("ENGINEERING");
+  });
+
+  it("updateSkill propagates a duplicate-name conflict without a mock fallback", async () => {
+    server.use(
+      http.patch("/api/v1/admin/skills/skill1", () =>
+        HttpResponse.json({ message: "Skill already exists" }, { status: 409 }),
+      ),
+    );
+
+    await expect(updateSkill("skill1", { name: "React", category: null })).rejects.toMatchObject({
+      status: 409,
+      message: "Skill already exists",
+    });
   });
 
   it("getSkillsByRoleId fetches skills linked to a role", async () => {
@@ -511,6 +554,19 @@ describe("teamManagementService", () => {
     await deleteSkill("skill1");
 
     expect(captured).toBe(true);
+  });
+
+  it("deleteSkill propagates backend failures without a mock fallback", async () => {
+    server.use(
+      http.delete("/api/v1/admin/skills/skill1", () =>
+        HttpResponse.json({ message: "Not allowed" }, { status: 403 }),
+      ),
+    );
+
+    await expect(deleteSkill("skill1")).rejects.toMatchObject({
+      status: 403,
+      message: "Not allowed",
+    });
   });
 
   it("saveUserSkillAssessments posts to current-user assessment endpoint", async () => {

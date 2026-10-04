@@ -610,6 +610,7 @@ export function pointsLostByArea(findings: readonly Finding[]): Map<FindingArea,
   return lost;
 }
 
+/** The one-line verdict shown next to a {@link healthScore}. */
 export function scoreVerdict(score: number): string {
   if (score >= 85) return "In great shape";
   if (score >= 65) return "Mostly on track";

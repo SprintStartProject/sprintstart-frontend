@@ -115,7 +115,7 @@ type MultiSelectFilterProps<TValue extends string> = {
  * `FilterSelect`: the menu is portaled into `<body>` so no ancestor's stacking
  * context or `overflow: hidden` can swallow it.
  *
- * @param summary The trigger's text. Callers word it from the selection because
+ * @param summary - The trigger's text. Callers word it from the selection because
  *   only they know what the options mean ("3 sources" reads better than a list
  *   once the list is long).
  */

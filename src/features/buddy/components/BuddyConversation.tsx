@@ -1,6 +1,7 @@
 import { memo, useCallback } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
+import type { ActionDrafts } from "../actionDrafts";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
 import { BuddyReplyActions } from "./BuddyReplyActions";
@@ -19,6 +20,10 @@ type BuddyConversationProps = {
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
   dismissAction: (messageId: string, action: ProposedAction) => void;
+  /** The session's wording for offers that carry an editable message — see `actionDrafts`. */
+  actionDrafts: ActionDrafts;
+  /** Records one, so it outlives whichever surface is on screen. */
+  setActionDraft: (key: string, text: string) => void;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
   /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
@@ -31,10 +36,6 @@ type BuddyConversationProps = {
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
-  /** Clears the previous conversation from the visit divider — see `BuddyThread`. */
-  onStartFreshVisit?: () => void;
-  /** The chord named in that control's tooltip, where the caller has actually bound one. */
-  freshVisitShortcut?: string;
   /**
    * Leaves room at the top of the thread for a control floating over it.
    *
@@ -89,14 +90,14 @@ function BuddyConversationImpl({
   activeTool,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   placeholder,
   lastMessageFooter,
   renderQuestionAction,
   aboveComposer,
   openError,
   onRetryOpen,
-  onStartFreshVisit,
-  freshVisitShortcut,
   hasFloatingControl = false,
   focusComposerOnMount = false,
   isStreaming = false,
@@ -169,6 +170,8 @@ function BuddyConversationImpl({
             activeTool={activeTool}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
+            actionDrafts={actionDrafts}
+            setActionDraft={setActionDraft}
             showNames
             lastMessageFooter={lastMessageFooter}
             renderQuestionAction={renderQuestionAction}
@@ -176,8 +179,6 @@ function BuddyConversationImpl({
             onRetryOpen={onRetryOpen}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={onDinoGameExit}
-            onStartFreshVisit={onStartFreshVisit}
-            freshVisitShortcut={freshVisitShortcut}
           />
         </div>
       </div>
@@ -207,7 +208,7 @@ function BuddyConversationImpl({
  * page's render — is silently the one prop that always changed, and the memo stops paying.
  *
  * The thread *inside* this carries the per-message boundary; this one is about the page's own
- * re-renders (the rail opening, a toast landing, a visit divider moving) not walking the whole
+ * re-renders (the rail opening, a toast landing, a conversation switch) not walking the whole
  * conversation.
  */
 export const BuddyConversation = memo(BuddyConversationImpl);

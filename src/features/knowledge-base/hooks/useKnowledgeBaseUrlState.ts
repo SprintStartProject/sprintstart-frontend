@@ -169,7 +169,7 @@ function readPositiveInt(raw: string | null, fallback: number, max: number): num
  * Uploads is selected and `repos` only while GitHub is. Otherwise a shared link could carry a
  * filter the panel does not even show — narrowing the list with no visible way to undo it.
  *
- * @param params The current `location.search`, parsed.
+ * @param params - The current `location.search`, parsed.
  * @returns The state the page should render. Never throws.
  */
 export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBaseUrlState {
@@ -322,8 +322,8 @@ export interface KnowledgeBaseUrlStateApi {
  * `replace`. Until that navigation lands the hook already *reports* the cleared state, so no
  * request is ever sent for project B with project A's filters.
  *
- * @param projectId The project the page is scoped to, or null while there is none.
- * @param options See {@link KnowledgeBaseUrlStateOptions}.
+ * @param projectId - The project the page is scoped to, or null while there is none.
+ * @param options - See {@link KnowledgeBaseUrlStateOptions}.
  */
 export function useKnowledgeBaseUrlState(
   projectId: string | null,

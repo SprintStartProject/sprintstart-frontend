@@ -24,7 +24,7 @@ import { queryKeys } from "../../services/queryKeys";
  * inbox never pays for the request nor sees the badge — and 0 when the read
  * fails, since a badge is not worth surfacing an error for.
  *
- * @param refreshKey Changing this asks for a recheck; callers pass the current
+ * @param refreshKey - Changing this asks for a recheck; callers pass the current
  * route, so returning to the sidebar from elsewhere refreshes it.
  */
 export function useOpenEscalationCount(

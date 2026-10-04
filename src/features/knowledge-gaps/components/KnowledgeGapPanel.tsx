@@ -9,6 +9,7 @@ import { FilterSelect } from "../../../components/ui/FilterSelect";
 import { PanelPresence } from "../../../components/ui/PanelPresence";
 import { SidePanel } from "../../../components/ui/SidePanel";
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useToast } from "../../../context/useToast";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
@@ -284,11 +285,7 @@ export function KnowledgeGapPanel({ gapId, gap, onClose }: KnowledgeGapPanelProp
               </span>
             ) : undefined
           }
-          leading={
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand-text">
-              <ShieldAlert aria-hidden="true" className="h-5 w-5" />
-            </span>
-          }
+          leading={<IconTile icon={ShieldAlert} size="xl" tone="brand" />}
           widthClassName="w-full sm:w-[34rem]"
           contentClassName="px-4 py-5 sm:px-6"
           closeAriaLabel="Close gap details"

@@ -28,11 +28,16 @@ body {
      content leaves for it both read this, so the two can never disagree. */
   --app-sidebar-width: 286px;
 
-  /* Backgrounds */
-  --bg: #f9fafb;
+  /* Backgrounds
+     Light mode cannot lift a card by making it brighter than white, so the page
+     and the insets inside a card are tinted instead. The steps are sized to
+     roughly match the dark theme's (page -> card -> inset): with the old
+     near-white page (#f9fafb) a white card only showed by its border, and a
+     tile nested in a card did not show at all. */
+  --bg: #edf1f5;
   --bg-soft: #f3f4f6;
   --surface: #ffffff;
-  --surface-muted: #f8fafc;
+  --surface-muted: #f3f6f9;
   --surface-hover: #f1f5f9;
 
   /* Borders */
@@ -43,7 +48,7 @@ body {
   /* Text */
   --text: #111827;
   --text-muted: #4b5563;
-  --text-subtle: #6b7280;
+  --text-subtle: #5f6b7a;
   --text-disabled: #9ca3af;
   --text-inverse: #ffffff;
 
@@ -997,6 +1002,50 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .app-widget-wiggle {
     animation: none;
+  }
+}
+
+/* The brief light on an onboarding step or question that a link from the buddy landed on.
+
+   The link opens the right phase and scrolls to the item, and on a list of look-alike cards
+   that is not quite enough to find it: this says "this one" twice and then gets out of the way.
+   Deliberately not a way of starting anything -- the hire presses the item's own button.
+
+   A ring rather than a background, so it reads over any card state (open, locked, done), and
+   delayed a beat so it plays after the smooth scroll has arrived rather than during it. */
+@keyframes app-link-highlight {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  25%,
+  65% {
+    box-shadow: 0 0 0 3px var(--color-app-brand);
+  }
+  45% {
+    box-shadow: 0 0 0 1px var(--color-app-brand-border);
+  }
+}
+
+/* `backwards`, not `both`: a last frame that outlived the animation beat the card's own shadow. */
+.app-link-highlight {
+  animation: app-link-highlight 1.6s ease-in-out 0.35s 1 backwards;
+}
+
+/* No pulse, but still marked for as long as the pulse would take: finding the item is the point,
+   not the motion. A step change rather than a fade, and gone afterwards like the pulse is. */
+@keyframes app-link-highlight-still {
+  0% {
+    box-shadow: 0 0 0 2px var(--color-app-brand);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-link-highlight {
+    animation: app-link-highlight-still 2s step-end 1 backwards;
   }
 }
 

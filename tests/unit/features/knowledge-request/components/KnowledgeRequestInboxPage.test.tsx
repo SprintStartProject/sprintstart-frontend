@@ -93,7 +93,7 @@ describe("KnowledgeRequestInboxPage", () => {
   });
 
   it("distinguishes an empty inbox from a still-loading one by words, not form", async () => {
-    // UI_CONSISTENCY_ROADMAP §6: both states share the EmptyState shape on
+    // UI_DESIGN_DECISIONS.md §6: both states share the EmptyState shape on
     // purpose — the copy is the difference.
     mockedService.listOpen.mockResolvedValue([]);
     mockedService.listAnswers.mockResolvedValue([]);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, ListChecks, Pencil, Undo2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import { readableTitle } from "../generation/pathToCards";
+import { readableTitle } from "../layout/cardNames";
 import { useCardMarks } from "../marks/useCardMarks";
 import { Marked } from "./Marked";
 import type {

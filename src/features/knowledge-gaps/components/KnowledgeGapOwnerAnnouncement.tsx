@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FileWarning } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useAuth } from "../../../context/useAuth";
 import { SEVERITY_ORDER } from "../severity";
 import { addAnnouncedComponents, readAnnouncedComponents } from "../ownerAnnouncement";
@@ -156,9 +157,7 @@ function OwnerAnnouncementDialog({ userId }: { userId: string }) {
     >
       <div className="space-y-4">
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-app-brand-soft text-app-brand">
-            <FileWarning aria-hidden="true" className="h-5 w-5" />
-          </span>
+          <IconTile icon={FileWarning} size="xl" tone="brand" />
 
           <p className="text-sm leading-relaxed text-app-text-muted">
             {newGaps.length === 1

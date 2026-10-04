@@ -30,6 +30,8 @@ type FilterSelectProps<TValue extends string> = {
   onChange: (value: TValue) => void;
   disabled?: boolean;
   className?: string;
+  /** `data-testid` of the trigger, for end-to-end tests. */
+  testId?: string;
 };
 
 /** How long a typed sequence keeps accumulating before it starts a new search. */
@@ -69,6 +71,7 @@ export function FilterSelect<TValue extends string>({
   onChange,
   disabled = false,
   className = "",
+  testId,
 }: FilterSelectProps<TValue>) {
   const [activeIndex, setActiveIndex] = useState(0);
   // Open/close state, measured placement and outside-dismissal all come from the
@@ -226,6 +229,7 @@ export function FilterSelect<TValue extends string>({
         aria-haspopup="listbox"
         aria-activedescendant={isOpen ? `${optionIdPrefix}-${activeIndex}` : undefined}
         disabled={disabled}
+        data-testid={testId}
         onClick={() => (isOpen ? close() : openMenu())}
         onKeyDown={handleKeyDown}
         {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}

@@ -4,7 +4,7 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { SelectionCheckbox } from "./SelectionCheckbox";
-import { getDisplayName } from "../data";
+import { getDisplayName, matchesUserSearch } from "../data";
 import type { AdminUser } from "../types";
 
 type MemberPickerProps = {
@@ -39,18 +39,9 @@ export function MemberPicker({
   const [search, setSearch] = useState("");
 
   const visibleUsers = useMemo(() => {
-    const normalized = search.trim().toLowerCase();
-    const sorted = [...users].sort((left, right) =>
-      getDisplayName(left).localeCompare(getDisplayName(right)),
-    );
-
-    if (normalized.length === 0) return sorted;
-
-    return sorted.filter((user) =>
-      [getDisplayName(user), user.username, user.email].some((value) =>
-        value.toLowerCase().includes(normalized),
-      ),
-    );
+    return [...users]
+      .sort((left, right) => getDisplayName(left).localeCompare(getDisplayName(right)))
+      .filter((user) => matchesUserSearch(user, search));
   }, [search, users]);
 
   const allVisibleSelected =

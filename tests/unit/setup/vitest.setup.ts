@@ -48,22 +48,8 @@ vi.mock("keycloak-js", () => ({
 // Re-export so tests can configure the mock per-scenario
 export { mockKeycloakInstance };
 
-// 1. Mock Keycloak Context (Isolates IAM Layer)
-vi.mock("@keycloakify/react", () => {
-  return {
-    useKeycloak: () => ({
-      keycloak: {
-        authenticated: true,
-        token: "mock-sprintstart-token",
-        login: vi.fn(),
-        logout: vi.fn(),
-      },
-      initialized: true,
-    }),
-  };
-});
-
-// 2. Mock React Router v7 (Handles Data Loaders and Application Boundaries)
+// ── React Router passthrough ────────────────────────────────
+// Real exports, nothing replaced, so `MemoryRouter` and friends work as in the app.
 vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
   return {
@@ -78,7 +64,7 @@ vi.mock("react-router", async (importOriginal) => {
   };
 });
 
-// 3. Robust Mock for Framer Motion 12 (Prevents layout timeouts & layout clipping)
+// ── Framer Motion mock (prevents layout timeouts and layout clipping in jsdom) ──
 vi.mock("framer-motion", async (importOriginal) => {
   const actual = await importOriginal<typeof import("framer-motion")>();
 
@@ -162,7 +148,7 @@ vi.mock("framer-motion", async (importOriginal) => {
   };
 });
 
-// 4. Global Browser Polyfills
+// ── Browser polyfills (APIs jsdom does not implement) ──────
 global.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}

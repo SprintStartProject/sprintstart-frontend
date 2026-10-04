@@ -1,20 +1,17 @@
 import { ExternalLink } from "lucide-react";
+import { getConnector } from "../../data-ingestion/connectors/registry.ts";
+import { toSourceSystem } from "../../data-ingestion/connectors/sourceSystems.ts";
 import type { SourceSystem } from "../types";
 
 /**
- * Maps the artifact's source system to a user-friendly label for opening the resource.
+ * The connector's wording for opening the resource at its origin, or a neutral
+ * one when the connector has none or the source system is not one the app knows
+ * (a value that arrived over the wire).
  */
 function getSourceSystemLabel(sourceSystem: SourceSystem): string {
-  switch (sourceSystem) {
-    case "GITHUB":
-      return "Open in GitHub";
-    case "JIRA":
-      return "Open in Jira";
-    case "CONFLUENCE":
-      return "Open in Confluence";
-    default:
-      return "Open source";
-  }
+  const known = toSourceSystem(sourceSystem);
+
+  return (known && getConnector(known).knowledgeBase.linkLabel) || "Open source";
 }
 
 const BADGE_CLASSES =

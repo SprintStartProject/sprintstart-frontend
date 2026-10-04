@@ -306,15 +306,18 @@ describe("ArtifactFilters", () => {
     const onSortChange = vi.fn();
     render(<ArtifactFilters {...buildProps({ sort: "ADDED_DESC", onSortChange })} />);
 
-    const select = screen.getByTestId<HTMLSelectElement>("kb-sort");
+    const select = screen.getByTestId("kb-sort");
     expect(select).toHaveAccessibleName("Sort artifacts");
-    expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
+    expect(select).toHaveTextContent("Newest added");
+
+    fireEvent.click(select);
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Newest added",
       "Recently changed",
       "Title A–Z",
     ]);
 
-    fireEvent.change(select, { target: { value: "CHANGED_DESC" } });
+    fireEvent.click(screen.getByRole("option", { name: "Recently changed" }));
     expect(onSortChange).toHaveBeenCalledWith("CHANGED_DESC");
   });
 

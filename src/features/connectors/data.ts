@@ -1,34 +1,24 @@
-import { BookOpen, GitBranch, Plug } from "lucide-react";
+import { Plug } from "lucide-react";
 import type { ConnectorDto } from "../../services/connectorService.ts";
+import { findConnectorById } from "../data-ingestion/connectors/registry.ts";
 import type { ConnectorListItem, ConnectorMeta } from "./types.ts";
-
-/**
- * Presentation metadata for connectors known to the frontend today.
- */
-const CONNECTOR_META: Record<string, ConnectorMeta> = {
-  github: {
-    label: "GitHub Repository Connector",
-    description:
-      "Commits, files, issues and pull request metadata from connected GitHub repositories.",
-    icon: GitBranch,
-  },
-  confluence: {
-    label: "Confluence Cloud Connector",
-    description: "Pages and spaces from connected Confluence Cloud tenants.",
-    icon: BookOpen,
-  },
-};
 
 const FALLBACK_CONNECTOR_META: Omit<ConnectorMeta, "label"> = {
   description: "Sources managed by this connector.",
   icon: Plug,
 };
 
+/**
+ * Label, description and icon for a connector. GitHub and Confluence have their own; any other
+ * connector the backend reports gets its backend name and a generic description and icon.
+ */
 export function getConnectorMeta(connector: ConnectorDto): ConnectorMeta {
-  const knownMeta = CONNECTOR_META[connector.id];
+  // The registry words the connectors the frontend knows; one without wording
+  // there (such as Jira) is listed under the name the backend reports for it.
+  const known = findConnectorById(connector.id)?.meta;
 
-  if (knownMeta) {
-    return knownMeta;
+  if (known?.connector) {
+    return { ...known.connector, icon: known.icon };
   }
 
   return {
@@ -44,6 +34,10 @@ export function toConnectorListItems(connectors: ConnectorDto[]): ConnectorListI
   }));
 }
 
+/**
+ * Fingerprint of a connector's sources and their allow/deny state, independent of their order.
+ * A pending edit that was made against a different fingerprint is stale and gets dropped.
+ */
 export function buildSourceKey(sources: { id: string; enabled: boolean }[]): string {
   return sources
     .map((source) => `${source.id}:${source.enabled}`)

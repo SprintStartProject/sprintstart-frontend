@@ -54,6 +54,8 @@ const BASE_PROPS = {
   activeTool: null,
   confirmAction: vi.fn(),
   dismissAction: vi.fn(),
+  actionDrafts: {},
+  setActionDraft: vi.fn(),
 };
 
 /** One flag per row, in the order they are on screen. */

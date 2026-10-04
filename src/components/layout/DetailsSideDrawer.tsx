@@ -20,6 +20,14 @@ type DetailsSideDrawerProps = {
   lockScroll?: boolean;
 };
 
+/**
+ * `SidePanel` preset for the details of an item opened from a list: a source, a run, a user,
+ * a project.
+ *
+ * Differs from the `SidePanel` defaults in that it is wider on desktop, has no dimming overlay
+ * (the list next to it stays visible and usable) and sits at `z-40`, below dialogs. Every prop
+ * is passed through, so a caller can still override each of these.
+ */
 export function DetailsSideDrawer({
   isOpen,
   onClose,

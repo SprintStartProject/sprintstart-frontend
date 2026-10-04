@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Plug } from "lucide-react";
+import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
 import { Spinner } from "../../../components/ui/Spinner";
 import { ACCESS_CONNECTORS } from "../registry";
@@ -144,18 +145,10 @@ export function AccessManagementView({
       )}
 
       {!hasVisibleConnector && !isSettling && (
-        <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-8">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <Plug className="h-8 w-8 text-app-text-disabled" aria-hidden />
-            <div>
-              <p className="text-base font-medium text-app-text">No source is set up yet</p>
-              <p className="mt-1 text-sm text-app-text-muted">
-                Add a credential to connect a source, or switch the filter to All sources to see
-                everything that can be connected.
-              </p>
-            </div>
-          </div>
-        </div>
+        <EmptyState icon={<Plug className="h-8 w-8" aria-hidden />} title="No source is set up yet">
+          Add a credential to connect a source, or switch the filter to All sources to see
+          everything that can be connected.
+        </EmptyState>
       )}
     </div>
   );

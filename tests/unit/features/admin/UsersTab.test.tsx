@@ -62,6 +62,49 @@ describe("UsersTab", () => {
     expect(screen.getAllByText("user1@example.com").length).toBeGreaterThan(0);
   });
 
+  it("flags a user without a project with a badge", () => {
+    render(<UsersTab {...defaultProps} />);
+
+    expect(screen.getAllByText("No project")).toHaveLength(2);
+  });
+
+  it("shows a user's projects as chips and marks the ones they manage", () => {
+    const withProjects: AdminUser[] = [
+      {
+        ...mockUsers[0],
+        permissionGroup: "Project Manager",
+        projects: [
+          { id: "p1", name: "Alpha" },
+          { id: "p2", name: "Beta" },
+          { id: "p3", name: "Gamma" },
+        ],
+        projectIds: ["p1", "p2", "p3"],
+      },
+    ];
+    const projects = [
+      {
+        id: "p1",
+        name: "Alpha",
+        description: "",
+        manager: { id: "1", username: "u", email: "", firstName: "", lastName: "" },
+        sources: [],
+        users: [],
+        industry: "",
+        industryConfidence: null,
+        industryCustom: false,
+      },
+    ];
+
+    render(<UsersTab {...defaultProps} paginatedUsers={withProjects} projects={projects} />);
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(screen.queryByText("Gamma")).not.toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.queryByText("No project")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: "Manager" })).toHaveLength(1);
+  });
+
   it("calls onToggleUserSelection when checkbox is clicked", async () => {
     const user = userEvent.setup();
     render(<UsersTab {...defaultProps} />);

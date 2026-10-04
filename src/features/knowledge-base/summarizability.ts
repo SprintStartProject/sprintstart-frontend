@@ -38,20 +38,6 @@ function isTextContent(content: ArtifactContent): boolean {
 }
 
 /**
- * Why summarising is not available for this content, or `null` when it is.
- *
- * Returns `null` while the content is still loading, deliberately: the summary
- * request does not need the content, and a primary action that flickers from
- * unavailable to available on every open is worse than one that occasionally
- * answers "nothing to summarise" for a file the reader can already see is
- * empty. Only a *known* empty or near-empty artifact is refused, which is the
- * case the round trip cannot fix.
- *
- * The caller decides what to do with the reason: the drawer disables the
- * button and shows the reason as a tooltip, so the action never disappears
- * without an explanation.
- */
-/**
  * Whether the artifact was imported with no body at all.
  *
  * The case this exists for: a pull request or issue whose description was never
@@ -67,6 +53,20 @@ export function isEmptyContent(content: ArtifactContent | null): boolean {
   return content !== null && isTextContent(content) && countContentLines(content.content) === 0;
 }
 
+/**
+ * Why summarising is not available for this content, or `null` when it is.
+ *
+ * Returns `null` while the content is still loading, deliberately: the summary
+ * request does not need the content, and a primary action that flickers from
+ * unavailable to available on every open is worse than one that occasionally
+ * answers "nothing to summarise" for a file the reader can already see is
+ * empty. Only a *known* empty or near-empty artifact is refused, which is the
+ * case the round trip cannot fix.
+ *
+ * The caller decides what to do with the reason: the drawer disables the
+ * button and shows the reason as a tooltip, so the action never disappears
+ * without an explanation.
+ */
 export function summariseBlockReason(content: ArtifactContent | null): string | null {
   if (!content || !isTextContent(content)) return null;
 

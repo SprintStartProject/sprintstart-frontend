@@ -34,13 +34,15 @@ function renderDock(
   {
     suggestions = [],
     setDraft = vi.fn(),
-    startFreshVisit = vi.fn(async () => {}),
+    newConversation = vi.fn(async () => {}),
+    isOpening = false,
     isThinking = false,
     isStreaming = false,
   }: {
     suggestions?: BuddySuggestion[];
     setDraft?: () => void;
-    startFreshVisit?: () => Promise<void>;
+    newConversation?: () => Promise<void>;
+    isOpening?: boolean;
     isThinking?: boolean;
     isStreaming?: boolean;
   } = {},
@@ -58,8 +60,11 @@ function renderDock(
           activeTool={null}
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
           suggestions={suggestions}
-          startFreshVisit={startFreshVisit}
+          newConversation={newConversation}
+          isOpening={isOpening}
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}
@@ -70,15 +75,15 @@ function renderDock(
   );
 }
 
-const assistant = (content: string): BuddyMessageView => ({
-  id: "a1",
+const assistant = (content: string, id = "a1"): BuddyMessageView => ({
+  id,
   role: "ASSISTANT",
   content,
   createdAt: "2026-08-03T00:00:00Z",
 });
 
-const user = (content: string): BuddyMessageView => ({
-  id: "u1",
+const user = (content: string, id = "u1"): BuddyMessageView => ({
+  id,
   role: "USER",
   content,
   createdAt: "2026-08-03T00:00:00Z",
@@ -273,18 +278,18 @@ describe("BuddyDock new conversation", () => {
     expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });
 
-  it("starts the fresh visit once, on the session the dock was handed", async () => {
-    const startFreshVisit = vi.fn(async () => {});
-    renderDock([assistant("Hello."), user("How do we deploy?")], { startFreshVisit });
+  it("starts a new conversation once, on the session the dock was handed", async () => {
+    const newConversation = vi.fn(async () => {});
+    renderDock([assistant("Hello."), user("How do we deploy?")], { newConversation });
 
     await userEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
 
-    expect(startFreshVisit).toHaveBeenCalledTimes(1);
+    expect(newConversation).toHaveBeenCalledTimes(1);
   });
 
-  // startFreshVisit clears the thread and greets, but cannot call back the request already
-  // streaming into it: that stream's callbacks still hold the shared conversation, so its tool
-  // events would land under the brand-new greeting.
+  // newConversation clears the thread, but cannot call back the request already streaming into
+  // it: that stream's callbacks still hold the shared conversation, so its tool events would
+  // land in the brand-new one.
   it("withdraws while the buddy is still thinking", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
       isThinking: true,
@@ -301,8 +306,18 @@ describe("BuddyDock new conversation", () => {
     expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
   });
 
+  // An open is going into the very thread this click would clear: withdrawn while one is in
+  // flight, exactly like a live turn.
+  it("withdraws while a conversation is opening", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isOpening: true,
+    });
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
   it("comes back once the turn is over", () => {
-    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.")]);
+    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.", "a2")]);
 
     expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });

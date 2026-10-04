@@ -1,3 +1,4 @@
+import { CONNECTORS, KNOWLEDGE_BASE_SOURCE_ORDER } from "../data-ingestion/connectors/registry.ts";
 import type { Artifact, ArtifactSort, ArtifactType, SourceSystem, UploadFormat } from "./types";
 
 /**
@@ -8,19 +9,17 @@ import type { Artifact, ArtifactSort, ArtifactType, SourceSystem, UploadFormat }
 export type { UploadFormat } from "./types";
 
 /**
- * Human-readable display names for the artifact sources (connectors).
+ * Human-readable display names for the artifact sources (connectors), from the
+ * connector registry.
  */
-export const SOURCE_LABELS: Record<SourceSystem, string> = {
-  GITHUB: "GitHub",
-  JIRA: "Jira",
-  CONFLUENCE: "Confluence",
-  UPLOAD: "Uploads",
-};
+export const SOURCE_LABELS = Object.fromEntries(
+  KNOWLEDGE_BASE_SOURCE_ORDER.map((system) => [system, CONNECTORS[system].knowledgeBase.label]),
+) as Record<SourceSystem, string>;
 
 /**
- * Standard left-to-right order for the source facet.
+ * Standard left-to-right order for the source facet, from the connector registry.
  */
-export const DEFAULT_SOURCE_ORDER: SourceSystem[] = ["GITHUB", "JIRA", "CONFLUENCE", "UPLOAD"];
+export const DEFAULT_SOURCE_ORDER: SourceSystem[] = [...KNOWLEDGE_BASE_SOURCE_ORDER];
 
 /**
  * Human-readable display names for artifact types.
@@ -80,13 +79,6 @@ export const KNOWLEDGE_TABS: readonly KnowledgeTabDef[] = [
 
 export const KNOWLEDGE_TAB_ORDER: readonly KnowledgeTab[] = KNOWLEDGE_TABS.map((tab) => tab.id);
 
-/**
- * File formats a reader can narrow *uploaded* artifacts to.
- *
- * Not a source type and not an artifact type: an upload's format only exists
- * for uploads, so this facet is offered only while `UPLOAD` is part of the
- * source selection (see `useKnowledgeBase`).
- */
 /** Human-readable display names for the file-format facet. */
 export const FORMAT_LABELS: Record<UploadFormat, string> = {
   PDF: "PDFs",

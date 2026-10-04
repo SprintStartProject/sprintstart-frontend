@@ -34,8 +34,8 @@ function store(taskId: string, steps: OrientationStep[]) {
  * whatever they left open. Keyed by task rather than globally: a different task
  * is a different problem, and its setup may genuinely need re-reading.
  *
- * @param taskId The task the packet belongs to.
- * @param firstStep The step to open on a first visit, when nothing is stored.
+ * @param taskId - The task the packet belongs to.
+ * @param firstStep - The step to open on a first visit, when nothing is stored.
  */
 export function useOpenSteps(taskId: string, firstStep: OrientationStep | undefined) {
   const [openSteps, setOpenSteps] = useState<OrientationStep[]>(

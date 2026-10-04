@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { AdminPage } from "../../../src/pages/AdminPage";
@@ -10,8 +11,17 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
   return { useProjectContext: () => createProjectContextValue() };
 });
 
+const authMock = vi.hoisted(() => ({ permissionGroup: undefined as string | undefined }));
+
 vi.mock("../../../src/context/useAuth", () => ({
-  useAuth: () => ({ profile: { id: "admin1", firstName: "Admin", lastName: "User" } }),
+  useAuth: () => ({
+    profile: {
+      id: "admin1",
+      firstName: "Admin",
+      lastName: "User",
+      permissionGroup: authMock.permissionGroup,
+    },
+  }),
 }));
 
 vi.mock("../../../src/services/adminUserService", () => ({
@@ -80,7 +90,19 @@ vi.mock("../../../src/features/admin/components/ProjectDetailsDrawer", () => ({
   ProjectDetailsDrawer: () => <div data-testid="project-details-drawer">Project Details</div>,
 }));
 
+vi.mock("../../../src/features/admin/components/AdminSkillsToolbar", () => ({
+  AdminSkillsToolbar: () => <div data-testid="admin-skills-toolbar">Skills toolbar</div>,
+}));
+
+vi.mock("../../../src/features/admin/components/SkillsTab", () => ({
+  SkillsTab: () => <div data-testid="skills-tab">Skills</div>,
+}));
+
 describe("AdminPage Accessibility", () => {
+  beforeEach(() => {
+    authMock.permissionGroup = undefined;
+  });
+
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
@@ -90,6 +112,29 @@ describe("AdminPage Accessibility", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("users-tab")).toBeInTheDocument();
+    });
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("should not have any a11y violations on the Skills tab for an ADMIN", async () => {
+    authMock.permissionGroup = "ADMIN";
+    const user = userEvent.setup();
+
+    const { baseElement } = render(
+      <MemoryRouter>
+        <AdminPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Skills" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Skills" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("skills-tab")).toBeInTheDocument();
     });
 
     expect(await axe(baseElement)).toHaveNoViolations();

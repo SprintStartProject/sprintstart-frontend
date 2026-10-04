@@ -11,4 +11,13 @@
 # commit subject as a comment above it.
 
 # formatting: prettier across the codebase
-# <SHA nach dem Formatier-Commit hier eintragen>
+25f0bb6d75f77dbe275afc639a74981b87cee325
+
+# Clear the formatting drift quoteFormat.ts inherited from the reply feature
+5ffebc71cd8f08c3af379c00f4dde62e99a028c9
+
+# Format the dock test the way prettier wants it
+651c479df0dcc441cd80dbce685780e411c28064
+
+# Fix prettier formatting in the CreateProjectWizard test
+5c532fb42f9ad098f56981632cb874e6a414c65a
