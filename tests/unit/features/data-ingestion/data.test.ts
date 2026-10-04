@@ -18,6 +18,7 @@ import {
 import { CONNECTORS } from "../../../../src/features/data-ingestion/connectors/registry";
 import { SOURCE_SYSTEMS } from "../../../../src/features/data-ingestion/connectors/sourceSystems";
 import {
+  bitbucketRepositoryOf,
   confluenceSpaceOf,
   githubRepositoryOf,
   jiraInstanceOf,
@@ -52,7 +53,7 @@ const confluenceCard = (
 describe("data-ingestion data helpers", () => {
   describe("SOURCE_SYSTEMS / SOURCE_META", () => {
     it("lists all known source systems", () => {
-      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"]);
+      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE", "BITBUCKET"]);
     });
 
     it("provides meta for every source system", () => {
@@ -330,6 +331,57 @@ describe("data-ingestion data helpers", () => {
       expect(source.sourceSystem).toBe("JIRA");
       expect(githubRepositoryOf(source)).toBeNull();
       expect(jiraInstanceOf(source)?.instanceUrl).toBe("https://acme.atlassian.net");
+    });
+
+    it("maps a Bitbucket row with its workspace, slug and pull-request sync time only", () => {
+      const source = createDataSourceFromStatus(
+        row({
+          sourceSystem: "BITBUCKET",
+          sourceId: "acme/widgets",
+          displayName: "acme/widgets",
+          repositoryId: "bb-1",
+          owner: "acme",
+          name: "widgets",
+          sourceUrl: "https://bitbucket.org/acme/widgets",
+          lastPullRequestsSyncAt: "2026-07-28T09:00:00Z",
+        }),
+      );
+
+      expect(source.sourceSystem).toBe("BITBUCKET");
+      expect(source.sourceId).toBe("bb-1");
+      expect(source.name).toBe("acme/widgets");
+      expect(githubRepositoryOf(source)).toBeNull();
+      expect(bitbucketRepositoryOf(source)).toEqual({
+        repositoryId: "bb-1",
+        workspace: "acme",
+        slug: "widgets",
+        fullName: "acme/widgets",
+        url: "https://bitbucket.org/acme/widgets",
+        enabled: true,
+      });
+      expect(source.details).toMatchObject({
+        syncTimes: { pullRequests: "2026-07-28T09:00:00Z" },
+      });
+    });
+
+    it("reads the workspace and slug off a Bitbucket row that leaves owner and name out", () => {
+      const source = createDataSourceFromStatus(
+        row({
+          sourceSystem: "BITBUCKET",
+          sourceId: "acme/widgets",
+          owner: null,
+          name: null,
+        }),
+      );
+
+      expect(bitbucketRepositoryOf(source)).toMatchObject({ workspace: "acme", slug: "widgets" });
+    });
+
+    it("shows a disabled Bitbucket repository as disabled", () => {
+      const source = createDataSourceFromStatus(row({ sourceSystem: "BITBUCKET", enabled: false }));
+
+      expect(source.backendStatus).toBe("DISABLED");
+      expect(source.statusView.state).toBe("disabled");
     });
 
     it("maps a Confluence row and an upload row without GitHub details", () => {

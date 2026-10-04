@@ -86,6 +86,11 @@ export type SourceActions = {
   };
   /** The source's sync schedule. The project-wide settings apply it to every source. */
   schedule?: {
+    /**
+     * Whether the connector's scheduler does nothing at all for a source while auto
+     * update is off. Without it, the scheduler still marks the source out of date.
+     */
+    skipsWhenAutoUpdateOff?: boolean;
     isAvailable(source: DataSource): boolean;
     load(source: DataSource, context: ActionContext): Promise<SyncScheduleConfig>;
     save(source: DataSource, request: SyncScheduleRequest, context: ActionContext): Promise<void>;
@@ -176,6 +181,11 @@ export type KnowledgeBaseSupport = {
   markdown?: boolean;
   /** Whether a user can delete the artifacts here, because nothing upstream owns them. */
   deletable?: boolean;
+  /**
+   * Whether the artifacts belong to a repository, so the repository facet is offered
+   * while this connector is among the selected sources.
+   */
+  repositoryFacet?: boolean;
   /**
    * The narrowing beyond the source system that the knowledge base can express for one
    * source, used to link from the source to its artifacts. Left out when the knowledge

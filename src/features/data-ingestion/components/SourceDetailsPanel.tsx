@@ -360,7 +360,11 @@ export function SourceDetailsPanel({
               await onChanged("changed");
             }}
             autoUpdateOnText={`Due checks update this ${meta.noun.singular}.`}
-            autoUpdateOffText={`Due checks only mark this ${meta.noun.singular} out of date.`}
+            autoUpdateOffText={
+              schedule.skipsWhenAutoUpdateOff
+                ? `Due checks skip this ${meta.noun.singular}. It only updates when started manually.`
+                : `Due checks only mark this ${meta.noun.singular} out of date.`
+            }
             toggleAriaLabel={`Toggle ${meta.noun.singular} auto update`}
           />
         </DrawerCard>

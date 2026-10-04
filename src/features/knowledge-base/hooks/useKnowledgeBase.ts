@@ -21,6 +21,7 @@ import {
   type KnowledgeTab,
   SOURCE_LABELS,
 } from "../tabs";
+import { hasRepositoryFacet } from "../../data-ingestion/connectors/registry.ts";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue.ts";
 import { DEFAULT_PAGE_SIZE, useKnowledgeBaseUrlState } from "./useKnowledgeBaseUrlState.ts";
 import type { KnowledgeBaseUrlStateOptions } from "./useKnowledgeBaseUrlState.ts";
@@ -362,7 +363,8 @@ export function useKnowledgeBase(
   }, [facetsData?.repositories]);
 
   const repositoryOptions = useMemo<FacetOption<string>[]>(() => {
-    if (!selectedSources.has("GITHUB")) return [];
+    // The facet shows while a connector whose artifacts belong to a repository is selected.
+    if (!hasRepositoryFacet(selectedSources)) return [];
     const repos = (facetsData?.repositories ?? []).map((r) => r.value);
     const offered = Array.from(new Set([...repos, ...selectedRepositories])).sort((a, b) =>
       a.localeCompare(b),

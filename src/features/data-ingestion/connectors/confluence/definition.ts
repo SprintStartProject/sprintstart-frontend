@@ -66,7 +66,7 @@ export const confluenceConnector: ConnectorDefinition<
   },
   knowledgeBase: {
     label: "Confluence",
-    facetOrder: 3,
+    facetOrder: 4,
     icon: BookOpen,
     linkLabel: "Open in Confluence",
     // Confluence pages are stored as Markdown.

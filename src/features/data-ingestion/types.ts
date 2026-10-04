@@ -88,7 +88,7 @@ export type IngestionRun = {
 
 /**
  * Per-source ingestion health from `/api/v1/ingestion-sources/status` — one row
- * per connected GitHub repository, Jira instance, Confluence space or upload
+ * per connected GitHub or Bitbucket repository, Jira instance, Confluence space or upload
  * source. This is the authoritative source for the Data Ingestion source cards:
  * it carries the source identity, connection status, enabled flag, the last
  * run's counters, the total stored artifact count and the per-artifact-type
@@ -98,15 +98,18 @@ export type IngestionRun = {
 export type SourceInstanceIngestionStatus = {
   sourceSystem: SourceSystem;
   /**
-   * Key of the source within its system: GitHub `"owner/name"`, Jira the instance URL,
-   * Confluence the base URL and space.
+   * Key of the source within its system: GitHub `"owner/name"`, Bitbucket
+   * `"workspace/slug"`, Jira the instance URL, Confluence the base URL and space.
    */
   sourceId: string;
-  /** Display name: GitHub `"owner/name"`, otherwise the source's own display name. */
+  /**
+   * Display name: GitHub `"owner/name"`, Bitbucket `"workspace/slug"`, otherwise the
+   * source's own display name.
+   */
   displayName: string;
   /**
-   * GitHub-only repository identity. Null for connector-neutral rows such as
-   * Jira, which are identified by {@link sourceId} (the instance URL) instead.
+   * Repository connection id (GitHub and Bitbucket). Null for connector-neutral rows
+   * such as Jira, which are identified by {@link sourceId} (the instance URL) instead.
    */
   repositoryId: string | null;
   owner: string | null;
@@ -179,6 +182,20 @@ export type GithubRepositoryReference = {
 
 export type GithubRepositoryDetails = GithubRepositoryReference & {
   repositoryId: string | null;
+  fullName: string;
+  url: string;
+  enabled: boolean | null;
+};
+
+/**
+ * Bitbucket-specific identity for a source card. A repository is addressed as
+ * `workspace/slug`; `repositoryId` is the connection's UUID, used to update the
+ * repository and to link or unlink it from a project.
+ */
+export type BitbucketRepositoryDetails = {
+  repositoryId: string | null;
+  workspace: string;
+  slug: string;
   fullName: string;
   url: string;
   enabled: boolean | null;
@@ -275,6 +292,12 @@ export type SourceDetails =
       repository: GithubRepositoryDetails | null;
       /** Per-artifact-type last-sync timestamps (from the status row). */
       syncTimes: { commits: string | null; issues: string | null; pullRequests: string | null };
+    }
+  | {
+      system: "BITBUCKET";
+      repository: BitbucketRepositoryDetails | null;
+      /** Bitbucket syncs pull requests only; commits and issues are never ingested. */
+      syncTimes: { pullRequests: string | null };
     }
   | {
       system: "JIRA";

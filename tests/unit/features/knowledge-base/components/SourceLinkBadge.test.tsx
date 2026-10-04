@@ -21,6 +21,20 @@ describe("SourceLinkBadge", () => {
     expect(link).toHaveAttribute("title", "https://github.com/org/repo/blob/main/doc.md");
   });
 
+  it("renders Bitbucket link badge", () => {
+    render(
+      <SourceLinkBadge
+        sourceUrl="https://bitbucket.org/acme/widgets/pull-requests/12"
+        sourceSystem="BITBUCKET"
+      />,
+    );
+
+    const link = screen.getByTestId("artifact-drawer-source-link");
+    expect(link).toHaveTextContent("Open in Bitbucket");
+    expect(link).toHaveAttribute("aria-label", "Open in Bitbucket (opens in a new tab)");
+    expect(link).toHaveAttribute("href", "https://bitbucket.org/acme/widgets/pull-requests/12");
+  });
+
   it("renders Jira link badge", () => {
     render(
       <SourceLinkBadge sourceUrl="https://jira.example.com/browse/KEY-123" sourceSystem="JIRA" />,

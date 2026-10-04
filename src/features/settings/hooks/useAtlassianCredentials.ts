@@ -20,7 +20,7 @@ type UseAtlassianCredentialsResult = {
 
 /**
  * Loads the Atlassian credentials owned by the authenticated user, shared by
- * the Jira and Confluence connectors.
+ * the Jira, Confluence and Bitbucket connectors.
  *
  * When disabled, the hook settles into a loaded-empty state without fetching.
  * Out-of-order responses (an explicit `reload` outrunning a slower, earlier

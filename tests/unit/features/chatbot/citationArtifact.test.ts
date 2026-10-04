@@ -17,6 +17,17 @@ describe("deriveArtifactFromCitation", () => {
     ).toBe("CONFLUENCE");
   });
 
+  it("attributes a bitbucket.org citation to Bitbucket and types its pull requests", () => {
+    const pullRequest = open("PR #4", "https://bitbucket.org/acme/widgets/pull-requests/4");
+    const file = open("main.ts", "https://bitbucket.org/acme/widgets/src/main/main.ts");
+
+    expect(pullRequest.sourceSystem).toBe("BITBUCKET");
+    expect(pullRequest.artifactType).toBe("PULL_REQUEST");
+    expect(pullRequest.mime).toBe("text/markdown");
+    expect(file.sourceSystem).toBe("BITBUCKET");
+    expect(file.artifactType).toBe("FILE");
+  });
+
   it("treats a citation without a URL as an upload with no source link", () => {
     const artifact = open("handbook.pdf");
 
