@@ -7,9 +7,7 @@ import {
   EMPTY_STRUCTURE,
   pruneStructure,
   readBoardStructure,
-  setCardStage,
   setDependency,
-  setGroupStage,
   setMarkedDone,
   writeBoardStructure,
   type BoardStage,
@@ -21,8 +19,6 @@ export type UseBoardStructureResult = {
   structure: BoardStructure;
   /** Every card's derived status, keyed by id. Recomputed whenever the board or the structure moves. */
   states: Map<string, CardState>;
-  assignStage: (cardId: string, stage: BoardStage) => void;
-  assignGroupStage: (groupId: string, cardIds: string[], stage: BoardStage) => void;
   toggleDone: (cardId: string, done: boolean) => void;
   toggleDependency: (cardId: string, blockerId: string, depends: boolean) => void;
   /**
@@ -51,8 +47,15 @@ export type UseBoardStructureResult = {
  * Everything a caller renders from comes out of `states`, never out of `structure`. That is what
  * keeps "blocked" from going stale: it is a question about other cards, answered fresh on every
  * board, and never a flag anybody has to remember to clear.
+ *
+ * Which stage a card is in is not part of what is kept here any more: it comes from the onboarding
+ * path, as `stageOf` (see `layout/pathStages.ts`), so there is nothing for the hire to set.
  */
-export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoardStructureResult {
+export function useBoardStructure(
+  boardId: string,
+  cards: BoardCard[],
+  stageOf?: (card: BoardCard) => BoardStage,
+): UseBoardStructureResult {
   const [structure, setStructure] = useState<BoardStructure>(EMPTY_STRUCTURE);
   const [readFor, setReadFor] = useState<string | null>(null);
 
@@ -69,7 +72,10 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
     [boardId],
   );
 
-  const states = useMemo(() => deriveCardStates(cards, structure), [cards, structure]);
+  const states = useMemo(
+    () => deriveCardStates(cards, structure, stageOf),
+    [cards, structure, stageOf],
+  );
 
   /**
    * Stores a new structure, forgetting whatever it says about cards that are no longer here.
@@ -90,9 +96,6 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
   return {
     structure,
     states,
-    assignStage: (cardId, stage) => save(setCardStage(structure, cardId, stage)),
-    assignGroupStage: (groupId, cardIds, stage) =>
-      save(setGroupStage(structure, groupId, cardIds, stage)),
     toggleDone: (cardId, done) => save(setMarkedDone(structure, cardId, done)),
     toggleDependency: (cardId, blockerId, depends) =>
       save(setDependency(structure, cardId, blockerId, depends)),

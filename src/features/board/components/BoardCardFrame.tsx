@@ -160,7 +160,6 @@ export function BoardCardFrame({
     dragHandle,
     state,
     onToggleDone,
-    stagePicker,
     dependencyPicker,
     onShowChain,
     unblocks,
@@ -373,14 +372,13 @@ export function BoardCardFrame({
             // The states it used to keep visible are not lost with it: "Pinned" and "Done" are
             // badges next to the title, and they are the ones that say so.
             //
-            // Not floated while the board is being arranged: there the cluster carries the stage
-            // and the "waits on" pickers, it *is* what somebody came for, and a panel of selects
+            // Not floated while the board is being arranged: there the cluster carries the "waits on"
+            // picker, it *is* what somebody came for, and a panel of selects
             // hovering over the title would be the mode fighting itself.
             className={`absolute top-0 right-0 z-10 flex items-center gap-1 rounded-xl bg-app-surface/90 px-1 opacity-0 shadow-sm backdrop-blur transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 [[data-arranging]_&]:pointer-events-auto [[data-arranging]_&]:static [[data-arranging]_&]:bg-transparent [[data-arranging]_&]:opacity-100 [[data-arranging]_&]:shadow-none [[data-arranging]_&]:backdrop-blur-none ${
               dismissing ? "" : "pointer-events-none"
             }`}
           >
-            {stagePicker}
             {dependencyPicker}
 
             {onToggleDone && (

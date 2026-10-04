@@ -41,6 +41,11 @@ const STORAGE_VERSION = 1;
  * *within* a bucket is what the dependencies and the stacks are for. That is the division of labour
  * here: the stage is the board's coarse answer for the cards nobody has sequenced, and a chain is a
  * hard claim about the few that somebody has.
+ *
+ * **Read off the path, no longer set by hand.** Since the onboarding path became the one plan, a
+ * card's stage is where it sits on that path — see `pathStages.ts`. A stage stored by an older
+ * version is still read and still synced, so nothing about a board is lost, but the board does not
+ * draw from it any more.
  */
 export type BoardStage = "NOW" | "LATER";
 
@@ -49,8 +54,11 @@ export const BOARD_STAGES: readonly BoardStage[] = ["NOW", "LATER"];
 
 /** What each stage is called on screen, and the sentence under it. */
 export const STAGE_LABELS: Record<BoardStage, { title: string; hint: string }> = {
-  NOW: { title: "Now", hint: "What to work through today." },
-  LATER: { title: "Later", hint: "Not yet — it will be here when it is." },
+  NOW: { title: "Now", hint: "Your current phase, and everything not tied to a later one." },
+  LATER: {
+    title: "Later",
+    hint: "From phases you haven't reached yet — they move up when you do.",
+  },
 };
 
 /**
@@ -346,10 +354,14 @@ export type CardState = {
  *
  * The default stage is `NOW`. A board with no structure at all should read as an ordinary board and
  * not as one where everything has been deferred.
+ *
+ * `stageOf` decides the stage when given — the board passes the path's answer (`pathStages.ts`) —
+ * and the stored stage is only the fallback for callers that have no path to ask.
  */
 export function deriveCardStates(
   cards: BoardCard[],
   structure: BoardStructure,
+  stageOf?: (card: BoardCard) => BoardStage,
 ): Map<string, CardState> {
   const byId = new Map(cards.map((card) => [card.id, card]));
   const done = new Map(cards.map((card) => [card.id, isCardDone(card, structure)]));
@@ -357,7 +369,7 @@ export function deriveCardStates(
   const states = new Map<string, CardState>();
   for (const card of cards) {
     const entry = structure.cards[card.id];
-    const stage = entry?.stage ?? "NOW";
+    const stage = stageOf ? stageOf(card) : (entry?.stage ?? "NOW");
     const progress = cardProgress(card);
     // Dependencies on cards that have left the board are dropped: a hire who dismissed the runbook
     // card is not thereby blocked forever on a card nobody can see.
@@ -414,31 +426,6 @@ export function currentStage(states: Map<string, CardState>): BoardStage {
   }
 
   return BOARD_STAGES[BOARD_STAGES.length - 1];
-}
-
-/** Sets one card's stage, or clears it back to the default. */
-export function setCardStage(
-  structure: BoardStructure,
-  cardId: string,
-  stage: BoardStage,
-): BoardStructure {
-  return {
-    ...structure,
-    cards: { ...structure.cards, [cardId]: { ...structure.cards[cardId], stage } },
-  };
-}
-
-/** Puts every card of an area in one stage — the gesture that makes sequencing forty cards bearable. */
-export function setGroupStage(
-  structure: BoardStructure,
-  groupId: string,
-  cardIds: string[],
-  stage: BoardStage,
-): BoardStructure {
-  const cards = { ...structure.cards };
-  for (const cardId of cardIds) cards[cardId] = { ...cards[cardId], stage };
-
-  return { cards, groupStages: { ...structure.groupStages, [groupId]: stage } };
 }
 
 /** Marks a card done, or un-marks it. Ignored for kinds that report their own completion. */

@@ -389,9 +389,6 @@ type BoardGridProps = {
    * about sequence, not claim every card is open and due now.
    */
   states?: Map<string, CardState>;
-  onAssignStage?: (cardId: string, stage: BoardStage) => void;
-  /** Puts every card of an area in one stage — sequencing twelve cards in one gesture. */
-  onAssignGroupStage?: (groupId: string, cardIds: string[], stage: BoardStage) => void;
   onToggleDone?: (cardId: string, done: boolean) => void;
   /** Makes a card wait on one other card, or on nothing. */
   onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
@@ -612,8 +609,6 @@ export function BoardGrid({
   onDissolveGroup,
   onRecolourGroup,
   states,
-  onAssignStage,
-  onAssignGroupStage,
   onToggleDone,
   onSetPredecessor,
   onShowChain,
@@ -1100,7 +1095,6 @@ export function BoardGrid({
         onTogglePinned={onTogglePinned}
         allCards={board.cards}
         state={states?.get(card.id)}
-        onAssignStage={isArranging ? onAssignStage : undefined}
         onToggleDone={onToggleDone}
         onSetPredecessor={isArranging ? onSetPredecessor : undefined}
         // Unlike the pickers, this is not an arranging tool: the question it answers — why is this
@@ -1192,7 +1186,6 @@ export function BoardGrid({
       return (
         <BoardGroupSection
           group={block.group}
-          isArranging={isArranging}
           canMove={onReorder !== undefined}
           onMoveStep={(direction) => moveBlock(blockIndex, direction)}
           onDragMove={(element) => handleGroupDrag(blockIndex, element)}
@@ -1217,7 +1210,6 @@ export function BoardGrid({
     return (
       <BoardGroupSection
         group={block.group}
-        isArranging={isArranging}
         canMove={onReorder !== undefined}
         onMoveStep={(direction) => moveBlock(blockIndex, direction)}
         onDragMove={(element) => handleGroupDrag(blockIndex, element)}
@@ -1226,16 +1218,6 @@ export function BoardGrid({
         onDissolve={onDissolveGroup}
         onRecolour={onRecolourGroup}
         stage={states?.get(block.cards[0]?.id ?? "")?.stage}
-        onAssignStage={
-          onAssignGroupStage
-            ? (stage) =>
-                onAssignGroupStage(
-                  block.group.id,
-                  block.cards.map((card) => card.id),
-                  stage,
-                )
-            : undefined
-        }
         registerElement={registerGroupElement}
       >
         {inner}
@@ -1450,7 +1432,6 @@ type BoardCardCellProps = {
   /** Every card on the board, so this one can offer them as things to wait on. */
   allCards: BoardCard[];
   state?: CardState;
-  onAssignStage?: (cardId: string, stage: BoardStage) => void;
   onToggleDone?: (cardId: string, done: boolean) => void;
   onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
   /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
@@ -1523,7 +1504,6 @@ function BoardCardCell({
   onTogglePinned,
   allCards,
   state,
-  onAssignStage,
   onToggleDone,
   onSetPredecessor,
   onShowChain,
@@ -1671,21 +1651,6 @@ function BoardCardCell({
         onToggleDone && !isSelfReporting(card)
           ? () => onToggleDone(card.id, state?.status !== "DONE")
           : undefined,
-      stagePicker: onAssignStage ? (
-        <Select
-          size="sm"
-          value={state?.stage ?? "NOW"}
-          aria-label={`When the ${label} card is due`}
-          className="max-w-32"
-          onChange={(event) => onAssignStage(card.id, event.target.value as BoardStage)}
-        >
-          {BOARD_STAGES.map((stage) => (
-            <option key={stage} value={stage}>
-              {STAGE_LABELS[stage].title}
-            </option>
-          ))}
-        </Select>
-      ) : undefined,
       dependencyPicker: !onSetPredecessor ? undefined : state?.predecessorSource === "TEAM" ? (
         // A rule the team wrote, shown rather than offered. The alternative was a select that
         // silently refused what it let somebody choose — an affordance that lies is worse than a
@@ -1805,7 +1770,6 @@ function BoardCardCell({
       dragControls,
       index,
       label,
-      onAssignStage,
       onMove,
       onSetPredecessor,
       onShowChain,
@@ -1952,7 +1916,6 @@ function BoardCardCell({
 
 type BoardGroupSectionProps = {
   group: BoardGroup;
-  isArranging: boolean;
   canMove: boolean;
   onMoveStep: (direction: "up" | "down") => void;
   onDragMove: (element: HTMLElement) => void;
@@ -1963,8 +1926,6 @@ type BoardGroupSectionProps = {
   onRecolour?: (groupId: string, accent: AreaAccent) => void;
   /** The earliest stage among the area's cards, shown as the area's own. */
   stage?: BoardStage;
-  /** Puts every card of this area in one stage. Absent when the board has no process layer. */
-  onAssignStage?: (stage: BoardStage) => void;
   registerElement: (groupId: string, element: HTMLElement | null) => void;
   children: ReactNode;
 };
@@ -1983,7 +1944,6 @@ type BoardGroupSectionProps = {
  */
 function BoardGroupSection({
   group,
-  isArranging,
   canMove,
   onMoveStep,
   onDragMove,
@@ -1992,7 +1952,6 @@ function BoardGroupSection({
   onDissolve,
   onRecolour,
   stage,
-  onAssignStage,
   registerElement,
   children,
 }: BoardGroupSectionProps) {
@@ -2136,30 +2095,12 @@ function BoardGroupSection({
             {group.cardIds.length}
           </span>
 
-          {/* An area is where sequencing is worth doing: a PM who has grouped twelve setup cards
-              wants them all due now, and setting that twelve times is how a good idea becomes a
-              chore nobody repeats. Outside arrange mode the stage is a fact, so it reads as a
-              badge rather than as a control offering to change something. */}
-          {stage &&
-            (onAssignStage && isArranging ? (
-              <Select
-                size="sm"
-                value={stage}
-                aria-label={`When the ${group.name} area is due`}
-                className="max-w-32"
-                onChange={(event) => onAssignStage(event.target.value as BoardStage)}
-              >
-                {BOARD_STAGES.map((option) => (
-                  <option key={option} value={option}>
-                    {STAGE_LABELS[option].title}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              <Badge variant={stage === "NOW" ? "brand" : "neutral"} size="sm">
-                {STAGE_LABELS[stage].title}
-              </Badge>
-            ))}
+          {/* The stage comes from the path, so it is a fact here and never a control. */}
+          {stage && (
+            <Badge variant={stage === "NOW" ? "brand" : "neutral"} size="sm">
+              {STAGE_LABELS[stage].title}
+            </Badge>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-1">

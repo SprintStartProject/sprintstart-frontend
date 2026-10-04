@@ -42,8 +42,6 @@ export type BoardCardControls = {
    * "done" beside a list with three items outstanding is the board contradicting itself.
    */
   onToggleDone?: () => void;
-  /** The stage picker for this card, shown while the board is being arranged. */
-  stagePicker?: ReactNode;
   /** The "waits on…" picker for this card, shown while the board is being arranged. */
   dependencyPicker?: ReactNode;
   /**

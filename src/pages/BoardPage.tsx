@@ -20,6 +20,8 @@ import { Spinner } from "../components/ui/Spinner";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
+import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
+import { pathPhases, pathStages } from "../features/board/layout/pathStages";
 import { BoardChainPanel } from "../features/board/components/BoardChainPanel";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
@@ -103,8 +105,8 @@ import {
  * **The board is now a process, not a pile.** Three things carry that, and none of them changes the
  * board's own order:
  *
- * - a *stage* per card — now, next, later — so the board can say what is due rather than only what
- *   exists;
+ * - a *stage* per card — now or later, read off the onboarding path (`pathStages.ts`) — so the
+ *   board can say what is due rather than only what exists;
  * - a *predecessor* per card, so "read the runbook before you deploy" is a fact the board holds
  *   instead of one the hire has to remember;
  * - *sections* down the side, so a board of forty cards is read one part at a time.
@@ -505,8 +507,45 @@ export function BoardPage() {
     [board, pendingRemovals, isTaskPoolShown],
   );
 
-  const { structure, states, assignStage, assignGroupStage, toggleDone, setPredecessor } =
-    useBoardStructure(boardId, allCards);
+  /**
+   * Where each card was found — see `cardOrigins.ts`.
+   *
+   * Read once when the board arrives and never written here: the origin is recorded by whoever
+   * made the card, which is always somewhere else in the app. The board only reads the trail.
+   *
+   * Keyed by project rather than by board, because the surfaces that write one — the selection
+   * toolbar, a chat, the buddy dock — know the project and not the board.
+   *
+   * Read under `selectedProjectId`, which is the id those surfaces write under, and *not* under the
+   * board's own `projectId`. The two are normally the same and the one time they are not — a board
+   * fetched for one project while the app has moved to another — reading the board's id would look
+   * up trails nobody stored there and show none of them.
+   */
+  const [cardOrigins, setCardOrigins] = useState<CardOrigins>({});
+  const [originsReadFor, setOriginsReadFor] = useState<string | null>(null);
+
+  // Keyed by project *and* revision: the origins follow the hire across a project, and a card
+  // saved from the buddy dock while this page is open writes them without leaving it.
+  const originsStoredFor = `${selectedProjectId}:${storageRevision}`;
+
+  if (originsStoredFor !== originsReadFor) {
+    setOriginsReadFor(originsStoredFor);
+    setCardOrigins(readCardOrigins(selectedProjectId));
+  }
+
+  /**
+   * Now and Later, read off the onboarding path — see `pathStages.ts`. Nothing on this page sets a
+   * stage any more: the path is the one plan, and the board files its cards against it.
+   */
+  const path = useOnboardingPath();
+  const phases = useMemo(() => (path ? pathPhases(path) : null), [path]);
+  const stageOf = useMemo(() => pathStages(phases, cardOrigins), [phases, cardOrigins]);
+
+  const { structure, states, toggleDone, setPredecessor } = useBoardStructure(
+    boardId,
+    allCards,
+    stageOf,
+  );
 
   /**
    * The card whose run is being looked at, or null.
@@ -680,32 +719,6 @@ export function BoardPage() {
   if (storedFor !== sizesReadFor) {
     setSizesReadFor(storedFor);
     setCardSizes(readCardSizes(boardId));
-  }
-
-  /**
-   * Where each card was found — see `cardOrigins.ts`.
-   *
-   * Read once when the board arrives and never written here: the origin is recorded by whoever
-   * made the card, which is always somewhere else in the app. The board only reads the trail.
-   *
-   * Keyed by project rather than by board, because the surfaces that write one — the selection
-   * toolbar, a chat, the buddy dock — know the project and not the board.
-   *
-   * Read under `selectedProjectId`, which is the id those surfaces write under, and *not* under the
-   * board's own `projectId`. The two are normally the same and the one time they are not — a board
-   * fetched for one project while the app has moved to another — reading the board's id would look
-   * up trails nobody stored there and show none of them.
-   */
-  const [cardOrigins, setCardOrigins] = useState<CardOrigins>({});
-  const [originsReadFor, setOriginsReadFor] = useState<string | null>(null);
-
-  // Keyed by project *and* revision: the origins follow the hire across a project, and a card
-  // saved from the buddy dock while this page is open writes them without leaving it.
-  const originsStoredFor = `${selectedProjectId}:${storageRevision}`;
-
-  if (originsStoredFor !== originsReadFor) {
-    setOriginsReadFor(originsStoredFor);
-    setCardOrigins(readCardOrigins(selectedProjectId));
   }
 
   /**
@@ -1252,8 +1265,6 @@ export function BoardPage() {
                   onDissolveGroup={handleDissolveGroup}
                   onRecolourGroup={handleRecolourGroup}
                   states={states}
-                  onAssignStage={assignStage}
-                  onAssignGroupStage={assignGroupStage}
                   onToggleDone={toggleDone}
                   onSetPredecessor={setPredecessor}
                   onShowChain={setChainCardId}
