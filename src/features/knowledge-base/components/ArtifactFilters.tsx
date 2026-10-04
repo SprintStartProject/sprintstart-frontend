@@ -411,7 +411,7 @@ export function ArtifactFilters({
               size="sm"
               onClick={onClearFilters}
               data-testid="kb-clear-filters"
-              className="shrink-0 text-app-text-muted hover:text-app-text"
+              className="shrink-0 text-app-text-muted hover:text-app-text max-sm:h-11"
             >
               Clear filters
             </Button>
@@ -442,7 +442,7 @@ export function ArtifactFilters({
               aria-pressed={isSelectMode}
               onClick={() => onSelectModeChange(!isSelectMode)}
               data-testid="kb-select-toggle"
-              className="shrink-0"
+              className="shrink-0 max-sm:h-11"
             >
               {/* Constant label: a toggle's state is aria-pressed, not a changing name. */}
               Select

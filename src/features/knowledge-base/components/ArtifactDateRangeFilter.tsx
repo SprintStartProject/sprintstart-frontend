@@ -101,9 +101,9 @@ export function ArtifactDateRangeFilter({
         <div
           role="group"
           aria-label="Custom date range"
-          className="flex flex-wrap items-center gap-2"
+          className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:flex-col max-sm:items-stretch"
         >
-          <div className="w-40">
+          <div className="w-40 max-sm:w-full">
             <Input
               type="date"
               size="sm"
@@ -118,10 +118,10 @@ export function ArtifactDateRangeFilter({
               data-testid="kb-date-from"
             />
           </div>
-          <span aria-hidden="true" className="text-sm text-app-text-muted">
+          <span aria-hidden="true" className="text-sm text-app-text-muted max-sm:hidden">
             –
           </span>
-          <div className="w-40">
+          <div className="w-40 max-sm:w-full">
             <Input
               type="date"
               size="sm"
@@ -154,6 +154,7 @@ export function ArtifactDateRangeFilter({
             onClick={() => onRangeChange({ from: null, to: null }, "push")}
             aria-label="Clear date range"
             data-testid="kb-date-clear"
+            className="max-sm:h-11 max-sm:w-11"
           >
             <X className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>

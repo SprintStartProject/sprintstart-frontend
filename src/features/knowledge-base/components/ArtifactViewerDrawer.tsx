@@ -280,6 +280,11 @@ const STATIC_MARKDOWN_COMPONENTS = {
       </div>
     );
   },
+  table: ({ children }: { children?: ReactNode }) => (
+    <div className="overflow-x-auto">
+      <table>{children}</table>
+    </div>
+  ),
   pre: ({ children }: { children?: ReactNode }) => <>{children}</>,
 } as const;
 
@@ -339,6 +344,11 @@ function createMarkdownComponents(highlightLines?: number[]) {
         </div>
       );
     },
+    table: ({ children }: { children?: ReactNode }) => (
+      <div className="overflow-x-auto">
+        <table>{children}</table>
+      </div>
+    ),
     pre: ({ children }: { children?: ReactNode }) => <>{children}</>,
     p({
       children,
@@ -964,7 +974,7 @@ export function ArtifactViewerDrawer({
   const MetadataView = artifact && metadataView?.appliesTo(artifact) ? metadataView.View : null;
 
   const actionsContent = viewMode === "raw" && !MetadataView && (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
       {isMarkdownArtifact && content && (
         <div className="flex items-center rounded-lg border border-app-border bg-app-bg p-0.5 text-xs">
           <button
@@ -1069,7 +1079,7 @@ export function ArtifactViewerDrawer({
       badge={headerBadge}
       actions={actionsContent}
       widthClassName="w-full max-w-5xl"
-      zIndexClassName="z-50 md:z-30"
+      zIndexClassName="z-50"
       panelClassName="border-l border-app-border shadow-2xl"
       panelBackgroundClassName="bg-app-surface"
       headerClassName="p-4 bg-app-bg"
@@ -1127,7 +1137,7 @@ export function ArtifactViewerDrawer({
               ) : content &&
                 shouldRenderAsMarkdown(content, artifact) &&
                 markdownViewMode === "rendered" ? (
-                <div className="prose prose-sm max-w-none text-app-text dark:prose-invert">
+                <div className="prose prose-sm max-w-none break-words text-app-text dark:prose-invert">
                   <ReactMarkdown
                     remarkPlugins={REMARK_PLUGINS}
                     rehypePlugins={REHYPE_PLUGINS}
@@ -1231,7 +1241,7 @@ export function ArtifactViewerDrawer({
             </div>
           ) : (
             <>
-              <div className="prose prose-sm max-w-none text-app-text dark:prose-invert">
+              <div className="prose prose-sm max-w-none break-words text-app-text dark:prose-invert">
                 <ReactMarkdown
                   remarkPlugins={REMARK_PLUGINS}
                   rehypePlugins={REHYPE_PLUGINS}

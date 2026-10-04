@@ -148,13 +148,20 @@ export function ArtifactBulkActions({
           <Button
             variant="dangerSoft"
             size="sm"
+            className="max-sm:h-11"
             icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
             onClick={openConfirm}
             data-testid="kb-bulk-delete"
           >
             Delete
           </Button>
-          <Button variant="ghost" size="sm" onClick={onClearSelection} data-testid="kb-bulk-clear">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearSelection}
+            className="max-sm:h-11"
+            data-testid="kb-bulk-clear"
+          >
             Clear selection
           </Button>
         </div>
