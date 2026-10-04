@@ -9,6 +9,7 @@ import { ChatContext } from "../../../context/ChatContext";
 import { boardService } from "../../../services/boardService";
 import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin } from "../layout/cardOrigins";
+import { withOnboardingPlace } from "../layout/onboardingOrigin";
 import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
 import { openAiBuddy } from "../../buddy/aiBuddyBus";
@@ -64,7 +65,8 @@ export function SelectionActions() {
       // the hire asked for and the trail back is the extra. `rememberOrigin` swallows a storage
       // that refuses, so this cannot throw past the toast below.
       rememberOrigin(selectedProjectId, card.id, {
-        url: selection.origin,
+        // On the Onboarding page, the step that was open rather than the page as a whole.
+        url: withOnboardingPlace(selection.origin),
         label: selection.source ?? "where you were",
       });
       // Found anywhere in the app, so the board is almost never on screen — see `useInvalidateBoard`.

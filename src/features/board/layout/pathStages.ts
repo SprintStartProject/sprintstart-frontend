@@ -13,8 +13,9 @@ import type { BoardStage } from "./boardStructure";
  * after it. So the board asks the path instead of asking the hire.
  *
  * **Later means "belongs to a phase you have not reached yet"**, and nothing else. A card is tied to
- * a phase through a step: the live step card names its step, and a card somebody kept from a step's
- * page carries that page as its origin. A card tied to nothing — most notes, the current task, the
+ * a phase through its origin: the live step card names its step, and a card kept while a step or a
+ * phase was open on the Onboarding page carries it as its origin (`onboardingOrigin.ts`). A card
+ * tied to nothing — most notes, the current task, the
  * pull requests — is about the work in front of the hire, so it is Now. That is also why a board
  * with no path reads as a single band, which the grid does not draw: no path, no ramp.
  *
@@ -24,9 +25,11 @@ import type { BoardStage } from "./boardStructure";
  */
 export type PathStages = (card: BoardCard) => BoardStage;
 
-/** What the board needs from the path: the phase of every step, and which phases lie ahead. */
+/** What the board needs from the path: the phase of every step and question, and which lie ahead. */
 export type PathPhases = {
   phaseOfStep: Map<string, string>;
+  phaseOfQuestion: Map<string, string>;
+  phaseIds: Set<string>;
   aheadPhaseIds: Set<string>;
 };
 
@@ -42,8 +45,10 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
   const activeIndex = findActivePhaseIndex({ ...path, phases });
 
   const phaseOfStep = new Map<string, string>();
+  const phaseOfQuestion = new Map<string, string>();
   for (const phase of phases) {
     for (const step of phase.steps ?? []) phaseOfStep.set(step.id, phase.id);
+    for (const question of phase.questions ?? []) phaseOfQuestion.set(question.id, phase.id);
   }
 
   const aheadPhaseIds = new Set(
@@ -52,17 +57,55 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
       .map((phase) => phase.id),
   );
 
-  return { phaseOfStep, aheadPhaseIds };
+  return {
+    phaseOfStep,
+    phaseOfQuestion,
+    phaseIds: new Set(phases.map((phase) => phase.id)),
+    aheadPhaseIds,
+  };
 }
 
-/** The step a card belongs to, if it belongs to one. */
-function stepOf(card: BoardCard, origins: CardOrigins): string | null {
-  if (card.content.kind === "PATH_STEP") return card.content.stepId;
+/**
+ * The phase an in-app address points into, if it points into one.
+ *
+ * Every way the app writes a link to a piece of the path: `/onboarding/<stepId>` (the old step page,
+ * and what a selection on it recorded), and `/onboarding?step=`, `?question=` or `?phase=` (what the
+ * buddy writes, and what `onboardingOrigin.ts` records now). Anything else — a chat, the knowledge
+ * base — points into no phase.
+ */
+export function phaseOfUrl(url: string, phases: PathPhases): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url, "http://app.invalid");
+  } catch {
+    return null;
+  }
 
-  // A card kept from a step's page: `/onboarding/<stepId>`, perhaps with a text fragment after it.
-  const match = /^\/onboarding\/([^/?#]+)/.exec(origins[card.id]?.url ?? "");
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  if (segments[0] !== "onboarding") return null;
 
-  return match ? decodeURIComponent(match[1]) : null;
+  const stepId = segments[1] ? decodeURIComponent(segments[1]) : parsed.searchParams.get("step");
+  if (stepId) return phases.phaseOfStep.get(stepId) ?? null;
+
+  const questionId = parsed.searchParams.get("question");
+  if (questionId) return phases.phaseOfQuestion.get(questionId) ?? null;
+
+  const phaseId = parsed.searchParams.get("phase");
+  return phaseId && phases.phaseIds.has(phaseId) ? phaseId : null;
+}
+
+/** The phase a card belongs to, if it belongs to one. */
+export function phaseOfCard(
+  card: BoardCard,
+  phases: PathPhases,
+  origins: CardOrigins,
+): string | null {
+  if (card.content.kind === "PATH_STEP") {
+    return card.content.stepId ? (phases.phaseOfStep.get(card.content.stepId) ?? null) : null;
+  }
+
+  const url = origins[card.id]?.url;
+  return url ? phaseOfUrl(url, phases) : null;
 }
 
 /** The stage of every card on a board, given its path (or none) and where its cards came from. */
@@ -70,8 +113,7 @@ export function pathStages(phases: PathPhases | null, origins: CardOrigins): Pat
   return (card) => {
     if (!phases) return "NOW";
 
-    const stepId = stepOf(card, origins);
-    const phaseId = stepId ? phases.phaseOfStep.get(stepId) : undefined;
+    const phaseId = phaseOfCard(card, phases, origins);
 
     return phaseId && phases.aheadPhaseIds.has(phaseId) ? "LATER" : "NOW";
   };

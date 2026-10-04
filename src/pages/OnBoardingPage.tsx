@@ -73,6 +73,7 @@ import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
+import { setOnboardingPlace } from "../features/onboarding/onboardingPlace";
 import {
   askAboutEmptyPhase,
   askAboutEmptyPhases,
@@ -591,6 +592,35 @@ export function OnBoardingPage() {
   const focusPhaseId =
     nextAction?.kind === "step" || nextAction?.kind === "question" ? nextAction.phase.id : null;
   const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0] ?? null;
+
+  // Where the hire is on this page, for whatever they keep on their board from here: the step they
+  // have open, or the phase they are looking at. See `onboardingPlace.ts`.
+  useEffect(() => {
+    const openItemId = viewMode === "graph" ? graphItemId : expandedItemId;
+    const shownPhase =
+      viewMode === "graph"
+        ? (phases.find((phase) => phase.id === openGraphPhaseId) ?? null)
+        : selectedPhase;
+    const openItem = openItemId
+      ? phases.flatMap(phaseItems).find((item) => item.id === openItemId)
+      : undefined;
+    // A question is not a place a note is kept *about*; its phase is.
+    const itemPhase =
+      openItem?.kind === "question"
+        ? phases.find((phase) => phase.id === openItem.question.phaseId)
+        : undefined;
+    const phase = itemPhase ?? shownPhase;
+
+    setOnboardingPlace(
+      openItem?.kind === "step"
+        ? { kind: "step", id: openItem.id, title: openItem.title }
+        : phase
+          ? { kind: "phase", id: phase.id, title: phase.title }
+          : null,
+    );
+  }, [expandedItemId, graphItemId, openGraphPhaseId, phases, selectedPhase, viewMode]);
+
+  useEffect(() => () => setOnboardingPlace(null), []);
   const overall = path ? pathProgress(path) : null;
   const generationIssues = path?.generationIssues ?? [];
   const generationIssueSummary = generationIssues
