@@ -6,6 +6,7 @@ describe("toolLabel", () => {
     expect(toolLabel("get_my_metrics")).toBe("Checking your progress…");
     expect(toolLabel("get_my_competencies")).toBe("Looking at where you stand…");
     expect(toolLabel("get_suggested_tasks")).toBe("Finding good tasks for you…");
+    expect(toolLabel("get_app_guide")).toBe("Checking where that is in the app…");
   });
 
   it("falls back to a generic label for an unknown tool", () => {

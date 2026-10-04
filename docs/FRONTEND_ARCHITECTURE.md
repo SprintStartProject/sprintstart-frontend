@@ -207,6 +207,13 @@ Route-level authorization is centralized in `src/auth/accessPolicy.ts`:
 > **New protected routes must be added to `AppRoute` + `routePermissions`**, or they
 > won't type-check and won't be access-controlled.
 
+> **The buddy has a hand-written map of these pages** (`AppGuide.kt` in the backend,
+> served by the `get_app_guide` tool). A new, renamed or removed page, tab or tab URL
+> parameter, or a changed sidebar/tab/button label it quotes, means updating that file
+> in the same change. `appGuideRoutes.test.ts` fails when `accessPolicy.ts` gains a
+> route the guide neither describes nor excludes on purpose
+> (`src/features/buddy/appGuideRoutes.ts`).
+
 ### 4.4 Actual route list
 
 Declared in `AppRouter.tsx`:

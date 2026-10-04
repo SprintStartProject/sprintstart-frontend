@@ -732,6 +732,32 @@ describe("buddyService", () => {
       expect(capturedBody).toEqual({ content: "who is behind?", teamProjectId: "p-123" });
     });
 
+    it("sends the page the hire is on, and omits it when unknown", async () => {
+      const bodies: Record<string, unknown>[] = [];
+      const encoder = new TextEncoder();
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/messages", async ({ request }) => {
+          bodies.push((await request.json()) as Record<string, unknown>);
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+              controller.close();
+            },
+          });
+          return new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } });
+        }),
+      );
+      const handlers = { onToken: vi.fn(), onCitation: vi.fn(), onDone: vi.fn() };
+
+      await streamMessage("where are roles?", handlers, "session-1", undefined, "/team-management");
+      await streamMessage("hi", handlers, "session-1");
+
+      expect(bodies).toEqual([
+        { content: "where are roles?", sessionId: "session-1", currentPage: "/team-management" },
+        { content: "hi", sessionId: "session-1" },
+      ]);
+    });
+
     it("opens the team greeting under the teamProjectId query param", async () => {
       let capturedUrl = "";
       const encoder = new TextEncoder();
