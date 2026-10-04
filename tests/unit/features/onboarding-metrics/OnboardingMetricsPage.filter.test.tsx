@@ -131,4 +131,32 @@ describe("OnboardingMetricsPage — per-hire filter", () => {
     });
     expect(screen.getByText("Bob")).toBeInTheDocument();
   });
+
+  it("says in place who has no GitHub login and narrows the list to them", async () => {
+    const bob = metrics.hires[1];
+    bob.githubLogin = null;
+    metrics.unattributableMemberCount = 1;
+    try {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <OnboardingMetricsPage />
+        </MemoryRouter>,
+      );
+
+      const notice = await screen.findByRole("region", { name: "Hires without a GitHub login" });
+      expect(notice).toHaveTextContent("1 hire can't be attributed");
+
+      await user.click(screen.getByRole("button", { name: "Show them" }));
+
+      await waitFor(() => {
+        expect(screen.queryByText("Ada")).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText("Cleo")).not.toBeInTheDocument();
+      expect(screen.getAllByText("Bob").length).toBeGreaterThan(0);
+    } finally {
+      bob.githubLogin = "bob";
+      metrics.unattributableMemberCount = 0;
+    }
+  });
 });

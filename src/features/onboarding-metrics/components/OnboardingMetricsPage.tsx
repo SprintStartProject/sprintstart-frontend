@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Rocket,
   Search,
+  UserX,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
@@ -29,8 +30,11 @@ import { formatDuration } from "../format";
 import { isAwaitingFirstResponse } from "../hireStatus";
 import type { HireTimeline } from "../types";
 
-/** Narrows the per-hire list to those a PM might act on, for a busy project. */
-type HireFilter = "all" | "attention";
+/**
+ * Narrows the per-hire list: to those a PM might act on, for a busy project, or to those whose
+ * work cannot be counted because they have no GitHub login.
+ */
+type HireFilter = "all" | "attention" | "unattributed";
 
 /** How many hire timelines to show per page before the list paginates. */
 const HIRES_PER_PAGE = 8;
@@ -63,6 +67,73 @@ function hasActivity(hires: HireTimeline[]): boolean {
       hire.firstContributionOpenedAt !== null ||
       hire.acceptedContributionCount > 0 ||
       hire.openContributionCount > 0,
+  );
+}
+
+/** How many names the notice spells out before it folds the rest into "+n". */
+const NOTICE_NAMES = 3;
+
+/**
+ * Hires whose work the numbers leave out, said where the numbers are — once, in place, rather
+ * than as a toast on every visit. Each name opens that member's panel (their profile is one
+ * press further), and "Show them" narrows the timelines below to exactly these hires.
+ */
+function UnattributedNotice({
+  count,
+  hires,
+  showingThem,
+  onShowThem,
+  onOpenMember,
+}: {
+  count: number;
+  hires: HireTimeline[];
+  showingThem: boolean;
+  onShowThem: () => void;
+  onOpenMember: (userId: string) => void;
+}) {
+  const named = hires.slice(0, NOTICE_NAMES);
+  const folded = hires.length - named.length;
+
+  return (
+    <section
+      aria-label="Hires without a GitHub login"
+      className="flex flex-col gap-3 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 sm:flex-row sm:items-center"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-surface text-app-warning-text">
+        <UserX aria-hidden="true" className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-app-text">
+          {count} {count === 1 ? "hire" : "hires"} can&apos;t be attributed
+        </p>
+        <p className="text-xs text-app-text-muted">
+          They have no GitHub login, so their work is left out of these numbers.
+          {named.length > 0 && (
+            <>
+              {" "}
+              {named.map((hire, index) => (
+                <span key={hire.userId}>
+                  {index > 0 && ", "}
+                  <button
+                    type="button"
+                    onClick={() => onOpenMember(hire.userId)}
+                    className="font-medium text-app-text underline decoration-app-border underline-offset-2 hover:decoration-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  >
+                    {hire.displayName}
+                  </button>
+                </span>
+              ))}
+              {folded > 0 && ` and ${folded} more`}
+            </>
+          )}
+        </p>
+      </div>
+      {!showingThem && (
+        <Button variant="secondary" size="sm" onClick={onShowThem} className="shrink-0">
+          Show them
+        </Button>
+      )}
+    </section>
   );
 }
 
@@ -147,9 +218,6 @@ export function OnboardingMetricsPage() {
   // Set when a manual refresh is in flight, so the completion effect can tell the
   // user what the refetch turned up without also firing on the first load.
   const pendingRefreshRef = useRef(false);
-  // The project we last warned about missing GitHub logins for, so the warning
-  // fires once per selection rather than on every refetch.
-  const warnedProjectRef = useRef<string | null>(null);
 
   const {
     data: metrics,
@@ -197,20 +265,9 @@ export function OnboardingMetricsPage() {
   // No toast for a failed load: the section already says so in place, and a toast on top
   // reported the same thing twice — loudly, on every visit to a project with nothing in it.
 
-  // Warn once per project when some hires have no GitHub login, since their work
-  // can't be attributed and the numbers below quietly exclude it.
-  useEffect(() => {
-    if (isFetching || error || !metrics) return;
-    if (metrics.unattributableMemberCount > 0 && warnedProjectRef.current !== metrics.projectId) {
-      warnedProjectRef.current = metrics.projectId;
-      toast.warning(
-        `${metrics.unattributableMemberCount} hire${
-          metrics.unattributableMemberCount === 1 ? "" : "s"
-        } can't be attributed`,
-        { description: "They have no GitHub login, so their work is left out of these numbers." },
-      );
-    }
-  }, [isFetching, error, metrics, toast]);
+  // Hires without a GitHub login are said on the view itself (see the notice above the
+  // timelines), not in a toast: the toast came back on every swipe through the workspace, and
+  // a toast cannot lead anywhere.
 
   // Stalled hires lead the per-hire list — they are what a PM should act on today.
   const orderedHires = useMemo(() => {
@@ -221,12 +278,14 @@ export function OnboardingMetricsPage() {
   const hireFilterOptions: FilterSelectOption<HireFilter>[] = [
     { value: "all", label: "All hires" },
     { value: "attention", label: "Needs attention only" },
+    { value: "unattributed", label: "No GitHub login" },
   ];
 
   const filteredHires = useMemo(() => {
     const query = search.trim().toLowerCase();
     return orderedHires.filter((hire) => {
       if (hireFilter === "attention" && !needsAttention(hire)) return false;
+      if (hireFilter === "unattributed" && hire.githubLogin) return false;
       if (!query) return true;
       return (
         hire.displayName.toLowerCase().includes(query) ||
@@ -342,6 +401,22 @@ export function OnboardingMetricsPage() {
               </div>
             </section>
 
+            {metrics.unattributableMemberCount > 0 && (
+              <UnattributedNotice
+                count={metrics.unattributableMemberCount}
+                hires={metrics.hires.filter((hire) => !hire.githubLogin)}
+                showingThem={hireFilter === "unattributed"}
+                onShowThem={() => {
+                  handleSearchChange("");
+                  handleFilterChange("unattributed");
+                  document
+                    .getElementById("metrics-hires-heading")
+                    ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+                }}
+                onOpenMember={openMember}
+              />
+            )}
+
             {/* Per-hire timelines, stalled first. */}
             <section aria-labelledby="metrics-hires-heading" className="space-y-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -374,7 +449,9 @@ export function OnboardingMetricsPage() {
                 <EmptyState size="sm">
                   {search.trim()
                     ? "No hires match your search."
-                    : "No hires need attention right now."}
+                    : hireFilter === "unattributed"
+                      ? "Every hire has a GitHub login."
+                      : "No hires need attention right now."}
                 </EmptyState>
               ) : (
                 <div className="space-y-3">
