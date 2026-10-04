@@ -22,6 +22,7 @@ import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
 import { isCardAt, pathPhases, pathStages } from "../features/board/layout/pathStages";
+import { isPathArea, pathAreas } from "../features/board/layout/pathAreas";
 import { resolveNextAction } from "../features/onboarding/nextAction";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
@@ -365,54 +366,6 @@ export function BoardPage() {
    * a select repeating that on forty cards was forty copies of a decision that is better made by
    * putting the card where it goes.
    */
-  function handleAssignGroup(cardId: string, groupId: string | null) {
-    saveGroups(assignToGroup(groups, cardId, groupId));
-  }
-
-  function handleRenameGroup(groupId: string, name: string) {
-    saveGroups(groups.map((group) => (group.id === groupId ? { ...group, name } : group)));
-  }
-
-  /**
-   * Makes an empty area under the name it was given, and opens it.
-   *
-   * Empty is the point: an area made from the tool rail is a box somebody wants *before* they have
-   * decided what goes in it — "Paperwork", "Week two" — and making them find a card to hang it off
-   * first is the reason areas were only ever made by accident.
-   *
-   * Named in the same breath, in a form over the board, the way a note or a link is written. The
-   * alternative was making it first and renaming it in place, which needs a name that can be
-   * edited where the area is drawn — and an empty area is drawn nowhere except in a tab, which is
-   * not a place to type.
-   */
-  function handleNewArea(name: string) {
-    const created = { ...newBoardGroup(groups), name };
-    saveGroups([...groups, created]);
-    setNamingArea(false);
-    setSectionId(created.id);
-  }
-
-  /** Takes the area away and leaves its cards exactly where they are on the board. */
-  function handleDissolveGroup(groupId: string) {
-    saveGroups(dissolveGroup(groups, groupId));
-    // A rail pointed at an area that no longer exists would show an empty pane, so the view falls
-    // back to the whole board rather than to nothing.
-    if (sectionId === groupId) setSectionId(null);
-  }
-
-  /** Paints an area. A colour the hire chose, on a group the hire named — see `areaAccents.ts`. */
-  function handleRecolourGroup(groupId: string, accent: AreaAccent) {
-    saveGroups(groups.map((group) => (group.id === groupId ? { ...group, accent } : group)));
-  }
-
-  function handleToggleGroup(groupId: string) {
-    saveGroups(
-      groups.map((group) =>
-        group.id === groupId ? { ...group, collapsed: !group.collapsed } : group,
-      ),
-    );
-  }
-
   const togglePinned = useCallback(
     (cardId: string) => {
       setPinnedIds((current) => {
@@ -539,6 +492,106 @@ export function BoardPage() {
   const stageOf = useMemo(() => pathStages(phases, cardOrigins), [phases, cardOrigins]);
 
   /**
+   * The hire's own areas, and after them one per phase of the path for the cards they did not
+   * file themselves — see `pathAreas.ts`. Everything that *draws* areas reads this; everything that
+   * *writes* them goes on writing `groups`, so a path area is never stored.
+   */
+  const [collapsedPathAreas, setCollapsedPathAreas] = useState<Set<string>>(new Set());
+  const shownGroups = useMemo(
+    () => [
+      ...groups,
+      ...pathAreas(allCards, groups, path, phases, cardOrigins, collapsedPathAreas),
+    ],
+    [allCards, cardOrigins, collapsedPathAreas, groups, path, phases],
+  );
+
+  function handleAssignGroup(cardId: string, groupId: string | null) {
+    // Dropping a card on a path area is taking it out of the hire's own areas: it then falls back
+    // under its phase by itself, and a card with no phase lands unfiled. See `pathAreas.ts`.
+    saveGroups(assignToGroup(groups, cardId, groupId && isPathArea(groupId) ? null : groupId));
+  }
+
+  /**
+   * Turns an area the board made from the path into one of the hire's own, holding the same cards.
+   *
+   * What renaming or painting one does: a path area cannot keep a name or a colour, being rebuilt
+   * from the path on every render, so the gesture is taken as "this is mine now".
+   */
+  function adoptPathArea(groupId: string, changes: Partial<BoardGroup>) {
+    const area = shownGroups.find((group) => group.id === groupId);
+    if (!area) return;
+
+    const adopted = {
+      ...newBoardGroup(groups),
+      name: area.name,
+      cardIds: area.cardIds,
+      ...changes,
+    };
+    saveGroups([...groups, adopted]);
+    if (sectionId === groupId) setSectionId(adopted.id);
+  }
+
+  function handleRenameGroup(groupId: string, name: string) {
+    if (isPathArea(groupId)) return adoptPathArea(groupId, { name });
+
+    saveGroups(groups.map((group) => (group.id === groupId ? { ...group, name } : group)));
+  }
+
+  /**
+   * Makes an empty area under the name it was given, and opens it.
+   *
+   * Empty is the point: an area made from the tool rail is a box somebody wants *before* they have
+   * decided what goes in it — "Paperwork", "Week two" — and making them find a card to hang it off
+   * first is the reason areas were only ever made by accident.
+   *
+   * Named in the same breath, in a form over the board, the way a note or a link is written. The
+   * alternative was making it first and renaming it in place, which needs a name that can be
+   * edited where the area is drawn — and an empty area is drawn nowhere except in a tab, which is
+   * not a place to type.
+   */
+  function handleNewArea(name: string) {
+    const created = { ...newBoardGroup(groups), name };
+    saveGroups([...groups, created]);
+    setNamingArea(false);
+    setSectionId(created.id);
+  }
+
+  /** Takes the area away and leaves its cards exactly where they are on the board. */
+  function handleDissolveGroup(groupId: string) {
+    if (isPathArea(groupId)) return;
+
+    saveGroups(dissolveGroup(groups, groupId));
+    // A rail pointed at an area that no longer exists would show an empty pane, so the view falls
+    // back to the whole board rather than to nothing.
+    if (sectionId === groupId) setSectionId(null);
+  }
+
+  /** Paints an area. A colour the hire chose, on a group the hire named — see `areaAccents.ts`. */
+  function handleRecolourGroup(groupId: string, accent: AreaAccent) {
+    if (isPathArea(groupId)) return adoptPathArea(groupId, { accent });
+
+    saveGroups(groups.map((group) => (group.id === groupId ? { ...group, accent } : group)));
+  }
+
+  function handleToggleGroup(groupId: string) {
+    if (isPathArea(groupId)) {
+      setCollapsedPathAreas((current) => {
+        const next = new Set(current);
+        if (next.has(groupId)) next.delete(groupId);
+        else next.add(groupId);
+        return next;
+      });
+      return;
+    }
+
+    saveGroups(
+      groups.map((group) =>
+        group.id === groupId ? { ...group, collapsed: !group.collapsed } : group,
+      ),
+    );
+  }
+
+  /**
    * One step or phase the board was opened for: `/board?step=<id>` or `/board?phase=<id>`.
    *
    * What "3 cards on your board from this step" on the Onboarding page links to. In the address
@@ -582,7 +635,7 @@ export function BoardPage() {
 
   const sections = useMemo(
     () =>
-      summariseSections(allCards, groups, states, {
+      summariseSections(allCards, shownGroups, states, {
         // The focus tab is for a board somebody can get lost on. Below the fold threshold every
         // card is already in front of them, and a tab offering a subset of six is a choice made
         // for its own sake.
@@ -591,7 +644,7 @@ export function BoardPage() {
         marks: cardMarks,
         markLabels,
       }),
-    [allCards, groups, pinnedIds, states, cardMarks, markLabels],
+    [allCards, shownGroups, pinnedIds, states, cardMarks, markLabels],
   );
 
   /**
@@ -770,7 +823,7 @@ export function BoardPage() {
     const bySource = atPlace.filter((card) => matchesFilter(card, filter));
     const visible = cardsInSection(
       bySource,
-      groups,
+      shownGroups,
       shownSectionId,
       { states, pinnedIds },
       cardMarks,
@@ -782,7 +835,7 @@ export function BoardPage() {
     cardMarks,
     cardOrigins,
     filter,
-    groups,
+    shownGroups,
     pathPlace,
     phases,
     pinnedIds,
@@ -1234,7 +1287,7 @@ export function BoardPage() {
                   onToggleCollapsed={toggleCollapsed}
                   pinnedIds={pinnedIds}
                   onTogglePinned={togglePinned}
-                  groups={groups}
+                  groups={shownGroups}
                   onAssignGroup={handleAssignGroup}
                   onRenameGroup={handleRenameGroup}
                   onToggleGroup={handleToggleGroup}
