@@ -118,7 +118,7 @@ describe("the task pool on the board", () => {
 
   it("is switched off and on again from the rail", async () => {
     await renderBoard();
-    const rail = screen.getByRole("toolbar", { name: "Board tools" });
+    const rail = screen.getByRole("group", { name: "Board tools" });
 
     fireEvent.click(within(rail).getByRole("button", { name: "Hide the task pool" }));
     expect(screen.queryByText("Fix the flaky login test")).not.toBeInTheDocument();

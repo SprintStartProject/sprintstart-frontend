@@ -955,9 +955,10 @@ export function BoardPage() {
             }
           >
             <div
-              role="toolbar"
+              // A group, not a toolbar: `toolbar` promises one tab stop with arrow keys between the
+              // buttons, and every button here is its own tab stop.
+              role="group"
               aria-label="Board tools"
-              aria-orientation={isRailVertical ? "vertical" : "horizontal"}
               className={[
                 "flex w-fit max-w-full flex-row flex-wrap items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur lg:flex-col lg:flex-nowrap",
                 // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
@@ -1064,7 +1065,6 @@ export function BoardPage() {
                   <BoardFilterTriggers
                     value={filter}
                     onChange={setFilter}
-                    compact
                     vertical={isRailVertical}
                   />
                 </>
@@ -1087,7 +1087,6 @@ export function BoardPage() {
                   <AddCardTriggers
                     onPick={setAddingKind}
                     active={addingKind}
-                    compact
                     vertical={isRailVertical}
                   />
                 </>

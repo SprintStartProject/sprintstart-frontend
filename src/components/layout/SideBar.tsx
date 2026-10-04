@@ -378,7 +378,16 @@ function SidebarContent({
         }`}
       >
         <SidebarLogo
-          sidebarToggle={onToggleCollapsed ? { collapsed, onToggle: onToggleCollapsed } : undefined}
+          sidebarToggle={
+            onToggleCollapsed
+              ? {
+                  collapsed,
+                  onToggle: onToggleCollapsed,
+                  // Only the desktop sidebar folds; the drawer's own logo closes the drawer.
+                  kind: onNavigate ? "drawer" : "fold",
+                }
+              : undefined
+          }
         />
 
         <h1
@@ -632,7 +641,11 @@ export function SideBar() {
           {/* Opens and closes the drawer like the menu button beside it, as the desktop logo
               folds the sidebar. "Collapsed" is the drawer being shut. */}
           <SidebarLogo
-            sidebarToggle={{ collapsed: !isMobileSidebarOpen, onToggle: toggleMobileSidebar }}
+            sidebarToggle={{
+              collapsed: !isMobileSidebarOpen,
+              onToggle: toggleMobileSidebar,
+              kind: "drawer",
+            }}
           />
 
           <span className="text-[16px] leading-none font-bold tracking-tight text-app-text">

@@ -40,8 +40,11 @@ function useFirstLineCount(): [RefCallback<HTMLDivElement>, number | null] {
     };
 
     measure();
+    // The chips as well as the row: a chip can change width while the row does not — most often
+    // when the web font arrives after the first measurement — and the count would then be one off.
     const observer = new ResizeObserver(measure);
     observer.observe(row);
+    for (const chip of row.children) observer.observe(chip);
 
     return () => observer.disconnect();
   }, []);
