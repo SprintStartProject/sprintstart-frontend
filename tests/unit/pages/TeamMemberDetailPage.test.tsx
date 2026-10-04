@@ -351,18 +351,28 @@ describe("TeamMemberDetailPage", () => {
     await waitFor(() => expect(mockGetUserOnboardingPath).toHaveBeenCalledTimes(2));
   });
 
-  it("keeps covered components out of the member's gaps panel", async () => {
-    const gap = (component: string, severity: KnowledgeGap["severity"]): KnowledgeGap => ({
+  it("shows only the gaps in components the member owns, and none that are covered", async () => {
+    const owner = { id: "user1", username: "ada", firstname: "Ada", lastname: "L" };
+    const gap = (
+      component: string,
+      severity: KnowledgeGap["severity"],
+      owners: KnowledgeGap["owners"] = [owner],
+    ): KnowledgeGap => ({
       id: component,
       component,
       missingTypes: severity === "covered" ? [] : ["readme"],
       lastIngested: new Date().toISOString(),
       refreshedAt: new Date().toISOString(),
-      owners: [],
+      owners,
       severity,
     });
     vi.mocked(knowledgeGapService.fetchKnowledgeGaps).mockResolvedValue({
-      gaps: [gap("auth-service", "high"), gap("docs-wiki", "covered")],
+      gaps: [
+        gap("auth-service", "high"),
+        gap("docs-wiki", "covered"),
+        gap("billing", "high", [{ ...owner, id: "someone-else" }]),
+        gap("unowned", "medium", []),
+      ],
     });
 
     render(
@@ -375,6 +385,8 @@ describe("TeamMemberDetailPage", () => {
       expect(screen.getByTestId("member-gaps-panel")).toHaveTextContent("auth-service");
     });
     expect(screen.getByTestId("member-gaps-panel")).not.toHaveTextContent("docs-wiki");
+    expect(screen.getByTestId("member-gaps-panel")).not.toHaveTextContent("billing");
+    expect(screen.getByTestId("member-gaps-panel")).not.toHaveTextContent("unowned");
   });
 });
 

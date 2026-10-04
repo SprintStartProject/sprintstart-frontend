@@ -1,4 +1,3 @@
-import { Badge } from "../../../../components/ui/Badge";
 import { InfoHint } from "../../../../components/ui/InfoHint";
 import type { KnowledgeGap } from "../../../knowledge-gaps/types";
 import type { UserSkillLevel } from "../../../../services/teamManagementService";
@@ -7,7 +6,7 @@ import { PmCard, PmCardHeader } from "../../../pm-area/components/PmCard";
 
 type MemberGapsPanelProps = {
   skillLevels: UserSkillLevel[];
-  skillGaps: UserSkillLevel[];
+  /** Only the gaps in components the member owns — the page filters by owner. */
   knowledgeGaps: KnowledgeGap[];
   onOpenKnowledgeGap: (gapId: string) => void;
 };
@@ -20,9 +19,12 @@ const LEVEL_DOTS: Record<string, number> = {
 };
 
 /**
- * The member's skill assessment plus their skill and knowledge gaps, rendered as the two cards
- * beside the journey on the member detail page. Read-only apart from opening a knowledge gap,
+ * The member's skill assessment and the knowledge gaps in components they own, rendered as the
+ * two cards under the journey on the member detail page. Read-only apart from opening a knowledge gap,
  * which hands off to the knowledge-gaps detail view via `onOpenKnowledgeGap`.
+ *
+ * The skill gaps that used to sit above the knowledge gaps are gone: they were the assessment's
+ * beginner and intermediate rows again, one card to the left.
  *
  * The "Knowledge gaps" explainer is an `InfoHint` in its `"top-end"` placement: the enclosing
  * `SpotlightCard` clips overflow, so the tooltip has to open upward and right-aligned to stay
@@ -30,7 +32,6 @@ const LEVEL_DOTS: Record<string, number> = {
  */
 export function MemberGapsPanel({
   skillLevels,
-  skillGaps,
   knowledgeGaps,
   onOpenKnowledgeGap,
 }: MemberGapsPanelProps) {
@@ -67,17 +68,13 @@ export function MemberGapsPanel({
         )}
       </PmCard>
 
-      <PmCard aria-label="Gaps" tone="pink">
-        <PmCardHeader icon={SearchX} tone="pink" title="Gaps" />
+      <PmCard aria-label="Knowledge gaps" tone="pink">
+        <PmCardHeader icon={SearchX} tone="pink" title="Knowledge gaps" />
 
-        <div className="space-y-4">
-          <SkillGapsSection skillGaps={skillGaps} />
-
-          <KnowledgeGapsSection
-            knowledgeGaps={knowledgeGaps}
-            onOpenKnowledgeGap={onOpenKnowledgeGap}
-          />
-        </div>
+        <KnowledgeGapsSection
+          knowledgeGaps={knowledgeGaps}
+          onOpenKnowledgeGap={onOpenKnowledgeGap}
+        />
       </PmCard>
     </>
   );
@@ -110,40 +107,6 @@ function SkillAssessmentRow({ skill }: { skill: UserSkillLevel }) {
   );
 }
 
-function SkillGapsSection({ skillGaps }: { skillGaps: UserSkillLevel[] }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-app-text">Skill gaps</p>
-        <GapCountBadge count={skillGaps.length} />
-      </div>
-
-      <div className="mt-2 space-y-2">
-        {skillGaps.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-            No low-rated skills found.
-          </p>
-        ) : (
-          skillGaps.slice(0, 3).map((skill) => (
-            <div
-              key={skill.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-app-border bg-app-surface-muted px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-app-text">{skill.skillName}</p>
-                <p className="mt-0.5 text-xs text-app-text-muted">{skill.roleName}</p>
-              </div>
-              <Badge variant="warning" size="sm" className="shrink-0 capitalize">
-                {skill.level.toLowerCase()}
-              </Badge>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
 function KnowledgeGapsSection({
   knowledgeGaps,
   onOpenKnowledgeGap,
@@ -154,7 +117,7 @@ function KnowledgeGapsSection({
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-app-text">Knowledge gaps</p>
+        <p className="text-xs text-app-text-muted">In components they own</p>
         <div className="flex items-center gap-2">
           <GapCountBadge count={knowledgeGaps.length} />
           <InfoHint
@@ -168,7 +131,7 @@ function KnowledgeGapsSection({
       <div className="mt-2 space-y-2">
         {knowledgeGaps.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-app-border bg-app-surface-muted px-4 py-3 text-sm text-app-text-muted">
-            No knowledge gaps found.
+            No knowledge gaps in components they own.
           </p>
         ) : (
           knowledgeGaps.map((gap) => (
