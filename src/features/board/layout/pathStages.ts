@@ -71,15 +71,18 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
   };
 }
 
+/** A piece of the path an in-app address points at. */
+export type PathPlace = { kind: "step" | "question" | "phase"; id: string };
+
 /**
- * The phase an in-app address points into, if it points into one.
+ * Which piece of the path an in-app address points at, if it points at one.
  *
- * Every way the app writes a link to a piece of the path: `/onboarding/<stepId>` (the old step page,
- * and what a selection on it recorded), and `/onboarding?step=`, `?question=` or `?phase=` (what the
- * buddy writes, and what `onboardingOrigin.ts` records now). Anything else — a chat, the knowledge
- * base — points into no phase.
+ * Every way the app writes a link into the path: `/onboarding/<stepId>` (the old step page, and what
+ * a selection on it recorded), and `/onboarding?step=`, `?question=` or `?phase=` (what the buddy
+ * writes, and what `onboardingOrigin.ts` records now). Anything else — a chat, the knowledge base —
+ * points at nothing on the path.
  */
-export function phaseOfUrl(url: string, phases: PathPhases): string | null {
+export function placeOfUrl(url: string): PathPlace | null {
   let parsed: URL;
   try {
     parsed = new URL(url, "http://app.invalid");
@@ -91,13 +94,34 @@ export function phaseOfUrl(url: string, phases: PathPhases): string | null {
   if (segments[0] !== "onboarding") return null;
 
   const stepId = segments[1] ? decodeURIComponent(segments[1]) : parsed.searchParams.get("step");
-  if (stepId) return phases.phaseOfStep.get(stepId) ?? null;
+  if (stepId) return { kind: "step", id: stepId };
 
   const questionId = parsed.searchParams.get("question");
-  if (questionId) return phases.phaseOfQuestion.get(questionId) ?? null;
+  if (questionId) return { kind: "question", id: questionId };
 
   const phaseId = parsed.searchParams.get("phase");
-  return phaseId && phases.phaseIds.has(phaseId) ? phaseId : null;
+  return phaseId ? { kind: "phase", id: phaseId } : null;
+}
+
+/** The phase an in-app address points into, if it points into one on this path. */
+export function phaseOfUrl(url: string, phases: PathPhases): string | null {
+  const place = placeOfUrl(url);
+  if (!place) return null;
+
+  if (place.kind === "step") return phases.phaseOfStep.get(place.id) ?? null;
+  if (place.kind === "question") return phases.phaseOfQuestion.get(place.id) ?? null;
+
+  return phases.phaseIds.has(place.id) ? place.id : null;
+}
+
+/** The step a card belongs to, if it belongs to one — readable without the path. */
+export function stepOfCard(card: BoardCard, origins: CardOrigins): string | null {
+  if (card.content.kind === "PATH_STEP") return card.content.stepId;
+
+  const url = origins[card.id]?.url;
+  const place = url ? placeOfUrl(url) : null;
+
+  return place?.kind === "step" ? place.id : null;
 }
 
 /** The phase a card belongs to, if it belongs to one. */
@@ -112,6 +136,27 @@ export function phaseOfCard(
 
   const url = origins[card.id]?.url;
   return url ? phaseOfUrl(url, phases) : null;
+}
+
+/**
+ * Whether a card belongs to one step, or to one phase.
+ *
+ * A phase holds what was kept from any of its steps as well as what was kept about the phase itself.
+ * Without the path a phase can only be matched by name — a card kept while the phase was open — and
+ * a card kept from one of its steps is not counted, which undercounts rather than guessing.
+ */
+export function isCardAt(
+  card: BoardCard,
+  place: { kind: "step" | "phase"; id: string },
+  phases: PathPhases | null,
+  origins: CardOrigins,
+): boolean {
+  if (place.kind === "step") return stepOfCard(card, origins) === place.id;
+  if (phases) return phaseOfCard(card, phases, origins) === place.id;
+
+  const url = origins[card.id]?.url;
+  const at = url ? placeOfUrl(url) : null;
+  return at?.kind === "phase" && at.id === place.id;
 }
 
 /** The stage of every card on a board, given its path (or none) and where its cards came from. */

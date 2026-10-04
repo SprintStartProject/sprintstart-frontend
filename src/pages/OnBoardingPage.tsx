@@ -74,6 +74,7 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
 import { setOnboardingPlace } from "../features/onboarding/onboardingPlace";
+import { KeptOnBoard } from "../features/board/components/KeptOnBoard";
 import {
   askAboutEmptyPhase,
   askAboutEmptyPhases,
@@ -829,16 +830,19 @@ export function OnBoardingPage() {
       );
     }
     return (
-      <StepWorkspace
-        key={item.id}
-        stepId={item.id}
-        stepStatus={item.step.status}
-        layout={layout}
-        onPathChanged={refreshPath}
-        onSkipAnswerSeen={acknowledgeSkipAnswer}
-        continueLabel={next.label}
-        onContinue={next.run}
-      />
+      <>
+        <StepWorkspace
+          key={item.id}
+          stepId={item.id}
+          stepStatus={item.step.status}
+          layout={layout}
+          onPathChanged={refreshPath}
+          onSkipAnswerSeen={acknowledgeSkipAnswer}
+          continueLabel={next.label}
+          onContinue={next.run}
+        />
+        <KeptOnBoard place={{ kind: "step", id: item.id }} path={path} className="mt-3" />
+      </>
     );
   };
 
@@ -1102,6 +1106,7 @@ export function OnBoardingPage() {
                     isFocus={selectedPhase.id === focusPhaseId}
                     onSelectPhase={selectPhase}
                   />
+                  <KeptOnBoard place={{ kind: "phase", id: selectedPhase.id }} path={path} />
                   <PhaseItemList
                     phase={selectedPhase}
                     nextItemId={nextItemId}

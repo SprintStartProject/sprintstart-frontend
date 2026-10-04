@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   Check,
@@ -21,7 +21,7 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
-import { pathPhases, pathStages } from "../features/board/layout/pathStages";
+import { isCardAt, pathPhases, pathStages } from "../features/board/layout/pathStages";
 import { BoardChainPanel } from "../features/board/components/BoardChainPanel";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
@@ -541,6 +541,35 @@ export function BoardPage() {
   const phases = useMemo(() => (path ? pathPhases(path) : null), [path]);
   const stageOf = useMemo(() => pathStages(phases, cardOrigins), [phases, cardOrigins]);
 
+  /**
+   * One step or phase the board was opened for: `/board?step=<id>` or `/board?phase=<id>`.
+   *
+   * What "3 cards on your board from this step" on the Onboarding page links to. In the address
+   * rather than in router state so it survives a reload and can be opened in a second tab, and so
+   * the browser's Back goes from the narrowed board to the step it came from.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pathPlace = useMemo(() => {
+    const stepId = searchParams.get("step");
+    if (stepId) return { kind: "step" as const, id: stepId };
+
+    const phaseId = searchParams.get("phase");
+    return phaseId ? { kind: "phase" as const, id: phaseId } : null;
+  }, [searchParams]);
+
+  /** What the step or phase is called, for the line saying the board is narrowed to it. */
+  const pathPlaceTitle = useMemo(() => {
+    if (!pathPlace || !path) return null;
+
+    for (const phase of path.phases) {
+      if (pathPlace.kind === "phase" && phase.id === pathPlace.id) return phase.title;
+      const step = (phase.steps ?? []).find((candidate) => candidate.id === pathPlace.id);
+      if (pathPlace.kind === "step" && step) return step.title;
+    }
+
+    return null;
+  }, [path, pathPlace]);
+
   const { structure, states, toggleDone, setPredecessor } = useBoardStructure(
     boardId,
     allCards,
@@ -773,6 +802,7 @@ export function BoardPage() {
     setSectionId(null);
     setFilter("all");
     setExpandedStackIds(allRootIds(stacks));
+    if (pathPlace) setSearchParams({}, { replace: true });
   }
 
   function toggleStack(rootId: string) {
@@ -802,7 +832,12 @@ export function BoardPage() {
     // a stack was about to stand on and leave the pile claiming a depth it no longer had.
     const folded = collapseStacks(allCards, stacks, openStackIds);
 
-    const bySource = folded.filter((card) => matchesFilter(card, filter));
+    // The step or phase the board was opened for, first: it is the narrowest question anybody asks
+    // of this page, and the other cuts still apply within it.
+    const atPlace = pathPlace
+      ? folded.filter((card) => isCardAt(card, pathPlace, phases, cardOrigins))
+      : folded;
+    const bySource = atPlace.filter((card) => matchesFilter(card, filter));
     const visible = cardsInSection(
       bySource,
       groups,
@@ -815,9 +850,12 @@ export function BoardPage() {
   }, [
     allCards,
     cardMarks,
+    cardOrigins,
     filter,
     groups,
     openStackIds,
+    pathPlace,
+    phases,
     pinnedIds,
     shownSectionId,
     stacks,
@@ -841,6 +879,16 @@ export function BoardPage() {
     const foldedAway = allCards.length - collapseStacks(allCards, stacks, openStackIds).length;
     if (foldedAway > 0) cuts.push(`${foldedAway} folded into sequences`);
 
+    if (pathPlace) {
+      cuts.push(
+        pathPlaceTitle
+          ? `From “${pathPlaceTitle}”`
+          : pathPlace.kind === "step"
+            ? "From one step"
+            : "From one phase",
+      );
+    }
+
     const cut = filterLabel(filter);
     if (cut) cuts.push(cut);
 
@@ -853,7 +901,7 @@ export function BoardPage() {
     // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
     // page explaining something that is not hidden.
     return cuts;
-  }, [allCards, filter, openStackIds, shownSectionId, sections, stacks]);
+  }, [allCards, filter, openStackIds, pathPlace, pathPlaceTitle, shownSectionId, sections, stacks]);
 
   const handleReorder = (cardIds: string[]) => void reorder(cardIds);
 
