@@ -91,6 +91,35 @@ describe("SourceList", () => {
     expect(screen.queryAllByText("https://acme.atlassian.net")).toHaveLength(0);
   });
 
+  it("shows the Bitbucket workspace under the name", () => {
+    const sources: DataSource[] = [
+      createMockSource({
+        sourceId: "repo-uuid-1",
+        sourceSystem: "BITBUCKET",
+        name: "acme/widgets",
+        type: "Bitbucket",
+        details: {
+          system: "BITBUCKET",
+          repository: {
+            repositoryId: "repo-uuid-1",
+            workspace: "acme",
+            slug: "widgets",
+            fullName: "acme/widgets",
+            url: "https://bitbucket.org/acme/widgets",
+            enabled: true,
+          },
+          syncTimes: { pullRequests: null },
+        },
+      }),
+    ];
+
+    render(<SourceList sources={sources} selectedSourceId={null} onSelectSource={vi.fn()} />);
+
+    expect(screen.getAllByText("acme/widgets").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("acme").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bitbucket").length).toBeGreaterThan(0);
+  });
+
   it("renders info blocks with formatted values", () => {
     const sources: DataSource[] = [
       createMockSource({

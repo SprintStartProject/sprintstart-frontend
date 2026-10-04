@@ -24,6 +24,25 @@ vi.mock("../../../src/services/sources/githubService", () => ({
   addGithubPat: vi.fn(),
 }));
 
+vi.mock("../../../src/services/sources/bitbucketService", () => ({
+  discoverBitbucketRepositories: vi.fn().mockResolvedValue({
+    repositories: [
+      {
+        workspace: "acme",
+        slug: "widgets",
+        name: "Widgets",
+        isPrivate: true,
+        url: "https://bitbucket.org/acme/widgets",
+        alreadyConnected: false,
+        isEnabled: null,
+      },
+    ],
+    hasMore: false,
+  }),
+  connectBitbucketRepository: vi.fn(),
+  addBitbucketRepositoryToProject: vi.fn(),
+}));
+
 vi.mock("../../../src/services/ingestionService", () => ({
   getIngestionSourceStatuses: vi.fn().mockResolvedValue([]),
 }));
@@ -65,6 +84,12 @@ async function goToSources(user: ReturnType<typeof userEvent.setup>) {
 async function openGithubDetail(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /add source/i }));
   await user.click(screen.getByRole("button", { name: /indexes repositories/i }));
+}
+
+/** From the sources step, open the add-source flow and pick the Bitbucket type. */
+async function openBitbucketDetail(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /add source/i }));
+  await user.click(screen.getByRole("button", { name: /indexes pull requests, readme/i }));
 }
 
 describe("CreateProjectWizard Accessibility", () => {
@@ -148,6 +173,36 @@ describe("CreateProjectWizard Accessibility", () => {
     // At or above 1280px the form slides in beside the wizard, portalled to
     // <body> — `baseElement` is the whole body, so axe sees it too.
     expect(await screen.findByRole("dialog", { name: "New GitHub token" })).toBeInTheDocument();
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no axe violations on the Bitbucket detail", async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderWizard();
+
+    await screen.findByRole("dialog", { name: "New Project" });
+    await waitFor(() => expect(screen.getByLabelText(/^Name/)).toBeInTheDocument());
+    await goToSources(user);
+    await openBitbucketDetail(user);
+
+    // No credential is stored in this suite, so the form is locked and the chip says why.
+    expect(await screen.findByText("No credential yet")).toBeInTheDocument();
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no axe violations with the inline Atlassian credential form open on the Bitbucket detail", async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderWizard();
+
+    await screen.findByRole("dialog", { name: "New Project" });
+    await waitFor(() => expect(screen.getByLabelText(/^Name/)).toBeInTheDocument());
+    await goToSources(user);
+    await openBitbucketDetail(user);
+
+    await user.click(screen.getByRole("button", { name: /add atlassian credential/i }));
+
+    expect(await screen.findByTestId("settings-atlassian-add-email")).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 

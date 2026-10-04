@@ -489,3 +489,316 @@ describe("AddSourceModal", () => {
     expect(screen.getByRole("button", { name: /connect now/i })).toBeDisabled();
   });
 });
+
+describe("AddSourceModal Bitbucket", () => {
+  const WORKSPACE_LABEL = "Workspace or bitbucket.org URL";
+
+  const bitbucketDiscoveryBody = {
+    repositories: [
+      {
+        workspace: "acme",
+        slug: "widgets",
+        name: "Widgets",
+        isPrivate: true,
+        url: "https://bitbucket.org/acme/widgets",
+        alreadyConnected: false,
+        enabled: null,
+      },
+      {
+        workspace: "acme",
+        slug: "gadgets",
+        name: "gadgets",
+        isPrivate: false,
+        url: "https://bitbucket.org/acme/gadgets",
+        alreadyConnected: true,
+        enabled: true,
+      },
+    ],
+  };
+
+  const bitbucketDiscoveryHandler = http.get(
+    "/api/v1/bitbucket/discover/workspace/:workspace",
+    () => HttpResponse.json(bitbucketDiscoveryBody),
+  );
+
+  /** Per-repo status rows; `gadgets` is ingested elsewhere (and optionally in this project). */
+  function bitbucketStatusHandler({ inThisProject = false } = {}) {
+    const row = {
+      sourceSystem: "BITBUCKET",
+      sourceId: "acme/gadgets",
+      displayName: "acme/gadgets",
+      repositoryId: "bb-gadgets-id",
+      owner: "acme",
+      name: "gadgets",
+      sourceUrl: "https://bitbucket.org/acme/gadgets",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      artifactCount: 3,
+    };
+
+    return http.get("/api/v1/ingestion-sources/status", ({ request }) => {
+      const projectId = new URL(request.url).searchParams.get("projectId");
+
+      return HttpResponse.json(projectId && !inThisProject ? [] : [row]);
+    });
+  }
+
+  async function openBitbucketDetail(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /bitbucket/i }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("Credential")).toHaveTextContent("default - me@corp.com"),
+    );
+  }
+
+  async function discoverAcme(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(screen.getByLabelText(WORKSPACE_LABEL), "acme");
+    await user.click(screen.getByRole("button", { name: "Discover" }));
+    await screen.findByText("Widgets");
+  }
+
+  const rowOf = (text: string) => screen.getByText(text).closest("label") as HTMLElement;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    server.use(
+      http.get("/api/v1/github/pat", () => HttpResponse.json(["default"])),
+      atlassianCredentialsHandler(["default"]),
+    );
+  });
+
+  it("offers Bitbucket as a connectable type instead of a Soon card", () => {
+    renderModal();
+
+    const card = screen.getByRole("button", { name: /bitbucket/i });
+    expect(card).not.toHaveTextContent(/soon/i);
+  });
+
+  it("opens the Bitbucket detail with a credential picker, the workspace field and the scope hint", async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await openBitbucketDetail(user);
+
+    expect(screen.getByLabelText(WORKSPACE_LABEL)).toBeInTheDocument();
+    expect(screen.getByText(/needs Bitbucket scopes/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add atlassian credential/i })).toBeInTheDocument();
+    // The GitHub screen is not what renders.
+    expect(screen.queryByLabelText("Organization, user, or URL")).not.toBeInTheDocument();
+  });
+
+  it("discovers a workspace with the selected credential and shows slug and visibility", async () => {
+    let discoverRequest: { workspace?: string; query: Record<string, string> } | null = null;
+    server.use(
+      http.get("/api/v1/bitbucket/discover/workspace/:workspace", ({ params, request }) => {
+        discoverRequest = {
+          workspace: String(params.workspace),
+          query: Object.fromEntries(new URL(request.url).searchParams),
+        };
+        return HttpResponse.json(bitbucketDiscoveryBody);
+      }),
+      bitbucketStatusHandler(),
+    );
+    const user = userEvent.setup();
+    renderModal();
+    await openBitbucketDetail(user);
+
+    await discoverAcme(user);
+
+    expect(discoverRequest).toEqual({
+      workspace: "acme",
+      query: { credentialName: "default", page: "0", pageSize: "20" },
+    });
+    expect(within(rowOf("Widgets")).getByText("Private")).toBeInTheDocument();
+    expect(within(rowOf("gadgets")).getByText("Public")).toBeInTheDocument();
+  });
+
+  it("shows a missing-credential notice once the list has loaded empty", async () => {
+    server.use(atlassianCredentialsHandler([]));
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(screen.getByRole("button", { name: /bitbucket/i }));
+
+    expect(await screen.findByText("No credential yet")).toBeInTheDocument();
+    expect(screen.getByLabelText(WORKSPACE_LABEL)).toBeDisabled();
+  });
+
+  it("keeps 'Add to list' disabled until a repository is selected", async () => {
+    server.use(bitbucketDiscoveryHandler, bitbucketStatusHandler());
+    const user = userEvent.setup();
+    renderModal();
+    await openBitbucketDetail(user);
+
+    expect(screen.getByRole("button", { name: /add to list/i })).toBeDisabled();
+
+    await discoverAcme(user);
+    await user.click(within(rowOf("Widgets")).getByRole("checkbox"));
+
+    expect(screen.getByRole("button", { name: /add to list/i })).toBeEnabled();
+  });
+
+  it("stages the selection and connects each repository with the credential and project", async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      bitbucketDiscoveryHandler,
+      bitbucketStatusHandler(),
+      http.post("/api/v1/bitbucket", async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ transactionId: "tx" }, { status: 202 });
+      }),
+    );
+    const user = userEvent.setup();
+    const props = renderModal();
+    await openBitbucketDetail(user);
+    await discoverAcme(user);
+
+    await user.click(within(rowOf("Widgets")).getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+
+    // Back on the staged list, titled workspace/slug with the credential as detail.
+    expect(await screen.findByText("acme/widgets")).toBeInTheDocument();
+    expect(screen.getByText(/Not connected yet · default/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /connect 1 source/i }));
+
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
+    expect(props.onClose).toHaveBeenCalled();
+    expect(bodies).toEqual([
+      { workspace: "acme", slug: "widgets", credentialName: "default", projectId: "project-1" },
+    ]);
+  });
+
+  it("links an already-ingested repository instead of re-ingesting it, with no reuse text from the backend", async () => {
+    let linkedPath: string | null = null;
+    let connectCalled = false;
+    server.use(
+      bitbucketDiscoveryHandler,
+      bitbucketStatusHandler(),
+      http.post(
+        "/api/v1/bitbucket/connections/:repositoryId/projects/:projectId",
+        ({ request }) => {
+          linkedPath = new URL(request.url).pathname;
+          return HttpResponse.json({ repositoryId: "bb-gadgets-id", projectIds: ["project-1"] });
+        },
+      ),
+      http.post("/api/v1/bitbucket", () => {
+        connectCalled = true;
+        return HttpResponse.json({ transactionId: "tx" }, { status: 202 });
+      }),
+    );
+    const user = userEvent.setup();
+    const props = renderModal();
+    await openBitbucketDetail(user);
+    await discoverAcme(user);
+
+    const gadgetsRow = rowOf("gadgets");
+    await waitFor(() =>
+      expect(within(gadgetsRow).getByText("Already ingested")).toBeInTheDocument(),
+    );
+    await user.click(within(gadgetsRow).getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+
+    expect(await screen.findByText(/Already ingested, will be linked/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /connect 1 source/i }));
+
+    await waitFor(() => expect(props.onConnected).toHaveBeenCalledTimes(1));
+    expect(linkedPath).toBe("/api/v1/bitbucket/connections/bb-gadgets-id/projects/project-1");
+    expect(connectCalled).toBe(false);
+    expect(await screen.findByText(/already available, nothing re-ingested/i)).toBeInTheDocument();
+  });
+
+  it("keeps a repository that is already in this project unselectable", async () => {
+    server.use(bitbucketDiscoveryHandler, bitbucketStatusHandler({ inThisProject: true }));
+    const user = userEvent.setup();
+    renderModal();
+    await openBitbucketDetail(user);
+    await discoverAcme(user);
+
+    const gadgetsRow = rowOf("gadgets");
+    await waitFor(() =>
+      expect(within(gadgetsRow).getByText("In this project")).toBeInTheDocument(),
+    );
+    expect(within(gadgetsRow).getByRole("checkbox")).toBeDisabled();
+  });
+
+  it("does not treat a GitHub repository with the same owner/name as ingested", async () => {
+    server.use(
+      bitbucketDiscoveryHandler,
+      http.get("/api/v1/ingestion-sources/status", () =>
+        HttpResponse.json([
+          {
+            sourceSystem: "GITHUB",
+            sourceId: "acme/gadgets",
+            displayName: "acme/gadgets",
+            repositoryId: "gh-gadgets-id",
+            owner: "acme",
+            name: "gadgets",
+            sourceUrl: "https://github.com/acme/gadgets",
+            connectionStatus: "CONNECTED",
+            enabled: true,
+            artifactCount: 3,
+          },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    renderModal();
+    await openBitbucketDetail(user);
+    await discoverAcme(user);
+
+    const gadgetsRow = rowOf("gadgets");
+    // Ingested as a Bitbucket repo elsewhere, but the only row that matches is GitHub's.
+    await waitFor(() => expect(within(gadgetsRow).getByText("Connected")).toBeInTheDocument());
+    expect(within(gadgetsRow).queryByText("Already ingested")).not.toBeInTheDocument();
+    expect(within(gadgetsRow).getByRole("checkbox")).toBeDisabled();
+  });
+
+  it("explains a failed connect of an unreachable repository instead of showing the status text", async () => {
+    server.use(
+      bitbucketDiscoveryHandler,
+      bitbucketStatusHandler(),
+      http.post("/api/v1/bitbucket", () =>
+        HttpResponse.json({ message: "Internal Server Error" }, { status: 500 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderModal();
+    await openBitbucketDetail(user);
+    await discoverAcme(user);
+
+    await user.click(within(rowOf("Widgets")).getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /connect now/i }));
+
+    expect(await screen.findByRole("button", { name: /retry/i })).toBeInTheDocument();
+    expect(screen.getByText(/Couldn't connect acme\/widgets/)).toBeInTheDocument();
+    expect(screen.queryByText(/Internal Server Error/)).not.toBeInTheDocument();
+  });
+
+  it("reports a missing credential on discovery in the adapter's words", async () => {
+    server.use(
+      http.get("/api/v1/bitbucket/discover/workspace/:workspace", () =>
+        HttpResponse.json({ message: "Credential not found" }, { status: 404 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderModal();
+    await openBitbucketDetail(user);
+
+    await user.type(screen.getByLabelText(WORKSPACE_LABEL), "acme");
+    await user.click(screen.getByRole("button", { name: "Discover" }));
+
+    expect(await screen.findByText(/selected credential was not found/i)).toBeInTheDocument();
+  });
+
+  it("can go back from the Bitbucket detail to the type grid", async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await openBitbucketDetail(user);
+
+    await user.click(screen.getByRole("button", { name: /back to source types/i }));
+
+    expect(screen.getByRole("button", { name: /jira/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(WORKSPACE_LABEL)).not.toBeInTheDocument();
+  });
+});

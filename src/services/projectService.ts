@@ -8,7 +8,8 @@ export type GlobalUserRole = "ADMIN" | "HR" | "PM" | "USER" | (string & {});
 
 export type ProjectRole = "MEMBER" | "MANAGER" | "TEAMLEAD" | (string & {});
 
-export type ProjectSourceType = "GITHUB" | "JIRA" | "SONARQUBE" | "UPLOAD" | (string & {});
+export type ProjectSourceType =
+  "GITHUB" | "JIRA" | "BITBUCKET" | "SONARQUBE" | "UPLOAD" | (string & {});
 
 export type ProjectSourceStatus =
   | "CONNECTED"

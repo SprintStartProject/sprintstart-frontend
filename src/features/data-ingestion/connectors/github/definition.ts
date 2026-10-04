@@ -50,6 +50,7 @@ export const githubConnector: ConnectorDefinition<ProjectSource, GithubDraftSour
     facetOrder: 1,
     icon: GitBranch,
     linkLabel: "Open in GitHub",
+    repositoryFacet: true,
     // The knowledge base filters GitHub artifacts by `owner/name`.
     scopeOf: (details) =>
       details.system === "GITHUB" && details.repository

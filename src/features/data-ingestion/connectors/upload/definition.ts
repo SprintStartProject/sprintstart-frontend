@@ -25,7 +25,7 @@ export const uploadConnector: ConnectorDefinition<ProjectSource, UploadDraftSour
   },
   knowledgeBase: {
     label: "Uploads",
-    facetOrder: 4,
+    facetOrder: 5,
     icon: Upload,
     linkLabel: null,
     deletable: true,

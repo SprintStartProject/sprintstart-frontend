@@ -8,10 +8,15 @@ export type {
   DraftSourceStatus,
   DraftSourceType,
 } from "../connectors/draft.ts";
+export type { BitbucketDraftSource } from "../connectors/bitbucket/draft.ts";
 export type { ConfluenceDraftSource } from "../connectors/confluence/draft.ts";
 export type { GithubDraftSource } from "../connectors/github/draft.ts";
 export type { JiraDraftSource } from "../connectors/jira/draft.ts";
 export type { UploadDraftSource } from "../connectors/upload/draft.ts";
+export {
+  createBitbucketDraft,
+  createBitbucketDraftFromDiscovery,
+} from "../connectors/bitbucket/draft.ts";
 export { createConfluenceDraft, isValidConfluenceSpaceId } from "../connectors/confluence/draft.ts";
 export { createDraftSource, createDraftSourceFromDiscovery } from "../connectors/github/draft.ts";
 export { createJiraDraft } from "../connectors/jira/draft.ts";

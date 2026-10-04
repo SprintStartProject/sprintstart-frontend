@@ -3,7 +3,7 @@
  * The single definition of {@link SourceSystem}: every other module that names
  * a source system imports it from here.
  */
-export const SOURCE_SYSTEMS = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"] as const;
+export const SOURCE_SYSTEMS = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE", "BITBUCKET"] as const;
 
 export type SourceSystem = (typeof SOURCE_SYSTEMS)[number];
 

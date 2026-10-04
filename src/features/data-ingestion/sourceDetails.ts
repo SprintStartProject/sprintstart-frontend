@@ -1,4 +1,5 @@
 import type {
+  BitbucketRepositoryDetails,
   ConfluenceSpaceSourceDetails,
   DataSource,
   GithubRepositoryDetails,
@@ -8,6 +9,11 @@ import type {
 /** The repository behind a GitHub card; null for any other source or an unresolved repository. */
 export function githubRepositoryOf(source: DataSource): GithubRepositoryDetails | null {
   return source.details.system === "GITHUB" ? source.details.repository : null;
+}
+
+/** The repository behind a Bitbucket card; null for any other source or an unresolved repository. */
+export function bitbucketRepositoryOf(source: DataSource): BitbucketRepositoryDetails | null {
+  return source.details.system === "BITBUCKET" ? source.details.repository : null;
 }
 
 /** The instance behind a Jira card; null for any other source. */

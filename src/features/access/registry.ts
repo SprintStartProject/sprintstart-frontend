@@ -59,7 +59,8 @@ export const atlassianConnector = defineAccessConnector<AtlassianCredentialDto>(
   noun: { one: "credential", many: "credentials" },
   addLabel: "Add credential",
   emptyTitle: "No credentials yet",
-  emptyDescription: "Add an Atlassian API token to connect Jira instances and Confluence spaces.",
+  emptyDescription:
+    "Add an Atlassian API token to connect Jira instances, Confluence spaces and Bitbucket repositories.",
   useEntries: () => {
     const { credentials, loaded, error, isRefreshing, reload } = useAtlassianCredentials();
 

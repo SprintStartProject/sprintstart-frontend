@@ -29,7 +29,7 @@ export type ChangeAtlassianCredentialTokenRequest = {
 /**
  * A stored credential as returned by the backend: only `userEmail` plus the
  * credential/token name (`displayName`). The token secret is never returned.
- * Shared by the Jira and Confluence connectors.
+ * Shared by the Jira, Confluence and Bitbucket connectors.
  */
 export type AtlassianCredentialDto = {
   userEmail: string;
