@@ -74,7 +74,7 @@ export const BOARD_STAGES: readonly BoardStage[] = ["NOW", "LATER", "BEHIND"];
 
 /** What each stage is called on screen, and the sentence under it. */
 export const STAGE_LABELS: Record<BoardStage, { title: string; hint: string }> = {
-  NOW: { title: "Now", hint: "Your current phase, and everything not tied to a later one." },
+  NOW: { title: "Now", hint: "Your current phase, and anything not tied to one ahead." },
   LATER: {
     title: "Later",
     hint: "From phases you haven't reached yet — they move up when you do.",
