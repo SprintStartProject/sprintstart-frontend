@@ -109,7 +109,7 @@ describe("PmWorkspace", () => {
       sectionTabs()
         .getAllByRole("button")
         .map((tab) => tab.textContent),
-    ).toEqual(["Overview", "Team", "Onboarding", "Questions", "Knowledge gaps", "Escalations3"]);
+    ).toEqual(["Overview", "Team", "Contributions", "Questions", "Knowledge gaps", "Escalations3"]);
   });
 
   it("shows the project analysis beside the tabs on the overview only", () => {

@@ -35,7 +35,6 @@ describe("MemberGapsPanel Accessibility", () => {
       <aside aria-label="Member insights">
         <MemberGapsPanel
           skillLevels={[skill]}
-          skillGaps={[skill]}
           knowledgeGaps={[
             gap({ id: "g1", severity: "high" }),
             gap({ id: "g2", component: "docs-wiki", severity: "low", missingTypes: ["adr"] }),
@@ -53,12 +52,7 @@ describe("MemberGapsPanel Accessibility", () => {
   it("should not have any a11y violations on the empty panel", async () => {
     const { baseElement } = render(
       <aside aria-label="Member insights">
-        <MemberGapsPanel
-          skillLevels={[]}
-          skillGaps={[]}
-          knowledgeGaps={[]}
-          onOpenKnowledgeGap={vi.fn()}
-        />
+        <MemberGapsPanel skillLevels={[]} knowledgeGaps={[]} onOpenKnowledgeGap={vi.fn()} />
       </aside>,
     );
 

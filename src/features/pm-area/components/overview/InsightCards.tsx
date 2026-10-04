@@ -276,11 +276,11 @@ export function OnboardingHealthSummary() {
         }));
 
   return (
-    <section aria-label="Onboarding health" className="min-w-0">
+    <section aria-label="Contribution health" className="min-w-0">
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-[10px] font-semibold tracking-widest text-app-cyan-text uppercase">
           <Gauge aria-hidden="true" className="h-3.5 w-3.5" />
-          Onboarding health
+          Contribution health
           {metrics && (
             <span className="font-medium tracking-normal text-app-text-muted normal-case">
               · {metrics.memberCount} hires
@@ -291,9 +291,9 @@ export function OnboardingHealthSummary() {
       </div>
 
       {loading ? (
-        <CardSkeleton label="Loading onboarding metrics" />
+        <CardSkeleton label="Loading contribution metrics" />
       ) : error || !metrics ? (
-        <EmptyState size="sm">No onboarding metrics for this project yet.</EmptyState>
+        <EmptyState size="sm">No contribution metrics for this project yet.</EmptyState>
       ) : metrics.memberCount === 0 ? (
         <EmptyState size="sm">No hires on this project yet.</EmptyState>
       ) : (

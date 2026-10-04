@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { AdminPage } from "../../../src/pages/AdminPage";
 import { DRAWER_CLOSE_DELAY_MS } from "../../../src/features/admin/data";
 import type { AdminUser, ProjectSummary } from "../../../src/services/adminUserService";
@@ -242,6 +242,30 @@ describe("AdminPage", () => {
     });
 
     expect(screen.queryByTestId("users-tab")).not.toBeInTheDocument();
+  });
+
+  // The buddy links to `/admin?tab=projects` in place, so the reader may already be here.
+  it("follows a tab named in the URL while the page is already open", async () => {
+    function BuddyLink() {
+      const navigate = useNavigate();
+      return <button onClick={() => void navigate("/admin?tab=projects")}>buddy link</button>;
+    }
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/admin"]}>
+        <BuddyLink />
+        <AdminPage />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("users-tab")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "buddy link" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("projects-tab")).toBeInTheDocument();
+    });
   });
 
   it("ignores a tab in the URL that does not exist", async () => {

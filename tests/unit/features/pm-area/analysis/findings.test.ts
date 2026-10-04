@@ -138,6 +138,29 @@ describe("buildFindings", () => {
     expect(findings[0].to).toBe("/insights/knowledge-gaps/billing");
   });
 
+  it("notices gaps computed before the latest import", () => {
+    const behind = buildFindings(
+      input({
+        gaps: { gaps: [], refreshedAt: ago(2 * DAY) },
+        sources: [{ name: "api", errors: 0, lastRunAt: ago(1 * DAY) }],
+      }),
+    );
+    expect(ids(behind)).toContain("gaps-behind");
+
+    const current = buildFindings(
+      input({
+        gaps: { gaps: [], refreshedAt: ago(1 * DAY) },
+        sources: [{ name: "api", errors: 0, lastRunAt: ago(2 * DAY) }],
+      }),
+    );
+    expect(ids(current)).not.toContain("gaps-behind");
+  });
+
+  it("does not guess about the gaps' age when the sources could not be read", () => {
+    const findings = buildFindings(input({ gaps: { gaps: [], refreshedAt: ago(30 * DAY) } }));
+    expect(ids(findings)).not.toContain("gaps-behind");
+  });
+
   it("reports a re-evaluated industry only when it changed", () => {
     const changed = buildFindings(
       input({

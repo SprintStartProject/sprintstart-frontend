@@ -21,7 +21,6 @@ function renderPanel(knowledgeGaps: KnowledgeGap[], onOpenKnowledgeGap = vi.fn()
   render(
     <MemberGapsPanel
       skillLevels={[]}
-      skillGaps={[]}
       knowledgeGaps={knowledgeGaps}
       onOpenKnowledgeGap={onOpenKnowledgeGap}
     />,
@@ -84,6 +83,6 @@ describe("MemberGapsPanel", () => {
 
   it("says so when the member has no gaps", () => {
     renderPanel([]);
-    expect(screen.getByText("No knowledge gaps found.")).toBeInTheDocument();
+    expect(screen.getByText("No knowledge gaps in components they own.")).toBeInTheDocument();
   });
 });

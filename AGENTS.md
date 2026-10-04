@@ -46,6 +46,8 @@ this list is only a reminder.
   ([architecture §3](./docs/FRONTEND_ARCHITECTURE.md#3-source-layout-src)).
 - A new protected route needs an `AppRoute` entry and a `routePermissions` entry
   ([architecture §4](./docs/FRONTEND_ARCHITECTURE.md#4-routing--access-control)).
+- Added, renamed or removed a page, tab or quoted label? Update the buddy's app guide
+  in the backend too ([architecture §4.3](./docs/FRONTEND_ARCHITECTURE.md#43-access-policy-srcauthaccesspolicyts)).
 - Use the `ui/` primitives and the palette tokens
   ([coding standards §4](./docs/FRONTEND_CODING_STANDARDS.md#4-styling-tailwind-css-v4)).
 - Touching a shared primitive or token? Check the Keycloak login theme's copy

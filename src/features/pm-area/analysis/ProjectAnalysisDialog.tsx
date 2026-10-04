@@ -1,8 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { Button } from "../../../components/ui/Button";
-import { Checkbox } from "../../../components/ui/Checkbox";
 import { Modal } from "../../../components/ui/Modal";
 import { formatRelativeDate } from "../../knowledge-gaps/format";
 import { AnalysisMap, type MapSelection } from "./AnalysisMap";
@@ -14,7 +13,6 @@ import { ScanPanel } from "./ScanPanel";
 import type {
   AnalysisComparison,
   AnalysisLogEntry,
-  AnalysisOptions,
   AnalysisPhase,
   AnalysisRunSummary,
   AnalysisTask,
@@ -33,17 +31,13 @@ type ProjectAnalysisDialogProps = {
   score: number | null;
   /** When the results on screen were produced. */
   resultsAt: string | null;
+  /** The results on screen could not be stored on the backend. */
+  resultsUnsaved?: boolean;
   previousRun: AnalysisComparison | null;
   lastRun: AnalysisRunSummary | null;
   projectName?: string;
-  canEvaluateIndustry: boolean;
-  options: AnalysisOptions;
-  onOptionsChange: (options: AnalysisOptions) => void;
   onStart: () => void;
-  /**
-   * "Run again" on the results: back to the choice of what to refresh, the same step a first run
-   * starts on — not straight into a run with whatever was ticked last time.
-   */
+  /** "Run again" on the results: starts a new run straight away — there is nothing to choose. */
   onRunAgain: () => void;
   /** Opens where a finding can be acted on; the dialog closes first. */
   onOpenFinding: (to: string) => void;
@@ -53,52 +47,12 @@ type ProjectAnalysisDialogProps = {
 const glassClassName =
   "rounded-2xl border border-app-border-muted bg-app-surface/60 p-5 backdrop-blur-xl";
 
-function OptionRow({
-  checked,
-  disabled = false,
-  onChange,
-  title,
-  description,
-  tone = "default",
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (checked: boolean) => void;
-  title: string;
-  description: string;
-  tone?: "default" | "warning";
-}) {
-  const id = useId();
-
-  return (
-    <label
-      htmlFor={id}
-      className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
-        checked && tone === "warning"
-          ? "border-app-warning-border bg-app-warning-bg"
-          : "border-app-border-muted bg-app-surface/50 hover:bg-app-surface/80"
-      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
-    >
-      <Checkbox
-        id={id}
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5"
-      />
-      <span className="min-w-0">
-        <span className="block text-sm font-medium text-app-text">{title}</span>
-        <span className="block text-xs text-app-text-muted">{description}</span>
-      </span>
-    </label>
-  );
-}
-
 function Results({
   findings,
   score,
   tasks,
   resultsAt,
+  resultsUnsaved,
   previousRun,
   projectName,
   onOpenFinding,
@@ -109,6 +63,7 @@ function Results({
   | "score"
   | "tasks"
   | "resultsAt"
+  | "resultsUnsaved"
   | "previousRun"
   | "projectName"
   | "onOpenFinding"
@@ -148,6 +103,7 @@ function Results({
         failedTasks={failed}
         findings={findings}
         analysedAt={resultsAt}
+        unsaved={resultsUnsaved}
         previous={previousRun}
         onRunAgain={onRunAgain}
       />
@@ -174,12 +130,10 @@ export function ProjectAnalysisDialog({
   findings,
   score,
   resultsAt,
+  resultsUnsaved,
   previousRun,
   lastRun,
   projectName,
-  canEvaluateIndustry,
-  options,
-  onOptionsChange,
   onStart,
   onRunAgain,
   onOpenFinding,
@@ -216,10 +170,10 @@ export function ProjectAnalysisDialog({
         done
           ? score === null
             ? "Some checks could not run, so there is no score this time. Pick an area to see what the others found."
-            : "Everything refreshed at once. Pick an area to see what it found, and open any card to act on it."
+            : "Everything read again, most pressing first. Pick an area to narrow it, and open any card to act on it."
           : running
-            ? "Refreshing every part of the project at once…"
-            : "Refresh everything the dashboard shows in one go, then see what needs you."
+            ? "Reading every part of the project at once…"
+            : "Read everything the dashboard shows in one go, then see what needs you."
       }
       footer={footer}
       testId="project-analysis-dialog"
@@ -238,6 +192,7 @@ export function ProjectAnalysisDialog({
               score={score}
               tasks={tasks}
               resultsAt={resultsAt}
+              resultsUnsaved={resultsUnsaved}
               previousRun={previousRun}
               projectName={projectName}
               onOpenFinding={onOpenFinding}
@@ -264,38 +219,9 @@ export function ProjectAnalysisDialog({
               <div className={`${glassClassName} space-y-4`}>
                 <p className="text-sm text-app-text-muted">
                   Team, onboarding, escalations, questions, gaps, data sources and industry are all
-                  read again. These three ask the AI to redo work first:
+                  read again. Nothing is recomputed by the AI — the gaps and the industry already
+                  update on their own after every import.
                 </p>
-                <div className="space-y-2">
-                  <OptionRow
-                    checked={options.rescanGaps}
-                    onChange={(checked) => onOptionsChange({ ...options, rescanGaps: checked })}
-                    title="Rescan knowledge gaps"
-                    description="Checks every component's documentation again."
-                  />
-                  <OptionRow
-                    checked={options.reevaluateIndustry && canEvaluateIndustry}
-                    disabled={!canEvaluateIndustry}
-                    onChange={(checked) =>
-                      onOptionsChange({ ...options, reevaluateIndustry: checked })
-                    }
-                    title="Re-evaluate the industry"
-                    description={
-                      canEvaluateIndustry
-                        ? "Never over one you set by hand."
-                        : "Only the project's manager or an admin can."
-                    }
-                  />
-                  <OptionRow
-                    checked={options.regroupQuestions}
-                    tone="warning"
-                    onChange={(checked) =>
-                      onOptionsChange({ ...options, regroupQuestions: checked })
-                    }
-                    title="Regroup recurring questions"
-                    description="Replaces the current entries — titles are rewritten and links to single entries stop working."
-                  />
-                </div>
                 {lastRun && (
                   <p className="text-xs text-app-text-subtle">
                     Last run {formatRelativeDate(lastRun.at)} ·{" "}

@@ -493,18 +493,25 @@ async function readBuddyStream(
  * @param teamProjectId - Pass to speak in *team mode* about a managed project instead of the hire's
  *   own conversation. Sent in the body, not the query string — the backend's contract puts the
  *   team target on the POST body and leaves the hire's own conversation to `sessionId`.
+ * @param currentPage The app path the sender is on (`/team-management`), so the buddy's app
+ *   guide can answer "where is this here?". Omitted when unknown, like `teamProjectId`.
  */
 export async function streamMessage(
   content: string,
   handlers: BuddyStreamHandlers,
   sessionId: string | undefined,
   teamProjectId?: string,
+  currentPage?: string,
 ): Promise<void> {
   const outcome = await readBuddyStream(
     `/api/v1/onboarding/me/buddy/messages`,
     // Omitted, never null: a team target replaces the conversation, and carrying
     // `teamProjectId: null` would send a field the contract does not have.
-    teamProjectId ? { content, teamProjectId } : { content, sessionId },
+    {
+      content,
+      ...(teamProjectId ? { teamProjectId } : { sessionId }),
+      ...(currentPage ? { currentPage } : {}),
+    },
     (event) => {
       switch (event.type) {
         case "tool_use":

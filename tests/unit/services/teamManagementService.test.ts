@@ -20,6 +20,7 @@ import {
   getMySkillLevels,
   getUserSkillLevels,
   saveUserSkillAssessments,
+  deleteProjectRole,
 } from "../../../src/services/teamManagementService";
 import { apiClient } from "../../../src/services/apiClient";
 import { http, HttpResponse } from "msw";
@@ -691,5 +692,25 @@ describe("teamManagementService", () => {
 
     expect(requestedUrls).not.toHaveLength(0);
     expect(requestedUrls.some((url) => url.includes("/projectRoles"))).toBe(false);
+  });
+});
+
+describe("deleteProjectRole", () => {
+  // It used to answer a failed delete by removing the role from the mock data, so the caller
+  // reported "Role deleted" while the backend still had it.
+  it("lets a failed delete reach the caller", async () => {
+    server.use(
+      http.delete("/api/v1/projectRoles/:roleId", () => HttpResponse.json({}, { status: 500 })),
+    );
+
+    await expect(deleteProjectRole("r1")).rejects.toThrow();
+  });
+
+  it("resolves once the backend has deleted the role", async () => {
+    server.use(
+      http.delete("/api/v1/projectRoles/:roleId", () => new HttpResponse(null, { status: 204 })),
+    );
+
+    await expect(deleteProjectRole("r1")).resolves.toBeUndefined();
   });
 });
