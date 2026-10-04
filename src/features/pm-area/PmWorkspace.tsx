@@ -334,7 +334,7 @@ export function PmWorkspace() {
       onSubChange: (view) => goToStop(`team-${view}`),
       subAriaLabel: "Team views",
     },
-    { value: "onboarding", label: "Onboarding", icon: <Gauge className="h-4 w-4" /> },
+    { value: "onboarding", label: "Contributions", icon: <Gauge className="h-4 w-4" /> },
     { value: "questions", label: "Questions", icon: <MessageSquareMore className="h-4 w-4" /> },
     { value: "gaps", label: "Knowledge gaps", icon: <ShieldAlert className="h-4 w-4" /> },
     {

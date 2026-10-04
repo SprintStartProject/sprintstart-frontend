@@ -60,7 +60,7 @@ function describeTask(id: FindingArea): string {
     case "team":
       return "Reading the roster, open skip requests and unread feedback";
     case "onboarding":
-      return "Reading onboarding metrics — who is stalled, who waits on a review";
+      return "Reading contribution metrics — who is stalled, who waits on a review";
     case "escalations":
       return "Reading the questions the buddy passed on to a person";
     case "questions":

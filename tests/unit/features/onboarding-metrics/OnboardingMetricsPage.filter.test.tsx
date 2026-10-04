@@ -146,6 +146,8 @@ describe("OnboardingMetricsPage — per-hire filter", () => {
 
       const notice = await screen.findByRole("region", { name: "Hires without a GitHub login" });
       expect(notice).toHaveTextContent("1 hire can't be attributed");
+      // The overview counts it too, as a figure that leads to the same hires.
+      expect(screen.getByRole("button", { name: /GitHub name added/ })).toHaveTextContent("1 / 2");
 
       await user.click(screen.getByRole("button", { name: "Show them" }));
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  AtSign,
   Clock,
   FolderKanban,
   Gauge,
@@ -137,7 +138,7 @@ function UnattributedNotice({
   );
 }
 
-/** Matches one `PmStat` in the `grid grid-cols-2 gap-3 lg:grid-cols-4` overview row. */
+/** Matches one `PmStat` in the `grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5` overview row. */
 function StatTileSkeleton() {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-app-border bg-app-surface p-4 sm:p-[18px]">
@@ -176,9 +177,9 @@ function HireTimelineCardSkeleton() {
 
 function OnboardingMetricsSkeleton() {
   return (
-    <SkeletonGroup label="Loading onboarding metrics" className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
+    <SkeletonGroup label="Loading contribution metrics" className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
           <StatTileSkeleton key={index} />
         ))}
       </div>
@@ -309,6 +310,15 @@ export function OnboardingMetricsPage() {
     setPage(1);
   };
 
+  /** Narrows the timelines to the hires without a GitHub name and scrolls down to them. */
+  const showUnattributed = () => {
+    handleSearchChange("");
+    handleFilterChange("unattributed");
+    document
+      .getElementById("metrics-hires-heading")
+      ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  };
+
   const totalPages = Math.max(1, Math.ceil(filteredHires.length / HIRES_PER_PAGE));
   // Clamp in case the list shrank under the current page (e.g. after filtering).
   const currentPage = Math.min(page, totalPages);
@@ -367,7 +377,7 @@ export function OnboardingMetricsPage() {
               >
                 Overview
               </h2>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <PmStat
                   tone="cyan"
                   icon={Rocket}
@@ -396,11 +406,22 @@ export function OnboardingMetricsPage() {
                   label="Waiting on a review"
                   value={metrics.waitingOnResponseCount}
                   attention={metrics.waitingOnResponseCount > 0}
+                  hint="Contributions nobody has answered"
+                />
+                {/* How many hires the numbers can see at all: without a GitHub name their pull
+                    requests cannot be matched to them. Leads to exactly those hires. */}
+                <PmStat
+                  tone="cyan"
+                  icon={AtSign}
+                  label="GitHub name added"
+                  value={`${metrics.memberCount - metrics.unattributableMemberCount} / ${metrics.memberCount}`}
+                  attention={metrics.unattributableMemberCount > 0}
                   hint={
                     metrics.unattributableMemberCount > 0
-                      ? `${metrics.unattributableMemberCount} unattributable (no GitHub login)`
-                      : "Contributions nobody has answered"
+                      ? `${metrics.unattributableMemberCount} still missing — not counted`
+                      : "Everyone can be counted"
                   }
+                  onClick={metrics.unattributableMemberCount > 0 ? showUnattributed : undefined}
                 />
               </div>
             </section>
@@ -410,13 +431,7 @@ export function OnboardingMetricsPage() {
                 count={metrics.unattributableMemberCount}
                 hires={metrics.hires.filter((hire) => !hire.githubLogin)}
                 showingThem={hireFilter === "unattributed"}
-                onShowThem={() => {
-                  handleSearchChange("");
-                  handleFilterChange("unattributed");
-                  document
-                    .getElementById("metrics-hires-heading")
-                    ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-                }}
+                onShowThem={showUnattributed}
                 onOpenMember={openMember}
               />
             )}
