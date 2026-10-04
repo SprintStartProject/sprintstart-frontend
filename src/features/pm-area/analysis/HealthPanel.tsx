@@ -39,6 +39,8 @@ type HealthPanelProps = {
   findings: readonly Finding[];
   /** When the results were produced. */
   analysedAt: string | null;
+  /** The results could not be stored on the backend and are gone after a reload. */
+  unsaved?: boolean;
   previous: AnalysisComparison | null;
   onRunAgain: () => void;
 };
@@ -59,6 +61,7 @@ export function HealthPanel({
   failedTasks,
   findings,
   analysedAt,
+  unsaved = false,
   previous,
   onRunAgain,
 }: HealthPanelProps) {
@@ -245,6 +248,13 @@ export function HealthPanel({
         {analysedAt && (
           <p className="text-center text-[11px] text-app-text-subtle">
             Analysed {formatRelativeDate(analysedAt)}
+          </p>
+        )}
+        {/* Said, not hidden behind a console warning: a result that looks saved and is gone after
+            a reload is the "it said it worked" problem the role writes no longer have. */}
+        {unsaved && (
+          <p role="status" className="text-center text-[11px] font-medium text-app-warning-text">
+            Not saved — these results are gone after a reload.
           </p>
         )}
       </div>

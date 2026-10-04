@@ -235,7 +235,8 @@ describe("TeamManagementPage", () => {
   it("shows the roles when the URL asks for them", async () => {
     renderPage("/team-management?tab=roles");
 
-    expect((await screen.findAllByText("Create role")).length).toBeGreaterThan(0);
+    // Creating a role sits behind the roles toolbar's "New role".
+    expect(await screen.findByRole("button", { name: "New role" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Search members" })).not.toBeInTheDocument();
   });
 

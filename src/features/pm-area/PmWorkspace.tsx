@@ -334,7 +334,7 @@ export function PmWorkspace() {
       onSubChange: (view) => goToStop(`team-${view}`),
       subAriaLabel: "Team views",
     },
-    { value: "onboarding", label: "Onboarding", icon: <Gauge className="h-4 w-4" /> },
+    { value: "onboarding", label: "Contributions", icon: <Gauge className="h-4 w-4" /> },
     { value: "questions", label: "Questions", icon: <MessageSquareMore className="h-4 w-4" /> },
     { value: "gaps", label: "Knowledge gaps", icon: <ShieldAlert className="h-4 w-4" /> },
     {
@@ -389,17 +389,23 @@ export function PmWorkspace() {
           <>
             {/* The project analysis beside the tabs, on the overview only. Hidden rather than
                 unmounted on the other sections: it owns the run, so leaving the overview while
-                one is going (or opening a finding elsewhere) must not throw it away. */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <SegmentedTabs
-                value={section}
-                options={options}
-                onChange={goToSection}
-                layoutId="pm-workspace-section-pill"
-                ariaLabel="PM dashboard sections"
-              />
+                one is going (or opening a finding elsewhere) must not throw it away.
+                One row that never wraps, the launcher pinned to its right edge: with `flex-wrap`
+                the launcher dropped under the tabs, to the left, whenever the column got narrower
+                (a wider sidebar, a smaller window). The tabs give way instead — they scroll
+                sideways on their own. */}
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <SegmentedTabs
+                  value={section}
+                  options={options}
+                  onChange={goToSection}
+                  layoutId="pm-workspace-section-pill"
+                  ariaLabel="PM dashboard sections"
+                />
+              </div>
               <motion.div
-                className={launcherShown ? "flex" : "hidden"}
+                className={launcherShown ? "flex shrink-0" : "hidden"}
                 initial={false}
                 animate={{ opacity: launcherShown ? 1 : 0 }}
                 transition={{ duration: prefersReducedMotion ? 0 : SLIDING_PANEL_SECONDS }}

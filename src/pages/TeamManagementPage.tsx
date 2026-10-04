@@ -42,8 +42,13 @@ import { queryKeys } from "../services/queryKeys";
 import { getProjectRoles } from "../services/teamManagementService";
 
 /**
- * Two chips: everyone, and who needs the manager (any reason — a skip, feedback, a waiting
- * review, drifting, a long step).
+ * Two chips: who needs the manager (any reason — a skip, feedback, a waiting review, drifting,
+ * a long step), and who is drifting. No "Everyone" chip: nothing chosen shows everyone, as on
+ * every other list in the PM area, and pressing the chosen chip again lets go of it.
+ *
+ * "Drifting" is the one reason worth its own chip: the others are something to click (a skip,
+ * feedback, a review), drifting is a conversation to have — the people a manager would go and
+ * talk to.
  *
  * "Waiting on you" used to be a chip of its own beside "Needs you", but it was only the first
  * half of it (skips and feedback), and two chips that mostly list the same people read as one
@@ -55,13 +60,16 @@ import { getProjectRoles } from "../services/teamManagementService";
  * The sort has no select of its own any more: the "Time on step" and "Progress" column headers
  * sort, and a select beside them saying "Longest on step" was the same control twice.
  */
-type StatusFilter = "all" | "attention";
+type StatusFilter = "all" | "attention" | "drifting";
 
-const STATUS_FILTERS: readonly StatusFilter[] = ["all", "attention"];
+/** The chips — "all" is what none of them chosen means, so it has none. */
+const STATUS_CHIPS: readonly Exclude<StatusFilter, "all">[] = ["attention", "drifting"];
 
-const STATUS_LABEL: Record<StatusFilter, string> = {
-  all: "Everyone",
+const STATUS_FILTERS: readonly StatusFilter[] = ["all", ...STATUS_CHIPS];
+
+const STATUS_LABEL: Record<Exclude<StatusFilter, "all">, string> = {
   attention: "Needs you",
+  drifting: "Drifting",
 };
 
 type SortColumn = "step" | "progress";
@@ -127,6 +135,7 @@ function SortHeader({
 /** The dot each chip carries — the same colours the overview uses for these states. */
 const STATUS_DOT: Partial<Record<StatusFilter, string>> = {
   attention: "bg-app-warning-solid",
+  drifting: "bg-app-danger-solid",
 };
 
 /**
@@ -243,6 +252,11 @@ export function TeamManagementPage() {
         return true;
       case "attention":
         return attentionById.has(member.userId);
+      case "drifting":
+        return (
+          attentionById.get(member.userId)?.reasons.some((reason) => reason.kind === "drifting") ??
+          false
+        );
     }
   };
 
@@ -388,15 +402,16 @@ export function TeamManagementPage() {
                 onChange: setQuery,
               }}
               filtersLabel="Filter members by status"
-              filters={STATUS_FILTERS.map((filter) => (
+              filters={STATUS_CHIPS.map((filter) => (
                 <PmFilterChip
                   key={filter}
                   active={statusFilter === filter}
-                  onClick={() => setStatusFilter(filter)}
+                  // Pressing the chosen one again lets go of it, back to everyone.
+                  onClick={() => setStatusFilter(statusFilter === filter ? "all" : filter)}
                   label={STATUS_LABEL[filter]}
                   count={roster ? statusCounts[filter] : undefined}
                   dotClassName={STATUS_DOT[filter]}
-                  flagged={filter !== "all"}
+                  flagged
                 />
               ))}
               shown={roster ? visibleMembers.length : undefined}

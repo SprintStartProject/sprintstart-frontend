@@ -296,7 +296,15 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
       // project's full roster now, but this panel is headed "Knowledge gaps"
       // and counting repositories that are missing nothing would overstate
       // what the member has to answer for.
-      setKnowledgeGaps(knowledgeGapOverview.gaps.filter((gap) => gap.severity !== "covered"));
+      // Only the components this member owns: the overview is project-wide, and listing every
+      // gap on every profile made each member look answerable for all of them.
+      setKnowledgeGaps(
+        knowledgeGapOverview.gaps.filter(
+          (gap) =>
+            gap.severity !== "covered" &&
+            gap.owners.some((owner) => owner.id === memberData?.userId),
+        ),
+      );
       setFeedbackItems(feedback);
       setOnboardingPath(path);
     }
@@ -798,9 +806,6 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           },
         ];
   const detailStepSkipReason = detailStep?.skip?.reason || "";
-  const skillGaps = skillLevels.filter(
-    (skill) => skill.level === "BEGINNER" || skill.level === "INTERMEDIATE",
-  );
   const severityOrder: Record<string, number> = {
     high: 0,
     medium: 1,
@@ -903,10 +908,11 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
           />
 
           {/* Below the journey rather than beside it: the graph needs the width. */}
-          <aside aria-label="Member insights">
+          {/* Side by side, each its own height: stacked without a gap the two cards ran into
+              each other. */}
+          <aside aria-label="Member insights" className="grid items-start gap-5 md:grid-cols-2">
             <MemberGapsPanel
               skillLevels={skillLevels}
-              skillGaps={skillGaps}
               knowledgeGaps={topKnowledgeGaps}
               onOpenKnowledgeGap={(gapId) => {
                 void navigate(`/insights/knowledge-gaps/${gapId}`);

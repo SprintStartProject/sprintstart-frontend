@@ -6,12 +6,12 @@ import {
   MessageSquareText,
   SkipForward,
 } from "lucide-react";
-import { useEffect, useRef, type MouseEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import type { TeamOverviewUser } from "../../team-management/types";
 import type { AttentionReason } from "../attentionQueue";
 import { REASON_META } from "../attentionReasons";
+import { usePeekClick } from "../usePeekClick";
 import { ROSTER_COLUMNS } from "../rosterLayout";
 import {
   daysOnStep,
@@ -150,15 +150,6 @@ export function MemberFlags({ member }: { member: TeamOverviewUser }) {
   );
 }
 
-/**
- * How long a first click waits for a second one before it counts as a single click.
- *
- * A single click opens the side panel, a double click the full profile. Opening the panel at once
- * would slide it in under the second click and then yank it away again as the page changes, so
- * the single click holds back for about as long as a double click takes.
- */
-export const DOUBLE_CLICK_WINDOW_MS = 220;
-
 /** How many open items a roster row spells out before it folds the rest into "+n". */
 const VISIBLE_REASONS = 2;
 
@@ -254,42 +245,7 @@ export function MemberRow({
   reasons,
 }: MemberRowProps) {
   const name = memberName(member);
-  const navigate = useNavigate();
-  const pendingClick = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (pendingClick.current !== null) window.clearTimeout(pendingClick.current);
-    },
-    [],
-  );
-
-  const cancelPendingClick = () => {
-    if (pendingClick.current === null) return;
-    window.clearTimeout(pendingClick.current);
-    pendingClick.current = null;
-  };
-
-  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
-    // `detail` is 0 for a click synthesized from the keyboard: no second click is coming.
-    if (event.detail === 0) {
-      onOpen(member.userId);
-      return;
-    }
-    // The second click of a double click: the double-click handler takes it from here.
-    if (event.detail > 1) return;
-
-    cancelPendingClick();
-    pendingClick.current = window.setTimeout(() => {
-      pendingClick.current = null;
-      onOpen(member.userId);
-    }, DOUBLE_CLICK_WINDOW_MS);
-  };
-
-  const handleDoubleClick = () => {
-    cancelPendingClick();
-    void navigate(`/team/${member.userId}`);
-  };
+  const { handleClick, handleDoubleClick } = usePeekClick(member.userId, onOpen);
 
   const percent = progressPercent(member);
   const stage = memberStage(member);

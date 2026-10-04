@@ -55,7 +55,7 @@ vi.mock("../../../src/features/knowledge-request/useOpenEscalationCount", () => 
 // The insight cards and the project-setup cards read their own endpoints and have nothing to do
 // with what this page composes; each is a stand-in here.
 vi.mock("../../../src/features/pm-area/components/overview/InsightCards", () => ({
-  OnboardingHealthSummary: () => <section aria-label="Onboarding health" />,
+  OnboardingHealthSummary: () => <section aria-label="Contribution health" />,
   RecentMilestones: () => <section aria-label="Recent milestones" />,
   QuestionsCard: () => <section aria-label="Recurring questions" />,
   KnowledgeGapsCard: () => <section aria-label="Knowledge gaps" />,
@@ -171,13 +171,15 @@ describe("PmDashboardPage", () => {
     const team = within(await screen.findByRole("region", { name: "Team" }));
     const rows = await team.findAllByRole("button");
 
-    // Dan is flagged by the metrics but not on the roster, so the team card leaves him out.
+    // Dan is flagged by the metrics but not on the roster, so the team card leaves him out. The
+    // row is topped up with the rest of the team, so Ada (through onboarding) comes last.
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining("Bob Builder"),
       expect.stringContaining("Cleo Park"),
+      expect.stringContaining("Ada Lovelace"),
     ]);
-    expect(within(rows[0]).getByLabelText("Skip request")).toBeInTheDocument();
-    expect(within(rows[1]).getByLabelText("Feedback")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("Skip request")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Feedback")).toBeInTheDocument();
   });
 
   it("opens a person in the member panel rather than on another page", async () => {

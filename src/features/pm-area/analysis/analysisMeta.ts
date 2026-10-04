@@ -43,7 +43,7 @@ export const AREA_META: Record<
     glow: "var(--brand-text)",
   },
   onboarding: {
-    label: "Onboarding",
+    label: "Contributions",
     icon: Gauge,
     tone: "cyan",
     chip: "bg-app-cyan-bg text-app-cyan-text",

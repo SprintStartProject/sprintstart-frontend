@@ -19,12 +19,12 @@ import type {
 
 // The fixture predates the `projects` list and still carries a single
 // `project`, so it goes through the same normalization as an API response.
-let mockUsers = (teamOverviewMock.users as unknown as BackendTeamOverviewUser[]).map((user) => ({
+const mockUsers = (teamOverviewMock.users as unknown as BackendTeamOverviewUser[]).map((user) => ({
   ...user,
   projects: toTeamOverviewProjects(user),
 }));
 
-let mockProjectRoles: ProjectRole[] = Array.from(
+const mockProjectRoles: ProjectRole[] = Array.from(
   new Map(mockUsers.flatMap((user) => user.roles).map((role) => [role.id, role])).values(),
 );
 
@@ -51,7 +51,7 @@ function normalizeSkill(skill: LegacySkill): Skill {
   };
 }
 
-let mockSkills = (skillsMock.skills as LegacySkill[]).map(normalizeSkill);
+const mockSkills = (skillsMock.skills as LegacySkill[]).map(normalizeSkill);
 
 /**
  * Team-overview user as the API actually sends it.
@@ -226,94 +226,47 @@ export async function getProjectRoles(): Promise<ProjectRole[]> {
 /**
  * Creates a project role.
  *
- * **Never throws.** When the request fails, it adds the role to the in-memory mock list and returns
- * it with a made-up `mock-role-…` id, which later calls with that id will not find on the backend.
- * The caller cannot tell this from a success; see the mock fallbacks in
- * `docs/testing_strategy.md` §8.
+ * No mock fallback: answering a failed write by changing the mock data told the caller it worked
+ * while the backend never changed — and the next reload undid it. A failure reaches the caller,
+ * which says so.
  */
 export async function createProjectRole(name: string, description: string): Promise<ProjectRole> {
-  try {
-    return await apiClient.fetch<ProjectRole>("/api/v1/projectRoles", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        description,
-      }),
-    });
-  } catch {
-    const newRole: ProjectRole = {
-      id: `mock-role-${Date.now()}`,
+  return await apiClient.fetch<ProjectRole>("/api/v1/projectRoles", {
+    method: "POST",
+    body: JSON.stringify({
       name,
       description,
-    };
-
-    mockProjectRoles = [...mockProjectRoles, newRole];
-
-    return newRole;
-  }
+    }),
+  });
 }
 
 /**
  * Gives a user a project role.
  *
- * **Never throws.** When the request fails, it adds the role to that user among the in-memory mock
- * users instead. The caller cannot tell this from a success; see the mock fallbacks in
- * `docs/testing_strategy.md` §8.
+ * No mock fallback: answering a failed write by changing the mock data told the caller it worked
+ * while the backend never changed — and the next reload undid it. A failure reaches the caller,
+ * which says so.
  */
 export async function assignProjectRoleToUser(userId: string, roleId: string): Promise<void> {
-  try {
-    await apiClient.fetch(`/api/v1/users/${userId}/project-roles`, {
-      method: "POST",
-      body: JSON.stringify({
-        roleId: roleId,
-      }),
-    });
-
-    return;
-  } catch {
-    const role = mockProjectRoles.find((projectRole) => projectRole.id === roleId);
-
-    if (!role) return;
-
-    mockUsers = mockUsers.map((user) => {
-      if (user.userId !== userId) return user;
-
-      const alreadyAssigned = user.roles.some((userRole) => userRole.id === roleId);
-
-      if (alreadyAssigned) return user;
-
-      return {
-        ...user,
-        roles: [...user.roles, role],
-      };
-    });
-  }
+  await apiClient.fetch(`/api/v1/users/${userId}/project-roles`, {
+    method: "POST",
+    body: JSON.stringify({
+      roleId: roleId,
+    }),
+  });
 }
 
 /**
  * Takes a project role away from a user.
  *
- * **Never throws.** When the request fails, it removes the role from that user among the in-memory
- * mock users instead. The caller cannot tell this from a success; see the mock fallbacks in
- * `docs/testing_strategy.md` §8.
+ * No mock fallback: answering a failed write by changing the mock data told the caller it worked
+ * while the backend never changed — and the next reload undid it. A failure reaches the caller,
+ * which says so.
  */
 export async function unassignProjectRoleFromUser(userId: string, roleId: string): Promise<void> {
-  try {
-    await apiClient.fetch(`/api/v1/users/${userId}/project-roles/${roleId}`, {
-      method: "DELETE",
-    });
-
-    return;
-  } catch {
-    mockUsers = mockUsers.map((user) => {
-      if (user.userId !== userId) return user;
-
-      return {
-        ...user,
-        roles: user.roles.filter((role) => role.id !== roleId),
-      };
-    });
-  }
+  await apiClient.fetch(`/api/v1/users/${userId}/project-roles/${roleId}`, {
+    method: "DELETE",
+  });
 }
 
 /** What waits on the project manager in one project, as the sidebar counts it. */
@@ -838,6 +791,10 @@ export async function updateRoleSkills(roleId: string, skillIds: string[]): Prom
  * to `roleIds`. ADMIN only; a PM or HR caller gets a 403.
  *
  * @param _skillId - Unused; the backend matches the retired skill by `name`.
+ *
+ * No mock fallback: answering a failed write by changing the mock data told the caller it worked
+ * while the backend never changed — and the next reload undid it. A failure reaches the caller,
+ * which says so.
  */
 export async function reactivateSkill(
   _skillId: string,
@@ -879,36 +836,26 @@ export async function createSkill(request: CreateSkillRequest): Promise<Skill> {
 /**
  * Deletes a project role.
  *
- * **Never throws.** When the request fails, it removes the role from the in-memory mock roles,
- * skills and users instead. The caller cannot tell this from a success; see the mock fallbacks in
- * `docs/testing_strategy.md` §8.
+ * No mock fallback: it used to answer a failed delete by removing the role from the mock data,
+ * so the caller reported "Role deleted" while the backend still had it — and the next reload
+ * brought it straight back. A failure now reaches the caller, which says so.
+ *
+ * @throws ApiError when the backend refuses or cannot be reached.
  */
 export async function deleteProjectRole(roleId: string): Promise<void> {
-  try {
-    await apiClient.fetch(`/api/v1/projectRoles/${roleId}`, {
-      method: "DELETE",
-    });
-
-    return;
-  } catch {
-    mockProjectRoles = mockProjectRoles.filter((role) => role.id !== roleId);
-
-    mockSkills = mockSkills.map((skill) => ({
-      ...skill,
-      roleIds: skill.roleIds.filter((linkedRoleId) => linkedRoleId !== roleId),
-    }));
-
-    mockUsers = mockUsers.map((user) => ({
-      ...user,
-      roles: user.roles.filter((role) => role.id !== roleId),
-    }));
-  }
+  await apiClient.fetch(`/api/v1/projectRoles/${roleId}`, {
+    method: "DELETE",
+  });
 }
 
 /**
  * Retires a skill globally through the admin endpoint. The backend keeps it with status
  * `RETIRED` rather than deleting it, so it can be reactivated later. ADMIN only; a PM or HR
  * caller gets a 403.
+ *
+ * No mock fallback: answering a failed write by changing the mock data told the caller it worked
+ * while the backend never changed — and the next reload undid it. A failure reaches the caller,
+ * which says so.
  */
 export async function deleteSkill(skillId: string): Promise<void> {
   await apiClient.fetch(`/api/v1/admin/skills/${skillId}`, {
@@ -922,7 +869,7 @@ export type CreateSkillAssessmentRequest = {
   level: SkillLevel;
 };
 
-let mockSkillAssessments: CreateSkillAssessmentRequest[] = [];
+const mockSkillAssessments: CreateSkillAssessmentRequest[] = [];
 
 const skillAssessmentPromptStatePrefix = "skill-assessment-prompt-state";
 
@@ -982,34 +929,21 @@ export async function hasCompletedSkillAssessment(userId: string): Promise<boole
 /**
  * Saves the signed-in user's skill assessments, one request per skill, in order.
  *
- * **Never throws.** When the request fails, including halfway through the list, it stores the
- * assessments in the in-memory mock list instead. `SkillWizardPage` relies on this function
- * throwing to keep the wizard open, so a failed save is reported to the user as saved. The caller
- * cannot tell this from a success; see the mock fallbacks in `docs/testing_strategy.md` §8.
+ * No mock fallback: answering a failed write by changing the mock data told the caller it worked
+ * while the backend never changed — and the next reload undid it. A failure reaches the caller,
+ * which says so.
  */
 export async function saveUserSkillAssessments(
   assessments: CreateSkillAssessmentRequest[],
 ): Promise<void> {
-  try {
-    for (const assessment of assessments) {
-      await apiClient.fetch("/api/v1/me/skill/assess", {
-        method: "POST",
-        body: JSON.stringify({
-          skillId: assessment.skillId,
-          level: assessment.level,
-        }),
-      });
-    }
-  } catch {
-    mockSkillAssessments = mockSkillAssessments.filter(
-      (assessment) =>
-        !assessments.some(
-          (incoming) =>
-            incoming.userId === assessment.userId && incoming.skillId === assessment.skillId,
-        ),
-    );
-
-    mockSkillAssessments = [...mockSkillAssessments, ...assessments];
+  for (const assessment of assessments) {
+    await apiClient.fetch("/api/v1/me/skill/assess", {
+      method: "POST",
+      body: JSON.stringify({
+        skillId: assessment.skillId,
+        level: assessment.level,
+      }),
+    });
   }
 }
 
