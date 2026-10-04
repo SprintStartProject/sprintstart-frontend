@@ -1,52 +1,55 @@
 import { ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
-import type { NextUp } from "../layout/nextUp";
+import type { OnboardingNextAction } from "../../onboarding/nextAction";
+import { onboardingPlaceUrl } from "../../onboarding/onboardingPlace";
 
 type BoardNextUpProps = {
-  next: NextUp | null;
+  /** What the path says to do next, or null while it loads and when there is no path. */
+  next: OnboardingNextAction | null;
 };
 
 /**
- * One line, above everything: start here.
+ * One line, above everything: what is next on your path.
  *
- * The complaint this whole feature came from was forty cards at the same volume. Stages, areas,
- * sequences and a focus section each answer it by showing *fewer* cards — which is right, and still
- * leaves a list to choose from. This is the only part of the board that answers with one thing.
+ * It used to be "start with" one of the board's own cards — the first open one in the hire's
+ * chains. Since the path became the one plan that was a second answer to the question the path
+ * already answers, and the two could disagree. So the line now says what the Onboarding page would
+ * say, and goes there: the board is where things are kept, the path is where the work is.
  *
- * It says what finishing it would let through, when finishing it would let anything through, and
- * that number is the reason to believe the line: "three cards are waiting on this" is a fact about
- * the sequences the hire and their PM built, not the board being encouraging.
+ * It finds the step rather than starting it (`?step=`), the same way a link from the buddy does —
+ * reading a line on the board is not the same as deciding to begin.
  *
- * Clicking it scrolls the card into view rather than filtering to it. Filtering would answer "where
- * do I start" by hiding everything else, which is a second thing to undo; scrolling leaves the board
- * exactly as it was and puts the card in front of them.
- *
- * A link in prose rather than a card of its own. A card would compete with the cards it is pointing
- * at, and this is a caption, not a thing on the board.
+ * Silent when there is nothing to say: no path yet, or the path finished.
  */
 export function BoardNextUp({ next }: BoardNextUpProps) {
-  if (!next) return null;
+  if (!next || next.kind === "done") return null;
+
+  const target =
+    next.kind === "step"
+      ? {
+          to: onboardingPlaceUrl({ kind: "step", id: next.step.id }),
+          name: next.step.title,
+          lead: "Next on your path:",
+        }
+      : next.kind === "question"
+        ? {
+            to: `/onboarding?question=${encodeURIComponent(next.question.id)}`,
+            name: next.question.title || "a knowledge check",
+            lead: "Next on your path:",
+          }
+        : { to: "/onboarding", name: "pick your next phase", lead: "Next on your path —" };
 
   return (
     <p className="flex flex-wrap items-baseline gap-x-1.5 text-sm text-app-text-muted">
-      <span>Start with</span>
-      <button
-        type="button"
-        onClick={() => {
-          document
-            .querySelector(`[data-card-id="${CSS.escape(next.card.id)}"]`)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }}
+      <span>{target.lead}</span>
+      <Link
+        to={target.to}
         className="inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
       >
-        {next.name}
+        {target.name}
         <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
-      {next.unblocks > 0 && (
-        <span>
-          — {next.unblocks} {next.unblocks === 1 ? "card is" : "cards are"} waiting on it
-        </span>
-      )}
+      </Link>
     </p>
   );
 }

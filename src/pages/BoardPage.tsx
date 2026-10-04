@@ -22,7 +22,7 @@ import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
 import { isCardAt, pathPhases, pathStages } from "../features/board/layout/pathStages";
-import { BoardChainPanel } from "../features/board/components/BoardChainPanel";
+import { resolveNextAction } from "../features/onboarding/nextAction";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
@@ -34,7 +34,6 @@ import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { MarkFilterRail } from "../features/board/components/MarkFilterRail";
 import { BoardNextUp } from "../features/board/components/BoardNextUp";
 import { BoardLocalOnlyNotice } from "../features/board/components/BoardLocalOnlyNotice";
-import { nextUp } from "../features/board/layout/nextUp";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
@@ -53,7 +52,6 @@ import {
   currentStage,
   type BoardStage,
 } from "../features/board/layout/boardStructure";
-import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
 import {
   filterLabel,
   matchesFilter,
@@ -75,7 +73,6 @@ import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardM
 import {
   assignToGroup,
   dissolveGroup,
-  groupOf,
   newBoardGroup,
   readBoardGroups,
   writeBoardGroups,
@@ -570,19 +567,7 @@ export function BoardPage() {
     return null;
   }, [path, pathPlace]);
 
-  const { structure, states, toggleDone, setPredecessor } = useBoardStructure(
-    boardId,
-    allCards,
-    stageOf,
-  );
-
-  /**
-   * The card whose run is being looked at, or null.
-   *
-   * Held by the page rather than by a card: the picture is a panel over the whole board, and two
-   * cards each holding their own would be two panels racing to be the open one.
-   */
-  const [chainCardId, setChainCardId] = useState<string | null>(null);
+  const { states, toggleDone, setPredecessor } = useBoardStructure(boardId, allCards, stageOf);
 
   // Lends these cards to the app shell, so the selection toolbar mounted above the router can offer
   // the marker pen on text that turns out to be on one of them. Taken back when this page leaves.
@@ -621,16 +606,11 @@ export function BoardPage() {
   const tabSections = useMemo(() => sections.filter((section) => !section.mark), [sections]);
 
   /**
-   * The one card to start with — see `layout/nextUp.ts`.
-   *
-   * Computed over every card rather than over what is currently shown: "where do I start" is a
-   * question about the board, and answering it from inside a filter would point at the best thing
-   * *in this view*, which is a different and much less useful answer.
+   * What to do next, from the path rather than from the board: the next step or question the
+   * Onboarding page itself would offer. The board's own "start with" used to be the first open card
+   * in the hire's chains — a second answer to the same question, from a second plan.
    */
-  const startHere = useMemo(
-    () => nextUp(allCards, states, { crowded: allCards.length > FOLD_THRESHOLD }),
-    [allCards, states],
-  );
+  const nextOnPath = useMemo(() => (path ? resolveNextAction(path) : null), [path]);
 
   /**
    * Whether the board has been divided into anything worth navigating.
@@ -726,22 +706,6 @@ export function BoardPage() {
     });
   }
 
-  /**
-   * The chains on this board, and which of them the hire has opened.
-   *
-   * Kept for the visit rather than stored: opening a stack is looking into it, not rearranging the
-   * board, and a pile that was still spread out a week later would have quietly become five cards
-   * again. Keyed by root id, which does not move as cards are ticked off — see `cardStacks.ts`.
-   */
-  // Area-aware, because a pile is drawn in one place and a chain that ran out of one area into
-  // another had two — see `cardStacks.ts`. Blueprints hit this routinely: a PM's "comes after"
-  // points at whatever card it names, wherever that card ended up filed.
-  const stacks = useMemo(
-    () => buildStacks(allCards, states, (cardId) => groupOf(groups, cardId)?.id ?? null),
-    [allCards, groups, states],
-  );
-  const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
-
   /** The kind of card being written, or null when nothing is being added. */
   const [addingKind, setAddingKind] = useState<AuthoredCardKind | null>(null);
 
@@ -773,51 +737,22 @@ export function BoardPage() {
   }
 
   /**
-   * The piles that are spread out — and while the board is being arranged, that is all of them.
-   *
-   * Derived rather than stored, because arranging is when chains get *made*. Saying "B comes after
-   * A" turns those two into a pile the moment it is set; a snapshot taken when arrange mode opened
-   * knows nothing about a pile that did not exist yet, so B folded away under A on the spot — out
-   * of the board, and out of the "waits on…" list on every other card. Which meant a run could
-   * never grow past two: the card you had just chained was gone before you could point the next one
-   * at it. Nothing was wrong with the chain; it was the surface refusing to show its own middle.
-   *
-   * The hire's own open set is kept untouched underneath, so leaving arrange mode puts the piles
-   * back exactly as they were before.
-   */
-  const openStackIds = useMemo(
-    () => (isArranging ? allRootIds(stacks) : expandedStackIds),
-    [expandedStackIds, isArranging, stacks],
-  );
-
-  /**
-   * Undoes every cut at once: the filter, the section, the focus view and every folded stack.
+   * Undoes every cut at once: the step it was opened for, the filter, the section and the focus view.
    *
    * One function because the line that offers it counts *all* the cards the board is holding back,
-   * and an offer that cleared the filters but left four cards folded inside a stack would be a
-   * button that does not do what the sentence above it says.
+   * and an offer that cleared some of them would be a button that does not do what the sentence
+   * above it says.
    */
   function showEverything() {
     setOpenStages(new Set(BOARD_STAGES));
     setSectionId(null);
     setFilter("all");
-    setExpandedStackIds(allRootIds(stacks));
     if (pathPlace) setSearchParams({}, { replace: true });
   }
 
-  function toggleStack(rootId: string) {
-    setExpandedStackIds((current) => {
-      const next = new Set(current);
-      if (next.has(rootId)) next.delete(rootId);
-      else next.add(rootId);
-
-      return next;
-    });
-  }
-
   /**
-   * The cards on screen: stacks folded to one card each, then the owner filter, then the section,
-   * then the focus view.
+   * The cards on screen: the step the board was opened for, then the owner filter, then the
+   * section, then the focus view.
    *
    * Pinned last and stably, so pinning one card lifts that card and disturbs nothing else. A
    * display sort, not a write: what gets sent on a reorder is what is on screen, so pinning and
@@ -827,16 +762,11 @@ export function BoardPage() {
    * matters to me now*, and a mode that overrode it would be the board arguing with them.
    */
   const shownCards = useMemo(() => {
-    // Stacks fold first, so every later cut sees one card where there is one card to work on. The
-    // alternative — filtering the members and then folding — would let the focus view hide the card
-    // a stack was about to stand on and leave the pile claiming a depth it no longer had.
-    const folded = collapseStacks(allCards, stacks, openStackIds);
-
     // The step or phase the board was opened for, first: it is the narrowest question anybody asks
     // of this page, and the other cuts still apply within it.
     const atPlace = pathPlace
-      ? folded.filter((card) => isCardAt(card, pathPlace, phases, cardOrigins))
-      : folded;
+      ? allCards.filter((card) => isCardAt(card, pathPlace, phases, cardOrigins))
+      : allCards;
     const bySource = atPlace.filter((card) => matchesFilter(card, filter));
     const visible = cardsInSection(
       bySource,
@@ -853,12 +783,10 @@ export function BoardPage() {
     cardOrigins,
     filter,
     groups,
-    openStackIds,
     pathPlace,
     phases,
     pinnedIds,
     shownSectionId,
-    stacks,
     states,
   ]);
 
@@ -875,9 +803,6 @@ export function BoardPage() {
    */
   const activeCuts = useMemo(() => {
     const cuts: string[] = [];
-
-    const foldedAway = allCards.length - collapseStacks(allCards, stacks, openStackIds).length;
-    if (foldedAway > 0) cuts.push(`${foldedAway} folded into sequences`);
 
     if (pathPlace) {
       cuts.push(
@@ -901,7 +826,7 @@ export function BoardPage() {
     // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
     // page explaining something that is not hidden.
     return cuts;
-  }, [allCards, filter, openStackIds, pathPlace, pathPlaceTitle, shownSectionId, sections, stacks]);
+  }, [filter, pathPlace, pathPlaceTitle, shownSectionId, sections]);
 
   const handleReorder = (cardIds: string[]) => void reorder(cardIds);
 
@@ -916,8 +841,7 @@ export function BoardPage() {
    * jumping to everything first.
    *
    * What is still opened is what is *folded*: planning is about what comes after what, and a
-   * dependency you cannot see is one you cannot set. Stacks spread out too, for as long as the
-   * mode lasts — see `openStackIds`, which derives that rather than snapshotting it.
+   * dependency you cannot see is one you cannot set.
    */
   function startArranging() {
     setOpenStages(new Set(BOARD_STAGES));
@@ -1274,7 +1198,7 @@ export function BoardPage() {
                 {/* First, above the status line: "showing 6 of 34" is about the view, and this is
                     about the work. The one line on this page that answers with a thing to do rather
                     than with a smaller list to choose from. */}
-                <BoardNextUp next={startHere} />
+                <BoardNextUp next={nextOnPath} />
 
                 <BoardViewStatus
                   shown={shownCards.length}
@@ -1319,10 +1243,6 @@ export function BoardPage() {
                   states={states}
                   onToggleDone={toggleDone}
                   onSetPredecessor={setPredecessor}
-                  onShowChain={setChainCardId}
-                  stacks={stacks}
-                  expandedStackIds={openStackIds}
-                  onToggleStack={toggleStack}
                   openStages={openStages}
                   onToggleStage={toggleStage}
                   cardSizes={cardSizes}
@@ -1334,19 +1254,6 @@ export function BoardPage() {
           </div>
         ) : null}
       </main>
-
-      <BoardChainPanel
-        cardId={chainCardId}
-        cards={allCards}
-        structure={structure}
-        states={states}
-        onClose={() => setChainCardId(null)}
-      />
     </div>
   );
-}
-
-/** Every stack's root id — what "open all of them" means. */
-function allRootIds(stacks: Map<string, { rootId: string }>): Set<string> {
-  return new Set([...stacks.values()].map((stack) => stack.rootId));
 }
