@@ -1,4 +1,4 @@
-import { ArrowUpRight, CheckCircle2, Clock, MousePointerClick, Users } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Clock, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../../components/common/UserAvatar";
 import { EmptyState } from "../../../../components/ui/EmptyState";
@@ -34,21 +34,18 @@ type TeamPulseCardProps = {
 };
 
 /** Avatar size inside the ring, and the ring around it. */
-const AVATAR = 44;
-const RING = AVATAR + 10;
-const RING_STROKE = 3;
+const AVATAR = 32;
+const RING = AVATAR + 8;
+const RING_STROKE = 2.5;
 
-/**
- * The member's avatar inside a thin ring that fills with their progress, the percentage on a
- * small badge where ring and tile meet — the tile's one number, drawn where the eye already is.
- */
+/** The member's avatar inside a thin ring that fills with their progress. */
 function AvatarProgress({ member, percent }: { member: TeamOverviewUser; percent: number }) {
   const radius = (RING - RING_STROKE) / 2;
   const circumference = 2 * Math.PI * radius;
 
   return (
     <span
-      className="relative mb-1.5 flex shrink-0 items-center justify-center"
+      className="relative flex shrink-0 items-center justify-center"
       style={{ width: RING, height: RING }}
     >
       <svg aria-hidden="true" width={RING} height={RING} className="absolute inset-0 -rotate-90">
@@ -78,20 +75,17 @@ function AvatarProgress({ member, percent }: { member: TeamOverviewUser; percent
         seed={member.userId}
         size={AVATAR}
       />
-      <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border border-app-border bg-app-surface px-1.5 text-[10px] leading-4 font-semibold text-app-text tabular-nums">
-        {percent}%
-      </span>
     </span>
   );
 }
 
 const pillClass =
-  "inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-0.5 text-[11px] font-medium";
+  "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-medium";
 
 /**
- * The one thing worth knowing about the member right now: the most pressing reason they need
- * the manager, with what it is about (the skip's reason in their own words, which review, how
- * long) — or, for everyone else, how long they have been on their step.
+ * The one thing worth knowing about the member right now, on one line: the most pressing reason
+ * they need the manager and what it is about (the skip's reason in their own words, which
+ * review) — or, for everyone else, how long they have been on their step.
  */
 function TileStatus({ member, reasons }: { member: TeamOverviewUser; reasons: AttentionReason[] }) {
   const days = daysOnStep(member);
@@ -104,24 +98,13 @@ function TileStatus({ member, reasons }: { member: TeamOverviewUser; reasons: At
     const detail = first.kind === "skip" && skipReason ? `“${skipReason}”` : first.text;
 
     return (
-      <span className="flex w-full min-w-0 flex-col items-center gap-1">
-        <span className="flex max-w-full items-center justify-center gap-1">
-          <span className={`${pillClass} ${meta.tone}`}>
-            <Icon aria-hidden="true" className="h-3 w-3 shrink-0" />
-            <span className="truncate">{meta.label}</span>
-          </span>
-          {rest.length > 0 && (
-            <span
-              title={rest.map((reason) => REASON_META[reason.kind].label).join(", ")}
-              className="shrink-0 rounded-full bg-app-surface px-1.5 py-0.5 text-[11px] font-medium text-app-text-muted"
-            >
-              +{rest.length}
-            </span>
-          )}
+      <span className="flex min-w-0 items-center gap-1.5" title={detail}>
+        <span className={`${pillClass} ${meta.tone}`}>
+          <Icon aria-hidden="true" className="h-3 w-3" />
+          {meta.label}
+          {rest.length > 0 && <span className="opacity-70">+{rest.length}</span>}
         </span>
-        <span className="line-clamp-2 text-[11px] leading-snug text-app-text-muted" title={detail}>
-          {detail}
-        </span>
+        <span className="min-w-0 truncate text-[11px] text-app-text-muted">{detail}</span>
       </span>
     );
   }
@@ -129,33 +112,28 @@ function TileStatus({ member, reasons }: { member: TeamOverviewUser; reasons: At
   if (memberStage(member) === "done") {
     return (
       <span className={`${pillClass} bg-app-success-bg text-app-success-text`}>
-        <CheckCircle2 aria-hidden="true" className="h-3 w-3 shrink-0" />
-        <span className="truncate">Through onboarding</span>
+        <CheckCircle2 aria-hidden="true" className="h-3 w-3" />
+        Through onboarding
       </span>
     );
   }
 
   return (
     <span className={`${pillClass} bg-app-surface text-app-text-muted`}>
-      <Clock aria-hidden="true" className="h-3 w-3 shrink-0" />
-      <span className="truncate">
-        {days === null
-          ? "Not started"
-          : days <= 0
-            ? "Started today"
-            : `${formatDays(days)} on step`}
-      </span>
+      <Clock aria-hidden="true" className="h-3 w-3" />
+      {days === null ? "Not started" : days <= 0 ? "Started today" : `${formatDays(days)} on step`}
     </span>
   );
 }
 
 /**
- * One member as a tile: progress ring around the avatar, name and roles, the phase and step they
- * are on, and the one thing worth knowing about them right now.
+ * One member as a slim tile: progress ring around the avatar, name and progress, the phase and
+ * step they are on, and the one thing worth knowing about them right now — three short lines,
+ * so four of them sit in a row without the card outgrowing its neighbours.
  *
  * A click opens the side panel, a double click the full profile — the same as a roster row. A
  * tooltip alone hid the double click from anyone who did not wait for it, so hovering the tile
- * says it on the tile itself, with the arrow the roster uses for "full profile" in the corner.
+ * raises a small tag over its corner that says so, without taking room from the content.
  */
 function MemberTile({
   member,
@@ -169,13 +147,16 @@ function MemberTile({
   const { handleClick, handleDoubleClick } = usePeekClick(member.userId, onOpen);
   const name = memberName(member);
   const stage = memberStage(member);
+  const percent = progressPercent(member);
   const step =
     stage === "done"
       ? "Onboarding complete"
       : (member.currentStep?.title ??
         (stage === "not-started" ? "Not started yet" : "No current step"));
-  const phase = stage === "done" ? null : member.currentPhase?.title;
-  const roles = member.roles.map((role) => role.name).join(", ");
+  const where =
+    stage !== "done" && member.currentPhase?.title
+      ? `${member.currentPhase.title} · ${step}`
+      : step;
   const needsYou = reasons.length > 0;
 
   return (
@@ -184,49 +165,33 @@ function MemberTile({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       title="Click for a quick look · double-click for the full profile"
-      className={`group relative flex h-full min-w-0 flex-col items-center gap-2.5 rounded-2xl px-3 pt-4 pb-2 text-center transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-        needsYou ? "bg-app-warning-bg/50" : "bg-app-surface-muted"
+      className={`group relative flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+        needsYou
+          ? "bg-app-warning-bg/50 hover:bg-app-warning-bg"
+          : "bg-app-surface-muted hover:bg-app-surface-hover"
       }`}
     >
-      <ArrowUpRight
-        aria-hidden="true"
-        className="absolute top-2.5 right-2.5 h-4 w-4 text-app-text-subtle opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-      />
-      <AvatarProgress member={member} percent={progressPercent(member)} />
-
-      <span className="w-full min-w-0">
-        <span className="block truncate text-sm font-semibold text-app-text">{name}</span>
-        <span
-          className={`block truncate text-[11px] ${roles ? "text-app-brand-text" : "text-app-text-subtle"}`}
-          title={roles || undefined}
-        >
-          {roles || "No role yet"}
-        </span>
-      </span>
-
-      <span className="w-full min-w-0 rounded-lg bg-app-surface/70 px-2 py-1.5">
-        {phase && (
-          <span className="block truncate text-[10px] font-semibold tracking-wider text-app-text-subtle uppercase">
-            {phase}
-          </span>
-        )}
-        <span className="block truncate text-xs text-app-text" title={step}>
-          {step}
-        </span>
-      </span>
-
-      <span className="flex w-full min-w-0 justify-center">
-        <TileStatus member={member} reasons={reasons} />
-      </span>
-
-      {/* Takes its room even while hidden, so hovering never shifts the tile's content. */}
       <span
         aria-hidden="true"
-        className="mt-auto flex items-center gap-1 text-[10px] text-app-text-subtle opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        className="pointer-events-none absolute -top-2 right-2 z-10 inline-flex translate-y-1 items-center gap-0.5 rounded-full border border-app-border bg-app-surface px-1.5 py-px text-[10px] font-medium text-app-brand-text opacity-0 shadow-sm transition-all group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
       >
-        <MousePointerClick className="h-3 w-3" />
-        Quick look · <span className="font-semibold text-app-brand-text">double-click</span> for
-        profile
+        Double-click: profile
+        <ArrowUpRight className="h-3 w-3" />
+      </span>
+
+      <AvatarProgress member={member} percent={percent} />
+
+      <span className="min-w-0 flex-1 space-y-0.5">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="truncate text-sm font-semibold text-app-text">{name}</span>
+          <span className="shrink-0 text-[11px] font-medium text-app-text-muted tabular-nums">
+            {percent}%
+          </span>
+        </span>
+        <span className="block truncate text-[11px] text-app-text-muted" title={where}>
+          {where}
+        </span>
+        <TileStatus member={member} reasons={reasons} />
       </span>
     </button>
   );
@@ -274,9 +239,9 @@ export function TeamPulseCard({ roster, queue, loading, error, onOpenMember }: T
       />
 
       {loading ? (
-        <SkeletonGroup label="Loading team" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SkeletonGroup label="Loading team" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: VISIBLE_MEMBERS }).map((_, index) => (
-            <SkeletonLine key={index} className="h-40 w-full rounded-2xl" />
+            <SkeletonLine key={index} className="h-[4.5rem] w-full rounded-xl" />
           ))}
         </SkeletonGroup>
       ) : error ? (
@@ -284,7 +249,7 @@ export function TeamPulseCard({ roster, queue, loading, error, onOpenMember }: T
       ) : roster.length === 0 ? (
         <EmptyState size="sm">Nobody is on this project yet.</EmptyState>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {needsYou.length === 0 ? (
             <p className="flex items-center gap-2 text-sm text-app-text-muted">
               <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-app-success-solid" />
@@ -305,7 +270,7 @@ export function TeamPulseCard({ roster, queue, loading, error, onOpenMember }: T
               )}
             </PmEyebrow>
           )}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {visible.map(({ member, reasons }) => (
               <MemberTile
                 key={member.userId}
