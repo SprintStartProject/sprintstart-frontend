@@ -496,8 +496,10 @@ html[data-sidebar-resizing] .app-sidebar-eases {
    Used by ChatPage's history sidebar and by the buddy page's PM replies. It
    started chat-specific; the second caller is what made it worth a name that
    says what it does rather than where it was first needed. */
-.app-rail-open .app-page-frame {
-  padding-left: 1.5rem;
+@media (min-width: 768px) {
+  .app-rail-open .app-page-frame {
+    padding-left: 1.5rem;
+  }
 }
 
 /* The admin page's frame is the page gutter now. It had a narrower one of its own below 1280px,

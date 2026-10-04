@@ -168,8 +168,8 @@ export function SegmentedTabs<TValue extends string>({
         wrap
           ? "flex w-full flex-wrap"
           : fullWidth
-            ? "flex w-full [scrollbar-width:none]! overflow-x-auto [&::-webkit-scrollbar]:hidden"
-            : "inline-flex max-w-full [scrollbar-width:none]! overflow-x-auto [&::-webkit-scrollbar]:hidden"
+            ? "flex w-full [scrollbar-width:none]! overflow-x-auto max-lg:flex-wrap [&::-webkit-scrollbar]:hidden"
+            : "inline-flex max-w-full [scrollbar-width:none]! overflow-x-auto max-lg:flex-wrap [&::-webkit-scrollbar]:hidden"
       } gap-1 ${
         isCompact ? "rounded-xl p-0.5" : "rounded-2xl p-1"
       } border border-app-border/70 bg-app-bg-soft/70 backdrop-blur-md ${className}`}
@@ -213,7 +213,7 @@ export function SegmentedTabs<TValue extends string>({
             } items-center justify-center ${
               isCompact
                 ? "gap-1.5 rounded-lg px-3 py-1.5 text-xs"
-                : "gap-2 rounded-xl px-4 py-2 text-sm"
+                : "gap-2 rounded-xl px-4 py-2 text-sm max-sm:py-3"
             } font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
               fullWidth && !wrap ? "flex-1" : ""
             } ${grown ? (isCompact ? "pr-2" : "pr-2.5") : ""} ${

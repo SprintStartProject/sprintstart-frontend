@@ -33,9 +33,9 @@ const normalBorderClasses = "border-app-border focus:border-app-brand-border-str
 const invalidBorderClasses = "border-app-danger-border focus:border-app-danger-solid";
 
 const sizeClasses: Record<FieldSize, string> = {
-  sm: "h-9 rounded-lg px-3 text-sm",
-  md: "h-11 rounded-xl px-3 text-sm",
-  lg: "h-12 rounded-xl px-4 text-sm",
+  sm: "h-9 rounded-lg px-3 text-base sm:text-sm",
+  md: "h-11 rounded-xl px-3 text-base sm:text-sm",
+  lg: "h-12 rounded-xl px-4 text-base sm:text-sm",
 };
 
 /** Left padding that clears a leading icon, per size. */
