@@ -678,8 +678,12 @@ export function BoardPage() {
 
   if (board && boardId !== bandsDecidedFor) {
     setBandsDecidedFor(boardId);
+    // "Behind you" never arrives open, at any size: it holds what is finished, and it fills in only
+    // once the path has been read, after this is decided.
     setOpenStages(
-      allCards.length > FOLD_THRESHOLD ? new Set([currentStage(states)]) : new Set(BOARD_STAGES),
+      allCards.length > FOLD_THRESHOLD
+        ? new Set([currentStage(states)])
+        : new Set(BOARD_STAGES.filter((stage) => stage !== "BEHIND")),
     );
   }
 

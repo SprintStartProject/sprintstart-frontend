@@ -47,10 +47,30 @@ const STORAGE_VERSION = 1;
  * version is still read and still synced, so nothing about a board is lost, but the board does not
  * draw from it any more.
  */
-export type BoardStage = "NOW" | "LATER";
+export type StoredStage = "NOW" | "LATER";
 
-/** Every stage, earliest first. The one place the order of the ramp is written down. */
-export const BOARD_STAGES: readonly BoardStage[] = ["NOW", "LATER"];
+/**
+ * A stage as the board draws it: the two that were ever stored, and **Behind you**.
+ *
+ * The third only exists because the path decides now: cards from a phase the hire has finished.
+ * Left in Now they kept the current phase's band full of things already dealt with; hidden, they
+ * would be gone exactly when somebody wants to look something up. So they get a band of their own
+ * that arrives folded. Never stored and never sent — it is a fact about the path, not about the
+ * board — which is why it sits outside {@link StoredStage}.
+ */
+export type BoardStage = StoredStage | "BEHIND";
+
+/** The stages that may be read back from storage or from the server. */
+const STORED_STAGES: readonly StoredStage[] = ["NOW", "LATER"];
+
+/**
+ * Every stage, in the order the board draws them. The one place that order is written down.
+ *
+ * Behind comes last although it is earliest in time: the board is read top down, and the top is for
+ * what to do now. It is also what every "earliest first" question here wants — the stage still to
+ * work through, and the card to start with, are never the finished ones.
+ */
+export const BOARD_STAGES: readonly BoardStage[] = ["NOW", "LATER", "BEHIND"];
 
 /** What each stage is called on screen, and the sentence under it. */
 export const STAGE_LABELS: Record<BoardStage, { title: string; hint: string }> = {
@@ -58,6 +78,10 @@ export const STAGE_LABELS: Record<BoardStage, { title: string; hint: string }> =
   LATER: {
     title: "Later",
     hint: "From phases you haven't reached yet — they move up when you do.",
+  },
+  BEHIND: {
+    title: "Behind you",
+    hint: "From phases you've finished — kept for when you want to look something up.",
   },
 };
 
@@ -69,7 +93,7 @@ export const STAGE_LABELS: Record<BoardStage, { title: string; hint: string }> =
  * deliberately deferred would arrive on top of the pile. `NEXT` meant "not now", and so does
  * `LATER`.
  */
-function toStage(value: unknown): BoardStage | null {
+function toStage(value: unknown): StoredStage | null {
   if (value === "NEXT") return "LATER";
 
   return isStage(value) ? value : null;
@@ -115,7 +139,7 @@ export function isRemovableByHire(dependency: CardDependency): boolean {
  * an entry only exists once somebody has said something about that card.
  */
 export type CardStructure = {
-  stage?: BoardStage;
+  stage?: StoredStage;
   /**
    * Cards that have to be done before this one is worth opening.
    *
@@ -138,7 +162,7 @@ export type BoardStructure = {
   /** Per card id. Cards absent from here have no structure, which is a state and not a default. */
   cards: Record<string, CardStructure>;
   /** The stage a whole area sits in, so a PM can sequence twelve cards in one gesture. */
-  groupStages: Record<string, BoardStage>;
+  groupStages: Record<string, StoredStage>;
 };
 
 export const EMPTY_STRUCTURE: BoardStructure = { cards: {}, groupStages: {} };
@@ -152,8 +176,8 @@ type StoredStructure = {
   structure: unknown;
 };
 
-function isStage(value: unknown): value is BoardStage {
-  return typeof value === "string" && (BOARD_STAGES as readonly string[]).includes(value);
+function isStage(value: unknown): value is StoredStage {
+  return typeof value === "string" && (STORED_STAGES as readonly string[]).includes(value);
 }
 
 /**
@@ -224,7 +248,7 @@ export function readBoardStructure(boardId: string): BoardStructure {
       if (entry) cards[cardId] = entry;
     }
 
-    const groupStages: Record<string, BoardStage> = {};
+    const groupStages: Record<string, StoredStage> = {};
     for (const [groupId, value] of Object.entries((stored.groupStages as object) ?? {})) {
       const groupStage = toStage(value);
       if (groupStage) groupStages[groupId] = groupStage;

@@ -54,7 +54,15 @@ export function BoardStageBand({
           board is the reading this page is trying to reduce. */}
       {open && <span className="hidden text-xs text-app-text-muted sm:inline">{label.hint}</span>}
 
-      {done ? (
+      {/* Behind you is a shelf, not a list: what is filed there is from work already finished, so
+          "3 to do" would be counting notes as chores. It says how much is on the shelf. */}
+      {stage === "BEHIND" ? (
+        <Badge variant="neutral" size="sm">
+          <span className="tabular-nums">
+            {total} {total === 1 ? "card" : "cards"}
+          </span>
+        </Badge>
+      ) : done ? (
         <Badge variant="purple" size="sm" className="gap-1">
           <CircleCheckBig className="h-3 w-3" aria-hidden="true" />
           All done
@@ -66,7 +74,7 @@ export function BoardStageBand({
       )}
 
       {/* Only when it differs from what is left: "12 cards · 12 to do" is the same fact twice. */}
-      {!done && total !== remaining && (
+      {stage !== "BEHIND" && !done && total !== remaining && (
         <span className="text-xs text-app-text-muted tabular-nums">{total} in all</span>
       )}
     </>

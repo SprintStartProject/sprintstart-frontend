@@ -12,7 +12,8 @@ import type { BoardStage } from "./boardStructure";
  * looked at. The path already knows where somebody stands: which phase is open, which ones come
  * after it. So the board asks the path instead of asking the hire.
  *
- * **Later means "belongs to a phase you have not reached yet"**, and nothing else. A card is tied to
+ * **Later means "belongs to a phase you have not reached yet"**, and **Behind you** means "belongs to
+ * a phase you have finished"; everything else is Now. A card is tied to
  * a phase through its origin: the live step card names its step, and a card kept while a step or a
  * phase was open on the Onboarding page carries it as its origin (`onboardingOrigin.ts`). A card
  * tied to nothing — most notes, the current task, the
@@ -25,12 +26,14 @@ import type { BoardStage } from "./boardStructure";
  */
 export type PathStages = (card: BoardCard) => BoardStage;
 
-/** What the board needs from the path: the phase of every step and question, and which lie ahead. */
+/** What the board needs from the path: the phase of every step and question, and where each is. */
 export type PathPhases = {
   phaseOfStep: Map<string, string>;
   phaseOfQuestion: Map<string, string>;
   phaseIds: Set<string>;
   aheadPhaseIds: Set<string>;
+  /** Phases with nothing left in them: every step finished or skipped, every question passed. */
+  finishedPhaseIds: Set<string>;
 };
 
 /**
@@ -62,6 +65,9 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
     phaseOfQuestion,
     phaseIds: new Set(phases.map((phase) => phase.id)),
     aheadPhaseIds,
+    finishedPhaseIds: new Set(
+      phases.filter((phase) => !isPhaseOpen(phase)).map((phase) => phase.id),
+    ),
   };
 }
 
@@ -115,6 +121,9 @@ export function pathStages(phases: PathPhases | null, origins: CardOrigins): Pat
 
     const phaseId = phaseOfCard(card, phases, origins);
 
-    return phaseId && phases.aheadPhaseIds.has(phaseId) ? "LATER" : "NOW";
+    if (!phaseId) return "NOW";
+    if (phases.finishedPhaseIds.has(phaseId)) return "BEHIND";
+
+    return phases.aheadPhaseIds.has(phaseId) ? "LATER" : "NOW";
   };
 }

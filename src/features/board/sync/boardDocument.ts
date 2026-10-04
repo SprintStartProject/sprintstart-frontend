@@ -1,8 +1,8 @@
 import {
   readBoardStructure,
   writeBoardStructure,
-  type BoardStage,
   type CardStructure,
+  type StoredStage,
 } from "../layout/boardStructure";
 import { readBoardGroups, writeBoardGroups, type BoardGroup } from "../layout/boardGroups";
 import { readCollapsedCards, writeCollapsedCards } from "../layout/collapsedCards";
@@ -29,7 +29,7 @@ import { notifyBoardStorageReplaced, whileApplying } from "../layout/boardStorag
  */
 export type BoardDocument = {
   cards: Record<string, CardStructure>;
-  groupStages: Record<string, BoardStage>;
+  groupStages: Record<string, StoredStage>;
   groups: BoardGroup[];
   collapsedCardIds: string[];
   pinnedCardIds: string[];
@@ -51,7 +51,7 @@ export type BoardDocument = {
  */
 export type BoardDocumentWire = {
   cards: Record<string, CardStructure>;
-  groupStages: Record<string, BoardStage>;
+  groupStages: Record<string, StoredStage>;
   groups: BoardGroup[];
   collapsedCardIds: string[];
   pinnedCardIds: string[];
