@@ -23,10 +23,11 @@ the list below.
 
 ## Open items
 
-Status as of 2026-10-02.
+Status as of 2026-10-04.
 
-- **Two pagination components.** `ui/Pagination.tsx` and `admin/AdminPagination.tsx`
-  do the same job. Both use `Button` by now, but one of them should go.
+- **Two pagination components.** `ui/Pagination.tsx` and
+  `features/admin/components/AdminPagination.tsx` do the same job. Both use `Button` by now,
+  but one of them should go.
 - **Clickable cards.** Only 5 files use `components/common/ClickableCard`; about 10
   places still build their own hover (`hover:scale-[1.01]`, `[1.02]`,
   `-translate-y-0.5`). Same problem as the buttons had, one level up.
@@ -38,8 +39,6 @@ Status as of 2026-10-02.
   easy (hide the backdrop with `aria-hidden`; Escape already covers keyboard users),
   but it changes the semantics of every dialog, so it needs a decision rather than a
   drive-by edit.
-- **`IngestionMetrics` renders a number as `<h3>`.** A figure is not a heading, but
-  changing the tag changes the page's document outline and belongs in its own step.
 
 ---
 
@@ -262,9 +261,8 @@ by context the picture differed a lot:
 **Decision.** Four type rungs, one of them a dedicated hero rung so the big moments
 stay big; every card on `rounded-2xl`. The scales are in the coding standards §4.
 
-**Deliberately outside the scale:** the `404` on the error page (`text-5xl`), the big
-figure in `IngestionMetrics` (`text-4xl`, a number display rather than a title), and
-the dialog chrome in `Modal` / `SidePanel`, which brings its own title size.
+**Deliberately outside the scale:** the `404` on the error page (`text-5xl`) and the
+dialog chrome in `Modal` / `SidePanel`, which brings its own title size.
 
 ---
 

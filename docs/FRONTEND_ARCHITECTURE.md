@@ -264,7 +264,19 @@ Feature providers mounted at app level (`App.tsx`):
 | `MomentsProvider`           | `features/moments/`               | Celebration animations, e.g. the launch sequence after login.                           |
 | `CardMarksProvider`         | `features/board/marks/`           | Highlights on board cards, shared with the selection toolbar.                           |
 | `OnboardingJourneyProvider` | `features/onboarding/generation/` | Onboarding path generation that keeps running across route changes.                     |
-| `BuddyProvider`             | `features/buddy/`                 | AI buddy session and drafts.                                                            |
+| `BuddyProvider`             | `features/buddy/`                 | The hire's one buddy conversation, shared by the dock and the `/buddy` page.            |
+| `BuddyDraftProvider`        | `features/buddy/`                 | Composer drafts shared by the dock and the `/buddy` page.                               |
+
+The buddy is the one provider with two surfaces and one session: `BuddyProvider` sits
+above the router (mounted in `App.tsx`), so the dock (`BuddyWidget`, mounted app-wide
+and hidden on `/buddy`) and the page render the same conversation — a message sent in
+either appears in the other, and the dock hands the session to the page by growing into
+it rather than by transferring anything. The composer's draft is a provider of its own
+(`BuddyDraftProvider`) below the session, so it survives closing the dock, and a
+keystroke re-renders the composer instead of the conversation. Team mode is bound to
+the global project selection: a user who manages a project can switch the session onto
+it, and when the binding breaks — management lost, or the selection moved — the session
+falls back to the hire thread and says so with a toast.
 
 Feature-local state stays inside the feature (e.g. `onboarding` step state lives in
 `features/onboarding/`).
@@ -288,6 +300,45 @@ factory in `src/services/queryKeys.ts`. Project-scoped keys always contain the
 and its main query on `pointerdown` (`src/services/routePrefetch.ts`). The reasoning
 behind this setup is recorded in ADR-017 in the Wiki, which is still on the Wiki branch
 `tanstack-query-adr` and not yet merged into `main`.
+
+### 5.3 Knowledge Base view state
+
+The `/knowledge-base` page keeps its whole view state in the query string, and
+`useKnowledgeBaseUrlState` is its only writer: tab, search, sources, repositories,
+format, languages, the date window, page, size and sort survive a refresh, a link is
+shareable, and Back undoes the last click instead of walking through every keystroke.
+`?artifact=<id>` is part of that state rather than a one-time hand-off — it names the
+document open in the viewer drawer, opening one writes it, closing one removes it
+(`replace` throughout, so reading four documents does not leave four entries in the back
+button), and a switch between two settled projects drops it together with the other
+project-scoped params, because an id from project A means nothing in project B. The board's
+cards rely on it: an origin recorded from a highlighted paragraph is this URL plus a
+`#:~:text=` fragment, so without the parameter the way back would land on the list instead
+of the document.
+
+Deleting uploads is gated to `PM` and `ADMIN`, mirroring the backend's
+`@PreAuthorize("hasRole('PM') or hasRole('ADMIN')")`: the page offers the selection mode
+only while the Uploads source is picked, and the viewer drawer shows its Delete control
+only for an allowed role and a connector whose artifacts are deletable.
+
+AI summaries stream over SSE through `knowledgeService.streamArtifactSummary`; a `503`
+means the artifact is still being indexed, and the drawer retries with exponential
+backoff (2 s up to 30 s) until it is ready. A second, batched request per visible page
+(`useArtifactAiStatus`) draws the AI status chips on the list, polling every 10 s while
+anything is still `PROCESSING`. Uploads enter through the Upload connector's add-source
+form (`FileUploadZone`, shared from `knowledge-base/`) and appear here as the Uploads
+source; this page lists them, it does not upload them.
+
+### 5.4 Settings view state
+
+`/settings` is open to every permission group (`/profile` redirects here), and it is
+one scrollable page with three sections: User Profile, Appearance and Access Tokens.
+The Access Tokens section exists only for `PM`, `HR` and `ADMIN` users, and it renders
+the same `AccessManagementView` as the admin Access Management page, so the two cannot
+drift apart. The section nav entries stay real anchor links; a click scrolls to the
+section (respecting `prefers-reduced-motion`), writes the hash with `replaceState`, and
+moves focus onto the section with `preventScroll`, so the focus change does not undo the
+scroll.
 
 ---
 
@@ -346,6 +397,7 @@ One module per domain (rules for writing them in
 | `onboardingMetricsService.ts`  | Onboarding metrics (insights)                                         |
 | `onboardingService.ts`         | Onboarding paths, steps, tasks, feedback                              |
 | `orientationService.ts`        | Task orientation                                                      |
+| `projectAnalysisService.ts`    | Project analysis runs (PM-area insights)                              |
 | `projectService.ts`            | Projects, managed projects, project selection                         |
 | `queryClient.ts`               | Shared TanStack Query client (§5.2)                                   |
 | `queryKeys.ts`                 | Central query key factory (§5.2)                                      |
