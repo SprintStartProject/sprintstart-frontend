@@ -171,10 +171,12 @@ describe("PmDashboardPage", () => {
     const team = within(await screen.findByRole("region", { name: "Team" }));
     const rows = await team.findAllByRole("button");
 
-    // Dan is flagged by the metrics but not on the roster, so the team card leaves him out.
+    // Dan is flagged by the metrics but not on the roster, so the team card leaves him out. The
+    // row is topped up with the rest of the team, so Ada (through onboarding) comes last.
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining("Bob Builder"),
       expect.stringContaining("Cleo Park"),
+      expect.stringContaining("Ada Lovelace"),
     ]);
     expect(within(rows[0]).getByLabelText("Skip request")).toBeInTheDocument();
     expect(within(rows[1]).getByLabelText("Feedback")).toBeInTheDocument();

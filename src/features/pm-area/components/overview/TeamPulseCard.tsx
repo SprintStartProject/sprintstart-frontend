@@ -1,26 +1,27 @@
 import { CheckCircle2, Clock, Users } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { UserAvatar } from "../../../../components/common/UserAvatar";
 import { EmptyState } from "../../../../components/ui/EmptyState";
 import { SkeletonGroup, SkeletonLine } from "../../../../components/ui/Skeleton";
 import type { TeamOverviewUser } from "../../../team-management/types";
 import type { AttentionEntry, AttentionReason } from "../../attentionQueue";
+import { REASON_META } from "../../attentionReasons";
 import {
   daysOnStep,
   formatDays,
-  isAtRisk,
   memberName,
   memberStage,
   progressPercent,
 } from "../../memberStatus";
 import { usePeekClick } from "../../usePeekClick";
-import { MemberProgressBar, ReasonIcons } from "../MemberRow";
 import { PmCard, PmCardHeader, PmCardLink, PmEyebrow } from "../PmCard";
 
 /**
  * How many people the card shows before it hands over to the team page — one row of tiles.
- * The card used to list up to eight rows (everybody who needs the manager, topped up with whoever
- * was still on the way), which made it the longest thing on the overview for the least news.
+ * The card used to list up to eight rows, which made it the longest thing on the overview for the
+ * least news. Four always show when the team has four: whoever needs the manager first, topped
+ * up with whoever has been longest on their step — a half-empty row reads as broken, not calm.
  */
 const VISIBLE_MEMBERS = 4;
 
@@ -33,10 +34,104 @@ type TeamPulseCardProps = {
   onOpenMember: (userId: string) => void;
 };
 
+/** Avatar size inside the ring, and the ring around it. */
+const AVATAR = 44;
+const RING = AVATAR + 10;
+const RING_STROKE = 3;
+
 /**
- * One person who needs the manager, as a tile: who, where they are and for how long, why they
- * need them, how far along. A click opens the side panel, a double click the full profile —
- * the same as a roster row.
+ * The member's avatar inside a thin ring that fills with their progress — the tile's one
+ * number, drawn where the eye already is instead of as a bar of its own.
+ */
+function AvatarProgress({ member, percent }: { member: TeamOverviewUser; percent: number }) {
+  const radius = (RING - RING_STROKE) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  return (
+    <span
+      role="img"
+      aria-label={`${percent}% through onboarding`}
+      className="relative flex shrink-0 items-center justify-center"
+      style={{ width: RING, height: RING }}
+    >
+      <svg aria-hidden="true" width={RING} height={RING} className="absolute inset-0 -rotate-90">
+        <circle
+          cx={RING / 2}
+          cy={RING / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={RING_STROKE}
+          className="stroke-app-progress-track"
+        />
+        <circle
+          cx={RING / 2}
+          cy={RING / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={RING_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - percent / 100)}
+          className="stroke-app-brand transition-[stroke-dashoffset] duration-700"
+        />
+      </svg>
+      <UserAvatar
+        profileIcon={member.profileIcon}
+        fallbackName={memberName(member)}
+        seed={member.userId}
+        size={AVATAR}
+      />
+    </span>
+  );
+}
+
+/** What the tile says under the name: the most pressing reason, or how the member is getting on. */
+function TileStatus({ member, reasons }: { member: TeamOverviewUser; reasons: AttentionReason[] }) {
+  const days = daysOnStep(member);
+  const pill = (Icon: LucideIcon, label: string, tone: string, title?: string) => (
+    <span
+      title={title}
+      className={`inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}
+    >
+      <Icon aria-hidden="true" className="h-3 w-3 shrink-0" />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+
+  if (reasons.length > 0) {
+    const [first, ...rest] = reasons;
+    const meta = REASON_META[first.kind];
+
+    return (
+      <span className="flex max-w-full items-center justify-center gap-1">
+        {pill(meta.icon, meta.label, meta.tone, first.text)}
+        {rest.length > 0 && (
+          <span
+            title={rest.map((reason) => REASON_META[reason.kind].label).join(", ")}
+            className="shrink-0 rounded-full bg-app-surface px-1.5 py-0.5 text-[11px] font-medium text-app-text-muted"
+          >
+            +{rest.length}
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  if (memberStage(member) === "done") {
+    return pill(CheckCircle2, "Through onboarding", "bg-app-success-bg text-app-success-text");
+  }
+
+  return pill(
+    Clock,
+    days === null ? "Not started" : days <= 0 ? "Started today" : `${formatDays(days)} on step`,
+    "bg-app-surface text-app-text-muted",
+  );
+}
+
+/**
+ * One member as a tile: progress ring around the avatar, name, where they are, and the one
+ * thing worth knowing about them right now. A click opens the side panel, a double click the
+ * full profile — the same as a roster row.
  */
 function MemberTile({
   member,
@@ -49,11 +144,13 @@ function MemberTile({
 }) {
   const { handleClick, handleDoubleClick } = usePeekClick(member.userId, onOpen);
   const name = memberName(member);
-  const days = daysOnStep(member);
+  const stage = memberStage(member);
   const where =
-    member.currentPhase?.title && member.currentStep?.title
-      ? `${member.currentPhase.title} · ${member.currentStep.title}`
-      : (member.currentStep?.title ?? "No current step");
+    stage === "done"
+      ? "Onboarding complete"
+      : (member.currentStep?.title ??
+        (stage === "not-started" ? "Not started yet" : "No current step"));
+  const needsYou = reasons.length > 0;
 
   return (
     <button
@@ -61,47 +158,32 @@ function MemberTile({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       title="Click for a quick look · double-click for the full profile"
-      className="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-app-border-muted bg-app-surface p-3 text-left transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className={`group flex h-full min-w-0 flex-col items-center gap-2 rounded-2xl px-3 pt-4 pb-3 text-center transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+        needsYou ? "bg-app-warning-bg/50" : "bg-app-surface-muted"
+      }`}
     >
-      <span className="flex min-w-0 items-center gap-2.5">
-        <UserAvatar
-          profileIcon={member.profileIcon}
-          fallbackName={name}
-          seed={member.userId}
-          size={36}
-        />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-app-text">{name}</span>
-          <span className="block truncate text-xs text-app-text-muted" title={where}>
-            {where}
-          </span>
+      <AvatarProgress member={member} percent={progressPercent(member)} />
+      <span className="w-full min-w-0">
+        <span className="block truncate text-sm font-semibold text-app-text">{name}</span>
+        <span className="block truncate text-xs text-app-text-muted" title={where}>
+          {where}
         </span>
       </span>
-      <span className="flex items-center justify-between gap-2">
-        <ReasonIcons reasons={reasons} />
-        {days !== null && (
-          <span
-            className={`inline-flex shrink-0 items-center gap-1 text-xs ${
-              isAtRisk(member) ? "font-medium text-app-orange-text" : "text-app-text-subtle"
-            }`}
-          >
-            <Clock aria-hidden="true" className="h-3 w-3" />
-            {days <= 0 ? "today" : formatDays(days)}
-          </span>
-        )}
+      <span className="mt-auto flex w-full justify-center pt-1">
+        <TileStatus member={member} reasons={reasons} />
       </span>
-      <MemberProgressBar percent={progressPercent(member)} className="mt-auto" />
     </button>
   );
 }
 
 /**
  * Who on the team needs the manager, most pressing first — a skip to decide, feedback to read,
- * then a waiting review, drifting, a long step — as one row of tiles.
+ * then a waiting review, drifting, a long step — as one row of tiles, topped up to four with
+ * whoever has been longest on their step (and, on a small team, whoever is through).
  *
- * Only the first few: everyone past them, and everyone who is simply on their way, is one press
- * away on the team page ("Needs you" filtered, or the whole roster). People the metrics flag who
- * are not on the project's roster are left out: they could not be opened here anyway.
+ * Everyone past them is one press away on the team page ("+n more" opens it filtered to
+ * "Needs you"). People the metrics flag who are not on the project's roster are left out: they
+ * could not be opened here anyway.
  */
 export function TeamPulseCard({ roster, queue, loading, error, onOpenMember }: TeamPulseCardProps) {
   const doneCount = roster.filter((member) => memberStage(member) === "done").length;
@@ -109,8 +191,18 @@ export function TeamPulseCard({ roster, queue, loading, error, onOpenMember }: T
   const needsYou = queue.flatMap((entry) =>
     entry.member ? [{ member: entry.member, reasons: entry.reasons }] : [],
   );
-  const visibleNeedsYou = needsYou.slice(0, VISIBLE_MEMBERS);
-  const hidden = needsYou.length - visibleNeedsYou.length;
+  const needsYouIds = new Set(needsYou.map(({ member }) => member.userId));
+  const rest = roster
+    .filter((member) => !needsYouIds.has(member.userId))
+    .sort(
+      (a, b) =>
+        Number(memberStage(a) === "done") - Number(memberStage(b) === "done") ||
+        (daysOnStep(b) ?? -1) - (daysOnStep(a) ?? -1),
+    )
+    .map((member) => ({ member, reasons: [] as AttentionReason[] }));
+
+  const visible = [...needsYou, ...rest].slice(0, VISIBLE_MEMBERS);
+  const hidden = needsYou.length - Math.min(needsYou.length, VISIBLE_MEMBERS);
 
   return (
     <PmCard aria-label="Team" className="h-full" to="/team-management" linkLabel="Open the team">
@@ -126,9 +218,9 @@ export function TeamPulseCard({ roster, queue, loading, error, onOpenMember }: T
       />
 
       {loading ? (
-        <SkeletonGroup label="Loading team" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SkeletonGroup label="Loading team" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {Array.from({ length: VISIBLE_MEMBERS }).map((_, index) => (
-            <SkeletonLine key={index} className="h-28 w-full rounded-xl" />
+            <SkeletonLine key={index} className="h-40 w-full rounded-2xl" />
           ))}
         </SkeletonGroup>
       ) : error ? (
@@ -136,35 +228,37 @@ export function TeamPulseCard({ roster, queue, loading, error, onOpenMember }: T
       ) : roster.length === 0 ? (
         <EmptyState size="sm">Nobody is on this project yet.</EmptyState>
       ) : (
-        <div>
-          <PmEyebrow className="mb-2 flex items-center justify-between text-app-warning-text!">
-            <span>Needs you · {needsYou.length}</span>
-            {hidden > 0 && (
-              <Link
-                to="/team-management?filter=attention"
-                className="tracking-normal text-app-brand-text normal-case hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-              >
-                +{hidden} more
-              </Link>
-            )}
-          </PmEyebrow>
-          {visibleNeedsYou.length === 0 ? (
-            <p className="flex items-center gap-2 py-2 text-sm text-app-text-muted">
+        <div className="space-y-3">
+          {needsYou.length === 0 ? (
+            <p className="flex items-center gap-2 text-sm text-app-text-muted">
               <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-app-success-solid" />
               All clear — no skip requests, no unread feedback, nobody stuck.
             </p>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {visibleNeedsYou.map(({ member, reasons }) => (
-                <MemberTile
-                  key={member.userId}
-                  member={member}
-                  reasons={reasons}
-                  onOpen={onOpenMember}
-                />
-              ))}
-            </div>
+            <PmEyebrow className="flex items-center justify-between text-app-warning-text!">
+              <span>
+                {needsYou.length} {needsYou.length === 1 ? "needs" : "need"} you
+              </span>
+              {hidden > 0 && (
+                <Link
+                  to="/team-management?filter=attention"
+                  className="tracking-normal text-app-brand-text normal-case hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                >
+                  +{hidden} more
+                </Link>
+              )}
+            </PmEyebrow>
           )}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {visible.map(({ member, reasons }) => (
+              <MemberTile
+                key={member.userId}
+                member={member}
+                reasons={reasons}
+                onOpen={onOpenMember}
+              />
+            ))}
+          </div>
         </div>
       )}
     </PmCard>

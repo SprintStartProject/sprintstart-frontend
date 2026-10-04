@@ -93,7 +93,7 @@ function WaitingIcons({ member }: { member: TeamOverviewUser }) {
  * roster's "Open with you" column. Same icons and colours as there; the label is the tooltip
  * and the accessible name.
  */
-export function ReasonIcons({ reasons }: { reasons: AttentionReason[] }) {
+function ReasonIcons({ reasons }: { reasons: AttentionReason[] }) {
   if (reasons.length === 0) return null;
 
   return (
