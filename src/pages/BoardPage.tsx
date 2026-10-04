@@ -927,11 +927,6 @@ export function BoardPage() {
       )}
 
       <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
-        {/*
-          On the board rather than in the header. The header was a place for furniture about the
-          page; this is about the work, and it belongs where the work is.
-        */}
-        {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
         {/* The page keeps a margin either side from `lg` up (at least 5rem on the right here, see
             `frameClass`), and on this page it is dead space: the board is a column of cards and
             the margin is where a hand rests. So the offers live there — always in reach, never in
@@ -1100,6 +1095,14 @@ export function BoardPage() {
             </div>
           </div>
         )}
+
+        {/*
+          On the board rather than in the header. The header was a place for furniture about the
+          page; this is about the work, and it belongs where the work is. After the rail in the
+          source: from `lg` up the rail is out of flow and the order does not show, but below it
+          the rail lies across the page and belongs above everything it acts on, this included.
+        */}
+        {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
 
         {!selectedProjectId && !projectsLoading ? (
           <EmptyState
