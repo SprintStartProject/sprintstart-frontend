@@ -8,6 +8,7 @@ import {
   ConversationRail,
   RailToggle,
   RAIL_DESKTOP_QUERY,
+  RAIL_TOGGLE_CLEARANCE,
 } from "../components/layout/ConversationRail";
 import { useIsSmUp } from "../hooks/useIsSmUp";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -93,6 +94,7 @@ function BuddyPageShell({
   railToggle,
   newConversationControl,
   modeControl,
+  reserveFloatingClearance = false,
   isRailOpen = false,
   children,
 }: {
@@ -112,6 +114,13 @@ function BuddyPageShell({
    * a hire-only user, so nobody gets a row of nothing.
    */
   modeControl?: ReactNode;
+  /**
+   * Whether the floating controls above the column (the rail toggle, "start a new conversation")
+   * need their room reserved. Computed by the page from the stable facts — a control withdraws
+   * mid-turn, the room it withdraws from must not — and applied to the mode row, which is the
+   * element those controls overlap when it renders.
+   */
+  reserveFloatingClearance?: boolean;
   /** Whether that column is currently taking width, which decides this column's left gutter. */
   isRailOpen?: boolean;
   children: ReactNode;
@@ -123,8 +132,6 @@ function BuddyPageShell({
   useEffect(() => {
     announceBuddyPageReady();
   }, []);
-
-  const hasFloatingControls = Boolean(railToggle || newConversationControl);
 
   return (
     <div className="flex min-h-0 flex-1 bg-app-bg">
@@ -142,7 +149,8 @@ function BuddyPageShell({
         {newConversationControl}
         {modeControl && (
           <div
-            className={`app-page-frame shrink-0 ${hasFloatingControls ? "pt-14 xl:pt-4" : "pt-4"}`}
+            data-testid="buddy-mode-band"
+            className={`app-page-frame shrink-0 ${reserveFloatingClearance ? RAIL_TOGGLE_CLEARANCE : "pt-4"}`}
           >
             {modeControl}
           </div>
@@ -384,6 +392,14 @@ function BuddyMentorHome() {
     canStartConversation && surfaceFromPathname(pathname) === "buddy",
   );
 
+  // The floating controls withdraw mid-turn (the new-conversation button while a reply streams),
+  // and the room they need must not go with them — so the mode row reserves it from the stable
+  // facts rather than from the controls' own presence: the rail toggle's conditions, or simply
+  // that this conversation has been spoken in. Hire-flow only; a team conversation has no
+  // floating controls to clear.
+  const needsFloatingRoom =
+    isHireMode && (((sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage);
+
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
   // Nothing here needs the greeting in order to work: the composer sends, the chips render, and
@@ -391,6 +407,7 @@ function BuddyMentorHome() {
   // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
     <BuddyPageShell
+      reserveFloatingClearance={needsFloatingRoom}
       isRailOpen={rail.open}
       rail={
         // Mounted whenever it holds something, open or not: the count on the control that
@@ -495,8 +512,12 @@ function BuddyMentorHome() {
         // to the button shunted the whole transcript down and back on every single turn.
         // Visible while the transcript is shorter than the viewport, which is exactly the
         // first few turns this control exists for.
+        // When the mode row renders it is the element the floating controls overlap, and it
+        // already carries their clearance (see the shell above) — the transcript below must
+        // not reserve a second gap for the same controls.
         hasFloatingControl={
-          (isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage
+          !canSwitchModes &&
+          ((isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage)
         }
         // Built above, in one identity — the conversation is memoised, and the chips' own reasons
         // are written where they are built.

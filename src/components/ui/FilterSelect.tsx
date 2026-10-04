@@ -300,7 +300,7 @@ export function FilterSelect<TValue extends string>({
                     // Anchored left so the label does not drift
                     // sideways as the row grows.
                     style={{ transformOrigin: "left center" }}
-                    className={`relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
+                    className={`relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors max-sm:py-3 ${
                       isSelected ? "font-semibold text-app-brand-text" : "text-app-text"
                     }`}
                   >

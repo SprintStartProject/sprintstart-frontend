@@ -308,6 +308,10 @@ describe("BuddyPage", () => {
    * reason to reserve any — so tying the space to the button meant the whole transcript slid
    * down and back on every turn. Visible precisely while the transcript is shorter than the
    * viewport, which is the first few turns this control exists for.
+   *
+   * The room lives in the mode row: when it renders it is the element the floating controls
+   * overlap, so the row reserves the space from the stable facts (this conversation has been
+   * spoken in) and the transcript below adds no second gap of its own.
    */
   it("keeps the room the floating control needs, even while the control is withdrawn", async () => {
     // No PM replies, so the rail toggle is not there to reserve the room on the button's
@@ -321,11 +325,14 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
+    const band = () => screen.getByTestId("buddy-mode-band");
     const framed = () =>
       screen.getByTestId("buddy-transcript").querySelector(".app-page-frame") as HTMLElement;
 
     expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
-    expect(framed().className).toContain("pt-14");
+    expect(band().className).toContain("pt-14");
+    // One reservation, not two: the transcript adds none under the mode row.
+    expect(framed().className).toContain("pt-8");
 
     await user.type(screen.getByLabelText("Message"), "and after that?");
     await user.click(screen.getByLabelText("Send message"));
@@ -334,7 +341,8 @@ describe("BuddyPage", () => {
       expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
     });
     // The control is gone and the padding it stands in has not moved.
-    expect(framed().className).toContain("pt-14");
+    expect(band().className).toContain("pt-14");
+    expect(framed().className).toContain("pt-8");
   });
 
   /**

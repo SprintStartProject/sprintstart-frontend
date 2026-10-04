@@ -389,6 +389,7 @@ export function ArtifactFilters({
         onChange={onTabChange}
         layoutId="kb-artifact-type-tab"
         ariaLabel="Filter artifacts by type"
+        wrapBelow="lg"
         className="self-start"
       />
 

@@ -59,6 +59,13 @@ type SegmentedTabsProps<TValue extends string> = {
   /** Allow options to wrap into multiple rows when they exceed container width. */
   wrap?: boolean;
   /**
+   * Wrap the options into multiple rows below the given breakpoint while the bar keeps its
+   * scrolling single row at or above it. For bars that only overflow on small screens —
+   * `wrap` wraps at every width, and this variant leaves the desktop row sizing itself to
+   * its label. Ignored when `wrap` is true.
+   */
+  wrapBelow?: "lg";
+  /**
    * Visual size variant.
    * - `md` (default): Standard height with text-sm, rounded-xl pills, and px-4 py-2.
    * - `sm`: Compact height with text-xs, rounded-lg pills, and px-3 py-1.5 for secondary underfilter rows.
@@ -115,6 +122,7 @@ export function SegmentedTabs<TValue extends string>({
   ariaLabel,
   fullWidth = false,
   wrap = false,
+  wrapBelow,
   size = "md",
   className = "",
 }: SegmentedTabsProps<TValue>) {
@@ -168,9 +176,9 @@ export function SegmentedTabs<TValue extends string>({
         wrap
           ? "flex w-full flex-wrap"
           : fullWidth
-            ? "flex w-full [scrollbar-width:none]! overflow-x-auto max-lg:flex-wrap [&::-webkit-scrollbar]:hidden"
-            : "inline-flex max-w-full [scrollbar-width:none]! overflow-x-auto max-lg:flex-wrap [&::-webkit-scrollbar]:hidden"
-      } gap-1 ${
+            ? "flex w-full [scrollbar-width:none]! overflow-x-auto [&::-webkit-scrollbar]:hidden"
+            : "inline-flex max-w-full [scrollbar-width:none]! overflow-x-auto [&::-webkit-scrollbar]:hidden"
+      } ${wrapBelow === "lg" ? "max-lg:flex-wrap" : ""} gap-1 ${
         isCompact ? "rounded-xl p-0.5" : "rounded-2xl p-1"
       } border border-app-border/70 bg-app-bg-soft/70 backdrop-blur-md ${className}`}
     >
@@ -215,7 +223,7 @@ export function SegmentedTabs<TValue extends string>({
                 ? "gap-1.5 rounded-lg px-3 py-1.5 text-xs"
                 : "gap-2 rounded-xl px-4 py-2 text-sm max-sm:py-3"
             } font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-              fullWidth && !wrap ? "flex-1" : ""
+              fullWidth && !wrap ? (wrapBelow ? "lg:flex-1" : "flex-1") : ""
             } ${grown ? (isCompact ? "pr-2" : "pr-2.5") : ""} ${
               isActive ? "text-white" : "text-app-text-muted hover:text-app-text"
             }`}
@@ -261,7 +269,7 @@ export function SegmentedTabs<TValue extends string>({
           <div
             key={option.value}
             className={`relative inline-flex ${wrap ? "min-w-fit" : "shrink-0"} items-center ${
-              fullWidth && !wrap ? "flex-1" : ""
+              fullWidth && !wrap ? (wrapBelow ? "lg:flex-1" : "flex-1") : ""
             }`}
           >
             {grown && pill}

@@ -154,7 +154,7 @@ export function ArtifactDateRangeFilter({
             onClick={() => onRangeChange({ from: null, to: null }, "push")}
             aria-label="Clear date range"
             data-testid="kb-date-clear"
-            className="max-sm:h-11 max-sm:w-11"
+            className="relative after:absolute after:-inset-2 after:content-['']"
           >
             <X className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>

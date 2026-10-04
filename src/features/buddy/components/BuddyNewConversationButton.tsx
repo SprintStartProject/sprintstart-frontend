@@ -36,7 +36,7 @@ export function BuddyNewConversationButton({
           ? `${label} (${shortcut}) — your buddy keeps what it has learned about you`
           : `${label} — your buddy keeps what it has learned about you`
       }
-      className="absolute top-3 right-2 z-30 shrink-0 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="absolute top-3 right-2 z-30 shrink-0 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors after:absolute after:-inset-x-1 after:-inset-y-1.5 after:content-[''] hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >
       <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
     </button>
