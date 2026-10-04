@@ -860,6 +860,89 @@ export function BoardPage() {
   }
 
   /**
+   * The switches that change what the board *is* rather than what it shows: planning it, a new
+   * area, the path strip and the task pool.
+   *
+   * Rendered twice from this one place — in the tool rail from `lg` up, and as a row above the
+   * cards below that. The rail is parked in the page margin and is `hidden` below `lg`, where
+   * there is no margin to park it in; filtering and adding already had a worded copy in the row
+   * above the cards, but these four had none, so on a narrow window a new area or the task pool
+   * could not be reached at all.
+   */
+  function boardSwitches() {
+    return (
+      <>
+        {/* Planning and making an area are the two ways of changing the board's *shape*,
+                    which is why they sit together and away from the three that add something to it.
+                    It is a toggle rather than a door: the way out has to be where the way in was,
+                    especially with the header's "Done" gone in focus mode. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
+          disabled={!board}
+          aria-pressed={isArranging}
+          title={isArranging ? "Done planning" : "Plan the board"}
+          aria-label={isArranging ? "Done planning" : "Plan the board"}
+        >
+          {isArranging ? (
+            <Check className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <ListTree className="h-4 w-4" aria-hidden="true" />
+          )}
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          onClick={() => setNamingArea(true)}
+          disabled={!board}
+          aria-pressed={namingArea}
+          title="New area"
+          aria-label="New area"
+        >
+          <FolderPlus className="h-4 w-4" aria-hidden="true" />
+        </Button>
+
+        {/* The strip saying where the hire stands, on or off this board. The switch lives
+                    here rather than on the strip, because the strip is the thing being switched: a
+                    control that takes its own surface away leaves nothing to press to get it back. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          onClick={() => showPathWindow(!isPathShown)}
+          disabled={!board}
+          aria-pressed={isPathShown}
+          title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
+          aria-label={isPathShown ? "Hide where you are in your path" : "Show where you are"}
+        >
+          <Milestone className="h-4 w-4" aria-hidden="true" />
+        </Button>
+
+        {/* The task pool, on or off — the same kind of switch as the path strip above, and
+                    for the same reason: the card's own X only hides it, so the way back has to live
+                    somewhere the card is not. */}
+        {hasTaskPool && (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={() => showTaskPool(!isTaskPoolShown)}
+            aria-pressed={isTaskPoolShown}
+            title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+            aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+          >
+            <LayoutList className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
+      </>
+    );
+  }
+
+  /**
    * The gutters the page draws in.
    *
    * Outside focus mode it is the page gutter, widened on the right from `lg` up to clear the tool
@@ -898,20 +981,6 @@ export function BoardPage() {
                   </Button>
                 ) : (
                   <>
-                    {/* The one switch from the rail worth a copy here, for the widths where
-                        there is no margin to put a rail in. `lg:hidden` rather than a second
-                        implementation: one state, two places it can be reached from. */}
-                    <Button
-                      variant="secondary"
-                      iconOnly
-                      className="lg:hidden"
-                      onClick={startArranging}
-                      disabled={!board}
-                      title="Plan the board"
-                      aria-label="Plan the board"
-                    >
-                      <ListTree className="h-4 w-4" aria-hidden="true" />
-                    </Button>
                     <Button
                       variant="secondary"
                       onClick={refresh}
@@ -959,6 +1028,9 @@ export function BoardPage() {
             }
           >
             <div
+              role="toolbar"
+              aria-label="Board tools"
+              aria-orientation="vertical"
               className={[
                 "flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur",
                 // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
@@ -988,72 +1060,7 @@ export function BoardPage() {
 
               <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
 
-              {/* Planning and making an area are the two ways of changing the board's *shape*,
-                  which is why they sit together and away from the three that add something to it.
-                  It is a toggle rather than a door: the way out has to be where the way in was,
-                  especially with the header's "Done" gone in focus mode. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
-                disabled={!board}
-                aria-pressed={isArranging}
-                title={isArranging ? "Done planning" : "Plan the board"}
-                aria-label={isArranging ? "Done planning" : "Plan the board"}
-              >
-                {isArranging ? (
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <ListTree className="h-4 w-4" aria-hidden="true" />
-                )}
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => setNamingArea(true)}
-                disabled={!board}
-                aria-pressed={namingArea}
-                title="New area"
-                aria-label="New area"
-              >
-                <FolderPlus className="h-4 w-4" aria-hidden="true" />
-              </Button>
-
-              {/* The strip saying where the hire stands, on or off this board. The switch lives
-                  here rather than on the strip, because the strip is the thing being switched: a
-                  control that takes its own surface away leaves nothing to press to get it back. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => showPathWindow(!isPathShown)}
-                disabled={!board}
-                aria-pressed={isPathShown}
-                title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-                aria-label={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-              >
-                <Milestone className="h-4 w-4" aria-hidden="true" />
-              </Button>
-
-              {/* The task pool, on or off — the same kind of switch as the path strip above, and
-                  for the same reason: the card's own X only hides it, so the way back has to live
-                  somewhere the card is not. */}
-              {hasTaskPool && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  onClick={() => showTaskPool(!isTaskPoolShown)}
-                  aria-pressed={isTaskPoolShown}
-                  title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-                  aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-                >
-                  <LayoutList className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              )}
+              {boardSwitches()}
 
               {/* Which cards, by where they came from. It sits below the switches that change the
                   board's shape because it changes neither the board nor its shape — it only
@@ -1137,6 +1144,30 @@ export function BoardPage() {
               )}
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* The rail's switches, for the widths without a rail. In focus mode the way back
+                    joins them: the rail that holds it is gone below `lg` too, and a window made
+                    narrower while the board is expanded would otherwise only have Escape. */}
+                <div
+                  role="toolbar"
+                  aria-label="Board tools"
+                  className="flex items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm lg:hidden"
+                >
+                  {isFocused && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      onClick={() => setFocused(false)}
+                      aria-pressed
+                      title="Back to the app (Esc)"
+                      aria-label="Back to the app"
+                    >
+                      <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
+                  {boardSwitches()}
+                </div>
+
                 {/* The rail in the margin takes over from `lg` up, where there is a margin to
                       put it in. Below that these are the only offers on the page — and there is
                       room for the words, which the rail's glyphs do without. */}

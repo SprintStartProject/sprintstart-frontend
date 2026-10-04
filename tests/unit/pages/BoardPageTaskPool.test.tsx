@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { BoardPage } from "../../../src/pages/BoardPage";
@@ -116,13 +116,22 @@ describe("the task pool on the board", () => {
     expect(screen.getByText("Fix the flaky login test")).toBeInTheDocument();
   });
 
-  it("is switched off and on again from the rail", async () => {
+  /**
+   * Two copies of the switch: the rail in the margin from `lg` up, and the row above the cards
+   * below that, where the rail is hidden. jsdom applies no media queries, so both are present
+   * here — and both have to work, since each is the only one on screen at its widths.
+   */
+  it.each([
+    ["the rail", 0],
+    ["the toolbar shown below lg", 1],
+  ])("is switched off and on again from %s", async (_where, index) => {
     await renderBoard();
+    const toolbar = () => screen.getAllByRole("toolbar", { name: "Board tools" })[index];
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide the task pool" }));
+    fireEvent.click(within(toolbar()).getByRole("button", { name: "Hide the task pool" }));
     expect(screen.queryByText("Fix the flaky login test")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show the task pool" }));
+    fireEvent.click(within(toolbar()).getByRole("button", { name: "Show the task pool" }));
     expect(screen.getByText("Fix the flaky login test")).toBeInTheDocument();
     expect(boardService.dismissCard).not.toHaveBeenCalled();
   });

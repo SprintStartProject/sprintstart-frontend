@@ -500,17 +500,14 @@ html[data-sidebar-resizing] .app-sidebar-eases {
   padding-left: 1.5rem;
 }
 
+/* The admin page's frame is the page gutter now. It had a narrower one of its own below 1280px,
+   from when the page gutter was a flat 10rem from 1024px and left its tables no room; the
+   fluid gutter does that job for every page, and the separate rule only left admin at 16px on
+   a phone where everything else has 20px. Kept as a name so the page does not have to change. */
 .admin-page-frame {
   width: 100%;
-  padding-left: clamp(1rem, 4vw, 2rem);
-  padding-right: clamp(1rem, 4vw, 2rem);
-}
-
-@media (min-width: 1280px) {
-  .admin-page-frame {
-    padding-left: var(--app-page-gutter);
-    padding-right: var(--app-page-gutter);
-  }
+  padding-left: var(--app-page-gutter);
+  padding-right: var(--app-page-gutter);
 }
 
 .app-page-shell {

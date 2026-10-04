@@ -63,7 +63,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
 
   return (
     <div
-      className={`@container relative flex h-full flex-col justify-center rounded-2xl ${isWide ? "px-6 py-4" : "p-6"}`}
+      className={`@container relative flex h-full flex-col justify-center rounded-2xl ${isWide ? "px-6 py-3.5" : "p-6"}`}
     >
       {/* The clip lives on this layer rather than on the card itself, so
           the glow blobs stay inside the rounded edge while the content
@@ -93,7 +93,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
             baseline off-centre. */}
         <div
           className={`flex flex-col items-center text-center ${
-            isWide ? "w-36 shrink-0 @3xl:w-56" : ""
+            isWide ? "w-40 shrink-0 @3xl:w-56" : ""
           }`}
         >
           {/* The same assistant as in the chat, idle timer and all —
@@ -113,7 +113,13 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
           </span>
 
           <div className="min-w-0">
-            <p className="font-semibold text-app-text">Ask the AI assistant</p>
+            {/* One line in the band: below `@3xl` the column is 160px, and wrapped at the base size
+                the label made the band 4px taller than its 136px cell. */}
+            <p
+              className={`font-semibold text-app-text ${isWide ? "text-sm whitespace-nowrap @3xl:text-base" : ""}`}
+            >
+              Ask the AI assistant
+            </p>
             {/* A single grid row has no line to spare for a subtitle the arrow already implies. */}
             {!isWide && <p className="text-xs text-app-text-muted">Continue in chat</p>}
           </div>
