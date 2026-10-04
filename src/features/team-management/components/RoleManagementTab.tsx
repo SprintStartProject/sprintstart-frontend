@@ -271,7 +271,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
         void requestSkillSuggestions(newRole.id);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't create the role.");
+      toast.error(parseApiError(error, "Couldn't create the role."));
     } finally {
       setCreatingRole(false);
     }
@@ -299,7 +299,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
       await onDataChanged();
       toast.success("Role deleted");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't delete the role.");
+      toast.error(parseApiError(error, "Couldn't delete the role."));
     }
   }
 
@@ -359,20 +359,52 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
     const roleId = selectedRole.id;
     setSavingAssignment(true);
 
-    try {
-      await Promise.all([
-        ...userIdsToAdd.map((userId) => assignProjectRoleToUser(userId, roleId)),
-        ...userIdsToRemove.map((userId) => unassignProjectRoleFromUser(userId, roleId)),
-      ]);
+    // Settled, not all-or-nothing: the writes are independent, so one failing leaves the others
+    // done. Treating that as a total failure kept the done ones as pending changes, and "Save"
+    // sent them a second time.
+    const changes = [
+      ...userIdsToAdd.map((userId) => ({ userId, add: true })),
+      ...userIdsToRemove.map((userId) => ({ userId, add: false })),
+    ];
+    const results = await Promise.allSettled(
+      changes.map(({ userId, add }) =>
+        add ? assignProjectRoleToUser(userId, roleId) : unassignProjectRoleFromUser(userId, roleId),
+      ),
+    );
+    const done = changes.filter((_, index) => results[index].status === "fulfilled");
+    const failed = changes.filter((_, index) => results[index].status === "rejected");
 
-      setOriginalUserIds(selectedUserIds);
-      await onDataChanged();
-      toast.success("Members updated");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Couldn't update the members.");
+    // What the backend now holds is the baseline; the failed ones stay as pending changes.
+    setOriginalUserIds((current) => {
+      const held = new Set(current);
+      done.forEach(({ userId, add }) => (add ? held.add(userId) : held.delete(userId)));
+      return [...held];
+    });
+
+    try {
+      // Read back whatever went through, also when part of it failed.
+      if (done.length > 0) await onDataChanged();
     } finally {
       setSavingAssignment(false);
     }
+
+    if (failed.length === 0) {
+      toast.success("Members updated");
+      return;
+    }
+
+    const firstError = results.find((result) => result.status === "rejected");
+    const names = failed.map(({ userId }) => {
+      const user = users.find((candidate) => candidate.userId === userId);
+      return user ? `${user.firstname} ${user.lastname}`.trim() : "a member";
+    });
+    const reason = parseApiError(
+      firstError?.status === "rejected" ? firstError.reason : null,
+      "The request failed.",
+    );
+    toast.error(`Couldn't update ${nameList(names)}`, {
+      description: done.length > 0 ? `${reason} The other changes were saved.` : reason,
+    });
   }
 
   function handleResetAssignment() {

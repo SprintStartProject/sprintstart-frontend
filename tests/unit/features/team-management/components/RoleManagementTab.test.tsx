@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   acceptSkillSuggestion: vi.fn(),
   createProjectRole: vi.fn(),
   updateRoleSkills: vi.fn(),
+  assignProjectRoleToUser: vi.fn(),
+  unassignProjectRoleFromUser: vi.fn(),
 }));
 
 vi.mock("../../../../../src/context/useAuth", () => ({
@@ -40,6 +42,8 @@ vi.mock("../../../../../src/services/teamManagementService", async (importOrigin
     acceptSkillSuggestion: mocks.acceptSkillSuggestion,
     createProjectRole: mocks.createProjectRole,
     updateRoleSkills: mocks.updateRoleSkills,
+    assignProjectRoleToUser: mocks.assignProjectRoleToUser,
+    unassignProjectRoleFromUser: mocks.unassignProjectRoleFromUser,
   };
 });
 
@@ -450,5 +454,26 @@ describe("RoleManagementTab", () => {
     expect(
       screen.queryByRole("button", { name: `Remove ${retiredSkill.name} from role` }),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the members that saved and names the one that didn't when part of a save fails", async () => {
+    mocks.unassignProjectRoleFromUser.mockResolvedValue(undefined);
+    mocks.assignProjectRoleToUser.mockRejectedValue(new Error("Forbidden"));
+    const onDataChanged = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role]} users={[ada, grace]} onDataChanged={onDataChanged} />);
+
+    await openRole(user);
+    // Ada leaves the role (works), Grace joins it (fails).
+    await user.click(screen.getByRole("checkbox", { name: /Ada Lovelace/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Grace Hopper/ }));
+    await user.click(screen.getByRole("button", { name: "Save 2 changes" }));
+
+    expect(await screen.findByText("Couldn't update Grace Hopper")).toBeInTheDocument();
+    expect(screen.getByText(/The other changes were saved/)).toBeInTheDocument();
+    // What went through is read back, and only the failed change is still pending.
+    expect(onDataChanged).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Save 1 change" })).toBeInTheDocument();
+    expect(mocks.unassignProjectRoleFromUser).toHaveBeenCalledTimes(1);
   });
 });

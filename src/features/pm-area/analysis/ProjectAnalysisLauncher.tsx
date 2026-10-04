@@ -46,6 +46,9 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
   }, [refreshRevision, onRefreshed]);
 
   const running = analysis.phase === "running";
+  // Until the stored history is known, the ring cannot tell "never analysed" from "not read yet".
+  const historyLoading = !running && analysis.history === "loading";
+  const historyUnavailable = !running && analysis.history === "unavailable";
 
   const lastRun = analysis.lastRun;
   // What the ring stands for, in words: its accessible name and its tooltip.
@@ -75,29 +78,60 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
       <section aria-label="Project analysis" className="flex shrink-0 items-center">
         <button
           type="button"
+          disabled={historyLoading}
           onClick={() => {
             if (running) setIsOpen(true);
             else if (analysis.canOpenLast) openLast();
+            // The history could not be read: open the dialog and let its button start a run,
+            // rather than storing a new one on every press of a ring that never shows them.
+            else if (historyUnavailable) setIsOpen(true);
             else start();
           }}
           aria-label={
             running
               ? "Analysing the project — show the analysis"
-              : lastRun && analysis.canOpenLast
-                ? `Open last results: ${lastRunSummary}`
-                : "Analyse project health"
+              : historyLoading
+                ? "Loading the project's health"
+                : historyUnavailable
+                  ? "Project health — the last results could not be loaded"
+                  : lastRun && analysis.canOpenLast
+                    ? `Open last results: ${lastRunSummary}`
+                    : "Analyse project health"
           }
           title={
             running
               ? "Analysing…"
-              : lastRun
-                ? `${lastRunSummary} — open the results`
-                : "Project health — run the first analysis"
+              : historyLoading
+                ? "Loading the project's health…"
+                : historyUnavailable
+                  ? "The last results could not be loaded — open to run an analysis"
+                  : lastRun
+                    ? `${lastRunSummary} — open the results`
+                    : "Project health — run the first analysis"
           }
           data-testid="project-analysis-open"
-          className="rounded-full transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none enabled:hover:scale-105 disabled:cursor-wait"
         >
-          {running ? (
+          {historyLoading || historyUnavailable ? (
+            // Not known yet, or not readable: a quiet empty ring — never "no health score yet",
+            // which would claim the project was never analysed.
+            <RingGauge
+              value={0}
+              size={38}
+              thickness={4}
+              colorClassName="text-app-text-subtle"
+              ariaLabel={historyLoading ? "Loading health score" : "Health score unavailable"}
+            >
+              {historyLoading ? (
+                <span
+                  aria-hidden="true"
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-app-text-subtle"
+                />
+              ) : (
+                <CircleAlert aria-hidden="true" className="h-4 w-4 text-app-text-subtle" />
+              )}
+            </RingGauge>
+          ) : running ? (
             <RingGauge
               value={0}
               size={38}
@@ -157,6 +191,7 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
         findings={analysis.findings}
         score={analysis.score}
         resultsAt={analysis.resultsAt}
+        resultsUnsaved={analysis.resultsUnsaved}
         previousRun={analysis.previousRun}
         lastRun={lastRun}
         projectName={selectedProject?.name}

@@ -100,13 +100,13 @@ function renderLauncher() {
 
 /** The button starts a run straight away: there is nothing to choose any more. */
 async function runAnalysis(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /Analyse project/ }));
+  await user.click(await screen.findByRole("button", { name: /Analyse project/ }));
   await screen.findByText(/Where the points went/, {}, { timeout: 8000 });
 }
 
 /** Like `runAnalysis`, for a run in which a check fails: its results have no points breakdown. */
 async function runIncompleteAnalysis(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /Analyse project/ }));
+  await user.click(await screen.findByRole("button", { name: /Analyse project/ }));
   await screen.findByText(/Could not run/, {}, { timeout: 8000 });
 }
 
@@ -265,7 +265,7 @@ describe("ProjectAnalysisLauncher", () => {
     const user = userEvent.setup();
     const { baseElement } = renderLauncher();
 
-    await user.click(screen.getByRole("button", { name: /Analyse project/ }));
+    await user.click(await screen.findByRole("button", { name: /Analyse project/ }));
 
     const now = within(await screen.findByRole("region", { name: "Now checking" }));
     expect(await now.findByText("Reading the documentation gaps")).toBeInTheDocument();
@@ -492,7 +492,33 @@ describe("ProjectAnalysisLauncher", () => {
 
       const dialog = within(screen.getByTestId("project-analysis-dialog"));
       expect(dialog.getByText("1 skip request waiting for your answer")).toBeInTheDocument();
+      // Said on the results, not only in the console: they are gone after a reload.
+      expect(dialog.getByText(/Not saved/)).toBeInTheDocument();
     }, 20000);
+
+    it("does not claim 'never analysed' while the history is still loading", () => {
+      mocks.listRuns.mockImplementation(() => new Promise(() => {}));
+      renderLauncher();
+
+      const ring = screen.getByTestId("project-analysis-open");
+      expect(ring).toBeDisabled();
+      expect(ring).toHaveAccessibleName("Loading the project's health");
+      expect(screen.queryByLabelText("No health score yet")).not.toBeInTheDocument();
+    });
+
+    it("does not store a new run on every press when the history cannot be read", async () => {
+      mocks.listRuns.mockRejectedValue(new Error("Forbidden"));
+      const user = userEvent.setup();
+      renderLauncher();
+
+      const ring = await screen.findByRole("button", { name: /could not be loaded/ });
+      await user.click(ring);
+
+      // The dialog opens on its start screen; nothing runs until the manager asks for it.
+      expect(await screen.findByTestId("project-analysis-dialog")).toBeInTheDocument();
+      expect(mocks.saveRun).not.toHaveBeenCalled();
+      expect(mocks.getTeamOverviewOrThrow).not.toHaveBeenCalled();
+    });
 
     it("compares the next complete run with the last complete one, not the incomplete one", async () => {
       const user = userEvent.setup();

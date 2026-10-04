@@ -1,12 +1,12 @@
 import type { KnowledgeGapOverview } from "../../knowledge-gaps/types";
 
 /**
- * Whether the knowledge gaps already reflect the newest import — and so whether asking the AI to
- * rescan them in an analysis would find anything new.
+ * Whether the knowledge gaps already reflect the newest import.
  *
- * The backend rescans the gaps on its own once an import is indexed, so normally they are current
- * and a manual rescan only pays for the same answer again. They fall behind when that automatic
- * rescan failed or is switched off, which is when the option is worth offering.
+ * The backend rescans the gaps on its own once an import is indexed, so normally they are current.
+ * They fall behind when that automatic rescan failed or is switched off. The analysis has no rescan
+ * option of its own (it only reads); gaps that are behind become the `gaps-behind` finding, which
+ * leads to the knowledge-gaps page and its own rescan button.
  */
 export type GapScanState =
   /** The gaps or the sources could not be read: nothing to say either way. */

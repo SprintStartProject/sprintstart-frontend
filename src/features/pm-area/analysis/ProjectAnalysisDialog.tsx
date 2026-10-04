@@ -31,6 +31,8 @@ type ProjectAnalysisDialogProps = {
   score: number | null;
   /** When the results on screen were produced. */
   resultsAt: string | null;
+  /** The results on screen could not be stored on the backend. */
+  resultsUnsaved?: boolean;
   previousRun: AnalysisComparison | null;
   lastRun: AnalysisRunSummary | null;
   projectName?: string;
@@ -50,6 +52,7 @@ function Results({
   score,
   tasks,
   resultsAt,
+  resultsUnsaved,
   previousRun,
   projectName,
   onOpenFinding,
@@ -60,6 +63,7 @@ function Results({
   | "score"
   | "tasks"
   | "resultsAt"
+  | "resultsUnsaved"
   | "previousRun"
   | "projectName"
   | "onOpenFinding"
@@ -99,6 +103,7 @@ function Results({
         failedTasks={failed}
         findings={findings}
         analysedAt={resultsAt}
+        unsaved={resultsUnsaved}
         previous={previousRun}
         onRunAgain={onRunAgain}
       />
@@ -125,6 +130,7 @@ export function ProjectAnalysisDialog({
   findings,
   score,
   resultsAt,
+  resultsUnsaved,
   previousRun,
   lastRun,
   projectName,
@@ -186,6 +192,7 @@ export function ProjectAnalysisDialog({
               score={score}
               tasks={tasks}
               resultsAt={resultsAt}
+              resultsUnsaved={resultsUnsaved}
               previousRun={previousRun}
               projectName={projectName}
               onOpenFinding={onOpenFinding}

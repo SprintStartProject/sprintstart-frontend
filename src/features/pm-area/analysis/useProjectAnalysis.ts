@@ -158,12 +158,28 @@ export function useProjectAnalysis() {
   );
   const [findings, setFindings] = useState<Finding[]>([]);
   const [score, setScore] = useState<number | null>(null);
-  const { data: runs } = useQueryFetch(
+  const {
+    data: runs,
+    loading: runsLoading,
+    error: runsError,
+  } = useQueryFetch(
     queryKeys.projectAnalysis.runs(projectId),
     () => projectAnalysisService.listRuns(projectId),
     { enabled: Boolean(projectId) },
   );
   const stored = runs?.[0] ?? null;
+  /**
+   * Whether the stored history is known at all. While it loads, or when it cannot be read, "no
+   * run yet" would be a guess — and acting on that guess stored a new run on every press of the
+   * ring while the history kept failing.
+   */
+  const history: "loading" | "unavailable" | "known" = runs
+    ? "known"
+    : runsLoading
+      ? "loading"
+      : runsError
+        ? "unavailable"
+        : "known";
   const lastRun: AnalysisRunSummary | null = stored ? summarise(stored) : null;
   /** The complete run before the current one — what the results compare against. */
   const [previousRun, setPreviousRun] = useState<AnalysisComparison | null>(null);
@@ -435,6 +451,12 @@ export function useProjectAnalysis() {
     lastRun,
     /** When the results on screen were produced — now, or the stored run's time. */
     resultsAt: phase === "done" ? (stored?.at ?? null) : null,
+    /**
+     * The results on screen could not be stored: they are gone after a reload. A run that only
+     * exists in this session has a `local-` id (see `run`).
+     */
+    resultsUnsaved: phase === "done" && (stored?.id.startsWith("local-") ?? false),
+    history,
     canOpenLast,
     openLast,
     previousRun,
