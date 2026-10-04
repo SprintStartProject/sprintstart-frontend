@@ -35,6 +35,7 @@ import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { MarkFilterRail } from "../features/board/components/MarkFilterRail";
 import { BoardNextUp } from "../features/board/components/BoardNextUp";
 import { BoardPhaseCheck } from "../features/board/components/BoardPhaseCheck";
+import { BoardPhaseRecap } from "../features/board/components/BoardPhaseRecap";
 import { BoardLocalOnlyNotice } from "../features/board/components/BoardLocalOnlyNotice";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
@@ -1256,6 +1257,8 @@ export function BoardPage() {
 
                 {/* Under the next step, because it is the same question one level up: the check
                     that closes the phase that step is in. */}
+                <BoardPhaseRecap boardId={boardId} path={path} />
+
                 <BoardPhaseCheck
                   path={path}
                   phases={phases}
