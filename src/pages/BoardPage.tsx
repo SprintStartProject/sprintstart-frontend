@@ -34,6 +34,7 @@ import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { MarkFilterRail } from "../features/board/components/MarkFilterRail";
 import { BoardNextUp } from "../features/board/components/BoardNextUp";
+import { BoardPhaseCheck } from "../features/board/components/BoardPhaseCheck";
 import { BoardLocalOnlyNotice } from "../features/board/components/BoardLocalOnlyNotice";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
@@ -1252,6 +1253,16 @@ export function BoardPage() {
                     about the work. The one line on this page that answers with a thing to do rather
                     than with a smaller list to choose from. */}
                 <BoardNextUp next={nextOnPath} />
+
+                {/* Under the next step, because it is the same question one level up: the check
+                    that closes the phase that step is in. */}
+                <BoardPhaseCheck
+                  path={path}
+                  phases={phases}
+                  cards={allCards}
+                  origins={cardOrigins}
+                  marks={cardMarks}
+                />
 
                 <BoardViewStatus
                   shown={shownCards.length}
