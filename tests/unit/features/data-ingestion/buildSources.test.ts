@@ -135,6 +135,25 @@ describe("buildDataSources", () => {
     expect(cards.map((card) => card.statusView.state)).toEqual(["connected", "syncing"]);
   });
 
+  it("prefers a GitHub source's own run over a sibling's when it has no status row", () => {
+    const [card] = buildDataSources({
+      ...none,
+      projectSources: [githubProjectSource],
+      latestRuns: [
+        run({
+          runId: "sibling",
+          ingestedCount: 99,
+          status: "COMPLETED",
+          repositoryId: "repo-2",
+          sourceId: "acme/other",
+        }),
+        run({ runId: "own", ingestedCount: 3, status: "COMPLETED" }),
+      ],
+    });
+
+    expect(card.artifacts).toBe(3);
+  });
+
   it("falls back to the source system's latest run for a GitHub source without a status row", () => {
     const [card] = buildDataSources({
       ...none,

@@ -48,12 +48,12 @@ function TriggerButton({
 
 /**
  * A compact "nothing stored yet" chip shown beside a credential trigger button.
- * Styled after the warning toast (icon + warning ink) but pushed a touch more
- * yellow, so it reads as a small hint rather than a full-width banner.
+ * Styled after the warning toast (icon + warning palette tokens), kept compact so it
+ * reads as a small hint rather than a full-width banner.
  */
 function MissingCredentialChip({ label }: { label: string }) {
   return (
-    <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-yellow-400 bg-yellow-200 px-3 text-xs font-medium text-app-warning-text dark:border-yellow-400/50 dark:bg-yellow-400/15">
+    <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-app-warning-border bg-app-warning-bg px-3 text-xs font-medium text-app-warning-text">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {label}
     </span>

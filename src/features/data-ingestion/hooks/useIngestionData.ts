@@ -84,6 +84,7 @@ export function useIngestionData({
     queryKey: queryKeys.ingestion.runsPage(runQuery),
     queryFn: () => getIngestionRunsPage(runQuery),
     placeholderData: keepPreviousData,
+    enabled,
     refetchInterval: (query) =>
       isPollingWindowOpen ||
       hasRunningRun(query.state.data?.items) ||

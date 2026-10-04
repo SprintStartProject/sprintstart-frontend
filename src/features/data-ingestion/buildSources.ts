@@ -167,12 +167,28 @@ export function buildDataSources({
       ];
     }
 
+    // No status row: prefer this repository's own run, so the card never shows a
+    // sibling repo's AI-sync stage. Only when none is loaded does it fall back to the
+    // newest run of the system (always the case for uploads, which have no repository).
+    const reference =
+      system === "GITHUB"
+        ? (parseGithubRepositoryReference(projectSource.name) ??
+          parseGithubRepositoryReference(projectSource.id))
+        : null;
+    const ownRun =
+      system === "GITHUB"
+        ? (latestRunByRepository.get(projectSource.id) ??
+          (reference
+            ? latestRunByRepository.get(`${reference.owner}/${reference.name}`.toLowerCase())
+            : undefined))
+        : undefined;
+
     return [
       createDataSource({
         definition: CONNECTORS[system],
         status: null,
         connection: projectSource,
-        latestRun: latestRunBySystem.get(system) ?? null,
+        latestRun: ownRun ?? latestRunBySystem.get(system) ?? null,
         connectorEnabled,
         sharesSourceSystem,
       }),

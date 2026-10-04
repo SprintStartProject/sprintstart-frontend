@@ -250,14 +250,14 @@ export function SyncScheduleSettings({
     // own the surface avoids a card-in-a-card look on either background.
     <div className="space-y-4">
       {errorMessage && (
-        <div className="flex items-start gap-2 rounded-2xl border border-yellow-400 bg-yellow-200 px-4 py-3 text-sm font-medium text-app-warning-text dark:border-yellow-400/50 dark:bg-yellow-400/15">
+        <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm font-medium text-app-warning-text">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}
 
       {disclaimer && (
-        <div className="flex items-start gap-2 rounded-2xl border border-yellow-400 bg-yellow-200 px-4 py-3 text-sm font-medium text-app-warning-text dark:border-yellow-400/50 dark:bg-yellow-400/15">
+        <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm font-medium text-app-warning-text">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{disclaimer}</span>
         </div>
