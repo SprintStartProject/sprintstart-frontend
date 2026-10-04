@@ -178,8 +178,8 @@ describe("PmDashboardPage", () => {
       expect.stringContaining("Cleo Park"),
       expect.stringContaining("Ada Lovelace"),
     ]);
-    expect(within(rows[0]).getByLabelText("Skip request")).toBeInTheDocument();
-    expect(within(rows[1]).getByLabelText("Feedback")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("Skip request")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Feedback")).toBeInTheDocument();
   });
 
   it("opens a person in the member panel rather than on another page", async () => {
