@@ -67,7 +67,11 @@ type SidebarContentProps = {
   unseenSkipAnswerCount?: number;
   /** Folded to icons -- the desktop sidebar only; the mobile drawer is always full width. */
   collapsed?: boolean;
-  /** Lets the logo fold and unfold the desktop sidebar. Left out on the mobile drawer. */
+  /**
+   * What a press on the logo does: folds and unfolds the desktop sidebar, and closes the mobile
+   * drawer -- the same gesture on both, so the logo never means something on one screen size and
+   * nothing on the other.
+   */
   onToggleCollapsed?: () => void;
 };
 
@@ -625,7 +629,11 @@ export function SideBar() {
 
       <header className="fixed top-0 right-0 left-0 z-40 flex h-[64px] items-center justify-between border-b border-app-border bg-app-bg px-[16px] lg:hidden">
         <div className="flex items-center gap-3">
-          <SidebarLogo />
+          {/* Opens and closes the drawer like the menu button beside it, as the desktop logo
+              folds the sidebar. "Collapsed" is the drawer being shut. */}
+          <SidebarLogo
+            sidebarToggle={{ collapsed: !isMobileSidebarOpen, onToggle: toggleMobileSidebar }}
+          />
 
           <span className="text-[16px] leading-none font-bold tracking-tight text-app-text">
             SprintStart
@@ -670,6 +678,7 @@ export function SideBar() {
         <SidebarContent
           aria-label="Mobile Navigation"
           onNavigate={closeMobileSidebar}
+          onToggleCollapsed={closeMobileSidebar}
           hasPmAttentionItems={hasPmAttentionItems}
           pmBadge={pmBadge}
           unseenSkipAnswerCount={unseenSkipAnswerCount}

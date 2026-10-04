@@ -36,6 +36,7 @@ import { nextUp } from "../features/board/layout/nextUp";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
 import { readPathWindowShown, writePathWindowShown } from "../features/board/layout/pathWindowFold";
 import { readTaskPoolShown, writeTaskPoolShown } from "../features/board/layout/taskPoolShown";
@@ -131,6 +132,12 @@ const UNDO_WINDOW_MS = 7000;
  * is "forty cards appeared and I do not know where to start".
  */
 const FOLD_THRESHOLD = 8;
+
+/**
+ * The rule between groups on the tool rail: a short horizontal line while the rail stands up the
+ * margin from `lg` up, a short vertical one while it lies across the page above the cards.
+ */
+const RAIL_SEPARATOR_CLASS = "mx-0.5 h-6 w-px bg-app-border lg:mx-0 lg:my-0.5 lg:h-px lg:w-6";
 
 /**
  * The hire's board: their own cards and the buddy's, arranged in areas and stages and synced with
@@ -860,89 +867,6 @@ export function BoardPage() {
   }
 
   /**
-   * The switches that change what the board *is* rather than what it shows: planning it, a new
-   * area, the path strip and the task pool.
-   *
-   * Rendered twice from this one place — in the tool rail from `lg` up, and as a row above the
-   * cards below that. The rail is parked in the page margin and is `hidden` below `lg`, where
-   * there is no margin to park it in; filtering and adding already had a worded copy in the row
-   * above the cards, but these four had none, so on a narrow window a new area or the task pool
-   * could not be reached at all.
-   */
-  function boardSwitches() {
-    return (
-      <>
-        {/* Planning and making an area are the two ways of changing the board's *shape*,
-                    which is why they sit together and away from the three that add something to it.
-                    It is a toggle rather than a door: the way out has to be where the way in was,
-                    especially with the header's "Done" gone in focus mode. */}
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
-          disabled={!board}
-          aria-pressed={isArranging}
-          title={isArranging ? "Done planning" : "Plan the board"}
-          aria-label={isArranging ? "Done planning" : "Plan the board"}
-        >
-          {isArranging ? (
-            <Check className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <ListTree className="h-4 w-4" aria-hidden="true" />
-          )}
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          onClick={() => setNamingArea(true)}
-          disabled={!board}
-          aria-pressed={namingArea}
-          title="New area"
-          aria-label="New area"
-        >
-          <FolderPlus className="h-4 w-4" aria-hidden="true" />
-        </Button>
-
-        {/* The strip saying where the hire stands, on or off this board. The switch lives
-                    here rather than on the strip, because the strip is the thing being switched: a
-                    control that takes its own surface away leaves nothing to press to get it back. */}
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          onClick={() => showPathWindow(!isPathShown)}
-          disabled={!board}
-          aria-pressed={isPathShown}
-          title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-          aria-label={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-        >
-          <Milestone className="h-4 w-4" aria-hidden="true" />
-        </Button>
-
-        {/* The task pool, on or off — the same kind of switch as the path strip above, and
-                    for the same reason: the card's own X only hides it, so the way back has to live
-                    somewhere the card is not. */}
-        {hasTaskPool && (
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            onClick={() => showTaskPool(!isTaskPoolShown)}
-            aria-pressed={isTaskPoolShown}
-            title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-            aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-          >
-            <LayoutList className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        )}
-      </>
-    );
-  }
-
-  /**
    * The gutters the page draws in.
    *
    * Outside focus mode it is the page gutter, widened on the right from `lg` up to clear the tool
@@ -951,6 +875,10 @@ export function BoardPage() {
    * cards and no wider — the whole reason somebody expands the board is that the gutters were space
    * they were not using, and giving them back at the same width would be the button doing nothing.
    */
+  // The rail's own groups lay themselves out by a prop, not by CSS, so the rail has to know
+  // which way it is standing: up the margin from `lg`, across the page below it.
+  const isRailVertical = useMediaQuery("(min-width: 1024px)");
+
   const frameClass = isFocused
     ? "px-4 sm:px-6 lg:pr-20 lg:pl-6"
     : "app-page-frame app-page-frame--rail";
@@ -1006,11 +934,12 @@ export function BoardPage() {
         {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
         {/* The page keeps a margin either side from `lg` up (at least 5rem on the right here, see
             `frameClass`), and on this page it is dead space: the board is a column of cards and
-            the margin is where a hand rests. So the
-            offers live there — always in reach, never in the way, and out of the row above the
-            board where they were competing with the controls that decide what is *shown*.
+            the margin is where a hand rests. So the offers live there — always in reach, never in
+            the way, and out of the row above the board where they were competing with the
+            controls that decide what is *shown*.
             Absolute rather than a column of its own, so nothing about the board's own width or its
-            two-column packing changes; hidden below `lg`, where there is no margin to sit in.
+            two-column packing changes. Below `lg` there is no margin to sit in, and it lies across
+            the page above the cards instead.
 
             It stays up while the board is being arranged, which it did not use to: arranging is now
             one of the switches on it, and a switch that takes its own rail off the screen leaves
@@ -1022,20 +951,23 @@ export function BoardPage() {
               // Centred on the viewport once the page is the whole screen. With the header gone
               // there is nothing at the top for it to hang under, and a rail pinned to a corner of
               // a screen this wide is a long way from wherever the pointer is.
+              //
+              // Below `lg` there is no margin to park it in, so it is the same rail lying flat in
+              // the page above the cards -- not a second, smaller set of controls.
               isFocused
-                ? "fixed top-1/2 right-3 z-20 hidden -translate-y-1/2 lg:block"
-                : "absolute top-6 right-3 z-20 hidden lg:top-8 lg:block"
+                ? "z-20 lg:fixed lg:top-1/2 lg:right-3 lg:-translate-y-1/2"
+                : "z-20 lg:absolute lg:top-8 lg:right-3"
             }
           >
             <div
               role="toolbar"
               aria-label="Board tools"
-              aria-orientation="vertical"
+              aria-orientation={isRailVertical ? "vertical" : "horizontal"}
               className={[
-                "flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur",
+                "flex w-fit max-w-full flex-row flex-wrap items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur lg:flex-col lg:flex-nowrap",
                 // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
                 // itself on a short screen rather than losing its last buttons off the bottom.
-                isFocused ? "max-h-[calc(100vh-2rem)] overflow-y-auto" : "sticky top-6",
+                isFocused ? "lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto" : "lg:sticky lg:top-6",
               ].join(" ")}
             >
               {/* Widest change first: expanding takes the app's own navigation and this page's
@@ -1058,9 +990,74 @@ export function BoardPage() {
                 )}
               </Button>
 
-              <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+              <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
 
-              {boardSwitches()}
+              {/* Planning and making an area are the two ways of changing the board's *shape*,
+                  which is why they sit together and away from the three that add something to it.
+                  It is a toggle rather than a door: the way out has to be where the way in was,
+                  especially with the header's "Done" gone in focus mode. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
+                disabled={!board}
+                aria-pressed={isArranging}
+                title={isArranging ? "Done planning" : "Plan the board"}
+                aria-label={isArranging ? "Done planning" : "Plan the board"}
+              >
+                {isArranging ? (
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <ListTree className="h-4 w-4" aria-hidden="true" />
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() => setNamingArea(true)}
+                disabled={!board}
+                aria-pressed={namingArea}
+                title="New area"
+                aria-label="New area"
+              >
+                <FolderPlus className="h-4 w-4" aria-hidden="true" />
+              </Button>
+
+              {/* The strip saying where the hire stands, on or off this board. The switch lives
+                  here rather than on the strip, because the strip is the thing being switched: a
+                  control that takes its own surface away leaves nothing to press to get it back. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                onClick={() => showPathWindow(!isPathShown)}
+                disabled={!board}
+                aria-pressed={isPathShown}
+                title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
+                aria-label={isPathShown ? "Hide where you are in your path" : "Show where you are"}
+              >
+                <Milestone className="h-4 w-4" aria-hidden="true" />
+              </Button>
+
+              {/* The task pool, on or off — the same kind of switch as the path strip above, and
+                  for the same reason: the card's own X only hides it, so the way back has to live
+                  somewhere the card is not. */}
+              {hasTaskPool && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => showTaskPool(!isTaskPoolShown)}
+                  aria-pressed={isTaskPoolShown}
+                  title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                  aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                >
+                  <LayoutList className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              )}
 
               {/* Which cards, by where they came from. It sits below the switches that change the
                   board's shape because it changes neither the board nor its shape — it only
@@ -1068,8 +1065,13 @@ export function BoardPage() {
                   a different button in the same group rather than the same one again. */}
               {allCards.length > 2 && (
                 <>
-                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-                  <BoardFilterTriggers value={filter} onChange={setFilter} compact vertical />
+                  <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
+                  <BoardFilterTriggers
+                    value={filter}
+                    onChange={setFilter}
+                    compact
+                    vertical={isRailVertical}
+                  />
                 </>
               )}
 
@@ -1079,15 +1081,20 @@ export function BoardPage() {
                 sections={markSections}
                 selectedId={shownSectionId}
                 onSelect={setSectionId}
-                vertical
+                vertical={isRailVertical}
               />
 
               {/* Nothing is added to a board somebody is rearranging: the three forms open over the
                   cards, which is exactly where the arranging is happening. */}
               {!isArranging && (
                 <>
-                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-                  <AddCardTriggers onPick={setAddingKind} active={addingKind} compact vertical />
+                  <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
+                  <AddCardTriggers
+                    onPick={setAddingKind}
+                    active={addingKind}
+                    compact
+                    vertical={isRailVertical}
+                  />
                 </>
               )}
             </div>
@@ -1142,51 +1149,6 @@ export function BoardPage() {
               ) : (
                 <span />
               )}
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* The rail's switches, for the widths without a rail. In focus mode the way back
-                    joins them: the rail that holds it is gone below `lg` too, and a window made
-                    narrower while the board is expanded would otherwise only have Escape. */}
-                <div
-                  role="toolbar"
-                  aria-label="Board tools"
-                  className="flex items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm lg:hidden"
-                >
-                  {isFocused && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      onClick={() => setFocused(false)}
-                      aria-pressed
-                      title="Back to the app (Esc)"
-                      aria-label="Back to the app"
-                    >
-                      <Minimize2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  )}
-                  {boardSwitches()}
-                </div>
-
-                {/* The rail in the margin takes over from `lg` up, where there is a margin to
-                      put it in. Below that these are the only offers on the page — and there is
-                      room for the words, which the rail's glyphs do without. */}
-                {allCards.length > 2 && (
-                  <BoardFilterTriggers value={filter} onChange={setFilter} className="lg:hidden" />
-                )}
-
-                {/* Same reason as the filter beside it: the rail these live in only exists from
-                    `lg` up, and a colour you can only filter by on a laptop is a colour half the
-                    board's readers do not have. */}
-                <MarkFilterRail
-                  sections={markSections}
-                  selectedId={shownSectionId}
-                  onSelect={setSectionId}
-                  className="lg:hidden"
-                />
-
-                <AddCardTriggers onPick={setAddingKind} active={addingKind} className="lg:hidden" />
-              </div>
             </div>
 
             {/* Over the board rather than in the rail: the rail is page margin, which is room for a

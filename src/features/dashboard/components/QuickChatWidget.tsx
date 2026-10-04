@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useCallback, useContext, useState, type RefCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
@@ -19,6 +19,37 @@ const SUGGESTIONS = [
 ];
 
 /**
+ * How many of a wrapping row's children sit on its first line, kept current as the row resizes.
+ *
+ * The band has one line for suggestions. Letting them wrap ran the band past its bottom edge,
+ * and a sideways scroller hid the rest behind a scroll nobody expects. This lets the row wrap
+ * out of sight and reports where the first line ends, so the chips past it can be taken out of
+ * the tab order and the accessibility tree rather than merely clipped. `null` until measured.
+ */
+function useFirstLineCount(): [RefCallback<HTMLDivElement>, number | null] {
+  const [count, setCount] = useState<number | null>(null);
+
+  const ref = useCallback<RefCallback<HTMLDivElement>>((row) => {
+    if (!row) return;
+
+    const measure = () => {
+      const items = [...row.children] as HTMLElement[];
+      const firstTop = items[0]?.offsetTop ?? 0;
+      const wrapped = items.findIndex((item) => item.offsetTop > firstTop);
+      setCount(wrapped === -1 ? items.length : wrapped);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, count];
+}
+
+/**
  * Lets the user start a question straight from the dashboard.
  *
  * The text is handed to the global chat context and the user is routed to
@@ -36,20 +67,15 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
   // under it — a left-aligned row of chips under a centred bot reads as a mistake.
   const isWide = size === "wide";
 
-  // Two chips at half a row, three across the band — never four, and the cost of getting this
-  // wrong is not a slightly tighter row. The cell height is fixed by the dashboard grid
-  // (`row-span-3`, 136px), and a second line of chips does not fit in it: the row wraps, the
-  // card cannot grow, and the chips are clipped at the bottom edge.
-  //
-  // Four fitted on one line only on a wide monitor. Subtract the sidebar and the page gutters
-  // and a laptop had barely a chip's width of slack, so anything that moved the layout
-  // by a few pixels — a scrollbar appearing, a slightly longer suggestion — tipped it over.
-  // Three leaves real room instead of relying on nothing ever changing.
-  const suggestions = isWide ? SUGGESTIONS.slice(0, 3) : SUGGESTIONS.slice(0, 2);
+  // Two chips at half a row. Across the band, as many as fit on its one line — all four on a
+  // wide monitor, fewer on a laptop — measured rather than guessed (`useFirstLineCount`): a fixed
+  // count either wasted the room or, a few pixels short, wrapped below the 136px cell's edge.
+  const suggestions = isWide ? SUGGESTIONS : SUGGESTIONS.slice(0, 2);
   const navigate = useNavigate();
   const chat = useContext(ChatContext);
   const [question, setQuestion] = useState("");
   const [focused, setFocused] = useState(false);
+  const [chipRowRef, fittingChips] = useFirstLineCount();
 
   function openInChat(text: string) {
     const trimmed = text.trim();
@@ -159,35 +185,41 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
             </div>
           </form>
 
-          {/* One line in the band, however many suggestions fit on it: wrapping to a second line
-              is what pushed the band's content past its bottom edge. The rest stay reachable --
-              the row scrolls sideways, and tabbing to a chip scrolls it into view. */}
+          {/* One line in the band, holding only the suggestions that fit on it whole: the row
+              wraps, the clip hides the second line, and `useFirstLineCount` takes the hidden chips
+              out of reach too. A second visible line ran the band past its bottom edge; a sideways
+              scroller kept them all but made you scroll a dashboard card to read them. `pt-1`
+              rather than a margin, because the clip cuts upwards as well and the chips lift 2px
+              on hover. */}
           <div
-            className={`flex gap-2 ${
-              isWide
-                ? // `pt-1` instead of the margin: a scroller clips upwards too, and the chips lift
-                  // 2px on hover.
-                  "mt-2 [scrollbar-width:none] flex-nowrap overflow-x-auto pt-1 [&::-webkit-scrollbar]:hidden"
-                : "mt-3 flex-wrap justify-center"
+            ref={isWide ? chipRowRef : undefined}
+            className={`flex flex-wrap gap-2 ${
+              isWide ? "relative mt-2 max-h-[2.125rem] overflow-hidden pt-1" : "mt-3 justify-center"
             }`}
           >
-            {suggestions.map((suggestion, index) => (
-              <motion.button
-                key={suggestion}
-                type="button"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  ...centralSpringToken,
-                  delay: 0.05 * index,
-                }}
-                whileHover={{ y: -2 }}
-                onClick={() => openInChat(suggestion)}
-                className="shrink-0 rounded-full border border-app-border-muted bg-app-surface-muted px-3 py-1.5 text-xs whitespace-nowrap text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text"
-              >
-                {suggestion}
-              </motion.button>
-            ))}
+            {suggestions.map((suggestion, index) => {
+              const isOffLine = isWide && fittingChips !== null && index >= fittingChips;
+
+              return (
+                <motion.button
+                  aria-hidden={isOffLine || undefined}
+                  tabIndex={isOffLine ? -1 : undefined}
+                  key={suggestion}
+                  type="button"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    ...centralSpringToken,
+                    delay: 0.05 * index,
+                  }}
+                  whileHover={{ y: -2 }}
+                  onClick={() => openInChat(suggestion)}
+                  className={`rounded-full border border-app-border-muted bg-app-surface-muted px-3 py-1.5 text-xs whitespace-nowrap text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text ${isOffLine ? "invisible" : ""}`}
+                >
+                  {suggestion}
+                </motion.button>
+              );
+            })}
           </div>
         </div>
       </div>

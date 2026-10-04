@@ -116,22 +116,14 @@ describe("the task pool on the board", () => {
     expect(screen.getByText("Fix the flaky login test")).toBeInTheDocument();
   });
 
-  /**
-   * Two copies of the switch: the rail in the margin from `lg` up, and the row above the cards
-   * below that, where the rail is hidden. jsdom applies no media queries, so both are present
-   * here — and both have to work, since each is the only one on screen at its widths.
-   */
-  it.each([
-    ["the rail", 0],
-    ["the toolbar shown below lg", 1],
-  ])("is switched off and on again from %s", async (_where, index) => {
+  it("is switched off and on again from the rail", async () => {
     await renderBoard();
-    const toolbar = () => screen.getAllByRole("toolbar", { name: "Board tools" })[index];
+    const rail = screen.getByRole("toolbar", { name: "Board tools" });
 
-    fireEvent.click(within(toolbar()).getByRole("button", { name: "Hide the task pool" }));
+    fireEvent.click(within(rail).getByRole("button", { name: "Hide the task pool" }));
     expect(screen.queryByText("Fix the flaky login test")).not.toBeInTheDocument();
 
-    fireEvent.click(within(toolbar()).getByRole("button", { name: "Show the task pool" }));
+    fireEvent.click(within(rail).getByRole("button", { name: "Show the task pool" }));
     expect(screen.getByText("Fix the flaky login test")).toBeInTheDocument();
     expect(boardService.dismissCard).not.toHaveBeenCalled();
   });

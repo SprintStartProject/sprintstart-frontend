@@ -46,9 +46,13 @@ export function MarkFilterRail({
 
   return (
     <>
-      {/* Only in the rail, where it separates two groups of switches. In the row above the board
-          this sits beside the other controls with the row's own gap between them. */}
-      {vertical && <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />}
+      {/* Separates it from the rail's other groups, whichever way the rail is standing: a short
+          line across while it stands up the margin, a short upright one while it lies across the
+          page below `lg`. */}
+      <span
+        className={vertical ? "my-0.5 h-px w-6 bg-app-border" : "mx-0.5 h-6 w-px bg-app-border"}
+        aria-hidden="true"
+      />
 
       <div
         className={`flex items-center gap-1 ${vertical ? "flex-col" : ""} ${className}`}
