@@ -60,7 +60,6 @@ vi.mock("../../../src/services/projectService", async (importOriginal) => {
 vi.mock("../../../src/services/sources/githubService", () => ({
   connectGithubRepository: vi.fn().mockResolvedValue({ transactionId: "tx1" }),
   getGithubPatNames: vi.fn().mockResolvedValue(["token1"]),
-  updateAllGithubRepositories: vi.fn().mockResolvedValue({ transactionId: "tx2" }),
   updateGithubRepository: vi.fn().mockResolvedValue({ transactionId: "tx3" }),
 }));
 
@@ -69,14 +68,6 @@ vi.mock("../../../src/features/data-ingestion/components/DataIngestionHeader", (
     <header>
       <h1>Data Ingestion</h1>
     </header>
-  ),
-}));
-
-vi.mock("../../../src/features/data-ingestion/components/IngestionMetrics", () => ({
-  IngestionMetrics: () => (
-    <section aria-label="Ingestion metrics">
-      <h2>Metrics</h2>
-    </section>
   ),
 }));
 

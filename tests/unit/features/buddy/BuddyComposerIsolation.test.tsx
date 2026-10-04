@@ -29,7 +29,14 @@ vi.mock("../../../../src/features/buddy/components/BuddyMarkdown", () => ({
 
 vi.mock("../../../../src/services/buddyService", () => ({
   getMessages: vi.fn(),
-  // The visit has history, so nothing greets — see `ensureOpened`.
+  // One conversation, read once — its id rides on every request the page makes.
+  getSessions: vi
+    .fn()
+    .mockResolvedValue([
+      { id: "session-1", title: "", projectId: null, createdAt: "2026-09-30T09:00:00Z" },
+    ]),
+  createSession: vi.fn().mockResolvedValue("session-2"),
+  // The conversation has history, so nothing greets — see `ensureOpened`.
   streamOpenBuddy: vi.fn(() => Promise.resolve()),
   streamMessage: vi.fn(),
   performAction: vi.fn(),

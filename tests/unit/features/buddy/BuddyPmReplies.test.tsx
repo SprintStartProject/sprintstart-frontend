@@ -20,7 +20,7 @@ import { usePmReplies } from "../../../../src/features/buddy/hooks/usePmReplies"
  */
 function Harness() {
   const replies = usePmReplies();
-  return <BuddyPmReplies {...replies} onClose={vi.fn()} />;
+  return <BuddyPmReplies {...replies} />;
 }
 
 function answer(overrides: Partial<CanonicalAnswer> = {}): CanonicalAnswer {

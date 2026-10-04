@@ -2,14 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import {
   connectGithubRepository,
-  connectRepositories,
   discoverRepositories,
   discoverOrgRepositories,
   getGithubPatNames,
   addGithubPat,
   updateGithubPat,
   deleteGithubPat,
-  updateAllGithubRepositories,
   updateGithubRepository,
   addRepositoryToProject,
   removeRepositoryFromProject,
@@ -192,18 +190,6 @@ describe("githubService", () => {
     });
   });
 
-  describe("updateAllGithubRepositories", () => {
-    it("POSTs to update-all and returns the transaction id", async () => {
-      server.use(
-        http.post("/api/v1/github/update-all", () =>
-          HttpResponse.json([{ transactionId: "txn-all" }]),
-        ),
-      );
-      const result = await updateAllGithubRepositories();
-      expect(result[0]?.transactionId).toBe("txn-all");
-    });
-  });
-
   describe("updateGithubRepository", () => {
     it("POSTs owner and name to update", async () => {
       let capturedBody: unknown = null;
@@ -305,37 +291,6 @@ describe("githubService", () => {
       await expect(discoverRepositories("octocat", "default", "auto", 0, 20)).rejects.toMatchObject(
         { name: "ApiError", status: 403 },
       );
-    });
-  });
-
-  describe("connectRepositories", () => {
-    it("POSTs one entry per repo with the shared token and project", async () => {
-      let capturedBody: unknown = null;
-      server.use(
-        http.post("/api/v1/github/connect/all", async ({ request }) => {
-          capturedBody = await request.json();
-          return HttpResponse.json({
-            transactionIdsByRepositoryId: { "octocat/a": "txn-a", "octocat/b": "txn-b" },
-          });
-        }),
-      );
-
-      const result = await connectRepositories(
-        [
-          { owner: "octocat", name: "a" },
-          { owner: "octocat", name: "b" },
-        ],
-        "default",
-        "project-1",
-      );
-
-      expect(capturedBody).toEqual({
-        repositories: [
-          { owner: "octocat", name: "a", tokenName: "default", projectId: "project-1" },
-          { owner: "octocat", name: "b", tokenName: "default", projectId: "project-1" },
-        ],
-      });
-      expect(result.transactionIdsByRepositoryId["octocat/a"]).toBe("txn-a");
     });
   });
 });

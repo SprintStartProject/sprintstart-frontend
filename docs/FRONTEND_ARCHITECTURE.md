@@ -122,6 +122,11 @@ the same `index.html`.
 **Rule:** new feature work → a `features/<name>/` slice. Promote to `components/` or
 `context/` only when the code is truly shared across features.
 
+**Known exception:** the connector registry (`features/data-ingestion/connectors/`) is
+imported by knowledge-base, chatbot, connectors, dashboard and admin, so a connector
+is a platform concept even though it lives inside the data-ingestion slice. Those
+features import only from the registry and `sourceSystems.ts`, never from
+data-ingestion components.
 ---
 
 ## 4. Routing & access control

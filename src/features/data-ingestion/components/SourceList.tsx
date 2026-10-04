@@ -14,6 +14,7 @@ import {
   formatInstanceDomain,
   formatNumber,
 } from "../data.ts";
+import { confluenceSpaceOf, githubRepositoryOf, jiraInstanceOf } from "../sourceDetails.ts";
 import type { DataSource } from "../types.ts";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { IconTile } from "../../../components/ui/IconTile";
@@ -48,8 +49,8 @@ export function SourceList({
             <h3 className="text-lg font-semibold text-app-text">Connect your first source</h3>
 
             <p className="mt-2 max-w-md text-sm text-app-text-muted">
-              Discover repositories from a GitHub organization or user and connect them to start
-              ingesting artifacts into the knowledge base.
+              Connect a GitHub repository, Jira instance, Confluence space or uploaded files to
+              start ingesting artifacts into the knowledge base.
             </p>
 
             {onAddSource && (
@@ -100,21 +101,21 @@ export function SourceList({
                       {source.name}
                     </h3>
 
-                    {source.githubRepository?.owner && (
+                    {githubRepositoryOf(source)?.owner && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {source.githubRepository.owner}
+                        {githubRepositoryOf(source)?.owner}
                       </p>
                     )}
 
-                    {source.jiraInstance?.instanceUrl && (
+                    {jiraInstanceOf(source)?.instanceUrl && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {formatInstanceDomain(source.jiraInstance.instanceUrl)}
+                        {formatInstanceDomain(jiraInstanceOf(source)?.instanceUrl ?? "")}
                       </p>
                     )}
 
-                    {source.confluenceSpace?.baseUrl && (
+                    {confluenceSpaceOf(source)?.baseUrl && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {formatInstanceDomain(source.confluenceSpace.baseUrl)}
+                        {formatInstanceDomain(confluenceSpaceOf(source)?.baseUrl ?? "")}
                       </p>
                     )}
                   </div>
@@ -245,12 +246,11 @@ function FailedItemsNote({ count }: { count: number }) {
   return (
     <div className="mt-5 rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
       <p className="text-sm font-semibold text-app-warning-text">
-        {count} failed item{count === 1 ? "" : "s"} in latest status
+        {count} {count === 1 ? "item" : "items"} failed in the latest sync
       </p>
 
       <p className="mt-1 text-sm text-app-text-muted">
-        Open the source details or check the backend response for failed artifact identifiers and
-        reasons.
+        Open the source to see which items failed and why.
       </p>
     </div>
   );

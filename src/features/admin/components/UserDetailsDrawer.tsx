@@ -32,7 +32,7 @@ import type {
 import { AccessBadge } from "./Badges";
 import { DetailRow } from "./DetailRow";
 import { DrawerBackButton } from "./DrawerBackButton";
-import { DrawerCard } from "./DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { EditableDetailRow } from "./EditableDetailRow";
 import { EditableSelectDetailRow } from "./EditableSelectDetailRow";
 import { MultiProjectAssignment } from "./MultiProjectAssignment";

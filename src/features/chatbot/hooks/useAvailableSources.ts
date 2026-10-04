@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { connectorService } from "../../../services/connectorService";
+import { toSourceSystem } from "../../data-ingestion/connectors/sourceSystems";
 import { SOURCE_SYSTEMS, type SourceSystem } from "../types";
 
 /**
@@ -12,9 +13,9 @@ const ALWAYS_AVAILABLE: readonly SourceSystem[] = ["UPLOAD"];
  * Maps a backend connector id onto the source system the chat filters by. Connector ids are
  * lowercase (`github`, `jira`, `confluence`); the filter values are the uppercase enum constants.
  */
-function toSourceSystem(connectorId: string): SourceSystem | null {
-  const candidate = connectorId.toUpperCase();
-  return SOURCE_SYSTEMS.includes(candidate as SourceSystem) ? (candidate as SourceSystem) : null;
+function toFilterSystem(connectorId: string): SourceSystem | null {
+  const system = toSourceSystem(connectorId);
+  return system && SOURCE_SYSTEMS.includes(system) ? system : null;
 }
 
 /**
@@ -42,7 +43,7 @@ export function useAvailableSources(): { sources: SourceSystem[]; loading: boole
 
         const enabled = connectors
           .filter((connector) => connector.enabled)
-          .map((connector) => toSourceSystem(connector.id))
+          .map((connector) => toFilterSystem(connector.id))
           .filter((system): system is SourceSystem => system !== null);
 
         setSources([...new Set([...enabled, ...ALWAYS_AVAILABLE])]);

@@ -7,14 +7,6 @@ import {
   Trash2,
   ArrowDown,
   BookOpen,
-  Building2,
-  MapPin,
-  Globe,
-  Mail,
-  Users,
-  Hash,
-  Link2,
-  ExternalLink,
   MessageSquare,
 } from "lucide-react";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
@@ -31,11 +23,7 @@ import { useAskAi } from "../../../hooks/useAskAi";
 import { isEmptyContent, summariseBlockReason } from "../summarizability";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { preprocessMarkdown } from "../markdown";
-import {
-  parseOrgMetadata,
-  type OrgMetadataArtifactMetadata,
-  type OrgMetadataTeam,
-} from "../orgMetadata";
+import { findConnector } from "../../data-ingestion/connectors/registry";
 import { getArtifactRepository } from "../githubMetadata";
 import { knowledgeService } from "../../../services/knowledgeService";
 import { RepositoryBadge } from "./RepositoryBadge";
@@ -132,8 +120,8 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
     case "loadSuccess":
       return { ...state, isLoading: false, content: action.content };
     case "skipContentLoad":
-      // ORG_METADATA artifacts have no stored content (their content endpoint
-      // redirects), so nothing to fetch — just end the loading state.
+      // Artifacts shown from their metadata have no stored content (an organization's
+      // content endpoint redirects), so nothing to fetch — just end the loading state.
       return { ...state, isLoading: false };
     case "loadError":
       return { ...state, isLoading: false, error: action.error };
@@ -180,6 +168,15 @@ function drawerReducer(state: DrawerState, action: DrawerAction): DrawerState {
 }
 
 /**
+ * How the artifact's connector presents it, or undefined for a source system the
+ * frontend does not know yet. Such an artifact is shown as plain content with its
+ * source link and cannot be deleted.
+ */
+function knowledgeBaseOf(artifact: Artifact) {
+  return findConnector(artifact.sourceSystem)?.knowledgeBase;
+}
+
+/**
  * Determines whether an artifact should be rendered as Markdown.
  * Issues, Pull Requests, Jira items, Confluence artifacts, and Markdown files (.md/.markdown) are always rendered as Markdown.
  * Confluence is detected via sourceSystem or a /wiki/spaces/ URL pattern.
@@ -210,7 +207,8 @@ const shouldRenderAsMarkdown = (
     sourceUrl.includes("/browse/");
 
   const isConfluence =
-    artifact?.sourceSystem === "CONFLUENCE" || sourceUrl.includes("/wiki/spaces/");
+    (artifact !== null && knowledgeBaseOf(artifact)?.markdown === true) ||
+    sourceUrl.includes("/wiki/spaces/");
 
   return content.mimeType.startsWith("text/markdown") || isPrOrIssue || isMd || isConfluence;
 };
@@ -615,230 +613,6 @@ const getLanguage = (filename?: string | null) => {
 };
 
 /**
- * Renders a labeled metadata row (icon + label + value) for the org profile.
- */
-function OrgProfileRow({
-  icon,
-  label,
-  children,
-}: {
-  icon: ReactNode;
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-2.5">
-      <span className="mt-0.5 shrink-0 text-app-text-subtle">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <dt className="text-xs font-medium text-app-text-subtle">{label}</dt>
-        <dd className="text-sm text-app-text">{children}</dd>
-      </div>
-    </div>
-  );
-}
-
-/** GitHub's `blog` is usually a URL; link it, prefixing a scheme when bare. */
-function normalizeUrl(value: string | null): string | null {
-  const trimmed = value?.trim();
-  // Shortest realistic hostname is 4 chars (e.g. a.io); anything shorter
-  // (including "N/A", "?", whitespace) is not a real URL and must not be linked.
-  if (!trimmed || trimmed.length < 4) return null;
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-}
-
-/** Org profile view, rendered purely from the artifact's `metadata` JSON.
- *  Teams and members are always fully expanded. */
-function OrgMetadataView({
-  metadata,
-  title,
-}: {
-  metadata: OrgMetadataArtifactMetadata | null;
-  title: string | null;
-}) {
-  if (!metadata) {
-    // Known backend gap: the org artifact exists but its metadata couldn't be
-    // parsed. Show a quiet empty state instead of killing the drawer or falling
-    // through to the (redirect-following) content fetch.
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 py-12 text-app-text-muted">
-        <Building2 className="h-10 w-10 opacity-50" />
-        <p className="text-sm">Organization profile unavailable.</p>
-      </div>
-    );
-  }
-
-  const blogUrl = normalizeUrl(metadata.blog);
-
-  return (
-    <div className="space-y-6" data-testid="org-metadata-view">
-      <header className="flex items-start gap-3">
-        <div className="shrink-0 rounded-xl border border-app-border bg-app-bg-soft p-2.5">
-          <Building2 className="h-6 w-6 text-app-text-muted" />
-        </div>
-        <div className="min-w-0">
-          <h2 className="truncate text-xl font-semibold text-app-text">
-            {metadata.name || title || "Organization"}
-          </h2>
-          <a
-            href={`https://github.com/${metadata.login}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-app-brand hover:underline"
-          >
-            @{metadata.login}
-          </a>
-          {metadata.description && (
-            <p className="mt-2 text-sm text-app-text-muted">{metadata.description}</p>
-          )}
-        </div>
-      </header>
-
-      <div className="flex flex-wrap gap-2" data-testid="org-quick-links">
-        <a
-          href={`https://github.com/orgs/${encodeURIComponent(metadata.login)}/repositories`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
-        >
-          <Hash className="h-3.5 w-3.5" />
-          <span>Repositories</span>
-          <ExternalLink className="h-3 w-3 opacity-60" />
-        </a>
-        <a
-          href={`https://github.com/orgs/${encodeURIComponent(metadata.login)}/people`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
-        >
-          <Users className="h-3.5 w-3.5" />
-          <span>People</span>
-          <ExternalLink className="h-3 w-3 opacity-60" />
-        </a>
-      </div>
-
-      <dl className="grid gap-3 sm:grid-cols-2">
-        {metadata.location && (
-          <OrgProfileRow icon={<MapPin className="h-4 w-4" />} label="Location">
-            {metadata.location}
-          </OrgProfileRow>
-        )}
-        {blogUrl && (
-          <OrgProfileRow icon={<Globe className="h-4 w-4" />} label="Blog">
-            <a
-              href={blogUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-app-brand hover:underline"
-            >
-              <Link2 className="h-3.5 w-3.5" />
-              {metadata.blog}
-            </a>
-          </OrgProfileRow>
-        )}
-        {metadata.company && (
-          <OrgProfileRow icon={<Building2 className="h-4 w-4" />} label="Company">
-            {metadata.company}
-          </OrgProfileRow>
-        )}
-        {metadata.email && (
-          <OrgProfileRow icon={<Mail className="h-4 w-4" />} label="Email">
-            <a href={`mailto:${metadata.email}`} className="text-app-brand hover:underline">
-              {metadata.email}
-            </a>
-          </OrgProfileRow>
-        )}
-        <OrgProfileRow icon={<Hash className="h-4 w-4" />} label="Repositories">
-          {metadata.publicRepos !== null && metadata.privateRepos !== null ? (
-            <>
-              {metadata.publicRepos} public · {metadata.privateRepos} private
-            </>
-          ) : metadata.publicRepos !== null ? (
-            <>{metadata.publicRepos} public</>
-          ) : (
-            "N/A"
-          )}
-        </OrgProfileRow>
-      </dl>
-
-      <section aria-label="Teams">
-        <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-app-text">
-          <Users className="h-4 w-4 text-app-text-subtle" />
-          Teams
-        </h3>
-        {metadata.teams && metadata.teams.length > 0 ? (
-          <div className="space-y-3">
-            {metadata.teams.map((team: OrgMetadataTeam) => (
-              <div
-                key={team.slug ?? team.name}
-                className="rounded-xl border border-app-border bg-app-bg-soft/60 p-3.5"
-              >
-                <p className="text-sm font-semibold text-app-text">{team.name}</p>
-                {team.members.length > 0 && (
-                  <ul className="mt-2 flex flex-wrap gap-1.5">
-                    {team.members.map((member) => (
-                      <li
-                        key={member.login}
-                        className="rounded-md border border-app-border bg-app-bg px-2 py-0.5 text-xs text-app-text-muted"
-                      >
-                        {member.login}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-app-text-muted">
-            No teams configured or visible in this organization.
-          </p>
-        )}
-      </section>
-
-      <section aria-label="Members">
-        <div className="mb-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-app-text">
-            <Users className="h-4 w-4 text-app-text-subtle" />
-            Members
-            {metadata.members.length > 0 && (
-              <span className="rounded-full bg-app-surface px-2 py-0.5 text-xs font-bold text-app-text-subtle">
-                {metadata.members.length}
-              </span>
-            )}
-          </h3>
-          <p className="mt-1 text-xs text-app-text-muted">
-            Only members with public organization visibility on GitHub are listed.
-          </p>
-        </div>
-
-        {metadata.members.length > 0 ? (
-          <ul className="flex flex-wrap gap-1.5">
-            {metadata.members.map((member) => (
-              <li key={member.login}>
-                <a
-                  href={member.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-app-border bg-app-bg px-2 py-1 text-xs text-app-text-muted transition-colors hover:border-app-brand/50 hover:text-app-brand"
-                >
-                  <Users className="h-3 w-3" />
-                  {member.login}
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-xs text-app-text-muted">
-            No public members visible. Members can set their organization membership to public on
-            GitHub.
-          </p>
-        )}
-      </section>
-    </div>
-  );
-}
-
-/**
  * ArtifactViewerDrawer
  *
  * Slide-out panel that displays the raw content of a selected artifact.
@@ -884,11 +658,11 @@ export function ArtifactViewerDrawer({
     // confirmation for the previous artifact can't be carried over.
     dispatch({ type: "reset" });
 
-    // ORG_METADATA artifacts carry no stored bytes: the backend's content
-    // endpoint answers a 302 redirect to the org's GitHub page, and following it
-    // would land the drawer on GitHub's HTML. They render purely from
+    // Artifacts with a metadata view carry no stored bytes: for a GitHub organization
+    // the backend's content endpoint answers a 302 redirect to the org's GitHub page,
+    // and following it would land the drawer on GitHub's HTML. They render purely from
     // `artifact.metadata` (org profile/teams/members), so skip the fetch entirely.
-    if (artifact.artifactType === "ORG_METADATA") {
+    if (knowledgeBaseOf(artifact)?.metadataView?.appliesTo(artifact)) {
       dispatch({ type: "skipContentLoad" });
       const myGeneration = summarizeGenerationRef.current;
       return () => {
@@ -1144,7 +918,8 @@ export function ArtifactViewerDrawer({
       <div className="line-clamp-1 text-lg font-semibold text-app-text">{artifact?.title}</div>
     );
 
-  const canDeleteThisArtifact = canDelete && artifact?.sourceSystem === "UPLOAD";
+  const canDeleteThisArtifact =
+    canDelete && artifact !== null && knowledgeBaseOf(artifact)?.deletable === true;
 
   const isMarkdownArtifact =
     artifact && content ? shouldRenderAsMarkdown(content, artifact) : false;
@@ -1183,12 +958,11 @@ export function ArtifactViewerDrawer({
 
   const summariseBlockedReason = summariseBlockReason(content);
 
-  const orgMetadata = useMemo(
-    () => (artifact?.artifactType === "ORG_METADATA" ? parseOrgMetadata(artifact.metadata) : null),
-    [artifact],
-  );
+  // The connector's own view for an artifact that has no content to fetch.
+  const metadataView = artifact ? knowledgeBaseOf(artifact)?.metadataView : undefined;
+  const MetadataView = artifact && metadataView?.appliesTo(artifact) ? metadataView.View : null;
 
-  const actionsContent = viewMode === "raw" && artifact?.artifactType !== "ORG_METADATA" && (
+  const actionsContent = viewMode === "raw" && !MetadataView && (
     <div className="flex items-center gap-2">
       {isMarkdownArtifact && content && (
         <div className="flex items-center rounded-lg border border-app-border bg-app-bg p-0.5 text-xs">
@@ -1265,7 +1039,10 @@ export function ArtifactViewerDrawer({
   // GitHub repo artifacts show their `owner/repository` in the header's badge
   // row; other kinds have no repository to name, so the badge stays unset.
   const repository = artifact ? getArtifactRepository(artifact) : null;
-  const hasSourceLink = Boolean(artifact?.sourceUrl?.trim()) && artifact?.sourceSystem !== "UPLOAD";
+  const hasSourceLink =
+    Boolean(artifact?.sourceUrl?.trim()) &&
+    artifact !== null &&
+    knowledgeBaseOf(artifact)?.linkLabel !== null;
 
   const headerBadge =
     repository || hasSourceLink ? (
@@ -1303,9 +1080,9 @@ export function ArtifactViewerDrawer({
           <p className="font-medium">Error loading content</p>
           <p className="mt-1 text-sm">{error}</p>
         </div>
-      ) : viewMode === "raw" && artifact?.artifactType === "ORG_METADATA" ? (
+      ) : viewMode === "raw" && MetadataView && artifact ? (
         <div data-testid="raw-content" aria-busy={false}>
-          <OrgMetadataView metadata={orgMetadata} title={artifact?.title ?? null} />
+          <MetadataView artifact={artifact} />
         </div>
       ) : viewMode === "raw" ? (
         <div ref={contentContainerRef} data-testid="raw-content" aria-busy={isLoading}>

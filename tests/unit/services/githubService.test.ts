@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../setup/vitest.setup";
 import {
-  configureAllGithubRepositories,
   configureGithubRepository,
   discoverRepositories,
   getGithubRepositoryConfig,
@@ -84,36 +83,6 @@ describe("discoverRepositories auto owner-type resolution", () => {
 });
 
 describe("githubService config endpoints", () => {
-  it("configureAllGithubRepositories sends the typed global schedule payload", async () => {
-    expect.assertions(1);
-
-    server.use(
-      http.put("/api/v1/github/config", async ({ request }) => {
-        const body = await request.json();
-
-        expect(body).toEqual({
-          autoUpdate: true,
-          schedule: {
-            type: "WEEKLY",
-            time: "09:00:00",
-            daysOfWeek: ["MONDAY", "THURSDAY"],
-          },
-        });
-
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-
-    await configureAllGithubRepositories({
-      autoUpdate: true,
-      schedule: {
-        type: "WEEKLY",
-        time: "09:00:00",
-        daysOfWeek: ["MONDAY", "THURSDAY"],
-      },
-    });
-  });
-
   it("configureGithubRepository targets one repository config", async () => {
     expect.assertions(2);
 
