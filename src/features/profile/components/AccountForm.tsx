@@ -66,10 +66,10 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
   };
 
   return (
-    <div className="rounded-xl border border-app-border bg-app-bg p-6">
+    <div className="rounded-xl border border-app-border bg-app-bg p-4 sm:p-6">
       <h2 className="mb-4 text-lg font-semibold text-app-text">Account Information</h2>
 
-      <div className="mb-6 flex items-center gap-6">
+      <div className="mb-6 flex flex-wrap items-center gap-6">
         <div className="group relative">
           <UserAvatar
             size={80}
@@ -78,8 +78,8 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
             seed={profile.id}
           />
         </div>
-        <div>
-          <h3 className="text-lg font-semibold text-app-text">{profile.username}</h3>
+        <div className="min-w-0">
+          <h3 className="text-lg font-semibold break-words text-app-text">{profile.username}</h3>
           <p className="mb-2 text-sm font-medium tracking-wider text-app-text-muted uppercase">
             {profile.projectRoles.length > 0
               ? profile.projectRoles.map((role) => role.name).join(", ")

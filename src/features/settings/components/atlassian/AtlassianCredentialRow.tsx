@@ -148,7 +148,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               data-testid={`settings-atlassian-rename-open-${displayName}`}
               icon={<Pencil className="h-3.5 w-3.5" />}
               aria-label={`Rename credential ${displayName}`}
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-sm:h-11 sm:flex-none"
             >
               <span className="hidden sm:inline">Rename</span>
             </Button>
@@ -159,7 +159,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               data-testid={`settings-atlassian-rotate-open-${displayName}`}
               icon={<RefreshCw className="h-3.5 w-3.5" />}
               aria-label={`Rotate token ${displayName}`}
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-sm:h-11 sm:flex-none"
             >
               <span className="hidden sm:inline">Rotate</span>
             </Button>
@@ -170,7 +170,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               data-testid={`settings-atlassian-delete-open-${displayName}`}
               icon={<Trash2 className="h-3.5 w-3.5" />}
               aria-label={`Delete credential ${displayName}`}
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-sm:h-11 sm:flex-none"
             >
               <span className="hidden sm:inline">Delete</span>
             </Button>
@@ -290,7 +290,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
             transition={centralSpringToken}
             className="border-t border-app-border bg-app-danger-bg px-5 py-4"
           >
-            <p className="mb-3 text-sm text-app-danger-text">
+            <p className="mb-3 text-sm break-words text-app-danger-text">
               Delete <strong>{displayName}</strong>? This cannot be undone and may break connected
               Jira instances and Confluence spaces.
             </p>
