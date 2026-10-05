@@ -92,6 +92,28 @@ export function readBoardDocument(boardId: string, projectId: string): BoardDocu
 }
 
 /**
+ * The server's document, plus every origin this browser recorded that the server has not heard of.
+ *
+ * Origins are the one layer written while the board is not open: a note kept from a step, a reply
+ * kept from the buddy dock, a message kept from a chat. Nothing is listening to send those up at
+ * that moment — the sync lives on the board page — so when the board then opened and the server's
+ * copy won, it overwrote them, and every card kept from somewhere else arrived with no way back.
+ *
+ * So origins are merged rather than replaced: the server still wins for any card it has an entry
+ * for, and an entry only this browser has is kept. Returns null when there is nothing to add, so the
+ * caller knows the server is already up to date.
+ */
+export function withLocalOrigins(
+  server: BoardDocument,
+  local: BoardDocument,
+): BoardDocument | null {
+  const missing = Object.keys(local.origins).filter((cardId) => !(cardId in server.origins));
+  if (missing.length === 0) return null;
+
+  return { ...server, origins: { ...local.origins, ...server.origins } };
+}
+
+/**
  * Puts a document back into the layers it came from, and says so.
  *
  * Every layer is written, including the empty ones: applying a document is "this is the
