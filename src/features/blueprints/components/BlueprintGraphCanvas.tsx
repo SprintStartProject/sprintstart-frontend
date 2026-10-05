@@ -970,7 +970,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   // in a corner.
                   <div className="max-w-56 rounded-xl border border-app-border bg-app-surface/95 px-3 py-2 shadow-md backdrop-blur">
                     <p className="truncate text-xs font-semibold text-app-text">{focusTitle}</p>
-                    <p className="mt-1 flex flex-col gap-1 text-[11px] text-app-text-muted">
+                    <p className="mt-1 flex flex-col gap-1 text-xs text-app-text-muted">
                       <span className="flex items-center gap-1.5">
                         <span
                           aria-hidden="true"
@@ -1284,12 +1284,12 @@ function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => 
   const arrowId = `${useId()}-legend-arrow`;
 
   return (
-    <div className="relative flex max-w-96 flex-col gap-2 rounded-2xl border border-app-border bg-app-surface/95 p-3 pr-8 text-[11px] leading-snug text-app-text-muted shadow-md backdrop-blur">
+    <div className="relative flex max-w-96 flex-col gap-2 rounded-2xl border border-app-border bg-app-surface/95 p-3 pr-8 text-xs leading-snug text-app-text-muted shadow-md backdrop-blur">
       <button
         type="button"
         onClick={onClose}
         aria-label="Hide the legend"
-        className="absolute top-2 right-2 rounded p-0.5 text-app-text-subtle transition-colors hover:text-app-text"
+        className="absolute top-1 right-1 rounded p-1.5 text-app-text-subtle transition-colors hover:text-app-text"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>

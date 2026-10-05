@@ -351,7 +351,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
                               {gap.component}
                             </span>
                             <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${badge}`}
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}
                             >
                               {label}
                             </span>
@@ -368,7 +368,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
                             {types.map((type) => (
                               <span
                                 key={type}
-                                className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-[11px]"
+                                className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-xs"
                               >
                                 {type}
                               </span>

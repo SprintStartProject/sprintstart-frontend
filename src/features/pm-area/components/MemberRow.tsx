@@ -130,19 +130,19 @@ export function MemberFlags({ member }: { member: TeamOverviewUser }) {
   return (
     <span className="flex flex-wrap items-center gap-1">
       {waiting.includes("skip") && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-app-warning-bg px-2 py-0.5 text-[11px] font-medium text-app-warning-text">
+        <span className="inline-flex items-center gap-1 rounded-full bg-app-warning-bg px-2 py-0.5 text-xs font-medium text-app-warning-text">
           <SkipForward aria-hidden="true" className="h-3 w-3" />
           Skip request
         </span>
       )}
       {waiting.includes("feedback") && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-app-brand-soft px-2 py-0.5 text-[11px] font-medium text-app-brand-text">
+        <span className="inline-flex items-center gap-1 rounded-full bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text">
           <MessageSquareText aria-hidden="true" className="h-3 w-3" />
           Feedback
         </span>
       )}
       {atRisk && days !== null && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-app-orange-bg px-2 py-0.5 text-[11px] font-medium text-app-orange-text">
+        <span className="inline-flex items-center gap-1 rounded-full bg-app-orange-bg px-2 py-0.5 text-xs font-medium text-app-orange-text">
           <AlarmClock aria-hidden="true" className="h-3 w-3" />
           {formatDays(days)} on step · long
         </span>
@@ -184,7 +184,7 @@ function OpenItems({ member, reasons }: { member: TeamOverviewUser; reasons: Att
         return (
           <span key={reason.kind} className="flex min-w-0 items-center gap-1.5 text-xs">
             <span
-              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.tone}`}
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${meta.tone}`}
             >
               <Icon aria-hidden="true" className="h-3 w-3" />
               {meta.label}
@@ -196,7 +196,7 @@ function OpenItems({ member, reasons }: { member: TeamOverviewUser; reasons: Att
         );
       })}
       {folded > 0 && (
-        <span className="text-[11px] text-app-text-subtle">
+        <span className="text-xs text-app-text-subtle">
           +{folded} more:{" "}
           {reasons
             .slice(VISIBLE_REASONS)
@@ -298,7 +298,7 @@ export function MemberRow({
                 member.roles.map((role) => (
                   <span
                     key={role.id}
-                    className="truncate rounded-md bg-app-brand-soft px-1.5 py-0.5 text-[11px] font-medium text-app-brand-text"
+                    className="truncate rounded-md bg-app-brand-soft px-1.5 py-0.5 text-xs font-medium text-app-brand-text"
                   >
                     {role.name}
                   </span>

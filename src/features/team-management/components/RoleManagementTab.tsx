@@ -808,7 +808,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
                     {(isBeingAdded || isBeingRemoved) && (
                       <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
                           isBeingAdded
                             ? "bg-app-success-solid/15 text-app-success-text"
                             : "bg-app-danger-solid/15 text-app-danger-text"

@@ -80,7 +80,7 @@ function AvatarProgress({ member, percent }: { member: TeamOverviewUser; percent
 }
 
 const pillClass =
-  "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-medium";
+  "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-xs font-medium";
 
 /**
  * The one thing worth knowing about the member right now, on one line: the most pressing reason
@@ -104,7 +104,7 @@ function TileStatus({ member, reasons }: { member: TeamOverviewUser; reasons: At
           {meta.label}
           {rest.length > 0 && <span className="opacity-70">+{rest.length}</span>}
         </span>
-        <span className="min-w-0 truncate text-[11px] text-app-text-muted">{detail}</span>
+        <span className="min-w-0 truncate text-xs text-app-text-muted">{detail}</span>
       </span>
     );
   }
@@ -173,7 +173,7 @@ function MemberTile({
     >
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -top-2 right-2 z-10 inline-flex translate-y-1 items-center gap-0.5 rounded-full border border-app-border bg-app-surface px-1.5 py-px text-[10px] font-medium text-app-brand-text opacity-0 shadow-sm transition-all group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
+        className="pointer-events-none absolute -top-2 right-2 z-10 inline-flex translate-y-1 items-center gap-0.5 rounded-full border border-app-border bg-app-surface px-1.5 py-px text-xs font-medium text-app-brand-text opacity-0 shadow-sm transition-all group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
       >
         Double-click: profile
         <ArrowUpRight className="h-3 w-3" />
@@ -184,11 +184,11 @@ function MemberTile({
       <span className="min-w-0 flex-1 space-y-0.5">
         <span className="flex items-baseline justify-between gap-2">
           <span className="truncate text-sm font-semibold text-app-text">{name}</span>
-          <span className="shrink-0 text-[11px] font-medium text-app-text-muted tabular-nums">
+          <span className="shrink-0 text-2xs font-medium text-app-text-muted tabular-nums">
             {percent}%
           </span>
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted" title={where}>
+        <span className="block truncate text-xs text-app-text-muted" title={where}>
           {where}
         </span>
         <TileStatus member={member} reasons={reasons} />

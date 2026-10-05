@@ -203,11 +203,16 @@ export function UsersTab({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-app-text">
+                    <span
+                      className="truncate text-sm font-semibold text-app-text"
+                      title={getDisplayName(user)}
+                    >
                       {getDisplayName(user)}
                     </span>
                   </div>
-                  <div className="truncate text-xs text-app-text-muted">{user.email}</div>
+                  <div className="truncate text-xs text-app-text-muted" title={user.email}>
+                    {user.email}
+                  </div>
                 </div>
               </div>
             </div>

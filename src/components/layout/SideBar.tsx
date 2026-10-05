@@ -322,7 +322,7 @@ function SidebarContent({
                 {profile.username}
               </span>
 
-              <span className="truncate text-[10px] font-medium tracking-wider text-app-text-muted uppercase">
+              <span className="truncate text-2xs font-medium tracking-wider text-app-text-muted uppercase">
                 {profile.permissionGroup.replace("_", " ")}
               </span>
             </div>
@@ -439,7 +439,7 @@ function SidebarContent({
                   />
                 </>
               ) : (
-                <p className="px-[12px] pb-[8px] text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+                <p className="px-[12px] pb-[8px] text-2xs font-semibold tracking-[0.18em] text-app-text-muted uppercase">
                   {section.heading}
                 </p>
               )
@@ -657,7 +657,7 @@ export function SideBar() {
             }}
           />
 
-          <span className="text-[16px] leading-none font-bold tracking-tight text-app-text">
+          <span className="text-base leading-none font-bold tracking-tight text-app-text">
             SprintStart
           </span>
         </div>

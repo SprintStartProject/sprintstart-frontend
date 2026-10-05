@@ -92,7 +92,7 @@ export function NewRoleSkillsInput({
 
       {matches.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-app-text-subtle">From the catalog:</span>
+          <span className="text-xs text-app-text-subtle">From the catalog:</span>
           {matches.map((skill) => (
             <button
               key={skill.id}
@@ -115,13 +115,13 @@ export function NewRoleSkillsInput({
               className="inline-flex items-center gap-1 rounded-full border border-app-brand-border-strong bg-app-brand-soft py-0.5 pr-1 pl-2.5 text-xs text-app-brand-text"
             >
               {skill.name}
-              {!skill.skillId && <span className="text-[10px] font-semibold uppercase">new</span>}
+              {!skill.skillId && <span className="text-2xs font-semibold uppercase">new</span>}
               <button
                 type="button"
                 aria-label={`Remove ${skill.name}`}
                 disabled={disabled}
                 onClick={() => onChange(value.filter((other) => other.key !== skill.key))}
-                className="rounded-full p-0.5 hover:bg-app-brand/15"
+                className="-my-1 rounded-full p-1.5 hover:bg-app-brand/15"
               >
                 <X aria-hidden="true" className="h-3 w-3" />
               </button>

@@ -74,7 +74,7 @@ export function MemberHero({
                   disabled={savingRoleId === role.id}
                   aria-label={`Remove ${role.name}`}
                   title={`Remove ${role.name}`}
-                  className="flex h-4.5 w-4.5 items-center justify-center rounded-full opacity-60 transition hover:bg-app-brand/15 hover:opacity-100 disabled:opacity-30"
+                  className="-my-1 flex h-6 w-6 items-center justify-center rounded-full opacity-60 transition hover:bg-app-brand/15 hover:opacity-100 disabled:opacity-30"
                 >
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>

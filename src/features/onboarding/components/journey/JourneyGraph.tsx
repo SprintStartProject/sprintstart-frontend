@@ -536,7 +536,7 @@ export function JourneyGraph({
                   <ListPlus className="h-4 w-4" aria-hidden="true" />
                   Add step
                 </button>
-                <span className="text-[11px] text-app-text-subtle">
+                <span className="text-xs text-app-text-subtle">
                   or double-click the canvas where it should go
                 </span>
               </div>
@@ -651,7 +651,7 @@ function ItemFocus({
             <ItemGlyph item={item} state={state} />
             <div className="min-w-0 flex-1">
               <p
-                className={`text-[11px] font-semibold tracking-wide uppercase ${
+                className={`text-2xs font-semibold tracking-wide uppercase ${
                   isQuestion ? "text-app-question-text" : "text-app-brand-text"
                 }`}
               >

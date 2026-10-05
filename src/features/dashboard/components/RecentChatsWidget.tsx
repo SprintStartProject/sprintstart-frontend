@@ -84,7 +84,7 @@ export function RecentChatsWidget() {
                   {recentChat.title || "Untitled chat"}
                 </span>
 
-                <span className="shrink-0 text-[11px] text-app-text-muted tabular-nums">
+                <span className="shrink-0 text-xs text-app-text-muted tabular-nums">
                   {formatRelativeDate(recentChat.createdAt)}
                 </span>
               </Link>

@@ -88,7 +88,7 @@ export function HealthPanel({
     >
       {score === null ? (
         <div>
-          <p className="text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">
+          <p className="text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
             Project health
           </p>
           <div className="mt-2 flex items-center gap-2">
@@ -103,7 +103,7 @@ export function HealthPanel({
         </div>
       ) : (
         <div>
-          <p className="text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">
+          <p className="text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
             Project health
           </p>
           <div className="mt-2 flex items-end gap-2">
@@ -153,7 +153,7 @@ export function HealthPanel({
 
       {failedTasks.length > 0 ? (
         <div>
-          <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">
+          <p className="mb-2 text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
             Could not run
           </p>
           <ul className="space-y-2">
@@ -178,7 +178,7 @@ export function HealthPanel({
         </div>
       ) : (
         <div>
-          <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">
+          <p className="mb-2 text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
             Where the points went
           </p>
           {areas.length === 0 ? (
@@ -228,7 +228,7 @@ export function HealthPanel({
           const Icon = meta.icon;
           return (
             <li key={severity} className="rounded-xl bg-app-surface-muted/70 px-3 py-2.5">
-              <span className="flex items-center gap-1.5 text-[11px] text-app-text-muted">
+              <span className="flex items-center gap-1.5 text-xs text-app-text-muted">
                 <Icon aria-hidden="true" className={`h-3.5 w-3.5 ${meta.text}`} />
                 {meta.label}
               </span>
@@ -250,14 +250,14 @@ export function HealthPanel({
           Run again
         </Button>
         {analysedAt && (
-          <p className="text-center text-[11px] text-app-text-subtle">
+          <p className="text-center text-xs text-app-text-subtle">
             Analysed {formatRelativeDate(analysedAt)}
           </p>
         )}
         {/* Said, not hidden behind a console warning: a result that looks saved and is gone after
             a reload is the "it said it worked" problem the role writes no longer have. */}
         {unsaved && (
-          <p role="status" className="text-center text-[11px] font-medium text-app-warning-text">
+          <p role="status" className="text-center text-xs font-medium text-app-warning-text">
             Not saved — these results are gone after a reload.
           </p>
         )}

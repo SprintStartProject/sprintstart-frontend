@@ -238,7 +238,7 @@ export function ProjectSwitcherModal({
         >
           {groups.map((group) => (
             <div key={group.label}>
-              <p className="mb-2 text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+              <p className="mb-2 text-2xs font-semibold tracking-[0.18em] text-app-text-muted uppercase">
                 {group.label}
               </p>
 

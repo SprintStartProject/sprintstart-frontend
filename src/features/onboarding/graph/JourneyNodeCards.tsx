@@ -209,7 +209,7 @@ export function ItemFlags({
     >
       {answer ? (
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-2 ring-app-surface ${
+          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-bold text-white shadow-sm ring-2 ring-app-surface ${
             answer === "approved" ? "bg-app-success-solid" : "bg-app-warning-solid"
           }`}
         >
@@ -220,7 +220,7 @@ export function ItemFlags({
       ) : null}
       {skip ? (
         <span
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold shadow-sm ${
             skip === "pending"
               ? "bg-app-warning-solid text-white"
               : "border border-app-warning-border bg-app-warning-bg text-app-warning-text"
@@ -239,7 +239,7 @@ export function ItemFlags({
                 ? "Feedback: not helpful"
                 : "Feedback given"
           }
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold shadow-sm ${
             feedback === "helpful"
               ? "bg-app-success-solid text-white"
               : feedback === "unhelpful"
@@ -305,7 +305,7 @@ export function ItemNodeCard({
     >
       {isNext ? (
         <span
-          className={`absolute -top-2.5 left-3 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase shadow ${
+          className={`absolute -top-2.5 left-3 rounded-full px-2 py-0.5 text-2xs font-bold tracking-wide text-white uppercase shadow ${
             isQuestion ? "bg-app-question-solid" : "bg-app-brand"
           }`}
         >
@@ -316,7 +316,7 @@ export function ItemNodeCard({
       <div className="flex items-start gap-2.5">
         <ItemGlyph item={item} state={state} size="sm" />
         <p
-          className={`line-clamp-2 text-[13px] leading-snug font-semibold ${
+          className={`line-clamp-2 text-sm leading-snug font-semibold ${
             state === "done" || state === "skipped" || state === "locked"
               ? "text-app-text-muted"
               : "text-app-text"
@@ -328,7 +328,7 @@ export function ItemNodeCard({
           {item.title}
         </p>
       </div>
-      <div className="flex items-center justify-between gap-2 pl-[38px] text-[11px] text-app-text-subtle">
+      <div className="flex items-center justify-between gap-2 pl-[38px] text-xs text-app-text-subtle">
         <span className="inline-flex min-w-0 items-center gap-1 truncate">
           {isQuestion ? (
             <span className="rounded-full bg-app-question-solid/15 px-1.5 py-px font-semibold text-app-question-text">
@@ -437,7 +437,7 @@ const PhaseGraphPreview = memo(function PhaseGraphPreview({
   const positions = useMemo(() => itemGraphLayout(phase).positions, [phase]);
   if (items.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-[11px] text-app-text-subtle">
+      <div className="flex h-full items-center justify-center text-xs text-app-text-subtle">
         Nothing in this phase
       </div>
     );
@@ -524,12 +524,12 @@ export function PhaseNodeCard({
       className={`relative flex h-full w-full flex-col rounded-2xl border p-3 transition-[opacity,box-shadow,transform] duration-200 ${phaseFrame[state]} ${emphasisClass(render)}`}
     >
       {isFocus ? (
-        <span className="absolute -top-2.5 left-3 rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase shadow">
+        <span className="absolute -top-2.5 left-3 rounded-full bg-app-brand px-2 py-0.5 text-2xs font-bold tracking-wide text-white uppercase shadow">
           You are here
         </span>
       ) : null}
       {hasUpdate ? (
-        <span className="absolute -top-2.5 right-3 inline-flex items-center gap-1.5 rounded-full bg-app-brand px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase shadow ring-2 ring-app-surface">
+        <span className="absolute -top-2.5 right-3 inline-flex items-center gap-1.5 rounded-full bg-app-brand px-2 py-0.5 text-2xs font-bold tracking-wide text-white uppercase shadow ring-2 ring-app-surface">
           <UpdateDot />
           New answer
         </span>
@@ -545,7 +545,7 @@ export function PhaseNodeCard({
           ) : state === "locked" ? (
             <Lock className="h-3.5 w-3.5 text-app-text-subtle" aria-hidden="true" />
           ) : (
-            <span className="text-[11px] font-bold text-app-text tabular-nums">{index + 1}</span>
+            <span className="text-2xs font-bold text-app-text tabular-nums">{index + 1}</span>
           )}
         </ProgressRing>
         <p
@@ -559,7 +559,7 @@ export function PhaseNodeCard({
       <div className="my-2 min-h-0 flex-1 rounded-xl bg-app-bg-soft/80 p-1.5">
         <PhaseGraphPreview phase={phase} />
       </div>
-      <div className="flex items-center justify-between text-[11px]">
+      <div className="flex items-center justify-between text-xs">
         <span className="text-app-text-subtle tabular-nums">
           {progress.completed}/{progress.total} done
         </span>

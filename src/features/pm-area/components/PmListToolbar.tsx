@@ -54,7 +54,7 @@ export function PmFilterChip({
       {label}
       {typeof count === "number" && (
         <span
-          className={`rounded-full px-1.5 text-[11px] font-semibold tabular-nums ${
+          className={`rounded-full px-1.5 text-2xs font-semibold tabular-nums ${
             active
               ? "bg-white/20 text-white"
               : flagged && !empty

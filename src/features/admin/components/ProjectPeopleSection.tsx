@@ -469,7 +469,7 @@ export function ProjectPeopleSection({
 
       {addableUsers.length > 0 && (
         <div className="mt-5">
-          <p className="mb-2 text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+          <p className="mb-2 text-2xs font-semibold tracking-[0.18em] text-app-text-muted uppercase">
             Add to project
           </p>
 

@@ -203,9 +203,9 @@ export function SourceDetailsPanel({
   // text for everyone else.
   const enabledRow: ReactNode = canToggleEnabled ? (
     <div className="flex items-center gap-3 border-t border-app-border py-2.5">
-      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">Source</dt>
+      <dt className="w-24 shrink-0 text-xs text-app-text-muted">Source</dt>
       <dd className="flex min-w-0 flex-1 items-center justify-between gap-3">
-        <span className="text-[13px] font-semibold text-app-text">
+        <span className="text-sm font-semibold text-app-text">
           Include in ingestion
           <span className="ml-1 font-normal text-app-text-subtle">
             · sync this {meta.noun.singular} into the knowledge base
@@ -289,7 +289,7 @@ export function SourceDetailsPanel({
               {dinoUnlocked && !dinoActive && (
                 <span className="hidden items-center gap-1 text-xs font-normal text-app-brand-text/80 sm:inline-flex">
                   Press{" "}
-                  <kbd className="rounded border border-app-brand-border bg-app-surface px-1.5 py-0.5 font-mono text-[10px] shadow-2xs">
+                  <kbd className="rounded border border-app-brand-border bg-app-surface px-1.5 py-0.5 font-mono text-xs shadow-2xs">
                     Space
                   </kbd>{" "}
                   to pass the time 🦖
@@ -432,7 +432,7 @@ function Tile({
 }) {
   return (
     <div className="rounded-xl border border-app-border bg-app-surface-muted px-4 py-3">
-      <p className="flex items-center gap-1.5 text-[11px] text-app-text-subtle">
+      <p className="flex items-center gap-1.5 text-xs text-app-text-subtle">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </p>

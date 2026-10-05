@@ -173,7 +173,7 @@ export function RailToggle({
       {icon}
 
       {typeof count === "number" && count > 0 && (
-        <span className="rounded-full bg-app-brand-soft px-1.5 text-[11px] font-semibold text-app-brand-text tabular-nums">
+        <span className="rounded-full bg-app-brand-soft px-1.5 text-2xs font-semibold text-app-brand-text tabular-nums">
           {count}
         </span>
       )}

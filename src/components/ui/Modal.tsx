@@ -188,7 +188,7 @@ export function Modal({
 
             <div className="relative z-10 flex shrink-0 items-start justify-between gap-4 px-5 pt-6 sm:px-7 sm:pt-7">
               <div>
-                <h2 id={titleId} className="text-[22px] leading-tight font-bold text-app-text">
+                <h2 id={titleId} className="text-xl leading-tight font-bold text-app-text">
                   {title}
                 </h2>
 

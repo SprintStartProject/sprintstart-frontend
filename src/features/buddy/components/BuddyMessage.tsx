@@ -152,7 +152,7 @@ export function BuddyMessage({
           </div>
         )}
 
-        {meta && <p className="px-1 text-[11px] text-app-text-disabled">{meta}</p>}
+        {meta && <p className="px-1 text-xs text-app-text-disabled">{meta}</p>}
         {footer}
       </div>
     </motion.div>

@@ -72,7 +72,7 @@ function Signal({
 }) {
   const body = (
     <>
-      <span className="flex items-center gap-1 text-[10px] font-semibold tracking-wider text-app-text-subtle uppercase">
+      <span className="flex items-center gap-1 text-2xs font-semibold tracking-wider text-app-text-subtle uppercase">
         <Icon aria-hidden="true" className="h-3 w-3" />
         {title}
       </span>
@@ -180,7 +180,7 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
             ariaLabel={`${percent}% of the onboarding path complete`}
           >
             <span className="text-xl leading-none font-bold text-app-text">{percent}%</span>
-            <span className="mt-1 text-[11px] text-app-text-muted">{STAGE_LABEL[stage]}</span>
+            <span className="mt-1 text-xs text-app-text-muted">{STAGE_LABEL[stage]}</span>
           </RingGauge>
           <div className="min-w-0 space-y-1 text-xs text-app-text-muted @xl:max-w-44">
             {data.progress && (
@@ -427,7 +427,7 @@ export function MemberSignals({
         <span className="font-semibold">
           {data.runningDays === null ? "—" : formatDays(data.runningDays)}
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted">since the path began</span>
+        <span className="block truncate text-xs text-app-text-muted">since the path began</span>
       </Signal>
 
       <Signal icon={MessageSquareText} title="What they said" onOpen={onOpen}>
@@ -451,7 +451,7 @@ export function MemberSignals({
             className="text-app-warning-text"
           />
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted">
+        <span className="block truncate text-xs text-app-text-muted">
           {data.pendingSkips > 0
             ? `${data.pendingSkips} skip ${data.pendingSkips === 1 ? "request" : "requests"} open`
             : `${data.comments} ${data.comments === 1 ? "comment" : "comments"}`}
@@ -476,7 +476,7 @@ export function MemberSignals({
                 />
               ))}
             </span>
-            <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] text-app-text-muted">
+            <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-app-text-muted">
               {levels
                 .filter((segment) => segment.value > 0)
                 .map((segment, position) => (
@@ -495,7 +495,7 @@ export function MemberSignals({
           </span>
         )}
         {knowledgeGapCount > 0 && (
-          <span className="block truncate text-[11px] text-app-text-muted">
+          <span className="block truncate text-xs text-app-text-muted">
             {knowledgeGapCount} knowledge {knowledgeGapCount === 1 ? "gap" : "gaps"}
           </span>
         )}

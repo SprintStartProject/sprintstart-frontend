@@ -1018,7 +1018,7 @@ export function OnBoardingPage() {
           {overall ? (
             <div className="flex items-center gap-3">
               <ProgressRing value={overall.percentage} size={44} stroke={4.5}>
-                <span className="text-[11px] font-bold text-app-text tabular-nums">
+                <span className="text-2xs font-bold text-app-text tabular-nums">
                   {overall.percentage}%
                 </span>
               </ProgressRing>

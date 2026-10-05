@@ -194,7 +194,7 @@ export function BuddyComposer({
       </form>
 
       {!compact && (
-        <p className="mt-1.5 hidden px-1 text-[11px] text-app-text-disabled pointer-fine:block">
+        <p className="mt-1.5 hidden px-1 text-xs text-app-text-disabled pointer-fine:block">
           <kbd className="font-sans font-medium">Enter</kbd> to send ·{" "}
           <kbd className="font-sans font-medium">Shift</kbd> +{" "}
           <kbd className="font-sans font-medium">Enter</kbd> for a new line

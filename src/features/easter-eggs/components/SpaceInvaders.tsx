@@ -699,10 +699,10 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
       {/* Top bar: high score + score + exit */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-semibold text-app-text-muted tabular-nums backdrop-blur-sm">
+          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-2xs font-semibold text-app-text-muted tabular-nums backdrop-blur-sm">
             HI {String(highScore).padStart(5, "0")}
           </span>
-          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-bold text-app-text tabular-nums backdrop-blur-sm">
+          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-2xs font-bold text-app-text tabular-nums backdrop-blur-sm">
             {String(score).padStart(5, "0")}
           </span>
         </div>
@@ -711,7 +711,7 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
           type="button"
           onClick={onExit}
           data-testid="invaders-exit"
-          className="pointer-events-auto rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-medium text-app-text-muted backdrop-blur-sm transition-colors hover:text-app-text"
+          className="pointer-events-auto rounded-md bg-app-surface/80 px-2 py-0.5 text-xs font-medium text-app-text-muted backdrop-blur-sm transition-colors hover:text-app-text"
         >
           Esc ✕
         </button>
@@ -720,7 +720,7 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
       {/* Controls hint */}
       {!isOver && (
         <div className="pointer-events-none absolute inset-x-0 top-9 flex justify-center">
-          <span className="rounded bg-app-surface/70 px-2 py-0.5 text-[10px] text-app-text-disabled backdrop-blur-sm">
+          <span className="rounded bg-app-surface/70 px-2 py-0.5 text-xs text-app-text-disabled backdrop-blur-sm">
             ← → move · Space shoot
           </span>
         </div>

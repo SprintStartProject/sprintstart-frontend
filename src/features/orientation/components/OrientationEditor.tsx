@@ -249,7 +249,7 @@ function StepRow({
             {index}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
+            <span className="block text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
               {label}
             </span>
             <span

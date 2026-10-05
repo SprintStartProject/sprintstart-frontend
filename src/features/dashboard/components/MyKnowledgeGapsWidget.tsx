@@ -77,8 +77,8 @@ function MissingTypes({
 
   const chip =
     tone === "present"
-      ? "rounded border border-app-success-border bg-app-success-bg px-1.5 py-0.5 text-[10px] text-app-success-text"
-      : "rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-[10px] text-app-text-muted";
+      ? "rounded border border-app-success-border bg-app-success-bg px-1.5 py-0.5 text-xs text-app-success-text"
+      : "rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-xs text-app-text-muted";
 
   return (
     <div className="flex flex-wrap gap-1">
@@ -96,7 +96,7 @@ function MissingTypes({
 /** Small uppercase caption over a chip group. */
 function ChipLabel({ children }: { children: string }) {
   return (
-    <p className="mb-1.5 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+    <p className="mb-1.5 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
       {children}
     </p>
   );
@@ -256,7 +256,7 @@ function GapCard({ gap, rich = false }: { gap: KnowledgeGap; rich?: boolean }) {
         the cards get a whole row to themselves and have the height to spare.
       */}
       {rich && (
-        <p className="mt-2 flex items-center gap-1 text-[10px] text-app-text-muted">
+        <p className="mt-2 flex items-center gap-1 text-xs text-app-text-muted">
           <Clock aria-hidden="true" className="h-3 w-3 shrink-0" />
           {formatRelativeDate(gap.lastIngested)}
         </p>
@@ -371,7 +371,7 @@ function NewOwnershipPill() {
   return (
     <span
       aria-hidden="true"
-      className="flex shrink-0 items-center gap-1.5 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 text-[10px] font-semibold tracking-wide text-app-warning-text uppercase"
+      className="flex shrink-0 items-center gap-1.5 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 text-2xs font-semibold tracking-wide text-app-warning-text uppercase"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-app-warning-solid" />
       New

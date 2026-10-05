@@ -38,7 +38,7 @@ function Figure({ value, label }: { value: string; label: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-app-border-muted bg-app-bg-soft px-3 py-2">
       <p className="text-base leading-tight font-bold text-app-text tabular-nums">{value}</p>
-      <p className="truncate text-[11px] text-app-text-muted" title={label}>
+      <p className="truncate text-xs text-app-text-muted" title={label}>
         {label}
       </p>
     </div>

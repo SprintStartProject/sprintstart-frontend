@@ -53,7 +53,7 @@ export function PhaseChooser({
                   onClick={() => onChoose(phase.id)}
                   className="group flex h-full w-full flex-col rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-colors hover:border-app-brand-border hover:bg-app-surface-hover"
                 >
-                  <span className="text-[11px] font-semibold text-app-text-subtle tabular-nums">
+                  <span className="text-2xs font-semibold text-app-text-subtle tabular-nums">
                     Phase {allPhases.indexOf(phase) + 1}
                   </span>
                   <span className="mt-0.5 text-sm font-semibold text-app-text">{phase.title}</span>

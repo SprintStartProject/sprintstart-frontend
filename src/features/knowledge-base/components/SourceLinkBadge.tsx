@@ -15,7 +15,7 @@ function getSourceSystemLabel(sourceSystem: SourceSystem): string {
 }
 
 const BADGE_CLASSES =
-  "inline-flex min-w-0 items-center gap-1.5 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted transition-colors hover:border-app-brand/50 hover:bg-app-surface-hover hover:text-app-brand";
+  "inline-flex min-w-0 items-center gap-1.5 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-xs font-bold text-app-text-muted transition-colors hover:border-app-brand/50 hover:bg-app-surface-hover hover:text-app-brand";
 
 interface SourceLinkBadgeProps {
   /** The destination URL for the artifact. */

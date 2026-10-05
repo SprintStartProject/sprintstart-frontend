@@ -90,14 +90,14 @@ function FindingRow({
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${severity.badge}`}
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${severity.badge}`}
           >
             <SeverityIcon aria-hidden="true" className="h-3 w-3" />
             {severity.label}
           </span>
           {showArea && (
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${area.chip}`}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${area.chip}`}
             >
               <AreaIcon aria-hidden="true" className="h-3 w-3" />
               {area.label}
@@ -192,7 +192,7 @@ function AreaCard({
             <CheckCircle2 aria-label="Nothing here" className="h-4 w-4 text-app-success-text" />
           )}
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted">{label}</span>
+        <span className="block truncate text-xs text-app-text-muted">{label}</span>
       </span>
       {worst && (
         // The area's worst finding, as the icon and the words of its severity -- the colour alone
@@ -397,7 +397,7 @@ export function AnalysisMap({
                 <span className="text-4xl leading-none font-bold text-app-text">
                   {score ?? "—"}
                 </span>
-                <span className="mt-1 text-[11px] font-medium tracking-wider text-app-text-muted uppercase">
+                <span className="mt-1 text-2xs font-medium tracking-wider text-app-text-muted uppercase">
                   {score === null ? "no score" : "of 100"}
                 </span>
               </NeonRing>

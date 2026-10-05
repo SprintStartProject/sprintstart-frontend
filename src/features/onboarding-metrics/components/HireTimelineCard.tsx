@@ -116,7 +116,7 @@ export function HireTimelineCard({ hire, onOpenMember }: HireTimelineCardProps) 
                     >
                       {moment.label}
                     </span>
-                    <span className="mt-0.5 flex items-center gap-0.5 text-[11px] text-app-text-muted">
+                    <span className="mt-0.5 flex items-center gap-0.5 text-xs text-app-text-muted">
                       {reached && (
                         <Check className="h-3 w-3 text-app-success-solid" aria-hidden="true" />
                       )}
@@ -133,7 +133,7 @@ export function HireTimelineCard({ hire, onOpenMember }: HireTimelineCardProps) 
                         aria-hidden="true"
                       />
                       {gap !== null && (
-                        <span className="mt-1 text-[10px] font-medium text-app-text-muted">
+                        <span className="mt-1 text-xs font-medium text-app-text-muted">
                           {formatDuration(gap)}
                         </span>
                       )}

@@ -44,7 +44,7 @@ type ShortcutSectionProps = {
 function ShortcutSection({ category, shortcuts }: ShortcutSectionProps) {
   return (
     <section>
-      <h3 className="text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+      <h3 className="text-2xs font-semibold tracking-[0.18em] text-app-text-muted uppercase">
         {category}
       </h3>
 

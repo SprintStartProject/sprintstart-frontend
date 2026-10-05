@@ -240,7 +240,7 @@ function HealthFigure({
         <span className="block text-sm leading-tight font-semibold text-app-text tabular-nums">
           {value}
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted">{label}</span>
+        <span className="block truncate text-xs text-app-text-muted">{label}</span>
       </span>
     </li>
   );
@@ -281,7 +281,7 @@ export function OnboardingHealthSummary() {
   return (
     <section aria-label="Contribution health" className="min-w-0">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-[10px] font-semibold tracking-widest text-app-cyan-text uppercase">
+        <p className="flex items-center gap-2 text-2xs font-semibold tracking-wider text-app-cyan-text uppercase">
           <Gauge aria-hidden="true" className="h-3.5 w-3.5" />
           Contribution health
           {metrics && (
@@ -375,7 +375,7 @@ export function RecentMilestones() {
 
   return (
     <section aria-label="Recent milestones" className="min-w-0">
-      <p className="mb-3 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+      <p className="mb-3 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
         Recent milestones
       </p>
       {loading ? (

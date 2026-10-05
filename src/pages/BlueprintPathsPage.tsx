@@ -430,7 +430,7 @@ function BlueprintRowCard({
         {contents?.shape ? (
           <BlueprintShapeStrip shape={contents.shape} className="h-full w-full" />
         ) : (
-          <span className="text-[11px] text-app-text-subtle">
+          <span className="text-xs text-app-text-subtle">
             {contents ? "Nothing in it yet" : "Reading…"}
           </span>
         )}

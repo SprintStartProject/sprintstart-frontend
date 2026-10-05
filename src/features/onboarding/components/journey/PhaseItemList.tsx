@@ -117,7 +117,7 @@ export function PhaseItemList({
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     {isNext && !isExpanded ? (
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase ${
+                        className={`rounded-full px-2 py-0.5 text-2xs font-bold tracking-wide text-white uppercase ${
                           isQuestion ? "bg-app-question-solid" : "bg-app-brand"
                         }`}
                       >

@@ -146,7 +146,7 @@ export function PmEyebrow({
 }) {
   return (
     <p
-      className={`text-[10px] font-semibold tracking-widest text-app-brand-text uppercase ${className}`}
+      className={`text-2xs font-semibold tracking-wider text-app-brand-text uppercase ${className}`}
     >
       {children}
     </p>
@@ -198,7 +198,7 @@ export function PmStat({
           <span className="text-xl leading-none font-bold tracking-tight text-app-text tabular-nums">
             {value}
           </span>
-          <span className="truncate text-[12.5px] font-medium text-app-text-muted">{label}</span>
+          <span className="truncate text-xs font-medium text-app-text-muted">{label}</span>
         </span>
         <span className="mt-1 block truncate text-xs text-app-text-subtle">{hint}</span>
       </span>

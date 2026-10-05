@@ -481,7 +481,7 @@ export function StepWorkspace({
                           {resource.title}
                         </span>
                         {resource.description ? (
-                          <span className="block truncate text-[11px] text-app-text-subtle">
+                          <span className="block truncate text-xs text-app-text-subtle">
                             {resource.description}
                           </span>
                         ) : null}

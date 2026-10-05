@@ -166,8 +166,10 @@ export function ChatSidebar({ chats, onNavigate, onDeleteChat }: ChatSidebarProp
                         }
                       >
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="truncate">{chat.title || "Thinking..."}</span>
-                          <span className="text-[10px] opacity-70">
+                          <span className="truncate" title={chat.title || undefined}>
+                            {chat.title || "Thinking..."}
+                          </span>
+                          <span className="text-xs opacity-70">
                             {formatRelativeDate(chat.createdAt)}
                           </span>
                         </div>

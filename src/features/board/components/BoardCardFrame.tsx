@@ -252,7 +252,12 @@ export function BoardCardFrame({
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <h2 className="line-clamp-2 text-sm font-semibold text-app-text">{title}</h2>
+                <h2
+                  className="line-clamp-2 text-sm font-semibold text-app-text"
+                  title={typeof title === "string" ? title : undefined}
+                >
+                  {title}
+                </h2>
 
                 {pinned && (
                   <Badge variant="neutral" size="sm" className="gap-1">

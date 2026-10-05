@@ -172,9 +172,7 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
               colorClassName={scoreColor(lastRun.score)}
               ariaLabel={`Last health score ${lastRun.score} of 100`}
             >
-              <span className="text-[11px] font-bold text-app-text tabular-nums">
-                {lastRun.score}
-              </span>
+              <span className="text-2xs font-bold text-app-text tabular-nums">{lastRun.score}</span>
             </RingGauge>
           )}
         </button>

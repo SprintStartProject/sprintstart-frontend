@@ -196,7 +196,7 @@ type SidebarNavLinkProps = {
 };
 
 const BASE_LINK_CLASS = [
-  "group relative flex h-[40px] items-center rounded-[10px] px-[12px] text-[14px] font-medium leading-none",
+  "group relative flex h-[40px] items-center rounded-[10px] px-[12px] text-sm font-medium leading-none",
   "transition-colors duration-200",
 ].join(" ");
 
@@ -630,7 +630,7 @@ export function SidebarNavLink({
                                             kind of thing carrying a number. */}
                     <span
                       aria-hidden="true"
-                      className="min-w-[20px] rounded-full bg-app-warning-bg px-1.5 py-0.5 text-center text-[11px] font-semibold text-app-warning-text"
+                      className="min-w-[20px] rounded-full bg-app-warning-bg px-1.5 py-0.5 text-center text-xs font-semibold text-app-warning-text"
                     >
                       {count}
                     </span>
@@ -657,15 +657,15 @@ export function SidebarNavLink({
           >
             {label}
             {busy ? (
-              <span className="block text-[11px] font-normal text-app-text-muted">
+              <span className="block text-xs font-normal text-app-text-muted">
                 {busyLabel ?? "In progress"}
               </span>
             ) : count > 0 ? (
-              <span className="block text-[11px] font-normal text-app-text-muted">
+              <span className="block text-xs font-normal text-app-text-muted">
                 {countLabel?.(count) ?? `${count} waiting`}
               </span>
             ) : needsAttention ? (
-              <span className="block text-[11px] font-normal text-app-text-muted">
+              <span className="block text-xs font-normal text-app-text-muted">
                 {attentionLabel ?? "Needs attention"}
               </span>
             ) : null}

@@ -119,7 +119,7 @@ export function KnowledgeBaseWidget() {
                   {artifact.title ?? "Untitled"}
                 </span>
 
-                <span className="shrink-0 text-[11px] text-app-text-muted tabular-nums">
+                <span className="shrink-0 text-xs text-app-text-muted tabular-nums">
                   {formatRelative(artifact.ingestedAt)}
                 </span>
               </Link>

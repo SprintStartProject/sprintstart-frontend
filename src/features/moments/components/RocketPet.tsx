@@ -366,7 +366,7 @@ export function RocketPet() {
           <motion.span
             key="rocket-tally"
             aria-hidden="true"
-            className="pointer-events-none fixed right-[10px] bottom-[68px] z-30 rounded-full border border-app-border bg-app-surface px-2 py-0.5 text-[10px] font-semibold text-app-text-subtle tabular-nums shadow-sm"
+            className="pointer-events-none fixed right-[10px] bottom-[68px] z-30 rounded-full border border-app-border bg-app-surface px-2 py-0.5 text-2xs font-semibold text-app-text-subtle tabular-nums shadow-sm"
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}

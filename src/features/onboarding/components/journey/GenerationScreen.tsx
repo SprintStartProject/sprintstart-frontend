@@ -175,7 +175,7 @@ export function GenerationScreen({
         {dinoUnlocked && !gameActive && isGenerating && (
           <p className="mt-4 text-center text-xs text-app-text-subtle">
             Press{" "}
-            <kbd className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-app-text shadow-2xs">
+            <kbd className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-app-text shadow-2xs">
               Space
             </kbd>{" "}
             to pass the time 🦖

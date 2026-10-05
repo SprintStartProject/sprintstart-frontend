@@ -134,7 +134,7 @@ function GapRing({ summary }: { summary: GapSummary }) {
           ring is 74px across, and "COMPONENTS" set in caps with letter-spacing runs straight
           under the stroke.
         */}
-        <span className="text-[10px] leading-none font-medium text-app-text-muted">
+        <span className="text-xs leading-none font-medium text-app-text-muted">
           {summary.componentCount === 1 ? "component" : "components"}
         </span>
       </div>
@@ -225,7 +225,7 @@ function GapList({ gaps }: { gaps: readonly KnowledgeGap[] }) {
 function ColumnHeading({ label, total }: { label: string; total: string }) {
   return (
     <div className="mb-3 flex items-baseline justify-between gap-2">
-      <span className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+      <span className="text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
         {label}
       </span>
       <span className="text-xs text-app-text-muted tabular-nums">{total}</span>

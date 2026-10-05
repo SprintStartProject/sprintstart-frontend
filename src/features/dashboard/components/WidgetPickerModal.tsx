@@ -286,7 +286,7 @@ function ChangeChip({ id, change }: { id: string; change: PendingChange }) {
   return (
     <span
       id={id}
-      className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${className}`}
+      className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${className}`}
     >
       <ChipIcon className="h-3 w-3" aria-hidden="true" />
       {label}

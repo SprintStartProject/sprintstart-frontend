@@ -431,7 +431,7 @@ export function TeamManagementPage() {
 
             <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
               <div
-                className={`hidden gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid ${ROSTER_COLUMNS}`}
+                className={`hidden gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-2xs font-semibold tracking-wider text-app-text-subtle uppercase md:grid ${ROSTER_COLUMNS}`}
               >
                 <span>Member</span>
                 {/* Named for what it sorts by, not for what the rows show: "Where they are"

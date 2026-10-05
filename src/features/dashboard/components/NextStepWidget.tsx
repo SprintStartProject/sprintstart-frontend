@@ -73,7 +73,7 @@ function ProgressRing({ percentage, compact }: { percentage: number; compact: bo
         >
           {percentage}%
         </span>
-        <span className="text-[10px] font-medium tracking-wide text-app-text-muted uppercase">
+        <span className="text-2xs font-medium tracking-wide text-app-text-muted uppercase">
           done
         </span>
       </div>
@@ -228,7 +228,7 @@ export function NextStepWidget({
         <div className={compact ? "max-w-full min-w-0" : "min-w-0 flex-1"}>
           {/* The eyebrow names the kind of action; at this size the title says it anyway. */}
           {!compact && (
-            <p className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+            <p className="text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
               {content.eyebrow}
             </p>
           )}

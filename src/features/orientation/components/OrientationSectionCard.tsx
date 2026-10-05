@@ -31,7 +31,7 @@ export function OrientationSectionCard({ section, isOpen, onToggle }: Orientatio
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-app-surface-muted"
       >
         <span>
-          <span className="block text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
+          <span className="block text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
             {label}
           </span>
           <span className="block text-sm font-medium text-app-text">{section.title}</span>

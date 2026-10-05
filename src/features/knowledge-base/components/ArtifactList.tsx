@@ -127,13 +127,16 @@ const ArtifactCard = memo(function ArtifactCard({
           <div className="mb-1 flex flex-wrap items-center gap-2">
             {/* h2: the cards sit directly under the page's h1, and a skipped level fails axe's
                 heading-order once the list is on screen. */}
-            <h2 className="min-w-0 truncate font-semibold text-app-text">
+            <h2
+              className="min-w-0 truncate font-semibold text-app-text"
+              title={artifact.title ?? undefined}
+            >
               {artifact.title ?? "Untitled"}
             </h2>
-            <span className="shrink-0 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
+            <span className="shrink-0 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-2xs font-bold text-app-text-muted uppercase">
               {getTypeLabel(artifact.artifactType)}
             </span>
-            <span className="shrink-0 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted uppercase">
+            <span className="shrink-0 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-2xs font-bold text-app-text-muted uppercase">
               {artifact.sourceSystem}
             </span>
             {repository && <RepositoryBadge repository={repository} testId="artifact-repo-badge" />}

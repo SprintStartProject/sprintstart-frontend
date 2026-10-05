@@ -61,7 +61,7 @@ export function BuddySuggestionChips({
       {(heading || headingAction) && (
         <div className="mb-1.5 flex items-center justify-between gap-2">
           {heading && (
-            <p className="text-[11px] font-medium tracking-wide text-app-text-muted uppercase">
+            <p className="text-2xs font-medium tracking-wide text-app-text-muted uppercase">
               {heading}
             </p>
           )}
