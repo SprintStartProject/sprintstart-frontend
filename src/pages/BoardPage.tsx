@@ -23,7 +23,6 @@ import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
 import { isCardAt, pathPhases, pathStages } from "../features/board/layout/pathStages";
 import { isPathArea, pathAreas } from "../features/board/layout/pathAreas";
-import { resolveNextAction } from "../features/onboarding/nextAction";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
@@ -33,7 +32,6 @@ import { BoardFilterTriggers } from "../features/board/components/BoardFilterTri
 import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { MarkFilterRail } from "../features/board/components/MarkFilterRail";
-import { BoardNextUp } from "../features/board/components/BoardNextUp";
 import { BoardPhaseCheck } from "../features/board/components/BoardPhaseCheck";
 import { BoardPhaseRecap } from "../features/board/components/BoardPhaseRecap";
 import { BoardLocalOnlyNotice } from "../features/board/components/BoardLocalOnlyNotice";
@@ -661,13 +659,6 @@ export function BoardPage() {
   const tabSections = useMemo(() => sections.filter((section) => !section.mark), [sections]);
 
   /**
-   * What to do next, from the path rather than from the board: the next step or question the
-   * Onboarding page itself would offer. The board's own "start with" used to be the first open card
-   * in the hire's chains — a second answer to the same question, from a second plan.
-   */
-  const nextOnPath = useMemo(() => (path ? resolveNextAction(path) : null), [path]);
-
-  /**
    * Whether the board has been divided into anything worth navigating.
    *
    * One section called "Everything" is a table of contents for a book with one chapter, so an
@@ -974,7 +965,7 @@ export function BoardPage() {
           On the board rather than in the header. The header was a place for furniture about the
           page; this is about the work, and it belongs where the work is.
         */}
-        {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
+        {isPathShown && <BoardPathWindow path={path} onRemove={removePathWindow} />}
         {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
             space: the board is a column of cards and the margin is where a hand rests. So the
             offers live there — always in reach, never in the way, and out of the row above the
@@ -1250,13 +1241,9 @@ export function BoardPage() {
                   </EmptyState>
                 )}
 
-                {/* First, above the status line: "showing 6 of 34" is about the view, and this is
-                    about the work. The one line on this page that answers with a thing to do rather
-                    than with a smaller list to choose from. */}
-                <BoardNextUp next={nextOnPath} />
-
-                {/* Under the next step, because it is the same question one level up: the check
-                    that closes the phase that step is in. */}
+                {/* Above the status line: "showing 6 of 34" is about the view, and these are about
+                    the work — the phase just finished, and the check closing the one the hire is
+                    in. What is next on the path is on the path card at the top of the board. */}
                 <BoardPhaseRecap boardId={boardId} path={path} />
 
                 <BoardPhaseCheck
