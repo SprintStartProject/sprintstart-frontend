@@ -176,7 +176,7 @@ export function SidePanel({
           aria-hidden={!isOpen}
           inert={!isOpen}
           onClick={onClose}
-          className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} ${overlayClassName} transition-opacity duration-300 ease-out ${
+          className={`fixed inset-x-0 top-0 h-dvh ${zIndexClassName} ${overlayClassName} transition-opacity duration-300 ease-out ${
             isOpen ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         />
@@ -205,7 +205,7 @@ export function SidePanel({
         initial={{ x: "100%", opacity: 0 }}
         animate={{ x: isOpen ? 0 : "100%", opacity: isOpen ? 1 : 0 }}
         transition={panelTransition}
-        className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-screen ${widthClassName} flex-col overflow-hidden border-l border-app-border ${panelBackgroundClassName} shadow-2xl sm:rounded-l-[28px] ${panelClassName}`}
+        className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-dvh ${widthClassName} flex-col overflow-hidden border-l border-app-border ${panelBackgroundClassName} shadow-2xl sm:rounded-l-[28px] ${panelClassName}`}
         aria-hidden={!isOpen}
         inert={!isOpen}
         tabIndex={-1}
@@ -247,7 +247,7 @@ export function SidePanel({
                 )}
               </div>
 
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                 {actions}
 
                 <button

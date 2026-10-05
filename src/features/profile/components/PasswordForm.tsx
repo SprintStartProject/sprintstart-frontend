@@ -16,7 +16,7 @@ export function PasswordForm() {
   };
 
   return (
-    <div className="rounded-xl border border-app-border bg-app-bg p-6">
+    <div className="rounded-xl border border-app-border bg-app-bg p-4 sm:p-6">
       <h2 className="mb-4 text-lg font-semibold text-app-text">Change Password</h2>
 
       <p className="mb-4 text-sm text-app-text/70">

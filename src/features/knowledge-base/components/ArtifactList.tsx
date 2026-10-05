@@ -139,12 +139,16 @@ const ArtifactCard = memo(function ArtifactCard({
             {repository && <RepositoryBadge repository={repository} testId="artifact-repo-badge" />}
             {aiStatus && <AiStatusChip status={aiStatus} />}
           </div>
-          <div className="mt-2 flex items-center gap-4 text-xs font-medium text-app-text-muted">
-            <span>Ingested: {formatDate(artifact.ingestedAt)}</span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-app-text-muted">
+            <span className="whitespace-nowrap">Ingested: {formatDate(artifact.ingestedAt)}</span>
             {/* Only shown once the content actually changed: an artifact that still matches its
                 import has nothing useful to say here, and an always-present date that equals
                 "Ingested" would just be noise. */}
-            {artifact.lastChangedAt && <span>Changed: {formatDate(artifact.lastChangedAt)}</span>}
+            {artifact.lastChangedAt && (
+              <span className="whitespace-nowrap">
+                Changed: {formatDate(artifact.lastChangedAt)}
+              </span>
+            )}
           </div>
         </div>
         <div className="shrink-0 pt-2">
@@ -170,13 +174,20 @@ function SelectSlot({
   selection: ArtifactListSelection;
 }) {
   if (!isUpload(artifact)) return <span className="w-5 shrink-0" aria-hidden="true" />;
+  const selectId = `artifact-select-${artifact.id}`;
   return (
-    <Checkbox
-      checked={selection.selectedIds.has(artifact.id)}
-      onChange={() => selection.onToggle(artifact.id)}
-      aria-label={`Select ${artifact.title ?? "upload"}`}
-      data-testid={`artifact-select-${artifact.id}`}
-    />
+    <label
+      htmlFor={selectId}
+      className="inline-flex cursor-pointer items-center justify-center max-sm:-m-3 max-sm:p-3"
+    >
+      <Checkbox
+        id={selectId}
+        checked={selection.selectedIds.has(artifact.id)}
+        onChange={() => selection.onToggle(artifact.id)}
+        aria-label={`Select ${artifact.title ?? "upload"}`}
+        data-testid={selectId}
+      />
+    </label>
   );
 }
 

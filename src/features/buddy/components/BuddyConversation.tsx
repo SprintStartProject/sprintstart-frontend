@@ -125,7 +125,7 @@ function BuddyConversationImpl({
         ref={containerRef}
         onScroll={onScroll}
         data-testid="buddy-transcript"
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
       >
         <div
           className={`app-page-frame flex min-w-0 flex-col gap-4 pb-6 ${

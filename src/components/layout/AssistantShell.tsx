@@ -65,7 +65,7 @@ export function AssistantShell() {
   });
 
   return (
-    <div className="flex h-[calc(100vh-64px)] flex-col overflow-hidden bg-app-bg lg:h-screen">
+    <div className="flex h-[calc(100dvh-64px)] flex-col overflow-hidden bg-app-bg lg:h-dvh">
       <header className="shrink-0 border-b border-app-border bg-app-bg">
         <div className="app-page-frame py-6">
           <PageHeader

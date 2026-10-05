@@ -51,7 +51,7 @@ export function TokenRow({ name, onSaved }: TokenRowProps) {
               onClick={openRotate}
               data-testid={`settings-rotate-open-${name}`}
               icon={<RefreshCw className="h-3.5 w-3.5" aria-hidden />}
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-sm:h-11 sm:flex-none"
               aria-label={`Rotate token ${name}`}
             >
               Rotate
@@ -62,7 +62,7 @@ export function TokenRow({ name, onSaved }: TokenRowProps) {
               onClick={openDelete}
               data-testid={`settings-delete-open-${name}`}
               icon={<Trash2 className="h-3.5 w-3.5" aria-hidden />}
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-sm:h-11 sm:flex-none"
               aria-label={`Delete token ${name}`}
             >
               Delete
