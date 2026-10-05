@@ -331,6 +331,9 @@ describe("BuddyPage", () => {
 
     expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
     expect(band().className).toContain("pt-14");
+    // The floor is the phone value up to `2xl` — below that the fluid page gutter is narrower
+    // than the rail toggle's halo, and the select sits at the gutter edge.
+    expect(band().className).toContain("2xl:pt-4");
     // One reservation, not two: the transcript adds none under the mode row.
     expect(framed().className).toContain("pt-8");
 

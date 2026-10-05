@@ -1080,7 +1080,10 @@ export function ArtifactViewerDrawer({
       actions={actionsContent}
       widthClassName="w-full max-w-5xl"
       zIndexClassName="z-50"
-      panelClassName="border-l border-app-border shadow-2xl"
+      // The `!` is load-bearing: Tailwind emits `sm:` utilities after `max-*` variants, so a
+      // plain `max-lg:rounded-none` would lose to the SidePanel's `sm:rounded-l-[28px]` — and
+      // below `lg` this drawer is full-bleed, where a corner would notch against the viewport.
+      panelClassName="border-l border-app-border shadow-2xl max-lg:rounded-none!"
       panelBackgroundClassName="bg-app-surface"
       headerClassName="p-4 bg-app-bg"
       contentClassName="p-6"

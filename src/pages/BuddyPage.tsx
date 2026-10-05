@@ -8,7 +8,6 @@ import {
   ConversationRail,
   RailToggle,
   RAIL_DESKTOP_QUERY,
-  RAIL_TOGGLE_CLEARANCE,
 } from "../components/layout/ConversationRail";
 import { useIsSmUp } from "../hooks/useIsSmUp";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -150,7 +149,7 @@ function BuddyPageShell({
         {modeControl && (
           <div
             data-testid="buddy-mode-band"
-            className={`app-page-frame shrink-0 ${reserveFloatingClearance ? RAIL_TOGGLE_CLEARANCE : "pt-4"}`}
+            className={`app-page-frame shrink-0 ${reserveFloatingClearance ? "pt-14 2xl:pt-4" : "pt-4"}`}
           >
             {modeControl}
           </div>
@@ -354,6 +353,8 @@ function BuddyMentorHome() {
     [hasUserMessage, openerAction, greeting.isRevealing, sendMessage],
   );
 
+  const isSmUp = useIsSmUp();
+
   /**
    * The suggestion row above the composer, held in one identity — the conversation below it is
    * memoised now, and an element built inline in the render would be the one prop that always
@@ -366,8 +367,6 @@ function BuddyMentorHome() {
    * role has pull requests. Hire-only, matching the fetch gate: a team-mode conversation would
    * otherwise show the heading over an empty list, since there is nothing team-scoped to load.
    */
-  const isSmUp = useIsSmUp();
-
   const aboveComposer = useMemo(
     () =>
       isHireMode && !hasUserMessage ? (
@@ -375,7 +374,10 @@ function BuddyMentorHome() {
           suggestions={suggestions}
           onPick={setDraft}
           heading="Not sure where to start?"
-          compact={!isSmUp}
+          // Fewer chips on phones, not smaller ones: capping the count answers the space the
+          // dock's compact mode was worried about, without shrinking a tap target right after
+          // this PR grew every other one.
+          limit={isSmUp ? undefined : 3}
         />
       ) : undefined,
     [isHireMode, hasUserMessage, suggestions, setDraft, isSmUp],
@@ -395,8 +397,11 @@ function BuddyMentorHome() {
   // The floating controls withdraw mid-turn (the new-conversation button while a reply streams),
   // and the room they need must not go with them — so the mode row reserves it from the stable
   // facts rather than from the controls' own presence: the rail toggle's conditions, or simply
-  // that this conversation has been spoken in. Hire-flow only; a team conversation has no
-  // floating controls to clear.
+  // that this conversation has been spoken in. The row keeps the phone value of that clearance
+  // up to `2xl`: until then the fluid page gutter (clamp(2rem, 9vw - 4rem, 10rem)) is narrower
+  // than the counted rail toggle's halo reach (~73px), and a select sitting at the column edge
+  // would tuck its top-left corner under it. Hire-flow only; a team conversation has no floating
+  // controls to clear.
   const needsFloatingRoom =
     isHireMode && (((sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage);
 

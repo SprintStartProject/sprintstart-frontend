@@ -174,7 +174,7 @@ export function BuddyComposer({
             setDraft(event.target.value);
           }}
           onKeyDown={handleKeyDown}
-          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-base text-app-text outline-none placeholder:text-app-text-disabled sm:text-sm"
+          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-base text-app-text outline-none placeholder:text-app-text-disabled sm:text-sm pointer-coarse:text-base"
         />
 
         <Button

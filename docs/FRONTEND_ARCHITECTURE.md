@@ -268,8 +268,9 @@ Feature providers mounted at app level (`App.tsx`):
 | `BuddyDraftProvider`        | `features/buddy/`                 | Composer drafts shared by the dock and the `/buddy` page.                               |
 
 The buddy is the one provider with two surfaces and one session: `BuddyProvider` sits
-above the router (mounted in `App.tsx`), so the dock (`BuddyWidget`, mounted app-wide
-and hidden on `/buddy`) and the page render the same conversation — a message sent in
+above the routes — inside the router, since `main-app.tsx` mounts `<BrowserRouter>`
+around `App.tsx` — so the dock (`BuddyWidget`; mounted once the user is signed in, gone
+in focus mode, hidden on `/buddy`) and the page render the same conversation — a message sent in
 either appears in the other, and the dock hands the session to the page by growing into
 it rather than by transferring anything. The composer's draft is a provider of its own
 (`BuddyDraftProvider`) below the session, so it survives closing the dock, and a
