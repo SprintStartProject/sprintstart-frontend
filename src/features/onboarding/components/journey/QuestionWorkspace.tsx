@@ -10,11 +10,13 @@ import { ConfettiBurst } from "../ConfettiBurst";
 import { AskTheBuddy } from "../../../buddy/components/AskTheBuddy";
 import { askAboutQuestion, askAboutWrongAnswer } from "../../buddyDrafts";
 import {
-  clearRevealedSample,
+  clearRevealed,
   COPIED_SAMPLE_WARNING,
-  isCopyOfSample,
-  readRevealedSample,
-  writeRevealedSample,
+  isCopyOfReveal,
+  isPasteFromReveal,
+  readRevealed,
+  revealedTexts,
+  writeRevealed,
 } from "../../questionIntegrity";
 
 type Props = {
@@ -47,14 +49,15 @@ export function QuestionWorkspace({
   const alreadyPassed = question.status === "PASSED" && !result;
   // Each attempt shows the options in a fresh order, so a retry is not answered by position.
   const [attemptRound, setAttemptRound] = useState(0);
-  // The sample answer a wrong attempt revealed: handing it back word for word is not an answer.
-  const [revealedSample, setRevealedSample] = useState<string | null>(() =>
-    question.type === "SHORT_TEXT" ? readRevealedSample(question.id) : null,
+  // What wrong attempts revealed -- sample answer, explanation, feedback: handing any of it back
+  // is not an answer.
+  const [revealed, setRevealed] = useState<string[]>(() =>
+    question.type === "SHORT_TEXT" ? readRevealed(question.id) : [],
   );
   const [copyWarning, setCopyWarning] = useState<string | null>(null);
 
   const submit = async () => {
-    if (question.type === "SHORT_TEXT" && isCopyOfSample(draft.textAnswer, revealedSample)) {
+    if (question.type === "SHORT_TEXT" && isCopyOfReveal(draft.textAnswer, revealed)) {
       setCopyWarning(COPIED_SAMPLE_WARNING);
       return;
     }
@@ -66,10 +69,11 @@ export function QuestionWorkspace({
       );
       if (question.type === "SHORT_TEXT") {
         if (attempt.correct) {
-          clearRevealedSample(question.id);
-        } else if (attempt.correctAnswer) {
-          writeRevealedSample(question.id, attempt.correctAnswer);
-          setRevealedSample(attempt.correctAnswer);
+          clearRevealed(question.id);
+        } else {
+          const next = [...new Set([...revealed, ...revealedTexts(attempt)])];
+          writeRevealed(question.id, next);
+          setRevealed(next);
         }
       }
       setResult(attempt);
@@ -171,7 +175,7 @@ export function QuestionWorkspace({
         }}
         optionOrderSeed={`${question.id}:${attemptRound}`}
         onTextPaste={(text) => {
-          if (!isCopyOfSample(text, revealedSample)) return true;
+          if (!isPasteFromReveal(text, revealed)) return true;
           setCopyWarning(COPIED_SAMPLE_WARNING);
           return false;
         }}

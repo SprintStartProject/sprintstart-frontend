@@ -104,41 +104,97 @@ export function isCopyOfSample(answer: string, sample: string | null | undefined
   const answerWords = words(answer);
   if (answerWords.length === 0) return false;
 
-  if (` ${answerWords.join(" ")} `.includes(` ${sampleWords.join(" ")} `)) return true;
+  if (containsRun(answerWords, sampleWords)) return true;
 
   const similarity =
     1 - wordDistance(answerWords, sampleWords) / Math.max(answerWords.length, sampleWords.length);
   return similarity >= COPY_SIMILARITY;
 }
 
-export const COPIED_SAMPLE_WARNING =
-  "That's the sample answer. Put it in your own words — that's how it sticks.";
-
-const REVEALED_SAMPLE_KEY = "sprintstart.onboarding.revealedSample";
+/** Whether `run` appears in `text` as consecutive words. */
+function containsRun(text: readonly string[], run: readonly string[]): boolean {
+  return ` ${text.join(" ")} `.includes(` ${run.join(" ")} `);
+}
 
 /**
- * The sample answer a wrong attempt revealed for a question, remembered past a reload -- otherwise
- * copying it, reloading and pasting would be all it takes.
+ * An answer lifted out of a longer revealed text -- the explanation, the feedback -- rather than
+ * being the whole of it. Below this many words, a phrase that also appears in the explanation is
+ * as likely to be the hire's own wording as a copy.
  */
-export function readRevealedSample(questionId: string): string | null {
+const MIN_LIFTED_WORDS = 4;
+
+/**
+ * Whether a typed or edited `answer` is taken from what a wrong attempt revealed: the sample
+ * answer (see {@link isCopyOfSample}), or a stretch of the explanation or feedback, which usually
+ * spell the answer out as well.
+ */
+export function isCopyOfReveal(answer: string, revealed: readonly string[]): boolean {
+  const answerWords = words(answer);
+  if (answerWords.length === 0) return false;
+  return revealed.some(
+    (text) =>
+      isCopyOfSample(answer, text) ||
+      (answerWords.length >= MIN_LIFTED_WORDS && containsRun(words(text), answerWords)),
+  );
+}
+
+/**
+ * Whether `pasted` text came out of what a wrong attempt revealed.
+ *
+ * Stricter than {@link isCopyOfReveal}, and on purpose: typing a short fact back after reading it
+ * is fine, but text arriving by paste while the reveal is the only place it could have come from is
+ * a copy whatever its length.
+ */
+export function isPasteFromReveal(pasted: string, revealed: readonly string[]): boolean {
+  const pastedWords = words(pasted);
+  if (pastedWords.length === 0) return false;
+  return (
+    isCopyOfReveal(pasted, revealed) ||
+    revealed.some((text) => containsRun(words(text), pastedWords))
+  );
+}
+
+export const COPIED_SAMPLE_WARNING =
+  "That's taken from the answer shown before. Put it in your own words — that's how it sticks.";
+
+const REVEALED_KEY = "sprintstart.onboarding.revealedAnswer";
+
+/** What a wrong attempt showed about the answer: the sample, the explanation, the feedback. */
+export function revealedTexts(result: {
+  correctAnswer: string | null;
+  explanation: string | null;
+  feedback: string | null;
+}): string[] {
+  return [result.correctAnswer, result.explanation, result.feedback].filter(
+    (text): text is string => Boolean(text?.trim()),
+  );
+}
+
+/**
+ * What wrong attempts revealed for a question, remembered past a reload -- otherwise copying it,
+ * reloading and pasting would be all it takes.
+ */
+export function readRevealed(questionId: string): string[] {
   try {
-    return window.localStorage.getItem(`${REVEALED_SAMPLE_KEY}.${questionId}`);
+    const raw = window.localStorage.getItem(`${REVEALED_KEY}.${questionId}`);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((text) => typeof text === "string") : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
-export function writeRevealedSample(questionId: string, sample: string): void {
+export function writeRevealed(questionId: string, revealed: readonly string[]): void {
   try {
-    window.localStorage.setItem(`${REVEALED_SAMPLE_KEY}.${questionId}`, sample);
+    window.localStorage.setItem(`${REVEALED_KEY}.${questionId}`, JSON.stringify(revealed));
   } catch {
     // Without storage the guard only lasts until the page reloads.
   }
 }
 
-export function clearRevealedSample(questionId: string): void {
+export function clearRevealed(questionId: string): void {
   try {
-    window.localStorage.removeItem(`${REVEALED_SAMPLE_KEY}.${questionId}`);
+    window.localStorage.removeItem(`${REVEALED_KEY}.${questionId}`);
   } catch {
     // Nothing to forget.
   }

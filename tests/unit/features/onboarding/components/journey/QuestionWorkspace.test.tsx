@@ -8,7 +8,7 @@ import type {
 } from "../../../../../../src/features/onboarding/types";
 import {
   COPIED_SAMPLE_WARNING,
-  readRevealedSample,
+  readRevealed,
   shuffleOptions,
 } from "../../../../../../src/features/onboarding/questionIntegrity";
 
@@ -203,7 +203,7 @@ describe("QuestionWorkspace: the revealed sample answer", () => {
     expect(await screen.findByText(/Correct/)).toBeVisible();
     expect(onboardingService.submitQuestionAttempt).toHaveBeenCalledTimes(2);
     // Once passed, there is nothing left to guard.
-    expect(readRevealedSample("q1")).toBeNull();
+    expect(readRevealed("q1")).toEqual([]);
   });
 
   it("is still guarded after a reload", async () => {
@@ -226,5 +226,33 @@ describe("QuestionWorkspace: the revealed sample answer", () => {
 
     expect(screen.getByRole("textbox")).toHaveValue("");
     expect(screen.getByRole("alert")).toHaveTextContent(COPIED_SAMPLE_WARNING);
+  });
+
+  /** The explanation usually spells the answer out too; it is no way round the guard. */
+  it("cannot be pasted from the explanation either", async () => {
+    const explanation =
+      "Retrospectives are facilitated by the Scrum Master, who keeps the meeting timeboxed.";
+    vi.mocked(onboardingService.submitQuestionAttempt).mockResolvedValue(
+      attempt({ correctAnswer: "Scrum Master", explanation }),
+    );
+    const user = userEvent.setup();
+    renderWorkspace();
+    await user.type(screen.getByRole("textbox"), "The PM");
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    expect(await screen.findByText(explanation)).toHaveClass("select-none");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    await user.click(screen.getByRole("textbox"));
+    await user.paste("Scrum Master");
+    expect(screen.getByRole("textbox")).toHaveValue("");
+
+    await user.paste("facilitated by the Scrum Master");
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.getByRole("alert")).toHaveTextContent(COPIED_SAMPLE_WARNING);
+
+    // Typed out, a short fact is fine: there is no other way to say it.
+    await user.type(screen.getByRole("textbox"), "Scrum Master");
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    expect(onboardingService.submitQuestionAttempt).toHaveBeenCalledTimes(2);
   });
 });

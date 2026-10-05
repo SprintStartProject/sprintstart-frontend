@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  clearRevealedSample,
+  clearRevealed,
+  isCopyOfReveal,
   isCopyOfSample,
-  readRevealedSample,
+  isPasteFromReveal,
+  readRevealed,
+  revealedTexts,
   shuffleOptions,
-  writeRevealedSample,
+  writeRevealed,
 } from "../../../../src/features/onboarding/questionIntegrity.ts";
 import type { OnboardingQuestionOptionEndpoint } from "../../../../src/features/onboarding/types.ts";
 
@@ -110,16 +113,54 @@ describe("isCopyOfSample", () => {
   });
 });
 
-describe("revealed sample memory", () => {
+describe("isCopyOfReveal / isPasteFromReveal", () => {
+  const explanation =
+    "Retrospectives are facilitated by the Scrum Master, who keeps the meeting timeboxed.";
+  const revealed = ["Scrum Master", explanation];
+
+  it("catches an answer lifted out of the explanation", () => {
+    expect(isCopyOfReveal("facilitated by the Scrum Master", revealed)).toBe(true);
+    expect(isCopyOfReveal(explanation, revealed)).toBe(true);
+  });
+
+  it("lets a short fact be typed back, but not pasted", () => {
+    expect(isCopyOfReveal("Scrum Master", revealed)).toBe(false);
+    expect(isPasteFromReveal("Scrum Master", revealed)).toBe(true);
+    expect(isPasteFromReveal("the Scrum Master, who keeps", revealed)).toBe(true);
+  });
+
+  it("lets the hire's own words through, typed or pasted", () => {
+    const own = "Our SM leads it and stops us when time is up";
+    expect(isCopyOfReveal(own, revealed)).toBe(false);
+    expect(isPasteFromReveal(own, revealed)).toBe(false);
+  });
+
+  it("has nothing to compare against before anything was revealed", () => {
+    expect(isPasteFromReveal("Scrum Master", [])).toBe(false);
+  });
+});
+
+describe("revealedTexts", () => {
+  it("collects the sample, the explanation and the feedback that are there", () => {
+    expect(revealedTexts({ correctAnswer: "A", explanation: null, feedback: "  " })).toEqual(["A"]);
+    expect(revealedTexts({ correctAnswer: "A", explanation: "B", feedback: "C" })).toEqual([
+      "A",
+      "B",
+      "C",
+    ]);
+  });
+});
+
+describe("revealed answer memory", () => {
   afterEach(() => window.localStorage.clear());
 
-  it("remembers a revealed sample per question, until it is cleared", () => {
-    writeRevealedSample("q1", "The sample");
+  it("remembers what was revealed per question, until it is cleared", () => {
+    writeRevealed("q1", ["The sample", "The explanation"]);
 
-    expect(readRevealedSample("q1")).toBe("The sample");
-    expect(readRevealedSample("q2")).toBeNull();
+    expect(readRevealed("q1")).toEqual(["The sample", "The explanation"]);
+    expect(readRevealed("q2")).toEqual([]);
 
-    clearRevealedSample("q1");
-    expect(readRevealedSample("q1")).toBeNull();
+    clearRevealed("q1");
+    expect(readRevealed("q1")).toEqual([]);
   });
 });

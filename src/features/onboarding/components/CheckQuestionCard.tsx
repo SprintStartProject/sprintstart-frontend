@@ -136,12 +136,17 @@ export function CheckQuestionCard({
               )}
               {/* AI feedback on the free-text answer (both correct and incorrect) */}
               {graded && result.feedback && (
-                <p className="mt-2 text-xs text-app-text-muted">{result.feedback}</p>
+                <p
+                  className={`mt-2 text-xs text-app-text-muted ${result.correct ? "" : "select-none"}`}
+                >
+                  {result.feedback}
+                </p>
               )}
               {graded && !result.correct && result.correctAnswer && (
                 <p className="mt-2 text-xs text-app-text-muted">
                   Sample answer:{" "}
-                  {/* Not selectable: it is there to be read and understood, not copied back. */}
+                  {/* Not selectable, like the feedback and explanation of a wrong answer: they are
+                      there to be read and understood, not copied back. */}
                   <span className="font-medium text-app-success-text select-none">
                     {result.correctAnswer}
                   </span>
@@ -152,7 +157,11 @@ export function CheckQuestionCard({
 
           {/* Explanation after grading */}
           {graded && result.explanation && (
-            <p className="mt-3 rounded-xl bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted">
+            <p
+              className={`mt-3 rounded-xl bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted ${
+                result.correct ? "" : "select-none"
+              }`}
+            >
               {result.explanation}
             </p>
           )}
