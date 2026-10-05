@@ -124,10 +124,11 @@ describe("MemberJourneySection", () => {
       await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
     ).toBeInTheDocument();
     const slider = screen.getByRole("button", { name: "Graph" }).parentElement!;
-    expect(within(slider).getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Graph",
-      "List",
-    ]);
+    expect(
+      within(slider)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Graph", "List"]);
   });
 
   it("opens on the phase the member is in, with items in graph order", () => {

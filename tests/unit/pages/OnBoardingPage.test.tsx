@@ -575,10 +575,11 @@ describe("OnBoardingPage", () => {
       await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
     ).toBeInTheDocument();
     const slider = screen.getByRole("button", { name: "Graph" }).parentElement!;
-    expect(within(slider).getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Graph",
-      "List",
-    ]);
+    expect(
+      within(slider)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Graph", "List"]);
   });
 
   it("switches to the graph with the view slider and back to the list", async () => {
