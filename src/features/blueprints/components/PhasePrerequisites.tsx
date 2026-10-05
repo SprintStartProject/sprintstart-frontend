@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { canConnect } from "../../graph-diagram/graphLayout.ts";
@@ -85,7 +85,8 @@ export function PhasePrerequisites({
   return (
     <div className="space-y-4">
       {saveError ? (
-        <p role="alert" className="text-sm text-app-danger-text">
+        <p role="alert" className="flex items-start gap-1.5 text-sm text-app-danger-text">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {saveError}
         </p>
       ) : null}

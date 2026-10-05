@@ -3,7 +3,8 @@ import { CheckCircle2, CircleDot, Lock, PauseCircle } from "lucide-react";
 import { SidePanel } from "../../../components/ui/SidePanel.tsx";
 import { BlueprintGraphCanvas } from "../../blueprints/components/BlueprintGraphCanvas.tsx";
 import { BlueprintNodeCard } from "../../blueprints/components/BlueprintNodeCard.tsx";
-import { EDGE_STYLE_SWATCH, EDGE_TONE_STYLE } from "../../graph-diagram/edgeStyles.ts";
+import { EDGE_TONE_STYLE } from "../../graph-diagram/edgeStyles.ts";
+import { EdgeSwatch } from "../../graph-diagram/EdgeLegend.tsx";
 import { type GraphEdgeTone } from "../../graph-diagram/graphLayout.ts";
 import { cardIcon } from "../layout/cardIcons.ts";
 import { boardChainNodes, chainAround, type BoardChainNode } from "../layout/boardChain.ts";
@@ -133,22 +134,7 @@ export function BoardChainPanel({
             {sources.map((source) => (
               <li key={source} className="flex items-center gap-2">
                 {/* The same numbers the canvas strokes with, read from the same table. */}
-                <svg width="30" height="8" aria-hidden="true" className="shrink-0">
-                  <path
-                    d="M0,4 C8,4 14,4 28,4"
-                    fill="none"
-                    className={
-                      EDGE_STYLE_SWATCH[EDGE_TONE_STYLE[SOURCE_WORDS[source].tone]].className
-                    }
-                    strokeWidth={
-                      EDGE_STYLE_SWATCH[EDGE_TONE_STYLE[SOURCE_WORDS[source].tone]].width
-                    }
-                    strokeDasharray={
-                      EDGE_STYLE_SWATCH[EDGE_TONE_STYLE[SOURCE_WORDS[source].tone]].dash
-                    }
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <EdgeSwatch tone={EDGE_TONE_STYLE[SOURCE_WORDS[source].tone]} length={30} />
                 {source === "TEAM" ? (
                   <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
                 ) : null}

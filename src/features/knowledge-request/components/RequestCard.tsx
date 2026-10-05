@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Clock, MessageSquareText } from "lucide-react";
+import { AlarmClock, Clock, MessageSquareText } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Button } from "../../../components/ui/Button";
 import type { EscalationHire, KnowledgeRequest } from "../types";
@@ -44,8 +44,13 @@ export function RequestCard({ request, onAnswer, onDismiss }: RequestCardProps) 
           }`}
           title="How long this has waited on a person"
         >
-          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          {isStale ? (
+            <AlarmClock className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
           {waited}
+          {isStale ? " · long" : null}
         </span>
       </div>
 

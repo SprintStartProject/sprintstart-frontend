@@ -21,6 +21,7 @@ import {
   Rocket,
   RotateCcw,
   Square,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -1785,7 +1786,8 @@ export function BlueprintPathDetailPage() {
         >
           Back to blueprints
         </Button>
-        <p role="alert" className="mt-6 text-app-danger-text">
+        <p role="alert" className="mt-6 flex items-start gap-1.5 text-app-danger-text">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {error || "Blueprint path not found."}
         </p>
       </MainContent>
@@ -2017,7 +2019,11 @@ export function BlueprintPathDetailPage() {
         }
       />
       {error ? (
-        <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
+        <p
+          role="alert"
+          className="flex items-start gap-1.5 rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text"
+        >
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
       ) : null}

@@ -6,6 +6,7 @@ import {
   ListChecks,
   Sparkles,
   Trash2,
+  TriangleAlert,
   Waypoints,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -496,7 +497,8 @@ function PhaseDetails({
             </Field>
           ) : null}
           {saveError ? (
-            <p role="alert" className="text-sm text-app-danger-text">
+            <p role="alert" className="flex items-start gap-1.5 text-sm text-app-danger-text">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               {saveError}
             </p>
           ) : null}

@@ -14,6 +14,7 @@ import {
   type Ref,
 } from "react";
 import { createPortal } from "react-dom";
+import { EDGE_STYLE_SWATCH } from "../../graph-diagram/edgeStyles.ts";
 import {
   collectDownstream,
   collectUpstream,
@@ -974,8 +975,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               const isSelected =
                 selectedEdge?.blockerId === edge.blockerId && selectedEdge?.nodeId === edge.nodeId;
               const dimmed = !!spotlightId || (!!emphasisSourceId && !edge.inChain);
-              const width = edge.inChain || isSelected ? 2.75 : 2;
-              const stroke = `${toneStroke[edge.tone]} ${isSelected ? "!stroke-app-danger-solid" : ""}`;
+              const style = EDGE_STYLE_SWATCH[edge.tone];
+              const width = edge.inChain || isSelected ? style.width + 0.75 : style.width;
+              const stroke = `${style.className} ${isSelected ? "!stroke-app-danger-solid" : ""}`;
               return (
                 <g key={`${edge.blockerId}->${edge.nodeId}`}>
                   <path
@@ -983,10 +985,8 @@ export function JourneyCanvas<TNode extends LayoutNode>({
                     data-edge={`${edge.blockerId}->${edge.nodeId}`}
                     fill="none"
                     strokeWidth={width}
-                    strokeLinecap="round"
-                    strokeDasharray={
-                      edge.tone === "waiting" ? "6 6" : edge.tone === "active" ? "10 8" : undefined
-                    }
+                    strokeLinecap={style.linecap}
+                    strokeDasharray={style.dash}
                     className={`transition-opacity duration-200 ${stroke} ${
                       edge.tone === "active" ? "journey-edge-flow" : ""
                     }`}
@@ -1266,14 +1266,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
     </>
   );
 }
-
-const toneStroke: Record<JourneyEdgeTone, string> = {
-  done: "stroke-app-success-solid/70",
-  active: "stroke-app-brand",
-  waiting: "stroke-app-text-subtle/50",
-  upstream: "stroke-app-orange-text",
-  rule: "stroke-app-brand",
-};
 
 export function CanvasButton({
   label,

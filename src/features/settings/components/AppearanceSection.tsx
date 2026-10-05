@@ -6,6 +6,7 @@ import { GLOW_INTENSITY_MAX, GLOW_INTENSITY_MIN } from "../../../context/ThemeCo
 import { useTheme } from "../../../context/useTheme";
 import type { Theme } from "../../../context/ThemeContext";
 import { useMoments } from "../../moments";
+import { SelectedBadge } from "../../../components/ui/SelectedBadge";
 import { SettingsToggleRow } from "./SettingsToggleRow";
 
 const OPTIONS: ReadonlyArray<{ value: Theme; label: string; icon: typeof Sun }> = [
@@ -96,7 +97,7 @@ export function AppearanceSection() {
                 data-testid={`theme-option-${value}`}
                 onClick={() => setTheme(value)}
                 className={[
-                  "flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors",
+                  "relative flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors",
                   isActive
                     ? "border-app-brand bg-app-brand-soft text-app-text"
                     : "border-app-border bg-app-bg text-app-text-muted hover:bg-app-surface-hover hover:text-app-text",
@@ -104,6 +105,7 @@ export function AppearanceSection() {
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 {label}
+                {isActive ? <SelectedBadge /> : null}
               </button>
             );
           })}

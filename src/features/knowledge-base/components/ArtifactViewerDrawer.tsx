@@ -1159,7 +1159,7 @@ export function ArtifactViewerDrawer({
                       <a
                         href={content.content}
                         download={artifact?.title || "document.pdf"}
-                        className="text-app-brand hover:underline"
+                        className="text-app-brand underline underline-offset-2"
                       >
                         Download
                       </a>{" "}

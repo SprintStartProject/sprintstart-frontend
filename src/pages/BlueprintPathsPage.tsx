@@ -11,6 +11,7 @@ import {
   Loader2,
   Search,
   Sparkles,
+  TriangleAlert,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
@@ -291,7 +292,11 @@ export function BlueprintPathsPage() {
       </div>
 
       {error ? (
-        <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
+        <p
+          role="alert"
+          className="flex items-start gap-1.5 rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text"
+        >
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
       ) : null}

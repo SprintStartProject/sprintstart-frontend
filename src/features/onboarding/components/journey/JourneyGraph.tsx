@@ -42,6 +42,7 @@ import { itemKindLabel, itemStateLabel, phaseStateLabel } from "../../graph/node
 import { layeredLayout, resolveLayout, type GraphPoint } from "../../graph/layout";
 import type { OnboardingPhaseEndpoint } from "../../types";
 import type { GraphNodePosition } from "../../../../services/onboardingGraphService";
+import { EdgeLegend } from "../../../graph-diagram/EdgeLegend";
 
 type PhaseNode = {
   id: string;
@@ -97,6 +98,9 @@ type Props = {
 
 const PHASE_KEY = (id: string) => `phase:${id}`;
 const MAP_KEY = "journey";
+
+/** The arrow styles the journey graphs actually draw, for the legend beside them. */
+const MAP_EDGE_TONES: readonly JourneyEdgeTone[] = ["done", "active", "waiting"];
 
 /**
  * A path as one zoomable graph: the journey map of all phases, and inside every phase the graph of
@@ -396,16 +400,19 @@ export function JourneyGraph({
         onConnect={connect}
         onDisconnect={editing ? disconnect : undefined}
         overlay={
-          <div className="flex items-center gap-2 rounded-2xl border border-app-border/70 bg-app-surface/90 px-3 py-2 shadow-lg backdrop-blur-md">
-            <MapIcon className="h-4 w-4 text-app-brand-text" aria-hidden="true" />
-            <span className="text-sm font-semibold text-app-text">Journey map</span>
-            <span className="hidden text-xs text-app-text-subtle sm:inline">
-              {arranging
-                ? editing
-                  ? "· Drag phases, or from a phase’s port to what it unlocks"
-                  : "· Drag phases to arrange them"
-                : "· Click a phase to step inside"}
-            </span>
+          <div className="rounded-2xl border border-app-border/70 bg-app-surface/90 px-3 py-2 shadow-lg backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <MapIcon className="h-4 w-4 text-app-brand-text" aria-hidden="true" />
+              <span className="text-sm font-semibold text-app-text">Journey map</span>
+              <span className="hidden text-xs text-app-text-subtle sm:inline">
+                {arranging
+                  ? editing
+                    ? "· Drag phases, or from a phase’s port to what it unlocks"
+                    : "· Drag phases to arrange them"
+                  : "· Click a phase to step inside"}
+              </span>
+            </div>
+            <EdgeLegend tones={MAP_EDGE_TONES} className="mt-1.5" />
           </div>
         }
         toolbar={arrangeTools}
@@ -517,6 +524,7 @@ export function JourneyGraph({
                 </span>
               ) : null}
             </div>
+            <EdgeLegend tones={MAP_EDGE_TONES} className="mt-1.5 pl-2" />
             {editing ? (
               // Named and up front: as a "+" among the zoom controls it read as "zoom in".
               <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-app-border/70 pt-2 pl-2">

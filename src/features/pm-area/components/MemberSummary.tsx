@@ -1,4 +1,5 @@
 import {
+  AlarmClock,
   CalendarClock,
   CheckCircle2,
   CircleDashed,
@@ -43,10 +44,15 @@ const PHASE_LABEL: Record<PhaseState, string> = {
 };
 
 const LEVEL_SEGMENTS = [
-  { level: "BEGINNER", label: "beginner", className: "bg-app-warning-solid" },
-  { level: "INTERMEDIATE", label: "intermediate", className: "bg-app-cyan-text" },
-  { level: "ADVANCED", label: "advanced", className: "bg-app-brand" },
-  { level: "EXPERT", label: "expert", className: "bg-app-success-solid" },
+  { level: "BEGINNER", label: "beginner", short: "beginner", className: "bg-app-warning-solid" },
+  {
+    level: "INTERMEDIATE",
+    label: "intermediate",
+    short: "intermed.",
+    className: "bg-app-cyan-text",
+  },
+  { level: "ADVANCED", label: "advanced", short: "adv.", className: "bg-app-brand" },
+  { level: "EXPERT", label: "expert", short: "expert", className: "bg-app-success-solid" },
 ] as const;
 
 /**
@@ -194,8 +200,13 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
               <p
                 className={`flex items-center gap-1 ${isAtRisk(member) ? "font-medium text-app-orange-text" : ""}`}
               >
-                <Clock aria-hidden="true" className="h-3 w-3" />
+                {isAtRisk(member) ? (
+                  <AlarmClock aria-hidden="true" className="h-3 w-3" />
+                ) : (
+                  <Clock aria-hidden="true" className="h-3 w-3" />
+                )}
                 {formatDays(days)} on this step
+                {isAtRisk(member) ? " · long" : null}
               </p>
             )}
           </div>
@@ -451,12 +462,9 @@ export function MemberSignals({
         {assessed === 0 ? (
           <span className="text-app-text-muted">Not assessed yet</span>
         ) : (
-          // The bar alone, with the levels in its tooltip: the legend under it took three lines
-          // in a tile this size.
-          <span
-            className="block"
-            title={levels.map((segment) => `${segment.value} ${segment.label}`).join(" · ")}
-          >
+          // The bar is only a picture of the counts; the line under it says them in words, in the
+          // order of the segments, so the levels are not left to a tooltip or to the colours.
+          <span className="block">
             <span className="font-semibold tabular-nums">{assessed}</span>
             <span className="text-app-text-muted"> assessed</span>
             <span aria-hidden="true" className="mt-1 flex h-1 gap-0.5 overflow-hidden rounded-full">
@@ -468,8 +476,21 @@ export function MemberSignals({
                 />
               ))}
             </span>
-            <span className="sr-only">
-              : {levels.map((segment) => `${segment.value} ${segment.label}`).join(", ")}
+            <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] text-app-text-muted">
+              {levels
+                .filter((segment) => segment.value > 0)
+                .map((segment, position) => (
+                  <span key={segment.level} className="inline-flex items-center gap-1.5">
+                    {position > 0 ? <span aria-hidden="true">·</span> : null}
+                    <span
+                      aria-hidden="true"
+                      className={`h-1.5 w-1.5 rounded-full ${segment.className}`}
+                    />
+                    <span>
+                      <span className="tabular-nums">{segment.value}</span> {segment.short}
+                    </span>
+                  </span>
+                ))}
             </span>
           </span>
         )}

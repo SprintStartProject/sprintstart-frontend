@@ -1182,7 +1182,7 @@ export function BoardPage() {
                     your own at any time. Your onboarding itself is on the{" "}
                     <Link
                       to="/onboarding"
-                      className="font-medium text-app-brand-text hover:underline"
+                      className="font-medium text-app-brand-text underline underline-offset-2"
                     >
                       Onboarding page
                     </Link>

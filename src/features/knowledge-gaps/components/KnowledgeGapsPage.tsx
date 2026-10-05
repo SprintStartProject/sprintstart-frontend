@@ -338,7 +338,9 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
                         onClick={() => void navigate(`/insights/knowledge-gaps/${gap.id}`)}
                         aria-current={selected ? "true" : undefined}
                         className={`group flex w-full items-stretch gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
-                          selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
+                          selected
+                            ? "bg-app-brand-soft shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
+                            : "hover:bg-app-surface-hover"
                         }`}
                       >
                         <SeverityBar severity={gap.severity} />

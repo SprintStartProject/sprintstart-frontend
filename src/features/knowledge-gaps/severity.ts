@@ -2,6 +2,7 @@
 // dashboard widget, list page and detail page keep an identical severity scale.
 // (Presentational components live in components/SeverityIndicators.tsx.)
 
+import { CircleCheck, Info, OctagonAlert, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { KnowledgeGapSeverity } from "./types";
 
 /** Sort weight so higher-impact gaps come first (high → medium → low → covered). */
@@ -51,6 +52,13 @@ export interface SeverityStyle {
   badge: string;
   /** Short label, e.g. "High". */
   label: string;
+  /**
+   * The step's own shape, drawn wherever the colour alone used to stand for it. The four differ in
+   * outline (octagon, triangle, circle with an `i`, circle with a tick), so they tell apart in grey.
+   */
+  icon: LucideIcon;
+  /** Text colour of the step, for the icon next to its label. */
+  text: string;
   /** Long label, e.g. "High severity". */
   longLabel: string;
   /** Border tint for framed containers (detail hero). */
@@ -66,7 +74,7 @@ export interface SeverityStyle {
  * used to share with "nothing missing at all" — two states a PM has to be able
  * to tell apart at a glance.
  *
- * Every place that uses these colors also renders a text label, so meaning
+ * Every place that uses these colors also renders a text label or the step's icon, so meaning
  * never depends on color alone (color-blind friendly).
  */
 export const SEVERITY_STYLES: Record<KnowledgeGapSeverity, SeverityStyle> = {
@@ -74,6 +82,8 @@ export const SEVERITY_STYLES: Record<KnowledgeGapSeverity, SeverityStyle> = {
     bar: "bg-app-severity-high-solid",
     badge: "bg-app-severity-high-bg text-app-severity-high-text",
     label: "High",
+    icon: OctagonAlert,
+    text: "text-app-severity-high-text",
     longLabel: "High severity",
     ring: "border-app-severity-high-border",
   },
@@ -81,6 +91,8 @@ export const SEVERITY_STYLES: Record<KnowledgeGapSeverity, SeverityStyle> = {
     bar: "bg-app-severity-medium-solid",
     badge: "bg-app-severity-medium-bg text-app-severity-medium-text",
     label: "Medium",
+    icon: TriangleAlert,
+    text: "text-app-severity-medium-text",
     longLabel: "Medium severity",
     ring: "border-app-severity-medium-border",
   },
@@ -88,6 +100,8 @@ export const SEVERITY_STYLES: Record<KnowledgeGapSeverity, SeverityStyle> = {
     bar: "bg-app-severity-low-solid",
     badge: "bg-app-severity-low-bg text-app-severity-low-text",
     label: "Low",
+    icon: Info,
+    text: "text-app-severity-low-text",
     longLabel: "Low severity",
     ring: "border-app-severity-low-border",
   },
@@ -97,6 +111,8 @@ export const SEVERITY_STYLES: Record<KnowledgeGapSeverity, SeverityStyle> = {
     bar: "bg-app-severity-covered-solid",
     badge: "bg-app-severity-covered-bg text-app-severity-covered-text",
     label: "Covered",
+    icon: CircleCheck,
+    text: "text-app-severity-covered-text",
     longLabel: "No gaps found",
     ring: "border-app-severity-covered-border",
   },

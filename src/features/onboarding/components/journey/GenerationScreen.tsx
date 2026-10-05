@@ -97,10 +97,7 @@ export function GenerationScreen({
           <p className="mx-auto mt-2 max-w-xl text-sm text-app-text-muted">
             Each phase is put together from your project’s knowledge base. This keeps running in the
             background — feel free to{" "}
-            <Link
-              to="/"
-              className="font-medium text-app-brand-text underline-offset-2 hover:underline"
-            >
+            <Link to="/" className="font-medium text-app-brand-text underline underline-offset-2">
               look around
             </Link>
             , we’ll let you know when it’s ready.

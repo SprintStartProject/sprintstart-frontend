@@ -9,7 +9,7 @@
 import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../types";
 import type { DraftAnswer } from "../checkAnswers";
 import { shuffleOptions } from "../questionIntegrity";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, CircleCheck, CircleX, TriangleAlert, XCircle } from "lucide-react";
 import { useMemo } from "react";
 
 interface CheckQuestionCardProps {
@@ -102,6 +102,19 @@ export function CheckQuestionCard({
                       className="h-4 w-4 shrink-0"
                     />
                     <span>{option.label}</span>
+                    {/* Beside the green and red tint, because the tint alone is the only thing that
+                        says which row is right and which was picked wrong (WCAG 1.4.1). */}
+                    {isCorrectOption ? (
+                      <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold">
+                        <CircleCheck className="h-4 w-4" aria-hidden="true" />
+                        Correct answer
+                      </span>
+                    ) : graded && selected ? (
+                      <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-app-danger-text">
+                        <CircleX className="h-4 w-4" aria-hidden="true" />
+                        Your pick
+                      </span>
+                    ) : null}
                   </label>
                 );
               })}
@@ -129,8 +142,9 @@ export function CheckQuestionCard({
                 <p
                   id={`${question.id}-text-warning`}
                   role="alert"
-                  className="mt-2 text-xs font-medium text-app-danger-text"
+                  className="mt-2 flex items-start gap-1.5 text-xs font-medium text-app-danger-text"
                 >
+                  <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   {textWarning}
                 </p>
               )}

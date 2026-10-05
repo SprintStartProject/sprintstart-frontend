@@ -1,5 +1,15 @@
+import { SelectedBadge } from "../../../components/ui/SelectedBadge";
 import { useEffect, useState } from "react";
-import { Check, CornerDownRight, ListChecks, Pencil, Plus, Trash2, Users } from "lucide-react";
+import {
+  Check,
+  CornerDownRight,
+  ListChecks,
+  Pencil,
+  Plus,
+  Trash2,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -104,8 +114,9 @@ export function ArrivalStepAuthoring({
     return (
       <p
         role="alert"
-        className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
+        className="flex items-start gap-1.5 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
       >
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         The arrival lists could not be loaded. Refresh to try again.
       </p>
     );
@@ -424,6 +435,7 @@ function EditStepDrawer({
                 onClick={() => setAnswer("company")}
                 className={radioCardClassName(answer === "company")}
               >
+                {answer === "company" ? <SelectedBadge /> : null}
                 <span className="block text-sm font-semibold text-app-text">Everyone</span>
                 <span className="block text-xs text-app-text-muted">
                   Changes the wording for all projects.
@@ -436,6 +448,7 @@ function EditStepDrawer({
                 onClick={() => setAnswer("project")}
                 className={radioCardClassName(answer === "project")}
               >
+                {answer === "project" ? <SelectedBadge /> : null}
                 <span className="block text-sm font-semibold text-app-text">
                   Only {projectName ?? "this project"}
                 </span>

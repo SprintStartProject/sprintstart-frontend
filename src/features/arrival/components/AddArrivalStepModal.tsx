@@ -1,3 +1,4 @@
+import { SelectedBadge } from "../../../components/ui/SelectedBadge";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -231,6 +232,7 @@ export function AddArrivalStepModal({
                           derivation.added ? "cursor-not-allowed opacity-50" : ""
                         }`}
                       >
+                        {isSelected ? <SelectedBadge /> : null}
                         <IconTile
                           icon={HowItsDoneIcon}
                           size="lg"
@@ -323,6 +325,7 @@ export function AddArrivalStepModal({
                         onClick={() => setWho("project")}
                         className={`flex items-center gap-2.5 ${radioCardClassName(who === "project")}`}
                       >
+                        {who === "project" ? <SelectedBadge /> : null}
                         <FolderKanban
                           className={`h-4 w-4 shrink-0 ${who === "project" ? "text-app-brand" : "text-app-text-muted"}`}
                           aria-hidden="true"
@@ -343,6 +346,7 @@ export function AddArrivalStepModal({
                         onClick={() => setWho("company")}
                         className={`flex items-center gap-2.5 ${radioCardClassName(who === "company")}`}
                       >
+                        {who === "company" ? <SelectedBadge /> : null}
                         <Building2
                           className={`h-4 w-4 shrink-0 ${who === "company" ? "text-app-brand" : "text-app-text-muted"}`}
                           aria-hidden="true"

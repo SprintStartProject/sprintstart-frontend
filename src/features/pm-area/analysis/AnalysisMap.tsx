@@ -161,6 +161,8 @@ function AreaCard({
   selected: boolean;
   onClick: () => void;
 }) {
+  const WorstIcon = worst ? SEVERITY_META[worst].icon : null;
+
   return (
     <button
       type="button"
@@ -193,16 +195,16 @@ function AreaCard({
         <span className="block truncate text-[11px] text-app-text-muted">{label}</span>
       </span>
       {worst && (
+        // The area's worst finding, as the icon and the words of its severity -- the colour alone
+        // was a dot, and a dot is only a colour.
         <span
           aria-label={SEVERITY_META[worst].label}
           title={SEVERITY_META[worst].label}
           role="img"
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{
-            background: SEVERITY_META[worst].glow,
-            boxShadow: `0 0 8px ${SEVERITY_META[worst].glow}`,
-          }}
-        />
+          className={`shrink-0 ${SEVERITY_META[worst].text}`}
+        >
+          {WorstIcon && <WorstIcon aria-hidden="true" className="h-4 w-4" />}
+        </span>
       )}
     </button>
   );

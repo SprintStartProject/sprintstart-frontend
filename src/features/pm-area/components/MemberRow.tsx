@@ -1,4 +1,5 @@
 import {
+  AlarmClock,
   ArrowUpRight,
   CheckCircle2,
   ChevronRight,
@@ -142,8 +143,8 @@ export function MemberFlags({ member }: { member: TeamOverviewUser }) {
       )}
       {atRisk && days !== null && (
         <span className="inline-flex items-center gap-1 rounded-full bg-app-orange-bg px-2 py-0.5 text-[11px] font-medium text-app-orange-text">
-          <Clock aria-hidden="true" className="h-3 w-3" />
-          {formatDays(days)} on step
+          <AlarmClock aria-hidden="true" className="h-3 w-3" />
+          {formatDays(days)} on step · long
         </span>
       )}
     </span>
@@ -273,7 +274,9 @@ export function MemberRow({
       title="Click for a quick look · double-click for the full profile"
       aria-current={selected ? "true" : undefined}
       className={`group grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-3 py-3 text-left transition-colors ${
-        selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
+        selected
+          ? "bg-app-brand-soft shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
+          : "hover:bg-app-surface-hover"
       } ${
         isFull
           ? `grid-cols-[minmax(0,1fr)_auto] ${ROSTER_COLUMNS}`
@@ -324,8 +327,13 @@ export function MemberRow({
                     isAtRisk(member) ? "font-medium text-app-orange-text" : ""
                   }`}
                 >
-                  <Clock aria-hidden="true" className="h-3 w-3" />
+                  {isAtRisk(member) ? (
+                    <AlarmClock aria-hidden="true" className="h-3 w-3" />
+                  ) : (
+                    <Clock aria-hidden="true" className="h-3 w-3" />
+                  )}
                   {days <= 0 ? "started today" : `${formatDays(days)} on step`}
+                  {isAtRisk(member) ? " · long" : null}
                 </span>
               )}
             </span>

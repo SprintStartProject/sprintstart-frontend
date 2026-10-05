@@ -66,7 +66,7 @@ export function RunHistory({
               aria-pressed={isSelected}
               className={`grid w-full grid-cols-2 gap-x-4 gap-y-3 px-5 py-4 text-left transition xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto] xl:items-center xl:gap-4 xl:py-5 ${
                 isSelected
-                  ? "bg-app-brand-soft"
+                  ? "bg-app-brand-soft shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
                   : // Rows sit in a shared grid, so they get an
                     // inset brand edge instead of the cards'
                     // lift -- a translate would break the

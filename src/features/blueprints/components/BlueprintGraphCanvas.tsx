@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   Plus,
   Search,
+  TriangleAlert,
   Waypoints,
   X,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
 import { useDialogFocus } from "../../../components/ui/useDialogFocus.ts";
+import { EdgeSwatch } from "../../graph-diagram/EdgeLegend.tsx";
 import {
   SWIPE_IGNORE_ATTRIBUTE,
   useHorizontalWheelNavigation,
@@ -1084,8 +1086,9 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
           {saveError ? (
             <p
               role="alert"
-              className="absolute bottom-4 left-4 z-40 max-w-sm rounded-lg bg-app-danger-bg px-3 py-2 text-xs text-app-danger-text shadow-lg"
+              className="absolute bottom-4 left-4 z-40 flex max-w-sm items-start gap-1.5 rounded-lg bg-app-danger-bg px-3 py-2 text-xs text-app-danger-text shadow-lg"
             >
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {saveError}
             </p>
           ) : null}
@@ -1315,11 +1318,11 @@ function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => 
       </span>
       <span className="flex items-center gap-2">
         <span aria-hidden="true" className="flex shrink-0 flex-col gap-1">
-          <span className="h-0.5 w-6 rounded-full bg-app-orange-text" />
-          <span className="h-0.5 w-6 rounded-full bg-app-brand" />
+          <EdgeSwatch tone="upstream" />
+          <EdgeSwatch tone="active" />
         </span>
-        Point at a node and its run lights up: orange for what has to happen before it, the brand
-        colour for what finishing it opens.
+        Point at a node and its run lights up: the orange dash-dot line for what has to happen
+        before it, the dashed brand line for what finishing it opens.
       </span>
       <span className="flex items-center gap-2">
         <KeyRound className="h-3.5 w-3.5 shrink-0 text-app-text-muted" aria-hidden="true" />

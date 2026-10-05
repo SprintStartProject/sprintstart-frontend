@@ -358,7 +358,9 @@ export function FaqPage({ groupId }: { groupId?: string }) {
                       onClick={() => openGroup(group)}
                       aria-current={selected ? "true" : undefined}
                       className={`group flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left transition-colors ${
-                        selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
+                        selected
+                          ? "bg-app-brand-soft shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
+                          : "hover:bg-app-surface-hover"
                       }`}
                     >
                       {/* A rank only means something while the list is ordered by how often. */}

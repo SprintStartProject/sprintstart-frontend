@@ -198,26 +198,25 @@ function GapList({ gaps }: { gaps: readonly KnowledgeGap[] }) {
 
   return (
     <ul className="space-y-2">
-      {worstFirst.map((gap) => (
-        <li key={gap.id} className="flex items-start gap-2">
-          <span
-            aria-hidden="true"
-            className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${
-              SEVERITY_STYLES[gap.severity].bar
-            }`}
-          />
+      {worstFirst.map((gap) => {
+        const { icon: SeverityIcon, label, longLabel, text } = SEVERITY_STYLES[gap.severity];
 
-          <div className="min-w-0">
-            <p className="truncate text-sm text-app-text">{gap.component}</p>
-            <p className="truncate text-xs text-app-text-muted">
-              {/* The severity is already in the dot; the words say what would fix it. */}
-              {gap.missingTypes.length > 0
-                ? `missing ${gap.missingTypes.join(", ")}`
-                : SEVERITY_STYLES[gap.severity].longLabel.toLowerCase()}
-            </p>
-          </div>
-        </li>
-      ))}
+        return (
+          <li key={gap.id} className="flex items-start gap-2">
+            <SeverityIcon aria-hidden="true" className={`mt-0.5 h-4 w-4 shrink-0 ${text}`} />
+
+            <div className="min-w-0">
+              <p className="truncate text-sm text-app-text">{gap.component}</p>
+              <p className="truncate text-xs text-app-text-muted">
+                {/* The icon carries the step; the words start with it and then say what would fix it. */}
+                {gap.missingTypes.length > 0
+                  ? `${label} · missing ${gap.missingTypes.join(", ")}`
+                  : longLabel}
+              </p>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

@@ -538,7 +538,7 @@ export function SidebarNavLink({
                         }
                       : { duration: 0.2 }
                   }
-                  className={`flex shrink-0 transition-colors ${
+                  className={`relative flex shrink-0 transition-colors ${
                     needsAttention
                       ? "text-app-warning-solid"
                       : isHighlighted
@@ -563,7 +563,19 @@ export function SidebarNavLink({
                                         would read out "Escalation Inbox, open
                                         escalations, 3 open escalations". */}
                   {needsAttention && count === 0 && (
-                    <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                    <>
+                      {/* The shape that stays when the movement does not: the icon wobbles for the
+                          people who can see it move, and this badge is there for everybody else,
+                          reduced motion included (WCAG 1.4.1). A count takes its place when there is
+                          one. */}
+                      <span
+                        aria-hidden="true"
+                        className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-app-warning-solid text-xs leading-none font-bold text-white ring-2 ring-app-surface"
+                      >
+                        !
+                      </span>
+                      <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                    </>
                   )}
                 </motion.span>
 

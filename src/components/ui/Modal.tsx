@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, type ReactNode } from "react";
@@ -229,8 +229,9 @@ export function Modal({
               <div className="relative z-10 shrink-0 px-5 pt-1 pb-4 sm:px-7">
                 <p
                   role="alert"
-                  className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
+                  className="flex items-start gap-1.5 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
                 >
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   {errorMessage}
                 </p>
               </div>

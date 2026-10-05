@@ -1,4 +1,14 @@
-import { Calendar, Check, Filter, ListPlus, RotateCcw, Send, Square, X } from "lucide-react";
+import {
+  Calendar,
+  Check,
+  Filter,
+  ListPlus,
+  RotateCcw,
+  Send,
+  Square,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -577,7 +587,11 @@ export function ChatComposer({
                   </div>
 
                   {rangeInvalid ? (
-                    <p className="text-[11px] text-app-danger-text" role="alert">
+                    <p
+                      className="flex items-start gap-1.5 text-[11px] text-app-danger-text"
+                      role="alert"
+                    >
+                      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       Start date cannot be after end date.
                     </p>
                   ) : (
@@ -685,7 +699,11 @@ export function ChatComposer({
       </form>
 
       {!hasProject && (
-        <p className="mt-2 text-center text-[11px] text-app-danger-text" role="alert">
+        <p
+          className="mt-2 flex items-start gap-1.5 text-center text-[11px] text-app-danger-text"
+          role="alert"
+        >
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           No project selected — pick one in the header to ask a question.
         </p>
       )}

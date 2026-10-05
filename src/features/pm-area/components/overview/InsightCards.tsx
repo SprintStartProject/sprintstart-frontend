@@ -183,26 +183,29 @@ export function KnowledgeGapsCard() {
           />
 
           <ul className="mt-3 space-y-0.5">
-            {worst.map((gap) => (
-              <li key={gap.id}>
-                <Link to={`/insights/knowledge-gaps/${gap.id}`} className={rowClassName}>
-                  <span className="flex items-center gap-2.5">
-                    <span
-                      aria-hidden="true"
-                      className={`h-2 w-2 shrink-0 rounded-full ${SEVERITY_STYLES[gap.severity].bar}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-app-text">{gap.component}</span>
-                      <span className="block truncate text-xs text-app-text-muted">
-                        {gap.missingTypes.length > 0
-                          ? `missing ${gap.missingTypes.join(", ")}`
-                          : SEVERITY_STYLES[gap.severity].longLabel}
+            {worst.map((gap) => {
+              const { icon: SeverityIcon, label, longLabel, text } = SEVERITY_STYLES[gap.severity];
+
+              return (
+                <li key={gap.id}>
+                  <Link to={`/insights/knowledge-gaps/${gap.id}`} className={rowClassName}>
+                    <span className="flex items-center gap-2.5">
+                      <SeverityIcon aria-hidden="true" className={`h-4 w-4 shrink-0 ${text}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-app-text">
+                          {gap.component}
+                        </span>
+                        <span className="block truncate text-xs text-app-text-muted">
+                          {gap.missingTypes.length > 0
+                            ? `${label} · missing ${gap.missingTypes.join(", ")}`
+                            : longLabel}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
