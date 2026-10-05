@@ -118,7 +118,7 @@ export function SettingsPage() {
     <div className="h-full min-h-screen w-full">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-content py-6">
-          <div className="max-w-4xl">
+          <div className="mx-auto max-w-4xl">
             <PageHeader
               icon={Settings}
               title="Settings"
@@ -133,13 +133,16 @@ export function SettingsPage() {
 
       <main className="app-page-content py-6 md:py-8">
         <div className="mx-auto max-w-4xl">
-          <nav aria-label="Settings sections" className="mb-8 flex gap-2 overflow-x-auto pb-1">
+          <nav
+            aria-label="Settings sections"
+            className="mb-8 flex gap-2 overflow-x-auto pb-1 max-lg:flex-wrap"
+          >
             {sections.map(({ id, label, icon: Icon }) => (
               <a
                 key={id}
                 href={`#${id}`}
                 onClick={(event) => scrollToSection(event, id)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none max-sm:py-3"
               >
                 <Icon className="h-4 w-4" aria-hidden />
                 {label}

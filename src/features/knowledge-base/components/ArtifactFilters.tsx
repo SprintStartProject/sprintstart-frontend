@@ -389,6 +389,7 @@ export function ArtifactFilters({
         onChange={onTabChange}
         layoutId="kb-artifact-type-tab"
         ariaLabel="Filter artifacts by type"
+        wrapBelow="lg"
         className="self-start"
       />
 
@@ -401,14 +402,17 @@ export function ArtifactFilters({
           {formatResultRange(resultCount, resultRange)}
         </p>
 
-        <div className="ml-auto flex w-full items-center justify-end gap-3 sm:w-auto">
+        {/* Wraps, and the sources filter takes a line of its own on a phone: the controls add
+            up to ~800px, so a row that could not wrap ran off both edges of a phone and 16px into
+            the page gutter at 1024px. */}
+        <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
           {hasActiveFilters && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onClearFilters}
               data-testid="kb-clear-filters"
-              className="shrink-0 text-app-text-muted hover:text-app-text"
+              className="shrink-0 text-app-text-muted hover:text-app-text max-sm:h-11"
             >
               Clear filters
             </Button>
@@ -439,14 +443,14 @@ export function ArtifactFilters({
               aria-pressed={isSelectMode}
               onClick={() => onSelectModeChange(!isSelectMode)}
               data-testid="kb-select-toggle"
-              className="shrink-0"
+              className="shrink-0 max-sm:h-11"
             >
               {/* Constant label: a toggle's state is aria-pressed, not a changing name. */}
               Select
             </Button>
           )}
 
-          <div className="min-w-0 flex-1 sm:w-80 sm:flex-none">
+          <div className="w-full min-w-0 sm:w-80">
             <MultiSelectFilter
               label="Filter sources"
               summary={summariseSources(

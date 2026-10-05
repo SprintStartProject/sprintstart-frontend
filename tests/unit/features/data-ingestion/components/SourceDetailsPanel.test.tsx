@@ -8,6 +8,7 @@ import { SidePanel } from "../../../../../src/components/ui/SidePanel";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { SourceDetailsPanel } from "../../../../../src/features/data-ingestion/components/SourceDetailsPanel";
 import type {
+  BitbucketRepositoryDetails,
   DataSource,
   GithubRepositoryDetails,
 } from "../../../../../src/features/data-ingestion/types";
@@ -22,6 +23,10 @@ const mocks = vi.hoisted(() => ({
   removeJiraInstanceFromProject: vi.fn(),
   getJiraConfig: vi.fn(),
   configureJiraInstance: vi.fn(),
+  updateBitbucketRepository: vi.fn(),
+  removeBitbucketRepositoryFromProject: vi.fn(),
+  getBitbucketRepositoryConfig: vi.fn(),
+  configureBitbucketRepository: vi.fn(),
   syncConnection: vi.fn(),
   deleteConnection: vi.fn(),
   getConnection: vi.fn(),
@@ -34,6 +39,13 @@ vi.mock("../../../../../src/services/sources/githubService", () => ({
   removeRepositoryFromProject: mocks.removeRepositoryFromProject,
   getGithubRepositoryConfig: mocks.getGithubRepositoryConfig,
   configureGithubRepository: mocks.configureGithubRepository,
+}));
+
+vi.mock("../../../../../src/services/sources/bitbucketService", () => ({
+  updateBitbucketRepository: mocks.updateBitbucketRepository,
+  removeBitbucketRepositoryFromProject: mocks.removeBitbucketRepositoryFromProject,
+  getBitbucketRepositoryConfig: mocks.getBitbucketRepositoryConfig,
+  configureBitbucketRepository: mocks.configureBitbucketRepository,
 }));
 
 vi.mock("../../../../../src/services/sources/jiraService", () => ({
@@ -102,6 +114,28 @@ const mockSource: DataSource = {
   failedItems: [],
   details: { system: "GITHUB", repository: githubRepository, syncTimes: noSyncTimes },
   description: "Indexes repositories.",
+};
+
+const bitbucketRepository: BitbucketRepositoryDetails = {
+  repositoryId: "bb-1",
+  workspace: "acme",
+  slug: "widgets",
+  fullName: "acme/widgets",
+  url: "https://bitbucket.org/acme/widgets",
+  enabled: true,
+};
+
+const bitbucketSource: DataSource = {
+  ...mockSource,
+  sourceId: "bb-1",
+  sourceSystem: "BITBUCKET",
+  name: "Bitbucket Repository",
+  type: "Bitbucket",
+  details: {
+    system: "BITBUCKET",
+    repository: bitbucketRepository,
+    syncTimes: { pullRequests: null },
+  },
 };
 
 const jiraInstance = {
@@ -196,6 +230,29 @@ const cases = [
       expect(mocks.removeRepositoryFromProject).toHaveBeenCalledWith("repo-1", "p1"),
   },
   {
+    name: "Bitbucket",
+    source: bitbucketSource,
+    section: "Repository",
+    updateButton: /Update repository/,
+    expectUpdate: () => expect(mocks.updateBitbucketRepository).toHaveBeenCalledWith("bb-1"),
+    toggleName: /Toggle ingestion for Bitbucket Repository/,
+    expectDisabled: () =>
+      expect(mocks.patchConnectorSources).toHaveBeenCalledWith("bitbucket", [
+        { sourceId: "acme/widgets", enabled: false },
+      ]),
+    autoUpdateName: /Toggle repository auto update/,
+    expectScheduleLoaded: () =>
+      expect(mocks.getBitbucketRepositoryConfig).toHaveBeenCalledWith(bitbucketRepository),
+    expectScheduleSaved: () =>
+      expect(mocks.configureBitbucketRepository).toHaveBeenCalledWith(bitbucketRepository, {
+        autoUpdate: false,
+        schedule: interval(30),
+      }),
+    unlinkTitle: /Remove repository from project/,
+    expectUnlinked: () =>
+      expect(mocks.removeBitbucketRepositoryFromProject).toHaveBeenCalledWith("bb-1", "p1"),
+  },
+  {
     name: "Jira",
     source: jiraSource,
     section: "Instance",
@@ -258,6 +315,12 @@ describe("SourceDetailsPanel", () => {
     mocks.updateGithubRepository.mockResolvedValue({ transactionId: "tx" });
     mocks.removeRepositoryFromProject.mockResolvedValue({ repositoryId: "repo-1", projectIds: [] });
     mocks.configureGithubRepository.mockResolvedValue(undefined);
+    mocks.updateBitbucketRepository.mockResolvedValue({ transactionId: "tx" });
+    mocks.removeBitbucketRepositoryFromProject.mockResolvedValue({
+      repositoryId: "bb-1",
+      projectIds: [],
+    });
+    mocks.configureBitbucketRepository.mockResolvedValue(undefined);
     mocks.updateJiraInstance.mockResolvedValue({ transactionId: "tx" });
     mocks.removeJiraInstanceFromProject.mockResolvedValue(undefined);
     mocks.configureJiraInstance.mockResolvedValue(undefined);
@@ -275,6 +338,7 @@ describe("SourceDetailsPanel", () => {
 
     const stored = { autoUpdate: true, spec: interval(60), nextSyncAt: null };
     mocks.getGithubRepositoryConfig.mockResolvedValue(stored);
+    mocks.getBitbucketRepositoryConfig.mockResolvedValue(stored);
     mocks.getJiraConfig.mockResolvedValue(stored);
     mocks.getConnection.mockResolvedValue(stored);
   });
@@ -512,6 +576,18 @@ describe("SourceDetailsPanel", () => {
       );
     });
 
+    it("links a Bitbucket source to its repository in the knowledge base", () => {
+      render(panel(bitbucketSource));
+
+      expect(screen.getByRole("link", { name: linkName })).toHaveAttribute(
+        "href",
+        "/knowledge-base?sources=BITBUCKET&repos=acme/widgets",
+      );
+      expect(screen.getByRole("link", { name: linkName })).toHaveTextContent(
+        "10 artifacts · acme/widgets",
+      );
+    });
+
     it("tells a GitHub source's artifact count and repository", () => {
       render(panel(mockSource));
 
@@ -569,6 +645,77 @@ describe("SourceDetailsPanel", () => {
     expect(screen.getByText("Issues")).toBeInTheDocument();
     expect(screen.queryByText("Commits")).not.toBeInTheDocument();
     expect(screen.queryByText("Pull requests")).not.toBeInTheDocument();
+  });
+
+  it("shows the Bitbucket workspace and slug and no GitHub-only rows", () => {
+    render(panel(bitbucketSource));
+
+    expect(screen.getByText("Workspace")).toBeInTheDocument();
+    expect(screen.getByText("acme")).toBeInTheDocument();
+    expect(screen.getByText("Slug")).toBeInTheDocument();
+    expect(screen.getByText("widgets")).toBeInTheDocument();
+    expect(screen.getByText("bb-1")).toBeInTheDocument();
+    expect(screen.queryByText("Owner")).not.toBeInTheDocument();
+  });
+
+  it("lists only the pull-request sync time of a Bitbucket repository", () => {
+    render(
+      panel({
+        ...bitbucketSource,
+        details: {
+          system: "BITBUCKET",
+          repository: bitbucketRepository,
+          syncTimes: { pullRequests: "2026-07-05T10:00:00Z" },
+        },
+      }),
+    );
+
+    expect(screen.getByText("Last Synced")).toBeInTheDocument();
+    expect(screen.getByText("Pull requests")).toBeInTheDocument();
+    expect(screen.queryByText("Commits")).not.toBeInTheDocument();
+    expect(screen.queryByText("Issues")).not.toBeInTheDocument();
+  });
+
+  it("disables the Bitbucket update and hides unlinking without a connection id", () => {
+    render(
+      panel({
+        ...bitbucketSource,
+        details: {
+          system: "BITBUCKET",
+          repository: { ...bitbucketRepository, repositoryId: null },
+          syncTimes: { pullRequests: null },
+        },
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: /Update repository/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Remove from project/ })).not.toBeInTheDocument();
+  });
+
+  it("says a Bitbucket repository is skipped, not marked out of date, with auto update off", async () => {
+    mocks.getBitbucketRepositoryConfig.mockResolvedValue({
+      autoUpdate: false,
+      spec: interval(60),
+      nextSyncAt: null,
+    });
+    mocks.getGithubRepositoryConfig.mockResolvedValue({
+      autoUpdate: false,
+      spec: interval(60),
+      nextSyncAt: null,
+    });
+
+    const { unmount } = render(panel(bitbucketSource));
+    expect(
+      await screen.findByText(
+        "Due checks skip this repository. It only updates when started manually.",
+      ),
+    ).toBeInTheDocument();
+    unmount();
+
+    render(panel(mockSource));
+    expect(
+      await screen.findByText("Due checks only mark this repository out of date."),
+    ).toBeInTheDocument();
   });
 
   it("keeps the three GitHub sync resource types", () => {

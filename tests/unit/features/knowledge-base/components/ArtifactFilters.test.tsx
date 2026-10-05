@@ -117,6 +117,42 @@ describe("ArtifactFilters", () => {
     expect(screen.getByTestId("kb-filter-option-markdown")).toBeInTheDocument();
   });
 
+  it("offers Bitbucket as a source with its own icon and reports its toggle", () => {
+    const onToggleSource = vi.fn();
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          onToggleSource,
+          sourceOptions: [...SOURCE_OPTIONS, { value: "BITBUCKET", label: "Bitbucket", count: 2 }],
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+
+    const bitbucket = screen.getByTestId("kb-filter-option-bitbucket");
+    // The Bitbucket logo is an inline SVG next to the option's label.
+    expect(bitbucket.closest("label")?.querySelector("svg")).not.toBeNull();
+
+    fireEvent.click(bitbucket);
+    expect(onToggleSource).toHaveBeenCalledWith("BITBUCKET");
+  });
+
+  it("shows the repository facet while Bitbucket repositories are offered", () => {
+    render(
+      <ArtifactFilters
+        {...buildProps({
+          selectedSources: new Set<SourceSystem>(["BITBUCKET"]),
+          repositoryOptions: [{ value: "acme/widgets", label: "acme/widgets", count: 2 }],
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("kb-filter-trigger"));
+
+    expect(screen.getByText("acme/widgets")).toBeInTheDocument();
+  });
+
   it("summarises the source selection and shows active filter count", () => {
     const { rerender } = render(
       <ArtifactFilters

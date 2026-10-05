@@ -129,7 +129,7 @@ export function TeamOverviewWidget({ size }: { size: DashboardWidgetSize }) {
       {size === "small" ? (
         <WidgetMetrics icon={Users} metrics={metricsFor(summary)} />
       ) : (
-        <div className="grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="grid flex-1 grid-cols-1 gap-5 @min-[24rem]:grid-cols-2">
           <WidgetMetrics icon={Users} metrics={metricsFor(summary).slice(0, 2)} />
 
           <div className="flex flex-col justify-center gap-4">

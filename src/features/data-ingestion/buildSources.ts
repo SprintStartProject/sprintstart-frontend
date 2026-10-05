@@ -91,9 +91,9 @@ function matchConfluenceRun(
  * stable `sourceId` is the project source's id, used for selection and deep
  * links). A GitHub source without a status row (an unresolvable repo) and an
  * upload source without one fall back to their source system's latest run.
- * Jira and Confluence cards are built from the status rows and connection
- * records instead, so a project source list that includes them does not double
- * them.
+ * Bitbucket, Jira and Confluence cards are built from the status rows and
+ * connection records instead, so a project source list that includes them does
+ * not double them.
  */
 export function buildDataSources({
   projectSources,
@@ -195,6 +195,19 @@ export function buildDataSources({
     ];
   });
 
+  // Bitbucket cards come from the status rows alone: every field the card and the
+  // details panel show is on the row, so a project source of this type must not
+  // add a second card.
+  const bitbucketCards = statuses
+    .filter((status) => status.sourceSystem === "BITBUCKET")
+    .map((status) =>
+      createDataSource({
+        definition: CONNECTORS.BITBUCKET,
+        status,
+        connectorEnabled: enabledOf("BITBUCKET"),
+      }),
+    );
+
   // The status row carries no credential metadata, so the instance records are
   // merged in by URL purely for the credential shown in the details panel.
   const jiraInstanceByUrl = new Map(
@@ -234,5 +247,11 @@ export function buildDataSources({
       }),
     );
 
-  return [...projectSourceCards, ...jiraCards, ...confluenceCards, ...uploadCards];
+  return [
+    ...projectSourceCards,
+    ...bitbucketCards,
+    ...jiraCards,
+    ...confluenceCards,
+    ...uploadCards,
+  ];
 }

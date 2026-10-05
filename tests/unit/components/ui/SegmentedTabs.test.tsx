@@ -124,6 +124,63 @@ describe("SegmentedTabs", () => {
     expect(buttons[2]).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("wraps below lg only when the caller asks for it", () => {
+    const { container, rerender } = render(
+      <SegmentedTabs
+        value="all"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-wrapbelow"
+        ariaLabel="Filter items"
+        wrapBelow="lg"
+      />,
+    );
+
+    expect(container.firstElementChild?.classList.contains("max-lg:flex-wrap")).toBe(true);
+
+    rerender(
+      <SegmentedTabs
+        value="all"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-wrapbelow"
+        ariaLabel="Filter items"
+      />,
+    );
+
+    expect(container.firstElementChild?.classList.contains("max-lg:flex-wrap")).toBe(false);
+  });
+
+  it("grows the phone padding on the reading size, and leaves the compact one its density", () => {
+    const { unmount } = render(
+      <SegmentedTabs
+        value="all"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-growth-compact"
+        ariaLabel="Filter items compact"
+        size="sm"
+      />,
+    );
+
+    // The compact size has no caller yet. When one needs the grown target the class comes back
+    // with it; until then the row keeps the density it was built for.
+    expect(screen.getByTestId("tab-all").className).not.toContain("max-sm:py-3");
+    unmount();
+
+    render(
+      <SegmentedTabs
+        value="all"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-growth"
+        ariaLabel="Filter items"
+      />,
+    );
+
+    expect(screen.getByTestId("tab-all").className).toContain("max-sm:py-3");
+  });
+
   describe("views inside an option", () => {
     const nested: SegmentedTabOption<string>[] = [
       { value: "overview", label: "Overview" },

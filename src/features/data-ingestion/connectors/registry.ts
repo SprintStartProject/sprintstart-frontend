@@ -2,6 +2,7 @@ import type { ProjectSource } from "../../../services/projectService.ts";
 import type { ConfluenceConnectionDto } from "../../../services/sources/confluenceService.ts";
 import type { JiraInstanceDto } from "../../../services/sources/jiraService.ts";
 import type { DraftSourceOf } from "./draft.ts";
+import { bitbucketConnector } from "./bitbucket/definition.ts";
 import { confluenceConnector } from "./confluence/definition.ts";
 import { githubConnector } from "./github/definition.ts";
 import { jiraConnector } from "./jira/definition.ts";
@@ -12,6 +13,7 @@ import { uploadConnector } from "./upload/definition.ts";
 /** The connection record each connector's cards are merged with. */
 export type ConnectionOf = {
   GITHUB: ProjectSource;
+  BITBUCKET: ProjectSource;
   JIRA: JiraInstanceDto;
   UPLOAD: ProjectSource;
   CONFLUENCE: ConfluenceConnectionDto;
@@ -29,6 +31,7 @@ export const CONNECTORS: {
   JIRA: jiraConnector,
   UPLOAD: uploadConnector,
   CONFLUENCE: confluenceConnector,
+  BITBUCKET: bitbucketConnector,
 };
 
 /** The definitions in the order the source systems are offered. */
@@ -63,6 +66,14 @@ export const CHAT_SOURCE_SYSTEMS: readonly SourceSystem[] = CONNECTOR_LIST.filte
 export const KNOWLEDGE_BASE_SOURCE_ORDER: readonly SourceSystem[] = [...CONNECTOR_LIST]
   .sort((left, right) => left.knowledgeBase.facetOrder - right.knowledgeBase.facetOrder)
   .map((definition) => definition.meta.system);
+
+/**
+ * Whether any of the sources has artifacts that belong to a repository, which is
+ * when the knowledge base offers its repository facet.
+ */
+export function hasRepositoryFacet(sources: Iterable<SourceSystem>): boolean {
+  return [...sources].some((system) => CONNECTORS[system].knowledgeBase.repositoryFacet === true);
+}
 
 /**
  * The source system a cited source comes from, judged by its URL and name (both

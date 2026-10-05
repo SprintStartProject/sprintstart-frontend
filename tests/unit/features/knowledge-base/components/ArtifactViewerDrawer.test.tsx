@@ -465,6 +465,28 @@ describe("ArtifactViewerDrawer", () => {
       expect(await screen.findByText("PR Description")).toBeInTheDocument();
     });
 
+    it("renders a Bitbucket pull request as markdown from its /pull-requests/ link alone", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Bitbucket PR\n- Reworked the widgets",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Rework widgets",
+          artifactType: "FILE",
+          sourceSystem: "BITBUCKET",
+          sourceUrl: "https://bitbucket.org/acme/widgets/pull-requests/12",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("Bitbucket PR")).toBeInTheDocument();
+    });
+
     it("renders Jira / GitHub issues as markdown even if artifactType is FILE", async () => {
       const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
       vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
@@ -963,6 +985,64 @@ describe("ArtifactViewerDrawer", () => {
       );
     });
   });
+  describe("Bitbucket workspace artifacts", () => {
+    const workspaceMetadata = JSON.stringify({
+      workspace: "acme",
+      uuid: "{1234}",
+      name: "Acme Corp",
+      isPrivate: true,
+      createdOn: "2020-01-15T00:00:00.000Z",
+      url: "https://bitbucket.org/acme/",
+      members: [
+        { accountId: "1", nickname: "ada", displayName: "Ada Lovelace" },
+        { accountId: "2", nickname: "grace", displayName: null },
+      ],
+    });
+
+    it("renders the workspace profile from metadata and never fetches content", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "Acme Corp",
+          sourceSystem: "BITBUCKET",
+          metadata: workspaceMetadata,
+        }),
+      );
+
+      expect(await screen.findByTestId("bitbucket-workspace-view")).toBeInTheDocument();
+      expect(screen.queryByTestId("org-metadata-view")).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "acme" })).toHaveAttribute(
+        "href",
+        "https://bitbucket.org/acme/",
+      );
+      expect(screen.getByRole("link", { name: /repositories/i })).toHaveAttribute(
+        "href",
+        "https://bitbucket.org/acme/workspace/repositories",
+      );
+      expect(screen.getByText("Private")).toBeInTheDocument();
+      expect(screen.getByText("15 Jan 2020")).toBeInTheDocument();
+      // A member without a display name falls back to the nickname.
+      expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+      expect(screen.getByText("grace")).toBeInTheDocument();
+      expect(knowledgeService.getArtifactContent).not.toHaveBeenCalled();
+    });
+
+    it("shows a quiet empty state when the workspace metadata is unusable", async () => {
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "Acme Corp",
+          sourceSystem: "BITBUCKET",
+          metadata: JSON.stringify({ name: "Acme Corp" }),
+        }),
+      );
+
+      expect(await screen.findByText("Workspace profile unavailable.")).toBeInTheDocument();
+      expect(screen.queryByText("Organization profile unavailable.")).not.toBeInTheDocument();
+    });
+  });
+
   it("refuses an empty artifact instead of asking the AI", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
 

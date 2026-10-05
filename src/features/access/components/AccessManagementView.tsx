@@ -109,13 +109,13 @@ export function AccessManagementView({
           Credentials are stored per source and used for ingestion.
         </p>
 
-        <div className="flex flex-row items-center gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <FilterSelect
             label="Filter access by source"
             value={sourceFilter}
             options={filterOptions}
             onChange={onSourceFilterChange}
-            className="min-w-0 flex-1 sm:w-48 sm:min-w-[auto] sm:flex-initial"
+            className="w-full min-w-0 sm:w-48 sm:min-w-[auto] sm:flex-initial"
           />
 
           <AccessAddMenu connectors={ACCESS_CONNECTORS} onSelect={handleAddRequest} />

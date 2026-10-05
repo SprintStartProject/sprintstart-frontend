@@ -8,6 +8,11 @@
  * the parse keeps consumers (the artifact list card and the viewer drawer) free
  * of ad-hoc `JSON.parse` + shape handling, and guarantees malformed metadata can
  * never crash the UI or leak raw JSON into it.
+ *
+ * Bitbucket artifacts carry `{ repositoryId, workspace, slug }` instead (see
+ * {@link parseBitbucketMetadata}); both shapes resolve to the same
+ * `owner/repository` display string, so the card badge and the repository facet
+ * treat the two providers alike.
  */
 
 import type { Artifact } from "./types";
@@ -22,6 +27,35 @@ export interface GithubArtifactMetadata {
   repositoryId?: string;
   /** `owner/repository` display string, as assembled by the backend mapper. */
   repositoryFullName: string;
+}
+
+/**
+ * Reads a metadata string as a plain JSON object, or `null` when it is missing,
+ * blank, malformed or not an object. `source` only names the provider in the
+ * warning logged for a malformed blob.
+ */
+function readMetadataObject(
+  json: string | null | undefined,
+  source: string,
+): Record<string, unknown> | null {
+  if (typeof json !== "string" || json.trim() === "") return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    // A malformed blob (never expected from the backend, but cheap to guard
+    // against) must not crash the UI — degrade to the same "no repository"
+    // state as missing metadata.
+    console.warn(`Ignoring unparseable ${source} artifact metadata`, json);
+    return null;
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+
+  return parsed as Record<string, unknown>;
 }
 
 /**
@@ -40,24 +74,9 @@ export interface GithubArtifactMetadata {
 export function parseGithubMetadata(
   json: string | null | undefined,
 ): GithubArtifactMetadata | null {
-  if (typeof json !== "string" || json.trim() === "") return null;
+  const payload = readMetadataObject(json, "GitHub");
+  if (payload === null) return null;
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    // A malformed blob (never expected from the backend, but cheap to guard
-    // against) must not crash the UI — degrade to the same "no repository"
-    // state as missing metadata.
-    console.warn("Ignoring unparseable GitHub artifact metadata", json);
-    return null;
-  }
-
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return null;
-  }
-
-  const payload = parsed as Record<string, unknown>;
   const repositoryFullName = payload["repositoryFullName"];
   if (typeof repositoryFullName !== "string" || repositoryFullName.trim() === "") {
     return null;
@@ -74,15 +93,57 @@ export function parseGithubMetadata(
   };
 }
 
+export interface BitbucketArtifactMetadata {
+  /** The connected repository's id; declared-but-unconsumed, like GitHub's. */
+  repositoryId?: string;
+  /** The Bitbucket workspace owning the repository (or described, for a workspace profile). */
+  workspace: string;
+  /**
+   * The repository's slug. Absent on a workspace's own metadata artifact, which
+   * names the workspace but no repository.
+   */
+  slug?: string;
+}
+
 /**
- * Resolves the display repository (`owner/repository`) for an artifact, or
- * `null` when the artifact has no repository to show.
+ * Parses a Bitbucket artifact's `metadata` JSON string: `{ repositoryId,
+ * workspace, slug }` on repository artifacts, `{ workspace, ... }` on the
+ * workspace's profile artifact.
  *
- * Only GitHub's repo-scoped artifact types carry repository metadata. GitHub's
- * `ORG_METADATA` artifacts are also `sourceSystem === "GITHUB"`, but their
- * metadata is the org profile (no repository fields), so they are excluded
- * explicitly — letting them through would run the org JSON through the repo
- * parser and always fail. Non-GitHub source systems (`UPLOAD`, `JIRA`,
+ * Tolerant like {@link parseGithubMetadata}: returns `null` for anything that
+ * names no workspace. Only the fields the UI uses are validated and trimmed.
+ *
+ * @param json - The raw `artifact.metadata` string (may be omitted).
+ * @returns The parsed metadata, or `null` when the input is not usable.
+ */
+export function parseBitbucketMetadata(
+  json: string | null | undefined,
+): BitbucketArtifactMetadata | null {
+  const payload = readMetadataObject(json, "Bitbucket");
+  if (payload === null) return null;
+
+  const workspace = payload["workspace"];
+  if (typeof workspace !== "string" || workspace.trim() === "") return null;
+
+  const slug = payload["slug"];
+
+  return {
+    repositoryId: typeof payload["repositoryId"] === "string" ? payload["repositoryId"] : undefined,
+    workspace: workspace.trim(),
+    slug: typeof slug === "string" && slug.trim() !== "" ? slug.trim() : undefined,
+  };
+}
+
+/**
+ * Resolves the display repository (`owner/repository`, or `workspace/slug` for
+ * Bitbucket) for an artifact, or `null` when the artifact has no repository to
+ * show.
+ *
+ * Only the repo-scoped artifact types of GitHub and Bitbucket carry repository
+ * metadata. Their `ORG_METADATA` artifacts share the source system, but the
+ * metadata is the org or workspace profile (no repository fields), so they are
+ * excluded explicitly — letting them through would run the profile JSON through
+ * the repo parser and always fail. Other source systems (`UPLOAD`, `JIRA`,
  * `CONFLUENCE`, including their `PAGE` artifacts) carry different metadata
  * shapes and are excluded by the source-system check.
  *
@@ -110,6 +171,7 @@ export function getArtifactRepository(
  */
 interface RepositoryInfo {
   repository: string | null;
+  /** The owning GitHub org login, or the Bitbucket workspace, of an owner-profile artifact. */
   orgLogin: string | null;
 }
 
@@ -117,6 +179,17 @@ interface RepositoryInfo {
 function computeRepositoryInfo(
   artifact: Pick<Artifact, "sourceSystem" | "artifactType" | "metadata">,
 ): RepositoryInfo {
+  if (artifact.sourceSystem === "BITBUCKET") {
+    const bitbucket = parseBitbucketMetadata(artifact.metadata);
+
+    if (bitbucket?.slug) {
+      return { repository: `${bitbucket.workspace}/${bitbucket.slug}`, orgLogin: null };
+    }
+
+    // The workspace's own artifact names no repository, only its workspace.
+    return { repository: null, orgLogin: bitbucket?.workspace ?? null };
+  }
+
   const repository =
     artifact.sourceSystem === "GITHUB" && artifact.artifactType !== "ORG_METADATA"
       ? (parseGithubMetadata(artifact.metadata)?.repositoryFullName ?? null)
@@ -150,7 +223,7 @@ function repositoryInfoOf(
  *
  * Mirrors `matchesFormat`'s scoping rule where it can: artifacts from other
  * sources are outside the facet's reach and always match, so "GitHub + Uploads
- * + repo X" does not hide the uploads. Within GitHub a selection narrows
+ * + repo X" does not hide the uploads. Within GitHub (and Bitbucket) a selection narrows
  * strictly, with one exception: the org profile names no repository, but it
  * describes the org that owns the chosen ones — so it stays visible exactly
  * when its login is the owner half of a checked `owner/repo`. An unrelated
@@ -174,13 +247,13 @@ export function matchesRepository(
   selected: ReadonlySet<string>,
 ): boolean {
   if (selected.size === 0) return true;
-  if (artifact.sourceSystem !== "GITHUB") return true;
+  if (artifact.sourceSystem !== "GITHUB" && artifact.sourceSystem !== "BITBUCKET") return true;
 
   const { repository, orgLogin } = repositoryInfoOf(artifact);
   if (repository !== null) return selected.has(repository);
 
-  // A GitHub artifact that names no repository: only the org profile can still
-  // belong to the selection — namely when its org owns one of the chosen repos.
+  // An artifact that names no repository: only the org (or workspace) profile can
+  // still belong to the selection — namely when its owner owns one of the chosen repos.
   if (orgLogin === null) return false;
   const login = orgLogin.toLowerCase();
   return [...selected].some((repo) => {

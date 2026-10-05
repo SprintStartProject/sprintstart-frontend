@@ -37,7 +37,7 @@ export function DashboardHero({
       };
 
   return (
-    <section className="relative flex h-full items-center overflow-hidden rounded-2xl px-6 py-5 sm:px-8">
+    <section className="@container relative flex h-full items-center overflow-hidden rounded-2xl px-6 py-5 sm:px-8">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-gradient-to-br from-app-brand/12 via-transparent to-transparent"
@@ -58,7 +58,10 @@ export function DashboardHero({
         style={{ background: "var(--progress-fill-end)" }}
       />
 
-      <div className="relative flex w-full flex-wrap items-center justify-between gap-6">
+      {/* One row, never wrapped: this is the 136px band, and a clock wrapped under the greeting
+          is a clock below the band's bottom edge. The type steps down with the *card's* width
+          instead, and a long name truncates -- the date above it still says whose card it is. */}
+      <div className="relative flex w-full items-center justify-between gap-6">
         <div className="flex min-w-0 items-center gap-4">
           <div className="relative shrink-0">
             <div
@@ -76,14 +79,14 @@ export function DashboardHero({
           </div>
 
           <div className="min-w-0">
-            <p className="text-sm font-medium text-app-text-muted">{formattedDate}</p>
-            <h2 className="bg-gradient-to-r from-app-text via-app-text to-app-brand bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl">
+            <p className="truncate text-sm font-medium text-app-text-muted">{formattedDate}</p>
+            <h2 className="truncate bg-gradient-to-r from-app-text via-app-text to-app-brand bg-clip-text text-2xl font-bold tracking-tight text-transparent @2xl:text-3xl">
               {greeting}, {displayName}
             </h2>
           </div>
         </div>
 
-        <p className="text-4xl font-light text-app-text/80 tabular-nums sm:text-5xl">
+        <p className="shrink-0 text-3xl font-light text-app-text/80 tabular-nums @xl:text-4xl @3xl:text-5xl">
           {formattedTime}
         </p>
       </div>

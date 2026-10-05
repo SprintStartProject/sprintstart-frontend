@@ -3,12 +3,21 @@ import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { GitBranch } from "lucide-react";
+import { BitbucketIcon } from "../../../src/components/icons/BitbucketIcon";
 import { SourceDetailsPanel } from "../../../src/features/data-ingestion/components/SourceDetailsPanel";
 import type { DataSource } from "../../../src/features/data-ingestion/types";
 import { deriveSourceStatus } from "../../../src/features/data-ingestion/data";
 
 vi.mock("../../../src/services/ingestionService", () => ({
   getIngestionStatus: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../../../src/services/sources/bitbucketService", () => ({
+  getBitbucketRepositoryConfig: vi.fn().mockResolvedValue({
+    autoUpdate: true,
+    spec: { type: "INTERVAL", everyMinutes: 30 },
+    nextSyncAt: null,
+  }),
 }));
 
 const source: DataSource = {
@@ -55,6 +64,49 @@ describe("SourceDetailsPanel Accessibility", () => {
     await waitFor(() => {
       expect(screen.getByText("GitHub Repository")).toBeInTheDocument();
     });
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no a11y violations for a Bitbucket repository with all actions", async () => {
+    const bitbucketSource: DataSource = {
+      ...source,
+      sourceId: "bb-repo-1",
+      sourceSystem: "BITBUCKET",
+      name: "acme/widgets",
+      type: "Bitbucket",
+      icon: BitbucketIcon,
+      details: {
+        system: "BITBUCKET",
+        repository: {
+          repositoryId: "bb-repo-1",
+          workspace: "acme",
+          slug: "widgets",
+          fullName: "acme/widgets",
+          url: "https://bitbucket.org/acme/widgets",
+          enabled: true,
+        },
+        syncTimes: { pullRequests: "2026-07-01T00:00:00.000Z" },
+      },
+    };
+
+    const { baseElement } = render(
+      <MemoryRouter>
+        <SourceDetailsPanel
+          source={bitbucketSource}
+          projectId="p1"
+          canManage
+          canUnlink
+          onChanged={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("acme/widgets").length).toBeGreaterThan(0);
+    });
+    await screen.findByLabelText("Minutes");
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });

@@ -3,6 +3,7 @@ import { buildDataSources } from "../../../../src/features/data-ingestion/buildS
 import { CONNECTORS } from "../../../../src/features/data-ingestion/connectors/registry";
 import { createDataSource, formatDateTime } from "../../../../src/features/data-ingestion/data";
 import {
+  bitbucketRepositoryOf,
   confluenceSpaceOf,
   githubRepositoryOf,
   jiraInstanceOf,
@@ -165,6 +166,69 @@ describe("buildDataSources", () => {
     expect(card.artifacts).toBe(7);
     expect(card.totalArtifactCount).toBe(0);
     expect(githubRepositoryOf(card)).toBeNull();
+  });
+
+  it("builds Bitbucket cards from the status rows alone, without a second card per project source", () => {
+    const cards = buildDataSources({
+      ...none,
+      projectSources: [
+        { id: "bb-ps", name: "acme/widgets", type: "BITBUCKET", status: "CONNECTED" },
+      ],
+      statuses: [
+        status({
+          sourceSystem: "BITBUCKET",
+          sourceId: "acme/widgets",
+          displayName: "acme/widgets",
+          repositoryId: "bb-1",
+          owner: "acme",
+          name: "widgets",
+          sourceUrl: "https://bitbucket.org/acme/widgets",
+          artifactCount: 12,
+          lastPullRequestsSyncAt: "2026-07-28T08:00:00Z",
+        }),
+      ],
+    });
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0].sourceSystem).toBe("BITBUCKET");
+    expect(cards[0].sourceId).toBe("bb-1");
+    expect(cards[0].totalArtifactCount).toBe(12);
+    expect(bitbucketRepositoryOf(cards[0])).toMatchObject({
+      workspace: "acme",
+      slug: "widgets",
+      repositoryId: "bb-1",
+    });
+    expect(cards[0].details).toMatchObject({ syncTimes: { pullRequests: "2026-07-28T08:00:00Z" } });
+  });
+
+  it("keeps GitHub and Bitbucket cards of the same name apart", () => {
+    const cards = buildDataSources({
+      ...none,
+      projectSources: [githubProjectSource],
+      statuses: [
+        status({}),
+        status({
+          sourceSystem: "BITBUCKET",
+          repositoryId: "bb-1",
+          sourceUrl: "https://bitbucket.org/acme/monorepo",
+        }),
+      ],
+    });
+
+    expect(cards.map((card) => card.sourceSystem)).toEqual(["GITHUB", "BITBUCKET"]);
+    expect(githubRepositoryOf(cards[0])).not.toBeNull();
+    expect(githubRepositoryOf(cards[1])).toBeNull();
+  });
+
+  it("shows a Bitbucket repository as disabled when its connector is globally disabled", () => {
+    const [card] = buildDataSources({
+      ...none,
+      statuses: [status({ sourceSystem: "BITBUCKET", repositoryId: "bb-1" })],
+      connectorEnabledById: new Map([["bitbucket", false]]),
+    });
+
+    expect(card.statusView.state).toBe("disabled");
+    expect(card.statusView.label).toBe("Connector disabled");
   });
 
   it("builds Jira cards from the status rows and merges the instance record by URL", () => {

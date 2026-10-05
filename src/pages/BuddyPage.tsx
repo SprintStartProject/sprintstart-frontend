@@ -9,6 +9,7 @@ import {
   RailToggle,
   RAIL_DESKTOP_QUERY,
 } from "../components/layout/ConversationRail";
+import { useIsSmUp } from "../hooks/useIsSmUp";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
 import { useBuddySession } from "../features/buddy/buddySessionContext";
@@ -92,6 +93,7 @@ function BuddyPageShell({
   railToggle,
   newConversationControl,
   modeControl,
+  reserveFloatingClearance = false,
   isRailOpen = false,
   children,
 }: {
@@ -111,6 +113,13 @@ function BuddyPageShell({
    * a hire-only user, so nobody gets a row of nothing.
    */
   modeControl?: ReactNode;
+  /**
+   * Whether the floating controls above the column (the rail toggle, "start a new conversation")
+   * need their room reserved. Computed by the page from the stable facts — a control withdraws
+   * mid-turn, the room it withdraws from must not — and applied to the mode row, which is the
+   * element those controls overlap when it renders.
+   */
+  reserveFloatingClearance?: boolean;
   /** Whether that column is currently taking width, which decides this column's left gutter. */
   isRailOpen?: boolean;
   children: ReactNode;
@@ -137,7 +146,14 @@ function BuddyPageShell({
       >
         {railToggle}
         {newConversationControl}
-        {modeControl && <div className="app-page-frame shrink-0 pt-4">{modeControl}</div>}
+        {modeControl && (
+          <div
+            data-testid="buddy-mode-band"
+            className={`app-page-frame shrink-0 ${reserveFloatingClearance ? "pt-14 min-[1660px]:pt-4" : "pt-4"}`}
+          >
+            {modeControl}
+          </div>
+        )}
 
         {children}
       </div>
@@ -337,6 +353,8 @@ function BuddyMentorHome() {
     [hasUserMessage, openerAction, greeting.isRevealing, sendMessage],
   );
 
+  const isSmUp = useIsSmUp();
+
   /**
    * The suggestion row above the composer, held in one identity — the conversation below it is
    * memoised now, and an element built inline in the render would be the one prop that always
@@ -356,9 +374,13 @@ function BuddyMentorHome() {
           suggestions={suggestions}
           onPick={setDraft}
           heading="Not sure where to start?"
+          // Fewer chips on phones, not smaller ones: capping the count answers the space the
+          // dock's compact mode was worried about, without shrinking a tap target right after
+          // this PR grew every other one.
+          limit={isSmUp ? undefined : 3}
         />
       ) : undefined,
-    [isHireMode, hasUserMessage, suggestions, setDraft],
+    [isHireMode, hasUserMessage, suggestions, setDraft, isSmUp],
   );
 
   // The keyboard half of the buttons that start a conversation. Gated the same way they are: a
@@ -372,6 +394,18 @@ function BuddyMentorHome() {
     canStartConversation && surfaceFromPathname(pathname) === "buddy",
   );
 
+  // The floating controls withdraw mid-turn (the new-conversation button while a reply streams),
+  // and the room they need must not go with them — so the mode row reserves it from the stable
+  // facts rather than from the controls' own presence: the rail toggle's conditions, or simply
+  // that this conversation has been spoken in. The row keeps the phone value of that clearance
+  // up to `min-[1660px]`, where the fluid page gutter (clamp(2rem, 9vw - 4rem, 10rem)) first
+  // clears the counted rail toggle with a real margin: a two-digit reply count puts its halo at
+  // ~79px, and the gutter only passes that with ~6px to spare at 1660px. Below it a select
+  // sitting at the column edge would tuck its top-left corner under the toggle. Hire-flow only;
+  // a team conversation has no floating controls to clear.
+  const needsFloatingRoom =
+    isHireMode && (((sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage);
+
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
   // Nothing here needs the greeting in order to work: the composer sends, the chips render, and
@@ -379,6 +413,7 @@ function BuddyMentorHome() {
   // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
     <BuddyPageShell
+      reserveFloatingClearance={needsFloatingRoom}
       isRailOpen={rail.open}
       rail={
         // Mounted whenever it holds something, open or not: the count on the control that
@@ -483,8 +518,12 @@ function BuddyMentorHome() {
         // to the button shunted the whole transcript down and back on every single turn.
         // Visible while the transcript is shorter than the viewport, which is exactly the
         // first few turns this control exists for.
+        // When the mode row renders it is the element the floating controls overlap, and it
+        // already carries their clearance (see the shell above) — the transcript below must
+        // not reserve a second gap for the same controls.
         hasFloatingControl={
-          (isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage
+          !canSwitchModes &&
+          ((isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage)
         }
         // Built above, in one identity — the conversation is memoised, and the chips' own reasons
         // are written where they are built.

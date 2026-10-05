@@ -22,7 +22,12 @@ export function deriveArtifactFromCitation(citation: CitationArtifactOpen): Arti
   const name = citation.filename.toLowerCase();
 
   let artifactType: ArtifactType = "FILE";
-  if (url.includes("/pull/") || name.startsWith("pr #") || name.startsWith("pull request")) {
+  if (
+    url.includes("/pull/") ||
+    url.includes("/pull-requests/") ||
+    name.startsWith("pr #") ||
+    name.startsWith("pull request")
+  ) {
     artifactType = "PULL_REQUEST";
   } else if (
     url.includes("/issues/") ||

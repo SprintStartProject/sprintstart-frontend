@@ -7,6 +7,7 @@ import { http, HttpResponse } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
 import { onboardingService } from "../../../src/services/onboardingService";
 import { announceBuddyPathChanged } from "../../../src/features/buddy/aiBuddyBus";
+import { hireJourneyViewKey } from "../../../src/features/onboarding/journeyViewMemory";
 import {
   OnboardingJourneyContext,
   type OnboardingJourneyValue,
@@ -169,11 +170,21 @@ function phaseFixture(id: string, position: number, title: string) {
   };
 }
 
+/** Remembers the list for the signed-in hire, as if they had left the page on it. */
+function startOnList() {
+  localStorage.setItem(
+    hireJourneyViewKey(signedInUserId.value),
+    JSON.stringify({ mode: "list", graphPhaseId: null }),
+  );
+}
+
 describe("OnBoardingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // The page remembers list or graph; every test starts from a page never seen before.
+    // The page remembers list or graph. The graph is the default; most tests here are about the
+    // list, so they start from a hire who left the page on it.
     localStorage.clear();
+    startOnList();
     projectContextState.selectedProjectId = "proj1";
     projectContextState.isLoading = false;
     projectContextState.isSwitcherEnabled = true;
@@ -555,6 +566,22 @@ describe("OnBoardingPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens on the graph for a hire with nothing remembered, and lists it first", async () => {
+    localStorage.clear();
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
+    ).toBeInTheDocument();
+    const slider = screen.getByRole("button", { name: "Graph" }).parentElement!;
+    expect(
+      within(slider)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Graph", "List"]);
+  });
+
   it("switches to the graph with the view slider and back to the list", async () => {
     const user = userEvent.setup();
 
@@ -848,7 +875,7 @@ describe("OnBoardingPage", () => {
       ),
     );
     localStorage.setItem(
-      "sprintstart.onboarding.view.user1",
+      hireJourneyViewKey("user1"),
       JSON.stringify({ mode: "graph", graphPhaseId: "phase2" }),
     );
 
@@ -876,26 +903,28 @@ describe("OnBoardingPage", () => {
         }),
       ),
     );
+    localStorage.clear();
     localStorage.setItem(
-      "sprintstart.onboarding.view.user1",
-      JSON.stringify({ mode: "graph", graphPhaseId: "phase2" }),
+      hireJourneyViewKey("user1"),
+      JSON.stringify({ mode: "list", graphPhaseId: null }),
     );
     signedInUserId.value = "user2";
 
     renderPage();
 
-    // The list, which is what an account with nothing remembered gets -- not the graph the other
-    // account left behind.
-    expect(await screen.findByRole("button", { name: /Phase 1 step/ })).toBeInTheDocument();
-    expect(screen.queryByRole("application")).not.toBeInTheDocument();
+    // The graph's journey map, which is what an account with nothing remembered gets -- not the
+    // list the other account left behind.
+    expect(
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Phase 1 step/ })).not.toBeInTheDocument();
 
     // And what this account does is written under its own key, leaving the other one alone.
-    await waitFor(() =>
-      expect(localStorage.getItem("sprintstart.onboarding.view.user2")).not.toBeNull(),
-    );
-    expect(
-      JSON.parse(localStorage.getItem("sprintstart.onboarding.view.user1") ?? "{}"),
-    ).toMatchObject({ mode: "graph", graphPhaseId: "phase2" });
+    await waitFor(() => expect(localStorage.getItem(hireJourneyViewKey("user2"))).not.toBeNull());
+    expect(JSON.parse(localStorage.getItem(hireJourneyViewKey("user1")) ?? "{}")).toMatchObject({
+      mode: "list",
+    });
+    signedInUserId.value = "user1";
   });
 
   /**
@@ -966,6 +995,7 @@ describe("OnBoardingPage", () => {
 describe("OnBoardingPage: changes the buddy made", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    startOnList();
     projectContextState.selectedProjectId = "proj1";
   });
 

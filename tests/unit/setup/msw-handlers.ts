@@ -676,6 +676,22 @@ export const handlers = [
   http.get("/api/v1/connectors/confluence/sources", () =>
     HttpResponse.json({ connectorId: "confluence", sources: [] }),
   ),
+  // Bitbucket: nothing discovered and every connect accepted. Tests that care override these.
+  http.get("/api/v1/bitbucket/discover/workspace/:workspace", () =>
+    HttpResponse.json({ repositories: [] }),
+  ),
+  http.post("/api/v1/bitbucket", () =>
+    HttpResponse.json({ transactionId: "bb-tx-default" }, { status: 202 }),
+  ),
+  http.post("/api/v1/bitbucket/connections/:repositoryId/projects/:projectId", ({ params }) =>
+    HttpResponse.json({ repositoryId: params.repositoryId, projectIds: [params.projectId] }),
+  ),
+  http.delete("/api/v1/bitbucket/connections/:repositoryId/projects/:projectId", ({ params }) =>
+    HttpResponse.json({ repositoryId: params.repositoryId, projectIds: [] }),
+  ),
+  http.post("/api/v1/bitbucket/connections/:repositoryId/update", () =>
+    HttpResponse.json({ transactionId: "bb-update-default" }, { status: 202 }),
+  ),
   // Every surface that opens the buddy dock asks for its suggestion chips. A default empty list
   // keeps that request handled for the many tests that open the dock without being about the
   // chips; `useBuddySuggestions`' own suite mocks the service directly and never sees this.

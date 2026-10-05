@@ -66,9 +66,15 @@ import type { SyncScheduleConfig, SyncScheduleRequest } from "../services/source
  * sentences.
  */
 function getSyncSettingsCopy(system: SourceSystem) {
-  const { label, noun } = CONNECTORS[system].meta;
+  const { meta, actions } = CONNECTORS[system];
+  const { label, noun } = meta;
 
-  return { label, one: `${label} ${noun.singular}`, many: `${label} ${noun.plural}` };
+  return {
+    label,
+    one: `${label} ${noun.singular}`,
+    many: `${label} ${noun.plural}`,
+    skipsWhenAutoUpdateOff: actions.schedule?.skipsWhenAutoUpdateOff === true,
+  };
 }
 
 // How long a connect or an update keeps the page reloading, so the run it just
@@ -863,7 +869,11 @@ export function DataIngestionPage() {
             isSyncScheduleMixed ? " These sources currently have different schedules." : ""
           }`}
           autoUpdateOnText={`Due checks update all ${syncSettingsCopy.many} in this project.`}
-          autoUpdateOffText={`Due checks only mark ${syncSettingsCopy.many} in this project out of date.`}
+          autoUpdateOffText={
+            syncSettingsCopy.skipsWhenAutoUpdateOff
+              ? `Due checks skip ${syncSettingsCopy.many} in this project. They only update when started manually.`
+              : `Due checks only mark ${syncSettingsCopy.many} in this project out of date.`
+          }
           toggleAriaLabel={`Toggle ${syncSettingsCopy.label} auto update for this project`}
           saveLabel="Apply to project"
         />

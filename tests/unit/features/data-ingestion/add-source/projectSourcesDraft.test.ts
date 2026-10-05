@@ -5,6 +5,8 @@ import {
   connectOutcome,
   connectOutcomeDescription,
   countUnconnectedSources,
+  createBitbucketDraft,
+  createBitbucketDraftFromDiscovery,
   createDraftSource,
   createDraftSourceFromDiscovery,
   createJiraDraft,
@@ -16,7 +18,12 @@ import {
   setDraftSourceOwner,
   type DraftSource,
 } from "../../../../../src/features/data-ingestion/add-source/projectSourcesDraft";
+import { ApiError } from "../../../../../src/services/apiClient";
 import { knowledgeGapService } from "../../../../../src/services/knowledgeGapService";
+import {
+  addBitbucketRepositoryToProject,
+  connectBitbucketRepository,
+} from "../../../../../src/services/sources/bitbucketService";
 import {
   addRepositoryToProject,
   connectGithubRepository,
@@ -28,6 +35,11 @@ import type { DiscoverySelection } from "../../../../../src/features/data-ingest
 vi.mock("../../../../../src/services/sources/githubService", () => ({
   connectGithubRepository: vi.fn(),
   addRepositoryToProject: vi.fn(),
+}));
+
+vi.mock("../../../../../src/services/sources/bitbucketService", () => ({
+  connectBitbucketRepository: vi.fn(),
+  addBitbucketRepositoryToProject: vi.fn(),
 }));
 
 vi.mock("../../../../../src/services/sources/jiraService", () => ({
@@ -44,6 +56,8 @@ vi.mock("../../../../../src/services/knowledgeGapService", () => ({
 
 const connectGithubRepositoryMock = vi.mocked(connectGithubRepository);
 const addRepositoryToProjectMock = vi.mocked(addRepositoryToProject);
+const connectBitbucketRepositoryMock = vi.mocked(connectBitbucketRepository);
+const addBitbucketRepositoryToProjectMock = vi.mocked(addBitbucketRepositoryToProject);
 const connectJiraInstanceMock = vi.mocked(connectJiraInstance);
 const uploadDocumentsMock = vi.mocked(knowledgeService.uploadDocuments);
 const setComponentOwnersMock = vi.mocked(knowledgeGapService.setComponentOwners);
@@ -60,6 +74,13 @@ beforeEach(() => {
   connectGithubRepositoryMock.mockResolvedValue({ transactionId: "tx" });
   addRepositoryToProjectMock.mockReset();
   addRepositoryToProjectMock.mockResolvedValue({ repositoryId: "r1", projectIds: ["p1"] });
+  connectBitbucketRepositoryMock.mockReset();
+  connectBitbucketRepositoryMock.mockResolvedValue({ transactionId: "bb-tx" });
+  addBitbucketRepositoryToProjectMock.mockReset();
+  addBitbucketRepositoryToProjectMock.mockResolvedValue({
+    repositoryId: "bb-r1",
+    projectIds: ["p1"],
+  });
   connectJiraInstanceMock.mockReset();
   connectJiraInstanceMock.mockResolvedValue(undefined);
   uploadDocumentsMock.mockReset();
@@ -166,6 +187,24 @@ describe("isSameSource", () => {
     ).toBe(true);
   });
 
+  it("matches Bitbucket repositories by workspace/slug regardless of casing", () => {
+    expect(
+      isSameSource(
+        createBitbucketDraft("acme", "widgets", "a"),
+        createBitbucketDraft("ACME", "Widgets", "b"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not match a Bitbucket repository with a GitHub one of the same name", () => {
+    expect(
+      isSameSource(
+        createBitbucketDraft("acme", "widgets", "cred"),
+        createDraftSource("acme", "widgets", "pat"),
+      ),
+    ).toBe(false);
+  });
+
   it("never treats two uploads as the same source", () => {
     expect(isSameSource(createUploadDraft("A", []), createUploadDraft("A", []))).toBe(false);
   });
@@ -201,6 +240,53 @@ describe("createDraftSourceFromDiscovery", () => {
     );
 
     expect(draft.repositoryId).toBe("repo-9");
+  });
+});
+
+describe("createBitbucketDraft / createBitbucketDraftFromDiscovery", () => {
+  const baseSelection: DiscoverySelection = {
+    owner: "acme",
+    name: "widgets",
+    isPrivate: false,
+    linkState: "new",
+  };
+
+  it("stages a pending Bitbucket repository with a unique id", () => {
+    const first = createBitbucketDraft("acme", "widgets", "atlassian-main");
+    const second = createBitbucketDraft("acme", "widgets", "atlassian-main");
+
+    expect(first).toMatchObject({
+      type: "BITBUCKET",
+      workspace: "acme",
+      slug: "widgets",
+      credentialName: "atlassian-main",
+      status: "pending",
+      wasReused: false,
+    });
+    expect(first.repositoryId).toBeUndefined();
+    expect(first.id).not.toBe(second.id);
+  });
+
+  it("reads the workspace from the selection's owner and the slug from its name", () => {
+    const draft = createBitbucketDraftFromDiscovery(baseSelection, "atlassian-main");
+
+    expect(draft).toMatchObject({ workspace: "acme", slug: "widgets" });
+    expect(draft.repositoryId).toBeUndefined();
+  });
+
+  it("keeps the repository id for a linkable repository only", () => {
+    expect(
+      createBitbucketDraftFromDiscovery(
+        { ...baseSelection, linkState: "linkable", repositoryId: "bb-9" },
+        "cred",
+      ).repositoryId,
+    ).toBe("bb-9");
+    expect(
+      createBitbucketDraftFromDiscovery(
+        { ...baseSelection, linkState: "new", repositoryId: "bb-9" },
+        "cred",
+      ).repositoryId,
+    ).toBeUndefined();
   });
 });
 
@@ -441,6 +527,65 @@ describe("connectDraftSources", () => {
 
     expect(result[0].status).toBe("connected");
     expect(result[0].ownerAssignmentFailed).toBe(true);
+  });
+
+  it("connects a new Bitbucket repository through the Bitbucket connector", async () => {
+    const result = await connectDraftSources("p1", [
+      createBitbucketDraft("acme", "widgets", "atlassian-main"),
+    ]);
+
+    expect(connectBitbucketRepositoryMock).toHaveBeenCalledWith({
+      workspace: "acme",
+      slug: "widgets",
+      credentialName: "atlassian-main",
+      projectId: "p1",
+    });
+    expect(addBitbucketRepositoryToProjectMock).not.toHaveBeenCalled();
+    expect(result[0]).toMatchObject({ status: "connected", wasReused: false });
+  });
+
+  it("links an already-ingested Bitbucket repository instead of re-ingesting it", async () => {
+    const result = await connectDraftSources("p1", [
+      createBitbucketDraft("acme", "linked", "cred", "bb-42"),
+    ]);
+
+    expect(addBitbucketRepositoryToProjectMock).toHaveBeenCalledWith("bb-42", "p1");
+    expect(connectBitbucketRepositoryMock).not.toHaveBeenCalled();
+    expect(result[0]).toMatchObject({ status: "connected", wasReused: true });
+  });
+
+  it("says what to check when the backend answers a bare 500 for a Bitbucket repository", async () => {
+    connectBitbucketRepositoryMock.mockRejectedValue(new ApiError(500, "Internal Server Error"));
+
+    const result = await connectDraftSources("p1", [
+      createBitbucketDraft("acme", "missing", "cred"),
+    ]);
+
+    expect(result[0].status).toBe("failed");
+    expect(result[0].errorMessage).toMatch(/acme\/missing/);
+    expect(result[0].errorMessage).toMatch(/exists/);
+    expect(result[0].errorMessage).not.toMatch(/Internal Server Error/);
+  });
+
+  it("keeps the backend's own message for a Bitbucket failure that is not a 500", async () => {
+    connectBitbucketRepositoryMock.mockRejectedValue(
+      new ApiError(404, "Atlassian credential 'gone' was not found"),
+    );
+
+    const result = await connectDraftSources("p1", [createBitbucketDraft("acme", "w", "gone")]);
+
+    expect(result[0].errorMessage).toBe("Atlassian credential 'gone' was not found");
+  });
+
+  it("connects a Bitbucket repository alongside a GitHub one in a mixed batch", async () => {
+    const result = await connectDraftSources("p1", [
+      createDraftSource("acme", "widgets", "pat"),
+      createBitbucketDraft("acme", "widgets", "cred"),
+    ]);
+
+    expect(connectGithubRepositoryMock).toHaveBeenCalledTimes(1);
+    expect(connectBitbucketRepositoryMock).toHaveBeenCalledTimes(1);
+    expect(result.every((source) => source.status === "connected")).toBe(true);
   });
 
   it("dispatches each source type in one mixed batch", async () => {

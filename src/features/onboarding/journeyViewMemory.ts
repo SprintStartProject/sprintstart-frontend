@@ -14,8 +14,11 @@ export type JourneyView = {
   graphPhaseId: string | null;
 };
 
-export const HIRE_JOURNEY_VIEW_KEY = "sprintstart.onboarding.view";
-export const MEMBER_JOURNEY_VIEW_KEY = "sprintstart.memberJourney.view";
+// Versioned since the graph became the default: the view is written on every visit, so the old keys
+// hold "list" for everyone who ever opened the page, chosen or not, and would keep the graph from
+// ever showing up as the default for them.
+export const HIRE_JOURNEY_VIEW_KEY = "sprintstart.onboarding.view.v2";
+export const MEMBER_JOURNEY_VIEW_KEY = "sprintstart.memberJourney.view.v2";
 
 /**
  * The key for one member's journey as one manager looks at it.
@@ -34,10 +37,10 @@ export function hireJourneyViewKey(userId: string): string {
   return `${HIRE_JOURNEY_VIEW_KEY}.${userId}`;
 }
 
-const DEFAULT_VIEW: JourneyView = { mode: "list", graphPhaseId: null };
+const DEFAULT_VIEW: JourneyView = { mode: "graph", graphPhaseId: null };
 
 /**
- * The last view stored under `key`, or the list when there is none.
+ * The last view stored under `key`, or the graph when there is none.
  *
  * Browser storage can be missing, full or blocked; none of that is worth more than falling back to
  * the default, so every failure reads as "nothing remembered".
@@ -48,7 +51,7 @@ export function readJourneyView(key: string): JourneyView {
     if (!raw) return DEFAULT_VIEW;
     const parsed = JSON.parse(raw) as Partial<JourneyView>;
     return {
-      mode: parsed.mode === "graph" ? "graph" : "list",
+      mode: parsed.mode === "list" ? "list" : "graph",
       graphPhaseId: typeof parsed.graphPhaseId === "string" ? parsed.graphPhaseId : null,
     };
   } catch {

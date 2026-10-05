@@ -63,7 +63,7 @@ export function ProjectOverviewWidget({ size }: { size: DashboardWidgetSize }) {
       {size === "small" ? (
         <WidgetMetrics icon={FolderKanban} metrics={metrics} />
       ) : (
-        <div className="grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="grid flex-1 grid-cols-1 gap-5 @min-[24rem]:grid-cols-2">
           <WidgetMetrics icon={FolderKanban} metrics={metrics.slice(0, 2)} />
 
           <div className="flex flex-col justify-center gap-4">

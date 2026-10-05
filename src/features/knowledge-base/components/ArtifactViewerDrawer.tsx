@@ -203,6 +203,7 @@ const shouldRenderAsMarkdown = (
     title.startsWith("issue #") ||
     title.startsWith("jira #") ||
     sourceUrl.includes("/pull/") ||
+    sourceUrl.includes("/pull-requests/") ||
     sourceUrl.includes("/issues/") ||
     sourceUrl.includes("/browse/");
 
@@ -279,6 +280,11 @@ const STATIC_MARKDOWN_COMPONENTS = {
       </div>
     );
   },
+  table: ({ children }: { children?: ReactNode }) => (
+    <div className="overflow-x-auto">
+      <table>{children}</table>
+    </div>
+  ),
   pre: ({ children }: { children?: ReactNode }) => <>{children}</>,
 } as const;
 
@@ -338,6 +344,11 @@ function createMarkdownComponents(highlightLines?: number[]) {
         </div>
       );
     },
+    table: ({ children }: { children?: ReactNode }) => (
+      <div className="overflow-x-auto">
+        <table>{children}</table>
+      </div>
+    ),
     pre: ({ children }: { children?: ReactNode }) => <>{children}</>,
     p({
       children,
@@ -963,7 +974,7 @@ export function ArtifactViewerDrawer({
   const MetadataView = artifact && metadataView?.appliesTo(artifact) ? metadataView.View : null;
 
   const actionsContent = viewMode === "raw" && !MetadataView && (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
       {isMarkdownArtifact && content && (
         <div className="flex items-center rounded-lg border border-app-border bg-app-bg p-0.5 text-xs">
           <button
@@ -1068,8 +1079,13 @@ export function ArtifactViewerDrawer({
       badge={headerBadge}
       actions={actionsContent}
       widthClassName="w-full max-w-5xl"
-      zIndexClassName="z-50 md:z-30"
-      panelClassName="border-l border-app-border shadow-2xl"
+      zIndexClassName="z-50"
+      // The `!` is load-bearing: Tailwind emits `sm:` utilities after `max-*` variants, so a
+      // plain `max-[1025px]:rounded-none` would lose to the SidePanel's `sm:rounded-l-[28px]`.
+      // The bound is 1025, not `lg`'s 1024, because this drawer is `w-full max-w-5xl`: at a
+      // 1024px window — an iPad on its side — it is still full-bleed, and a corner there would
+      // notch against the viewport. From 1025 up the page shows beside it and the corner stands.
+      panelClassName="border-l border-app-border shadow-2xl max-[1025px]:rounded-none!"
       panelBackgroundClassName="bg-app-surface"
       headerClassName="p-4 bg-app-bg"
       contentClassName="p-6"
@@ -1126,7 +1142,7 @@ export function ArtifactViewerDrawer({
               ) : content &&
                 shouldRenderAsMarkdown(content, artifact) &&
                 markdownViewMode === "rendered" ? (
-                <div className="prose prose-sm max-w-none text-app-text dark:prose-invert">
+                <div className="prose prose-sm max-w-none break-words text-app-text dark:prose-invert">
                   <ReactMarkdown
                     remarkPlugins={REMARK_PLUGINS}
                     rehypePlugins={REHYPE_PLUGINS}
@@ -1230,7 +1246,7 @@ export function ArtifactViewerDrawer({
             </div>
           ) : (
             <>
-              <div className="prose prose-sm max-w-none text-app-text dark:prose-invert">
+              <div className="prose prose-sm max-w-none break-words text-app-text dark:prose-invert">
                 <ReactMarkdown
                   remarkPlugins={REMARK_PLUGINS}
                   rehypePlugins={REHYPE_PLUGINS}

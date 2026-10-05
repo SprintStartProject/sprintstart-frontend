@@ -14,7 +14,12 @@ import {
   formatInstanceDomain,
   formatNumber,
 } from "../data.ts";
-import { confluenceSpaceOf, githubRepositoryOf, jiraInstanceOf } from "../sourceDetails.ts";
+import {
+  bitbucketRepositoryOf,
+  confluenceSpaceOf,
+  githubRepositoryOf,
+  jiraInstanceOf,
+} from "../sourceDetails.ts";
 import type { DataSource } from "../types.ts";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
 import { IconTile } from "../../../components/ui/IconTile";
@@ -104,6 +109,12 @@ export function SourceList({
                     {githubRepositoryOf(source)?.owner && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
                         {githubRepositoryOf(source)?.owner}
+                      </p>
+                    )}
+
+                    {bitbucketRepositoryOf(source)?.workspace && (
+                      <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
+                        {bitbucketRepositoryOf(source)?.workspace}
                       </p>
                     )}
 

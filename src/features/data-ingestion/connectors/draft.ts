@@ -1,4 +1,5 @@
 import type { SourceSystem } from "./sourceSystems.ts";
+import type { BitbucketDraftSource } from "./bitbucket/draft.ts";
 import type { ConfluenceDraftSource } from "./confluence/draft.ts";
 import type { GithubDraftSource } from "./github/draft.ts";
 import type { JiraDraftSource } from "./jira/draft.ts";
@@ -68,6 +69,7 @@ export type DraftSourceOf = {
   JIRA: JiraDraftSource;
   UPLOAD: UploadDraftSource;
   CONFLUENCE: ConfluenceDraftSource;
+  BITBUCKET: BitbucketDraftSource;
 };
 
 export type DraftSourceType = SourceSystem;

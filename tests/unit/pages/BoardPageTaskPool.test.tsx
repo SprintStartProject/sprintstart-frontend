@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { BoardPage } from "../../../src/pages/BoardPage";
@@ -118,11 +118,12 @@ describe("the task pool on the board", () => {
 
   it("is switched off and on again from the rail", async () => {
     await renderBoard();
+    const rail = screen.getByRole("group", { name: "Board tools" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide the task pool" }));
+    fireEvent.click(within(rail).getByRole("button", { name: "Hide the task pool" }));
     expect(screen.queryByText("Fix the flaky login test")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show the task pool" }));
+    fireEvent.click(within(rail).getByRole("button", { name: "Show the task pool" }));
     expect(screen.getByText("Fix the flaky login test")).toBeInTheDocument();
     expect(boardService.dismissCard).not.toHaveBeenCalled();
   });

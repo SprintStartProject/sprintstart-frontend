@@ -1,5 +1,5 @@
 import { ChevronRight, Loader2, RotateCcw, Trophy, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/Button";
 import { useToast } from "../../../../context/useToast";
 import { onboardingService } from "../../../../services/onboardingService";
@@ -9,6 +9,17 @@ import { CheckQuestionCard } from "../CheckQuestionCard";
 import { ConfettiBurst } from "../ConfettiBurst";
 import { AskTheBuddy } from "../../../buddy/components/AskTheBuddy";
 import { askAboutQuestion, askAboutWrongAnswer } from "../../buddyDrafts";
+import {
+  clearRevealed,
+  COPIED_SAMPLE_WARNING,
+  isCopyOfReveal,
+  isPasteFromReveal,
+  NOTHING_REVEALED,
+  readRevealed,
+  withAttempt,
+  writeRevealed,
+  type Revealed,
+} from "../../questionIntegrity";
 
 type Props = {
   question: OnboardingQuestionEndpoint;
@@ -38,14 +49,39 @@ export function QuestionWorkspace({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<QuestionAttemptResult | null>(null);
   const alreadyPassed = question.status === "PASSED" && !result;
+  // Each attempt shows the options in a fresh order, so a retry is not answered by position.
+  const [attemptRound, setAttemptRound] = useState(0);
+  // What wrong attempts revealed -- sample answer, explanation, feedback: handing it back is not
+  // an answer.
+  const [revealed, setRevealed] = useState<Revealed>(() =>
+    question.type === "SHORT_TEXT" ? readRevealed(question.id) : NOTHING_REVEALED,
+  );
+  // A question passed elsewhere (another tab, a reload after passing) has nothing left to guard.
+  useEffect(() => {
+    if (question.status === "PASSED") clearRevealed(question.id);
+  }, [question.id, question.status]);
+  const [copyWarning, setCopyWarning] = useState<string | null>(null);
 
   const submit = async () => {
+    if (question.type === "SHORT_TEXT" && isCopyOfReveal(draft.textAnswer, revealed)) {
+      setCopyWarning(COPIED_SAMPLE_WARNING);
+      return;
+    }
     setSubmitting(true);
     try {
       const attempt = await onboardingService.submitQuestionAttempt(
         question.id,
         toSubmission(question, draft),
       );
+      if (question.type === "SHORT_TEXT") {
+        if (attempt.correct) {
+          clearRevealed(question.id);
+        } else {
+          const next = withAttempt(revealed, attempt, draft.textAnswer.trim());
+          writeRevealed(question.id, next);
+          setRevealed(next);
+        }
+      }
       setResult(attempt);
       await onAnswered(attempt);
     } catch (reason) {
@@ -139,7 +175,17 @@ export function QuestionWorkspace({
               : [...current.selectedOptionIds, optionId],
           }))
         }
-        onTextChange={(textAnswer) => setDraft((current) => ({ ...current, textAnswer }))}
+        onTextChange={(textAnswer) => {
+          setCopyWarning(null);
+          setDraft((current) => ({ ...current, textAnswer }));
+        }}
+        optionOrderSeed={`${question.id}:${attemptRound}`}
+        onTextPaste={(text) => {
+          if (!isPasteFromReveal(text, revealed)) return true;
+          setCopyWarning(COPIED_SAMPLE_WARNING);
+          return false;
+        }}
+        textWarning={copyWarning}
       />
 
       <div className="flex justify-end gap-2 border-t border-app-border pt-4">
@@ -158,6 +204,8 @@ export function QuestionWorkspace({
             onClick={() => {
               setDraft(emptyDraft);
               setResult(null);
+              setCopyWarning(null);
+              setAttemptRound((round) => round + 1);
             }}
           >
             Try again

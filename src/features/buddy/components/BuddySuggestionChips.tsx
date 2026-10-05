@@ -10,13 +10,21 @@ type BuddySuggestionChipsProps = {
   /** Rendered at the end of the heading row — the dock's dismiss control. */
   headingAction?: ReactNode;
   /**
-   * Tighter type and padding, and at most [COMPACT_LIMIT] of them.
+   * Tighter type and padding, and at most [COMPACT_LIMIT] of them unless `limit` says otherwise.
    *
    * For the dock, where the full row took about half the window: five wrapped chips at reading
    * size left the conversation with the other half, which is the wrong way round for a
    * conversation window.
    */
   compact?: boolean;
+  /**
+   * Show at most this many chips.
+   *
+   * The page caps the row on phones for the dock's reason — five wrapped chips at reading size
+   * is half the composer there too — but keeps them at reading size: the answer to a small
+   * surface is fewer chips, not smaller ones, on a page where every other target just grew.
+   */
+  limit?: number;
 };
 
 /** How many chips the compact row shows before it stops. */
@@ -42,10 +50,11 @@ export function BuddySuggestionChips({
   heading,
   headingAction,
   compact = false,
+  limit,
 }: BuddySuggestionChipsProps) {
   if (suggestions.length === 0) return null;
 
-  const shown = compact ? suggestions.slice(0, COMPACT_LIMIT) : suggestions;
+  const shown = suggestions.slice(0, limit ?? (compact ? COMPACT_LIMIT : suggestions.length));
 
   return (
     <div data-testid="buddy-suggestions">

@@ -102,7 +102,7 @@ type ViewMode = "list" | "graph";
 /** How a step came to be opened: by its address, or by the member on the page. */
 type StartOptions = { byAddress?: boolean };
 
-const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
+const VIEW_ORDER: readonly ViewMode[] = ["graph", "list"];
 
 type NavigationState = {
   focusQuestionId?: string;
@@ -213,7 +213,7 @@ export function OnBoardingPage() {
       ? "list"
       : viewKey
         ? readJourneyView(viewKey).mode
-        : "list",
+        : "graph",
   );
   const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
     // A phase arrived at by name opens *inside* itself on the graph, the same way it opens selected
@@ -1049,8 +1049,8 @@ export function OnBoardingPage() {
             value={viewMode}
             onChange={chooseViewMode}
             options={[
-              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
               { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
+              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
             ]}
           />
           {overall ? (

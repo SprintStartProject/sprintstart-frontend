@@ -27,16 +27,16 @@ describe("journey view memory", () => {
       memberJourneyViewKey("pm-1", "member-2"),
     );
 
-    writeJourneyView(hireJourneyViewKey("user-1"), { mode: "graph", graphPhaseId: "phase-2" });
+    writeJourneyView(hireJourneyViewKey("user-1"), { mode: "list", graphPhaseId: "phase-2" });
 
     expect(readJourneyView(hireJourneyViewKey("user-2"))).toEqual({
-      mode: "list",
+      mode: "graph",
       graphPhaseId: null,
     });
   });
 
-  it("opens on the list when nothing is remembered", () => {
-    expect(readJourneyView(KEY)).toEqual({ mode: "list", graphPhaseId: null });
+  it("opens on the graph when nothing is remembered", () => {
+    expect(readJourneyView(KEY)).toEqual({ mode: "graph", graphPhaseId: null });
   });
 
   it("gives back the view and phase it was left in", () => {
@@ -45,12 +45,18 @@ describe("journey view memory", () => {
     expect(readJourneyView(KEY)).toEqual({ mode: "graph", graphPhaseId: "phase-2" });
   });
 
-  it("falls back to the list on anything it cannot read", () => {
-    window.localStorage.setItem(KEY, "{not json");
+  it("keeps a list that was chosen", () => {
+    writeJourneyView(KEY, { mode: "list", graphPhaseId: null });
+
     expect(readJourneyView(KEY)).toEqual({ mode: "list", graphPhaseId: null });
+  });
+
+  it("falls back to the graph on anything it cannot read", () => {
+    window.localStorage.setItem(KEY, "{not json");
+    expect(readJourneyView(KEY)).toEqual({ mode: "graph", graphPhaseId: null });
 
     window.localStorage.setItem(KEY, JSON.stringify({ mode: "map", graphPhaseId: 3 }));
-    expect(readJourneyView(KEY)).toEqual({ mode: "list", graphPhaseId: null });
+    expect(readJourneyView(KEY)).toEqual({ mode: "graph", graphPhaseId: null });
   });
 
   it("does not throw when storage is unavailable", () => {
@@ -62,6 +68,6 @@ describe("journey view memory", () => {
     });
 
     expect(() => writeJourneyView(KEY, { mode: "graph", graphPhaseId: null })).not.toThrow();
-    expect(readJourneyView(KEY)).toEqual({ mode: "list", graphPhaseId: null });
+    expect(readJourneyView(KEY)).toEqual({ mode: "graph", graphPhaseId: null });
   });
 });

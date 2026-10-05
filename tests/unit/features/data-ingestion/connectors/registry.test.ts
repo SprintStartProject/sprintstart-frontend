@@ -7,6 +7,7 @@ import {
   SCHEDULED_SOURCE_SYSTEMS,
   findConnectorById,
   getConnector,
+  hasRepositoryFacet,
   sourceSystemOfCitation,
 } from "../../../../../src/features/data-ingestion/connectors/registry";
 import {
@@ -67,7 +68,7 @@ describe("connector registry", () => {
         (definition) => definition.meta.system,
       ),
     );
-    expect(SCHEDULED_SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "CONFLUENCE"]);
+    expect(SCHEDULED_SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "CONFLUENCE", "BITBUCKET"]);
   });
 
   it("words the connectors modal from the registry and falls back to the backend name", () => {
@@ -89,7 +90,8 @@ describe("connector registry", () => {
   it("parses a source system from free text ignoring case", () => {
     expect(toSourceSystem("github")).toBe("GITHUB");
     expect(toSourceSystem("Confluence")).toBe("CONFLUENCE");
-    expect(toSourceSystem("bitbucket")).toBeNull();
+    expect(toSourceSystem("Bitbucket")).toBe("BITBUCKET");
+    expect(toSourceSystem("sonarqube")).toBeNull();
   });
 
   describe("actions", () => {
@@ -122,7 +124,7 @@ describe("connector registry", () => {
     });
 
     it("gives every other connector an identity card, an update or a sync, and a schedule", () => {
-      for (const system of ["GITHUB", "JIRA", "CONFLUENCE"] as const) {
+      for (const system of ["GITHUB", "JIRA", "CONFLUENCE", "BITBUCKET"] as const) {
         const { actions, DetailsSection } = CONNECTORS[system];
 
         expect(DetailsSection).not.toBeNull();
@@ -168,8 +170,35 @@ describe("connector registry", () => {
       expect(CONNECTORS.CONFLUENCE.runFilter?.param).toBe("repositoryId");
     });
 
+    it("scopes the run history of a Bitbucket repository by its connection id", () => {
+      const bitbucket = createDataSource({
+        definition: CONNECTORS.BITBUCKET,
+        status: { ...status, sourceSystem: "BITBUCKET", repositoryId: "bb-1" },
+      });
+
+      expect(CONNECTORS.BITBUCKET.runFilter?.param).toBe("repositoryId");
+      expect(CONNECTORS.BITBUCKET.runFilter?.valueOf(bitbucket)).toBe("bb-1");
+    });
+
+    it("offers no action on a Bitbucket card without a connection id", () => {
+      const unresolved = createDataSource({
+        definition: CONNECTORS.BITBUCKET,
+        status: { ...status, sourceSystem: "BITBUCKET", repositoryId: null },
+      });
+      const { update, unlink } = CONNECTORS.BITBUCKET.actions;
+
+      expect(update?.isAvailable(unresolved)).toBe(false);
+      expect(unlink?.isAvailable(unresolved)).toBe(false);
+    });
+
+    it("tells a source apart whose scheduler skips it while auto update is off", () => {
+      expect(CONNECTORS.BITBUCKET.actions.schedule?.skipsWhenAutoUpdateOff).toBe(true);
+      expect(CONNECTORS.GITHUB.actions.schedule?.skipsWhenAutoUpdateOff).toBeUndefined();
+    });
+
     it("names the unlink cost in each connector's own words", () => {
       expect(CONNECTORS.GITHUB.actions.unlink?.removalHint).toMatch(/repository/);
+      expect(CONNECTORS.BITBUCKET.actions.unlink?.removalHint).toMatch(/repository/);
       expect(CONNECTORS.JIRA.actions.unlink?.removalHint).toMatch(/instance/);
       expect(CONNECTORS.CONFLUENCE.actions.unlink?.removalHint).toMatch(/from scratch/);
     });
@@ -183,13 +212,20 @@ describe("connector registry", () => {
       }
 
       expect(CONNECTORS.GITHUB.knowledgeBase.linkLabel).toBe("Open in GitHub");
+      expect(CONNECTORS.BITBUCKET.knowledgeBase.linkLabel).toBe("Open in Bitbucket");
       expect(CONNECTORS.JIRA.knowledgeBase.linkLabel).toBe("Open in Jira");
       expect(CONNECTORS.CONFLUENCE.knowledgeBase.linkLabel).toBe("Open in Confluence");
       expect(CONNECTORS.UPLOAD.knowledgeBase.linkLabel).toBeNull();
     });
 
     it("lists the knowledge base source facet with uploads last", () => {
-      expect(KNOWLEDGE_BASE_SOURCE_ORDER).toEqual(["GITHUB", "JIRA", "CONFLUENCE", "UPLOAD"]);
+      expect(KNOWLEDGE_BASE_SOURCE_ORDER).toEqual([
+        "GITHUB",
+        "BITBUCKET",
+        "JIRA",
+        "CONFLUENCE",
+        "UPLOAD",
+      ]);
     });
 
     it("lets only uploads be deleted and only Confluence be forced to Markdown", () => {
@@ -201,15 +237,62 @@ describe("connector registry", () => {
       ).toEqual(["CONFLUENCE"]);
     });
 
-    it("shows a metadata view for a GitHub organization only", () => {
-      const view = CONNECTORS.GITHUB.knowledgeBase.metadataView;
-      const artifact = { artifactType: "ORG_METADATA" } as Parameters<
-        NonNullable<typeof view>["appliesTo"]
-      >[0];
+    it("shows a metadata view for a GitHub organization and a Bitbucket workspace only", () => {
+      for (const system of ["GITHUB", "BITBUCKET"] as const) {
+        const view = CONNECTORS[system].knowledgeBase.metadataView;
+        const artifact = { artifactType: "ORG_METADATA" } as Parameters<
+          NonNullable<typeof view>["appliesTo"]
+        >[0];
 
-      expect(view?.appliesTo(artifact)).toBe(true);
-      expect(view?.appliesTo({ ...artifact, artifactType: "FILE" })).toBe(false);
+        expect(view?.appliesTo(artifact)).toBe(true);
+        expect(view?.appliesTo({ ...artifact, artifactType: "FILE" })).toBe(false);
+      }
+      expect(CONNECTORS.GITHUB.knowledgeBase.metadataView?.View).not.toBe(
+        CONNECTORS.BITBUCKET.knowledgeBase.metadataView?.View,
+      );
       expect(CONNECTORS.JIRA.knowledgeBase.metadataView).toBeUndefined();
+    });
+
+    it("offers the repository facet for the repository connectors only", () => {
+      expect(hasRepositoryFacet(["GITHUB"])).toBe(true);
+      expect(hasRepositoryFacet(["UPLOAD", "BITBUCKET"])).toBe(true);
+      expect(hasRepositoryFacet(["JIRA", "CONFLUENCE", "UPLOAD"])).toBe(false);
+      expect(hasRepositoryFacet([])).toBe(false);
+    });
+
+    it("keeps Bitbucket out of the chat's source filter", () => {
+      expect(CHAT_SOURCE_SYSTEMS).not.toContain("BITBUCKET");
+    });
+
+    it("scopes the knowledge base to a Bitbucket repository by workspace/slug", () => {
+      const source = createDataSource({
+        definition: CONNECTORS.BITBUCKET,
+        status: {
+          sourceSystem: "BITBUCKET",
+          sourceId: "acme/widgets",
+          displayName: "acme/widgets",
+          repositoryId: "bb-1",
+          owner: "acme",
+          name: "widgets",
+          sourceUrl: "https://bitbucket.org/acme/widgets",
+          connectionStatus: "CONNECTED",
+          enabled: true,
+          lastRunTime: null,
+          ingestedCount: 0,
+          updatedCount: 0,
+          deletedCount: 0,
+          failedCount: 0,
+          failedItems: [],
+          artifactCount: 0,
+          lastCommitsSyncAt: null,
+          lastIssuesSyncAt: null,
+          lastPullRequestsSyncAt: null,
+        },
+      });
+
+      expect(CONNECTORS.BITBUCKET.knowledgeBase.scopeOf?.(source.details)).toEqual({
+        repositories: ["acme/widgets"],
+      });
     });
 
     it("has exactly one default citation source", () => {
@@ -221,6 +304,8 @@ describe("connector registry", () => {
     it.each([
       ["https://github.com/acme/api/pull/4", "pr #4", "GITHUB"],
       ["https://git.corp.example/acme/api/blob/main/a.ts", "a.ts", "GITHUB"],
+      ["https://bitbucket.org/acme/api/pull-requests/4", "pr #4", "BITBUCKET"],
+      ["https://bitbucket.org/acme/api/src/main/a.ts", "a.ts", "BITBUCKET"],
       ["https://acme.atlassian.net/browse/ENG-1", "jira #eng-1", "JIRA"],
       ["https://acme.atlassian.net/rest/x", "board", "JIRA"],
       ["https://acme.atlassian.net/wiki/spaces/ENG/pages/1", "onboarding", "CONFLUENCE"],

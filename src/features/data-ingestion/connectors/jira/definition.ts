@@ -34,7 +34,7 @@ export const jiraConnector: ConnectorDefinition<JiraInstanceDto, JiraDraftSource
       url.includes("/browse/") ||
       name.startsWith("jira #"),
   },
-  knowledgeBase: { label: "Jira", facetOrder: 2, icon: Ticket, linkLabel: "Open in Jira" },
+  knowledgeBase: { label: "Jira", facetOrder: 3, icon: Ticket, linkLabel: "Open in Jira" },
   DetailsSection: JiraDetailsSection,
   // A Jira run is scoped by its source reference, which is the instance URL.
   runFilter: { param: "sourceRef", valueOf: (source) => source.sourceId },

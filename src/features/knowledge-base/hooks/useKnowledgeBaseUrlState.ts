@@ -9,6 +9,7 @@ import {
 } from "../tabs.ts";
 import type { KnowledgeTab } from "../tabs.ts";
 import type { ArtifactSort, SourceSystem, UploadFormat } from "../types.ts";
+import { hasRepositoryFacet } from "../../data-ingestion/connectors/registry.ts";
 import { normalizeDateRange, type DateRange } from "../dateRange.ts";
 
 /** Page size used when the URL names none. Mirrors the backend's list default. */
@@ -96,7 +97,7 @@ export interface KnowledgeBaseUrlState {
   /** Search text exactly as written to `?q=`; trimming is the request builder's job. */
   search: string;
   sources: ReadonlySet<SourceSystem>;
-  /** Only ever non-empty while GitHub is among `sources` — see {@link parseKnowledgeBaseSearch}. */
+  /** Only ever non-empty while a connector with a repository facet is among `sources` — see {@link parseKnowledgeBaseSearch}. */
   repositories: ReadonlySet<string>;
   /** Only ever non-null while Uploads is among `sources` — see {@link parseKnowledgeBaseSearch}. */
   format: UploadFormat | null;
@@ -166,7 +167,7 @@ function readPositiveInt(raw: string | null, fallback: number, max: number): num
  * because people type URLs by hand.
  *
  * The two dependent facets keep the invariant the toggles enforce: a `format` only counts while
- * Uploads is selected and `repos` only while GitHub is. Otherwise a shared link could carry a
+ * Uploads is selected and `repos` only while a connector with a repository facet is. Otherwise a shared link could carry a
  * filter the panel does not even show — narrowing the list with no visible way to undo it.
  *
  * @param params - The current `location.search`, parsed.
@@ -186,7 +187,9 @@ export function parseKnowledgeBaseSearch(params: URLSearchParams): KnowledgeBase
   const format =
     sources.has("UPLOAD") && FORMAT_VALUES.has(rawFormat) ? (rawFormat as UploadFormat) : null;
 
-  const repositoryList = sources.has("GITHUB") ? readList(params, KB_URL_PARAM.repositories) : [];
+  const repositoryList = hasRepositoryFacet(sources)
+    ? readList(params, KB_URL_PARAM.repositories)
+    : [];
   const repositories: ReadonlySet<string> =
     repositoryList.length > 0 ? new Set(repositoryList) : NO_STRINGS;
 
@@ -415,7 +418,11 @@ export function useKnowledgeBaseUrlState(
         const isRemoving = toggleInList(params, KB_URL_PARAM.sources, source);
         // The dependent facets describe one source each; they go when their source goes.
         if (isRemoving && source === "UPLOAD") params.delete(KB_URL_PARAM.format);
-        if (isRemoving && source === "GITHUB") params.delete(KB_URL_PARAM.repositories);
+        // Repositories belong to every connector with a repository facet together, so
+        // they go once none of those is left among the sources.
+        if (isRemoving && !hasRepositoryFacet(parseKnowledgeBaseSearch(params).sources)) {
+          params.delete(KB_URL_PARAM.repositories);
+        }
         params.delete(KB_URL_PARAM.page);
       }, "push"),
     [commit],

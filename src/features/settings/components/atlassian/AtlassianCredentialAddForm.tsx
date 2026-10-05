@@ -28,7 +28,7 @@ const ADD_FALLBACK = "Failed to add Atlassian credential.";
 
 /**
  * Inline form for storing an Atlassian account email and API token for the
- * authenticated user, shared by the Jira and Confluence connectors. The login
+ * authenticated user, shared by the Jira, Confluence and Bitbucket connectors. The login
  * email is only a convenience default because the Atlassian account may use a
  * different address.
  */
@@ -176,7 +176,7 @@ export function AtlassianCredentialAddForm({
           />
         </Field>
 
-        <div className="flex flex-row justify-end gap-2 pt-1">
+        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={handleClose} disabled={isSaving}>
             Cancel
           </Button>
