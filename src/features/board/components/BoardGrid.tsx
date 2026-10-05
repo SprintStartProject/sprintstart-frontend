@@ -380,6 +380,9 @@ function toViewport(point: { x: number; y: number }): { x: number; y: number } {
   return { x: point.x - window.scrollX, y: point.y - window.scrollY };
 }
 
+/** What piling onto the lit card does to the dragged card's area, if anything. */
+type PileAreaMove = "into" | "out" | null;
+
 type BoardGridProps = {
   board: Board;
   onDismiss?: (cardId: string) => void;
@@ -700,8 +703,8 @@ export function BoardGrid({
   /** The card a dragged one would be piled under if let go now — see `handleDrag`. */
   const [pileTargetId, setPileTargetId] = useState<string | null>(null);
   const pileTargetRef = useRef<string | null>(null);
-  /** Whether piling onto the lit card takes the dragged one into another area — said on the label. */
-  const [pileMovesArea, setPileMovesArea] = useState(false);
+  /** Whether piling onto the lit card moves the dragged one into or out of an area — on the label. */
+  const [pileAreaMove, setPileAreaMove] = useState<PileAreaMove>(null);
   /**
    * Lights the pile target once the dragged card has rested long enough, even when the pointer holds
    * perfectly still: drag events only arrive while it moves, so counting on them alone left a hire
@@ -848,7 +851,9 @@ export function BoardGrid({
       if (pileTargetRef.current === candidateId) return;
       pileTargetRef.current = candidateId;
       setPileTargetId(candidateId);
-      setPileMovesArea(groupOf(groups, draggedId)?.id !== groupOf(groups, candidateId)?.id);
+      const from = groupOf(groups, draggedId)?.id ?? null;
+      const to = groupOf(groups, candidateId)?.id ?? null;
+      setPileAreaMove(from === to ? null : to ? "into" : "out");
     },
     [groups],
   );
@@ -1269,7 +1274,7 @@ export function BoardGrid({
         isArranging={isArranging}
         isDragging={draggingId === card.id}
         isPileTarget={pileTargetId === card.id}
-        pileMovesArea={pileMovesArea}
+        pileAreaMove={pileAreaMove}
         isWiggling={isArranging && !reduceMotion && hoveredId !== card.id && draggingId !== card.id}
         collapsed={collapsedIds?.has(card.id) ?? false}
         pinned={pinnedIds?.has(card.id) ?? false}
@@ -1605,8 +1610,8 @@ type BoardCardCellProps = {
   isDragging: boolean;
   /** A dragged card is resting on this one, and letting go would pile it here. */
   isPileTarget?: boolean;
-  /** Whether piling onto this card would take the dragged one into this card's area. */
-  pileMovesArea?: boolean;
+  /** Whether piling onto this card moves the dragged one into this card's area, or out of its own. */
+  pileAreaMove?: PileAreaMove;
   isWiggling: boolean;
   collapsed: boolean;
   pinned: boolean;
@@ -1677,7 +1682,7 @@ function BoardCardCell({
   isArranging,
   isDragging,
   isPileTarget = false,
-  pileMovesArea = false,
+  pileAreaMove = null,
   isWiggling,
   collapsed,
   pinned,
@@ -1820,7 +1825,7 @@ function BoardCardCell({
           size="sm"
           value={predecessorId ?? ""}
           aria-label={`Put the ${label} card in a pile`}
-          title="Put this card under another one, so the two lie in one pile. A card in another area moves into that one."
+          title="Put this card under another one, so the two lie in one pile. It moves into the other card’s area, or out of its own when the other card has none."
           className="max-w-40"
           onChange={(event) => onStackOnto(card.id, event.target.value || null)}
         >
@@ -1989,7 +1994,11 @@ function BoardCardCell({
         {/* Says what letting go will do, on the card it will do it to. */}
         {isPileTarget && (
           <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-app-brand px-2 py-0.5 text-xs font-medium whitespace-nowrap text-white shadow-sm">
-            {pileMovesArea ? "Drop to pile here, in this area" : "Drop to pile here"}
+            {pileAreaMove === "into"
+              ? "Drop to pile here, in this area"
+              : pileAreaMove === "out"
+                ? "Drop to pile here, out of its area"
+                : "Drop to pile here"}
           </span>
         )}
 

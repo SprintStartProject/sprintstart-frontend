@@ -5,6 +5,7 @@ import { onboardingService } from "../../../services/onboardingService";
 import type { PhaseState } from "../../onboarding/journey";
 import { useBoardPath } from "../hooks/boardPath";
 import { completeLink, deepenLink, openLinkBefore, titleKey } from "../layout/stepLinks";
+import { openLinkLevel } from "../layout/pathStages";
 
 /** How many are offered at once; typing more of the name narrows them. */
 const OFFERED = 8;
@@ -70,13 +71,10 @@ export function StepLinkTextarea({
   const [tasksOf, setTasksOf] = useState<Record<string, { id: string; title: string }[]>>({});
 
   const open = openLinkBefore(value, caret);
-  const parts = open ? open.query.split("#") : [];
-  const phaseId = parts.length > 1 ? phases?.phaseByTitle.get(titleKey(parts[0] ?? "")) : undefined;
+  const at = open ? openLinkLevel(open.query, phases) : null;
+  const phaseId = at && at.level !== "phase" ? at.phaseId : undefined;
   const phase = phaseId ? phases?.phaseInfo.get(phaseId) : undefined;
-  const stepId =
-    phaseId && parts.length > 2
-      ? phases?.stepInPhase.get(`${phaseId}|${titleKey(parts[1] ?? "")}`)
-      : undefined;
+  const stepId = at?.level === "task" ? at.stepId : undefined;
   const step = stepId ? phases?.steps.get(stepId) : undefined;
 
   // The tasks of the step named before the second `#`, once, the first time they are asked for.
@@ -115,11 +113,10 @@ export function StepLinkTextarea({
   );
 
   let offers: Offer[] = [];
-  let query = "";
-  if (parts.length === 1) {
+  const query = at?.query ?? "";
+  if (at?.level === "phase") {
     offers = phaseOffers;
-    query = parts[0] ?? "";
-  } else if (parts.length === 2 && phase && phaseId) {
+  } else if (at?.level === "step" && phase) {
     offers = phase.stepIds.flatMap((id) => {
       const candidate = phases?.steps.get(id);
       return candidate
@@ -135,8 +132,7 @@ export function StepLinkTextarea({
           ]
         : [];
     });
-    query = parts[1] ?? "";
-  } else if (parts.length === 3 && phase && step && stepId) {
+  } else if (at?.level === "task" && phase && step && stepId) {
     offers = (tasksOf[stepId] ?? []).map((task) => ({
       key: task.id,
       link: `${phase.title}#${step.title}#${task.title}`,
@@ -145,7 +141,6 @@ export function StepLinkTextarea({
       level: "task" as const,
       deeper: false,
     }));
-    query = parts[2] ?? "";
   }
 
   const offered =

@@ -12,13 +12,18 @@ type BoardPhaseRecapProps = {
   path: OnboardingPathEndpoint | null;
 };
 
+/** Whether a title can sit inside `[[…]]`: brackets in it would close the link early. */
+function linkable(title: string): boolean {
+  return !/[[\]]/.test(title);
+}
+
 /**
  * "You finished Setup — want a recap to keep?"
  *
  * When a phase is done, what it taught is spread over a dozen steps the hire will not open again.
  * This offers to have the buddy write it down once, in the dock, where the hire can read it and keep
- * it with the dock's own button — it then lands under *Behind you* with the rest of that phase (see
- * `phaseRecaps.ts`). The buddy writes the recap; the board only asks and files it.
+ * it with the dock's own button. The buddy is asked to open the recap with a `[[Phase]]` link, so the
+ * kept note files under *Behind you* with the rest of that phase like any other linked note.
  *
  * **Once per phase, and only the latest.** Offered for the most recently finished phase, never for
  * a backlog of them, and gone for good as soon as it is answered or waved away. Not in focus mode:
@@ -56,7 +61,7 @@ export function BoardPhaseRecap({ boardId, path }: BoardPhaseRecapProps) {
   function ask() {
     if (!latest) return;
     openAiBuddy({
-      draft: `I just finished the phase “${latest.title}”. Give me a short recap I can keep: what it covered, the few things I should remember, and anything on my board from it. Start it with [[${latest.title}]] so the recap links back to the phase.`,
+      draft: `I just finished the phase “${latest.title}”. Give me a short recap I can keep: what it covered, the few things I should remember, and anything on my board from it.${linkable(latest.title) ? ` Start it with [[${latest.title}]] so the recap links back to the phase.` : ""}`,
     });
     settle();
   }

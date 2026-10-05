@@ -228,6 +228,39 @@ export function resolveLink(text: string, phases: PathPhases): ResolvedLink | nu
   return null;
 }
 
+/**
+ * Where a half-typed `[[…` stands: still choosing a phase, a step in one, or a task in a step.
+ *
+ * The same reading as {@link resolveLink}: a `#` only separates levels when what comes before it
+ * names something on the path, so `[[Phase #1` is still a phase being typed and `[[C# basics#`
+ * goes on to that phase's steps. `query` is what is left to filter the current level by.
+ */
+export type OpenLinkLevel =
+  | { level: "phase"; query: string }
+  | { level: "step"; phaseId: string; query: string }
+  | { level: "task"; phaseId: string; stepId: string; query: string };
+
+export function openLinkLevel(typed: string, phases: PathPhases | null): OpenLinkLevel {
+  const cutsOf = (text: string) => [...text.matchAll(/#/g)].map((match) => match.index);
+
+  if (phases) {
+    for (const cut of cutsOf(typed)) {
+      const phaseId = phases.phaseByTitle.get(titleKey(typed.slice(0, cut)));
+      if (!phaseId) continue;
+
+      const rest = typed.slice(cut + 1);
+      for (const stepCut of cutsOf(rest)) {
+        const stepId = phases.stepInPhase.get(`${phaseId}|${titleKey(rest.slice(0, stepCut))}`);
+        if (stepId) return { level: "task", phaseId, stepId, query: rest.slice(stepCut + 1) };
+      }
+
+      return { level: "step", phaseId, query: rest };
+    }
+  }
+
+  return { level: "phase", query: typed };
+}
+
 /** Everything on the path a note links to, `[[…]]` first and the buddy's app links after. */
 export function linkedPlaces(card: BoardCard, phases: PathPhases): ResolvedLink[] {
   if (card.content.kind !== "NOTE") return [];

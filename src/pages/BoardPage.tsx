@@ -40,6 +40,11 @@ import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
+import {
+  hasNewlyBehind,
+  readBehindSeen,
+  writeBehindSeen,
+} from "../features/board/layout/behindSeen";
 import { readPathWindowShown, writePathWindowShown } from "../features/board/layout/pathWindowFold";
 import { readTaskPoolShown, writeTaskPoolShown } from "../features/board/layout/taskPoolShown";
 import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
@@ -742,34 +747,46 @@ export function BoardPage() {
   }
 
   /**
-   * "Behind you" opens when cards move into it while the hire is looking.
+   * "Behind you" opens when cards have moved into it since the hire last looked.
    *
-   * It arrives folded, but a phase finished in the dock (or on the Onboarding page in another tab)
-   * moves its cards there under the hire's eyes, and a band that silently swallows them reads as the
-   * cards being gone. So the cards already behind when the path was first read are noted, and any
-   * card joining them later unfolds the band once. Folding it again is the hire's call and sticks.
+   * It arrives folded, but cards move there without the hire touching the board: a phase finished
+   * in the dock or on the Onboarding page, a note kept from a step of a finished phase. A band that
+   * silently swallows them reads as the cards being gone. So what was behind last time is
+   * remembered (`behindSeen.ts`) — across visits, and while the board stays open — and any card
+   * that is new there unfolds the band once. Folding it again is the hire's call and sticks.
    */
-  const behindKey = pathSettled
-    ? allCards
-        .filter((card) => states.get(card.id)?.stage === "BEHIND")
-        .map((card) => card.id)
-        .sort()
-        .join("|")
-    : null;
+  const behindIds = useMemo(
+    () =>
+      pathSettled
+        ? allCards
+            .filter((card) => states.get(card.id)?.stage === "BEHIND")
+            .map((card) => card.id)
+            .sort()
+        : null,
+    [allCards, pathSettled, states],
+  );
+  const behindKey = behindIds?.join("|") ?? null;
   const [knownBehind, setKnownBehind] = useState<{ boardId: string; key: string } | null>(null);
 
   if (
     board &&
+    behindIds !== null &&
     behindKey !== null &&
     (knownBehind?.boardId !== boardId || knownBehind.key !== behindKey)
   ) {
-    const sameBoard = knownBehind?.boardId === boardId;
-    const before = new Set(sameBoard ? knownBehind.key.split("|") : []);
+    const before =
+      knownBehind?.boardId === boardId
+        ? new Set(knownBehind.key.split("|").filter(Boolean))
+        : readBehindSeen(boardId);
     setKnownBehind({ boardId, key: behindKey });
-    if (sameBoard && behindKey.split("|").some((id) => id && !before.has(id))) {
+    if (hasNewlyBehind(before, behindIds)) {
       setOpenStages((current) => new Set([...current, "BEHIND"]));
     }
   }
+
+  useEffect(() => {
+    if (board && behindIds !== null) writeBehindSeen(boardId, behindIds);
+  }, [board, boardId, behindIds]);
 
   function toggleStage(stage: BoardStage) {
     setOpenStages((current) => {

@@ -10,6 +10,7 @@ import { BoardPathContext } from "../../../../src/features/board/hooks/boardPath
 import {
   leadsOntoPath,
   linkedSteps,
+  openLinkLevel,
   placeOfUrl,
   pathPhases,
   pathStages,
@@ -142,6 +143,38 @@ describe("[[Phase#Step]] links in a note", () => {
       task: "Read #1",
     });
     expect(resolveLink("Learn F# too", sharp)).toEqual({ phaseId: "p1", stepId: "s1", task: null });
+  });
+
+  it("know which level a half-typed link is at, with # inside titles", () => {
+    const sharp = pathPhases({
+      id: "path",
+      phases: [
+        {
+          id: "p1",
+          title: "Phase #1",
+          position: 1,
+          steps: [{ id: "s1", title: "Fix #12", status: "WAITING", position: 0 }],
+          questions: [],
+        },
+      ],
+    } as unknown as OnboardingPathEndpoint);
+
+    expect(openLinkLevel("Phase #1", sharp)).toEqual({ level: "phase", query: "Phase #1" });
+    expect(openLinkLevel("Phase #1#Fix", sharp)).toEqual({
+      level: "step",
+      phaseId: "p1",
+      query: "Fix",
+    });
+    expect(openLinkLevel("Phase #1#Fix #12#re", sharp)).toEqual({
+      level: "task",
+      phaseId: "p1",
+      stepId: "s1",
+      query: "re",
+    });
+    expect(openLinkLevel("Anything#else", null)).toEqual({
+      level: "phase",
+      query: "Anything#else",
+    });
   });
 
   it("are completed, or gone into, from what is typed after [[", () => {
