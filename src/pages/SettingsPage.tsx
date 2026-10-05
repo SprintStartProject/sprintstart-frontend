@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useReducedMotion } from "framer-motion";
@@ -131,7 +132,7 @@ export function SettingsPage() {
         </div>
       </header>
 
-      <main className="app-page-content py-6 md:py-8">
+      <MainContent className="app-page-content py-6 md:py-8">
         <div className="mx-auto max-w-4xl">
           <nav
             aria-label="Settings sections"
@@ -164,7 +165,7 @@ export function SettingsPage() {
             ))}
           </div>
         </div>
-      </main>
+      </MainContent>
     </div>
   );
 }

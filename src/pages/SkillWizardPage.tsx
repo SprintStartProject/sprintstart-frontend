@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { SkillWizard } from "../features/team-management/components/SkillWizard";
@@ -93,15 +94,15 @@ export function SkillWizardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <MainContent className="flex min-h-screen items-center justify-center px-4 py-10" placeholder>
         <p className="text-sm text-app-text-muted">Loading skill assessment...</p>
-      </div>
+      </MainContent>
     );
   }
 
   if (error || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <MainContent className="flex min-h-screen items-center justify-center px-4 py-10">
         <div className="w-full max-w-lg rounded-2xl border border-app-border bg-app-surface p-6 text-center shadow-lg">
           <p className="text-sm text-app-text-muted">{error ?? "Unknown error."}</p>
 
@@ -114,11 +115,13 @@ export function SkillWizardPage() {
             </Link>
           </div>
         </div>
-      </div>
+      </MainContent>
     );
   }
 
   return (
-    <SkillWizard open user={user} skills={skills} onClose={handleClose} onSubmit={handleSubmit} />
+    <MainContent className="min-h-screen">
+      <SkillWizard open user={user} skills={skills} onClose={handleClose} onSubmit={handleSubmit} />
+    </MainContent>
   );
 }

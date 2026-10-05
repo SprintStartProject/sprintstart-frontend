@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   Archive,
@@ -1767,13 +1768,16 @@ export function BlueprintPathDetailPage() {
   // header described it. The `reopen` effect guards this the same way.
   if (isLoading && (!path || path.id !== pathId))
     return (
-      <main className="flex min-h-80 items-center justify-center gap-3 text-app-text-muted">
+      <MainContent
+        placeholder
+        className="flex min-h-80 items-center justify-center gap-3 text-app-text-muted"
+      >
         <Loader2 className="h-5 w-5 animate-spin" /> Loading blueprint…
-      </main>
+      </MainContent>
     );
   if (!path)
     return (
-      <main className="mx-auto max-w-3xl p-8">
+      <MainContent className="mx-auto max-w-3xl p-8">
         <Button
           variant="secondary"
           icon={<ArrowLeft className="h-4 w-4" />}
@@ -1784,7 +1788,7 @@ export function BlueprintPathDetailPage() {
         <p role="alert" className="mt-6 text-app-danger-text">
           {error || "Blueprint path not found."}
         </p>
-      </main>
+      </MainContent>
     );
 
   // What the overlay is about, whichever way it was opened. The field conditions below used to ask
@@ -1800,7 +1804,7 @@ export function BlueprintPathDetailPage() {
   return (
     // The swipe listens on the page, not on the bar: a gesture that only works while the pointer is
     // over a 20rem control reads as broken everywhere else.
-    <main
+    <MainContent
       ref={swipeRef}
       className="mx-auto w-full max-w-[calc(72rem+2*var(--app-page-gutter))] space-y-7 px-(--app-page-gutter) py-8"
     >
@@ -3024,6 +3028,6 @@ export function BlueprintPathDetailPage() {
           ) : null}
         </form>
       </Modal>
-    </main>
+    </MainContent>
   );
 }

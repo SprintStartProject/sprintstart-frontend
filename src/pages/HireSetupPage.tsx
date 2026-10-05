@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DoorOpen } from "lucide-react";
@@ -81,7 +82,7 @@ export function HireSetupPage() {
         </div>
       </header>
 
-      <main ref={swipeRef} className="app-page-frame py-6 lg:py-8">
+      <MainContent ref={swipeRef} className="app-page-frame py-6 lg:py-8">
         <SegmentedTabs
           value={activeTab}
           options={tabOptions}
@@ -101,7 +102,7 @@ export function HireSetupPage() {
             <StarterWorkSection actionsPortalTarget={starterActionsHost} />
           )}
         </SlidingTabPanel>
-      </main>
+      </MainContent>
     </div>
   );
 }

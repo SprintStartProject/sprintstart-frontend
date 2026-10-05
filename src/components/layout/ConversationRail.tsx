@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useDialogFocus } from "../ui/useDialogFocus";
 
 /** The width the app branches on for a rail: below it there is no room for a column. */
 export const RAIL_DESKTOP_QUERY = "(min-width: 768px)";
@@ -26,6 +28,9 @@ export const RAIL_DESKTOP_QUERY = "(min-width: 768px)";
  * not only by finding its cross. The backdrop is a `button` rather than a `div` with a click
  * handler, so it is a real control with a name — the same shape, and the same layering
  * (`z-50` under a `z-[60]` panel), as `SideBar`'s.
+ *
+ * Below `md`, while it is open, it is also a modal layer for the keyboard: focus moves in, Tab
+ * stays inside, Escape shuts it, and focus goes back to whatever reopens it.
  */
 export function ConversationRail({
   isOpen,
@@ -53,6 +58,25 @@ export function ConversationRail({
   dismissLabel?: string;
   children: ReactNode;
 }) {
+  const isDrawer = !useMediaQuery(RAIL_DESKTOP_QUERY);
+  const isDrawerOpen = isOpen && isDrawer && onDismiss !== undefined;
+  const railRef = useDialogFocus<HTMLElement>(isDrawerOpen, onDismiss);
+
+  // The control that opened the drawer is not there while it is open (`RailToggle` only exists
+  // for a closed rail), so `useDialogFocus` has nothing to give focus back to. Once the drawer is
+  // shut and the control is back, hand it focus -- unless focus has already gone somewhere.
+  useEffect(() => {
+    if (!isDrawerOpen || !id) return;
+    return () => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      const opener = Array.from(document.querySelectorAll<HTMLElement>("[aria-controls]")).find(
+        (element) => element.getAttribute("aria-controls") === id,
+      );
+      opener?.focus();
+    };
+  }, [isDrawerOpen, id]);
+
   return (
     <>
       {isOpen && onDismiss && (
@@ -65,12 +89,14 @@ export function ConversationRail({
       )}
 
       <aside
+        ref={railRef}
+        tabIndex={-1}
         id={id}
         aria-label={label}
         aria-hidden={!isOpen}
         inert={!isOpen}
         className={[
-          "fixed inset-y-0 left-0 z-[60] flex w-72 max-w-[85vw] flex-col",
+          "fixed inset-y-0 left-0 z-[60] flex w-72 max-w-[85vw] flex-col outline-hidden",
           "border-r border-app-border bg-app-bg-soft shadow-2xl",
           "transition-transform duration-300",
           // From `md` the insets and the shadow stop applying and the width does the work.

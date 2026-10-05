@@ -16,9 +16,7 @@ describe("LoginPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <LoginPage />
-        </main>
+        <LoginPage />
       </MemoryRouter>,
     );
 

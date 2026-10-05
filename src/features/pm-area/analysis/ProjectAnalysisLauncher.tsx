@@ -125,7 +125,7 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
               {historyLoading ? (
                 <span
                   aria-hidden="true"
-                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-app-text-subtle"
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-app-text-subtle motion-reduce:animate-none"
                 />
               ) : (
                 <CircleAlert aria-hidden="true" className="h-4 w-4 text-app-text-subtle" />

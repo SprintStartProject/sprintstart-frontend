@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -754,7 +755,7 @@ export function AdminPage() {
         </div>
       </header>
 
-      <main className="admin-page-frame py-4 sm:py-6">
+      <MainContent className="admin-page-frame py-4 sm:py-6">
         {/* No card around the sections, matching the other tabbed pages: the
             box drew a second frame inside the page frame and made the tab bar
             look like it belonged to a widget rather than to the page. */}
@@ -932,7 +933,7 @@ export function AdminPage() {
             </SlidingTabPanel>
           )}
         </div>
-      </main>
+      </MainContent>
 
       {(selectedUser || selectedProject || selectedSkill || isCreatingSkill) && (
         <button

@@ -283,9 +283,9 @@ export function BuddyTypingMessage({
           {!replyReady && (
             <div className="mt-2 flex w-max max-w-full items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-2.5 shadow-sm">
               <span className="flex gap-1" aria-hidden="true">
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand motion-reduce:animate-none" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms] motion-reduce:animate-none" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms] motion-reduce:animate-none" />
               </span>
               {label && <span className="text-sm text-app-text-muted italic">{label}</span>}
             </div>
@@ -316,9 +316,9 @@ export function BuddyTypingMessage({
 
         <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-3 shadow-sm">
           <span className="flex gap-1" aria-hidden="true">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand motion-reduce:animate-none" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms] motion-reduce:animate-none" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms] motion-reduce:animate-none" />
           </span>
           {/* What it is *doing*, when the backend says so. "Checking your progress…" answers
                         "why is this taking a moment"; three dots do not. */}

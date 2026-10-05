@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -926,7 +927,7 @@ export function BoardPage() {
         </header>
       )}
 
-      <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
+      <MainContent ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
         {/* The page keeps a margin either side from `lg` up (at least 5rem on the right here, see
             `frameClass`), and on this page it is dead space: the board is a column of cards and
             the margin is where a hand rests. So the offers live there — always in reach, never in
@@ -1270,7 +1271,7 @@ export function BoardPage() {
             </div>
           </div>
         ) : null}
-      </main>
+      </MainContent>
 
       <BoardChainPanel
         cardId={chainCardId}

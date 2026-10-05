@@ -2,6 +2,7 @@
 // OnBoardingPage.tsx
 // ============================================================
 
+import { MainContent } from "../components/layout/MainContent";
 import {
   AlertCircle,
   AlertTriangle,
@@ -1002,7 +1003,7 @@ export function OnBoardingPage() {
         </div>
       </header>
 
-      <main className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
+      <MainContent className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <SegmentedTabs
             layoutId="onboarding-view-mode"
@@ -1113,7 +1114,7 @@ export function OnBoardingPage() {
             />
           )}
         </SlidingTabPanel>
-      </main>
+      </MainContent>
     </div>
   );
 }

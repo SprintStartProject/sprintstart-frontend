@@ -131,7 +131,7 @@ export function ReasoningPanel({ reasoning, isStreaming, answerLength }: Reasoni
         {/* Says which of the two states it is in without relying on the animation alone:
             still being written, or finished and available to read back. */}
         {isThinkingNow ? (
-          <span className="animate-pulse text-xs italic">thinking…</span>
+          <span className="animate-pulse text-xs italic motion-reduce:animate-none">thinking…</span>
         ) : (
           !isOpen && <span className="text-xs text-app-text-disabled">(hidden)</span>
         )}

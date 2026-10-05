@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenCheck,
@@ -236,7 +237,7 @@ export function BlueprintPathsPage() {
   return (
     // The swipe listens on the page rather than on the bar: having to be over the control to change
     // scope makes the gesture feel like it only works in one corner.
-    <main
+    <MainContent
       ref={swipeRef}
       className="mx-auto w-full max-w-[calc(72rem+2*var(--app-page-gutter))] space-y-8 px-(--app-page-gutter) py-8"
     >
@@ -385,7 +386,7 @@ export function BlueprintPathsPage() {
           </Field>
         </form>
       </Modal>
-    </main>
+    </MainContent>
   );
 }
 

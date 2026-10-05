@@ -302,7 +302,7 @@ function PoolStatusMarker({ unseen }: { unseen: boolean }) {
       <span className="relative flex h-2 w-2 shrink-0" role="img" aria-label="Not looked at yet">
         <span
           aria-hidden="true"
-          className="absolute inline-flex h-full w-full animate-ping rounded-full bg-app-brand opacity-75"
+          className="absolute inline-flex h-full w-full animate-ping rounded-full bg-app-brand opacity-75 motion-reduce:animate-none"
         />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-app-brand" />
       </span>

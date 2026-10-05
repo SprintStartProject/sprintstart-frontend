@@ -1103,7 +1103,7 @@ export function ArtifactViewerDrawer({
       ) : viewMode === "raw" ? (
         <div ref={contentContainerRef} data-testid="raw-content" aria-busy={isLoading}>
           {isLoading ? (
-            <div className="animate-pulse space-y-4">
+            <div className="animate-pulse space-y-4 motion-reduce:animate-none">
               <div className="h-4 w-3/4 rounded bg-app-border"></div>
               <div className="h-4 w-1/2 rounded bg-app-border"></div>
               <div className="h-4 w-5/6 rounded bg-app-border"></div>
