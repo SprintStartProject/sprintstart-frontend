@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Layers, ListChecks, Milestone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { onboardingPlaceUrl } from "../../onboarding/onboardingPlace";
@@ -7,16 +8,18 @@ import { titleKey } from "../layout/stepLinks";
 
 type StepLinkProps =
   /** The inside of a `[[…]]` as written in the note: `Phase`, `Phase#Step` or `Phase#Step#Task`. */
-  | { title: string; stepId?: never }
-  /** An in-app link to a step by id — what the buddy writes. */
-  | { stepId: string; title?: never };
+  | { title: string; stepId?: never; label?: never }
+  /** An in-app link to a step by id — what the buddy writes — and the words it wrote for it. */
+  | { stepId: string; title?: never; label?: ReactNode };
 
 /**
  * A link into the path in a note — a phase, a step, or a task in a step — drawn as a small chip
  * that opens it on the Onboarding page.
  *
  * Something that matches nothing on the path — renamed, rebuilt away, or simply mistyped — stays
- * readable and says why it does not go anywhere, rather than disappearing or pretending to link.
+ * readable and says why it does not go anywhere, rather than disappearing or pretending to link. It
+ * reads as what it named last (`Setup#Set up SSH` reads "Set up SSH"), with the whole of it in the
+ * tooltip, and a buddy's link keeps the words the buddy wrote for it.
  */
 export function StepLink(props: StepLinkProps) {
   const { phases } = useBoardPath();
@@ -30,12 +33,18 @@ export function StepLink(props: StepLinkProps) {
 
   const phase = link ? phases?.phaseInfo.get(link.phaseId) : undefined;
   if (!link || !phase) {
+    const parts = (props.title ?? "")
+      .split("#")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const named = parts.length > 0 ? parts.join(" › ") : null;
+
     return (
       <span
         className="rounded-sm border-b border-dashed border-app-text-subtle text-app-text-muted"
-        title={phases ? "Nothing with this name on your path" : undefined}
+        title={named ? `${named} — not on your path any more` : "Not on your path any more"}
       >
-        {props.title ?? "a step"}
+        {parts.length > 0 ? parts[parts.length - 1] : (props.label ?? "a step")}
       </span>
     );
   }

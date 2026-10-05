@@ -10,7 +10,12 @@ import type { PathPhases } from "../layout/pathStages";
  * page hands it down. Outside the board — a card drawn in a test, say — there is none, and the links
  * are drawn as plain titles.
  */
-export type BoardPath = { path: OnboardingPathEndpoint | null; phases: PathPhases | null };
+export type BoardPath = {
+  path: OnboardingPathEndpoint | null;
+  phases: PathPhases | null;
+  /** Whether the path has been read at least once — see `useOnboardingPath`. */
+  settled?: boolean;
+};
 
 export const BoardPathContext = createContext<BoardPath>({ path: null, phases: null });
 

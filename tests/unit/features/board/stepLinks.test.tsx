@@ -9,6 +9,7 @@ import { StepLinkTextarea } from "../../../../src/features/board/components/Step
 import { BoardPathContext } from "../../../../src/features/board/hooks/boardPath";
 import {
   isCardAt,
+  leadsOntoPath,
   pathPhases,
   pathStages,
   resolveLink,
@@ -145,6 +146,36 @@ describe("drawing and writing them", () => {
     expect(screen.getByRole("link", { name: "Open your first PR" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Nope" })).not.toBeInTheDocument();
     expect(screen.getByText("Nope")).toBeInTheDocument();
+  });
+
+  it("reads a link that leads nowhere as what it named last, and keeps the buddy's words", () => {
+    render(
+      <MemoryRouter>
+        <BoardPathContext.Provider value={{ path: null, phases: null, settled: true }}>
+          <NoteMarkdown
+            text={"- [[Setup#Set up SSH#Generate a key]]\n- [Set up SSH](/onboarding?step=gone)"}
+            marks={[]}
+            cardId="n"
+          />
+        </BoardPathContext.Provider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Generate a key")).toHaveAttribute(
+      "title",
+      "Setup › Set up SSH › Generate a key — not on your path any more",
+    );
+    expect(screen.getByText("Set up SSH")).toBeInTheDocument();
+    expect(screen.queryByText("a step")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("knows which ways back still lead onto the path", () => {
+    expect(leadsOntoPath("/onboarding?step=s1&open=1", phases)).toBe(true);
+    expect(leadsOntoPath("/onboarding?step=gone", phases)).toBe(false);
+    expect(leadsOntoPath("/onboarding?phase=p2", phases)).toBe(true);
+    expect(leadsOntoPath("/onboarding?step=s1", null)).toBe(false);
+    expect(leadsOntoPath("/chat/1", null)).toBe(true);
   });
 
   it("offers phases after [[, a phase's steps after Tab, and links one with Enter", async () => {

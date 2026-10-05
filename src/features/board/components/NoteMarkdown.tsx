@@ -32,7 +32,7 @@ export function NoteMarkdown({ text, marks, cardId }: NoteMarkdownProps) {
             }
             // A link the buddy wrote to a step of the path: the step chip, like a `[[…]]`.
             const [stepId] = href ? linkedStepIds(href) : [];
-            if (stepId) return <StepLink stepId={stepId} />;
+            if (stepId) return <StepLink stepId={stepId} label={children} />;
             // Any other app path opens in place; everything else is another site, beside the board.
             if (href?.startsWith("/") && href[1] !== "/" && href[1] !== "\\") {
               return <Link to={href}>{children}</Link>;

@@ -145,6 +145,23 @@ export function placeOfUrl(url: string): PathPlace | null {
   return phaseId ? { kind: "phase", id: phaseId } : null;
 }
 
+/**
+ * Whether an in-app address into the path still leads somewhere on it.
+ *
+ * True for anything that is not an address into the path at all — a chat, the knowledge base —
+ * since this is only a question about links into the path. With no path (`null`), nothing on it
+ * can be reached.
+ */
+export function leadsOntoPath(url: string, phases: PathPhases | null): boolean {
+  const place = placeOfUrl(url);
+  if (!place) return true;
+  if (!phases) return false;
+
+  if (place.kind === "step") return phases.steps.has(place.id);
+  if (place.kind === "question") return phases.phaseOfQuestion.has(place.id);
+  return phases.phaseIds.has(place.id);
+}
+
 /** The phase an in-app address points into, if it points into one on this path. */
 export function phaseOfUrl(url: string, phases: PathPhases): string | null {
   const place = placeOfUrl(url);

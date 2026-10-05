@@ -11,8 +11,14 @@ import type { OnboardingPathEndpoint } from "../../onboarding/types";
  * the way the path strip does, so a phase finished in the dock moves its cards up on the board
  * underneath it.
  */
-export function useOnboardingPath(): OnboardingPathEndpoint | null {
+export function useOnboardingPath(): { path: OnboardingPathEndpoint | null; settled: boolean } {
   const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
+  /**
+   * Whether the path has been asked for and answered at least once. Null before that means "not
+   * known yet"; null after it means "there is none" — the difference between leaving a card's way
+   * back alone and hiding one that leads nowhere.
+   */
+  const [settled, setSettled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +31,9 @@ export function useOnboardingPath(): OnboardingPathEndpoint | null {
         })
         .catch(() => {
           if (!cancelled) setPath(null);
+        })
+        .finally(() => {
+          if (!cancelled) setSettled(true);
         });
 
     read();
@@ -36,5 +45,5 @@ export function useOnboardingPath(): OnboardingPathEndpoint | null {
     };
   }, []);
 
-  return path;
+  return { path, settled };
 }

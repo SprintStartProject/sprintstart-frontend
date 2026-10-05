@@ -544,10 +544,13 @@ export function BoardPage() {
    * Now and Later, read off the onboarding path — see `pathStages.ts`. Nothing on this page sets a
    * stage any more: the path is the one plan, and the board files its cards against it.
    */
-  const path = useOnboardingPath();
+  const { path, settled: pathSettled } = useOnboardingPath();
   const phases = useMemo(() => (path ? pathPhases(path) : null), [path]);
   const stageOf = useMemo(() => pathStages(phases, cardOrigins), [phases, cardOrigins]);
-  const boardPath = useMemo(() => ({ path, phases }), [path, phases]);
+  const boardPath = useMemo(
+    () => ({ path, phases, settled: pathSettled }),
+    [path, phases, pathSettled],
+  );
 
   /**
    * One step or phase the board was opened for: `/board?step=<id>` or `/board?phase=<id>`.

@@ -23,6 +23,8 @@ import { CurrentTaskCard } from "./CurrentTaskCard";
 import { DiagramCard } from "./DiagramCard";
 import { LinkCard } from "./LinkCard";
 import { originOf, type CardOrigin, type CardOrigins } from "../layout/cardOrigins";
+import { useBoardPath } from "../hooks/boardPath";
+import { leadsOntoPath } from "../layout/pathStages";
 import { MemoryRecapCard } from "./MemoryRecapCard";
 import { NoteCard } from "./NoteCard";
 import { ArrivalStepsCard } from "./ArrivalStepsCard";
@@ -660,6 +662,22 @@ export function BoardGrid({
   const groupElements = useRef(new Map<string, HTMLElement>());
   const lastMoveAt = useRef(0);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  /**
+   * A card's way back, unless it leads into the path somewhere the path no longer has.
+   *
+   * A step rebuilt away, or a path that is gone altogether, would turn "Back to …" into a trip to a
+   * page that says the step is not there. Only decided once the path has been read: before that,
+   * "no path" means "not known yet", and hiding every way back for a second would be the board
+   * flickering.
+   */
+  const { phases: pathPhasesNow, settled: pathSettled } = useBoardPath();
+  const reachableOrigin = (cardId: string) => {
+    const origin = originOf(cardOrigins, cardId);
+    if (!origin || !pathSettled) return origin;
+
+    return leadsOntoPath(origin.url, pathPhasesNow) ? origin : null;
+  };
   /** The card a dragged one would be piled under if let go now — see `handleDrag`. */
   const [pileTargetId, setPileTargetId] = useState<string | null>(null);
   const pileTargetRef = useRef<string | null>(null);
@@ -1188,7 +1206,7 @@ export function BoardGrid({
           stack && onToggleStack ? (memberId) => revealMember(stack.rootId, memberId) : undefined
         }
         size={sizeOf(cardSizes, card.id)}
-        origin={originOf(cardOrigins, card.id)}
+        origin={reachableOrigin(card.id)}
         onCardAdded={onCardAdded}
         onResize={onResizeCard ? (next) => onResizeCard(card.id, next) : undefined}
       />
