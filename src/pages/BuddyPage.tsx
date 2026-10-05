@@ -149,7 +149,7 @@ function BuddyPageShell({
         {modeControl && (
           <div
             data-testid="buddy-mode-band"
-            className={`app-page-frame shrink-0 ${reserveFloatingClearance ? "pt-14 2xl:pt-4" : "pt-4"}`}
+            className={`app-page-frame shrink-0 ${reserveFloatingClearance ? "pt-14 min-[1660px]:pt-4" : "pt-4"}`}
           >
             {modeControl}
           </div>
@@ -398,10 +398,11 @@ function BuddyMentorHome() {
   // and the room they need must not go with them — so the mode row reserves it from the stable
   // facts rather than from the controls' own presence: the rail toggle's conditions, or simply
   // that this conversation has been spoken in. The row keeps the phone value of that clearance
-  // up to `2xl`: until then the fluid page gutter (clamp(2rem, 9vw - 4rem, 10rem)) is narrower
-  // than the counted rail toggle's halo reach (~73px), and a select sitting at the column edge
-  // would tuck its top-left corner under it. Hire-flow only; a team conversation has no floating
-  // controls to clear.
+  // up to `min-[1660px]`, where the fluid page gutter (clamp(2rem, 9vw - 4rem, 10rem)) first
+  // clears the counted rail toggle with a real margin: a two-digit reply count puts its halo at
+  // ~79px, and the gutter only passes that with ~6px to spare at 1660px. Below it a select
+  // sitting at the column edge would tuck its top-left corner under the toggle. Hire-flow only;
+  // a team conversation has no floating controls to clear.
   const needsFloatingRoom =
     isHireMode && (((sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage);
 

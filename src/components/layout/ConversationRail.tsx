@@ -94,9 +94,10 @@ export function ConversationRail({
  * about 40px tall, so on a phone — where the conversation runs to both page edges — the first
  * message would start underneath it. From `md` up the page gutter grows and content *inside*
  * the column sits beside the control rather than under it, and the page's own `pt-8` stands. A
- * control that sits *at* the gutter edge is the exception — below ~1220px the gutter (a fluid
- * `clamp(2rem, 9vw - 4rem, 10rem)`) is narrower than the toggle's reach, so the buddy's mode
- * row keeps this phone value up to `2xl` (`pt-14 2xl:pt-4` in `BuddyPage`). One number covers
+ * control that sits *at* the gutter edge is the exception — below ~1660px the gutter (a fluid
+ * `clamp(2rem, 9vw - 4rem, 10rem)`) is narrower than the counted toggle's reach, so the buddy's
+ * mode row keeps this phone value up to `min-[1660px]` (`pt-14 min-[1660px]:pt-4` in
+ * `BuddyPage`). One number covers
  * the two message surfaces because their geometry is identical; a control of a different height
  * would need its own, not a bigger shared one.
  *

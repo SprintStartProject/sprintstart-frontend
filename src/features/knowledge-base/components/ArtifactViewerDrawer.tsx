@@ -1081,9 +1081,11 @@ export function ArtifactViewerDrawer({
       widthClassName="w-full max-w-5xl"
       zIndexClassName="z-50"
       // The `!` is load-bearing: Tailwind emits `sm:` utilities after `max-*` variants, so a
-      // plain `max-lg:rounded-none` would lose to the SidePanel's `sm:rounded-l-[28px]` — and
-      // below `lg` this drawer is full-bleed, where a corner would notch against the viewport.
-      panelClassName="border-l border-app-border shadow-2xl max-lg:rounded-none!"
+      // plain `max-[1025px]:rounded-none` would lose to the SidePanel's `sm:rounded-l-[28px]`.
+      // The bound is 1025, not `lg`'s 1024, because this drawer is `w-full max-w-5xl`: at a
+      // 1024px window — an iPad on its side — it is still full-bleed, and a corner there would
+      // notch against the viewport. From 1025 up the page shows beside it and the corner stands.
+      panelClassName="border-l border-app-border shadow-2xl max-[1025px]:rounded-none!"
       panelBackgroundClassName="bg-app-surface"
       headerClassName="p-4 bg-app-bg"
       contentClassName="p-6"

@@ -151,7 +151,7 @@ describe("SegmentedTabs", () => {
     expect(container.firstElementChild?.classList.contains("max-lg:flex-wrap")).toBe(false);
   });
 
-  it("grows the phone padding in both sizes", () => {
+  it("grows the phone padding on the reading size, and leaves the compact one its density", () => {
     const { unmount } = render(
       <SegmentedTabs
         value="all"
@@ -163,7 +163,9 @@ describe("SegmentedTabs", () => {
       />,
     );
 
-    expect(screen.getByTestId("tab-all").className).toContain("max-sm:py-3");
+    // The compact size has no caller yet. When one needs the grown target the class comes back
+    // with it; until then the row keeps the density it was built for.
+    expect(screen.getByTestId("tab-all").className).not.toContain("max-sm:py-3");
     unmount();
 
     render(

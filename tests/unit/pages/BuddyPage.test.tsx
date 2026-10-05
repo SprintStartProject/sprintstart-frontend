@@ -97,6 +97,7 @@ import {
   createSession,
   getMessages,
   getSessions,
+  getSuggestions,
   streamOpenBuddy,
   streamMessage,
 } from "../../../src/services/buddyService";
@@ -331,9 +332,9 @@ describe("BuddyPage", () => {
 
     expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
     expect(band().className).toContain("pt-14");
-    // The floor is the phone value up to `2xl` — below that the fluid page gutter is narrower
-    // than the rail toggle's halo, and the select sits at the gutter edge.
-    expect(band().className).toContain("2xl:pt-4");
+    // The floor is the phone value up to `min-[1660px]` — below that the fluid page gutter is
+    // narrower than the counted rail toggle's halo, and the select sits at the gutter edge.
+    expect(band().className).toContain("min-[1660px]:pt-4");
     // One reservation, not two: the transcript adds none under the mode row.
     expect(framed().className).toContain("pt-8");
 
@@ -346,6 +347,31 @@ describe("BuddyPage", () => {
     // The control is gone and the padding it stands in has not moved.
     expect(band().className).toContain("pt-14");
     expect(framed().className).toContain("pt-8");
+  });
+
+  /**
+   * The row is capped on phones — five wrapped chips at reading size take the composer's half of
+   * a small screen — but the cap is the count, not the type: the chips keep the size the rest of
+   * the page reads at, and only the dock's compact row shrinks.
+   */
+  it("caps the suggestion row at three on a phone, at reading size", async () => {
+    vi.mocked(getSuggestions).mockResolvedValue([
+      { label: "What should I work on?", question: "What should I work on next?" },
+      { label: "Who reviews my PRs?", question: "Who reviews my pull requests?" },
+      { label: "Where are the runbooks?", question: "Where do I find the runbooks?" },
+      { label: "How do I get staging access?", question: "How do I get staging credentials?" },
+      { label: "When is the release train?", question: "When does the next release train leave?" },
+    ]);
+
+    renderPage();
+
+    const row = within(await screen.findByTestId("buddy-suggestions"));
+    const chips = await row.findAllByRole("button");
+    expect(chips).toHaveLength(3);
+    for (const chip of chips) {
+      expect(chip.className).toContain("text-sm");
+      expect(chip.className).not.toContain("text-xs");
+    }
   });
 
   /**

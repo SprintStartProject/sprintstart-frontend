@@ -220,7 +220,7 @@ export function SegmentedTabs<TValue extends string>({
               wrap ? "min-w-fit" : "shrink-0"
             } items-center justify-center ${
               isCompact
-                ? "gap-1.5 rounded-lg px-3 py-1.5 text-xs max-sm:py-3"
+                ? "gap-1.5 rounded-lg px-3 py-1.5 text-xs"
                 : "gap-2 rounded-xl px-4 py-2 text-sm max-sm:py-3"
             } font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
               fullWidth && !wrap ? (wrapBelow ? "lg:flex-1" : "flex-1") : ""
