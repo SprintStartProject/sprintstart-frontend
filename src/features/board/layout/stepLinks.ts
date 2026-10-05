@@ -10,6 +10,14 @@
  * on every machine, and `[[Set up SSH]]` reads as what it means even where nothing draws it. The
  * price is that a step renamed or rebuilt away leaves a link that no longer resolves — which is
  * drawn as such, and is the same bargain Obsidian makes.
+ *
+ * **A task too, the Obsidian way:** `[[Set up SSH#Generate a key]]` — the step, then `#` and one of
+ * its tasks, as Obsidian points at a heading inside a note. It opens the step and files the note
+ * there; the task is what the chip says.
+ *
+ * **And what the buddy already writes.** The buddy is handed each step's app link and writes
+ * "[#3](/onboarding?step=…)" into its replies. A reply kept on the board with such a link is linked
+ * to that step just the same — no new syntax for the model to learn.
  */
 const WIKI_LINK = /\[\[([^[\]\n]+?)\]\]/g;
 
@@ -30,6 +38,26 @@ export function splitStepLinks(text: string): LinkRun[] {
   if (last < text.length) runs.push({ text: text.slice(last), link: false });
 
   return runs;
+}
+
+/** What a `[[…]]` names: a step, and perhaps one of its tasks after a `#`. */
+export function linkTarget(text: string): { step: string; task: string | null } {
+  const at = text.indexOf("#");
+  if (at === -1) return { step: text.trim(), task: null };
+
+  return { step: text.slice(0, at).trim(), task: text.slice(at + 1).trim() || null };
+}
+
+/**
+ * The step ids a text points at through in-app links — `/onboarding/<id>` or `?step=<id>`, the
+ * shapes the buddy and the board write. Markdown link syntax or a bare path, either works.
+ */
+export function linkedStepIds(text: string): string[] {
+  const ids: string[] = [];
+  for (const match of text.matchAll(/\/onboarding(?:\/([\w-]+)|\?(?:[^\s)#]*&)?step=([\w-]+))/g)) {
+    ids.push(match[1] ?? match[2]);
+  }
+  return ids;
 }
 
 /** Every title a note links to, in order. */

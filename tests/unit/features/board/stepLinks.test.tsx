@@ -24,7 +24,15 @@ const path = {
       id: "p1",
       title: "Setup",
       position: 1,
-      steps: [{ id: "s1", title: "Set up SSH", status: "IN_PROGRESS", position: 0 }],
+      steps: [
+        {
+          id: "s1",
+          title: "Set up SSH",
+          status: "IN_PROGRESS",
+          position: 0,
+          tasks: [{ id: "t1", title: "Generate a key", position: 0 }],
+        },
+      ],
       questions: [],
     },
     {
@@ -67,6 +75,25 @@ describe("[[step]] links in a note", () => {
     expect(isCardAt(card, { kind: "step", id: "s1" }, phases, {})).toBe(false);
   });
 
+  it("can name a task in the step, and a buddy's app link counts too", () => {
+    expect(
+      isCardAt(
+        note("t", "see [[Set up SSH#Generate a key]]"),
+        { kind: "step", id: "s1" },
+        phases,
+        {},
+      ),
+    ).toBe(true);
+    expect(
+      isCardAt(
+        note("u", "Try [#3](/onboarding?step=s2) next"),
+        { kind: "step", id: "s2" },
+        phases,
+        {},
+      ),
+    ).toBe(true);
+  });
+
   it("are completed from what is typed after [[", () => {
     expect(openLinkBefore("note [[set", 10)).toEqual({ query: "set", start: 5 });
     expect(openLinkBefore("note [[set]] done", 17)).toBeNull();
@@ -83,7 +110,9 @@ describe("drawing and writing them", () => {
       <MemoryRouter>
         <BoardPathContext.Provider value={{ path, phases }}>
           <NoteMarkdown
-            text={"## Plan\n- do [[Set up SSH]]\n- then [[Nope]]"}
+            text={
+              "## Plan\n- do [[Set up SSH]]\n- [[Set up SSH#Generate a key]]\n- [#3](/onboarding?step=s2)\n- then [[Nope]]"
+            }
             marks={[]}
             cardId="n"
           />
@@ -96,6 +125,11 @@ describe("drawing and writing them", () => {
       "/onboarding?step=s1&open=1",
     );
     expect(screen.queryByRole("link", { name: "Nope" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /generate a key/i })).toHaveAttribute(
+      "href",
+      "/onboarding?step=s1&open=1",
+    );
+    expect(screen.getByRole("link", { name: "Open your first PR" })).toBeInTheDocument();
     expect(screen.getByText("Nope")).toBeInTheDocument();
   });
 
@@ -111,6 +145,10 @@ describe("drawing and writing them", () => {
     }
     render(<Editor />);
 
+    await userEvent.type(screen.getByLabelText("Note"), "Before [[[[key");
+    expect(screen.getByRole("option", { name: /generate a key/i })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.clear(screen.getByLabelText("Note"));
     await userEvent.type(screen.getByLabelText("Note"), "Before [[[[first");
     expect(screen.getByRole("option", { name: /open your first pr/i })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /set up ssh/i })).not.toBeInTheDocument();

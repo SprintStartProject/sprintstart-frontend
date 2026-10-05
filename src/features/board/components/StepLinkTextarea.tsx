@@ -1,11 +1,14 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Milestone } from "lucide-react";
+import { ListChecks, Milestone } from "lucide-react";
 import { Textarea, type TextareaProps } from "../../../components/ui/Textarea";
 import { useBoardPath } from "../hooks/boardPath";
 import { completeLink, openLinkBefore, titleKey } from "../layout/stepLinks";
 
-/** How many steps are offered at once; typing more of the title narrows them. */
-const OFFERED = 6;
+/** How many steps and tasks are offered at once; typing more of the title narrows them. */
+const OFFERED = 8;
+
+/** One thing a `[[` can link: a step, or a task in one — see `layout/stepLinks.ts`. */
+type Offer = { key: string; link: string; title: string; detail: string; task: boolean };
 
 type StepLinkTextareaProps = Omit<TextareaProps, "value" | "onChange"> & {
   value: string;
@@ -13,11 +16,15 @@ type StepLinkTextareaProps = Omit<TextareaProps, "value" | "onChange"> & {
 };
 
 /**
- * A note's text field that offers the path's steps as soon as `[[` is typed, like Obsidian does for
- * notes — see `layout/stepLinks.ts` for what a link is and does.
+ * A note's text field that offers the path's steps and their tasks as soon as `[[` is typed, like
+ * Obsidian does for notes — see `layout/stepLinks.ts` for what a link is and does.
  *
- * The offer narrows as the title is typed; ↑/↓ move through it, Enter or Tab takes one, Escape puts
- * it away until the next `[[`. Without a path there is nothing to offer and it is a plain text field.
+ * The offer narrows as the title is typed: a step's name finds the step and its tasks, a task's
+ * name finds the task. ↑/↓ move through it, Enter or Tab takes one, Escape puts it away until the
+ * next `[[`. Without a path there is nothing to offer and it is a plain text field.
+ *
+ * **In the flow, not floating.** The list sits under the field and pushes what follows down. A card
+ * on the board clips whatever overflows it, and a list hovering over the card's edge was cut off.
  */
 export function StepLinkTextarea({
   value,
@@ -32,25 +39,33 @@ export function StepLinkTextarea({
   /** Where the `[[` that Escape put away starts, so the same one does not reopen at once. */
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
 
-  const steps = useMemo(
+  const offers = useMemo<Offer[]>(
     () =>
       [...(path?.phases ?? [])]
         .sort((left, right) => left.position - right.position)
         .flatMap((phase) =>
-          (phase.steps ?? []).map((step) => ({
-            id: step.id,
-            title: step.title,
-            phase: phase.title,
-          })),
+          (phase.steps ?? []).flatMap((step) => [
+            { key: step.id, link: step.title, title: step.title, detail: phase.title, task: false },
+            ...[...(step.tasks ?? [])]
+              .sort((left, right) => left.position - right.position)
+              .map((task) => ({
+                key: task.id,
+                link: `${step.title}#${task.title}`,
+                title: task.title,
+                detail: step.title,
+                task: true,
+              })),
+          ]),
         ),
     [path],
   );
 
   const open = openLinkBefore(value, caret);
+  const query = open ? titleKey(open.query.replace("#", " ")) : "";
   const offered =
-    open && open.start !== dismissedAt && steps.length > 0
-      ? steps
-          .filter((step) => titleKey(step.title).includes(titleKey(open.query)))
+    open && open.start !== dismissedAt
+      ? offers
+          .filter((offer) => titleKey(`${offer.detail} ${offer.title}`).includes(query))
           .slice(0, OFFERED)
       : [];
   const listId = `${rest.id ?? "note"}-step-links`;
@@ -60,8 +75,8 @@ export function StepLinkTextarea({
     if (element) setCaret(element.selectionStart);
   }
 
-  function pick(title: string) {
-    const done = completeLink(value, caret, title);
+  function pick(link: string) {
+    const done = completeLink(value, caret, link);
     if (!done) return;
 
     onValueChange(done.text);
@@ -84,7 +99,7 @@ export function StepLinkTextarea({
       }
       if (event.key === "Enter" || event.key === "Tab") {
         event.preventDefault();
-        pick(offered[Math.min(active, offered.length - 1)].title);
+        pick(offered[Math.min(active, offered.length - 1)].link);
         return;
       }
       if (event.key === "Escape" && open) {
@@ -97,7 +112,7 @@ export function StepLinkTextarea({
   }
 
   return (
-    <div className="relative">
+    <div>
       <Textarea
         {...rest}
         ref={ref}
@@ -106,6 +121,10 @@ export function StepLinkTextarea({
           onValueChange(event.target.value);
           setCaret(event.target.selectionStart);
           setActive(0);
+          // A `[[` put away with Escape stays away only while it is there: once it is gone, the next
+          // one is a new one, even if it is typed at the same place.
+          if (!openLinkBefore(event.target.value, event.target.selectionStart))
+            setDismissedAt(null);
         }}
         onKeyDown={handleKeyDown}
         onKeyUp={track}
@@ -116,43 +135,49 @@ export function StepLinkTextarea({
         aria-controls={offered.length > 0 ? listId : undefined}
       />
 
-      {offered.length > 0 && (
+      {offered.length > 0 ? (
         <ul
           id={listId}
           role="listbox"
-          aria-label="Steps to link"
-          className="absolute top-full right-0 left-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-app-border bg-app-surface p-1 shadow-lg"
+          aria-label="Steps and tasks to link"
+          className="mt-1 max-h-56 overflow-y-auto rounded-xl border border-app-border bg-app-surface p-1 shadow-sm"
         >
-          {offered.map((step, index) => (
+          {offered.map((offer, index) => (
             <li
-              key={step.id}
+              key={offer.key}
               role="option"
               aria-selected={index === active}
               // `mousedown`, not `click`: a click would blur the field first and lose the caret.
               onMouseDown={(event) => {
                 event.preventDefault();
-                pick(step.title);
+                pick(offer.link);
               }}
               onMouseEnter={() => setActive(index)}
               className={`flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-sm ${
                 index === active ? "bg-app-brand-soft text-app-brand-text" : "text-app-text"
               }`}
             >
-              <Milestone className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {offer.task ? (
+                <ListChecks className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              ) : (
+                <Milestone className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              )}
               <span className="min-w-0">
-                <span className="block truncate font-medium">{step.title}</span>
-                <span className="block truncate text-xs text-app-text-muted">{step.phase}</span>
+                <span className="block truncate font-medium">{offer.title}</span>
+                <span className="block truncate text-xs text-app-text-muted">
+                  {offer.task ? `Task in ${offer.detail}` : offer.detail}
+                </span>
               </span>
             </li>
           ))}
         </ul>
-      )}
-
-      {steps.length > 0 && (
-        <p className="mt-1 text-xs text-app-text-subtle">
-          Type <kbd className="rounded border border-app-border px-1 font-mono">[[</kbd> to link a
-          step of your path.
-        </p>
+      ) : (
+        offers.length > 0 && (
+          <p className="mt-1 text-xs text-app-text-subtle">
+            Type <kbd className="rounded border border-app-border px-1 font-mono">[[</kbd> to link a
+            step or task of your path.
+          </p>
+        )
       )}
     </div>
   );

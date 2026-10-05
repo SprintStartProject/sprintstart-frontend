@@ -2,7 +2,7 @@ import { phaseState } from "../../onboarding/journey";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
 import type { BoardCard } from "../types";
 import type { CardOrigins } from "./cardOrigins";
-import { linkedTitles, titleKey } from "./stepLinks";
+import { linkedStepIds, linkedTitles, linkTarget, titleKey } from "./stepLinks";
 import type { BoardStage } from "./boardStructure";
 
 /**
@@ -40,6 +40,8 @@ export type PathPhases = {
   finishedPhaseIds: Set<string>;
   /** Every step by its title as `[[…]]` matches it (see `stepLinks.ts`), first one on a tie. */
   stepByTitle: Map<string, string>;
+  /** Every step's title and tasks, by id — what a link to it is drawn as. */
+  steps: Map<string, { title: string; tasks: { id: string; title: string }[] }>;
 };
 
 /**
@@ -55,9 +57,16 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
   const phaseOfStep = new Map<string, string>();
   const phaseOfQuestion = new Map<string, string>();
   const stepByTitle = new Map<string, string>();
+  const steps: PathPhases["steps"] = new Map();
   for (const phase of phases) {
     for (const step of phase.steps ?? []) {
       phaseOfStep.set(step.id, phase.id);
+      steps.set(step.id, {
+        title: step.title,
+        tasks: [...(step.tasks ?? [])]
+          .sort((left, right) => left.position - right.position)
+          .map((task) => ({ id: task.id, title: task.title })),
+      });
       const key = titleKey(step.title ?? "");
       if (key && !stepByTitle.has(key)) stepByTitle.set(key, step.id);
     }
@@ -74,6 +83,7 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
     phaseIds: new Set(phases.map((phase) => phase.id)),
     aheadPhaseIds,
     stepByTitle,
+    steps,
     finishedPhaseIds: new Set(
       phases.filter((phase) => phaseState(phase) === "done").map((phase) => phase.id),
     ),
@@ -137,9 +147,12 @@ export function stepOfCard(card: BoardCard, origins: CardOrigins): string | null
 export function linkedSteps(card: BoardCard, phases: PathPhases): string[] {
   if (card.content.kind !== "NOTE") return [];
 
-  return linkedTitles(card.content.text)
-    .map((title) => phases.stepByTitle.get(titleKey(title)))
+  const byTitle = linkedTitles(card.content.text)
+    .map((title) => phases.stepByTitle.get(titleKey(linkTarget(title).step)))
     .filter((stepId): stepId is string => stepId !== undefined);
+  const byUrl = linkedStepIds(card.content.text).filter((stepId) => phases.steps.has(stepId));
+
+  return [...byTitle, ...byUrl];
 }
 
 /**

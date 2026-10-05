@@ -4,6 +4,8 @@ import remarkGfm from "remark-gfm";
 import type { CardMark } from "../marks/cardMarks";
 import { remarkNoteText, STEP_LINK_HREF } from "../layout/noteMarkdown";
 import { StepLink } from "./StepLink";
+import { linkedStepIds } from "../layout/stepLinks";
+import { Link } from "react-router-dom";
 import { Marked } from "./Marked";
 
 type NoteMarkdownProps = { text: string; marks: CardMark[]; cardId: string };
@@ -24,14 +26,23 @@ export function NoteMarkdown({ text, marks, cardId }: NoteMarkdownProps) {
           mark: ({ node }) => (
             <Marked text={`==${textOf(node)}==`} marks={marks} parse cardId={cardId} />
           ),
-          a: ({ children, href }) =>
-            href?.startsWith(STEP_LINK_HREF) ? (
-              <StepLink title={decodeURIComponent(href.slice(STEP_LINK_HREF.length))} />
-            ) : (
+          a: ({ children, href }) => {
+            if (href?.startsWith(STEP_LINK_HREF)) {
+              return <StepLink title={decodeURIComponent(href.slice(STEP_LINK_HREF.length))} />;
+            }
+            // A link the buddy wrote to a step of the path: the step chip, like a `[[…]]`.
+            const [stepId] = href ? linkedStepIds(href) : [];
+            if (stepId) return <StepLink stepId={stepId} />;
+            // Any other app path opens in place; everything else is another site, beside the board.
+            if (href?.startsWith("/") && href[1] !== "/" && href[1] !== "\\") {
+              return <Link to={href}>{children}</Link>;
+            }
+            return (
               <a href={href} target="_blank" rel="noopener noreferrer">
                 {children}
               </a>
-            ),
+            );
+          },
         }}
       >
         {text}
