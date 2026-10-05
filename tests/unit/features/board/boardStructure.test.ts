@@ -330,6 +330,17 @@ describe("restack", () => {
   const ids = ["a", "b", "c", "d"];
   const under = (from: BoardStructure, id: string) => from.cards[id]?.dependsOn?.[0]?.id ?? null;
 
+  it("moves a whole pile onto another card, keeping its order", () => {
+    // a ← b is a pile; c ← d another. The a–b pile goes under c, and d now lies under b.
+    const two = structure({ b: { dependsOn: after("a") }, d: { dependsOn: after("c") } });
+    const next = restack(two, ids, "a", "c", ["a", "b"]);
+
+    expect(under(next, "a")).toBe("c");
+    expect(under(next, "b")).toBe("a");
+    expect(under(next, "d")).toBe("b");
+    expect(restack(two, ids, "a", "b", ["a", "b"])).toBe(two);
+  });
+
   it("leaves a neighbour's edge with whoever put it there", () => {
     // A team pile a ← b ← c; the hire takes b out. c closes the gap onto a, still the team's.
     const team = structure({

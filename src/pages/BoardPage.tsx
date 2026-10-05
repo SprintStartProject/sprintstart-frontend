@@ -604,15 +604,21 @@ export function BoardPage() {
     });
   }
 
-  /** Piles a card under another one, and into that card's area so the two can lie together. */
-  function handleStackOnto(cardId: string, targetId: string | null) {
-    stackOnto(cardId, targetId);
+  /**
+   * Piles a card under another one, and into that card's area so the two can lie together.
+   *
+   * `carry` is a whole closed pile being moved — every card of it goes along, area included.
+   */
+  function handleStackOnto(cardId: string, targetId: string | null, carry?: readonly string[]) {
+    stackOnto(cardId, targetId, carry);
     if (!targetId) return;
 
     const area = groupOf(groups, targetId)?.id ?? null;
-    if ((groupOf(groups, cardId)?.id ?? null) !== area) {
-      saveGroups(assignToGroup(groups, cardId, area));
+    let next = groups;
+    for (const id of carry ?? [cardId]) {
+      if ((groupOf(next, id)?.id ?? null) !== area) next = assignToGroup(next, id, area);
     }
+    if (next !== groups) saveGroups(next);
   }
 
   // Lends these cards to the app shell, so the selection toolbar mounted above the router can offer

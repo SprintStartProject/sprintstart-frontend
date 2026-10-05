@@ -18,7 +18,7 @@ export type UseBoardStructureResult = {
   /** Every card's derived status, keyed by id. Recomputed whenever the board or the structure moves. */
   states: Map<string, CardState>;
   /** Puts a card on another card's pile, or (with null) takes it off its own — see `restack`. */
-  stackOnto: (cardId: string, targetId: string | null) => void;
+  stackOnto: (cardId: string, targetId: string | null, carry?: readonly string[]) => void;
 };
 
 /**
@@ -84,13 +84,14 @@ export function useBoardStructure(
   return {
     structure,
     states,
-    stackOnto: (cardId, targetId) =>
+    stackOnto: (cardId, targetId, carry) =>
       save(
         restack(
           structure,
           cards.map((card) => card.id),
           cardId,
           targetId,
+          carry,
         ),
       ),
   };

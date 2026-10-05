@@ -527,8 +527,18 @@ export function restack(
   cardIds: readonly string[],
   cardId: string,
   targetId: string | null,
+  /**
+   * A whole run to move instead of the one card, in pile order, `cardId` first — what dragging a
+   * closed pile does. The run keeps its own order; only its ends are re-linked.
+   */
+  carry: readonly string[] = [cardId],
 ): BoardStructure {
   const known = new Set(cardIds);
+  const block = new Set(carry);
+  if (targetId && block.has(targetId)) return structure;
+
+  const first = carry[0] ?? cardId;
+  const last = carry[carry.length - 1] ?? cardId;
   const edge = (from: BoardStructure, id: string) =>
     (from.cards[id]?.dependsOn ?? []).find((dependency) => known.has(dependency.id));
   const before = (from: BoardStructure, id: string) => edge(from, id)?.id ?? null;
@@ -548,22 +558,20 @@ export function restack(
   });
 
   let next = structure;
-  const previous = before(next, cardId);
+  const previous = before(next, first);
   for (const other of cardIds) {
-    if (other !== cardId && before(next, other) === cardId)
-      next = placeAfter(next, other, previous);
+    if (!block.has(other) && before(next, other) === last) next = placeAfter(next, other, previous);
   }
-  next = placeAfter(next, cardId, null);
+  next = placeAfter(next, first, null);
 
-  if (!targetId || targetId === cardId || !known.has(targetId)) return next;
+  if (!targetId || !known.has(targetId)) return next;
 
-  // Whatever lay directly under the target now lies under the card that goes in between.
+  // Whatever lay directly under the target now lies under what goes in between.
   for (const other of cardIds) {
-    if (other !== cardId && before(next, other) === targetId)
-      next = placeAfter(next, other, cardId);
+    if (!block.has(other) && before(next, other) === targetId) next = placeAfter(next, other, last);
   }
 
-  return placeAfter(next, cardId, targetId, "HIRE");
+  return placeAfter(next, first, targetId, "HIRE");
 }
 
 /** Whether `from` already waits on `target`, directly or through other cards. */

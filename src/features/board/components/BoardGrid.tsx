@@ -90,9 +90,9 @@ const PILE_DWELL_MS = 350;
 const REORDER_DWELL_MS = 150;
 
 /**
- * How far the pointer may drift and still count as resting.
+ * How far the pointer may drift over a card's edge and still count as resting.
  *
- * Both gestures wait for the pointer to *stop*, not merely to stay over one zone. Timing the zone
+ * Reordering waits for the pointer to *stop*, not merely to stay over the edge. Timing the zone
  * alone meant the edge band — which every drag towards a card's middle crosses first — moved the
  * card aside on the way in whenever the crossing took longer than a beat, and the pile it was
  * headed for slid out from under it. A hand held still jitters a few pixels; anything more is the
@@ -101,13 +101,21 @@ const REORDER_DWELL_MS = 150;
 const STILL_PX = 8;
 
 /** Whether a point is in the middle of an element — the half of it, either way, around its centre. */
-function inMiddle(element: HTMLElement, x: number, y: number): boolean {
+function inMiddle(element: HTMLElement, x: number, y: number, reach = 1 / 4): boolean {
   const rect = element.getBoundingClientRect();
   const dx = Math.abs(x - (rect.left + rect.width / 2));
   const dy = Math.abs(y - (rect.top + rect.height / 2));
 
-  return dx <= rect.width / 4 && dy <= rect.height / 4;
+  return dx <= rect.width * reach && dy <= rect.height * reach;
 }
+
+/**
+ * How far the middle reaches once the pointer is in it — further than the way in.
+ *
+ * Without the extra room a hand resting near the middle's border flickered between middle and edge,
+ * and every flicker started the wait over, so the pile never lit.
+ */
+const MIDDLE_HOLD_REACH = 0.4;
 
 /**
  * The tilt that says "this can be moved".
@@ -427,7 +435,7 @@ type BoardGridProps = {
    */
   states?: Map<string, CardState>;
   /** Puts a card directly under another one in a pile, or (with null) takes it out of its pile. */
-  onStackOnto?: (cardId: string, targetId: string | null) => void;
+  onStackOnto?: (cardId: string, targetId: string | null, carry?: readonly string[]) => void;
   /**
    * The stacks on this board, keyed by every member's id.
    *
@@ -853,9 +861,16 @@ export function BoardGrid({
       clearPileTarget();
       restingRef.current = null;
 
-      // Let go over the middle of another card: the two become a pile. See `handleDrag`.
+      // Let go over the middle of another card: the two become a pile. See `handleDrag`. A closed
+      // pile is drawn as one card and moves as one: all of it goes onto the target. From an open
+      // pile only the card that was picked up goes.
       if (target && target !== cardId && onStackOnto) {
-        onStackOnto(cardId, target);
+        const pile = stacks?.get(cardId);
+        if (pile && !expandedStackIds?.has(pile.rootId)) {
+          onStackOnto(pile.memberIds[0], target, pile.memberIds);
+        } else {
+          onStackOnto(cardId, target);
+        }
         return;
       }
 
@@ -908,17 +923,23 @@ export function BoardGrid({
       for (const [candidateId, element] of elements.current) {
         if (candidateId === id || !contains(element, x, y)) continue;
 
-        const zone = onStackOnto && inMiddle(element, x, y) ? "middle" : "edge";
         const resting = restingRef.current;
+        const holding = resting?.id === candidateId && resting.zone === "middle";
+        const zone =
+          onStackOnto && inMiddle(element, x, y, holding ? MIDDLE_HOLD_REACH : undefined)
+            ? "middle"
+            : "edge";
+        // The middle only has to be *stayed in*: it is small and deliberate, and asking a hand to
+        // hold still inside it as well made piling feel broken. The edge has to be rested on, or
+        // every drag towards a middle would shuffle the cards on its way in.
         const sameSpot =
           resting?.id === candidateId &&
           resting.zone === zone &&
-          Math.hypot(x - resting.x, y - resting.y) <= STILL_PX;
+          (zone === "middle" || Math.hypot(x - resting.x, y - resting.y) <= STILL_PX);
         // Still resting where it was: whatever is pending stays pending, whatever is lit stays lit.
         if (sameSpot) return;
 
-        // Moving within the middle of the card that is already lit keeps it lit; anything else
-        // starts the wait over from here.
+        // Anything else starts the wait over from here.
         const keepLit = zone === "middle" && pileTargetRef.current === candidateId;
         if (pileTimer.current) clearTimeout(pileTimer.current);
         pileTimer.current = null;
