@@ -42,25 +42,44 @@ describe("TaskCheckItem", () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
-  it("still ticks from a plain click anywhere on the row", async () => {
+  it("still ticks from a click on the row around the text", async () => {
     const user = userEvent.setup();
     const onToggle = renderTask();
+    const row = screen.getByRole("button", { name: "1. Install Node" }).parentElement!;
 
-    await user.click(screen.getByText("Use the LTS version from nodejs.org"));
+    await user.click(row);
 
     expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Review on #309: a double-click to select one word is a single click first, which ticked the
+   * task on the way to selecting the word. Clicks on the text select; they do not tick.
+   */
+  it("does not tick from clicks on the text, single, double or triple", async () => {
+    const user = userEvent.setup();
+    const onToggle = renderTask();
+    const description = screen.getByText("Use the LTS version from nodejs.org");
+
+    await user.click(description);
+    await user.dblClick(screen.getByText(/Install Node/));
+    await user.tripleClick(description);
+
+    expect(onToggle).not.toHaveBeenCalled();
   });
 
   it("does not tick when the click ends a text selection", () => {
     const onToggle = renderTask();
     const description = screen.getByText("Use the LTS version from nodejs.org");
+    const row = screen.getByRole("button", { name: "1. Install Node" }).parentElement!;
 
     const range = document.createRange();
     range.selectNodeContents(description);
     window.getSelection()?.removeAllRanges();
     window.getSelection()?.addRange(range);
-    // The click that ends a drag, without the mousedown that would collapse the selection first.
-    fireEvent.click(description);
+    // A drag from the text out onto the row ends in a click there, without the mousedown that
+    // would collapse the selection first.
+    fireEvent.click(row);
 
     expect(onToggle).not.toHaveBeenCalled();
   });

@@ -25,8 +25,9 @@ interface TaskCheckItemProps {
  * Only the tick is a button. The whole row used to be one, and text inside a
  * button cannot be selected -- so a task could not be marked to hand to the
  * buddy (the app-wide selection toolbar's "Ask the buddy") or copied at all.
- * Clicking anywhere on the row still ticks it, unless that click was the end of
- * selecting some of its text.
+ * The tick and the rest of the row still tick it; the text itself does not, since a
+ * click there is how selecting starts -- a double-click on a word is a single click
+ * first, and would tick the task on the way to selecting the word.
  */
 export function TaskCheckItem({ index, title, description, isDone, onToggle }: TaskCheckItemProps) {
   const reduceMotion = useReducedMotion();
@@ -36,8 +37,10 @@ export function TaskCheckItem({ index, title, description, isDone, onToggle }: T
     // and for assistive technology, so the row itself needs no role or key handling.
     <motion.div
       onClick={(event) => {
-        if (event.target instanceof Element && event.target.closest("button")) return;
-        // Dragging across the text to select it ends in a click; that is not a tick.
+        if (event.target instanceof Element && event.target.closest("button, [data-task-text]")) {
+          return;
+        }
+        // Dragging from the row onto the text to select it ends in a click; that is not a tick.
         if (window.getSelection()?.isCollapsed === false) return;
         onToggle();
       }}
@@ -116,7 +119,7 @@ export function TaskCheckItem({ index, title, description, isDone, onToggle }: T
         </motion.span>
       </motion.button>
 
-      <span className="min-w-0 select-text">
+      <span data-task-text className="min-w-0 cursor-text select-text">
         <span
           className={`relative inline text-sm font-medium ${
             isDone ? "text-app-text-subtle" : "text-app-text"

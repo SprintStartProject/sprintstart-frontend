@@ -4,9 +4,11 @@ import {
   isCopyOfReveal,
   isCopyOfSample,
   isPasteFromReveal,
+  NOTHING_REVEALED,
   readRevealed,
-  revealedTexts,
+  type Revealed,
   shuffleOptions,
+  withAttempt,
   writeRevealed,
 } from "../../../../src/features/onboarding/questionIntegrity.ts";
 import type { OnboardingQuestionOptionEndpoint } from "../../../../src/features/onboarding/types.ts";
@@ -59,6 +61,16 @@ describe("shuffleOptions", () => {
     for (let round = 0; round < 20; round += 1) {
       const shuffled = shuffleOptions(withCatchAll, `q1:${round}`);
       expect(shuffled[shuffled.length - 1].label).toBe("All of the above");
+    }
+  });
+
+  it("keeps the German forms at the end too", () => {
+    for (const label of ["Alle genannten", "Keine der oben genannten", "Keine davon"]) {
+      const withCatchAll = options("Right", label, "Wrong A", "Wrong B");
+      for (let round = 0; round < 10; round += 1) {
+        const shuffled = shuffleOptions(withCatchAll, `q1:${round}`);
+        expect(shuffled[shuffled.length - 1].label).toBe(label);
+      }
     }
   });
 
@@ -116,17 +128,42 @@ describe("isCopyOfSample", () => {
 describe("isCopyOfReveal / isPasteFromReveal", () => {
   const explanation =
     "Retrospectives are facilitated by the Scrum Master, who keeps the meeting timeboxed.";
-  const revealed = ["Scrum Master", explanation];
+  const revealed: Revealed = { samples: ["Scrum Master"], texts: [explanation], own: [] };
 
-  it("catches an answer lifted out of the explanation", () => {
-    expect(isCopyOfReveal("facilitated by the Scrum Master", revealed)).toBe(true);
-    expect(isCopyOfReveal(explanation, revealed)).toBe(true);
+  it("catches a long sample typed back", () => {
+    const sample = "The Scrum Master facilitates the retro and keeps it timeboxed";
+    expect(isCopyOfReveal(sample, { ...NOTHING_REVEALED, samples: [sample] })).toBe(true);
   });
 
-  it("lets a short fact be typed back, but not pasted", () => {
+  /** Review on #309: the "lifted" check made the sample threshold 4 instead of the documented 5. */
+  it("lets a four-word sample be typed back, as documented for short samples", () => {
+    const sample = "Product Owner and Developers";
+    expect(isCopyOfReveal(sample, { ...NOTHING_REVEALED, samples: [sample] })).toBe(false);
+  });
+
+  /**
+   * A typed answer is never refused for sharing words with the explanation or feedback: that is
+   * as likely the hire's own wording as a copy. Copying from there is the paste guard's job.
+   */
+  it("never refuses a typed answer for words it shares with the explanation", () => {
+    expect(isCopyOfReveal("facilitated by the Scrum Master", revealed)).toBe(false);
     expect(isCopyOfReveal("Scrum Master", revealed)).toBe(false);
+  });
+
+  it("refuses any stretch of the sample or explanation arriving by paste", () => {
     expect(isPasteFromReveal("Scrum Master", revealed)).toBe(true);
     expect(isPasteFromReveal("the Scrum Master, who keeps", revealed)).toBe(true);
+  });
+
+  /** Review on #309: grading feedback quotes the hire's own wrong answer back. */
+  it("lets the hire paste their own earlier answer, though the feedback quotes it", () => {
+    const own = "the team lead decides the sprint scope";
+    const feedback = `Your answer '${own}' is not right: in Scrum the Product Owner orders the backlog.`;
+    const quoted: Revealed = { samples: [], texts: [feedback], own: [own] };
+
+    expect(isPasteFromReveal(own, quoted)).toBe(false);
+    expect(isCopyOfReveal("in Scrum the Product Owner", quoted)).toBe(false);
+    expect(isPasteFromReveal("in Scrum the Product Owner orders the backlog", quoted)).toBe(true);
   });
 
   it("lets the hire's own words through, typed or pasted", () => {
@@ -136,18 +173,22 @@ describe("isCopyOfReveal / isPasteFromReveal", () => {
   });
 
   it("has nothing to compare against before anything was revealed", () => {
-    expect(isPasteFromReveal("Scrum Master", [])).toBe(false);
+    expect(isPasteFromReveal("Scrum Master", NOTHING_REVEALED)).toBe(false);
   });
 });
 
-describe("revealedTexts", () => {
-  it("collects the sample, the explanation and the feedback that are there", () => {
-    expect(revealedTexts({ correctAnswer: "A", explanation: null, feedback: "  " })).toEqual(["A"]);
-    expect(revealedTexts({ correctAnswer: "A", explanation: "B", feedback: "C" })).toEqual([
-      "A",
-      "B",
-      "C",
-    ]);
+describe("withAttempt", () => {
+  it("keeps the sample apart from the explanation and feedback, and records the answer", () => {
+    const first = withAttempt(
+      NOTHING_REVEALED,
+      { correctAnswer: "A", explanation: null, feedback: "  " },
+      "my answer",
+    );
+    expect(first).toEqual({ samples: ["A"], texts: [], own: ["my answer"] });
+
+    expect(
+      withAttempt(first, { correctAnswer: "A", explanation: "B", feedback: "C" }, "another"),
+    ).toEqual({ samples: ["A"], texts: ["B", "C"], own: ["my answer", "another"] });
   });
 });
 
@@ -155,12 +196,13 @@ describe("revealed answer memory", () => {
   afterEach(() => window.localStorage.clear());
 
   it("remembers what was revealed per question, until it is cleared", () => {
-    writeRevealed("q1", ["The sample", "The explanation"]);
+    const revealed: Revealed = { samples: ["The sample"], texts: ["The explanation"], own: ["x"] };
+    writeRevealed("q1", revealed);
 
-    expect(readRevealed("q1")).toEqual(["The sample", "The explanation"]);
-    expect(readRevealed("q2")).toEqual([]);
+    expect(readRevealed("q1")).toEqual(revealed);
+    expect(readRevealed("q2")).toEqual(NOTHING_REVEALED);
 
     clearRevealed("q1");
-    expect(readRevealed("q1")).toEqual([]);
+    expect(readRevealed("q1")).toEqual(NOTHING_REVEALED);
   });
 });

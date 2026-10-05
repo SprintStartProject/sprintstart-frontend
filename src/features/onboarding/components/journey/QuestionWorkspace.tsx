@@ -1,5 +1,5 @@
 import { ChevronRight, Loader2, RotateCcw, Trophy, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/Button";
 import { useToast } from "../../../../context/useToast";
 import { onboardingService } from "../../../../services/onboardingService";
@@ -14,9 +14,11 @@ import {
   COPIED_SAMPLE_WARNING,
   isCopyOfReveal,
   isPasteFromReveal,
+  NOTHING_REVEALED,
   readRevealed,
-  revealedTexts,
+  withAttempt,
   writeRevealed,
+  type Revealed,
 } from "../../questionIntegrity";
 
 type Props = {
@@ -49,11 +51,15 @@ export function QuestionWorkspace({
   const alreadyPassed = question.status === "PASSED" && !result;
   // Each attempt shows the options in a fresh order, so a retry is not answered by position.
   const [attemptRound, setAttemptRound] = useState(0);
-  // What wrong attempts revealed -- sample answer, explanation, feedback: handing any of it back
-  // is not an answer.
-  const [revealed, setRevealed] = useState<string[]>(() =>
-    question.type === "SHORT_TEXT" ? readRevealed(question.id) : [],
+  // What wrong attempts revealed -- sample answer, explanation, feedback: handing it back is not
+  // an answer.
+  const [revealed, setRevealed] = useState<Revealed>(() =>
+    question.type === "SHORT_TEXT" ? readRevealed(question.id) : NOTHING_REVEALED,
   );
+  // A question passed elsewhere (another tab, a reload after passing) has nothing left to guard.
+  useEffect(() => {
+    if (question.status === "PASSED") clearRevealed(question.id);
+  }, [question.id, question.status]);
   const [copyWarning, setCopyWarning] = useState<string | null>(null);
 
   const submit = async () => {
@@ -71,7 +77,7 @@ export function QuestionWorkspace({
         if (attempt.correct) {
           clearRevealed(question.id);
         } else {
-          const next = [...new Set([...revealed, ...revealedTexts(attempt)])];
+          const next = withAttempt(revealed, attempt, draft.textAnswer.trim());
           writeRevealed(question.id, next);
           setRevealed(next);
         }

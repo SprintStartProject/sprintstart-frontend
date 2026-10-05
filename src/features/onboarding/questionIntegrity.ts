@@ -3,13 +3,17 @@
 // ============================================================
 // Keeps a knowledge check a check: multiple-choice options are
 // shown in a shuffled order, and a short-text answer may not be
-// the sample answer a wrong attempt just revealed.
+// what a wrong attempt just revealed, handed back.
 // ============================================================
 
 import type { OnboardingQuestionOptionEndpoint } from "./types";
 
-/** Options whose meaning depends on standing last, e.g. "All of the above". */
-const PINNED_LAST = /^(all|none|both|neither) of (the )?(above|these|them)\b/i;
+/**
+ * Options whose meaning depends on standing last, e.g. "All of the above" -- and the German forms,
+ * should questions ever be generated in German ("Alle genannten", "Keine der oben genannten").
+ */
+const PINNED_LAST =
+  /^((all|none|both|neither) of (the )?(above|these|them)|(alle|keine|beide)( der| davon)?( oben)? genannten|(alle|keine) davon)(?![\p{L}\p{N}])/iu;
 
 /** A 32-bit hash of `text`, as the seed for {@link seededRandom}. */
 function hashString(text: string): number {
@@ -117,74 +121,98 @@ function containsRun(text: readonly string[], run: readonly string[]): boolean {
 }
 
 /**
- * An answer lifted out of a longer revealed text -- the explanation, the feedback -- rather than
- * being the whole of it. Below this many words, a phrase that also appears in the explanation is
- * as likely to be the hire's own wording as a copy.
+ * What wrong attempts at one question showed, and what the hire answered there.
+ *
+ * Kept apart because they are guarded differently: the sample *is* an answer, while the
+ * explanation and feedback only contain one somewhere -- next to ordinary words a hire may well
+ * use themselves, and, in the feedback, next to the hire's own earlier answer quoted back.
  */
-const MIN_LIFTED_WORDS = 4;
+export type Revealed = {
+  /** Sample answers. */
+  samples: string[];
+  /** Explanations and grading feedback. */
+  texts: string[];
+  /** The hire's own answers to the question, the ones that were wrong. */
+  own: string[];
+};
+
+export const NOTHING_REVEALED: Revealed = { samples: [], texts: [], own: [] };
 
 /**
- * Whether a typed or edited `answer` is taken from what a wrong attempt revealed: the sample
- * answer (see {@link isCopyOfSample}), or a stretch of the explanation or feedback, which usually
- * spell the answer out as well.
+ * Whether a typed `answer` is a revealed sample handed back (see {@link isCopyOfSample}).
+ *
+ * Deliberately only the sample. A run of words that also stands in the explanation or feedback is
+ * as likely to be the hire's own wording -- or their own earlier answer the feedback quoted -- as a
+ * copy, and refusing those accuses somebody who did nothing wrong. Copying from there is what the
+ * paste guard ({@link isPasteFromReveal}) and the unselectable text are for.
  */
-export function isCopyOfReveal(answer: string, revealed: readonly string[]): boolean {
-  const answerWords = words(answer);
-  if (answerWords.length === 0) return false;
-  return revealed.some(
-    (text) =>
-      isCopyOfSample(answer, text) ||
-      (answerWords.length >= MIN_LIFTED_WORDS && containsRun(words(text), answerWords)),
-  );
+export function isCopyOfReveal(answer: string, revealed: Revealed): boolean {
+  return revealed.samples.some((sample) => isCopyOfSample(answer, sample));
 }
 
 /**
  * Whether `pasted` text came out of what a wrong attempt revealed.
  *
- * Stricter than {@link isCopyOfReveal}, and on purpose: typing a short fact back after reading it
- * is fine, but text arriving by paste while the reveal is the only place it could have come from is
- * a copy whatever its length.
+ * Stricter than {@link isCopyOfReveal}, and on purpose: text arriving by paste while the reveal is
+ * where it could have come from is a copy whatever its length -- unless the hire wrote it
+ * themselves in an earlier answer, which the feedback may well quote.
  */
-export function isPasteFromReveal(pasted: string, revealed: readonly string[]): boolean {
+export function isPasteFromReveal(pasted: string, revealed: Revealed): boolean {
   const pastedWords = words(pasted);
   if (pastedWords.length === 0) return false;
+  if (revealed.own.some((answer) => containsRun(words(answer), pastedWords))) return false;
   return (
     isCopyOfReveal(pasted, revealed) ||
-    revealed.some((text) => containsRun(words(text), pastedWords))
+    [...revealed.samples, ...revealed.texts].some((text) => containsRun(words(text), pastedWords))
   );
+}
+
+/** `revealed` with what one more wrong attempt showed, and the answer that was given to it. */
+export function withAttempt(
+  revealed: Revealed,
+  attempt: { correctAnswer: string | null; explanation: string | null; feedback: string | null },
+  answer: string,
+): Revealed {
+  const present = (texts: (string | null)[]) =>
+    texts.filter((text): text is string => Boolean(text?.trim()));
+  const merged = (current: string[], added: (string | null)[]) => [
+    ...new Set([...current, ...present(added)]),
+  ];
+  return {
+    samples: merged(revealed.samples, [attempt.correctAnswer]),
+    texts: merged(revealed.texts, [attempt.explanation, attempt.feedback]),
+    own: merged(revealed.own, [answer]),
+  };
 }
 
 export const COPIED_SAMPLE_WARNING =
   "That's taken from the answer shown before. Put it in your own words — that's how it sticks.";
 
-const REVEALED_KEY = "sprintstart.onboarding.revealedAnswer";
-
-/** What a wrong attempt showed about the answer: the sample, the explanation, the feedback. */
-export function revealedTexts(result: {
-  correctAnswer: string | null;
-  explanation: string | null;
-  feedback: string | null;
-}): string[] {
-  return [result.correctAnswer, result.explanation, result.feedback].filter(
-    (text): text is string => Boolean(text?.trim()),
-  );
-}
+const REVEALED_KEY = "sprintstart.onboarding.revealed";
 
 /**
  * What wrong attempts revealed for a question, remembered past a reload -- otherwise copying it,
  * reloading and pasting would be all it takes.
  */
-export function readRevealed(questionId: string): string[] {
+export function readRevealed(questionId: string): Revealed {
   try {
     const raw = window.localStorage.getItem(`${REVEALED_KEY}.${questionId}`);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((text) => typeof text === "string") : [];
+    const parsed = (raw ? JSON.parse(raw) : null) as Partial<
+      Record<keyof Revealed, unknown>
+    > | null;
+    const strings = (value: unknown) =>
+      Array.isArray(value) ? value.filter((text): text is string => typeof text === "string") : [];
+    return {
+      samples: strings(parsed?.samples),
+      texts: strings(parsed?.texts),
+      own: strings(parsed?.own),
+    };
   } catch {
-    return [];
+    return NOTHING_REVEALED;
   }
 }
 
-export function writeRevealed(questionId: string, revealed: readonly string[]): void {
+export function writeRevealed(questionId: string, revealed: Revealed): void {
   try {
     window.localStorage.setItem(`${REVEALED_KEY}.${questionId}`, JSON.stringify(revealed));
   } catch {

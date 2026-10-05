@@ -203,7 +203,7 @@ describe("QuestionWorkspace: the revealed sample answer", () => {
     expect(await screen.findByText(/Correct/)).toBeVisible();
     expect(onboardingService.submitQuestionAttempt).toHaveBeenCalledTimes(2);
     // Once passed, there is nothing left to guard.
-    expect(readRevealed("q1")).toEqual([]);
+    expect(readRevealed("q1").samples).toEqual([]);
   });
 
   it("is still guarded after a reload", async () => {
@@ -254,5 +254,42 @@ describe("QuestionWorkspace: the revealed sample answer", () => {
     await user.type(screen.getByRole("textbox"), "Scrum Master");
     await user.click(screen.getByRole("button", { name: "Submit answer" }));
     expect(onboardingService.submitQuestionAttempt).toHaveBeenCalledTimes(2);
+  });
+
+  /** Review on #309: the feedback quotes the hire's wrong answer; reusing it is not copying. */
+  it("lets the hire reuse their own earlier answer, which the feedback quoted", async () => {
+    const own = "the team lead decides the sprint scope";
+    vi.mocked(onboardingService.submitQuestionAttempt).mockResolvedValue(
+      attempt({ feedback: `Your answer '${own}' is not right.` }),
+    );
+    const user = userEvent.setup();
+    renderWorkspace();
+    await user.type(screen.getByRole("textbox"), own);
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+
+    await user.click(screen.getByRole("textbox"));
+    await user.paste(own);
+
+    expect(screen.getByRole("textbox")).toHaveValue(own);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the explanation of a multiple-choice answer selectable, to ask the buddy about", async () => {
+    vi.mocked(onboardingService.submitQuestionAttempt).mockResolvedValue(
+      attempt({ correctOptionIds: ["a"], explanation: "Because A." }),
+    );
+    const user = userEvent.setup();
+    renderWorkspace({
+      type: "MULTIPLE_CHOICE",
+      options: [
+        { id: "a", position: 0, label: "A" },
+        { id: "b", position: 1, label: "B" },
+      ],
+    });
+    await user.click(screen.getByRole("checkbox", { name: "B" }));
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+
+    expect(await screen.findByText("Because A.")).not.toHaveClass("select-none");
   });
 });
