@@ -211,16 +211,19 @@ both have to be running (see the README).
 `src/mocks/` only holds two fixtures, both used by
 `src/services/teamManagementService.ts`:
 
-| File                    | Fallback in                                                                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `teamOverviewMock.json` | `getTeamOverview`, `getProjectRoles`, `createProjectRole`, `assignProjectRoleToUser`, `unassignProjectRoleFromUser`, `deleteProjectRole` |
-| `skillsMock.json`       | `getSkills`, `reactivateSkill`, `createSkill`, `deleteSkill`, `deleteProjectRole`                                                        |
+| File                    | Fallback in                          |
+| ----------------------- | ------------------------------------ |
+| `teamOverviewMock.json` | `getTeamOverview`, `getProjectRoles` |
+| `skillsMock.json`       | `getSkills`                          |
 
 These functions fall back to the fixtures when the backend request fails.
-`hasCompletedSkillAssessment` and `saveUserSkillAssessments` fall back the same way,
-but to an in-memory list of assessments that starts empty, not to a fixture. In all
-of these cases the caller cannot tell the fallback from a success. Functions that
-must not invent data, such as `getTeamOverviewOrThrow`, do not fall back.
+`hasCompletedSkillAssessment` falls back the same way, but to an in-memory list of
+assessments that starts empty, not to a fixture. In all of these cases the caller cannot
+tell the fallback from a success. Writes no longer fall back: `createProjectRole`,
+`assignProjectRoleToUser`, `unassignProjectRoleFromUser`, `deleteProjectRole`,
+`reactivateSkill`, `createSkill`, `deleteSkill` and `saveUserSkillAssessments` let a
+failure reach the caller, which reports it. Functions that must not invent data, such as
+`getTeamOverviewOrThrow`, do not fall back either.
 
 ### In tests
 

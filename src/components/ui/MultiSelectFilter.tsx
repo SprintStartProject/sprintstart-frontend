@@ -57,7 +57,7 @@ export const SECTION_SEARCH_THRESHOLD = 8;
 export type MultiSelectFilterSize = "sm" | "md";
 
 const triggerSizeClasses: Record<MultiSelectFilterSize, string> = {
-  sm: "h-9 px-2.5",
+  sm: "h-9 max-sm:h-11 px-2.5",
   md: "h-11 px-3.5",
 };
 
@@ -296,7 +296,7 @@ export function MultiSelectFilter<TValue extends string>({
                 const renderOption = (option: MultiSelectFilterOption<TValue>) => (
                   <label
                     key={option.value}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover max-sm:py-3"
                   >
                     <Checkbox
                       checked={selected.has(option.value)}

@@ -92,10 +92,14 @@ export function ConversationRail({
  * Two of them do, one per corner and both to the same measurements: {@link RailToggle} on the
  * left, and the buddy page's `BuddyNewConversationButton` on the right. Either sits at `top-3` and is
  * about 40px tall, so on a phone — where the conversation runs to both page edges — the first
- * message would start underneath it. From `md` up the page gutter is wide enough that a control
- * sits beside the column rather than over it, and the page's own `pt-8` stands. One number
- * covers both because the geometry is identical; a control of a different height would need its
- * own, not a bigger shared one.
+ * message would start underneath it. From `md` up the page gutter grows and content *inside*
+ * the column sits beside the control rather than under it, and the page's own `pt-8` stands. A
+ * control that sits *at* the gutter edge is the exception — below ~1660px the gutter (a fluid
+ * `clamp(2rem, 9vw - 4rem, 10rem)`) is narrower than the counted toggle's reach, so the buddy's
+ * mode row keeps this phone value up to `min-[1660px]` (`pt-14 min-[1660px]:pt-4` in
+ * `BuddyPage`). One number covers
+ * the two message surfaces because their geometry is identical; a control of a different height
+ * would need its own, not a bigger shared one.
  *
  * One exported string rather than a rule per page. The chat and the buddy had drifted to two
  * different answers for it: the buddy reserved the room at every width, so on a desktop with the
@@ -138,7 +142,7 @@ export function RailToggle({
       aria-expanded={false}
       title={label}
       onClick={onClick}
-      className="absolute top-3 left-2 z-30 flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="absolute top-3 left-2 z-30 flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >
       {icon}
 

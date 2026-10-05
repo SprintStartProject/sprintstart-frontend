@@ -174,7 +174,7 @@ export function BuddyComposer({
             setDraft(event.target.value);
           }}
           onKeyDown={handleKeyDown}
-          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
+          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-base text-app-text outline-none placeholder:text-app-text-disabled sm:text-sm pointer-coarse:text-base"
         />
 
         <Button
@@ -187,13 +187,14 @@ export function BuddyComposer({
           iconOnly
           aria-label="Send message"
           disabled={!draft.trim()}
+          className="max-sm:h-11 max-sm:w-11"
         >
           <Send className="h-4 w-4" aria-hidden="true" />
         </Button>
       </form>
 
       {!compact && (
-        <p className="mt-1.5 px-1 text-[11px] text-app-text-disabled">
+        <p className="mt-1.5 hidden px-1 text-[11px] text-app-text-disabled pointer-fine:block">
           <kbd className="font-sans font-medium">Enter</kbd> to send ·{" "}
           <kbd className="font-sans font-medium">Shift</kbd> +{" "}
           <kbd className="font-sans font-medium">Enter</kbd> for a new line

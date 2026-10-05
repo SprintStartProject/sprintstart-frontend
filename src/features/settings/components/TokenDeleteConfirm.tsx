@@ -59,7 +59,7 @@ export function TokenDeleteConfirm({ name, onClose, onSaved }: TokenDeleteConfir
 
   return (
     <div className="border-t border-app-border bg-app-danger-bg px-5 py-4">
-      <p className="mb-3 text-sm text-app-danger-text">
+      <p className="mb-3 text-sm break-words text-app-danger-text">
         Delete <strong>{name}</strong>? This cannot be undone and may break connected repositories.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">

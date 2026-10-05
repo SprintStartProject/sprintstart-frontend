@@ -46,7 +46,7 @@ export function BuddyPmReplies({ answered, waiting, dismissed }: PmReplies) {
         </h2>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-4 pb-5">
         {answered.length > 0 && (
           <Group
             icon={BookCheck}
@@ -54,8 +54,8 @@ export function BuddyPmReplies({ answered, waiting, dismissed }: PmReplies) {
           >
             {answered.map((request) => (
               <li key={request.id} className="rounded-xl bg-app-surface-muted/60 p-3">
-                <p className="text-sm font-medium text-app-text">{request.question}</p>
-                <p className="mt-1.5 text-sm whitespace-pre-wrap text-app-text-muted">
+                <p className="text-sm font-medium break-words text-app-text">{request.question}</p>
+                <p className="mt-1.5 text-sm break-words whitespace-pre-wrap text-app-text-muted">
                   {request.answer?.answer}
                 </p>
                 <p className="mt-2 text-xs text-app-text-disabled">
@@ -73,7 +73,7 @@ export function BuddyPmReplies({ answered, waiting, dismissed }: PmReplies) {
             {waiting.map((request) => (
               <li
                 key={request.id}
-                className="rounded-xl bg-app-surface-muted/60 px-3 py-2.5 text-sm text-app-text-muted"
+                className="rounded-xl bg-app-surface-muted/60 px-3 py-2.5 text-sm break-words text-app-text-muted"
               >
                 {request.question}
                 {/* The wait is the information, and a long one is worth flagging — said in
@@ -101,7 +101,7 @@ export function BuddyPmReplies({ answered, waiting, dismissed }: PmReplies) {
             {dismissed.map((request) => (
               <li
                 key={request.id}
-                className="rounded-xl bg-app-surface-muted/40 px-3 py-2.5 text-sm text-app-text-muted"
+                className="rounded-xl bg-app-surface-muted/40 px-3 py-2.5 text-sm break-words text-app-text-muted"
               >
                 {request.question}
                 <span className="mt-1 block text-xs text-app-text-disabled">
