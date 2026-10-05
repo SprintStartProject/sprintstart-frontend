@@ -66,8 +66,7 @@ export const notionConnector: ConnectorDefinition<NotionWorkspaceConnectionDto, 
       },
     },
     chat: {
-      // The AI service's source filter does not accept NOTION yet.
-      filterable: false,
+      filterable: true,
       matchesCitationUrl: (url) => url.includes("notion.so") || url.includes("notion.site"),
     },
     knowledgeBase: {

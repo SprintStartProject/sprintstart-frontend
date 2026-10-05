@@ -314,9 +314,9 @@ describe("connector registry", () => {
       expect(hasRepositoryFacet([])).toBe(false);
     });
 
-    it("keeps Bitbucket and Notion out of the chat's source filter", () => {
-      expect(CHAT_SOURCE_SYSTEMS).not.toContain("BITBUCKET");
-      expect(CHAT_SOURCE_SYSTEMS).not.toContain("NOTION");
+    it("offers Bitbucket and Notion in the chat's source filter", () => {
+      expect(CHAT_SOURCE_SYSTEMS).toContain("BITBUCKET");
+      expect(CHAT_SOURCE_SYSTEMS).toContain("NOTION");
     });
 
     it("scopes the knowledge base to a Bitbucket repository by workspace/slug", () => {
