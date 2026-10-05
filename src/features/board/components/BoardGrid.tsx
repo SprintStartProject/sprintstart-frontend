@@ -85,9 +85,20 @@ const PILE_DWELL_MS = 350;
  *
  * Reordering used to be instant, which made the middle of a card unreachable: the card moved aside
  * the moment its edge was touched. A beat is enough to tell "passing through" from "this is the
- * place".
+ * place" — as long as the beat only counts while the pointer is still (see {@link STILL_PX}).
  */
-const REORDER_DWELL_MS = 120;
+const REORDER_DWELL_MS = 150;
+
+/**
+ * How far the pointer may drift and still count as resting.
+ *
+ * Both gestures wait for the pointer to *stop*, not merely to stay over one zone. Timing the zone
+ * alone meant the edge band — which every drag towards a card's middle crosses first — moved the
+ * card aside on the way in whenever the crossing took longer than a beat, and the pile it was
+ * headed for slid out from under it. A hand held still jitters a few pixels; anything more is the
+ * hire still on their way.
+ */
+const STILL_PX = 8;
 
 /** Whether a point is in the middle of an element — the half of it, either way, around its centre. */
 function inMiddle(element: HTMLElement, x: number, y: number): boolean {
@@ -689,8 +700,10 @@ export function BoardGrid({
    * who stopped and waited with nothing happening.
    */
   const pileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** The card and the part of it the dragged card has been resting on, and since when. */
-  const restingRef = useRef<{ id: string; zone: "middle" | "edge"; since: number } | null>(null);
+  /** The card and the part of it the dragged card is resting on, and where the rest began. */
+  const restingRef = useRef<{ id: string; zone: "middle" | "edge"; x: number; y: number } | null>(
+    null,
+  );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   /**
    * A card the pile was opened *for*, to be brought into view once it is on the board.
@@ -890,39 +903,49 @@ export function BoardGrid({
       if (!dragged) return;
 
       const { x, y } = centerOf(dragged);
-      const now = performance.now();
 
       for (const [candidateId, element] of elements.current) {
         if (candidateId === id || !contains(element, x, y)) continue;
 
         const zone = onStackOnto && inMiddle(element, x, y) ? "middle" : "edge";
         const resting = restingRef.current;
-        if (!resting || resting.id !== candidateId || resting.zone !== zone) {
-          clearPileTarget();
-          restingRef.current = { id: candidateId, zone, since: now };
-          if (zone === "middle") {
-            pileTimer.current = setTimeout(() => {
-              pileTimer.current = null;
-              const still = restingRef.current;
-              if (still?.id === candidateId && still.zone === "middle")
-                lightPileTarget(id, candidateId);
-            }, PILE_DWELL_MS);
-          }
-          return;
-        }
+        const sameSpot =
+          resting?.id === candidateId &&
+          resting.zone === zone &&
+          Math.hypot(x - resting.x, y - resting.y) <= STILL_PX;
+        // Still resting where it was: whatever is pending stays pending, whatever is lit stays lit.
+        if (sameSpot) return;
 
-        if (zone === "middle") {
-          if (now - resting.since >= PILE_DWELL_MS) lightPileTarget(id, candidateId);
-          return;
-        }
+        // Moving within the middle of the card that is already lit keeps it lit; anything else
+        // starts the wait over from here.
+        const keepLit = zone === "middle" && pileTargetRef.current === candidateId;
+        if (pileTimer.current) clearTimeout(pileTimer.current);
+        pileTimer.current = null;
+        if (!keepLit) clearPileTarget();
 
-        clearPileTarget();
-        if (!onReorder || now - resting.since < REORDER_DWELL_MS) return;
-        if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
+        const spot = { id: candidateId, zone, x, y } as const;
+        restingRef.current = spot;
+        if (keepLit) return;
 
-        onReorder(reorder(id, candidateId));
-        lastMoveAt.current = now;
-        restingRef.current = null;
+        pileTimer.current = setTimeout(
+          () => {
+            pileTimer.current = null;
+            if (restingRef.current !== spot) return;
+
+            if (zone === "middle") {
+              lightPileTarget(id, candidateId);
+              return;
+            }
+            if (!onReorder) return;
+            const now = performance.now();
+            if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
+
+            onReorder(reorder(id, candidateId));
+            lastMoveAt.current = now;
+            restingRef.current = null;
+          },
+          zone === "middle" ? PILE_DWELL_MS : REORDER_DWELL_MS,
+        );
         return;
       }
 
