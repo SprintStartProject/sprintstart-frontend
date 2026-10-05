@@ -21,25 +21,45 @@ interface TaskCheckItemProps {
  * The strikethrough is deliberately kept: crossing something out is the oldest
  * "done" signal there is, and it survives being the only cue for anyone who
  * cannot separate the green from the grey.
+ *
+ * Only the tick is a button. The whole row used to be one, and text inside a
+ * button cannot be selected -- so a task could not be marked to hand to the
+ * buddy (the app-wide selection toolbar's "Ask the buddy") or copied at all.
+ * The tick and the rest of the row still tick it; the text itself does not, since a
+ * click there is how selecting starts -- a double-click on a word is a single click
+ * first, and would tick the task on the way to selecting the word.
  */
 export function TaskCheckItem({ index, title, description, isDone, onToggle }: TaskCheckItemProps) {
   const reduceMotion = useReducedMotion();
 
   return (
-    <motion.button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={isDone}
-      className={`flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+    // The row's click is a larger target for the mouse; the tick is the control, for the keyboard
+    // and for assistive technology, so the row itself needs no role or key handling.
+    <motion.div
+      onClick={(event) => {
+        if (event.target instanceof Element && event.target.closest("button, [data-task-text]")) {
+          return;
+        }
+        // Dragging from the row onto the text to select it ends in a click; that is not a tick.
+        if (window.getSelection()?.isCollapsed === false) return;
+        onToggle();
+      }}
+      className={`flex w-full cursor-pointer items-start gap-4 rounded-xl border p-4 text-left transition-colors ${
         isDone
           ? "border-app-success-border bg-app-success-bg"
           : "border-app-border hover:border-app-brand-border-strong"
       }`}
       whileHover={reduceMotion ? undefined : { x: 3 }}
-      whileTap={reduceMotion ? undefined : { scale: 0.99 }}
       transition={hoverSpringToken}
     >
-      <span className="relative mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+      <motion.button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={isDone}
+        aria-label={`${index + 1}. ${title}`}
+        className="relative mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:ring-offset-2 focus-visible:outline-none"
+        whileTap={reduceMotion ? undefined : { scale: 0.9 }}
+      >
         {/* Pulse that rings out of the tick on completion. Keyed on the
                     done state so it replays on every re-check, not just once. */}
         {isDone && !reduceMotion && (
@@ -97,9 +117,9 @@ export function TaskCheckItem({ index, title, description, isDone, onToggle }: T
             />
           </svg>
         </motion.span>
-      </span>
+      </motion.button>
 
-      <span className="min-w-0">
+      <span data-task-text className="min-w-0 cursor-text select-text">
         <span
           className={`relative inline text-sm font-medium ${
             isDone ? "text-app-text-subtle" : "text-app-text"
@@ -123,6 +143,6 @@ export function TaskCheckItem({ index, title, description, isDone, onToggle }: T
 
         {description && <p className="mt-0.5 text-xs text-app-text-muted">{description}</p>}
       </span>
-    </motion.button>
+    </motion.div>
   );
 }

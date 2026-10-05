@@ -8,7 +8,9 @@
 
 import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../types";
 import type { DraftAnswer } from "../checkAnswers";
+import { shuffleOptions } from "../questionIntegrity";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { useMemo } from "react";
 
 interface CheckQuestionCardProps {
   question: OnboardingQuestionEndpoint;
@@ -18,6 +20,15 @@ interface CheckQuestionCardProps {
   result: QuestionAttemptResult | null;
   onToggleOption: (optionId: string) => void;
   onTextChange: (text: string) => void;
+  /** Seeds the order the options are shown in; defaults to the question's id. */
+  optionOrderSeed?: string;
+  /**
+   * Called with text pasted into the short-text answer; returning false keeps it out. Used to keep
+   * a revealed sample answer from simply being pasted back.
+   */
+  onTextPaste?: (text: string) => boolean;
+  /** Shown under the short-text answer, e.g. why a pasted answer was not taken. */
+  textWarning?: string | null;
 }
 
 export function CheckQuestionCard({
@@ -27,8 +38,15 @@ export function CheckQuestionCard({
   result,
   onToggleOption,
   onTextChange,
+  optionOrderSeed,
+  onTextPaste,
+  textWarning,
 }: CheckQuestionCardProps) {
   const graded = result !== null;
+  const options = useMemo(
+    () => shuffleOptions(question.options ?? [], optionOrderSeed ?? question.id),
+    [question.options, question.id, optionOrderSeed],
+  );
 
   return (
     <div
@@ -58,7 +76,7 @@ export function CheckQuestionCard({
           {/* Multiple choice options */}
           {question.type === "MULTIPLE_CHOICE" && (
             <div className="mt-3 space-y-2">
-              {(question.options ?? []).map((option) => {
+              {options.map((option) => {
                 const selected = draft.selectedOptionIds.includes(option.id);
                 const isCorrectOption = graded && result.correctOptionIds.includes(option.id);
                 return (
@@ -98,17 +116,40 @@ export function CheckQuestionCard({
                 value={draft.textAnswer}
                 disabled={graded}
                 onChange={(event) => onTextChange(event.target.value)}
+                onPaste={(event) => {
+                  if (onTextPaste && !onTextPaste(event.clipboardData.getData("text"))) {
+                    event.preventDefault();
+                  }
+                }}
+                aria-describedby={textWarning ? `${question.id}-text-warning` : undefined}
                 placeholder="Your answer..."
                 className="w-full rounded-xl border border-app-border bg-app-bg px-4 py-2.5 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand focus:outline-none disabled:opacity-70"
               />
+              {textWarning && !graded && (
+                <p
+                  id={`${question.id}-text-warning`}
+                  role="alert"
+                  className="mt-2 text-xs font-medium text-app-danger-text"
+                >
+                  {textWarning}
+                </p>
+              )}
               {/* AI feedback on the free-text answer (both correct and incorrect) */}
               {graded && result.feedback && (
-                <p className="mt-2 text-xs text-app-text-muted">{result.feedback}</p>
+                <p
+                  className={`mt-2 text-xs text-app-text-muted ${result.correct ? "" : "select-none"}`}
+                >
+                  {result.feedback}
+                </p>
               )}
               {graded && !result.correct && result.correctAnswer && (
                 <p className="mt-2 text-xs text-app-text-muted">
                   Sample answer:{" "}
-                  <span className="font-medium text-app-success-text">{result.correctAnswer}</span>
+                  {/* Not selectable, like the feedback and explanation of a wrong answer: they are
+                      there to be read and understood, not copied back. */}
+                  <span className="font-medium text-app-success-text select-none">
+                    {result.correctAnswer}
+                  </span>
                 </p>
               )}
             </div>
@@ -116,7 +157,11 @@ export function CheckQuestionCard({
 
           {/* Explanation after grading */}
           {graded && result.explanation && (
-            <p className="mt-3 rounded-xl bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted">
+            <p
+              className={`mt-3 rounded-xl bg-app-surface-muted px-3 py-2 text-xs text-app-text-muted ${
+                question.type === "SHORT_TEXT" && !result.correct ? "select-none" : ""
+              }`}
+            >
               {result.explanation}
             </p>
           )}

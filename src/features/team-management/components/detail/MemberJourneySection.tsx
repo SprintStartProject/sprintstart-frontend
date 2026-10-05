@@ -62,7 +62,7 @@ import { SkipReview, type SkipReviewAction } from "./SkipReview";
 import { StepQuickEdit } from "./StepQuickEdit";
 
 type ViewMode = "list" | "graph";
-const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
+const VIEW_ORDER: readonly ViewMode[] = ["graph", "list"];
 
 type StepTaskCount = { total: number; done: number };
 
@@ -424,8 +424,8 @@ export function MemberJourneySection({
               setSelectedItemId(null);
             }}
             options={[
-              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
               { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
+              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
             ]}
           />
 
