@@ -2,15 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { BoardCard } from "../types";
 import { subscribeToBoardStorageReplaced } from "../layout/boardStorage";
 import {
-  clearHireDependencies,
   deriveCardStates,
   EMPTY_STRUCTURE,
   pruneStructure,
   readBoardStructure,
-  setCardStage,
-  setDependency,
-  setGroupStage,
-  setMarkedDone,
+  restack,
   writeBoardStructure,
   type BoardStage,
   type BoardStructure,
@@ -21,20 +17,8 @@ export type UseBoardStructureResult = {
   structure: BoardStructure;
   /** Every card's derived status, keyed by id. Recomputed whenever the board or the structure moves. */
   states: Map<string, CardState>;
-  assignStage: (cardId: string, stage: BoardStage) => void;
-  assignGroupStage: (groupId: string, cardIds: string[], stage: BoardStage) => void;
-  toggleDone: (cardId: string, done: boolean) => void;
-  toggleDependency: (cardId: string, blockerId: string, depends: boolean) => void;
-  /**
-   * Makes a card wait on exactly one other card, or on nothing.
-   *
-   * The model holds a set, because a blueprint can reasonably say "after both of these". The
-   * *control* offers one, because a hire sequencing their own board is describing a chain — this
-   * before that before the other — and a multi-select in a card header to express something almost
-   * nobody needs is chrome charged to everybody. Setting one predecessor replaces whatever set was
-   * there, so the two never drift into disagreeing.
-   */
-  setPredecessor: (cardId: string, blockerId: string | null) => void;
+  /** Puts a card on another card's pile, or (with null) takes it off its own — see `restack`. */
+  stackOnto: (cardId: string, targetId: string | null, carry?: readonly string[]) => void;
 };
 
 /**
@@ -51,8 +35,15 @@ export type UseBoardStructureResult = {
  * Everything a caller renders from comes out of `states`, never out of `structure`. That is what
  * keeps "blocked" from going stale: it is a question about other cards, answered fresh on every
  * board, and never a flag anybody has to remember to clear.
+ *
+ * Which stage a card is in is not part of what is kept here any more: it comes from the onboarding
+ * path, as `stageOf` (see `layout/pathStages.ts`), so there is nothing for the hire to set.
  */
-export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoardStructureResult {
+export function useBoardStructure(
+  boardId: string,
+  cards: BoardCard[],
+  stageOf?: (card: BoardCard) => BoardStage,
+): UseBoardStructureResult {
   const [structure, setStructure] = useState<BoardStructure>(EMPTY_STRUCTURE);
   const [readFor, setReadFor] = useState<string | null>(null);
 
@@ -69,7 +60,10 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
     [boardId],
   );
 
-  const states = useMemo(() => deriveCardStates(cards, structure), [cards, structure]);
+  const states = useMemo(
+    () => deriveCardStates(cards, structure, stageOf),
+    [cards, structure, stageOf],
+  );
 
   /**
    * Stores a new structure, forgetting whatever it says about cards that are no longer here.
@@ -90,18 +84,15 @@ export function useBoardStructure(boardId: string, cards: BoardCard[]): UseBoard
   return {
     structure,
     states,
-    assignStage: (cardId, stage) => save(setCardStage(structure, cardId, stage)),
-    assignGroupStage: (groupId, cardIds, stage) =>
-      save(setGroupStage(structure, groupId, cardIds, stage)),
-    toggleDone: (cardId, done) => save(setMarkedDone(structure, cardId, done)),
-    toggleDependency: (cardId, blockerId, depends) =>
-      save(setDependency(structure, cardId, blockerId, depends)),
-    setPredecessor: (cardId, blockerId) => {
-      // Only the hire's own edges go: the control offers one predecessor at a time, so choosing
-      // a new one drops the last one *they* set and leaves a rule the team wrote where it is.
-      const cleared = clearHireDependencies(structure, cardId);
-
-      save(blockerId ? setDependency(cleared, cardId, blockerId, true, "HIRE") : cleared);
-    },
+    stackOnto: (cardId, targetId, carry) =>
+      save(
+        restack(
+          structure,
+          cards.map((card) => card.id),
+          cardId,
+          targetId,
+          carry,
+        ),
+      ),
   };
 }

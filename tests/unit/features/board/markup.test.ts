@@ -5,11 +5,13 @@ import {
   enclosingMark,
   hasMarks,
   isMarked,
+  markGroup,
   removeMark,
   splitMarks,
   stripMarks,
   toggleMark,
   unmarkPart,
+  unmarkableRanges,
 } from "../../../../src/features/board/marks/markup";
 
 describe("the highlighter, as two equals signs", () => {
@@ -129,5 +131,79 @@ describe("rubbing out part of a highlight", () => {
   it("finds the highlight a selection sits inside", () => {
     expect(enclosingMark("a ==big deal== here", "deal")).toBe("big deal");
     expect(enclosingMark("a ==big deal== here", "here")).toBeNull();
+  });
+});
+
+describe("marking inside markdown", () => {
+  it("never paints into a link target, code or a [[link]]", () => {
+    const text = "see [docs](/onboarding/docs) and `docs` and [[Setup#docs]]";
+
+    expect(toggleMark(text, "docs")).toBe(
+      "see [==docs==](/onboarding/docs) and `docs` and [[Setup#docs]]",
+    );
+    expect(toggleMark("`docs` only", "docs")).toBe("`docs` only");
+    expect(unmarkableRanges("a `b` c").length).toBe(1);
+  });
+
+  it("takes a later plain occurrence when the first one is not prose", () => {
+    expect(toggleMark("[[ssh]] then ssh again", "ssh")).toBe("[[ssh]] then ==ssh== again");
+  });
+});
+
+describe("marking what the card shows rather than what the source says", () => {
+  it("marks a selection that runs across a line break, line by line", () => {
+    expect(toggleMark("deploys are\non Thursdays", "are on Thursdays")).toBe(
+      "deploys ==are==\n==on Thursdays==",
+    );
+  });
+
+  it("marks across bold and list markers, inside the formatting", () => {
+    expect(toggleMark("- **Ask Sam** before merging", "Ask Sam before")).toBe(
+      "- **==Ask Sam==** ==before== merging",
+    );
+    expect(toggleMark("1. first step\n2. second step", "first step second")).toBe(
+      "1. ==first step==\n2. ==second== step",
+    );
+  });
+
+  it("marks a link's words but never its target", () => {
+    expect(toggleMark("read [the docs](/onboarding/docs) first", "the docs first")).toBe(
+      "read [==the docs==](/onboarding/docs) ==first==",
+    );
+  });
+
+  it("collapses runs of spaces the way the card does", () => {
+    expect(toggleMark("one  two", "one two")).toBe("==one  two==");
+  });
+
+  it("leaves text it cannot find alone", () => {
+    expect(toggleMark("hello there", "goodbye")).toBe("hello there");
+  });
+});
+
+describe("one stroke over a list, read back as one highlight", () => {
+  const yellow = () => "YELLOW";
+
+  it("groups the pieces of one stroke across list items and bold", () => {
+    const text = "- ==first== item\n- ==second==\n- **==third==** and more";
+
+    expect(markGroup(text, "first", yellow)?.texts).toEqual(["first"]);
+    expect(markGroup(text, "second", yellow)?.texts).toEqual(["second", "third"]);
+    const list = "- ==first==\n- ==second==\n- **==third==**";
+    expect(markGroup(list, "second", yellow)?.texts).toEqual(["first", "second", "third"]);
+    expect(markGroup(list, "first", yellow)?.without).toBe("- first\n- second\n- **third**");
+  });
+
+  it("keeps neighbours in another colour apart", () => {
+    const list = "- ==first==\n- ==second==";
+    const colours = (run: string) => (run === "first" ? "GREEN" : "YELLOW");
+
+    expect(markGroup(list, "second", colours)?.texts).toEqual(["second"]);
+    expect(markGroup(list, "second", colours)?.without).toBe("- ==first==\n- second");
+  });
+
+  it("does not reach across words nobody marked", () => {
+    expect(markGroup("==a== then ==b==", "a", yellow)?.texts).toEqual(["a"]);
+    expect(markGroup("plain", "a", yellow)).toBeNull();
   });
 });

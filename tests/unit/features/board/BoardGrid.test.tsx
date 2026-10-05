@@ -222,25 +222,29 @@ describe("the stage bands", () => {
 
   const twoStages = () => board([currentTaskContent(), suggestedTasksContent()]);
 
-  it("files the board under its stages and counts what is left in each", () => {
+  it("files what is finished under Behind you, and draws the rest as the board itself", () => {
     render(
       <BoardGrid
         board={twoStages()}
-        states={states("NOW", "LATER")}
-        openStages={new Set<BoardStage>(["NOW", "LATER"])}
+        states={states("NOW", "BEHIND")}
+        openStages={new Set<BoardStage>(["NOW", "BEHIND"])}
         onToggleStage={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: /now/i })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /later/i })).toBeInTheDocument();
+    // What is current needs no heading saying so.
+    expect(screen.queryByRole("button", { name: /^now/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /behind you/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   it("folds a band without taking it off the page", () => {
     render(
       <BoardGrid
         board={twoStages()}
-        states={states("NOW", "LATER")}
+        states={states("NOW", "BEHIND")}
         openStages={new Set<BoardStage>(["NOW"])}
         onToggleStage={vi.fn()}
       />,
@@ -248,7 +252,7 @@ describe("the stage bands", () => {
 
     // The heading still says what is filed under it — a fold is not a disappearance, which is the
     // whole difference between this and the focus mode it replaced.
-    const later = screen.getByRole("button", { name: /later/i });
+    const later = screen.getByRole("button", { name: /behind you/i });
     expect(later).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Fix the flaky login test")).toBeInTheDocument();
   });
@@ -272,24 +276,25 @@ describe("the stage bands", () => {
       <BoardGrid
         board={twoStages()}
         groups={[{ id: "g1", name: "From your team", cardIds: ["c0", "c1"], collapsed: false }]}
-        states={states("NOW", "LATER")}
-        openStages={new Set<BoardStage>(["NOW", "LATER"])}
+        states={states("NOW", "BEHIND")}
+        openStages={new Set<BoardStage>(["NOW", "BEHIND"])}
         onToggleStage={vi.fn()}
       />,
     );
 
     // A team's blueprints are one set somebody wrote in one sitting, deliberately spread across
-    // the stages. It keeps its name and folds by stage within itself.
+    // the stages. It keeps its name and folds by stage within itself — the current part needs no
+    // heading of its own.
     expect(screen.getByText("From your team")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /now/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /later/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^now/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /behind you/i })).toBeInTheDocument();
   });
 
   it("lays the board out flat while it is being arranged", () => {
     render(
       <BoardGrid
         board={twoStages()}
-        states={states("NOW", "LATER")}
+        states={states("NOW", "BEHIND")}
         openStages={new Set<BoardStage>(["NOW"])}
         onToggleStage={vi.fn()}
         isArranging
@@ -299,6 +304,39 @@ describe("the stage bands", () => {
     // Arranging is about the board's own order; a fold hiding a third of it mid-drag would be the
     // surface arguing with the gesture.
     expect(screen.queryByRole("button", { name: /^later/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("an open pile", () => {
+  it("stays open while the highlighter's toolbar is used, and closes when you look away", () => {
+    const onToggleStack = vi.fn();
+    const chain: CardStack = {
+      rootId: "c0",
+      memberIds: ["c0", "c1"],
+      topId: "c0",
+      remaining: 2,
+      members: new Map(),
+    };
+    render(
+      <>
+        <BoardGrid
+          board={board([currentTaskContent(), currentTaskContent({ taskId: "t2" })])}
+          stacks={new Map([["c0", chain] as const, ["c1", chain] as const])}
+          expandedStackIds={new Set(["c0"])}
+          onToggleStack={onToggleStack}
+        />
+        <div role="toolbar" aria-label="Selection">
+          <button type="button">Highlight</button>
+        </div>
+        <p>Elsewhere</p>
+      </>,
+    );
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Highlight" }));
+    expect(onToggleStack).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(screen.getByText("Elsewhere"));
+    expect(onToggleStack).toHaveBeenCalledWith("c0");
   });
 });
 

@@ -726,18 +726,17 @@ describe("useBuddy", () => {
       await waitFor(() => expect(boardIsStale(client)).toBe(true));
     });
 
-    it("leaves the board alone when the turn ran other tools", async () => {
+    it("re-reads the board after a turn that ran any tool, so nothing waits for a refresh", async () => {
       const { client, result } = await openSession([METRICS_TURN, PLACE_CARD_TURN]);
       const invalidations = vi.spyOn(client, "invalidateQueries");
 
       await ask(result, "how am I doing?");
       await ask(result, "put the PR review task on my board");
 
-      // Waiting for the *second* turn's sync closes the window: whatever the board-silent first
-      // turn was going to do has happened by now, so a single invalidation proves the metrics
-      // read marked nothing on its own.
+      // A tool the client does not know as a board write still marks the board: the backend
+      // grows tools faster than the client's list, and a re-read is cheaper than a stale board.
       await waitFor(() => expect(boardIsStale(client)).toBe(true));
-      expect(invalidations).toHaveBeenCalledTimes(1);
+      expect(invalidations).toHaveBeenCalledTimes(2);
     });
 
     /** A reply that delivers its events and then drops — the failure lands after `place_card` ran. */

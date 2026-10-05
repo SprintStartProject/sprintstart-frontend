@@ -976,9 +976,10 @@ export function useBuddyConversation(
       // Once the hire says anything, the opener's one-click suggestion has served its purpose.
       setOpenerAction(null);
 
-      // Whether this turn ran a tool that puts a card on the board. A property rather than a
-      // `let`, so the reads below see the writes made in the stream callbacks — see `greet`.
-      const touched = { board: false };
+      // Whether this turn ran a tool that puts a card on the board, and whether it ran any tool at
+      // all. Properties rather than `let`s, so the reads below see the writes made in the stream
+      // callbacks — see `greet`.
+      const touched = { board: false, any: false };
 
       /**
        * `place_card` is the one board write that is not confirmed: its `tool_use` event is the
@@ -986,8 +987,15 @@ export function useBuddyConversation(
        * refused. So the board is marked stale when the turn ends — the failing paths included.
        * See `useInvalidateBoard` for why the mark is what makes this visible.
        */
+      //
+      // Any tool, not only `place_card`: the backend grows tools faster than this list follows,
+      // and a board that changed mid-answer and then waited for a manual refresh is the one thing
+      // the hire notices. A re-read after a turn that only *read* something costs one request; a
+      // missed one costs the hire's trust in what the board shows. The board only — the path's
+      // "changed" signal stays for confirmed path actions, because the pages that listen to it
+      // refetch whole steps and say so when that fails.
       const syncBoardIfTouched = () => {
-        if (touched.board) invalidateBoard();
+        if (touched.board || touched.any) invalidateBoard();
       };
 
       try {
@@ -996,6 +1004,7 @@ export function useBuddyConversation(
           {
             onToolUse: (name) => {
               setActiveTool(name);
+              touched.any = true;
               if (BUDDY_BOARD_TOOLS.has(name)) touched.board = true;
             },
 

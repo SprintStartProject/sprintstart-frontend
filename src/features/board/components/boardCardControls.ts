@@ -36,34 +36,12 @@ export type BoardCardControls = {
    */
   state?: CardState;
   /**
-   * Ticks a card off, for the kinds whose completion nothing can observe.
-   *
-   * Absent for a checklist or an arrival card: those report their own progress, and a hand-set
-   * "done" beside a list with three items outstanding is the board contradicting itself.
+   * The "Pile" control: which card this one lies under, if any. Offered in both modes — see
+   * `restack` in `boardStructure.ts`.
    */
-  onToggleDone?: () => void;
-  /** The stage picker for this card, shown while the board is being arranged. */
-  stagePicker?: ReactNode;
-  /** The "waits on…" picker for this card, shown while the board is being arranged. */
-  dependencyPicker?: ReactNode;
+  pilePicker?: ReactNode;
   /**
-   * Opens the picture of the run this card belongs to.
-   *
-   * The panel it opens is what decides there is nothing to draw: it says so in words ("Nothing
-   * waits on this one") rather than being withheld, because a control that appears on some cards
-   * and not others is a fact about the board somebody has to work out by pressing things.
-   */
-  onShowChain?: () => void;
-  /**
-   * How many cards this one alone is holding up.
-   *
-   * Said on the card rather than only on the board's "start here" line, because the line names one
-   * card and this is the reason to pick any of the others: a card that frees three is worth doing
-   * before a card that frees none, and nothing else on the board says which is which.
-   */
-  unblocks?: number;
-  /**
-   * This card's place in a stack of cards that have to be worked in order.
+   * This card's place in a pile of cards lying on top of each other.
    *
    * Set on exactly one card: the one standing in for the rest while the pile is *closed*. An open
    * pile is drawn by its own frame, which carries the way back — and repeating "3 of 5" on every
