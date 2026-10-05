@@ -15,7 +15,7 @@ type SettingsSectionProps = {
  *
  * `tabIndex={-1}` is not for tabbing -- it is what lets the nav move focus here after it has
  * scrolled, so a keyboard user carries on inside the section they asked for instead of from
- * the nav. Programmatic focus should not paint a ring, hence `focus:outline-none`; the
+ * the nav. Programmatic focus should not paint an outline, hence `focus:outline-hidden`; the
  * section is not a control and nothing about it is reachable by Tab.
  */
 export function SettingsSection({
@@ -29,7 +29,7 @@ export function SettingsSection({
     <section
       id={id}
       tabIndex={-1}
-      className="scroll-mt-24 focus:outline-none"
+      className="scroll-mt-24 focus:outline-hidden"
       aria-labelledby={`${id}-title`}
     >
       <div className="mb-4 flex items-start gap-3">

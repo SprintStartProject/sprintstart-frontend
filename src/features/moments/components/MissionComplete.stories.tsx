@@ -36,7 +36,7 @@ function Replayable({ displayName, dark }: StoryArgs) {
           setRun((value) => value + 1);
           setPlaying(true);
         }}
-        className="rounded-xl bg-app-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="rounded-xl bg-app-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover"
       >
         Replay finale
       </button>

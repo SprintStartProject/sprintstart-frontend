@@ -57,7 +57,7 @@ export function KnowledgeRequestWidget({ projectId }: KnowledgeRequestWidgetProp
             event.stopPropagation();
             go();
           }}
-          className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="flex items-center gap-1 rounded-lg text-xs text-app-text-muted transition-colors hover:text-app-text"
         >
           Open inbox
           <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />

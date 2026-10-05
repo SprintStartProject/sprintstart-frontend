@@ -74,7 +74,7 @@ export function BuddySuggestionChips({
             key={suggestion.label}
             type="button"
             onClick={() => onPick(suggestion.question)}
-            className={`rounded-full border border-app-border bg-app-surface text-app-text transition-colors hover:border-app-brand hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+            className={`rounded-full border border-app-border bg-app-surface text-app-text transition-colors hover:border-app-brand hover:text-app-brand-text ${
               compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"
             }`}
           >

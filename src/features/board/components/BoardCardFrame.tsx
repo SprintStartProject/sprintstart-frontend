@@ -298,7 +298,7 @@ export function BoardCardFrame({
                     onClick={stack.onToggle}
                     aria-expanded={false}
                     aria-label={`Show all ${stack.total} cards in this sequence`}
-                    className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:bg-app-brand hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:bg-app-brand hover:text-white"
                   >
                     <Layers className="h-3 w-3" aria-hidden="true" />
                     <span className="tabular-nums">
@@ -347,7 +347,7 @@ export function BoardCardFrame({
                     <button
                       type="button"
                       onClick={onShowChain}
-                      className="inline-flex items-center gap-1 rounded font-medium text-app-brand-text underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="inline-flex items-center gap-1 rounded font-medium text-app-brand-text underline-offset-2 hover:underline"
                     >
                       <Waypoints className="h-3 w-3" aria-hidden="true" />
                       See the whole run

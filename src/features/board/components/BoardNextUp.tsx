@@ -37,7 +37,7 @@ export function BoardNextUp({ next }: BoardNextUpProps) {
             .querySelector(`[data-card-id="${CSS.escape(next.card.id)}"]`)
             ?.scrollIntoView({ behavior: "smooth", block: "center" });
         }}
-        className="inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline"
       >
         {next.name}
         <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />

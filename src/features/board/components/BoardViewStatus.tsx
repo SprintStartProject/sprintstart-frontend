@@ -56,7 +56,7 @@ export function BoardViewStatus({ shown, total, cuts, onShowEverything }: BoardV
       <button
         type="button"
         onClick={onShowEverything}
-        className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="font-medium text-app-brand-text hover:underline"
       >
         Show everything
       </button>

@@ -357,7 +357,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
                       type="button"
                       onClick={() => openGroup(group)}
                       aria-current={selected ? "true" : undefined}
-                      className={`group flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                      className={`group flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left transition-colors ${
                         selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
                       }`}
                     >

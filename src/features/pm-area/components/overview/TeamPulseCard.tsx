@@ -165,7 +165,7 @@ function MemberTile({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       title="Click for a quick look · double-click for the full profile"
-      className={`group relative flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+      className={`group relative flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors ${
         needsYou
           ? "bg-app-warning-bg/50 hover:bg-app-warning-bg"
           : "bg-app-surface-muted hover:bg-app-surface-hover"
@@ -263,7 +263,7 @@ export function TeamPulseCard({ roster, queue, loading, error, onOpenMember }: T
               {hidden > 0 && (
                 <Link
                   to="/team-management?filter=attention"
-                  className="tracking-normal text-app-brand-text normal-case hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  className="tracking-normal text-app-brand-text normal-case hover:underline"
                 >
                   +{hidden} more
                 </Link>

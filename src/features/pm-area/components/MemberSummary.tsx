@@ -80,7 +80,7 @@ function Signal({
     <button
       type="button"
       onClick={onOpen}
-      className={`${className} transition-colors hover:border-app-brand-border-strong focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+      className={`${className} transition-colors hover:border-app-brand-border-strong`}
     >
       {body}
     </button>
@@ -151,7 +151,7 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
         type="button"
         onClick={() => onOpenPhase(phase.id)}
         title={`Show ${phase.title} in the path`}
-        className={`rounded text-left hover:text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${className}`}
+        className={`rounded text-left hover:text-app-brand-text hover:underline ${className}`}
       >
         {children}
       </button>
@@ -295,7 +295,7 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
                             type="button"
                             onClick={() => onOpenPhase(phase.id)}
                             title={`Show ${phase.title} in the path`}
-                            className={`${cardClassName} transition-colors hover:border-app-brand-border-strong hover:bg-app-brand-soft/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+                            className={`${cardClassName} transition-colors hover:border-app-brand-border-strong hover:bg-app-brand-soft/70`}
                           >
                             {content}
                           </button>

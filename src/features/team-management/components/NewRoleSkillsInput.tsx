@@ -98,7 +98,7 @@ export function NewRoleSkillsInput({
               key={skill.id}
               type="button"
               onClick={() => add({ key: skill.id, name: skill.name, skillId: skill.id })}
-              className="inline-flex items-center gap-1 rounded-full border border-app-border bg-app-bg px-2 py-0.5 text-xs text-app-text transition-colors hover:border-app-brand-border-strong hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              className="inline-flex items-center gap-1 rounded-full border border-app-border bg-app-bg px-2 py-0.5 text-xs text-app-text transition-colors hover:border-app-brand-border-strong hover:text-app-brand-text"
             >
               <Plus aria-hidden="true" className="h-3 w-3" />
               {skill.name}
@@ -121,7 +121,7 @@ export function NewRoleSkillsInput({
                 aria-label={`Remove ${skill.name}`}
                 disabled={disabled}
                 onClick={() => onChange(value.filter((other) => other.key !== skill.key))}
-                className="rounded-full p-0.5 hover:bg-app-brand/15 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                className="rounded-full p-0.5 hover:bg-app-brand/15"
               >
                 <X aria-hidden="true" className="h-3 w-3" />
               </button>

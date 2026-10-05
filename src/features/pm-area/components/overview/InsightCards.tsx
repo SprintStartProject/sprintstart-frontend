@@ -46,7 +46,7 @@ function CardSkeleton({ label }: { label: string }) {
 }
 
 const rowClassName =
-  "group -mx-2 block rounded-xl px-2 py-2 transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none";
+  "group -mx-2 block rounded-xl px-2 py-2 transition-colors hover:bg-app-surface-hover";
 
 /** The most asked questions as bars, longest first; each opens its detail panel. */
 export function QuestionsCard() {

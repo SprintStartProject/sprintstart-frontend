@@ -446,7 +446,7 @@ function BlueprintRowCard({
             <button
               type="button"
               onClick={onOpen}
-              className="cursor-pointer text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-app-focus"
+              className="cursor-pointer text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-hidden focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-app-focus focus-visible:after:outline-solid"
             >
               {latest.title}
             </button>

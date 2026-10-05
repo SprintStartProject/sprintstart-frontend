@@ -88,7 +88,7 @@ export function SourceList({
             onClick={() => onSelectSource(source.sourceId)}
             // Mobile: onboarding-style card (scale + brand-soft fill on select).
             // From `sm` up: the original card (subtle lift, 2x2 stat grid below).
-            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border p-5 text-left transition-all duration-200 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 sm:p-6 ${
+            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border p-5 text-left transition-all duration-200 motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 sm:p-6 ${
               isSelected
                 ? "border-app-brand bg-app-brand-soft sm:bg-app-surface sm:shadow-sm"
                 : "border-app-border bg-app-surface hover:scale-[1.01] hover:border-app-brand-border-strong hover:shadow-lg sm:hover:-translate-y-0.5 sm:hover:scale-100"

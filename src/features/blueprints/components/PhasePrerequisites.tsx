@@ -109,7 +109,7 @@ export function PhasePrerequisites({
                       aria-label={`Stop waiting for ${blocker.title}`}
                       disabled={isSaving}
                       onClick={() => void run(() => onRemove(phase, blocker.id))}
-                      className="rounded-full transition-colors hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="rounded-full transition-colors hover:text-app-danger-text"
                     >
                       <X className="h-3 w-3" aria-hidden="true" />
                     </button>
@@ -157,7 +157,7 @@ export function PhasePrerequisites({
                       aria-label={`Stop ${dependent.title} waiting for ${phase.title}`}
                       disabled={isSaving}
                       onClick={() => void run(() => onRemove(dependent, phase.id))}
-                      className="rounded-full transition-colors hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="rounded-full transition-colors hover:text-app-danger-text"
                     >
                       <X className="h-3 w-3" aria-hidden="true" />
                     </button>

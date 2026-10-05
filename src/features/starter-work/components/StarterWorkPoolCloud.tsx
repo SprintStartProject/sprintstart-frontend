@@ -336,7 +336,7 @@ function PoolCloudCard({ task, onOpen, closed = false }: PoolTaskProps) {
   return (
     <SpotlightCard
       roundedClassName="rounded-2xl"
-      className={`transition-shadow focus-within:ring-2 focus-within:ring-app-focus hover:shadow-xl ${
+      className={`transition-shadow hover:shadow-xl ${
         unseen ? "border-dashed border-app-border-muted" : ""
       } ${closed ? "opacity-70" : ""}`}
     >
@@ -353,7 +353,7 @@ function PoolCloudCard({ task, onOpen, closed = false }: PoolTaskProps) {
         type="button"
         onClick={() => onOpen(task)}
         aria-label={`Open details for ${task.title}`}
-        className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="absolute inset-0 z-0 rounded-2xl focus-ring-inset"
       />
 
       <article className="pointer-events-none relative z-10 flex h-full flex-col gap-1 p-3">
@@ -421,7 +421,7 @@ function PoolListRow({ task, onOpen, closed = false }: PoolTaskProps) {
         type="button"
         onClick={() => onOpen(task)}
         aria-label={`Open details for ${task.title}`}
-        className="absolute inset-0 z-0 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset"
+        className="absolute inset-0 z-0 focus-ring-inset"
       />
 
       <div className="pointer-events-none relative z-10 flex flex-col gap-2 p-4 transition-colors group-hover:bg-app-surface-hover sm:flex-row sm:items-center sm:gap-3">

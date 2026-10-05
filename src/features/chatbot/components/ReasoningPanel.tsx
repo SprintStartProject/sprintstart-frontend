@@ -120,7 +120,7 @@ export function ReasoningPanel({ reasoning, isStreaming, answerLength }: Reasoni
         type="button"
         onClick={toggle}
         aria-expanded={isOpen}
-        className="flex w-full items-center gap-2 px-4 py-2 text-left font-medium text-app-text-muted transition-colors select-none hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="flex w-full items-center gap-2 px-4 py-2 text-left font-medium text-app-text-muted transition-colors select-none hover:text-app-text"
       >
         <ChevronRight
           aria-hidden="true"

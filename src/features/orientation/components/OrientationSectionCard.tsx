@@ -28,7 +28,7 @@ export function OrientationSectionCard({ section, isOpen, onToggle }: Orientatio
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-app-surface-muted focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-app-surface-muted"
       >
         <span>
           <span className="block text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">

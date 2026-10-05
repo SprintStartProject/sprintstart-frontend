@@ -125,7 +125,7 @@ export function FileUploadZone({ onUpload, isUploading }: FileUploadZoneProps) {
         }}
         className={[
           "group relative flex cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200 sm:p-10",
-          "focus:ring-2 focus:ring-app-focus focus:outline-none",
+          "focus:__DEL__",
           isDragActive
             ? "border-app-brand-border-strong bg-app-brand-soft"
             : "border-app-border-muted bg-app-bg hover:border-app-brand-border hover:bg-app-surface-hover",

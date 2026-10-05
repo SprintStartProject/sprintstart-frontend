@@ -121,7 +121,7 @@ function SortHeader({
       aria-label={`Sort by ${sortLabel}`}
       aria-pressed={active}
       title={`Sort by ${sortLabel}`}
-      className={`-mx-1 inline-flex items-center gap-1 rounded px-1 tracking-wider uppercase transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+      className={`-mx-1 inline-flex items-center gap-1 rounded px-1 tracking-wider uppercase transition-colors ${
         active ? "text-app-text" : "hover:text-app-text"
       }`}
     >

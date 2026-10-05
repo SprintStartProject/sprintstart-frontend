@@ -286,7 +286,7 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
               ref={actionRef}
               type="button"
               onClick={onDismiss}
-              className="relative mt-8 rounded-xl bg-app-brand px-7 py-3 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              className="relative mt-8 rounded-xl bg-app-brand px-7 py-3 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover"
             >
               Let&apos;s go
             </button>

@@ -284,7 +284,7 @@ export function DropdownSelect<TValue extends string>({
         onClick={() => (isOpen ? close() : open())}
         onKeyDown={handleKeyDown}
         {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}
-        className="inline-flex h-9 w-full cursor-pointer items-center justify-between gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 text-sm text-app-text backdrop-blur-md transition-colors outline-none hover:border-app-brand-border-strong hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70"
+        className="inline-flex h-9 w-full cursor-pointer items-center justify-between gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 text-sm text-app-text backdrop-blur-md transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70"
       >
         <span className="truncate">{selectedLabel}</span>
 

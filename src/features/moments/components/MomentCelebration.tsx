@@ -147,7 +147,7 @@ export function MomentCelebration({ celebration, onDismiss }: MomentCelebrationP
           ref={actionRef}
           type="button"
           onClick={onDismiss}
-          className="relative mt-7 rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="relative mt-7 rounded-xl bg-app-brand px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover"
         >
           {celebration.actionLabel ?? tone.defaultAction}
         </button>

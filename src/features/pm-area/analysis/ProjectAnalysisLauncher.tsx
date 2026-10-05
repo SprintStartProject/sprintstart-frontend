@@ -110,7 +110,7 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
                     : "Project health — run the first analysis"
           }
           data-testid="project-analysis-open"
-          className="rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none enabled:hover:scale-105 disabled:cursor-wait"
+          className="rounded-full transition-transform enabled:hover:scale-105 disabled:cursor-wait"
         >
           {historyLoading || historyUnavailable ? (
             // Not known yet, or not readable: a quiet empty ring — never "no health score yet",

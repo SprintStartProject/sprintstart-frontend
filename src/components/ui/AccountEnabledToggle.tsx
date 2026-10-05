@@ -25,7 +25,7 @@ export function AccountEnabledToggle({
       aria-checked={enabled}
       disabled={disabled}
       onClick={() => onChange(!enabled)}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
         enabled
           ? "border-app-success-border bg-app-success-solid"
           : "border-app-border-strong bg-app-neutral-bg"

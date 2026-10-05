@@ -427,6 +427,32 @@ body {
   --color-app-glow-alt: var(--glow-alt);
 }
 
+/* One keyboard focus indicator for the whole app (WCAG 2.4.7, 1.4.11). It is an `outline`, not a
+   `box-shadow`/`ring`, because outlines survive Windows contrast themes (forced colors) and are
+   drawn outside the element's box, so they cannot be clipped by the element's own `overflow`.
+   `:focus-visible` keeps it off mouse clicks. The 2px offset leaves a gap of page background
+   between the element and the outline, which is what keeps it readable on blue surfaces such as
+   primary buttons and the active sidebar link.
+   Components must not add their own focus ring or `outline-none`: a Tailwind utility beats this
+   `base` rule. Where the focus indicator is drawn by something else (a container showing
+   `focus-within`, an element that is only focused by script) use `outline-hidden`, never
+   `outline-none`, so forced-colors mode still gets an outline. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+/* Draws the focus outline inside the element's border box. Use it on a focusable element that sits
+   inside an `overflow-hidden` ancestor (cards, widgets, popover rows, toasts), where the default
+   outer outline would be cut off at the ancestor's edge. */
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+}
+
 @media (max-width: 1024px) {
   :root {
     font-size: 16px;

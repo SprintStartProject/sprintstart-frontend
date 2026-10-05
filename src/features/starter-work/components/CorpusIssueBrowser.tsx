@@ -338,7 +338,7 @@ function CandidateRow({
           onClick={() => onToggle(candidate.sourceId)}
           aria-expanded={isExpanded}
           aria-label={`${isExpanded ? "Close" : "Open"} ${candidate.title}`}
-          className="min-w-0 flex-1 text-left focus-visible:outline-none"
+          className="min-w-0 flex-1 text-left"
         >
           <div className="flex items-start gap-2">
             <h3
@@ -408,7 +408,7 @@ function CandidateRow({
                 const origin = capturePoolFlightRect(event.currentTarget);
                 void onPromote(candidate.sourceId, origin);
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-xl bg-app-brand px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-app-brand-lift transition-colors hover:bg-app-brand-hover disabled:cursor-not-allowed"
             >
               {isPromoting ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

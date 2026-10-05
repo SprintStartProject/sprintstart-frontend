@@ -129,7 +129,7 @@ export function TaskOrientationManager() {
                     disabled={!selectedProjectId || openingId !== null}
                     onClick={() => void openEditor(task)}
                     aria-label={`Edit orientation for ${task.title}`}
-                    className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed"
+                    className="absolute inset-0 z-0 rounded-2xl disabled:cursor-not-allowed"
                   />
                   <div
                     className={`pointer-events-none relative z-10 flex items-start gap-3 rounded-2xl border border-app-border bg-app-surface p-4 transition-colors group-hover:border-app-border-strong ${

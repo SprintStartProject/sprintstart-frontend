@@ -1,3 +1,11 @@
+/* Keyboard focus, mirroring the global `:focus-visible` rule in `src/styles/index.css`. That rule
+   sits in `@layer base`, so it loses against any unlayered Keycloak/PatternFly rule; `:root` raises
+   the specificity here so the outline cannot be overridden. */
+:root :focus-visible {
+  outline: 2px solid var(--color-app-focus);
+  outline-offset: 2px;
+}
+
 #kc-header-wrapper {
   display: flex;
   gap: 0.75rem;
@@ -81,13 +89,10 @@ div.kcFormGroupClass {
     box-shadow 0.15s ease;
 }
 
-/* Same focus treatment as the app's shared Input (fieldStyles.ts):
-   brand-colored border + a visible `--app-focus` ring, never just
-   `outline: none` with nothing to replace it (FRONTEND_CODING_STANDARDS.md §5). */
+/* Same focus treatment as the app's shared Input (fieldStyles.ts): brand-colored border,
+   plus the focus outline at the top of this file (FRONTEND_CODING_STANDARDS.md §5). */
 .pf-c-form-control:focus {
-  outline: none;
   border-color: var(--color-app-brand-border-strong);
-  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .pf-c-input-group {
@@ -105,11 +110,6 @@ div.kcFormGroupClass {
 
 .password-visibility-btn:hover {
   background-color: var(--color-app-surface-hover);
-}
-
-.password-visibility-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .visibility-icon {
@@ -152,11 +152,6 @@ div.kcFormGroupClass {
 
 .kcButtonClass.pf-c-button:active {
   transform: scale(0.97);
-}
-
-.kcButtonClass.pf-c-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .kcButtonClass.pf-c-button:disabled {

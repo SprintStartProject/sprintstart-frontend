@@ -102,8 +102,7 @@ function ProjectCard({
       aria-selected={isSelected}
       onClick={onSelect}
       className={[
-        "group relative flex h-full flex-col gap-3 overflow-hidden rounded-2xl border p-4 text-left transition-all",
-        "focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
+        "group relative flex h-full flex-col gap-3 overflow-hidden rounded-2xl border p-4 text-left focus-ring-inset transition-all",
         isSelected
           ? "border-app-brand bg-app-brand-soft"
           : "border-app-border bg-app-surface hover:border-app-border-strong hover:shadow-lg",

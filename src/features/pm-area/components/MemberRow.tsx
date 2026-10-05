@@ -272,7 +272,7 @@ export function MemberRow({
       onDoubleClick={handleDoubleClick}
       title="Click for a quick look · double-click for the full profile"
       aria-current={selected ? "true" : undefined}
-      className={`group grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+      className={`group grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-3 py-3 text-left transition-colors ${
         selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
       } ${
         isFull
@@ -379,7 +379,7 @@ export function MemberRow({
         to={`/team/${member.userId}`}
         aria-label={`Open full profile of ${name}`}
         title="Full profile"
-        className="absolute top-3 right-9 flex h-8 w-8 items-center justify-center rounded-lg text-app-text-subtle transition-colors hover:bg-app-brand-soft hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none md:top-1/2 md:-translate-y-1/2"
+        className="absolute top-3 right-9 flex h-8 w-8 items-center justify-center rounded-lg text-app-text-subtle transition-colors hover:bg-app-brand-soft hover:text-app-brand-text md:top-1/2 md:-translate-y-1/2"
       >
         <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
       </Link>

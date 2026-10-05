@@ -193,7 +193,7 @@ export function NextStepWidget({
     <ClickableCard
       onClick={() => void navigate(content.to, { state: content.navigationState })}
       aria-label={content.ariaLabel}
-      className={`${CARD_CLASS_NAME} cursor-pointer hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+      className={`${CARD_CLASS_NAME} cursor-pointer focus-ring-inset hover:-translate-y-0.5`}
     >
       <div
         aria-hidden="true"

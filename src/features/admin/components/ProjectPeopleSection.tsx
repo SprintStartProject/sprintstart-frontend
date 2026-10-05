@@ -127,7 +127,7 @@ function RowIdentity({
       type="button"
       onClick={onOpen}
       aria-label={label}
-      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left"
     >
       {children}
     </button>

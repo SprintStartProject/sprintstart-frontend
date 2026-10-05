@@ -671,7 +671,7 @@ function TaskInsertButton({ label, onClick }: { label: string; onClick: () => vo
       aria-label={label}
       title="Add task here"
     >
-      <Plus className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover/step-insert:opacity-100 group-hover/task-insert:opacity-100" />
+      <Plus className="h-3.5 w-3.5 opacity-0 transition-opacity group-focus-within/step-insert:opacity-100 group-focus-within/task-insert:opacity-100 group-hover/step-insert:opacity-100 group-hover/task-insert:opacity-100" />
     </button>
   );
 }

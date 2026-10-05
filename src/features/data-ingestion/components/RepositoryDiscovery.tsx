@@ -545,7 +545,7 @@ export function RepositoryDiscovery({
                       />
                       <span
                         aria-hidden="true"
-                        className={`flex h-5 w-5 items-center justify-center rounded-md border transition peer-focus-visible:ring-2 peer-focus-visible:ring-app-focus peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-app-surface ${
+                        className={`flex h-5 w-5 items-center justify-center rounded-md border transition peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-app-focus peer-focus-visible:outline-solid ${
                           isSelected
                             ? "border-app-brand bg-app-brand text-white"
                             : "border-app-border-strong bg-app-surface"

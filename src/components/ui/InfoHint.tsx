@@ -132,7 +132,7 @@ export function InfoHint({
           setPinned(next);
           setOpen(next);
         }}
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-app-text-muted transition-colors hover:text-app-text"
       >
         <Info className="h-[15px] w-[15px]" aria-hidden="true" />
       </button>

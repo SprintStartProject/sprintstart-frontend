@@ -944,7 +944,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         // nodes, the minimap and the zoom toolbar would otherwise all still be tab stops behind
         // what was opened, which is the long way round to the thing in front.
         inert={cover ? true : undefined}
-        className="absolute inset-0 cursor-grab touch-none select-none focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset active:cursor-grabbing"
+        className="absolute inset-0 cursor-grab touch-none focus-ring-inset select-none active:cursor-grabbing"
         style={{
           backgroundImage: "radial-gradient(var(--color-app-border) 1.2px, transparent 1.2px)",
           backgroundSize: `${gridSize}px ${gridSize}px`,
@@ -1066,7 +1066,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
                 tabIndex={isInteractive ? 0 : undefined}
                 aria-label={isInteractive ? nodeLabel(node) : undefined}
                 aria-pressed={isInteractive ? selected : undefined}
-                className={`group/node absolute rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-app-focus ${
+                className={`group/node absolute rounded-2xl ${
                   canMove ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                 } ${dragging ? "z-30" : selected ? "z-20" : "z-10"}`}
                 style={{
@@ -1296,7 +1296,7 @@ export function CanvasButton({
       aria-pressed={active || undefined}
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         active
           ? "bg-app-brand text-white"
           : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"

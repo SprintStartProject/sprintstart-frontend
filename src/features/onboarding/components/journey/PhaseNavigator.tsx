@@ -53,7 +53,7 @@ function PhaseRow({
       aria-pressed={selected}
       aria-current={isFocus ? "step" : undefined}
       onClick={onSelect}
-      className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+      className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ${
         selected
           ? "border-app-brand bg-app-brand-soft"
           : "border-transparent hover:border-app-border hover:bg-app-surface-hover"

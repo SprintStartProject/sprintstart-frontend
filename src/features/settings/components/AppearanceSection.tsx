@@ -96,7 +96,7 @@ export function AppearanceSection() {
                 data-testid={`theme-option-${value}`}
                 onClick={() => setTheme(value)}
                 className={[
-                  "flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
+                  "flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors",
                   isActive
                     ? "border-app-brand bg-app-brand-soft text-app-text"
                     : "border-app-border bg-app-bg text-app-text-muted hover:bg-app-surface-hover hover:text-app-text",
@@ -176,7 +176,7 @@ export function AppearanceSection() {
                 onChange={(event) => setGlowIntensity(event.target.valueAsNumber)}
                 // Native control tinted with the brand colour — deliberately no
                 // custom track CSS until a second slider justifies extracting one.
-                className="mt-2 w-full cursor-pointer rounded-full accent-app-brand focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                className="mt-2 w-full cursor-pointer rounded-full accent-app-brand"
               />
               <p className="mt-1 text-xs text-app-text-muted">
                 Size and brightness of the glow that follows your mouse.

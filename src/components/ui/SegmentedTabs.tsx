@@ -222,7 +222,7 @@ export function SegmentedTabs<TValue extends string>({
               isCompact
                 ? "gap-1.5 rounded-lg px-3 py-1.5 text-xs"
                 : "gap-2 rounded-xl px-4 py-2 text-sm max-sm:py-3"
-            } font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+            } font-semibold whitespace-nowrap transition-colors ${
               fullWidth && !wrap ? (wrapBelow ? "lg:flex-1" : "flex-1") : ""
             } ${grown ? (isCompact ? "pr-2" : "pr-2.5") : ""} ${
               isActive ? "text-white" : "text-app-text-muted hover:text-app-text"
@@ -300,7 +300,7 @@ export function SegmentedTabs<TValue extends string>({
                           type="button"
                           aria-pressed={selected}
                           onClick={() => option.onSubChange?.(sub.value)}
-                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none ${
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors ${
                             isCompact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"
                           } ${
                             selected

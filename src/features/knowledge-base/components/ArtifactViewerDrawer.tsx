@@ -1038,7 +1038,7 @@ export function ArtifactViewerDrawer({
           onClick={openDeleteConfirm}
           data-testid="delete-artifact-btn"
           disabled={isDeleting}
-          className="flex items-center gap-2 rounded-md border border-app-danger-border bg-app-danger-bg px-3 py-1.5 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-text/10 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-2 rounded-md border border-app-danger-border bg-app-danger-bg px-3 py-1.5 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-text/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Trash2 className="h-4 w-4" />
           Delete

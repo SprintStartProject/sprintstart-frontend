@@ -51,7 +51,7 @@ function EditButton({ onEdit, label }: { onEdit: () => void; label: string }) {
       type="button"
       data-testid="edit-orientation"
       onClick={onEdit}
-      className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
     >
       <PencilLine className="h-3 w-3" aria-hidden="true" />
       {label}
@@ -150,7 +150,7 @@ export function OrientationPanel({
             <button
               type="button"
               onClick={onRetry}
-              className="mt-1.5 inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              className="mt-1.5 inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline"
             >
               <RefreshCw className="h-3 w-3" aria-hidden="true" />
               Try again

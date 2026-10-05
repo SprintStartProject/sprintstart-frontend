@@ -189,7 +189,7 @@ export function AddArrivalStepModal({
         ref={bodyRef}
         tabIndex={-1}
         data-testid="add-arrival-step-body"
-        className="focus:outline-none"
+        className="focus:outline-hidden"
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div

@@ -63,7 +63,7 @@ export function RoleRow({
         type="button"
         aria-expanded={selected}
         onClick={() => onSelect(role.id)}
-        className="absolute inset-0 rounded-xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="absolute inset-0 rounded-xl"
       >
         <span className="sr-only">
           {selected ? `Close ${role.name}` : `Manage skills and members of ${role.name}`}

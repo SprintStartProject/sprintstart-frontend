@@ -126,7 +126,7 @@ function FindingRow({
       onClick={() => onOpen(finding.to ?? "")}
       aria-label={`Open: ${finding.title}`}
       style={glowStyle}
-      className={`${className} transition-colors hover:border-app-border-strong hover:bg-app-surface focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+      className={`${className} transition-colors hover:border-app-border-strong hover:bg-app-surface`}
     >
       {body}
     </button>
@@ -167,7 +167,7 @@ function AreaCard({
       data-anchor={anchor}
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex min-w-36 flex-1 items-center gap-3 rounded-xl border px-3 py-2 text-left backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none lg:flex-none ${
+      className={`flex min-w-36 flex-1 items-center gap-3 rounded-xl border px-3 py-2 text-left backdrop-blur-md transition-colors lg:flex-none ${
         selected
           ? "border-app-brand-border-strong bg-app-surface"
           : "border-app-border-muted bg-app-surface/50 hover:bg-app-surface/80"

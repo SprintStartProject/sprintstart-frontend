@@ -145,7 +145,7 @@ export function ProjectsTab({
             // 1px border from the pre-scale bitmap, which reads as the outline
             // thinning out and partly vanishing. A translation moves the same
             // crisp pixels.
-            className="group flex h-full w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-app-focus motion-reduce:hover:translate-y-0 sm:p-5"
+            className="group flex h-full w-full cursor-pointer flex-col gap-4 overflow-hidden rounded-2xl border border-app-border bg-app-surface p-4 text-left shadow-sm focus-ring-inset transition-all duration-200 hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:bg-app-surface-hover hover:shadow-lg motion-reduce:hover:translate-y-0 sm:p-5"
             aria-label={`Open details for ${project.name}`}
           >
             <div className="flex w-full items-center gap-3">

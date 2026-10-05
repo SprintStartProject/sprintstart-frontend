@@ -197,7 +197,7 @@ type SidebarNavLinkProps = {
 
 const BASE_LINK_CLASS = [
   "group relative flex h-[40px] items-center rounded-[10px] px-[12px] text-[14px] font-medium leading-none",
-  "transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus",
+  "transition-colors duration-200",
 ].join(" ");
 
 function getLinkStateClass(isHighlighted: boolean): string {

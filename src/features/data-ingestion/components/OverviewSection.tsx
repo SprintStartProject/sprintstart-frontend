@@ -265,7 +265,7 @@ function Kpi({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-app-border bg-app-surface p-4 text-left transition hover:border-app-brand-border focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none sm:p-[18px]"
+      className="rounded-2xl border border-app-border bg-app-surface p-4 text-left transition hover:border-app-brand-border sm:p-[18px]"
     >
       {body}
     </button>

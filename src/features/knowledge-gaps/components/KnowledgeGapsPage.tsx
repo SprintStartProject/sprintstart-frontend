@@ -337,7 +337,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
                         type="button"
                         onClick={() => void navigate(`/insights/knowledge-gaps/${gap.id}`)}
                         aria-current={selected ? "true" : undefined}
-                        className={`group flex w-full items-stretch gap-3 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                        className={`group flex w-full items-stretch gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
                           selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
                         }`}
                       >

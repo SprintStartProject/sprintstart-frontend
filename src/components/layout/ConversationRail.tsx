@@ -142,7 +142,7 @@ export function RailToggle({
       aria-expanded={false}
       title={label}
       onClick={onClick}
-      className="absolute top-3 left-2 z-30 flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="absolute top-3 left-2 z-30 flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:bg-app-surface-hover hover:text-app-text"
     >
       {icon}
 

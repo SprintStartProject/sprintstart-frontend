@@ -123,7 +123,7 @@ export function CheckQuestionCard({
                 }}
                 aria-describedby={textWarning ? `${question.id}-text-warning` : undefined}
                 placeholder="Your answer..."
-                className="w-full rounded-xl border border-app-border bg-app-bg px-4 py-2.5 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand focus:outline-none disabled:opacity-70"
+                className="w-full rounded-xl border border-app-border bg-app-bg px-4 py-2.5 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand disabled:opacity-70"
               />
               {textWarning && !graded && (
                 <p

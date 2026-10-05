@@ -113,7 +113,7 @@ export function UsersTab({
               type="button"
               role="menuitem"
               onClick={(event) => onOpenUserDetailsFromMenu(event, openMenuUser)}
-              className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
+              className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-medium text-app-text-muted focus-ring-inset transition-colors hover:bg-app-surface-hover hover:text-app-text"
             >
               <ExternalLink className="h-4 w-4" />
               Open details
@@ -122,7 +122,7 @@ export function UsersTab({
               type="button"
               role="menuitem"
               onClick={(event) => onRequestUserDeleteFromMenu(event, openMenuUser)}
-              className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-bg"
+              className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-medium text-app-danger-text focus-ring-inset transition-colors hover:bg-app-danger-bg"
             >
               <Trash2 className="h-4 w-4" />
               Delete
@@ -176,7 +176,7 @@ export function UsersTab({
             <button
               type="button"
               onClick={() => onOpenUserDetails(user)}
-              className="absolute inset-0 z-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow focus-visible:ring-inset"
+              className="absolute inset-0 z-0 focus-ring-inset"
               aria-label={`Open details for ${getDisplayName(user)}`}
             />
 

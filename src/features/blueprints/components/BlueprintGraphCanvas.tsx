@@ -955,7 +955,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Find a node"
                       aria-label="Find a node on the canvas"
-                      className="h-8 w-44 rounded-lg border border-app-border bg-app-surface/95 pr-2 pl-8 text-xs text-app-text shadow-sm backdrop-blur placeholder:text-app-text-subtle focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="h-8 w-44 rounded-lg border border-app-border bg-app-surface/95 pr-2 pl-8 text-xs text-app-text shadow-sm backdrop-blur placeholder:text-app-text-subtle"
                     />
                   </div>
                 ) : null}
@@ -1210,7 +1210,7 @@ function NodeCover({
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface shadow-2xl outline-none"
+        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface shadow-2xl outline-hidden"
       >
         <header className="border-b border-app-border bg-app-brand-soft/30 px-4 py-3 sm:px-6">
           <nav
@@ -1286,7 +1286,7 @@ function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => 
         type="button"
         onClick={onClose}
         aria-label="Hide the legend"
-        className="absolute top-2 right-2 rounded p-0.5 text-app-text-subtle transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="absolute top-2 right-2 rounded p-0.5 text-app-text-subtle transition-colors hover:text-app-text"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>

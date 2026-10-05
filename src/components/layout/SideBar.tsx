@@ -362,7 +362,7 @@ function SidebarContent({
         whileHover={status === "loading" ? undefined : { scale: 1.02 }}
         whileTap={status === "loading" ? undefined : { scale: 0.98 }}
         transition={hoverSpringToken}
-        className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         <LogOut aria-hidden="true" className="h-[16px] w-[16px]" />
         Logout
@@ -658,7 +658,7 @@ export function SideBar() {
           aria-label={isMobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
           aria-expanded={isMobileSidebarOpen}
           onClick={toggleMobileSidebar}
-          className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
         >
           {isMobileSidebarOpen ? (
             <X className="h-[22px] w-[22px]" />

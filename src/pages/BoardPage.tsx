@@ -1181,7 +1181,7 @@ export function BoardPage() {
                     your own at any time. Your onboarding itself is on the{" "}
                     <Link
                       to="/onboarding"
-                      className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="font-medium text-app-brand-text hover:underline"
                     >
                       Onboarding page
                     </Link>
@@ -1198,7 +1198,7 @@ export function BoardPage() {
                       <button
                         type="button"
                         onClick={showEverything}
-                        className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                        className="font-medium text-app-brand-text hover:underline"
                       >
                         Show all {allCards.length} cards
                       </button>

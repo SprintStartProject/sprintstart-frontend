@@ -815,11 +815,7 @@ function MemberItemRow({
           <ItemGlyph item={item} state={state} />
         </span>
         <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={onOpen}
-            className="w-full rounded-lg text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-          >
+          <button type="button" onClick={onOpen} className="w-full rounded-lg text-left">
             <span className="flex flex-wrap items-center gap-2">
               {isNext ? (
                 <span
@@ -891,7 +887,7 @@ function MemberItemRow({
       <div className="group/insert relative flex h-5 items-center justify-center">
         <span
           aria-hidden="true"
-          className="absolute inset-x-10 top-1/2 border-t border-dashed border-app-border opacity-0 transition-opacity group-hover/insert:opacity-100"
+          className="absolute inset-x-10 top-1/2 border-t border-dashed border-app-border opacity-0 transition-opacity group-focus-within/insert:opacity-100 group-hover/insert:opacity-100"
         />
         <button
           type="button"

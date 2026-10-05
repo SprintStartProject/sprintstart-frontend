@@ -2424,7 +2424,7 @@ export function BlueprintPathDetailPage() {
                                                   <div
                                                     role="button"
                                                     tabIndex={0}
-                                                    className="min-w-0 flex-1 cursor-pointer px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                    className="min-w-0 flex-1 cursor-pointer px-2 py-1"
                                                     onClick={() =>
                                                       openEdit({
                                                         kind: "task",
@@ -2477,7 +2477,7 @@ export function BlueprintPathDetailPage() {
                                                   <div
                                                     role="button"
                                                     tabIndex={0}
-                                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1"
                                                     onClick={() =>
                                                       openEdit({
                                                         kind: "resource",
@@ -2637,7 +2637,7 @@ export function BlueprintPathDetailPage() {
                                               <div
                                                 role="button"
                                                 tabIndex={0}
-                                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1"
                                                 onClick={() =>
                                                   openEdit({
                                                     kind: "option",
@@ -2925,7 +2925,7 @@ export function BlueprintPathDetailPage() {
                   onClick={() =>
                     setPhaseType((current) => (current === "FIXED" ? "AI_ENHANCED" : "FIXED"))
                   }
-                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
                     phaseType === "AI_ENHANCED"
                       ? "border-app-brand bg-app-brand"
                       : "border-app-border-strong bg-app-neutral-bg"

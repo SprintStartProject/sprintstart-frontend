@@ -295,7 +295,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
     <ClickableCard
       onClick={() => void navigate("/pm-dashboard")}
       aria-label="Open the PM Dashboard for the full team insights"
-      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 focus-ring-inset transition-all hover:-translate-y-0.5"
     >
       <div
         aria-hidden="true"

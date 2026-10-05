@@ -295,7 +295,7 @@ export function RocketPet() {
             : "Launch the rocket"
         }
         title="Go on, launch it"
-        className={`fixed right-1 z-30 h-12 w-12 rounded-xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+        className={`fixed right-1 z-30 h-12 w-12 rounded-xl ${
           // Invisible but present while it is away; without this you
           // could set off a rocket that is not there.
           isGone && !isFocused ? "pointer-events-none" : "pointer-events-auto"

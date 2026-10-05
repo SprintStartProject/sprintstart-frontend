@@ -73,7 +73,7 @@ export function PmCard({
         <Link
           to={to}
           aria-label={linkLabel ?? ariaLabel}
-          className="absolute inset-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset"
+          className="absolute inset-0 rounded-2xl focus-ring-inset"
         />
       )}
       <div
@@ -125,7 +125,7 @@ export function PmCardLink({ to, children }: { to: string; children: ReactNode }
   return (
     <Link
       to={to}
-      className="group flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text"
     >
       {children}
       <ArrowRight
@@ -207,7 +207,7 @@ export function PmStat({
 
   const className =
     "flex h-full items-center gap-3 rounded-2xl border border-app-border bg-app-surface px-3.5 py-3 text-left";
-  const interactiveClassName = `${className} transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-md focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none motion-reduce:hover:translate-y-0`;
+  const interactiveClassName = `${className} transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-md motion-reduce:hover:translate-y-0`;
 
   if (to) {
     return (

@@ -51,7 +51,7 @@ export function PhaseChooser({
                 <button
                   type="button"
                   onClick={() => onChoose(phase.id)}
-                  className="group flex h-full w-full flex-col rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-colors hover:border-app-brand-border hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  className="group flex h-full w-full flex-col rounded-2xl border border-app-border bg-app-surface p-4 text-left transition-colors hover:border-app-brand-border hover:bg-app-surface-hover"
                 >
                   <span className="text-[11px] font-semibold text-app-text-subtle tabular-nums">
                     Phase {allPhases.indexOf(phase) + 1}

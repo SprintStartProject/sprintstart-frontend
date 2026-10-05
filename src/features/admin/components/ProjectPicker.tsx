@@ -186,7 +186,7 @@ export function ProjectPicker({
                   type="button"
                   onClick={() => void select(project.id)}
                   disabled={hasPendingChange}
-                  className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all hover:border-app-brand-border-strong hover:bg-app-brand-soft focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-2.5 py-2 text-left transition-all hover:border-app-brand-border-strong hover:bg-app-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <ProjectMonogram projectId={project.id} name={project.name} size="sm" />
 

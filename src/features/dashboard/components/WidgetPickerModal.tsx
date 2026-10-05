@@ -227,7 +227,7 @@ function WidgetOption({
       // gets it past the `aria-label` above.
       aria-describedby={change === "absent" ? descriptionId : `${descriptionId} ${changeId}`}
       onClick={onToggle}
-      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
         isSelected
           ? "border-app-brand bg-app-brand-soft/40"
           : "border-app-border-muted bg-app-surface-muted hover:border-app-border"

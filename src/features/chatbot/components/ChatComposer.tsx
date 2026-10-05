@@ -554,7 +554,7 @@ export function ChatComposer({
                         max={to || undefined}
                         value={from}
                         onChange={(e) => setFrom(e.target.value)}
-                        className="w-full min-w-0 bg-transparent text-xs text-app-text outline-none"
+                        className="w-full min-w-0 bg-transparent text-xs text-app-text outline-hidden"
                       />
                     </div>
 
@@ -571,7 +571,7 @@ export function ChatComposer({
                         min={from || undefined}
                         value={to}
                         onChange={(e) => setTo(e.target.value)}
-                        className="w-full min-w-0 bg-transparent text-xs text-app-text outline-none"
+                        className="w-full min-w-0 bg-transparent text-xs text-app-text outline-hidden"
                       />
                     </div>
                   </div>
@@ -599,7 +599,7 @@ export function ChatComposer({
               ? "Ask anything about the project..."
               : "Select a project to start asking questions"
           }
-          className="max-h-44 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
+          className="max-h-44 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-hidden placeholder:text-app-text-disabled"
           value={value}
           rows={1}
           onChange={(e) => {
