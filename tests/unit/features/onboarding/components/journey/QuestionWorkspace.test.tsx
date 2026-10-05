@@ -2,7 +2,15 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuestionWorkspace } from "../../../../../../src/features/onboarding/components/journey/QuestionWorkspace";
-import type { OnboardingQuestionEndpoint } from "../../../../../../src/features/onboarding/types";
+import type {
+  OnboardingQuestionEndpoint,
+  QuestionAttemptResult,
+} from "../../../../../../src/features/onboarding/types";
+import {
+  COPIED_SAMPLE_WARNING,
+  readRevealedSample,
+  shuffleOptions,
+} from "../../../../../../src/features/onboarding/questionIntegrity";
 
 const mockOpenAiBuddy = vi.hoisted(() => vi.fn());
 
@@ -87,5 +95,136 @@ describe("QuestionWorkspace: the buddy", () => {
 
     expect(lastDraft()).toContain("wrong");
     expect(lastDraft()).toContain("Who runs the retro?");
+  });
+});
+
+function attempt(over: Partial<QuestionAttemptResult> = {}): QuestionAttemptResult {
+  return {
+    attemptId: "a1",
+    questionId: "q1",
+    correct: false,
+    createdAt: "2026-10-05T10:00:00Z",
+    correctOptionIds: [],
+    correctAnswer: null,
+    explanation: null,
+    feedback: null,
+    status: "RETRY",
+    onboardingCompleted: false,
+    ...over,
+  };
+}
+
+describe("QuestionWorkspace: multiple choice", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const options = [
+    { id: "right", position: 0, label: "The Scrum Master" },
+    { id: "w1", position: 1, label: "The CEO" },
+    { id: "w2", position: 2, label: "The newest hire" },
+    { id: "w3", position: 3, label: "Nobody" },
+  ];
+
+  function shownLabels(): string[] {
+    return screen.getAllByRole("checkbox").map((box) => box.closest("label")?.textContent ?? "");
+  }
+
+  /** The stored order puts the right answer first; what is shown must not simply repeat it. */
+  it("shows the options shuffled, and in a new order on every attempt", async () => {
+    vi.mocked(onboardingService.submitQuestionAttempt).mockResolvedValue(
+      attempt({ correctOptionIds: ["right"] }),
+    );
+    const user = userEvent.setup();
+    renderWorkspace({ type: "MULTIPLE_CHOICE", options });
+
+    expect(shownLabels()).toEqual(shuffleOptions(options, "q1:0").map((option) => option.label));
+
+    await user.click(screen.getByRole("checkbox", { name: "The CEO" }));
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+
+    expect(shownLabels()).toEqual(shuffleOptions(options, "q1:1").map((option) => option.label));
+  });
+});
+
+describe("QuestionWorkspace: the revealed sample answer", () => {
+  const sample = "The Scrum Master facilitates the retro and keeps it timeboxed";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  async function answerWrongAndRetry(user: ReturnType<typeof userEvent.setup>) {
+    vi.mocked(onboardingService.submitQuestionAttempt).mockResolvedValue(
+      attempt({ correctAnswer: sample }),
+    );
+    await user.type(screen.getByRole("textbox"), "The PM");
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    expect(await screen.findByText(sample)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+  }
+
+  it("cannot be pasted back in", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await answerWrongAndRetry(user);
+
+    await user.click(screen.getByRole("textbox"));
+    await user.paste(sample);
+
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.getByRole("alert")).toHaveTextContent(COPIED_SAMPLE_WARNING);
+  });
+
+  it("is not taken as an answer when typed out again, and is not sent", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await answerWrongAndRetry(user);
+
+    await user.type(screen.getByRole("textbox"), sample);
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(COPIED_SAMPLE_WARNING);
+    expect(onboardingService.submitQuestionAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets an answer in the hire's own words through", async () => {
+    const user = userEvent.setup();
+    renderWorkspace();
+    await answerWrongAndRetry(user);
+    vi.mocked(onboardingService.submitQuestionAttempt).mockResolvedValue(
+      attempt({ correct: true, status: "PASSED" }),
+    );
+
+    await user.click(screen.getByRole("textbox"));
+    await user.paste("Our SM leads it, and makes sure we stop when the time is up");
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+
+    expect(await screen.findByText(/Correct/)).toBeVisible();
+    expect(onboardingService.submitQuestionAttempt).toHaveBeenCalledTimes(2);
+    // Once passed, there is nothing left to guard.
+    expect(readRevealedSample("q1")).toBeNull();
+  });
+
+  it("is still guarded after a reload", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <QuestionWorkspace
+        question={question}
+        phaseTitle="Meetings"
+        onAnswered={vi.fn()}
+        continueLabel="Next step"
+        onContinue={vi.fn()}
+      />,
+    );
+    await answerWrongAndRetry(user);
+    unmount();
+
+    renderWorkspace({ status: "RETRY" });
+    await user.click(screen.getByRole("textbox"));
+    await user.paste(sample);
+
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.getByRole("alert")).toHaveTextContent(COPIED_SAMPLE_WARNING);
   });
 });

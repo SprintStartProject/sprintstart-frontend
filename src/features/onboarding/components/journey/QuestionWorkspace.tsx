@@ -9,6 +9,13 @@ import { CheckQuestionCard } from "../CheckQuestionCard";
 import { ConfettiBurst } from "../ConfettiBurst";
 import { AskTheBuddy } from "../../../buddy/components/AskTheBuddy";
 import { askAboutQuestion, askAboutWrongAnswer } from "../../buddyDrafts";
+import {
+  clearRevealedSample,
+  COPIED_SAMPLE_WARNING,
+  isCopyOfSample,
+  readRevealedSample,
+  writeRevealedSample,
+} from "../../questionIntegrity";
 
 type Props = {
   question: OnboardingQuestionEndpoint;
@@ -38,14 +45,33 @@ export function QuestionWorkspace({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<QuestionAttemptResult | null>(null);
   const alreadyPassed = question.status === "PASSED" && !result;
+  // Each attempt shows the options in a fresh order, so a retry is not answered by position.
+  const [attemptRound, setAttemptRound] = useState(0);
+  // The sample answer a wrong attempt revealed: handing it back word for word is not an answer.
+  const [revealedSample, setRevealedSample] = useState<string | null>(() =>
+    question.type === "SHORT_TEXT" ? readRevealedSample(question.id) : null,
+  );
+  const [copyWarning, setCopyWarning] = useState<string | null>(null);
 
   const submit = async () => {
+    if (question.type === "SHORT_TEXT" && isCopyOfSample(draft.textAnswer, revealedSample)) {
+      setCopyWarning(COPIED_SAMPLE_WARNING);
+      return;
+    }
     setSubmitting(true);
     try {
       const attempt = await onboardingService.submitQuestionAttempt(
         question.id,
         toSubmission(question, draft),
       );
+      if (question.type === "SHORT_TEXT") {
+        if (attempt.correct) {
+          clearRevealedSample(question.id);
+        } else if (attempt.correctAnswer) {
+          writeRevealedSample(question.id, attempt.correctAnswer);
+          setRevealedSample(attempt.correctAnswer);
+        }
+      }
       setResult(attempt);
       await onAnswered(attempt);
     } catch (reason) {
@@ -139,7 +165,17 @@ export function QuestionWorkspace({
               : [...current.selectedOptionIds, optionId],
           }))
         }
-        onTextChange={(textAnswer) => setDraft((current) => ({ ...current, textAnswer }))}
+        onTextChange={(textAnswer) => {
+          setCopyWarning(null);
+          setDraft((current) => ({ ...current, textAnswer }));
+        }}
+        optionOrderSeed={`${question.id}:${attemptRound}`}
+        onTextPaste={(text) => {
+          if (!isCopyOfSample(text, revealedSample)) return true;
+          setCopyWarning(COPIED_SAMPLE_WARNING);
+          return false;
+        }}
+        textWarning={copyWarning}
       />
 
       <div className="flex justify-end gap-2 border-t border-app-border pt-4">
@@ -158,6 +194,8 @@ export function QuestionWorkspace({
             onClick={() => {
               setDraft(emptyDraft);
               setResult(null);
+              setCopyWarning(null);
+              setAttemptRound((round) => round + 1);
             }}
           >
             Try again
