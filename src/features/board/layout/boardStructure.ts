@@ -50,15 +50,18 @@ const STORAGE_VERSION = 1;
 export type StoredStage = "NOW" | "LATER";
 
 /**
- * A stage as the board draws it: the two that were ever stored, and **Behind you**.
+ * A stage as the board draws it: **Now**, and **Behind you**.
  *
- * The third only exists because the path decides now: cards from a phase the hire has finished.
+ * Later is gone from the drawing: the path is the one plan, and a phase not reached yet is the
+ * path's to show, not the board's (#311). A stored `LATER` is still read and synced — it just no
+ * longer decides anything. Behind you only exists because the path decides now: cards from a phase
+ * the hire has finished.
  * Left in Now they kept the current phase's band full of things already dealt with; hidden, they
  * would be gone exactly when somebody wants to look something up. So they get a band of their own
  * that arrives folded. Never stored and never sent — it is a fact about the path, not about the
  * board — which is why it sits outside {@link StoredStage}.
  */
-export type BoardStage = StoredStage | "BEHIND";
+export type BoardStage = "NOW" | "BEHIND";
 
 /** The stages that may be read back from storage or from the server. */
 const STORED_STAGES: readonly StoredStage[] = ["NOW", "LATER"];
@@ -70,15 +73,11 @@ const STORED_STAGES: readonly StoredStage[] = ["NOW", "LATER"];
  * what to do now. It is also what every "earliest first" question here wants — the stage still to
  * work through, and the card to start with, are never the finished ones.
  */
-export const BOARD_STAGES: readonly BoardStage[] = ["NOW", "LATER", "BEHIND"];
+export const BOARD_STAGES: readonly BoardStage[] = ["NOW", "BEHIND"];
 
 /** What each stage is called on screen, and the sentence under it. */
 export const STAGE_LABELS: Record<BoardStage, { title: string; hint: string }> = {
   NOW: { title: "Now", hint: "Your current phase, and anything not tied to one ahead." },
-  LATER: {
-    title: "Later",
-    hint: "From phases you haven't reached yet — they move up when you do.",
-  },
   BEHIND: {
     title: "Behind you",
     hint: "From phases you've finished — kept for when you want to look something up.",
@@ -382,8 +381,8 @@ export type CardState = {
  * The default stage is `NOW`. A board with no structure at all should read as an ordinary board and
  * not as one where everything has been deferred.
  *
- * `stageOf` decides the stage when given — the board passes the path's answer (`pathStages.ts`) —
- * and the stored stage is only the fallback for callers that have no path to ask.
+ * `stageOf` decides the stage when given — the board passes the path's answer (`pathStages.ts`).
+ * Without it everything is Now: a stored stage is kept for sync but no longer drawn.
  */
 export function deriveCardStates(
   cards: BoardCard[],
@@ -396,7 +395,7 @@ export function deriveCardStates(
   const states = new Map<string, CardState>();
   for (const card of cards) {
     const entry = structure.cards[card.id];
-    const stage = stageOf ? stageOf(card) : (entry?.stage ?? "NOW");
+    const stage = stageOf ? stageOf(card) : "NOW";
     const progress = cardProgress(card);
     // Dependencies on cards that have left the board are dropped: a hire who dismissed the runbook
     // card is not thereby blocked forever on a card nobody can see.
@@ -451,18 +450,6 @@ export function currentStage(states: Map<string, CardState>): BoardStage {
   }
 
   return BOARD_STAGES[BOARD_STAGES.length - 1];
-}
-
-/** Marks a card done, or un-marks it. Ignored for kinds that report their own completion. */
-export function setMarkedDone(
-  structure: BoardStructure,
-  cardId: string,
-  markedDone: boolean,
-): BoardStructure {
-  return {
-    ...structure,
-    cards: { ...structure.cards, [cardId]: { ...structure.cards[cardId], markedDone } },
-  };
 }
 
 /**
@@ -520,27 +507,6 @@ export function setDependency(
 }
 
 /**
- * Takes off every dependency the hire's own controls are allowed to take off.
- *
- * The picker offers one predecessor at a time, so choosing a new one means dropping the last — and
- * "the last" has to mean the last *they* set. A rule the team wrote into a blueprint is not that
- * control's to drop, and one card can carry both.
- *
- * Here rather than in the hook that calls it because it is the same rule {@link setDependency}
- * applies on removal, and a rule about who may unsay what belongs with the thing being said.
- */
-export function clearHireDependencies(structure: BoardStructure, cardId: string): BoardStructure {
-  const kept = (structure.cards[cardId]?.dependsOn ?? []).filter(
-    (dependency) => !isRemovableByHire(dependency),
-  );
-
-  return {
-    ...structure,
-    cards: { ...structure.cards, [cardId]: { ...structure.cards[cardId], dependsOn: kept } },
-  };
-}
-
-/**
  * Puts a card on a pile, or takes it off one — what the board's "Pile" control does.
  *
  * A pile is stored the way a sequence used to be: each card after the first names the one before
@@ -563,13 +529,21 @@ export function restack(
   targetId: string | null,
 ): BoardStructure {
   const known = new Set(cardIds);
-  const before = (from: BoardStructure, id: string) =>
-    (from.cards[id]?.dependsOn ?? []).find((dependency) => known.has(dependency.id))?.id ?? null;
-  const placeAfter = (from: BoardStructure, id: string, after: string | null): BoardStructure => ({
+  const edge = (from: BoardStructure, id: string) =>
+    (from.cards[id]?.dependsOn ?? []).find((dependency) => known.has(dependency.id));
+  const before = (from: BoardStructure, id: string) => edge(from, id)?.id ?? null;
+  // The moved card's edge is the hire's doing; a neighbour that only closes the gap keeps whoever
+  // put it there — a PM's or the buddy's pile does not turn into the hire's because a card left it.
+  const placeAfter = (
+    from: BoardStructure,
+    id: string,
+    after: string | null,
+    source = edge(from, id)?.source ?? "HIRE",
+  ): BoardStructure => ({
     ...from,
     cards: {
       ...from.cards,
-      [id]: { ...from.cards[id], dependsOn: after ? [{ id: after, source: "HIRE" }] : [] },
+      [id]: { ...from.cards[id], dependsOn: after ? [{ id: after, source }] : [] },
     },
   });
 
@@ -589,7 +563,7 @@ export function restack(
       next = placeAfter(next, other, cardId);
   }
 
-  return placeAfter(next, cardId, targetId);
+  return placeAfter(next, cardId, targetId, "HIRE");
 }
 
 /** Whether `from` already waits on `target`, directly or through other cards. */

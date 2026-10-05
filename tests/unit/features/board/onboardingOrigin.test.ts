@@ -3,7 +3,6 @@ import {
   onboardingOrigin,
   withOnboardingPlace,
 } from "../../../../src/features/board/layout/onboardingOrigin";
-import { expectRecap } from "../../../../src/features/board/layout/phaseRecaps";
 import { setOnboardingPlace } from "../../../../src/features/onboarding/onboardingPlace";
 
 afterEach(() => setOnboardingPlace(null));
@@ -29,15 +28,5 @@ describe("the step a card kept during onboarding belongs to", () => {
 
     expect(withOnboardingPlace("/onboarding#:~:text=ssh")).toBe("/onboarding?phase=p1#:~:text=ssh");
     expect(withOnboardingPlace("/knowledge#:~:text=ssh")).toBe("/knowledge#:~:text=ssh");
-  });
-
-  it("is the phase of a recap just asked for, once, wherever it is kept", () => {
-    expectRecap("p1", "Setup");
-
-    expect(onboardingOrigin("/board")).toEqual({
-      url: "/onboarding?phase=p1",
-      label: "Recap of Setup",
-    });
-    expect(onboardingOrigin("/board")).toBeNull();
   });
 });

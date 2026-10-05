@@ -1,6 +1,5 @@
 import { onboardingPlace, onboardingPlaceUrl } from "../../onboarding/onboardingPlace";
 import type { CardOrigin } from "./cardOrigins";
-import { takeRecapOrigin } from "./phaseRecaps";
 
 /** Whether an in-app path is the Onboarding page, with or without a step after it. */
 function isOnboardingPath(pathname: string): boolean {
@@ -14,14 +13,8 @@ function isOnboardingPath(pathname: string): boolean {
  * a step is open is the case it exists for. Without it such a card is tied to nothing, and the board
  * can only ever file it under Now. Null anywhere else in the app: a note kept from a chat about a
  * step is not thereby *in* the step, and guessing would be worse than saying nothing.
- *
- * The one exception is a recap the board just asked the buddy for (`phaseRecaps.ts`): that is about
- * a phase wherever the hire happens to be when they keep it.
  */
 export function onboardingOrigin(pathname: string): CardOrigin | null {
-  const recap = takeRecapOrigin();
-  if (recap) return recap;
-
   if (!isOnboardingPath(pathname)) return null;
 
   const place = onboardingPlace();

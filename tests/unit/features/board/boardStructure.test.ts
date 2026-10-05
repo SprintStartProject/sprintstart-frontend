@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  clearHireDependencies,
   currentStage,
   deriveCardStates,
   isCardDone,
@@ -164,12 +163,11 @@ describe("currentStage", () => {
     const done = checklist("done", [{ text: "one", done: true }]);
     const later = checklist("later", [{ text: "two", done: false }]);
 
-    const states = deriveCardStates(
-      [done, later],
-      structure({ done: { stage: "NOW" }, later: { stage: "LATER" } }),
+    const states = deriveCardStates([done, later], structure({}), (card) =>
+      card.id === "later" ? "BEHIND" : "NOW",
     );
 
-    expect(currentStage(states)).toBe("LATER");
+    expect(currentStage(states)).toBe("BEHIND");
   });
 
   it("stays on a stage whose only open card is blocked", () => {
@@ -321,20 +319,9 @@ describe("who put a card behind another one", () => {
     ]);
   });
 
-  it("clears the hire's own edges and leaves the team's", () => {
-    const both = structure({
-      b: { dependsOn: [{ id: "a", source: "TEAM" }, ...after("c")] },
-    });
-
-    expect(clearHireDependencies(both, "b").cards.b?.dependsOn).toEqual([
-      { id: "a", source: "TEAM" },
-    ]);
-  });
-
   it("lets a buddy's link go, because a suggestion is not a rule", () => {
     const suggested = structure({ b: { dependsOn: [{ id: "a", source: "BUDDY" }] } });
 
-    expect(clearHireDependencies(suggested, "b").cards.b?.dependsOn).toEqual([]);
     expect(setDependency(suggested, "b", "a", false).cards.b?.dependsOn).toEqual([]);
   });
 });
@@ -342,6 +329,20 @@ describe("who put a card behind another one", () => {
 describe("restack", () => {
   const ids = ["a", "b", "c", "d"];
   const under = (from: BoardStructure, id: string) => from.cards[id]?.dependsOn?.[0]?.id ?? null;
+
+  it("leaves a neighbour's edge with whoever put it there", () => {
+    // A team pile a ← b ← c; the hire takes b out. c closes the gap onto a, still the team's.
+    const team = structure({
+      b: { dependsOn: [{ id: "a", source: "TEAM" }] },
+      c: { dependsOn: [{ id: "b", source: "TEAM" }] },
+    });
+    const next = restack(team, ids, "b", null);
+
+    expect(next.cards.c?.dependsOn).toEqual([{ id: "a", source: "TEAM" }]);
+    expect(next.cards.b?.dependsOn).toEqual([]);
+    expect(restack(team, ids, "d", "a").cards.d?.dependsOn).toEqual([{ id: "a", source: "HIRE" }]);
+    expect(restack(team, ids, "d", "a").cards.b?.dependsOn).toEqual([{ id: "d", source: "TEAM" }]);
+  });
 
   it("puts a card directly under another, and what lay under that one under it", () => {
     let piled = restack(EMPTY, ids, "b", "a");

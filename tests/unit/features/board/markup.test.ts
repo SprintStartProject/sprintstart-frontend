@@ -10,6 +10,7 @@ import {
   stripMarks,
   toggleMark,
   unmarkPart,
+  unmarkableRanges,
 } from "../../../../src/features/board/marks/markup";
 
 describe("the highlighter, as two equals signs", () => {
@@ -129,5 +130,21 @@ describe("rubbing out part of a highlight", () => {
   it("finds the highlight a selection sits inside", () => {
     expect(enclosingMark("a ==big deal== here", "deal")).toBe("big deal");
     expect(enclosingMark("a ==big deal== here", "here")).toBeNull();
+  });
+});
+
+describe("marking inside markdown", () => {
+  it("never paints into a link target, code or a [[link]]", () => {
+    const text = "see [docs](/onboarding/docs) and `docs` and [[Setup#docs]]";
+
+    expect(toggleMark(text, "docs")).toBe(
+      "see [==docs==](/onboarding/docs) and `docs` and [[Setup#docs]]",
+    );
+    expect(toggleMark("`docs` only", "docs")).toBe("`docs` only");
+    expect(unmarkableRanges("a `b` c").length).toBe(1);
+  });
+
+  it("takes a later plain occurrence when the first one is not prose", () => {
+    expect(toggleMark("[[ssh]] then ssh again", "ssh")).toBe("[[ssh]] then ==ssh== again");
   });
 });

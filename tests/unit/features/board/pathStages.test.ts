@@ -124,24 +124,19 @@ describe("Now, Later and Behind you, read off the path", () => {
   });
 });
 
-describe("whether a card belongs to a step or a phase", () => {
+describe("whether a card belongs to a phase", () => {
   const origins: CardOrigins = {
     a: { url: "/onboarding?step=s2", label: "" },
     b: { url: "/onboarding?phase=p2", label: "" },
   };
 
-  it("matches a step only by that step", () => {
-    expect(isCardAt(note("a"), { kind: "step", id: "s2" }, phases, origins)).toBe(true);
-    expect(isCardAt(note("b"), { kind: "step", id: "s2" }, phases, origins)).toBe(false);
-  });
-
   it("counts a phase's steps as the phase", () => {
-    expect(isCardAt(note("a"), { kind: "phase", id: "p2" }, phases, origins)).toBe(true);
-    expect(isCardAt(note("b"), { kind: "phase", id: "p2" }, phases, origins)).toBe(true);
+    expect(isCardAt(note("a"), "p2", phases, origins)).toBe(true);
+    expect(isCardAt(note("b"), "p2", phases, origins)).toBe(true);
   });
 
   it("matches a phase by name only, without the path", () => {
-    expect(isCardAt(note("a"), { kind: "phase", id: "p2" }, null, origins)).toBe(false);
-    expect(isCardAt(note("b"), { kind: "phase", id: "p2" }, null, origins)).toBe(true);
+    expect(isCardAt(note("a"), "p2", null, origins)).toBe(false);
+    expect(isCardAt(note("b"), "p2", null, origins)).toBe(true);
   });
 });

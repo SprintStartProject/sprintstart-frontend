@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Layers, ListChecks, Lock, Milestone } from "lucide-react";
 import { Textarea, type TextareaProps } from "../../../components/ui/Textarea";
 import { onboardingService } from "../../../services/onboardingService";
@@ -150,9 +150,14 @@ export function StepLinkTextarea({
 
   const offered =
     open && open.start !== dismissedAt
-      ? offers.filter((offer) => titleKey(offer.title).includes(titleKey(query))).slice(0, OFFERED)
+      ? offers
+          // A title with brackets in it would close the link early; it cannot be linked by name.
+          .filter((offer) => !/[[\]]/.test(offer.link))
+          .filter((offer) => titleKey(offer.title).includes(titleKey(query)))
+          .slice(0, OFFERED)
       : [];
-  const listId = `${rest.id ?? "note"}-step-links`;
+  const fallbackId = useId();
+  const listId = `${rest.id ?? fallbackId}-step-links`;
 
   function track() {
     const element = ref.current;
@@ -184,9 +189,11 @@ export function StepLinkTextarea({
         setActive((current) => (current + step + offered.length) % offered.length);
         return;
       }
-      if (event.key === "Enter" || event.key === "Tab") {
+      const highlighted = offered[Math.min(active, offered.length - 1)];
+      // Tab is only taken when it goes somewhere: otherwise it moves focus on, as it should.
+      if (event.key === "Enter" || (event.key === "Tab" && highlighted.deeper && !event.shiftKey)) {
         event.preventDefault();
-        pick(offered[Math.min(active, offered.length - 1)], event.key === "Tab");
+        pick(highlighted, event.key === "Tab");
         return;
       }
       if (event.key === "Escape" && open) {
@@ -220,6 +227,9 @@ export function StepLinkTextarea({
         aria-autocomplete="list"
         aria-expanded={offered.length > 0}
         aria-controls={offered.length > 0 ? listId : undefined}
+        aria-activedescendant={
+          offered.length > 0 ? `${listId}-${Math.min(active, offered.length - 1)}` : undefined
+        }
       />
 
       {offered.length > 0 ? (
@@ -233,6 +243,7 @@ export function StepLinkTextarea({
             {offered.map((offer, index) => (
               <li
                 key={offer.key}
+                id={`${listId}-${index}`}
                 role="option"
                 aria-selected={index === active}
                 // `mousedown`, not `click`: a click would blur the field first and lose the caret.

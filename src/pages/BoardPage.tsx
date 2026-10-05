@@ -106,7 +106,7 @@ import {
  * **The board is now a process, not a pile.** Three things carry that, and none of them changes the
  * board's own order:
  *
- * - a *stage* per card — now or later, read off the onboarding path (`pathStages.ts`) — so the
+ * - a *stage* per card — now or behind you, read off the onboarding path (`pathStages.ts`) — so the
  *   board can say what is due rather than only what exists;
  * - a *predecessor* per card, so "read the runbook before you deploy" is a fact the board holds
  *   instead of one the hire has to remember;
@@ -541,7 +541,7 @@ export function BoardPage() {
   }
 
   /**
-   * Now and Later, read off the onboarding path — see `pathStages.ts`. Nothing on this page sets a
+   * Now and Behind you, read off the onboarding path — see `pathStages.ts`. Nothing on this page sets a
    * stage any more: the path is the one plan, and the board files its cards against it.
    */
   const { path, settled: pathSettled } = useOnboardingPath();
@@ -553,33 +553,21 @@ export function BoardPage() {
   );
 
   /**
-   * One step or phase the board was opened for: `/board?step=<id>` or `/board?phase=<id>`.
+   * The phase the board was opened for: `/board?phase=<id>`.
    *
-   * What "3 cards on your board from this step" on the Onboarding page links to. In the address
-   * rather than in router state so it survives a reload and can be opened in a second tab, and so
-   * the browser's Back goes from the narrowed board to the step it came from.
+   * What "N cards on your board from this phase" in the path card links to. In the address rather
+   * than in router state so it survives a reload and can be opened in a second tab, and so the
+   * browser's Back goes from the narrowed board to where it came from.
    */
   const [searchParams, setSearchParams] = useSearchParams();
-  const pathPlace = useMemo(() => {
-    const stepId = searchParams.get("step");
-    if (stepId) return { kind: "step" as const, id: stepId };
+  const pathPlace = searchParams.get("phase");
 
-    const phaseId = searchParams.get("phase");
-    return phaseId ? { kind: "phase" as const, id: phaseId } : null;
-  }, [searchParams]);
-
-  /** What the step or phase is called, for the line saying the board is narrowed to it. */
-  const pathPlaceTitle = useMemo(() => {
-    if (!pathPlace || !path) return null;
-
-    for (const phase of path.phases) {
-      if (pathPlace.kind === "phase" && phase.id === pathPlace.id) return phase.title;
-      const step = (phase.steps ?? []).find((candidate) => candidate.id === pathPlace.id);
-      if (pathPlace.kind === "step" && step) return step.title;
-    }
-
-    return null;
-  }, [path, pathPlace]);
+  /** What the phase is called, for the line saying the board is narrowed to it. */
+  const pathPlaceTitle = useMemo(
+    () =>
+      pathPlace ? (path?.phases.find((phase) => phase.id === pathPlace)?.title ?? null) : null,
+    [path, pathPlace],
+  );
 
   const { states, stackOnto } = useBoardStructure(boardId, allCards, stageOf);
 
@@ -747,6 +735,36 @@ export function BoardPage() {
     );
   }
 
+  /**
+   * "Behind you" opens when cards move into it while the hire is looking.
+   *
+   * It arrives folded, but a phase finished in the dock (or on the Onboarding page in another tab)
+   * moves its cards there under the hire's eyes, and a band that silently swallows them reads as the
+   * cards being gone. So the cards already behind when the path was first read are noted, and any
+   * card joining them later unfolds the band once. Folding it again is the hire's call and sticks.
+   */
+  const behindKey = pathSettled
+    ? allCards
+        .filter((card) => states.get(card.id)?.stage === "BEHIND")
+        .map((card) => card.id)
+        .sort()
+        .join("|")
+    : null;
+  const [knownBehind, setKnownBehind] = useState<{ boardId: string; key: string } | null>(null);
+
+  if (
+    board &&
+    behindKey !== null &&
+    (knownBehind?.boardId !== boardId || knownBehind.key !== behindKey)
+  ) {
+    const sameBoard = knownBehind?.boardId === boardId;
+    const before = new Set(sameBoard ? knownBehind.key.split("|") : []);
+    setKnownBehind({ boardId, key: behindKey });
+    if (sameBoard && behindKey.split("|").some((id) => id && !before.has(id))) {
+      setOpenStages((current) => new Set([...current, "BEHIND"]));
+    }
+  }
+
   function toggleStage(stage: BoardStage) {
     setOpenStages((current) => {
       const next = new Set(current);
@@ -803,7 +821,7 @@ export function BoardPage() {
   }
 
   /**
-   * The cards on screen: the step the board was opened for, then the owner filter, then the
+   * The cards on screen: the phase the board was opened for, then the owner filter, then the
    * section, then the focus view.
    *
    * Pinned last and stably, so pinning one card lifts that card and disturbs nothing else. A
@@ -814,7 +832,7 @@ export function BoardPage() {
    * matters to me now*, and a mode that overrode it would be the board arguing with them.
    */
   const shownCards = useMemo(() => {
-    // The step or phase the board was opened for, first: it is the narrowest question anybody asks
+    // The phase the board was opened for, first: it is the narrowest question anybody asks
     // of this page, and the other cuts still apply within it.
     // Piles fold first, so every later cut sees one card where there is one pile.
     const folded = collapseStacks(allCards, stacks, openStackIds);
@@ -864,13 +882,7 @@ export function BoardPage() {
     if (piled > 0) cuts.push(`${piled} under other cards in piles`);
 
     if (pathPlace) {
-      cuts.push(
-        pathPlaceTitle
-          ? `From “${pathPlaceTitle}”`
-          : pathPlace.kind === "step"
-            ? "From one step"
-            : "From one phase",
-      );
+      cuts.push(pathPlaceTitle ? `From “${pathPlaceTitle}”` : "From one phase");
     }
 
     const cut = filterLabel(filter);

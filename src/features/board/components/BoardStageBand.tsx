@@ -23,7 +23,7 @@ type BoardStageBandProps = {
  * twenty-eight cards off the screen and left a number behind, so a hire looking at six cards had to
  * trust that the rest were somewhere. A band is a *fold*: everything the board holds is on the page,
  * named, counted, and one click from being read. The same six cards are in front of them and the
- * other twenty-eight are visibly filed under "Later" rather than gone.
+ * others are visibly filed under "Behind you" rather than gone.
  *
  * That is also the shape the customer asked for. A notebook does not hide the sections you are not
  * reading; it puts them in order and lets you open one. The section bar above does that for areas —

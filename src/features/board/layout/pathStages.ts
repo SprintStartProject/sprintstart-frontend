@@ -13,19 +13,18 @@ import type { BoardStage } from "./boardStructure";
  * looked at. The path already knows where somebody stands: which phase is open, which ones come
  * after it. So the board asks the path instead of asking the hire.
  *
- * **Later means "belongs to a phase you cannot start yet"** — one still waiting on another phase —
- * and **Behind you** means "belongs to a phase you have finished"; everything else is Now. That is
- * the Onboarding page's own reading of a phase (`phaseState` in `journey.ts`): phases are not a
- * queue, several can be open at once, and the one the hire is working in need not be the lowest. A card is tied to
- * a phase through its origin: the live step card names its step, and a card kept while a step or a
- * phase was open on the Onboarding page carries it as its origin (`onboardingOrigin.ts`). A card
- * tied to nothing — most notes, the current task, the
- * pull requests — is about the work in front of the hire, so it is Now. That is also why a board
+ * **Behind you means "belongs to a phase you have finished"**; everything else is Now. Later is
+ * gone: a phase not reached yet is the path's to show, and a card about it is simply on the board.
+ * "Finished" is the Onboarding page's own reading of a phase (`phaseState` in `journey.ts`): phases
+ * are not a queue, and several can be open at once. A card is tied to a phase through its origin
+ * (the live step card names its step; a card kept on the Onboarding page carries the step or phase
+ * it was kept from, see `onboardingOrigin.ts`) or through a `[[…]]` link in its text. A card tied
+ * to nothing — most notes, the current task, the pull requests — is about the work in front of the
+ * hire, so it is Now. That is also why a board
  * with no path reads as a single band, which the grid does not draw: no path, no ramp.
  *
  * Derived on every render rather than stored, for the same reason "blocked" is: the moment the hire
- * finishes a phase, the cards that were waiting for the next one move up without anybody touching
- * them.
+ * finishes a phase, its cards move behind them without anybody touching them.
  */
 export type PathStages = (card: BoardCard) => BoardStage;
 
@@ -51,11 +50,7 @@ export type PathPhases = {
 };
 
 /**
- * Reads the path once into the lookups a card's stage needs.
- *
- * "Ahead" is every phase the Onboarding page shows as locked. It used to be every open phase after
- * the first open one by position — which filed a phase the hire was already working in under Later
- * whenever an earlier one was still open beside it.
+ * Reads the path once into the lookups a card's stage and its `[[…]]` links need.
  */
 export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
   const phases = [...path.phases].sort((left, right) => left.position - right.position);
@@ -135,7 +130,12 @@ export function placeOfUrl(url: string): PathPlace | null {
   const segments = parsed.pathname.split("/").filter(Boolean);
   if (segments[0] !== "onboarding") return null;
 
-  const stepId = segments[1] ? decodeURIComponent(segments[1]) : parsed.searchParams.get("step");
+  let stepId: string | null;
+  try {
+    stepId = segments[1] ? decodeURIComponent(segments[1]) : parsed.searchParams.get("step");
+  } catch {
+    return null;
+  }
   if (stepId) return { kind: "step", id: stepId };
 
   const questionId = parsed.searchParams.get("question");
@@ -195,20 +195,37 @@ export type ResolvedLink = { phaseId: string; stepId: string | null; task: strin
  * phase does not have.
  */
 export function resolveLink(text: string, phases: PathPhases): ResolvedLink | null {
-  const parts = text.split("#").map((part) => part.trim());
+  const trimmed = text.trim();
+  // Titles may contain `#` themselves ("C# basics"), so every `#` is only a candidate separator: try
+  // the splits from the left and take the first one whose parts are all on the path.
+  const cuts = [...trimmed.matchAll(/#/g)].map((match) => match.index);
+  const head = (end: number) => trimmed.slice(0, end).trim();
 
-  const phaseId = phases.phaseByTitle.get(titleKey(parts[0] ?? ""));
-  if (phaseId) {
-    if (!parts[1]) return { phaseId, stepId: null, task: null };
+  for (const cut of [...cuts, trimmed.length]) {
+    const phaseId = phases.phaseByTitle.get(titleKey(head(cut)));
+    if (!phaseId) continue;
+    if (cut === trimmed.length) return { phaseId, stepId: null, task: null };
 
-    const stepId = phases.stepInPhase.get(`${phaseId}|${titleKey(parts[1])}`);
-    return stepId ? { phaseId, stepId, task: parts[2] || null } : null;
+    const rest = trimmed.slice(cut + 1);
+    const restCuts = [...[...rest.matchAll(/#/g)].map((match) => match.index), rest.length];
+    for (const stepCut of restCuts) {
+      const stepId = phases.stepInPhase.get(
+        `${phaseId}|${titleKey(rest.slice(0, stepCut).trim())}`,
+      );
+      if (stepId) return { phaseId, stepId, task: rest.slice(stepCut + 1).trim() || null };
+    }
   }
 
-  const stepId = phases.stepByTitle.get(titleKey(parts[0] ?? ""));
-  const stepPhase = stepId ? phases.phaseOfStep.get(stepId) : undefined;
+  // Written before phases came first: `[[Step]]` or `[[Step#Task]]`.
+  for (const cut of [...cuts, trimmed.length]) {
+    const stepId = phases.stepByTitle.get(titleKey(head(cut)));
+    const stepPhase = stepId ? phases.phaseOfStep.get(stepId) : undefined;
+    if (stepId && stepPhase) {
+      return { phaseId: stepPhase, stepId, task: trimmed.slice(cut + 1).trim() || null };
+    }
+  }
 
-  return stepId && stepPhase ? { phaseId: stepPhase, stepId, task: parts[1] || null } : null;
+  return null;
 }
 
 /** Everything on the path a note links to, `[[…]]` first and the buddy's app links after. */
@@ -256,29 +273,25 @@ export function phaseOfCard(
 }
 
 /**
- * Whether a card belongs to one step, or to one phase.
+ * Whether a card belongs to one phase — what "cards on your board from this phase" counts.
  *
  * A phase holds what was kept from any of its steps as well as what was kept about the phase itself.
  * Without the path a phase can only be matched by name — a card kept while the phase was open — and
- * a card kept from one of its steps is not counted, which undercounts rather than guessing.
+ * a card kept from one of its steps is not counted, which undercounts rather than guessing. The live
+ * step card is never counted: it is the path itself, not something the hire kept from it.
  */
 export function isCardAt(
   card: BoardCard,
-  place: { kind: "step" | "phase"; id: string },
+  phaseId: string,
   phases: PathPhases | null,
   origins: CardOrigins,
 ): boolean {
-  if (place.kind === "step") {
-    return (
-      stepOfCard(card, origins) === place.id ||
-      (phases !== null && linkedSteps(card, phases).includes(place.id))
-    );
-  }
-  if (phases) return phaseOfCard(card, phases, origins) === place.id;
+  if (card.content.kind === "PATH_STEP") return false;
+  if (phases) return phaseOfCard(card, phases, origins) === phaseId;
 
   const url = origins[card.id]?.url;
   const at = url ? placeOfUrl(url) : null;
-  return at?.kind === "phase" && at.id === place.id;
+  return at?.kind === "phase" && at.id === phaseId;
 }
 
 /** The stage of every card on a board, given its path (or none) and where its cards came from. */

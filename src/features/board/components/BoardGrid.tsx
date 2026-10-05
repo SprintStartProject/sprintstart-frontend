@@ -681,6 +681,14 @@ export function BoardGrid({
   /** The card a dragged one would be piled under if let go now — see `handleDrag`. */
   const [pileTargetId, setPileTargetId] = useState<string | null>(null);
   const pileTargetRef = useRef<string | null>(null);
+  /** Whether piling onto the lit card takes the dragged one into another area — said on the label. */
+  const [pileMovesArea, setPileMovesArea] = useState(false);
+  /**
+   * Lights the pile target once the dragged card has rested long enough, even when the pointer holds
+   * perfectly still: drag events only arrive while it moves, so counting on them alone left a hire
+   * who stopped and waited with nothing happening.
+   */
+  const pileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The card and the part of it the dragged card has been resting on, and since when. */
   const restingRef = useRef<{ id: string; zone: "middle" | "edge"; since: number } | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -711,6 +719,30 @@ export function BoardGrid({
    */
   const ids = useMemo(() => boardOrder ?? shownIds, [boardOrder, shownIds]);
 
+  /**
+   * {@link moveTo}, but a closed pile travels whole.
+   *
+   * A closed pile is drawn as its top card, so moving that card is — to the hire — moving the pile.
+   * Moving only the one card would scatter the others through the order behind it, and the pile
+   * would open later with its cards strewn across the board.
+   */
+  const reorder = useCallback(
+    (cardId: string, targetId: string): string[] => {
+      const pile = stacks?.get(cardId);
+      if (!pile || expandedStackIds?.has(pile.rootId)) return moveTo(ids, cardId, targetId);
+
+      const members = new Set(pile.memberIds);
+      if (members.has(targetId)) return ids;
+
+      const moved = moveTo(ids, cardId, targetId).filter((id) => id === cardId || !members.has(id));
+      const at = moved.indexOf(cardId);
+      const block = pile.memberIds.filter((id) => ids.includes(id));
+
+      return [...moved.slice(0, at), ...block, ...moved.slice(at + 1)];
+    },
+    [expandedStackIds, ids, stacks],
+  );
+
   const move = onReorder
     ? (cardId: string, direction: "up" | "down") => {
         // Stepped through what is *shown*: the neighbour a hire means by "up" is the card above
@@ -721,7 +753,7 @@ export function BoardGrid({
 
         // Anchored on that neighbour rather than swapped by index, so the step means the same
         // thing whether or not there are hidden cards between the two.
-        onReorder(moveTo(ids, cardId, shownIds[to]));
+        onReorder(reorder(cardId, shownIds[to]));
       }
     : undefined;
 
@@ -781,11 +813,32 @@ export function BoardGrid({
    * a pointer that is still moving — and it is the pointer's own position that counts, not the
    * card's, because that is where the hire is looking when they let go.
    */
+  const clearPileTarget = useCallback(() => {
+    if (pileTimer.current) clearTimeout(pileTimer.current);
+    pileTimer.current = null;
+    if (pileTargetRef.current) {
+      pileTargetRef.current = null;
+      setPileTargetId(null);
+    }
+  }, []);
+
+  const lightPileTarget = useCallback(
+    (draggedId: string, candidateId: string) => {
+      if (pileTargetRef.current === candidateId) return;
+      pileTargetRef.current = candidateId;
+      setPileTargetId(candidateId);
+      setPileMovesArea(groupOf(groups, draggedId)?.id !== groupOf(groups, candidateId)?.id);
+    },
+    [groups],
+  );
+
+  useEffect(() => clearPileTarget, [clearPileTarget]);
+
   const handleCardDrop = useCallback(
     (cardId: string, point: { x: number; y: number }) => {
       const target = pileTargetRef.current;
-      pileTargetRef.current = null;
-      setPileTargetId(null);
+      clearPileTarget();
+      restingRef.current = null;
 
       // Let go over the middle of another card: the two become a pile. See `handleDrag`.
       if (target && target !== cardId && onStackOnto) {
@@ -814,7 +867,7 @@ export function BoardGrid({
 
       if (groupOf(groups, cardId)) onAssignGroup(cardId, null);
     },
-    [expandedStackIds, groups, onAssignGroup, onStackOnto, stacks],
+    [clearPileTarget, expandedStackIds, groups, onAssignGroup, onStackOnto, stacks],
   );
 
   /**
@@ -845,26 +898,29 @@ export function BoardGrid({
         const zone = onStackOnto && inMiddle(element, x, y) ? "middle" : "edge";
         const resting = restingRef.current;
         if (!resting || resting.id !== candidateId || resting.zone !== zone) {
+          clearPileTarget();
           restingRef.current = { id: candidateId, zone, since: now };
-          return;
-        }
-
-        if (zone === "middle") {
-          if (now - resting.since >= PILE_DWELL_MS && pileTargetRef.current !== candidateId) {
-            pileTargetRef.current = candidateId;
-            setPileTargetId(candidateId);
+          if (zone === "middle") {
+            pileTimer.current = setTimeout(() => {
+              pileTimer.current = null;
+              const still = restingRef.current;
+              if (still?.id === candidateId && still.zone === "middle")
+                lightPileTarget(id, candidateId);
+            }, PILE_DWELL_MS);
           }
           return;
         }
 
-        if (pileTargetRef.current) {
-          pileTargetRef.current = null;
-          setPileTargetId(null);
+        if (zone === "middle") {
+          if (now - resting.since >= PILE_DWELL_MS) lightPileTarget(id, candidateId);
+          return;
         }
+
+        clearPileTarget();
         if (!onReorder || now - resting.since < REORDER_DWELL_MS) return;
         if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
 
-        onReorder(moveTo(ids, id, candidateId));
+        onReorder(reorder(id, candidateId));
         lastMoveAt.current = now;
         restingRef.current = null;
         return;
@@ -872,12 +928,9 @@ export function BoardGrid({
 
       // Over nothing: whatever was about to happen is off.
       restingRef.current = null;
-      if (pileTargetRef.current) {
-        pileTargetRef.current = null;
-        setPileTargetId(null);
-      }
+      clearPileTarget();
     },
-    [ids, onReorder, onStackOnto],
+    [clearPileTarget, lightPileTarget, onReorder, onStackOnto, reorder],
   );
 
   /**
@@ -1018,7 +1071,7 @@ export function BoardGrid({
    * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
    * this exists for — one set somebody wrote in one sitting, deliberately spread across the
    * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
-   * "Now" around cards marked Later, and splitting it across the bands would take a thing with a
+   * "Now" around cards already behind the hire, and splitting it across the bands would take a thing with a
    * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
    * the same fold, one level in.
    *
@@ -1171,6 +1224,7 @@ export function BoardGrid({
         isArranging={isArranging}
         isDragging={draggingId === card.id}
         isPileTarget={pileTargetId === card.id}
+        pileMovesArea={pileMovesArea}
         isWiggling={isArranging && !reduceMotion && hoveredId !== card.id && draggingId !== card.id}
         collapsed={collapsedIds?.has(card.id) ?? false}
         pinned={pinnedIds?.has(card.id) ?? false}
@@ -1506,6 +1560,8 @@ type BoardCardCellProps = {
   isDragging: boolean;
   /** A dragged card is resting on this one, and letting go would pile it here. */
   isPileTarget?: boolean;
+  /** Whether piling onto this card would take the dragged one into this card's area. */
+  pileMovesArea?: boolean;
   isWiggling: boolean;
   collapsed: boolean;
   pinned: boolean;
@@ -1575,6 +1631,7 @@ function BoardCardCell({
   isArranging,
   isDragging,
   isPileTarget = false,
+  pileMovesArea = false,
   isWiggling,
   collapsed,
   pinned,
@@ -1717,7 +1774,7 @@ function BoardCardCell({
           size="sm"
           value={predecessorId ?? ""}
           aria-label={`Put the ${label} card in a pile`}
-          title="Put this card under another one, so the two lie in one pile"
+          title="Put this card under another one, so the two lie in one pile. A card in another area moves into that one."
           className="max-w-40"
           onChange={(event) => onStackOnto(card.id, event.target.value || null)}
         >
@@ -1886,7 +1943,7 @@ function BoardCardCell({
         {/* Says what letting go will do, on the card it will do it to. */}
         {isPileTarget && (
           <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-app-brand px-2 py-0.5 text-xs font-medium whitespace-nowrap text-white shadow-sm">
-            Drop to pile here
+            {pileMovesArea ? "Drop to pile here, in this area" : "Drop to pile here"}
           </span>
         )}
 

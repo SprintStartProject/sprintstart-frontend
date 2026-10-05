@@ -48,7 +48,9 @@ export function splitStepLinks(text: string): LinkRun[] {
  */
 export function linkedStepIds(text: string): string[] {
   const ids: string[] = [];
-  for (const match of text.matchAll(/\/onboarding(?:\/([\w-]+)|\?(?:[^\s)#]*&)?step=([\w-]+))/g)) {
+  for (const match of text.matchAll(
+    /(?<![\w.:/-])\/onboarding(?:\/([\w-]+)|\?(?:[^\s)#]*&)?step=([\w-]+))/g,
+  )) {
     ids.push(match[1] ?? match[2]);
   }
   return ids;

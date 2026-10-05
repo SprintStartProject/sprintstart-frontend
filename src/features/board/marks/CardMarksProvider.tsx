@@ -15,6 +15,7 @@ import { addMark, enclosingMark, isMarked, unmarkPart } from "./markup";
 import { DEFAULT_HIGHLIGHT, type HighlightColor } from "./highlightColors";
 import { readMarkLabels, setMarkLabel, writeMarkLabels, type MarkLabels } from "./markLabels";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { useToastApi } from "../../../context/useToast";
 import { subscribeToBoardStorageReplaced } from "../layout/boardStorage";
 import type { BoardCard } from "../types";
 
@@ -40,6 +41,9 @@ import type { BoardCard } from "../types";
  */
 export function CardMarksProvider({ children }: { children: ReactNode }) {
   const { selectedProjectId } = useProjectContext();
+  // The stable half of the toast API: this provider sits above the whole app, and the toast list
+  // changing must not re-render it.
+  const toast = useToastApi();
 
   const [marks, setMarks] = useState<CardMarks>({});
   const [labels, setLabels] = useState<MarkLabels>({});
@@ -165,8 +169,15 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
         const next = addMark(inside ? unmarkPart(text, selected) : text, selected);
 
         // Unchanged and not already marked means the selection spans something no single run
-        // contains — a heading and the body, or two cards. Nothing to paint, so nothing is stored.
-        if (next === text && !isMarked(text, selected)) return;
+        // contains — a heading and the body, two cards, or text drawn from formatting (a bold
+        // word, a link, a step chip) in a note the buddy wrote in Markdown. Nothing to paint, so
+        // nothing is stored — and the hire is told, rather than left wondering why nothing lit.
+        if (next === text && !isMarked(text, selected)) {
+          toast.info("That can't be highlighted", {
+            description: "Try a shorter piece of plain text, without links or formatting in it.",
+          });
+          return;
+        }
         if (next !== text) board.current?.onEditCard?.(cardId, { kind: "NOTE", text: next });
       } else {
         // The same cut, on the other storage: what was around the selection keeps the colour it
@@ -176,7 +187,7 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
 
       writeColor(cardId, selected, color);
     },
-    [cardById, writeColor],
+    [cardById, toast, writeColor],
   );
 
   const unmark = useCallback(

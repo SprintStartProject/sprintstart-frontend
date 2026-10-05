@@ -8,8 +8,9 @@ import { NoteMarkdown } from "../../../../src/features/board/components/NoteMark
 import { StepLinkTextarea } from "../../../../src/features/board/components/StepLinkTextarea";
 import { BoardPathContext } from "../../../../src/features/board/hooks/boardPath";
 import {
-  isCardAt,
   leadsOntoPath,
+  linkedSteps,
+  placeOfUrl,
   pathPhases,
   pathStages,
   resolveLink,
@@ -17,6 +18,7 @@ import {
 import {
   completeLink,
   deepenLink,
+  linkedStepIds,
   linkedTitles,
   openLinkBefore,
   splitStepLinks,
@@ -103,11 +105,43 @@ describe("[[Phase#Step]] links in a note", () => {
   it("tie the note to what they name, and the buddy's app links count too", () => {
     const linked = note("n", "Ask Sam before [[Ship#open your first pr]]");
 
-    expect(isCardAt(linked, { kind: "step", id: "s2" }, phases, {})).toBe(true);
+    expect(linkedSteps(linked, phases)).toContain("s2");
     expect(pathStages(phases, {})(note("old", "[[Setup]]"))).toBe("BEHIND");
-    expect(
-      isCardAt(note("u", "Try [#3](/onboarding?step=s2)"), { kind: "step", id: "s2" }, phases, {}),
-    ).toBe(true);
+    expect(linkedSteps(note("u", "Try [#3](/onboarding?step=s2)"), phases)).toContain("s2");
+  });
+
+  it("only count the app's own paths, not another site's /onboarding", () => {
+    expect(linkedStepIds("[x](https://example.com/onboarding/s2) and /docs/onboarding/s1")).toEqual(
+      [],
+    );
+    expect(linkedStepIds("see /onboarding/s1 or [y](/onboarding?step=s2)")).toEqual(["s1", "s2"]);
+  });
+
+  it("survive a malformed step id instead of throwing", () => {
+    expect(placeOfUrl("/onboarding/%E0%A4%A")).toBeNull();
+  });
+
+  it("resolve titles that have a # in them", () => {
+    const sharp = pathPhases({
+      id: "path",
+      phases: [
+        {
+          id: "p1",
+          title: "C# basics",
+          position: 1,
+          steps: [{ id: "s1", title: "Learn F# too", status: "WAITING", position: 0 }],
+          questions: [],
+        },
+      ],
+    } as unknown as OnboardingPathEndpoint);
+
+    expect(resolveLink("C# basics", sharp)).toEqual({ phaseId: "p1", stepId: null, task: null });
+    expect(resolveLink("C# basics#Learn F# too#Read #1", sharp)).toEqual({
+      phaseId: "p1",
+      stepId: "s1",
+      task: "Read #1",
+    });
+    expect(resolveLink("Learn F# too", sharp)).toEqual({ phaseId: "p1", stepId: "s1", task: null });
   });
 
   it("are completed, or gone into, from what is typed after [[", () => {

@@ -244,7 +244,7 @@ describe("the stage bands", () => {
     render(
       <BoardGrid
         board={twoStages()}
-        states={states("NOW", "LATER")}
+        states={states("NOW", "BEHIND")}
         openStages={new Set<BoardStage>(["NOW"])}
         onToggleStage={vi.fn()}
       />,
@@ -252,7 +252,7 @@ describe("the stage bands", () => {
 
     // The heading still says what is filed under it — a fold is not a disappearance, which is the
     // whole difference between this and the focus mode it replaced.
-    const later = screen.getByRole("button", { name: /later/i });
+    const later = screen.getByRole("button", { name: /behind you/i });
     expect(later).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Fix the flaky login test")).toBeInTheDocument();
   });
@@ -276,8 +276,8 @@ describe("the stage bands", () => {
       <BoardGrid
         board={twoStages()}
         groups={[{ id: "g1", name: "From your team", cardIds: ["c0", "c1"], collapsed: false }]}
-        states={states("NOW", "LATER")}
-        openStages={new Set<BoardStage>(["NOW", "LATER"])}
+        states={states("NOW", "BEHIND")}
+        openStages={new Set<BoardStage>(["NOW", "BEHIND"])}
         onToggleStage={vi.fn()}
       />,
     );
@@ -287,14 +287,14 @@ describe("the stage bands", () => {
     // heading of its own.
     expect(screen.getByText("From your team")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^now/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /later/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /behind you/i })).toBeInTheDocument();
   });
 
   it("lays the board out flat while it is being arranged", () => {
     render(
       <BoardGrid
         board={twoStages()}
-        states={states("NOW", "LATER")}
+        states={states("NOW", "BEHIND")}
         openStages={new Set<BoardStage>(["NOW"])}
         onToggleStage={vi.fn()}
         isArranging

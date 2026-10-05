@@ -989,12 +989,13 @@ export function useBuddyConversation(
        */
       //
       // Any tool, not only `place_card`: the backend grows tools faster than this list follows,
-      // and a board or a path that changed mid-answer and then waited for a manual refresh is the
-      // one thing the hire notices. A re-read after a turn that only *read* something costs one
-      // request; a missed one costs the hire's trust in what the board shows.
+      // and a board that changed mid-answer and then waited for a manual refresh is the one thing
+      // the hire notices. A re-read after a turn that only *read* something costs one request; a
+      // missed one costs the hire's trust in what the board shows. The board only — the path's
+      // "changed" signal stays for confirmed path actions, because the pages that listen to it
+      // refetch whole steps and say so when that fails.
       const syncBoardIfTouched = () => {
         if (touched.board || touched.any) invalidateBoard();
-        if (touched.any) announceBuddyPathChanged();
       };
 
       try {

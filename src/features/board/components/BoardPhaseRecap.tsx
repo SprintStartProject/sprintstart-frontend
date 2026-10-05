@@ -5,7 +5,7 @@ import { useFocusMode } from "../../../context/useFocusMode";
 import { openAiBuddy } from "../../buddy/aiBuddyBus";
 import { isPhaseOpen } from "../../onboarding/activePhase";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
-import { expectRecap, readOfferedRecaps, writeOfferedRecaps } from "../layout/phaseRecaps";
+import { readOfferedRecaps, writeOfferedRecaps } from "../layout/phaseRecaps";
 
 type BoardPhaseRecapProps = {
   boardId: string;
@@ -55,9 +55,8 @@ export function BoardPhaseRecap({ boardId, path }: BoardPhaseRecapProps) {
 
   function ask() {
     if (!latest) return;
-    expectRecap(latest.id, latest.title);
     openAiBuddy({
-      draft: `I just finished the phase “${latest.title}”. Give me a short recap I can keep: what it covered, the few things I should remember, and anything on my board from it.`,
+      draft: `I just finished the phase “${latest.title}”. Give me a short recap I can keep: what it covered, the few things I should remember, and anything on my board from it. Start it with [[${latest.title}]] so the recap links back to the phase.`,
     });
     settle();
   }

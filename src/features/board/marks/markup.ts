@@ -147,6 +147,31 @@ export function unmarkPart(text: string, selected: string): string {
 }
 
 /**
+ * The parts of a note's source that are not prose a person reads: Markdown link targets
+ * (`](…)`), inline code, code fences, `[[…]]` links and bare app paths. A highlight placed inside
+ * one of these would change what a link points at — `/==onboarding==?step=…` is a link to nothing —
+ * while highlighting nothing anybody can see, so {@link toggleMark} never looks there.
+ *
+ * Half-open `[start, end)` ranges into the source.
+ */
+export function unmarkableRanges(text: string): [number, number][] {
+  const ranges: [number, number][] = [];
+  const patterns = [
+    /```[\s\S]*?(?:```|$)/g,
+    /`[^`\n]*`/g,
+    /\]\([^)\n]*\)/g,
+    /\[\[[^[\]\n]*\]\]/g,
+    /(?:https?:\/\/|(?<![\w/])\/)[^\s)\]]+/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      ranges.push([match.index, match.index + match[0].length]);
+    }
+  }
+  return ranges;
+}
+
+/**
  * Puts `==` around one occurrence of `selected`, or takes them off again when it is already marked.
  *
  * Matched by *text* rather than by position, because the position the hire selected is a position in
@@ -168,14 +193,20 @@ export function toggleMark(text: string, selected: string): string {
   if (text.includes(marked)) return text.replace(marked, needle);
 
   // Only outside an existing mark: wrapping a word that is already inside a highlight would nest
-  // one pair inside another, and the parser reads the first closing `==` it finds.
+  // one pair inside another, and the parser reads the first closing `==` it finds. And only in
+  // prose: never inside a link target, code or a `[[…]]` — see `unmarkableRanges`.
+  const blocked = unmarkableRanges(text);
+  const isFree = (start: number) =>
+    !blocked.some(([from, to]) => start < to && start + needle.length > from);
+
   let offset = 0;
   for (const run of splitMarks(text)) {
     if (!run.marked) {
-      const at = run.text.indexOf(needle);
-      if (at !== -1) {
+      for (let at = run.text.indexOf(needle); at !== -1; at = run.text.indexOf(needle, at + 1)) {
         const start = offset + at;
-        return `${text.slice(0, start)}${marked}${text.slice(start + needle.length)}`;
+        if (isFree(start)) {
+          return `${text.slice(0, start)}${marked}${text.slice(start + needle.length)}`;
+        }
       }
     }
     // Marked runs sit between two delimiters in the source, so stepping over one costs both.
