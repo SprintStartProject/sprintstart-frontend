@@ -1068,7 +1068,8 @@ export function BoardGrid({
         onTogglePinned={onTogglePinned}
         allCards={board.cards}
         state={states?.get(card.id)}
-        onStackOnto={onStackOnto}
+        // Piling is rearranging, so it is offered where the rest of rearranging is: in plan mode.
+        onStackOnto={isArranging ? onStackOnto : undefined}
         onDrop={handleCardDrop}
         onMove={move}
         onDismiss={onDismiss}
@@ -1596,8 +1597,7 @@ function BoardCardCell({
       pinned,
       accent: cardAccent(card.content.kind),
       state,
-      // The pile this card lies in, in both modes: piling is tidying, not planning, and somebody
-      // reading the board is the person who notices two cards belong together.
+      // The pile this card lies in. Only while the board is being planned — see where it is passed.
       pilePicker: onStackOnto ? (
         <Select
           size="sm"
