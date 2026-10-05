@@ -70,6 +70,33 @@ const TWO_COLUMN_QUERY = "(min-width: 1024px)";
 const MOVE_COOLDOWN_MS = 160;
 
 /**
+ * How long a dragged card has to rest over the middle of another before letting go piles it there.
+ *
+ * Long enough that passing over a card on the way somewhere else never does it, short enough that
+ * somebody who means it does not feel the board hesitating. The edge of a card still moves cards
+ * aside the way it always did — after {@link REORDER_DWELL_MS}, so the middle is reachable at all.
+ */
+const PILE_DWELL_MS = 350;
+
+/**
+ * How long a dragged card rests over the edge of another before the two trade places.
+ *
+ * Reordering used to be instant, which made the middle of a card unreachable: the card moved aside
+ * the moment its edge was touched. A beat is enough to tell "passing through" from "this is the
+ * place".
+ */
+const REORDER_DWELL_MS = 120;
+
+/** Whether a point is in the middle of an element — the half of it, either way, around its centre. */
+function inMiddle(element: HTMLElement, x: number, y: number): boolean {
+  const rect = element.getBoundingClientRect();
+  const dx = Math.abs(x - (rect.left + rect.width / 2));
+  const dy = Math.abs(y - (rect.top + rect.height / 2));
+
+  return dx <= rect.width / 4 && dy <= rect.height / 4;
+}
+
+/**
  * The tilt that says "this can be moved".
  *
  * Under a degree, and every card starts at a different point in the cycle, so the board shimmers
@@ -633,6 +660,11 @@ export function BoardGrid({
   const groupElements = useRef(new Map<string, HTMLElement>());
   const lastMoveAt = useRef(0);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  /** The card a dragged one would be piled under if let go now — see `handleDrag`. */
+  const [pileTargetId, setPileTargetId] = useState<string | null>(null);
+  const pileTargetRef = useRef<string | null>(null);
+  /** The card and the part of it the dragged card has been resting on, and since when. */
+  const restingRef = useRef<{ id: string; zone: "middle" | "edge"; since: number } | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   /**
    * A card the pile was opened *for*, to be brought into view once it is on the board.
@@ -733,9 +765,26 @@ export function BoardGrid({
    */
   const handleCardDrop = useCallback(
     (cardId: string, point: { x: number; y: number }) => {
-      if (!onAssignGroup) return;
+      const target = pileTargetRef.current;
+      pileTargetRef.current = null;
+      setPileTargetId(null);
+
+      // Let go over the middle of another card: the two become a pile. See `handleDrag`.
+      if (target && target !== cardId && onStackOnto) {
+        onStackOnto(cardId, target);
+        return;
+      }
 
       const { x, y } = toViewport(point);
+
+      // Dragged out of an open pile and let go anywhere outside it: it leaves the pile.
+      const pile = stacks?.get(cardId);
+      if (pile && onStackOnto && expandedStackIds?.has(pile.rootId)) {
+        const frame = document.querySelector(`[data-stack-root="${CSS.escape(pile.rootId)}"]`);
+        if (frame instanceof HTMLElement && !contains(frame, x, y)) onStackOnto(cardId, null);
+      }
+
+      if (!onAssignGroup) return;
 
       for (const [groupId, element] of groupElements.current) {
         if (contains(element, x, y)) {
@@ -747,28 +796,70 @@ export function BoardGrid({
 
       if (groupOf(groups, cardId)) onAssignGroup(cardId, null);
     },
-    [groups, onAssignGroup],
+    [expandedStackIds, groups, onAssignGroup, onStackOnto, stacks],
   );
 
+  /**
+   * What a dragged card is over, every frame, and what letting go there would do.
+   *
+   * Two things a drag can mean, told apart by *where* on the other card it rests:
+   *
+   * - **Its edge** — the two trade places, as dragging always did, after a beat
+   *   ({@link REORDER_DWELL_MS}).
+   * - **Its middle** — after a longer rest ({@link PILE_DWELL_MS}) the card underneath lights up,
+   *   and letting go puts the dragged card into a pile under it. Nothing moves aside while it is
+   *   lit, so the target stays where the pointer is.
+   *
+   * In plan mode and outside it alike: tidying two cards into one pile is something a person
+   * reading the board notices they want, and the grip is there in both.
+   */
   const handleDrag = useCallback(
     (id: string) => {
       const dragged = elements.current.get(id);
-      if (!dragged || !onReorder) return;
-
-      const now = performance.now();
-      if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
+      if (!dragged) return;
 
       const { x, y } = centerOf(dragged);
+      const now = performance.now();
 
       for (const [candidateId, element] of elements.current) {
-        if (candidateId !== id && contains(element, x, y)) {
-          onReorder(moveTo(ids, id, candidateId));
-          lastMoveAt.current = now;
+        if (candidateId === id || !contains(element, x, y)) continue;
+
+        const zone = onStackOnto && inMiddle(element, x, y) ? "middle" : "edge";
+        const resting = restingRef.current;
+        if (!resting || resting.id !== candidateId || resting.zone !== zone) {
+          restingRef.current = { id: candidateId, zone, since: now };
           return;
         }
+
+        if (zone === "middle") {
+          if (now - resting.since >= PILE_DWELL_MS && pileTargetRef.current !== candidateId) {
+            pileTargetRef.current = candidateId;
+            setPileTargetId(candidateId);
+          }
+          return;
+        }
+
+        if (pileTargetRef.current) {
+          pileTargetRef.current = null;
+          setPileTargetId(null);
+        }
+        if (!onReorder || now - resting.since < REORDER_DWELL_MS) return;
+        if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
+
+        onReorder(moveTo(ids, id, candidateId));
+        lastMoveAt.current = now;
+        restingRef.current = null;
+        return;
+      }
+
+      // Over nothing: whatever was about to happen is off.
+      restingRef.current = null;
+      if (pileTargetRef.current) {
+        pileTargetRef.current = null;
+        setPileTargetId(null);
       }
     },
-    [ids, onReorder],
+    [ids, onReorder, onStackOnto],
   );
 
   /**
@@ -1061,6 +1152,7 @@ export function BoardGrid({
         total={ids.length}
         isArranging={isArranging}
         isDragging={draggingId === card.id}
+        isPileTarget={pileTargetId === card.id}
         isWiggling={isArranging && !reduceMotion && hoveredId !== card.id && draggingId !== card.id}
         collapsed={collapsedIds?.has(card.id) ?? false}
         pinned={pinnedIds?.has(card.id) ?? false}
@@ -1082,6 +1174,7 @@ export function BoardGrid({
         registerElement={registerElement}
         onDragStart={() => {
           lastMoveAt.current = 0;
+          restingRef.current = null;
           setDraggingId(card.id);
         }}
         onDrag={() => handleDrag(card.id)}
@@ -1393,6 +1486,8 @@ type BoardCardCellProps = {
   total: number;
   isArranging: boolean;
   isDragging: boolean;
+  /** A dragged card is resting on this one, and letting go would pile it here. */
+  isPileTarget?: boolean;
   isWiggling: boolean;
   collapsed: boolean;
   pinned: boolean;
@@ -1461,6 +1556,7 @@ function BoardCardCell({
   total,
   isArranging,
   isDragging,
+  isPileTarget = false,
   isWiggling,
   collapsed,
   pinned,
@@ -1764,11 +1860,18 @@ function BoardCardCell({
         onPointerLeave={() => onHoverChange(false)}
         className={`relative ${stack ? "cursor-pointer" : ""} ${
           isDragging ? "z-40 cursor-grabbing" : ""
-        }`}
+        } ${isPileTarget ? "rounded-2xl ring-2 ring-app-brand ring-offset-2 ring-offset-app-bg" : ""}`}
         // The floor for a tall card lives on the grid block that measures it, not here — see
         // `GridBlock`. Two floors would be one too many, and this one is inside the measurement.
         style={isArranging ? { touchAction: "none" } : undefined}
       >
+        {/* Says what letting go will do, on the card it will do it to. */}
+        {isPileTarget && (
+          <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-app-brand px-2 py-0.5 text-xs font-medium whitespace-nowrap text-white shadow-sm">
+            Drop to pile here
+          </span>
+        )}
+
         {/* Deepest first, so the nearer sheet paints over it and the two strips stack rather than
           overlap. Only what is still to do is drawn: three of five ticked off leaves one card
           behind this one, and drawing two would be the board overstating what is left.

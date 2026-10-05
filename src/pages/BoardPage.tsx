@@ -1208,17 +1208,22 @@ export function BoardPage() {
                     about the work rather than about one section of the board — where the hire is in
                     their path and what is next, the phase just finished, and the check closing the
                     one they are in. Kept together, so "continue" and "the check" read as one place. */}
-                {isPathShown && <BoardPathWindow path={path} onRemove={removePathWindow} />}
+                {/* The phase check rides inside the path card, so "show where you are" on the rail
+                    shows and hides both. */}
+                {isPathShown && (
+                  <BoardPathWindow path={path} onRemove={removePathWindow}>
+                    <BoardPhaseCheck
+                      path={path}
+                      phases={phases}
+                      cards={allCards}
+                      origins={cardOrigins}
+                      marks={cardMarks}
+                      embedded
+                    />
+                  </BoardPathWindow>
+                )}
 
                 <BoardPhaseRecap boardId={boardId} path={path} />
-
-                <BoardPhaseCheck
-                  path={path}
-                  phases={phases}
-                  cards={allCards}
-                  origins={cardOrigins}
-                  marks={cardMarks}
-                />
 
                 {/* Only the cards travel. The controls above are the same controls whatever section
                   is open, and sliding them out and back would be the page redrawing its own

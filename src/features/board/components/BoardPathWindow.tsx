@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Milestone, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "../../../components/ui/Button.tsx";
@@ -11,6 +12,12 @@ type BoardPathWindowProps = {
   path: OnboardingPathEndpoint | null;
   /** Takes the card off this board altogether. The way back is the board's own rail. */
   onRemove: () => void;
+  /**
+   * Drawn at the foot of the card, under "Next": the phase check (`BoardPhaseCheck`). Inside the
+   * card rather than beside it, so the rail's "show where you are" shows and hides both together —
+   * the check closes the phase this card is about.
+   */
+  children?: ReactNode;
 };
 
 /**
@@ -29,7 +36,7 @@ type BoardPathWindowProps = {
  *
  * Silent when there is no path, which is an ordinary state rather than an error.
  */
-export function BoardPathWindow({ path, onRemove }: BoardPathWindowProps) {
+export function BoardPathWindow({ path, onRemove, children }: BoardPathWindowProps) {
   if (!path || path.phases.length === 0) return null;
 
   const phases = sortedPhases(path);
@@ -133,6 +140,8 @@ export function BoardPathWindow({ path, onRemove }: BoardPathWindowProps) {
           <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>
       </p>
+
+      {children}
     </section>
   );
 }

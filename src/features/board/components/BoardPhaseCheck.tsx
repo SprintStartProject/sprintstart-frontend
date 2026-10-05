@@ -18,6 +18,11 @@ type BoardPhaseCheckProps = {
   cards: readonly BoardCard[];
   origins: CardOrigins;
   marks: CardMarks;
+  /**
+   * Drawn inside the path card rather than as a box of its own: a rule above it instead of a
+   * border around it, and above the card's own whole-card link so its buttons stay pressable.
+   */
+  embedded?: boolean;
 };
 
 /**
@@ -32,7 +37,14 @@ type BoardPhaseCheckProps = {
  * question passed: nothing is drawn. The cards are named in prose, like "next on your path", and
  * pressing one brings it into view rather than filtering the board to it.
  */
-export function BoardPhaseCheck({ path, phases, cards, origins, marks }: BoardPhaseCheckProps) {
+export function BoardPhaseCheck({
+  path,
+  phases,
+  cards,
+  origins,
+  marks,
+  embedded = false,
+}: BoardPhaseCheckProps) {
   if (!path || !phases) return null;
 
   // The phase the hire is working in, as the Onboarding page and "next on your path" read it —
@@ -61,7 +73,11 @@ export function BoardPhaseCheck({ path, phases, cards, origins, marks }: BoardPh
   return (
     <section
       aria-label={`Phase check for ${phase.title}`}
-      className="space-y-2 rounded-2xl border border-app-border bg-app-surface px-4 py-3"
+      className={
+        embedded
+          ? "relative z-10 space-y-2 border-t border-app-border pt-2"
+          : "space-y-2 rounded-2xl border border-app-border bg-app-surface px-4 py-3"
+      }
     >
       <div className="flex flex-wrap items-center gap-2">
         <ClipboardCheck className="h-4 w-4 shrink-0 text-app-brand-text" aria-hidden="true" />
