@@ -74,6 +74,9 @@ export function FilterSelect<TValue extends string>({
   testId,
 }: FilterSelectProps<TValue>) {
   const [activeIndex, setActiveIndex] = useState(0);
+  // Whether the highlighted option was reached with the keyboard. Only then does it get the
+  // strong outline; an option the pointer hovers keeps the quiet hover fill.
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   // Open/close state, measured placement and outside-dismissal all come from the
   // shared popover hook, so this control and `MultiSelectFilter` cannot drift
   // apart on where the menu lands or what counts as an outside press.
@@ -159,6 +162,8 @@ export function FilterSelect<TValue extends string>({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) return;
 
+    if (event.key !== "Tab" && event.key !== "Escape") setIsKeyboardNav(true);
+
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -230,7 +235,11 @@ export function FilterSelect<TValue extends string>({
         aria-activedescendant={isOpen ? `${optionIdPrefix}-${activeIndex}` : undefined}
         disabled={disabled}
         data-testid={testId}
-        onClick={() => (isOpen ? close() : openMenu())}
+        onClick={(event) => {
+          if (event.detail > 0) setIsKeyboardNav(false);
+          if (isOpen) close();
+          else openMenu();
+        }}
         onKeyDown={handleKeyDown}
         {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}
         className="inline-flex h-9 w-full cursor-pointer items-center justify-between gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 text-sm text-app-text backdrop-blur-md transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70 max-sm:h-11"
@@ -292,6 +301,7 @@ export function FilterSelect<TValue extends string>({
                     role="option"
                     aria-selected={isSelected}
                     onMouseEnter={() => setActiveIndex(index)}
+                    onMouseMove={() => setIsKeyboardNav(false)}
                     onClick={() => commit(index)}
                     animate={{
                       scale: isActive && !prefersReducedMotion ? OPTION_HOVER_SCALE : 1,
@@ -315,7 +325,11 @@ export function FilterSelect<TValue extends string>({
                         transition={
                           prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken
                         }
-                        className="absolute inset-0 rounded-xl bg-app-surface-hover/80 ring-1 ring-app-border/50 backdrop-blur-sm ring-inset"
+                        className={`absolute inset-0 rounded-xl ${
+                          isKeyboardNav
+                            ? "bg-app-brand-soft outline-2 -outline-offset-2 outline-app-focus outline-solid"
+                            : "bg-app-surface-hover/80 ring-1 ring-app-border/50 backdrop-blur-sm ring-inset"
+                        }`}
                       />
                     )}
 

@@ -20,6 +20,18 @@ body {
   overflow-x: clip;
 }
 
+/* Below `lg` the header is fixed (`SideBar`, `h-16` = 64px) and the buddy button floats at the
+   bottom (`BuddyLauncher`, `size-16` = 64px, plus its margin to the edge). A focused element that
+   the browser scrolls into view would otherwise land right underneath one of them (WCAG 2.4.11).
+   `scroll-padding` moves the edge the browser scrolls to inwards by that much. A page that owns
+   its own scroll container needs the same padding on it, e.g. `max-lg:scroll-pb-26`. */
+@media (width < 64rem) {
+  html {
+    scroll-padding-top: 4.5rem;
+    scroll-padding-bottom: 6.5rem;
+  }
+}
+
 :root {
   --app-page-gutter: 1.25rem;
   --app-page-block-gutter: 1.25rem;

@@ -916,7 +916,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                     half
                       ? HALF_RING[half]
                       : node.id === selectedId
-                        ? "ring-2 ring-app-focus ring-offset-2 ring-offset-app-bg-soft"
+                        ? "ring-2 ring-app-brand-border-strong"
                         : ""
                   }`}
                 >

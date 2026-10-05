@@ -158,7 +158,7 @@ export function ItemGlyph({
 function emphasisClass({ emphasis, selected, dragging }: JourneyNodeRenderState): string {
   return [
     emphasis === "dimmed" ? "opacity-35" : "opacity-100",
-    selected ? "ring-2 ring-app-focus ring-offset-2 ring-offset-app-bg-soft" : "",
+    selected ? "ring-2 ring-app-brand-border-strong" : "",
     emphasis === "focus" && !selected ? "ring-2 ring-app-brand/50" : "",
     dragging ? "scale-[1.03] shadow-2xl" : "",
   ].join(" ");

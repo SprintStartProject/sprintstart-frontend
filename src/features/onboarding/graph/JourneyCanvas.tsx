@@ -1066,7 +1066,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
                 tabIndex={isInteractive ? 0 : undefined}
                 aria-label={isInteractive ? nodeLabel(node) : undefined}
                 aria-pressed={isInteractive ? selected : undefined}
-                className={`group/node absolute rounded-2xl ${
+                className={`group/node absolute rounded-2xl focus-visible:outline-offset-6 ${
                   canMove ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                 } ${dragging ? "z-30" : selected ? "z-20" : "z-10"}`}
                 style={{

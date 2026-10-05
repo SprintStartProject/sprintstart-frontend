@@ -740,7 +740,8 @@ export function AdminPage() {
       // header (App's main has pt-[64px] lg:pt-0). A plain h-dvh would then run
       // 64px past the viewport, hiding the last row of content (e.g. the
       // pagination) below the fold, so subtract the header there.
-      className="h-[calc(100dvh-64px)] overflow-y-scroll overscroll-contain lg:h-dvh"
+      // It scrolls on its own, so the buddy button's `scroll-padding` on `html` does not reach it.
+      className="h-[calc(100dvh-64px)] overflow-y-scroll overscroll-contain max-lg:scroll-pb-26 lg:h-dvh"
     >
       <header className="border-b border-app-border bg-app-bg">
         <div className="admin-page-frame py-4 sm:py-6">

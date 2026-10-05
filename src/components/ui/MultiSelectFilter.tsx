@@ -296,7 +296,7 @@ export function MultiSelectFilter<TValue extends string>({
                 const renderOption = (option: MultiSelectFilterOption<TValue>) => (
                   <label
                     key={option.value}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover max-sm:py-3"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover has-[:focus-visible]:bg-app-brand-soft max-sm:py-3"
                   >
                     <Checkbox
                       checked={selected.has(option.value)}
