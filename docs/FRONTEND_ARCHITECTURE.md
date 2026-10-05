@@ -60,7 +60,7 @@ goes in the top-level folders.
 
 ```
 src/
-├── features/            # Self-contained domain slices (components/, hooks/, types.ts)
+├── features/            # Self-contained domain slices (most hold components/, hooks/, types.ts)
 │   ├── access/              # Stored connector credentials (admin access management)
 │   ├── admin/               # User, project & token management, create-project wizard
 │   ├── ai-activity/         # Live AI progress log for generations (useAiStream)
@@ -84,7 +84,7 @@ src/
 │   ├── onboarding/          # AI onboarding paths, journey canvas, generation, checks
 │   ├── onboarding-metrics/  # Onboarding progress and attention per hire (insights)
 │   ├── orientation/         # Task orientation editor and panel
-│   ├── pm-area/             # PM workspace layout (PmWorkspace), team roster, attention analysis
+│   ├── pm-area/             # PM workspace layout (PmWorkspace), team roster, attention queue, project analysis
 │   ├── profile/             # User profile view/edit
 │   ├── projects/            # Project selection (ProjectProvider)
 │   ├── settings/            # User settings, personal credentials
@@ -97,7 +97,7 @@ src/
 ├── auth/                # accessPolicy.ts (AppRoute union + canAccessRoute), redirectUtils.ts
 ├── context/             # Global providers (Auth, Theme, Chat, Toast, FocusMode)
 ├── services/            # Backend communication (one module per domain), query client, query keys
-├── components/          # Shared UI: common/, layout/, ui/ primitives
+├── components/          # Shared UI: common/, icons/ (logos lucide lacks), layout/, ui/ primitives
 ├── config/              # keycloak.ts (Keycloak client), contributionWording.ts (wording shared with the backend)
 ├── hooks/               # Shared hooks (incl. the TanStack Query based fetch hooks)
 ├── styles/              # Global CSS (index.css) + animation tokens (tokens.ts)
@@ -106,7 +106,8 @@ src/
 ├── main.tsx             # Entry point: boots the login theme or the app (see below)
 ├── main-app.tsx         # React root of the app: StrictMode, BrowserRouter, App
 ├── App.tsx              # App-level providers (§5.1) around AppRouter
-└── bootSplash.ts        # Dismisses the boot splash that index.html paints before React
+├── bootSplash.ts        # Dismisses the boot splash that index.html paints before React
+└── vite-env.d.ts        # Vite client types (import.meta.env, asset imports)
 ```
 
 `main.tsx` decides at runtime what this bundle is: when Keycloak injected a
@@ -127,6 +128,7 @@ imported by knowledge-base, chatbot, connectors, dashboard and admin, so a conne
 is a platform concept even though it lives inside the data-ingestion slice. Those
 features import only from the registry and `sourceSystems.ts`, never from
 data-ingestion components.
+
 ---
 
 ## 4. Routing & access control
@@ -286,8 +288,7 @@ factory in `src/services/queryKeys.ts`. Project-scoped keys always contain the
 `useFetch` is superseded by `useQueryFetch` and has no callers left; only its
 `UseFetchResult` type is still imported by `useQueryFetch`. The sidebar warms the page module
 and its main query on `pointerdown` (`src/services/routePrefetch.ts`). The reasoning
-behind this setup is recorded in ADR-017 in the Wiki, which is still on the Wiki branch
-`tanstack-query-adr` and not yet merged into `main`.
+behind this setup is recorded in ADR-017 in the Wiki.
 
 ---
 
@@ -322,40 +323,41 @@ their own read loops.
 One module per domain (rules for writing them in
 [FRONTEND_CODING_STANDARDS.md §7](./FRONTEND_CODING_STANDARDS.md#7-services--api-layer)):
 
-| Module                         | Domain                                                                |
-| ------------------------------ | --------------------------------------------------------------------- |
-| `adminUserService.ts`          | Admin user management                                                 |
-| `aiStreamService.ts`           | Live AI progress events (SSE over `fetch`)                            |
-| `apiClient.ts`, `apiError.ts`  | Shared fetch wrapper and `ApiError`                                   |
-| `arrivalService.ts`            | Arrival steps                                                         |
-| `attestationService.ts`        | Attestation requests                                                  |
-| `blueprintService.ts`          | Onboarding path blueprints                                            |
-| `boardService.ts`              | Board cards and board arrangement sync                                |
-| `buddyService.ts`              | AI buddy (SSE streaming)                                              |
-| `chatService.ts`               | Chatbot (SSE streaming)                                               |
-| `connectorService.ts`          | Connectors + source allow/deny lists                                  |
-| `dashboardLayoutService.ts`    | Dashboard widget layout                                               |
-| `faqService.ts`                | Insights FAQ clusters                                                 |
-| `ingestionService.ts`          | Data ingestion runs + artifacts                                       |
-| `knowledgeGapService.ts`       | Insights knowledge gaps                                               |
-| `knowledgeRequestService.ts`   | Escalated knowledge requests                                          |
-| `knowledgeService.ts`          | Knowledge base + streamed summaries                                   |
-| `myStarterWorkService.ts`      | The current hire's starter work                                       |
-| `onboardingFeedbackService.ts` | Onboarding feedback                                                   |
-| `onboardingGraphService.ts`    | Onboarding journey graph                                              |
-| `onboardingMetricsService.ts`  | Onboarding metrics (insights)                                         |
-| `onboardingService.ts`         | Onboarding paths, steps, tasks, feedback                              |
-| `orientationService.ts`        | Task orientation                                                      |
-| `projectService.ts`            | Projects, managed projects, project selection                         |
-| `queryClient.ts`               | Shared TanStack Query client (§5.2)                                   |
-| `queryKeys.ts`                 | Central query key factory (§5.2)                                      |
-| `routePrefetch.ts`             | Sidebar prefetch of page modules and queries (§5.2)                   |
-| `sse.ts`                       | Shared SSE stream parser                                              |
-| `starterWorkService.ts`        | Starter work pool and review                                          |
-| `teamManagementService.ts`     | Team overview, member detail, skills                                  |
-| `userService.ts`               | Current user profile                                                  |
-| `types.ts`                     | Backend DTO types (the closest thing to a global types folder)        |
-| `sources/`                     | Per-source services (GitHub, Jira, Confluence, Atlassian credentials) |
+| Module                         | Domain                                                               |
+| ------------------------------ | -------------------------------------------------------------------- |
+| `adminUserService.ts`          | Admin user management                                                |
+| `aiStreamService.ts`           | Live AI progress events (SSE over `fetch`)                           |
+| `apiClient.ts`, `apiError.ts`  | Shared fetch wrapper and `ApiError`                                  |
+| `arrivalService.ts`            | Arrival steps                                                        |
+| `attestationService.ts`        | Attestation requests                                                 |
+| `blueprintService.ts`          | Onboarding path blueprints                                           |
+| `boardService.ts`              | Board cards and board arrangement sync                               |
+| `buddyService.ts`              | AI buddy (SSE streaming)                                             |
+| `chatService.ts`               | Chatbot (SSE streaming)                                              |
+| `connectorService.ts`          | Connectors + source allow/deny lists                                 |
+| `dashboardLayoutService.ts`    | Dashboard widget layout                                              |
+| `faqService.ts`                | Insights FAQ clusters                                                |
+| `ingestionService.ts`          | Data ingestion runs + artifacts                                      |
+| `knowledgeGapService.ts`       | Insights knowledge gaps                                              |
+| `knowledgeRequestService.ts`   | Escalated knowledge requests                                         |
+| `knowledgeService.ts`          | Knowledge base + streamed summaries                                  |
+| `myStarterWorkService.ts`      | The current hire's starter work                                      |
+| `onboardingFeedbackService.ts` | Onboarding feedback                                                  |
+| `onboardingGraphService.ts`    | Onboarding journey graph                                             |
+| `onboardingMetricsService.ts`  | Onboarding metrics (insights)                                        |
+| `onboardingService.ts`         | Onboarding paths, steps, tasks, feedback                             |
+| `orientationService.ts`        | Task orientation                                                     |
+| `projectAnalysisService.ts`    | Stored project analysis runs (PM area)                               |
+| `projectService.ts`            | Projects, managed projects, project selection                        |
+| `queryClient.ts`               | Shared TanStack Query client (§5.2)                                  |
+| `queryKeys.ts`                 | Central query key factory (§5.2)                                     |
+| `routePrefetch.ts`             | Sidebar prefetch of page modules and queries (§5.2)                  |
+| `sse.ts`                       | Shared SSE stream parser                                             |
+| `starterWorkService.ts`        | Starter work pool and review                                         |
+| `teamManagementService.ts`     | Team overview, member detail, skills                                 |
+| `userService.ts`               | Current user profile                                                 |
+| `types.ts`                     | Backend DTO types (the closest thing to a global types folder)       |
+| `sources/`                     | Per-source services (GitHub, Bitbucket, Jira, Confluence, Atlassian) |
 
 ### 6.4 Reverse proxy
 
