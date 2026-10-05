@@ -9,6 +9,8 @@ import { CardOriginLink } from "./CardOriginLink";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutNote } from "../generation/cardQuestion";
 import { Marked } from "./Marked";
+import { NoteMarkdown } from "./NoteMarkdown";
+import { looksLikeMarkdown } from "../layout/noteMarkdown";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardMark } from "../marks/cardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";
@@ -255,23 +257,27 @@ function NoteBody({ body, marks, cardId }: { body: string; marks: CardMark[]; ca
   const [expanded, setExpanded] = useState(false);
 
   const long = body.length > COLLAPSE_AFTER_CHARS || body.split("\n").length > COLLAPSE_AFTER_LINES;
-  if (!long)
-    return (
+  // What the buddy writes is Markdown, and is drawn as such; see `NoteMarkdown`.
+  const markdown = looksLikeMarkdown(body);
+  const draw = (text: string) =>
+    markdown ? (
+      <NoteMarkdown text={text} marks={marks} cardId={cardId} />
+    ) : (
       <p className="text-sm whitespace-pre-wrap text-app-text">
-        <Marked text={body} marks={marks} parse cardId={cardId} />
+        <Marked text={text} marks={marks} parse cardId={cardId} />
       </p>
     );
 
+  if (!long) return draw(body);
+
   return (
     <div>
-      <p className="text-sm whitespace-pre-wrap text-app-text">
-        {/* The fold cuts the *raw* text, delimiters and all, so a highlight that straddles the cut
-            would lose its closing `==` and stop being one. `preview` keeps whole lines and whole
-            words, so the only way to split a mark is to have written one across a line break —
-            and `Marked` renders an unclosed pair as ordinary text rather than lighting up the
-            rest of the card. */}
-        <Marked text={expanded ? body : preview(body)} marks={marks} parse cardId={cardId} />
-      </p>
+      {/* The fold cuts the *raw* text, delimiters and all, so a highlight that straddles the cut
+          would lose its closing `==` and stop being one. `preview` keeps whole lines and whole
+          words, so the only way to split a mark is to have written one across a line break — and
+          `Marked` renders an unclosed pair as ordinary text rather than lighting up the rest of
+          the card. */}
+      {draw(expanded ? body : preview(body))}
 
       <Button
         variant="ghost"
