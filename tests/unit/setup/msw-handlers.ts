@@ -692,6 +692,45 @@ export const handlers = [
   http.post("/api/v1/bitbucket/connections/:repositoryId/update", () =>
     HttpResponse.json({ transactionId: "bb-update-default" }, { status: 202 }),
   ),
+  http.get("/api/v1/notion/credentials", () => HttpResponse.json([])),
+  http.get("/api/v1/notion/pages", () => HttpResponse.json([])),
+  http.get("/api/v1/notion/projects/:projectId/connections", () => HttpResponse.json([])),
+  http.post("/api/v1/notion/projects/:projectId/connections", ({ params }) =>
+    HttpResponse.json(
+      {
+        id: "notion-conn-default",
+        projectId: params.projectId,
+        workspaceId: "workspace-default",
+        workspaceName: "Example Workspace",
+        workspaceUrl: "https://www.notion.so/example",
+        credentialName: "default",
+        sourceEnabled: true,
+        autoUpdate: false,
+        schedule: "every 60 minutes",
+        scheduleSpec: { type: "INTERVAL", everyMinutes: 60 },
+        nextSyncAt: null,
+        lastSyncedAt: null,
+        createdAt: "2026-10-05T09:00:00.000Z",
+        updatedAt: "2026-10-05T09:00:00.000Z",
+        version: 1,
+      },
+      { status: 201 },
+    ),
+  ),
+  http.post("/api/v1/notion/projects/:projectId/connections/:connectionId/update", ({ params }) =>
+    HttpResponse.json({
+      runId: "run-default",
+      connectionId: params.connectionId,
+      outcome: "COMPLETED",
+      failure: null,
+      successfulPages: 0,
+      failedPages: 0,
+      removedPages: 0,
+    }),
+  ),
+  http.get("/api/v1/connectors/notion/sources", () =>
+    HttpResponse.json({ connectorId: "notion", sources: [] }),
+  ),
   // Every surface that opens the buddy dock asks for its suggestion chips. A default empty list
   // keeps that request handled for the many tests that open the dock without being about the
   // chips; `useBuddySuggestions`' own suite mocks the service directly and never sees this.

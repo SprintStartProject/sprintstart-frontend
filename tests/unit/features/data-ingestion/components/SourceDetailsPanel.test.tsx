@@ -11,6 +11,7 @@ import type {
   BitbucketRepositoryDetails,
   DataSource,
   GithubRepositoryDetails,
+  NotionWorkspaceSourceDetails,
 } from "../../../../../src/features/data-ingestion/types";
 import { deriveSourceStatus } from "../../../../../src/features/data-ingestion/data";
 
@@ -31,6 +32,10 @@ const mocks = vi.hoisted(() => ({
   deleteConnection: vi.fn(),
   getConnection: vi.fn(),
   configureSchedule: vi.fn(),
+  notionSyncConnection: vi.fn(),
+  notionDeleteConnection: vi.fn(),
+  notionListConnections: vi.fn(),
+  notionConfigureSchedule: vi.fn(),
   patchConnectorSources: vi.fn(),
 }));
 
@@ -61,6 +66,15 @@ vi.mock("../../../../../src/services/sources/confluenceService", () => ({
     deleteConnection: mocks.deleteConnection,
     getConnection: mocks.getConnection,
     configureSchedule: mocks.configureSchedule,
+  },
+}));
+
+vi.mock("../../../../../src/services/sources/notionService", () => ({
+  notionService: {
+    syncConnection: mocks.notionSyncConnection,
+    deleteConnection: mocks.notionDeleteConnection,
+    listConnections: mocks.notionListConnections,
+    configureSchedule: mocks.notionConfigureSchedule,
   },
 }));
 
@@ -173,6 +187,22 @@ const confluenceSource: DataSource = {
   },
 };
 
+const notionWorkspace: NotionWorkspaceSourceDetails = {
+  connectionId: "notion-conn-1",
+  sourceRef: "ws-1",
+  workspaceName: "Acme Workspace",
+  credentialName: "wiki",
+};
+
+const notionSource: DataSource = {
+  ...mockSource,
+  sourceId: "notion-conn-1",
+  sourceSystem: "NOTION",
+  name: "Acme Workspace",
+  type: "Notion",
+  details: { system: "NOTION", workspace: notionWorkspace },
+};
+
 const uploadSource: DataSource = {
   ...mockSource,
   sourceId: "upload-1",
@@ -183,6 +213,44 @@ const uploadSource: DataSource = {
 };
 
 const interval = (everyMinutes: number) => ({ type: "INTERVAL", everyMinutes }) as const;
+
+/** A Notion connection record carrying the given stored schedule. */
+function notionConnectionRecord(stored: {
+  autoUpdate: boolean;
+  spec: ReturnType<typeof interval>;
+  nextSyncAt: string | null;
+}) {
+  return {
+    id: "notion-conn-1",
+    projectId: "p1",
+    workspaceId: "ws-1",
+    workspaceName: "Acme Workspace",
+    workspaceUrl: "https://www.notion.so/acme",
+    credentialName: "wiki",
+    sourceEnabled: true,
+    autoUpdate: stored.autoUpdate,
+    schedule: "every 60 minutes",
+    scheduleSpec: stored.spec,
+    nextSyncAt: stored.nextSyncAt,
+    lastSyncedAt: null,
+    createdAt: "2026-10-05T09:00:00Z",
+    updatedAt: "2026-10-05T09:00:00Z",
+    version: 1,
+  };
+}
+
+function notionSyncResult(overrides: Record<string, unknown> = {}) {
+  return {
+    runId: "run-1",
+    connectionId: "notion-conn-1",
+    outcome: "COMPLETED",
+    failure: null,
+    successfulPages: 5,
+    failedPages: 0,
+    removedPages: 0,
+    ...overrides,
+  };
+}
 
 type PanelProps = ComponentProps<typeof SourceDetailsPanel>;
 
@@ -305,6 +373,31 @@ const cases = [
     unlinkTitle: /Remove space from project/,
     expectUnlinked: () => expect(mocks.deleteConnection).toHaveBeenCalledWith("p1", "conn-1"),
   },
+  {
+    name: "Notion",
+    source: notionSource,
+    section: "Workspace",
+    updateButton: /Update workspace/,
+    expectUpdate: () =>
+      expect(mocks.notionSyncConnection).toHaveBeenCalledWith("p1", "notion-conn-1"),
+    toggleName: /Toggle ingestion for Acme Workspace/,
+    expectDisabled: () =>
+      expect(mocks.patchConnectorSources).toHaveBeenCalledWith(
+        "notion",
+        [{ sourceId: "notion-conn-1", enabled: false }],
+        "p1",
+      ),
+    autoUpdateName: /Toggle workspace auto update/,
+    expectScheduleLoaded: () => expect(mocks.notionListConnections).toHaveBeenCalledWith("p1"),
+    expectScheduleSaved: () =>
+      expect(mocks.notionConfigureSchedule).toHaveBeenCalledWith("p1", "notion-conn-1", {
+        autoUpdate: false,
+        schedule: interval(30),
+      }),
+    unlinkTitle: /Remove workspace from project/,
+    expectUnlinked: () =>
+      expect(mocks.notionDeleteConnection).toHaveBeenCalledWith("p1", "notion-conn-1"),
+  },
 ];
 
 describe("SourceDetailsPanel", () => {
@@ -334,6 +427,9 @@ describe("SourceDetailsPanel", () => {
     });
     mocks.deleteConnection.mockResolvedValue(undefined);
     mocks.configureSchedule.mockResolvedValue({});
+    mocks.notionSyncConnection.mockResolvedValue(notionSyncResult());
+    mocks.notionDeleteConnection.mockResolvedValue(undefined);
+    mocks.notionConfigureSchedule.mockResolvedValue({});
     mocks.patchConnectorSources.mockResolvedValue({ connectorId: "x", sources: [] });
 
     const stored = { autoUpdate: true, spec: interval(60), nextSyncAt: null };
@@ -341,6 +437,7 @@ describe("SourceDetailsPanel", () => {
     mocks.getBitbucketRepositoryConfig.mockResolvedValue(stored);
     mocks.getJiraConfig.mockResolvedValue(stored);
     mocks.getConnection.mockResolvedValue(stored);
+    mocks.notionListConnections.mockResolvedValue([notionConnectionRecord(stored)]);
   });
 
   describe.each(cases)("$name source", (connector) => {
@@ -465,6 +562,92 @@ describe("SourceDetailsPanel", () => {
     expect(screen.getByText("2 pages failed out of 3 discovered.")).toBeInTheDocument();
   });
 
+  it("reports a Notion sync's page counts once and leaves the toasts to the sync", async () => {
+    const user = userEvent.setup();
+    mocks.notionSyncConnection.mockResolvedValue(notionSyncResult({ removedPages: 2 }));
+
+    render(panel(notionSource));
+    await user.click(screen.getByRole("button", { name: /Update workspace/ }));
+
+    expect(await screen.findByText("Notion workspace synced")).toBeInTheDocument();
+    expect(screen.getByText("5 pages synced, 2 removed.")).toBeInTheDocument();
+    expect(screen.queryByText("Update started")).not.toBeInTheDocument();
+  });
+
+  it("reports a Notion sync that finished with failed pages as a warning", async () => {
+    const user = userEvent.setup();
+    mocks.notionSyncConnection.mockResolvedValue(
+      notionSyncResult({ outcome: "PARTIAL", successfulPages: 3, failedPages: 2 }),
+    );
+
+    render(panel(notionSource));
+    await user.click(screen.getByRole("button", { name: /Update workspace/ }));
+
+    expect(await screen.findByText("Notion sync finished with errors")).toBeInTheDocument();
+    expect(screen.getByText("2 pages failed, 3 synced.")).toBeInTheDocument();
+  });
+
+  it("reports a failed Notion run with the backend's reason", async () => {
+    const user = userEvent.setup();
+    mocks.notionSyncConnection.mockResolvedValue(
+      notionSyncResult({
+        outcome: "FAILED",
+        successfulPages: 0,
+        failure: { stage: "FETCHING", message: "Notion source is disabled" },
+      }),
+    );
+
+    render(panel(notionSource));
+    await user.click(screen.getByRole("button", { name: /Update workspace/ }));
+
+    expect(await screen.findByText("Notion sync failed")).toBeInTheDocument();
+    expect(screen.getByText("Notion source is disabled (fetching)")).toBeInTheDocument();
+  });
+
+  it("tells a Notion workspace without visible pages how to share some", async () => {
+    const user = userEvent.setup();
+    mocks.notionSyncConnection.mockResolvedValue(notionSyncResult({ successfulPages: 0 }));
+
+    render(panel(notionSource));
+    await user.click(screen.getByRole("button", { name: /Update workspace/ }));
+
+    expect(await screen.findByText(/Share pages with the Notion integration/)).toBeInTheDocument();
+  });
+
+  it("shows the Notion workspace and credential, without a link to notion.so", () => {
+    render(panel(notionSource));
+
+    expect(screen.getByText("Credential")).toBeInTheDocument();
+    expect(screen.getByText("wiki")).toBeInTheDocument();
+    expect(screen.queryByText("URL")).not.toBeInTheDocument();
+  });
+
+  it("disables the Notion update and hides unlinking without a connection record", () => {
+    render(
+      panel({
+        ...notionSource,
+        details: { system: "NOTION", workspace: { ...notionWorkspace, connectionId: null } },
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: /Update workspace/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Remove from project/ })).not.toBeInTheDocument();
+  });
+
+  it("says a Notion workspace is skipped, not marked out of date, with auto update off", async () => {
+    mocks.notionListConnections.mockResolvedValue([
+      notionConnectionRecord({ autoUpdate: false, spec: interval(60), nextSyncAt: null }),
+    ]);
+
+    render(panel(notionSource));
+
+    expect(
+      await screen.findByText(
+        "Due checks skip this workspace. It only updates when started manually.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("announces that a background update started for GitHub and Jira", async () => {
     const user = userEvent.setup();
 
@@ -574,6 +757,14 @@ describe("SourceDetailsPanel", () => {
         "href",
         "/knowledge-base?sources=JIRA",
       );
+    });
+
+    it("links a Notion source to the Notion system and counts its pages", () => {
+      render(panel(notionSource));
+
+      const link = screen.getByRole("link", { name: linkName });
+      expect(link).toHaveAttribute("href", "/knowledge-base?sources=NOTION");
+      expect(link).toHaveTextContent("10 artifacts · Notion");
     });
 
     it("links a Bitbucket source to its repository in the knowledge base", () => {

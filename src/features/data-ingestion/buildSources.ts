@@ -2,6 +2,7 @@ import type { ProjectSource } from "../../services/projectService.ts";
 import type { ConfluenceConnectionDto } from "../../services/sources/confluenceService.ts";
 import { parseGithubRepositoryReference } from "../../services/sources/githubRepositoryInput.ts";
 import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
+import type { NotionWorkspaceConnectionDto } from "../../services/sources/notionService.ts";
 import { CONNECTORS } from "./connectors/registry.ts";
 import { toSourceSystem, type SourceSystem } from "./connectors/sourceSystems.ts";
 import { createDataSource } from "./data.ts";
@@ -13,6 +14,7 @@ type BuildDataSourcesInput = {
   statuses: SourceInstanceIngestionStatus[];
   jiraInstances: JiraInstanceDto[];
   confluenceConnections: ConfluenceConnectionDto[];
+  notionConnections: NotionWorkspaceConnectionDto[];
   /** The project's newest runs, newest first. */
   latestRuns: IngestionRun[];
   /** Connector id (lowercase, e.g. "github") -> globally enabled. */
@@ -84,6 +86,44 @@ function matchConfluenceRun(
 }
 
 /**
+ * Pairs each Notion status row with its connection record. A row is keyed by the
+ * workspace id (the connection id when Notion names none), which two connections of one
+ * project can share when different tokens see the same workspace; rows and connections
+ * both arrive oldest first, so each row takes the first connection with its key that no
+ * earlier row has taken.
+ */
+function pairNotionConnections(
+  rows: SourceInstanceIngestionStatus[],
+  connections: NotionWorkspaceConnectionDto[],
+): { status: SourceInstanceIngestionStatus; connection: NotionWorkspaceConnectionDto | null }[] {
+  const unmatched = [...connections];
+
+  return rows.map((status) => {
+    const index = unmatched.findIndex(
+      (connection) => (connection.workspaceId ?? connection.id) === status.sourceId,
+    );
+    const [connection = null] = index >= 0 ? unmatched.splice(index, 1) : [];
+
+    return { status, connection };
+  });
+}
+
+/** Finds the newest run of a Notion workspace: by connection id, else by the reference the run carries. */
+function matchNotionRun(
+  status: SourceInstanceIngestionStatus,
+  connection: NotionWorkspaceConnectionDto | null,
+  runs: IngestionRun[],
+): IngestionRun | null {
+  return (
+    runs.find(
+      (run) =>
+        run.sourceSystem === "NOTION" &&
+        (connection ? run.repositoryId === connection.id : run.sourceId === status.sourceId),
+    ) ?? null
+  );
+}
+
+/**
  * Builds the source cards for the Data Ingestion page, with the same generic
  * mapper for every connector.
  *
@@ -91,7 +131,7 @@ function matchConfluenceRun(
  * stable `sourceId` is the project source's id, used for selection and deep
  * links). A GitHub source without a status row (an unresolvable repo) and an
  * upload source without one fall back to their source system's latest run.
- * Bitbucket, Jira and Confluence cards are built from the status rows and
+ * Bitbucket, Jira, Confluence and Notion cards are built from the status rows and
  * connection records instead, so a project source list that includes them does
  * not double them.
  */
@@ -100,6 +140,7 @@ export function buildDataSources({
   statuses,
   jiraInstances,
   confluenceConnections,
+  notionConnections,
   latestRuns,
   connectorEnabledById,
 }: BuildDataSourcesInput): DataSource[] {
@@ -237,6 +278,22 @@ export function buildDataSources({
     });
   });
 
+  // The status row names the workspace and its health; the connection record adds the
+  // connection id every action keys on. A viewer who may not read the connections still
+  // gets the cards, without those actions.
+  const notionCards = pairNotionConnections(
+    statuses.filter((status) => status.sourceSystem === "NOTION"),
+    notionConnections,
+  ).map(({ status, connection }) =>
+    createDataSource({
+      definition: CONNECTORS.NOTION,
+      status,
+      connection,
+      latestRun: matchNotionRun(status, connection, latestRuns),
+      connectorEnabled: enabledOf("NOTION"),
+    }),
+  );
+
   const uploadCards = statuses
     .filter((status) => status.sourceSystem === "UPLOAD")
     .map((status) =>
@@ -252,6 +309,7 @@ export function buildDataSources({
     ...bitbucketCards,
     ...jiraCards,
     ...confluenceCards,
+    ...notionCards,
     ...uploadCards,
   ];
 }

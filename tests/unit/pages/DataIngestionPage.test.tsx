@@ -1826,6 +1826,317 @@ describe("DataIngestionPage", () => {
       expect(mockConfigureGithubRepository).not.toHaveBeenCalled();
     });
   });
+  describe("Notion workspaces", () => {
+    const notionStatusRow = (overrides: Record<string, unknown> = {}) => ({
+      sourceSystem: "NOTION",
+      sourceId: "ws-1",
+      displayName: "Acme Workspace",
+      repositoryId: null,
+      owner: null,
+      name: null,
+      sourceUrl: "https://www.notion.so/acme",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-09-28T10:00:00Z",
+      ingestedCount: 5,
+      updatedCount: 0,
+      deletedCount: 0,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 31,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: null,
+      lastPullRequestsSyncAt: null,
+      ...overrides,
+    });
+
+    const notionConnection = {
+      id: "notion-conn-1",
+      projectId: "proj1",
+      workspaceId: "ws-1",
+      workspaceName: "Acme Workspace",
+      workspaceUrl: "https://www.notion.so/acme",
+      credentialName: "wiki",
+      sourceEnabled: true,
+      autoUpdate: true,
+      schedule: "every 60 minutes",
+      scheduleSpec: { type: "INTERVAL", everyMinutes: 60 },
+      nextSyncAt: null,
+      lastSyncedAt: "2026-09-28T10:00:00Z",
+      createdAt: "2026-09-01T10:00:00Z",
+      updatedAt: "2026-09-28T10:00:00Z",
+      version: 1,
+    };
+
+    beforeEach(() => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow()]);
+      server.use(
+        http.get("/api/v1/notion/projects/proj1/connections", () =>
+          HttpResponse.json([notionConnection]),
+        ),
+      );
+    });
+
+    async function openNotionDrawer() {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/data-ingestion?sourceId=notion-conn-1"]}>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      const panel = await screen.findByRole("dialog");
+      expect(within(panel).getByText("Credential")).toBeInTheDocument();
+
+      return { user, panel };
+    }
+
+    it("builds a card from the status row and selects it by the connection id", async () => {
+      await openNotionDrawer();
+
+      expect((await screen.findAllByText("Acme Workspace")).length).toBeGreaterThan(0);
+      expect(screen.getByText("wiki")).toBeInTheDocument();
+    });
+
+    it("still shows the card when the project's connections cannot be read", async () => {
+      server.use(
+        http.get("/api/v1/notion/projects/proj1/connections", () =>
+          HttpResponse.json({ message: "forbidden" }, { status: 403 }),
+        ),
+      );
+
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      expect((await screen.findAllByText("Acme Workspace")).length).toBeGreaterThan(0);
+    });
+
+    it("syncs the workspace through its connection id", async () => {
+      const synced: string[] = [];
+      server.use(
+        http.post(
+          "/api/v1/notion/projects/proj1/connections/:connectionId/update",
+          ({ params }) => {
+            synced.push(String(params.connectionId));
+            return HttpResponse.json({
+              runId: "run-1",
+              connectionId: params.connectionId,
+              outcome: "COMPLETED",
+              failure: null,
+              successfulPages: 7,
+              failedPages: 0,
+              removedPages: 0,
+            });
+          },
+        ),
+      );
+
+      const { user, panel } = await openNotionDrawer();
+      await user.click(within(panel).getByRole("button", { name: /update workspace/i }));
+
+      await waitFor(() => expect(synced).toEqual(["notion-conn-1"]));
+    });
+
+    it("disables the workspace through the connector endpoint, scoped to the project", async () => {
+      const patches: unknown[] = [];
+      server.use(
+        http.patch(
+          "/api/v1/connectors/:connectorId/sources/status",
+          async ({ params, request }) => {
+            patches.push({
+              connectorId: params.connectorId,
+              projectId: new URL(request.url).searchParams.get("projectId"),
+              body: await request.json(),
+            });
+            return HttpResponse.json({});
+          },
+        ),
+      );
+
+      const { user, panel } = await openNotionDrawer();
+      await user.click(
+        within(panel).getByRole("switch", { name: /toggle ingestion for acme workspace/i }),
+      );
+
+      await waitFor(() => {
+        expect(patches).toEqual([
+          {
+            connectorId: "notion",
+            projectId: "proj1",
+            body: { sources: [{ sourceId: "notion-conn-1", enabled: false }] },
+          },
+        ]);
+      });
+    });
+
+    it("removes the workspace connection from the project", async () => {
+      const removed: string[] = [];
+      server.use(
+        http.delete("/api/v1/notion/projects/proj1/connections/:connectionId", ({ params }) => {
+          removed.push(String(params.connectionId));
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+
+      const { user, panel } = await openNotionDrawer();
+      await user.click(within(panel).getByRole("button", { name: /remove from project/i }));
+      await user.click(await screen.findByRole("button", { name: /^remove$/i }));
+
+      await waitFor(() => expect(removed).toEqual(["notion-conn-1"]));
+    });
+
+    it("loads the schedule from the project's connection list and saves it per connection", async () => {
+      const saved: unknown[] = [];
+      server.use(
+        http.put(
+          "/api/v1/notion/projects/proj1/connections/:connectionId/schedule",
+          async ({ params, request }) => {
+            saved.push({ connectionId: params.connectionId, body: await request.json() });
+            return HttpResponse.json(notionConnection);
+          },
+        ),
+      );
+
+      const { user, panel } = await openNotionDrawer();
+      const minutes = await within(panel).findByLabelText("Minutes");
+      await waitFor(() => expect(minutes).toHaveValue(60));
+
+      await user.clear(minutes);
+      await user.type(minutes, "45");
+      await user.click(within(panel).getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(saved).toEqual([
+          {
+            connectionId: "notion-conn-1",
+            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 45 } },
+          },
+        ]);
+      });
+    });
+
+    it("applies the project-wide schedule to each Notion workspace of the project", async () => {
+      const saved: unknown[] = [];
+      server.use(
+        http.put(
+          "/api/v1/notion/projects/proj1/connections/:connectionId/schedule",
+          async ({ params, request }) => {
+            saved.push({ connectionId: params.connectionId, body: await request.json() });
+            return HttpResponse.json(notionConnection);
+          },
+        ),
+      );
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await user.click(await screen.findByRole("button", { name: /manage sync settings/i }));
+
+      expect(await screen.findByText("Notion Sync Settings")).toBeInTheDocument();
+
+      await user.click(
+        await screen.findByRole("switch", {
+          name: /toggle notion auto update for this project/i,
+        }),
+      );
+      expect(
+        screen.getByText(/Due checks skip Notion workspaces in this project/i),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /apply to project/i }));
+
+      await waitFor(() => {
+        expect(saved).toEqual([
+          {
+            connectionId: "notion-conn-1",
+            body: { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } },
+          },
+        ]);
+      });
+    });
+
+    it("filters the run history to a Notion workspace via its connection id", async () => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [
+          {
+            id: "repo-uuid",
+            name: "octocat/hello-world",
+            type: "GITHUB",
+            status: "CONNECTED",
+          },
+        ],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([
+        {
+          sourceSystem: "GITHUB",
+          sourceId: "octocat/hello-world",
+          displayName: "octocat/hello-world",
+          repositoryId: "repo-uuid",
+          owner: "octocat",
+          name: "hello-world",
+          sourceUrl: "https://github.com/octocat/hello-world",
+          connectionStatus: "CONNECTED",
+          enabled: true,
+          lastRunTime: "2026-07-01T00:00:00Z",
+          ingestedCount: 1,
+          updatedCount: 0,
+          deletedCount: 0,
+          failedCount: 0,
+          failedItems: [],
+          artifactCount: 10,
+          lastCommitsSyncAt: null,
+          lastIssuesSyncAt: null,
+          lastPullRequestsSyncAt: null,
+        },
+        notionStatusRow(),
+      ]);
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("combobox", { name: "Filter runs by source" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("combobox", { name: "Filter runs by source" }));
+      await user.click(await screen.findByRole("option", { name: "Acme Workspace" }));
+
+      // A workspace is scoped by its connection id, not by the workspace id the status row carries.
+      await waitFor(() => {
+        expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            repositoryId: "notion-conn-1",
+            sourceRef: undefined,
+            page: 1,
+          }),
+        );
+      });
+    });
+  });
+
   it("opens the connectors modal from Manage connectors", async () => {
     const user = userEvent.setup();
     render(

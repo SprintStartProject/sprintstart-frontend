@@ -4,6 +4,7 @@ import type {
   DataSource,
   GithubRepositoryDetails,
   JiraInstanceSourceDetails,
+  NotionWorkspaceSourceDetails,
 } from "./types.ts";
 
 /** The repository behind a GitHub card; null for any other source or an unresolved repository. */
@@ -24,4 +25,9 @@ export function jiraInstanceOf(source: DataSource): JiraInstanceSourceDetails | 
 /** The space behind a Confluence card; null for any other source or a card without a connection. */
 export function confluenceSpaceOf(source: DataSource): ConfluenceSpaceSourceDetails | null {
   return source.details.system === "CONFLUENCE" ? source.details.space : null;
+}
+
+/** The workspace behind a Notion card; null for any other source or one without workspace details. */
+export function notionWorkspaceOf(source: DataSource): NotionWorkspaceSourceDetails | null {
+  return source.details.system === "NOTION" ? source.details.workspace : null;
 }

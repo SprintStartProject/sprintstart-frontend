@@ -12,6 +12,7 @@ export type { BitbucketDraftSource } from "../connectors/bitbucket/draft.ts";
 export type { ConfluenceDraftSource } from "../connectors/confluence/draft.ts";
 export type { GithubDraftSource } from "../connectors/github/draft.ts";
 export type { JiraDraftSource } from "../connectors/jira/draft.ts";
+export type { NotionDraftSource } from "../connectors/notion/draft.ts";
 export type { UploadDraftSource } from "../connectors/upload/draft.ts";
 export {
   createBitbucketDraft,
@@ -20,6 +21,7 @@ export {
 export { createConfluenceDraft, isValidConfluenceSpaceId } from "../connectors/confluence/draft.ts";
 export { createDraftSource, createDraftSourceFromDiscovery } from "../connectors/github/draft.ts";
 export { createJiraDraft } from "../connectors/jira/draft.ts";
+export { createNotionDraft } from "../connectors/notion/draft.ts";
 export { createUploadDraft } from "../connectors/upload/draft.ts";
 
 /**

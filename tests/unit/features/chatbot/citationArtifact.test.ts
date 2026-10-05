@@ -28,6 +28,15 @@ describe("deriveArtifactFromCitation", () => {
     expect(file.artifactType).toBe("FILE");
   });
 
+  it("attributes notion.so and notion.site citations to Notion", () => {
+    const page = open("Handbook", "https://www.notion.so/acme/Handbook-123");
+    const site = open("Handbook", "https://acme.notion.site/Handbook-123");
+
+    expect(page.sourceSystem).toBe("NOTION");
+    expect(site.sourceSystem).toBe("NOTION");
+    expect(page.sourceUrl).toBe("https://www.notion.so/acme/Handbook-123");
+  });
+
   it("treats a citation without a URL as an upload with no source link", () => {
     const artifact = open("handbook.pdf");
 

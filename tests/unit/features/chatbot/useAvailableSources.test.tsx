@@ -45,6 +45,15 @@ describe("useAvailableSources", () => {
     expect([...result.current.sources].sort()).toEqual(["GITHUB", "UPLOAD"]);
   });
 
+  it("does not offer Notion while the chat has no filter for it", async () => {
+    mockListConnectors.mockResolvedValue([connector("github"), connector("notion")]);
+
+    const { result } = renderHook(() => useAvailableSources());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect([...result.current.sources].sort()).toEqual(["GITHUB", "UPLOAD"]);
+  });
+
   it("leaves out a disabled connector and any id the chat has no filter for", async () => {
     mockListConnectors.mockResolvedValue([
       connector("github"),
