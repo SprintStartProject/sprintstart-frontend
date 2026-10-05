@@ -898,11 +898,12 @@ export function BoardGrid({
    * reading the board notices they want, and the grip is there in both.
    */
   const handleDrag = useCallback(
-    (id: string) => {
-      const dragged = elements.current.get(id);
-      if (!dragged) return;
-
-      const { x, y } = centerOf(dragged);
+    (id: string, point: { x: number; y: number }) => {
+      // The pointer, not the dragged card's centre. The card is held by its grip in a corner, so
+      // its centre sits half a card away from where the hire is looking — and how far depends on
+      // the card's size, which is why aiming at a card's middle piled onto some cards and not
+      // others. Letting go already goes by the pointer; this now agrees with it.
+      const { x, y } = toViewport(point);
 
       for (const [candidateId, element] of elements.current) {
         if (candidateId === id || !contains(element, x, y)) continue;
@@ -1272,7 +1273,7 @@ export function BoardGrid({
           restingRef.current = null;
           setDraggingId(card.id);
         }}
-        onDrag={() => handleDrag(card.id)}
+        onDrag={(point) => handleDrag(card.id, point)}
         onDragEnd={() => setDraggingId(null)}
         onHoverChange={(hovered) =>
           setHoveredId((current) => (hovered ? card.id : current === card.id ? null : current))
@@ -1625,7 +1626,8 @@ type BoardCardCellProps = {
   undoNotice: BoardUndoNotice | null;
   registerElement: (id: string, element: HTMLDivElement | null) => void;
   onDragStart: () => void;
-  onDrag: () => void;
+  /** Every frame of a drag, with where the pointer is (page coordinates). */
+  onDrag: (point: { x: number; y: number }) => void;
   onDragEnd: () => void;
   onHoverChange: (hovered: boolean) => void;
 };
@@ -1947,7 +1949,7 @@ function BoardCardCell({
         dragElastic={0}
         dragMomentum={false}
         onDragStart={onDragStart}
-        onDrag={onDrag}
+        onDrag={(_event, info) => onDrag(info.point)}
         onDragEnd={(_event, info) => {
           onDrop(card.id, info.point);
           onDragEnd();
