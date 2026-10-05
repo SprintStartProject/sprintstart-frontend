@@ -75,7 +75,6 @@ import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
 import { setOnboardingPlace } from "../features/onboarding/onboardingPlace";
 import { KeptOnBoard } from "../features/board/components/KeptOnBoard";
-import { StepNotes } from "../features/board/components/StepNotes";
 import {
   askAboutEmptyPhase,
   askAboutEmptyPhases,
@@ -851,7 +850,7 @@ export function OnBoardingPage() {
           continueLabel={next.label}
           onContinue={next.run}
         />
-        <StepNotes stepId={item.id} stepTitle={item.title} />
+        <KeptOnBoard place={{ kind: "step", id: item.id }} path={path} className="mt-3" />
       </>
     );
   };
