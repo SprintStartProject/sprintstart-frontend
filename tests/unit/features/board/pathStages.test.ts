@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { CardOrigins } from "../../../../src/features/board/layout/cardOrigins";
-import { pathAreas } from "../../../../src/features/board/layout/pathAreas";
 import {
   isCardAt,
   pathPhases,
@@ -143,36 +142,5 @@ describe("whether a card belongs to a step or a phase", () => {
   it("matches a phase by name only, without the path", () => {
     expect(isCardAt(note("a"), { kind: "phase", id: "p2" }, null, origins)).toBe(false);
     expect(isCardAt(note("b"), { kind: "phase", id: "p2" }, null, origins)).toBe(true);
-  });
-});
-
-describe("the areas the board makes from the path", () => {
-  const origins: CardOrigins = {
-    a: { url: "/onboarding?step=s1", label: "" },
-    b: { url: "/onboarding?step=s3", label: "" },
-    c: { url: "/onboarding?step=s3", label: "" },
-    filed: { url: "/onboarding?step=s3", label: "" },
-  };
-  const cards = [
-    note("a"),
-    note("b"),
-    note("c"),
-    note("filed"),
-    note("loose"),
-    stepCard("x", "s2"),
-  ];
-  const own = [{ id: "mine", name: "Mine", cardIds: ["filed"], collapsed: false }];
-
-  it("makes one per phase with cards, in path order, leaving the hire's own areas alone", () => {
-    const areas = pathAreas(cards, own, path, phases, origins, new Set(["path-phase:p3"]));
-
-    expect(areas.map((area) => [area.name, area.cardIds, area.collapsed])).toEqual([
-      ["Setup", ["a"], false],
-      ["Ship", ["b", "c"], true],
-    ]);
-  });
-
-  it("makes none without a path", () => {
-    expect(pathAreas(cards, own, null, null, origins, new Set())).toEqual([]);
   });
 });

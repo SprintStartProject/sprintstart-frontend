@@ -9,15 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
-import {
-  ChevronsDownUp,
-  ChevronsUpDown,
-  GripVertical,
-  Layers,
-  Lock,
-  Milestone,
-  X,
-} from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, Lock, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Collapsible } from "../../../components/ui/Collapsible";
@@ -43,7 +35,6 @@ import { BoardStageBand } from "./BoardStageBand";
 import { cardAccent } from "../layout/cardAccents";
 import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents";
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
-import { isPathArea } from "../layout/pathAreas";
 import { moveTo } from "../layout/boardOrder";
 import { cardIcon } from "../layout/cardIcons";
 import { buddyLockSaid, lockedAfter, teamLockSaid } from "../../graph-diagram/lockWords";
@@ -1200,7 +1191,7 @@ export function BoardGrid({
           onDragMove={(element) => handleGroupDrag(blockIndex, element)}
           onRename={onRenameGroup}
           onToggle={onToggleGroup}
-          onDissolve={isPathArea(block.group.id) ? undefined : onDissolveGroup}
+          onDissolve={onDissolveGroup}
           onRecolour={onRecolourGroup}
           // No stage badge: the whole point of this area is that its cards do not share one, and
           // the bands inside say what each of them is.
@@ -1224,7 +1215,7 @@ export function BoardGrid({
         onDragMove={(element) => handleGroupDrag(blockIndex, element)}
         onRename={onRenameGroup}
         onToggle={onToggleGroup}
-        onDissolve={isPathArea(block.group.id) ? undefined : onDissolveGroup}
+        onDissolve={onDissolveGroup}
         onRecolour={onRecolourGroup}
         stage={states?.get(block.cards[0]?.id ?? "")?.stage}
         registerElement={registerGroupElement}
@@ -2103,21 +2094,6 @@ function BoardGroupSection({
           <span className="shrink-0 text-xs text-app-text-subtle tabular-nums">
             {group.cardIds.length}
           </span>
-
-          {/* An area the board made from the path rather than one the hire made — see
-              `pathAreas.ts`. Said in a word, because the difference is what explains why it has no
-              way to be dissolved, and why renaming it makes it theirs. */}
-          {isPathArea(group.id) && (
-            <Badge
-              variant="neutral"
-              size="sm"
-              className="gap-1"
-              title="Made from your onboarding path"
-            >
-              <Milestone className="h-3 w-3" aria-hidden="true" />
-              Path
-            </Badge>
-          )}
 
           {/* The stage comes from the path, so it is a fact here and never a control. */}
           {stage && (
