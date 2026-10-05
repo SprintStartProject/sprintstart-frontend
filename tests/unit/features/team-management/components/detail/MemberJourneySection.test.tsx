@@ -11,6 +11,7 @@ import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
 } from "../../../../../../src/features/onboarding/types";
+import { memberJourneyViewKey } from "../../../../../../src/features/onboarding/journeyViewMemory";
 
 // The remembered List/Graph view is keyed on the manager looking as well as on the member, so
 // the section asks who is signed in.
@@ -108,6 +109,25 @@ describe("MemberJourneySection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // The graph is the default; most tests here are about the list, so the manager left it there.
+    localStorage.setItem(
+      memberJourneyViewKey("pm-1", "user1"),
+      JSON.stringify({ mode: "list", graphPhaseId: null }),
+    );
+  });
+
+  it("opens on the graph when nothing is remembered, and lists it first", async () => {
+    localStorage.clear();
+    renderSection();
+
+    expect(
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
+    ).toBeInTheDocument();
+    const slider = screen.getByRole("button", { name: "Graph" }).parentElement!;
+    expect(within(slider).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Graph",
+      "List",
+    ]);
   });
 
   it("opens on the phase the member is in, with items in graph order", () => {
