@@ -14,7 +14,7 @@ import {
   ThumbsUp,
   Trophy,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../../../components/ui/Button";
 import { Textarea } from "../../../../components/ui/Textarea";
 import { useToast } from "../../../../context/useToast";
@@ -58,12 +58,6 @@ type Props = {
   onContinue: () => void;
   /** `inline` sits inside a list row; `focus` fills the graph when zoomed into a step. */
   layout?: "inline" | "focus";
-  /**
-   * Drawn at the foot of the right-hand column, under the resources — the hire's own notes on the
-   * step (`StepNotes`). A slot rather than an import, so the step stays a step and the board is
-   * what the page chooses to put beside it.
-   */
-  aside?: ReactNode;
 };
 
 type Drawer = "skip" | "feedback" | null;
@@ -89,7 +83,6 @@ export function StepWorkspace({
   continueLabel,
   onContinue,
   layout = "inline",
-  aside,
 }: Props) {
   const toast = useToast();
   const { flyby } = useMoments();
@@ -408,7 +401,7 @@ export function StepWorkspace({
       ) : null}
 
       <div
-        className={`grid gap-4 ${resources.length > 0 || outcomes.length > 0 || aside ? "lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}`}
+        className={`grid gap-4 ${resources.length > 0 || outcomes.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_18rem]" : ""}`}
       >
         {/* ── Tasks ── */}
         <div className="min-w-0 space-y-3">
@@ -448,8 +441,8 @@ export function StepWorkspace({
           )}
         </div>
 
-        {/* ── What it leads to, what helps, and what the hire kept ── */}
-        {outcomes.length > 0 || resources.length > 0 || aside ? (
+        {/* ── What it leads to, and what helps ── */}
+        {outcomes.length > 0 || resources.length > 0 ? (
           <div className="space-y-3">
             {outcomes.length > 0 ? (
               <div className="rounded-2xl bg-app-surface-muted p-3">
@@ -501,7 +494,6 @@ export function StepWorkspace({
                 </div>
               </div>
             ) : null}
-            {aside}
           </div>
         ) : null}
       </div>

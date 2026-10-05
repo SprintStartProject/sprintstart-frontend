@@ -840,17 +840,19 @@ export function OnBoardingPage() {
       );
     }
     return (
-      <StepWorkspace
-        key={item.id}
-        stepId={item.id}
-        stepStatus={item.step.status}
-        layout={layout}
-        onPathChanged={refreshPath}
-        onSkipAnswerSeen={acknowledgeSkipAnswer}
-        continueLabel={next.label}
-        onContinue={next.run}
-        aside={<StepNotes stepId={item.id} stepTitle={item.title} />}
-      />
+      <>
+        <StepWorkspace
+          key={item.id}
+          stepId={item.id}
+          stepStatus={item.step.status}
+          layout={layout}
+          onPathChanged={refreshPath}
+          onSkipAnswerSeen={acknowledgeSkipAnswer}
+          continueLabel={next.label}
+          onContinue={next.run}
+        />
+        <StepNotes stepId={item.id} stepTitle={item.title} />
+      </>
     );
   };
 

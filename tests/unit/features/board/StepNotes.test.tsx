@@ -55,13 +55,7 @@ describe("your notes under a step", () => {
 
     render(wrap(<StepNotes stepId="s1" stepTitle="Set up SSH" />));
 
-    // Folded, it only says how many there are.
-    const toggle = await screen.findByRole("button", { name: /your notes · 1/i });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("SSH key")).not.toBeInTheDocument();
-
-    await userEvent.click(toggle);
-    expect(screen.getByText("SSH key")).toBeInTheDocument();
+    expect(await screen.findByText("SSH key")).toBeInTheDocument();
     expect(screen.getByText(/add it to the agent first/)).toBeInTheDocument();
     expect(screen.queryByText("Unrelated")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /on your board/i })).toHaveAttribute(
@@ -80,9 +74,8 @@ describe("your notes under a step", () => {
 
     render(wrap(<StepNotes stepId="s1" stepTitle="Set up SSH" />));
 
-    await userEvent.click(screen.getByRole("button", { name: /your notes/i }));
     await userEvent.type(screen.getByLabelText(/a note for yourself/i), "Ask Sam for VPN access");
-    await userEvent.click(screen.getByRole("button", { name: "Keep" }));
+    await userEvent.click(screen.getByRole("button", { name: "Keep on my board" }));
 
     await waitFor(() =>
       expect(addCard).toHaveBeenCalledWith("p1", { kind: "NOTE", text: "Ask Sam for VPN access" }),
