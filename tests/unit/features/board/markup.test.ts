@@ -148,3 +148,34 @@ describe("marking inside markdown", () => {
     expect(toggleMark("[[ssh]] then ssh again", "ssh")).toBe("[[ssh]] then ==ssh== again");
   });
 });
+
+describe("marking what the card shows rather than what the source says", () => {
+  it("marks a selection that runs across a line break, line by line", () => {
+    expect(toggleMark("deploys are\non Thursdays", "are on Thursdays")).toBe(
+      "deploys ==are==\n==on Thursdays==",
+    );
+  });
+
+  it("marks across bold and list markers, inside the formatting", () => {
+    expect(toggleMark("- **Ask Sam** before merging", "Ask Sam before")).toBe(
+      "- **==Ask Sam==** ==before== merging",
+    );
+    expect(toggleMark("1. first step\n2. second step", "first step second")).toBe(
+      "1. ==first step==\n2. ==second== step",
+    );
+  });
+
+  it("marks a link's words but never its target", () => {
+    expect(toggleMark("read [the docs](/onboarding/docs) first", "the docs first")).toBe(
+      "read [==the docs==](/onboarding/docs) ==first==",
+    );
+  });
+
+  it("collapses runs of spaces the way the card does", () => {
+    expect(toggleMark("one  two", "one two")).toBe("==one  two==");
+  });
+
+  it("leaves text it cannot find alone", () => {
+    expect(toggleMark("hello there", "goodbye")).toBe("hello there");
+  });
+});

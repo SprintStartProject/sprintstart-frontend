@@ -213,5 +213,100 @@ export function toggleMark(text: string, selected: string): string {
     offset += run.marked ? run.text.length + 2 * MARK.length : run.text.length;
   }
 
-  return text;
+  return markAsSeen(text, needle) ?? text;
+}
+
+/**
+ * Marks a selection the way the card *shows* it, when it is not found in the source as it stands.
+ *
+ * What the hire selects is the rendered note, flattened by the selection code into one line with
+ * single spaces. The source has line breaks where the card has them, list markers and `**` where
+ * the card has bullets and bold, and link syntax around a link's words. So a selection across two
+ * lines, or over a bold word and the next, is not a substring of the source — which, for a note
+ * written in Markdown, is most selections worth making.
+ *
+ * So the source is read the way the card shows it: syntax dropped, whitespace collapsed, each
+ * visible character remembering where it sits in the source. The selection is found in that, and
+ * every unbroken stretch of source it covers is wrapped on its own — `**==bold==** ==word==`,
+ * `==line one==` / `==line two==` — because a highlight is drawn inside one run of text and cannot
+ * reach across a line break or out of a bold word. Never inside link targets, code, `[[…]]` or an
+ * existing highlight. Null when the selection is not there either.
+ */
+function markAsSeen(text: string, needle: string): string | null {
+  const wanted = needle.replace(/\s+/g, " ").trim();
+  if (wanted.length === 0) return null;
+
+  const hidden = new Set<number>();
+  const block = (from: number, to: number) => {
+    for (let index = from; index < to; index++) hidden.add(index);
+  };
+  const markedAt = new Set<number>();
+
+  // Not prose at all: nothing in these is visible as typed, or may be painted.
+  for (const [from, to] of unmarkableRanges(text)) block(from, to);
+  // Existing highlights: their delimiters are syntax, their words are off limits.
+  let offset = 0;
+  for (const run of splitMarks(text)) {
+    if (run.marked) {
+      block(offset, offset + MARK.length);
+      for (
+        let index = offset + MARK.length;
+        index < offset + MARK.length + run.text.length;
+        index++
+      )
+        markedAt.add(index);
+      block(offset + MARK.length + run.text.length, offset + 2 * MARK.length + run.text.length);
+      offset += run.text.length + 2 * MARK.length;
+    } else {
+      offset += run.text.length;
+    }
+  }
+  // Line-start syntax: headings, bullets, numbers, quotes, task boxes.
+  for (const match of text.matchAll(
+    /^[ \t]*(?:#{1,6}[ \t]+|>[ \t]?|(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?)/gm,
+  )) {
+    block(match.index, match.index + match[0].length);
+  }
+  // Emphasis markers, and the bracket that opens a link's words.
+  for (const match of text.matchAll(/\*\*|__|~~|\*|\[(?!\[)/g)) {
+    block(match.index, match.index + match[0].length);
+  }
+
+  // The card's text, one character at a time, with where each came from. Whitespace collapses to
+  // one space that remembers it was a break, so a match never stitches across one.
+  const seen: { char: string; at: number }[] = [];
+  for (let index = 0; index < text.length; index++) {
+    if (hidden.has(index) && !markedAt.has(index)) continue;
+    const char = text[index];
+    if (/\s/.test(char)) {
+      if (seen.length > 0 && seen[seen.length - 1].char !== " ") seen.push({ char: " ", at: -1 });
+      continue;
+    }
+    seen.push({ char, at: index });
+  }
+  const flat = seen.map((entry) => entry.char).join("");
+
+  for (let start = flat.indexOf(wanted); start !== -1; start = flat.indexOf(wanted, start + 1)) {
+    const covered = seen.slice(start, start + wanted.length);
+    if (covered.some((entry) => entry.at !== -1 && markedAt.has(entry.at))) continue;
+
+    // Unbroken stretches of the source, each wrapped on its own.
+    const stretches: [number, number][] = [];
+    for (const entry of covered) {
+      if (entry.at === -1) continue;
+      const last = stretches[stretches.length - 1];
+      const between = last ? text.slice(last[1], entry.at) : "";
+      if (last && (entry.at === last[1] || /^[^\S\n]+$/.test(between))) last[1] = entry.at + 1;
+      else stretches.push([entry.at, entry.at + 1]);
+    }
+    if (stretches.length === 0) return null;
+
+    let result = text;
+    for (const [from, to] of [...stretches].reverse()) {
+      result = `${result.slice(0, from)}${MARK}${result.slice(from, to)}${MARK}${result.slice(to)}`;
+    }
+    return result;
+  }
+
+  return null;
 }
