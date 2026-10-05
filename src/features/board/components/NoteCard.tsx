@@ -10,7 +10,7 @@ import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutNote } from "../generation/cardQuestion";
 import { Marked } from "./Marked";
 import { NoteMarkdown } from "./NoteMarkdown";
-import { looksLikeMarkdown } from "../layout/noteMarkdown";
+import { looksLikeMarkdown, plainHeading } from "../layout/noteMarkdown";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardMark } from "../marks/cardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";
@@ -126,7 +126,7 @@ export function NoteCard({
           // The first line is the note's own words, so it can be marked like any other part of it.
           // `controlLabel` below keeps the card's controls saying "the note card" rather than
           // trying to put a highlighted sentence inside an accessible name.
-          <Marked text={heading} marks={marks} parse cardId={card.id} />
+          <Marked text={plainHeading(heading)} marks={marks} parse cardId={card.id} />
         )
       }
       controlLabel="note"

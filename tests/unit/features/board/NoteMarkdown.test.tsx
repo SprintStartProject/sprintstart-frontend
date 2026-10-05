@@ -2,7 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { NoteMarkdown } from "../../../../src/features/board/components/NoteMarkdown";
-import { looksLikeMarkdown } from "../../../../src/features/board/layout/noteMarkdown";
+import {
+  looksLikeMarkdown,
+  plainHeading,
+} from "../../../../src/features/board/layout/noteMarkdown";
 
 describe("a note the buddy wrote in Markdown", () => {
   it("is told apart from a plain note", () => {
@@ -26,5 +29,13 @@ describe("a note the buddy wrote in Markdown", () => {
     expect(container.querySelector("mark")?.textContent).toBe("runbook");
     expect(container.querySelector("br")).not.toBeNull();
     expect(container.textContent).not.toContain("==");
+  });
+});
+
+describe("a Markdown first line as a note's title", () => {
+  it("loses the syntax and keeps the words", () => {
+    expect(plainHeading("## Recap of **Setup**")).toBe("Recap of Setup");
+    expect(plainHeading("Read `README` and [the guide](/kb)")).toBe("Read README and the guide");
+    expect(plainHeading("Keep ==this== marked")).toBe("Keep ==this== marked");
   });
 });

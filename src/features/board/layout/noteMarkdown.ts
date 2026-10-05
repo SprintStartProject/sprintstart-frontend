@@ -65,3 +65,21 @@ export function remarkNoteText() {
 
   return (tree: MdNode) => walk(tree);
 }
+
+/**
+ * A note's first line, as a title: the Markdown that only means "this is a heading" or "this is
+ * bold" taken off it.
+ *
+ * The first line of a note is drawn as the card's title (see `NoteCard`), and a buddy writing in
+ * Markdown starts a note with `## Recap` — which is already a title, so the `##` only made it read as
+ * source. Emphasis, code and link syntax go the same way; the words stay. Highlights (`==…==`) are
+ * left in, because `Marked` draws them.
+ */
+export function plainHeading(line: string): string {
+  return line
+    .replace(/^\s{0,3}#{1,6}\s+/, "")
+    .replace(/\s+#+\s*$/, "")
+    .replace(/\*\*(.+?)\*\*|__(.+?)__/g, "$1$2")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+}
