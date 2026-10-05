@@ -11,7 +11,7 @@ import {
   writeCardMarks,
   type CardMarks,
 } from "./cardMarks";
-import { addMark, enclosingMark, isMarked, unmarkPart } from "./markup";
+import { addMark, enclosingMark, isMarked, markGroup, splitMarks, unmarkPart } from "./markup";
 import { DEFAULT_HIGHLIGHT, type HighlightColor } from "./highlightColors";
 import { readMarkLabels, setMarkLabel, writeMarkLabels, type MarkLabels } from "./markLabels";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -139,6 +139,12 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
     [cardById, marks],
   );
 
+  /** The colour a note's highlight is drawn in — its stored colour, or yellow where none is. */
+  const colorIn = useCallback(
+    (cardId: string) => (run: string) => colorOf(marksOf(marks, cardId), run) ?? DEFAULT_HIGHLIGHT,
+    [marks],
+  );
+
   /** Stores a colour beside the card, or drops it. The one write both storages share. */
   const writeColor = useCallback(
     (cardId: string, selected: string, color: HighlightColor | null) => {
@@ -162,23 +168,43 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
 
       if (card.content.kind === "NOTE") {
         const text = card.content.text;
+
+        // A new colour for a highlight that is already there: the whole of it, every piece one
+        // stroke over a list or across a paragraph left behind (see `markGroup`).
+        if (isMarked(text, selected)) {
+          const group = markGroup(text, selected, colorIn(cardId));
+          for (const piece of group?.texts ?? [selected]) writeColor(cardId, piece, color);
+          return;
+        }
+
         // Painting part of an existing highlight: cut it out of the old one first, then mark it on
         // its own. Wrapping it where it stands would nest one pair of delimiters inside another,
         // and the parser closes at the first `==` it meets.
-        const inside = enclosingMark(text, selected) !== null && !isMarked(text, selected);
-        const next = addMark(inside ? unmarkPart(text, selected) : text, selected);
+        const around = enclosingMark(text, selected);
+        const cut = around !== null ? unmarkPart(text, selected) : text;
+        const next = addMark(cut, selected);
 
         // Unchanged and not already marked means the selection spans something no single run
         // contains — a heading and the body, two cards, or text drawn from formatting (a bold
         // word, a link, a step chip) in a note the buddy wrote in Markdown. Nothing to paint, so
         // nothing is stored — and the hire is told, rather than left wondering why nothing lit.
-        if (next === text && !isMarked(text, selected)) {
+        if (next === cut) {
           toast.info("That can't be highlighted", {
             description: "Try a shorter piece of plain text, without links or formatting in it.",
           });
           return;
         }
-        if (next !== text) board.current?.onEditCard?.(cardId, { kind: "NOTE", text: next });
+        board.current?.onEditCard?.(cardId, { kind: "NOTE", text: next });
+
+        // Every piece the stroke became takes the colour — a selection over three list items is
+        // three `==…==`, and a colour stored only under the whole selection would match none.
+        for (const piece of newPieces(cut, next)) writeColor(cardId, piece, color);
+        // What is left of a highlight that was painted over in part keeps the colour it had.
+        if (around !== null) {
+          const was = colorIn(cardId)(around);
+          for (const piece of newPieces(text, cut)) writeColor(cardId, piece, was);
+        }
+        return;
       } else {
         // The same cut, on the other storage: what was around the selection keeps the colour it
         // had, and the selection itself takes the new one from `writeColor` below.
@@ -187,7 +213,7 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
 
       writeColor(cardId, selected, color);
     },
-    [cardById, toast, writeColor],
+    [cardById, colorIn, toast, writeColor],
   );
 
   const unmark = useCallback(
@@ -196,6 +222,16 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
       if (!card) return;
 
       if (card.content.kind === "NOTE") {
+        // Removing a whole highlight takes all of it: every piece of one stroke (see `markGroup`).
+        const group = isMarked(card.content.text, selected)
+          ? markGroup(card.content.text, selected, colorIn(cardId))
+          : null;
+        if (group) {
+          board.current?.onEditCard?.(cardId, { kind: "NOTE", text: group.without });
+          for (const piece of group.texts) writeColor(cardId, piece, null);
+          return;
+        }
+
         const next = unmarkPart(card.content.text, selected);
         if (next !== card.content.text) {
           board.current?.onEditCard?.(cardId, { kind: "NOTE", text: next });
@@ -204,7 +240,7 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
 
       writeColor(cardId, selected, null);
     },
-    [cardById, writeColor],
+    [cardById, colorIn, writeColor],
   );
 
   const value = useMemo(
@@ -238,4 +274,19 @@ export function CardMarksProvider({ children }: { children: ReactNode }) {
   );
 
   return <CardMarksContext.Provider value={value}>{children}</CardMarksContext.Provider>;
+}
+
+/** The highlights `next` has that `before` did not — what one stroke of the pen just made. */
+function newPieces(before: string, next: string): string[] {
+  const had = splitMarks(before)
+    .filter((run) => run.marked)
+    .map((run) => run.text);
+  const pieces: string[] = [];
+  for (const run of splitMarks(next)) {
+    if (!run.marked) continue;
+    const known = had.indexOf(run.text);
+    if (known === -1) pieces.push(run.text);
+    else had.splice(known, 1);
+  }
+  return pieces;
 }

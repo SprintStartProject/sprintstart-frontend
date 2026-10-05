@@ -147,6 +147,73 @@ export function unmarkPart(text: string, selected: string): string {
 }
 
 /**
+ * The highlights that read as one with `piece`: the run itself, and every neighbour reached across
+ * nothing but layout — whitespace, a line break, a list marker, `**`, a link's target — that is
+ * painted the same colour.
+ *
+ * A highlight cannot reach across a line or out of a bold word, so one stroke over a list is
+ * stored as one `==…==` per item (see `markAsSeen`). To the hire it is still one highlight, and
+ * removing it or changing its colour has to act on all of it — while two items they marked
+ * separately in *different* colours stay two highlights. Same colour and nothing visible between
+ * them is the one case the text cannot tell apart, and there they act as one.
+ *
+ * `without` is the text with the whole group's delimiters taken out, by position, so a second
+ * occurrence of the same words elsewhere in the note is left alone. Null when `piece` is not a
+ * highlight in the text.
+ */
+export function markGroup(
+  text: string,
+  piece: string,
+  colorOf: (run: string) => string,
+): { texts: string[]; without: string } | null {
+  const needle = piece.trim();
+  const runs: { text: string; marked: boolean; start: number; end: number }[] = [];
+  let offset = 0;
+  for (const run of splitMarks(text)) {
+    const length = run.marked ? run.text.length + 2 * MARK.length : run.text.length;
+    runs.push({ ...run, start: offset, end: offset + length });
+    offset += length;
+  }
+  // Whatever follows the last highlight is not in `splitMarks`' runs; it never joins a group.
+
+  const at = runs.findIndex((run) => run.marked && run.text === needle);
+  if (at === -1) return null;
+
+  const color = colorOf(needle);
+  const joins = (from: number, step: 1 | -1): number => {
+    const gap = runs[from + step];
+    const neighbour = gap?.marked ? gap : runs[from + 2 * step];
+    if (!neighbour?.marked || colorOf(neighbour.text) !== color) return -1;
+    if (!gap.marked && !onlyLayout(gap.text)) return -1;
+
+    return runs.indexOf(neighbour);
+  };
+
+  const members = [at];
+  for (let next = joins(at, -1); next !== -1; next = joins(next, -1)) members.unshift(next);
+  for (let next = joins(at, 1); next !== -1; next = joins(next, 1)) members.push(next);
+
+  let without = text;
+  for (const index of [...members].reverse()) {
+    const run = runs[index];
+    without = `${without.slice(0, run.start)}${run.text}${without.slice(run.end)}`;
+  }
+
+  return { texts: members.map((index) => runs[index].text), without };
+}
+
+/** Whether a stretch of source shows nothing on the card: whitespace and Markdown syntax only. */
+function onlyLayout(gap: string): boolean {
+  return (
+    gap
+      .replace(/\]\([^)\n]*\)/g, "")
+      .replace(/^[ \t]*\d+[.)]/gm, "")
+      .replace(/\[[ xX]\]/g, "")
+      .replace(/[\s*_~>#+\-[\]]/g, "").length === 0
+  );
+}
+
+/**
  * The parts of a note's source that are not prose a person reads: Markdown link targets
  * (`](…)`), inline code, code fences, `[[…]]` links and bare app paths. A highlight placed inside
  * one of these would change what a link points at — `/==onboarding==?step=…` is a link to nothing —

@@ -5,6 +5,7 @@ import {
   enclosingMark,
   hasMarks,
   isMarked,
+  markGroup,
   removeMark,
   splitMarks,
   stripMarks,
@@ -177,5 +178,32 @@ describe("marking what the card shows rather than what the source says", () => {
 
   it("leaves text it cannot find alone", () => {
     expect(toggleMark("hello there", "goodbye")).toBe("hello there");
+  });
+});
+
+describe("one stroke over a list, read back as one highlight", () => {
+  const yellow = () => "YELLOW";
+
+  it("groups the pieces of one stroke across list items and bold", () => {
+    const text = "- ==first== item\n- ==second==\n- **==third==** and more";
+
+    expect(markGroup(text, "first", yellow)?.texts).toEqual(["first"]);
+    expect(markGroup(text, "second", yellow)?.texts).toEqual(["second", "third"]);
+    const list = "- ==first==\n- ==second==\n- **==third==**";
+    expect(markGroup(list, "second", yellow)?.texts).toEqual(["first", "second", "third"]);
+    expect(markGroup(list, "first", yellow)?.without).toBe("- first\n- second\n- **third**");
+  });
+
+  it("keeps neighbours in another colour apart", () => {
+    const list = "- ==first==\n- ==second==";
+    const colours = (run: string) => (run === "first" ? "GREEN" : "YELLOW");
+
+    expect(markGroup(list, "second", colours)?.texts).toEqual(["second"]);
+    expect(markGroup(list, "second", colours)?.without).toBe("- ==first==\n- second");
+  });
+
+  it("does not reach across words nobody marked", () => {
+    expect(markGroup("==a== then ==b==", "a", yellow)?.texts).toEqual(["a"]);
+    expect(markGroup("plain", "a", yellow)).toBeNull();
   });
 });
