@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { NoteMarkdown } from "../../../../src/features/board/components/NoteMarkdown";
 import { StepLinkTextarea } from "../../../../src/features/board/components/StepLinkTextarea";
@@ -16,6 +16,7 @@ import {
 } from "../../../../src/features/board/layout/stepLinks";
 import type { BoardCard } from "../../../../src/features/board/types";
 import type { OnboardingPathEndpoint } from "../../../../src/features/onboarding/types";
+import { onboardingService } from "../../../../src/services/onboardingService";
 
 const path = {
   id: "path",
@@ -145,15 +146,43 @@ describe("drawing and writing them", () => {
     }
     render(<Editor />);
 
-    await userEvent.type(screen.getByLabelText("Note"), "Before [[[[key");
-    expect(screen.getByRole("option", { name: /generate a key/i })).toBeInTheDocument();
-    await userEvent.keyboard("{Escape}");
-    await userEvent.clear(screen.getByLabelText("Note"));
     await userEvent.type(screen.getByLabelText("Note"), "Before [[[[first");
     expect(screen.getByRole("option", { name: /open your first pr/i })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /set up ssh/i })).not.toBeInTheDocument();
 
     await userEvent.keyboard("{Enter}");
     expect(screen.getByRole("status")).toHaveTextContent("Before [[Open your first PR]]");
+  });
+
+  it("offers a step's tasks after [[Step#, fetched for that step", async () => {
+    const fetchTasks = vi
+      .spyOn(onboardingService, "fetchTasks")
+      .mockResolvedValue([
+        {
+          id: "t1",
+          stepId: "s1",
+          position: 0,
+          title: "Generate a key",
+          description: "",
+          finished: false,
+        },
+      ]);
+    function Editor() {
+      const [value, setValue] = useState("");
+      return (
+        <BoardPathContext.Provider value={{ path, phases }}>
+          <StepLinkTextarea aria-label="Note" value={value} onValueChange={setValue} />
+          <output>{value}</output>
+        </BoardPathContext.Provider>
+      );
+    }
+    render(<Editor />);
+
+    await userEvent.type(screen.getByLabelText("Note"), "[[[[Set up SSH#gen");
+    expect(await screen.findByRole("option", { name: /generate a key/i })).toBeInTheDocument();
+    expect(fetchTasks).toHaveBeenCalledWith("s1");
+
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("status")).toHaveTextContent("[[Set up SSH#Generate a key]]");
   });
 });

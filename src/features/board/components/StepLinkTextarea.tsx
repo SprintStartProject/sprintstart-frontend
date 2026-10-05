@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ListChecks, Milestone } from "lucide-react";
 import { Textarea, type TextareaProps } from "../../../components/ui/Textarea";
+import { onboardingService } from "../../../services/onboardingService";
 import { useBoardPath } from "../hooks/boardPath";
-import { completeLink, openLinkBefore, titleKey } from "../layout/stepLinks";
+import { completeLink, linkTarget, openLinkBefore, titleKey } from "../layout/stepLinks";
 
 /** How many steps and tasks are offered at once; typing more of the title narrows them. */
 const OFFERED = 8;
@@ -16,12 +17,15 @@ type StepLinkTextareaProps = Omit<TextareaProps, "value" | "onChange"> & {
 };
 
 /**
- * A note's text field that offers the path's steps and their tasks as soon as `[[` is typed, like
- * Obsidian does for notes — see `layout/stepLinks.ts` for what a link is and does.
+ * A note's text field that offers the path's steps as soon as `[[` is typed, and a step's tasks
+ * after `[[Step#` — the way Obsidian offers notes, then a note's headings. See `layout/stepLinks.ts`
+ * for what a link is and does.
  *
- * The offer narrows as the title is typed: a step's name finds the step and its tasks, a task's
- * name finds the task. ↑/↓ move through it, Enter or Tab takes one, Escape puts it away until the
- * next `[[`. Without a path there is nothing to offer and it is a plain text field.
+ * The offer narrows as the title is typed; ↑/↓ move through it, Enter or Tab takes one, Escape puts
+ * it away until the next `[[`. Without a path there is nothing to offer and it is a plain text field.
+ *
+ * **Tasks are asked for when they are wanted.** The path the board reads carries each step but not
+ * its tasks, so they are fetched for one step at a time, the moment a `#` follows its name.
  *
  * **In the flow, not floating.** The list sits under the field and pushes what follows down. A card
  * on the board clips whatever overflows it, and a list hovering over the card's edge was cut off.
@@ -32,40 +36,75 @@ export function StepLinkTextarea({
   onKeyDown,
   ...rest
 }: StepLinkTextareaProps) {
-  const { path } = useBoardPath();
+  const { path, phases } = useBoardPath();
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const [caret, setCaret] = useState(value.length);
   const [active, setActive] = useState(0);
   /** Where the `[[` that Escape put away starts, so the same one does not reopen at once. */
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
 
-  const offers = useMemo<Offer[]>(
+  /** Tasks fetched so far, by step id. */
+  const [tasksOf, setTasksOf] = useState<Record<string, { id: string; title: string }[]>>({});
+
+  const stepOffers = useMemo<Offer[]>(
     () =>
       [...(path?.phases ?? [])]
         .sort((left, right) => left.position - right.position)
         .flatMap((phase) =>
-          (phase.steps ?? []).flatMap((step) => [
-            { key: step.id, link: step.title, title: step.title, detail: phase.title, task: false },
-            ...[...(step.tasks ?? [])]
-              .sort((left, right) => left.position - right.position)
-              .map((task) => ({
-                key: task.id,
-                link: `${step.title}#${task.title}`,
-                title: task.title,
-                detail: step.title,
-                task: true,
-              })),
-          ]),
+          (phase.steps ?? []).map((step) => ({
+            key: step.id,
+            link: step.title,
+            title: step.title,
+            detail: phase.title,
+            task: false,
+          })),
         ),
     [path],
   );
 
   const open = openLinkBefore(value, caret);
-  const query = open ? titleKey(open.query.replace("#", " ")) : "";
+  const target = open?.query.includes("#") ? linkTarget(open.query) : null;
+  const taskStepId = target ? phases?.stepByTitle.get(titleKey(target.step)) : undefined;
+  const taskStep = taskStepId ? phases?.steps.get(taskStepId) : undefined;
+
+  // The tasks of the step named before the `#`, once, the first time they are asked for.
+  useEffect(() => {
+    if (!taskStepId || tasksOf[taskStepId]) return;
+
+    let live = true;
+    void onboardingService
+      .fetchTasks(taskStepId)
+      .then((tasks) => {
+        if (!live) return;
+        const ordered = [...tasks]
+          .sort((left, right) => left.position - right.position)
+          .map((task) => ({ id: task.id, title: task.title }));
+        setTasksOf((current) => ({ ...current, [taskStepId]: ordered }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      live = false;
+    };
+  }, [taskStepId, tasksOf]);
+
+  const offers: Offer[] =
+    taskStepId && taskStep
+      ? (tasksOf[taskStepId] ?? []).map((task) => ({
+          key: task.id,
+          link: `${taskStep.title}#${task.title}`,
+          title: task.title,
+          detail: taskStep.title,
+          task: true,
+        }))
+      : stepOffers;
+  const query = titleKey(target ? (target.task ?? "") : (open?.query ?? ""));
   const offered =
     open && open.start !== dismissedAt
       ? offers
-          .filter((offer) => titleKey(`${offer.detail} ${offer.title}`).includes(query))
+          .filter((offer) =>
+            titleKey(offer.task ? offer.title : `${offer.detail} ${offer.title}`).includes(query),
+          )
           .slice(0, OFFERED)
       : [];
   const listId = `${rest.id ?? "note"}-step-links`;
@@ -172,10 +211,11 @@ export function StepLinkTextarea({
           ))}
         </ul>
       ) : (
-        offers.length > 0 && (
+        stepOffers.length > 0 && (
           <p className="mt-1 text-xs text-app-text-subtle">
             Type <kbd className="rounded border border-app-border px-1 font-mono">[[</kbd> to link a
-            step or task of your path.
+            step, then <kbd className="rounded border border-app-border px-1 font-mono">#</kbd> for
+            one of its tasks.
           </p>
         )
       )}

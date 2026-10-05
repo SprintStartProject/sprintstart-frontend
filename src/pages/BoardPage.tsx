@@ -912,11 +912,6 @@ export function BoardPage() {
         )}
 
         <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
-          {/*
-          On the board rather than in the header. The header was a place for furniture about the
-          page; this is about the work, and it belongs where the work is.
-        */}
-          {isPathShown && <BoardPathWindow path={path} onRemove={removePathWindow} />}
           {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
             space: the board is a column of cards and the margin is where a hand rests. So the
             offers live there — always in reach, never in the way, and out of the row above the
@@ -1164,6 +1159,22 @@ export function BoardPage() {
               )}
 
               <div className="min-w-0 space-y-4">
+                {/* Under the section tabs, and outside the panel that slides between them: these are
+                    about the work rather than about one section of the board — where the hire is in
+                    their path and what is next, the phase just finished, and the check closing the
+                    one they are in. Kept together, so "continue" and "the check" read as one place. */}
+                {isPathShown && <BoardPathWindow path={path} onRemove={removePathWindow} />}
+
+                <BoardPhaseRecap boardId={boardId} path={path} />
+
+                <BoardPhaseCheck
+                  path={path}
+                  phases={phases}
+                  cards={allCards}
+                  origins={cardOrigins}
+                  marks={cardMarks}
+                />
+
                 {/* Only the cards travel. The controls above are the same controls whatever section
                   is open, and sliding them out and back would be the page redrawing its own
                   furniture every time somebody moved one tab across. */}
@@ -1209,19 +1220,6 @@ export function BoardPage() {
                       )}
                     </EmptyState>
                   )}
-
-                  {/* Above the status line: "showing 6 of 34" is about the view, and these are about
-                    the work — the phase just finished, and the check closing the one the hire is
-                    in. What is next on the path is on the path card at the top of the board. */}
-                  <BoardPhaseRecap boardId={boardId} path={path} />
-
-                  <BoardPhaseCheck
-                    path={path}
-                    phases={phases}
-                    cards={allCards}
-                    origins={cardOrigins}
-                    marks={cardMarks}
-                  />
 
                   <BoardViewStatus
                     shown={shownCards.length}
