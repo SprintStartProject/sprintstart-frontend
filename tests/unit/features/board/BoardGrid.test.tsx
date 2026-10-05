@@ -307,6 +307,39 @@ describe("the stage bands", () => {
   });
 });
 
+describe("an open pile", () => {
+  it("stays open while the highlighter's toolbar is used, and closes when you look away", () => {
+    const onToggleStack = vi.fn();
+    const chain: CardStack = {
+      rootId: "c0",
+      memberIds: ["c0", "c1"],
+      topId: "c0",
+      remaining: 2,
+      members: new Map(),
+    };
+    render(
+      <>
+        <BoardGrid
+          board={board([currentTaskContent(), currentTaskContent({ taskId: "t2" })])}
+          stacks={new Map([["c0", chain] as const, ["c1", chain] as const])}
+          expandedStackIds={new Set(["c0"])}
+          onToggleStack={onToggleStack}
+        />
+        <div role="toolbar" aria-label="Selection">
+          <button type="button">Highlight</button>
+        </div>
+        <p>Elsewhere</p>
+      </>,
+    );
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Highlight" }));
+    expect(onToggleStack).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(screen.getByText("Elsewhere"));
+    expect(onToggleStack).toHaveBeenCalledWith("c0");
+  });
+});
+
 describe("a closed pile", () => {
   const chain: CardStack = {
     rootId: "c0",

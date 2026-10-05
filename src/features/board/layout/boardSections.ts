@@ -58,7 +58,7 @@ export function markSectionColor(sectionId: string | null): HighlightColor | nul
 }
 
 /** The cards carrying at least one highlight in this colour. */
-function markedIn(cards: BoardCard[], marks: CardMarks, color: HighlightColor): BoardCard[] {
+export function markedIn(cards: BoardCard[], marks: CardMarks, color: HighlightColor): BoardCard[] {
   return cards.filter((card) => (marks[card.id] ?? []).some((mark) => mark.color === color));
 }
 

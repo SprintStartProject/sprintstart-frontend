@@ -136,6 +136,10 @@ const WIGGLE = { rotate: [-0.55, 0.55, -0.55] };
  * Ticking an item, following a link or pressing a control does what it says, and never also opens
  * the pile.
  */
+/** Pressing inside one of these is acting on the board, not looking away from an open pile. */
+const KEEPS_PILES_OPEN =
+  "[role='toolbar'], [role='dialog'], [role='menu'], [role='listbox'], [role='status'], [role='alert'], [data-keeps-piles-open]";
+
 const INTERACTIVE_WITHIN_CARD =
   "a, button, input, select, textarea, label, [role='button'], [role='checkbox'], [role='link']";
 
@@ -811,6 +815,10 @@ export function BoardGrid({
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target instanceof Element ? event.target : null;
+      // Floating controls acting on what is in the pile — the highlighter's toolbar, the colour
+      // popover, a menu or dialog — are not looking elsewhere. Pressing "Highlight" on a sentence in
+      // an open pile used to fold the pile away under the sentence being marked.
+      if (target?.closest(KEEPS_PILES_OPEN)) return;
       const openedFrame = target?.closest("[data-stack-root]");
       const insideRoot = openedFrame?.getAttribute("data-stack-root") ?? null;
 

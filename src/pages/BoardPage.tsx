@@ -51,6 +51,8 @@ import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinn
 import {
   ALL_SECTIONS,
   cardsInSection,
+  markSectionColor,
+  markedIn,
   sectionTabOrder,
   summariseSections,
 } from "../features/board/layout/boardSections";
@@ -691,6 +693,40 @@ export function BoardPage() {
   );
 
   /**
+   * Piles opened because the colour picked on the right is on a card inside them.
+   *
+   * A closed pile shows only its top card, so filtering by a colour that sits on the second card
+   * showed nothing at all — the filter's count said there was one, and the board said there was
+   * none. Such a pile is spread out for as long as the colour is picked; the filter then leaves only
+   * the cards that carry it.
+   */
+  const heldOpenByMarks = useMemo(() => {
+    const color = markSectionColor(shownSectionId);
+    if (!color) return new Set<string>();
+
+    const hits = new Set(markedIn(allCards, cardMarks, color).map((card) => card.id));
+    const roots = new Set<string>();
+    for (const stack of stacks.values()) {
+      if (stack.memberIds.some((id) => hits.has(id))) roots.add(stack.rootId);
+    }
+    return roots;
+  }, [allCards, cardMarks, shownSectionId, stacks]);
+  const visibleStackIds = useMemo(
+    () =>
+      heldOpenByMarks.size === 0 ? openStackIds : new Set([...openStackIds, ...heldOpenByMarks]),
+    [heldOpenByMarks, openStackIds],
+  );
+
+  /**
+   * The grid's open-and-close, minus the piles the colour filter holds open: folding one of those
+   * from outside it would only hide the highlight the filter is there to show.
+   */
+  function toggleVisibleStack(rootId: string) {
+    if (heldOpenByMarks.has(rootId) && !openStackIds.has(rootId)) return;
+    toggleStack(rootId);
+  }
+
+  /**
    * The sections as the tab machinery sees them: a fixed left-to-right order, and a string for the
    * current one.
    *
@@ -858,7 +894,7 @@ export function BoardPage() {
     // The phase the board was opened for, first: it is the narrowest question anybody asks
     // of this page, and the other cuts still apply within it.
     // Piles fold first, so every later cut sees one card where there is one pile.
-    const folded = collapseStacks(allCards, stacks, openStackIds);
+    const folded = collapseStacks(allCards, stacks, visibleStackIds);
     const atPlace = pathPlace
       ? folded.filter((card) => isCardAt(card, pathPlace, phases, cardOrigins))
       : folded;
@@ -878,7 +914,7 @@ export function BoardPage() {
     cardOrigins,
     filter,
     groups,
-    openStackIds,
+    visibleStackIds,
     pathPlace,
     phases,
     pinnedIds,
@@ -901,7 +937,7 @@ export function BoardPage() {
   const activeCuts = useMemo(() => {
     const cuts: string[] = [];
 
-    const piled = allCards.length - collapseStacks(allCards, stacks, openStackIds).length;
+    const piled = allCards.length - collapseStacks(allCards, stacks, visibleStackIds).length;
     if (piled > 0) cuts.push(`${piled} under other cards in piles`);
 
     if (pathPlace) {
@@ -920,7 +956,16 @@ export function BoardPage() {
     // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
     // page explaining something that is not hidden.
     return cuts;
-  }, [allCards, filter, openStackIds, pathPlace, pathPlaceTitle, shownSectionId, sections, stacks]);
+  }, [
+    allCards,
+    filter,
+    visibleStackIds,
+    pathPlace,
+    pathPlaceTitle,
+    shownSectionId,
+    sections,
+    stacks,
+  ]);
 
   const handleReorder = (cardIds: string[]) => void reorder(cardIds);
 
@@ -1352,8 +1397,8 @@ export function BoardPage() {
                     states={states}
                     onStackOnto={handleStackOnto}
                     stacks={stacks}
-                    expandedStackIds={openStackIds}
-                    onToggleStack={toggleStack}
+                    expandedStackIds={visibleStackIds}
+                    onToggleStack={toggleVisibleStack}
                     openStages={openStages}
                     onToggleStage={toggleStage}
                     cardSizes={cardSizes}
