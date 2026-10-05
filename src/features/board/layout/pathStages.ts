@@ -1,4 +1,4 @@
-import { findActivePhaseIndex, isPhaseOpen } from "../../onboarding/activePhase";
+import { phaseState } from "../../onboarding/journey";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
 import type { BoardCard } from "../types";
 import type { CardOrigins } from "./cardOrigins";
@@ -12,8 +12,10 @@ import type { BoardStage } from "./boardStructure";
  * looked at. The path already knows where somebody stands: which phase is open, which ones come
  * after it. So the board asks the path instead of asking the hire.
  *
- * **Later means "belongs to a phase you have not reached yet"**, and **Behind you** means "belongs to
- * a phase you have finished"; everything else is Now. A card is tied to
+ * **Later means "belongs to a phase you cannot start yet"** — one still waiting on another phase —
+ * and **Behind you** means "belongs to a phase you have finished"; everything else is Now. That is
+ * the Onboarding page's own reading of a phase (`phaseState` in `journey.ts`): phases are not a
+ * queue, several can be open at once, and the one the hire is working in need not be the lowest. A card is tied to
  * a phase through its origin: the live step card names its step, and a card kept while a step or a
  * phase was open on the Onboarding page carries it as its origin (`onboardingOrigin.ts`). A card
  * tied to nothing — most notes, the current task, the
@@ -31,21 +33,21 @@ export type PathPhases = {
   phaseOfStep: Map<string, string>;
   phaseOfQuestion: Map<string, string>;
   phaseIds: Set<string>;
+  /** Phases still waiting on another phase that is not done. */
   aheadPhaseIds: Set<string>;
   /** Phases with nothing left in them: every step finished or skipped, every question passed. */
   finishedPhaseIds: Set<string>;
 };
 
 /**
- * Reads the path once into the two lookups a card's stage needs.
+ * Reads the path once into the lookups a card's stage needs.
  *
- * "Ahead" is every phase after the one the hire is in that is still open. The active phase is the
- * first open one by position — the rule the Onboarding page and the PM's view of a member already
- * share — and a later phase that happens to be finished already is nothing to wait for.
+ * "Ahead" is every phase the Onboarding page shows as locked. It used to be every open phase after
+ * the first open one by position — which filed a phase the hire was already working in under Later
+ * whenever an earlier one was still open beside it.
  */
 export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
   const phases = [...path.phases].sort((left, right) => left.position - right.position);
-  const activeIndex = findActivePhaseIndex({ ...path, phases });
 
   const phaseOfStep = new Map<string, string>();
   const phaseOfQuestion = new Map<string, string>();
@@ -55,9 +57,7 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
   }
 
   const aheadPhaseIds = new Set(
-    phases
-      .filter((phase, index) => index > activeIndex && isPhaseOpen(phase))
-      .map((phase) => phase.id),
+    phases.filter((phase) => phaseState(phase) === "locked").map((phase) => phase.id),
   );
 
   return {
@@ -66,7 +66,7 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
     phaseIds: new Set(phases.map((phase) => phase.id)),
     aheadPhaseIds,
     finishedPhaseIds: new Set(
-      phases.filter((phase) => !isPhaseOpen(phase)).map((phase) => phase.id),
+      phases.filter((phase) => phaseState(phase) === "done").map((phase) => phase.id),
     ),
   };
 }

@@ -192,6 +192,9 @@ export function OnBoardingPage() {
    */
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedStepId = searchParams.get("step");
+  // `&open=1` beside `?step=`: unfold the step as well as finding it -- still without starting it.
+  // What a card's "Back to" on the board sends, since the words it was kept from are inside the step.
+  const linkOpensStep = searchParams.get("open") === "1";
   const linkedQuestionId = searchParams.get("question");
   const linkedPhaseId = searchParams.get("phase");
 
@@ -500,8 +503,13 @@ export function OnBoardingPage() {
       if (arrival.kind === "link-step" || arrival.kind === "link-question") {
         setSelectedPhaseId(owningPhase.id);
         // "You're on #3" is most likely clicked while #3 is open -- collapsing it would throw away
-        // a typed answer or skip reason.
-        setExpandedItemId((current) => (current === arrival.id ? current : null));
+        // a typed answer or skip reason. A link that asks for the step open unfolds it instead.
+        if (arrival.kind === "link-step" && linkOpensStep) {
+          scrollToItemRef.current = arrival.id;
+          setExpandedItemId(arrival.id);
+        } else {
+          setExpandedItemId((current) => (current === arrival.id ? current : null));
+        }
         setLinkHighlight({ id: arrival.id, key: arrivalKey });
         clearLinkRef.current();
         return;
@@ -516,7 +524,7 @@ export function OnBoardingPage() {
       const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
       if (item) startStepRef.current(item, { byAddress: true });
     });
-  }, [arrival, arrivalKey, loadingState, navigate, path, toast]);
+  }, [arrival, arrivalKey, linkOpensStep, loadingState, navigate, path, toast]);
 
   useEffect(() => {
     clearLinkRef.current = () =>
@@ -525,6 +533,7 @@ export function OnBoardingPage() {
           params.delete("step");
           params.delete("question");
           params.delete("phase");
+          params.delete("open");
           return params;
         },
         { replace: true },

@@ -31,8 +31,11 @@ export function onboardingPlace(): OnboardingPlace | null {
  *
  * `?step=` and `?phase=` rather than `/onboarding/:stepId`: the path segment unfolds a step *and
  * starts it* if it was waiting, and following a link back from a note is looking something up, not
- * beginning the work. The query form only lands — see `OnBoardingPage`.
+ * beginning the work. A step also carries `&open=1`, so it lands unfolded — the words a note was
+ * kept from are inside it — but still not started. See `OnBoardingPage`.
  */
 export function onboardingPlaceUrl(place: Pick<OnboardingPlace, "kind" | "id">): string {
-  return `/onboarding?${place.kind}=${encodeURIComponent(place.id)}`;
+  const url = `/onboarding?${place.kind}=${encodeURIComponent(place.id)}`;
+
+  return place.kind === "step" ? `${url}&open=1` : url;
 }

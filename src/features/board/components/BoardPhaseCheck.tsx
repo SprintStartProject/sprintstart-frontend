@@ -1,7 +1,7 @@
 import { ArrowRight, ClipboardCheck, Highlighter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "../../../components/ui/Badge";
-import { findActivePhaseIndex, isPhaseOpen } from "../../onboarding/activePhase";
+import { resolveNextAction } from "../../onboarding/nextAction";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
 import { cardName } from "../layout/cardNames";
 import type { CardOrigins } from "../layout/cardOrigins";
@@ -35,11 +35,11 @@ type BoardPhaseCheckProps = {
 export function BoardPhaseCheck({ path, phases, cards, origins, marks }: BoardPhaseCheckProps) {
   if (!path || !phases) return null;
 
-  const sorted = [...path.phases].sort((left, right) => left.position - right.position);
-  if (sorted.length === 0) return null;
-
-  const phase = sorted[findActivePhaseIndex({ ...path, phases: sorted })];
-  if (!phase || !isPhaseOpen(phase)) return null;
+  // The phase the hire is working in, as the Onboarding page and "next on your path" read it —
+  // not the lowest open one, since several can be open at once.
+  const next = resolveNextAction(path);
+  if (next.kind !== "step" && next.kind !== "question") return null;
+  const phase = next.phase;
 
   const open = [...(phase.questions ?? [])]
     .filter((question) => question.status !== "PASSED")

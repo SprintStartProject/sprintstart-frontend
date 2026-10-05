@@ -13,7 +13,7 @@ describe("the step a card kept during onboarding belongs to", () => {
     setOnboardingPlace({ kind: "step", id: "s1", title: "Set up SSH" });
 
     expect(onboardingOrigin("/onboarding")).toEqual({
-      url: "/onboarding?step=s1",
+      url: "/onboarding?step=s1&open=1",
       label: "Set up SSH",
     });
   });

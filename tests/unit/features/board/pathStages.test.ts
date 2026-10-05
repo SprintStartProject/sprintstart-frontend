@@ -34,7 +34,7 @@ function stepCard(id: string, stepId: string): BoardCard {
 
 const step = (id: string, status: string) => ({ id, status, position: 0 });
 
-/** Three phases: p1 finished, p2 the one the hire is in, p3 still ahead. */
+/** Three phases: p1 finished, p2 the one the hire is in, p3 locked behind it. */
 const path = {
   id: "path",
   phases: [
@@ -42,6 +42,7 @@ const path = {
       id: "p3",
       title: "Ship",
       position: 3,
+      locked: true,
       steps: [step("s3", "WAITING")],
       questions: [],
     },
@@ -93,6 +94,19 @@ describe("Now, Later and Behind you, read off the path", () => {
     expect(stageOf(note("current"))).toBe("NOW");
     expect(stageOf(note("finished"))).toBe("BEHIND");
     expect(stageOf(note("phase"))).toBe("BEHIND");
+  });
+
+  it("keeps a phase that is open beside the current one in Now", () => {
+    const twoOpen = {
+      ...path,
+      phases: [
+        ...path.phases,
+        { id: "p4", title: "Side", position: 4, steps: [step("s4", "WAITING")], questions: [] },
+      ],
+    } as unknown as OnboardingPathEndpoint;
+    const side: CardOrigins = { side: { url: "/onboarding?step=s4&open=1", label: "" } };
+
+    expect(pathStages(pathPhases(twoOpen), side)(note("side"))).toBe("NOW");
   });
 
   it("keeps everything tied to nothing in Now", () => {
