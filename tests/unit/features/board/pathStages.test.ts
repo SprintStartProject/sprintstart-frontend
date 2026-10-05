@@ -89,7 +89,8 @@ describe("Now, Later and Behind you, read off the path", () => {
   const stageOf = pathStages(phases, origins);
 
   it("files a card under the phase its step is in", () => {
-    expect(stageOf(note("ahead"))).toBe("LATER");
+    // A locked phase is no longer filed apart: only what is finished is.
+    expect(stageOf(note("ahead"))).toBe("NOW");
     expect(stageOf(note("current"))).toBe("NOW");
     expect(stageOf(note("finished"))).toBe("BEHIND");
     expect(stageOf(note("phase"))).toBe("BEHIND");

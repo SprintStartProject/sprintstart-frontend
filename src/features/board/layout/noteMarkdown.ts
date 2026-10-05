@@ -101,11 +101,16 @@ export function remarkNoteText() {
  * left in, because `Marked` draws them.
  */
 export function plainHeading(line: string): string {
-  return line
-    .replace(/^\s{0,3}#{1,6}\s+/, "")
-    .replace(/\s+#+\s*$/, "")
-    .replace(/\*\*(.+?)\*\*|__(.+?)__/g, "$1$2")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[\[([^[\]\n]+?)\]\]/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  return (
+    line
+      .replace(/^\s{0,3}#{1,6}\s+/, "")
+      .replace(/\s+#+\s*$/, "")
+      .replace(/\*\*(.+?)\*\*|__(.+?)__/g, "$1$2")
+      .replace(/`([^`]+)`/g, "$1")
+      // A link into the path reads as what it names last: `[[Setup#Set up SSH]]` is "Set up SSH".
+      .replace(/\[\[([^[\]\n]+?)\]\]/g, (_match, inside: string) =>
+        (inside.split("#").pop() ?? inside).trim(),
+      )
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+  );
 }

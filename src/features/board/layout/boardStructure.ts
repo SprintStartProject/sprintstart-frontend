@@ -334,8 +334,11 @@ export function cardProgress(card: BoardCard): { done: number; total: number } |
  * *not* done: zero of zero is a list nobody has written yet, and calling it finished would let a
  * blank card unblock everything behind it.
  */
-export function isCardDone(card: BoardCard, structure: BoardStructure): boolean {
-  if (!isSelfReporting(card)) return structure.cards[card.id]?.markedDone === true;
+export function isCardDone(card: BoardCard, _structure?: BoardStructure): boolean {
+  // A note or a link is never "done": ticking one off by hand was only ever there to release the
+  // cards waiting on it, and since piles replaced waiting nothing does. A stored tick is ignored
+  // rather than honoured, so a note somebody once ticked does not stay greyed with no way back.
+  if (!isSelfReporting(card)) return false;
 
   const progress = cardProgress(card);
 
@@ -415,14 +418,12 @@ export function deriveCardStates(
       continue;
     }
 
-    const blockedBy = (entry?.dependsOn ?? [])
-      .map((dependency) => byId.get(dependency.id))
-      .filter((blocker): blocker is BoardCard => blocker !== undefined && !done.get(blocker.id));
-
+    // Nothing blocks any more: a stored "comes after" is a card's place in a pile, not a lock on it.
+    // See `restack`. `BLOCKED` stays in the type only for boards drawn from older data in tests.
     states.set(card.id, {
-      status: blockedBy.length > 0 ? "BLOCKED" : "OPEN",
+      status: "OPEN",
       stage,
-      blockedBy,
+      blockedBy: [],
       predecessorId,
       predecessorSource,
       progress,
@@ -537,6 +538,58 @@ export function clearHireDependencies(structure: BoardStructure, cardId: string)
     ...structure,
     cards: { ...structure.cards, [cardId]: { ...structure.cards[cardId], dependsOn: kept } },
   };
+}
+
+/**
+ * Puts a card on a pile, or takes it off one — what the board's "Pile" control does.
+ *
+ * A pile is stored the way a sequence used to be: each card after the first names the one before
+ * it (`dependsOn`), and `cardStacks.ts` folds such a run into one pile. Storing it that way keeps it
+ * in the arrangement that already syncs, with no new field on the wire. What it no longer means is
+ * "wait for": a card in a pile is just a card lying under another one.
+ *
+ * - **Off its pile:** whatever lay after it now lies after whatever was before it, so taking out the
+ *   middle card closes the gap instead of splitting the pile in two.
+ * - **Under a card:** it goes directly under the target, and whatever lay under the target now lies
+ *   under it. The pile's top card stays on top, and "under X" means exactly that.
+ *
+ * Every "comes after" on the card is replaced, including one a team blueprint once wrote: it used
+ * to be a rule, and nothing enforces it any more.
+ */
+export function restack(
+  structure: BoardStructure,
+  cardIds: readonly string[],
+  cardId: string,
+  targetId: string | null,
+): BoardStructure {
+  const known = new Set(cardIds);
+  const before = (from: BoardStructure, id: string) =>
+    (from.cards[id]?.dependsOn ?? []).find((dependency) => known.has(dependency.id))?.id ?? null;
+  const placeAfter = (from: BoardStructure, id: string, after: string | null): BoardStructure => ({
+    ...from,
+    cards: {
+      ...from.cards,
+      [id]: { ...from.cards[id], dependsOn: after ? [{ id: after, source: "HIRE" }] : [] },
+    },
+  });
+
+  let next = structure;
+  const previous = before(next, cardId);
+  for (const other of cardIds) {
+    if (other !== cardId && before(next, other) === cardId)
+      next = placeAfter(next, other, previous);
+  }
+  next = placeAfter(next, cardId, null);
+
+  if (!targetId || targetId === cardId || !known.has(targetId)) return next;
+
+  // Whatever lay directly under the target now lies under the card that goes in between.
+  for (const other of cardIds) {
+    if (other !== cardId && before(next, other) === targetId)
+      next = placeAfter(next, other, cardId);
+  }
+
+  return placeAfter(next, cardId, targetId);
 }
 
 /** Whether `from` already waits on `target`, directly or through other cards. */

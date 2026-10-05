@@ -42,6 +42,10 @@ export function BoardStageBand({
   onToggle,
   children,
 }: BoardStageBandProps) {
+  // The board itself, not a band on it: what is current needs no heading saying so, and no fold to
+  // put it away. Only what is finished ("Behind you") is filed apart — see `pathStages.ts`.
+  if (stage === "NOW") return <div className="space-y-4">{children}</div>;
+
   const label = STAGE_LABELS[stage];
   const done = remaining === 0;
 
@@ -68,7 +72,7 @@ export function BoardStageBand({
           All done
         </Badge>
       ) : (
-        <Badge variant={stage === "NOW" ? "brand" : "neutral"} size="sm">
+        <Badge variant="neutral" size="sm">
           <span className="tabular-nums">{remaining} to do</span>
         </Badge>
       )}

@@ -222,18 +222,22 @@ describe("the stage bands", () => {
 
   const twoStages = () => board([currentTaskContent(), suggestedTasksContent()]);
 
-  it("files the board under its stages and counts what is left in each", () => {
+  it("files what is finished under Behind you, and draws the rest as the board itself", () => {
     render(
       <BoardGrid
         board={twoStages()}
-        states={states("NOW", "LATER")}
-        openStages={new Set<BoardStage>(["NOW", "LATER"])}
+        states={states("NOW", "BEHIND")}
+        openStages={new Set<BoardStage>(["NOW", "BEHIND"])}
         onToggleStage={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: /now/i })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /later/i })).toBeInTheDocument();
+    // What is current needs no heading saying so.
+    expect(screen.queryByRole("button", { name: /^now/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /behind you/i })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   it("folds a band without taking it off the page", () => {
@@ -279,9 +283,10 @@ describe("the stage bands", () => {
     );
 
     // A team's blueprints are one set somebody wrote in one sitting, deliberately spread across
-    // the stages. It keeps its name and folds by stage within itself.
+    // the stages. It keeps its name and folds by stage within itself — the current part needs no
+    // heading of its own.
     expect(screen.getByText("From your team")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /now/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^now/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /later/i })).toBeInTheDocument();
   });
 

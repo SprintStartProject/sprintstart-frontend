@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
-import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, Lock, X } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Collapsible } from "../../../components/ui/Collapsible";
@@ -37,13 +37,10 @@ import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
 import { moveTo } from "../layout/boardOrder";
 import { cardIcon } from "../layout/cardIcons";
-import { buddyLockSaid, lockedAfter, teamLockSaid } from "../../graph-diagram/lockWords";
-import { unblockedByFinishing } from "../layout/nextUp";
 import { cardName } from "../layout/cardNames";
 import type { CardStack } from "../layout/cardStacks";
 import {
   BOARD_STAGES,
-  isSelfReporting,
   STAGE_LABELS,
   type BoardStage,
   type CardState,
@@ -389,11 +386,8 @@ type BoardGridProps = {
    * about sequence, not claim every card is open and due now.
    */
   states?: Map<string, CardState>;
-  onToggleDone?: (cardId: string, done: boolean) => void;
-  /** Makes a card wait on one other card, or on nothing. */
-  onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
-  /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
-  onShowChain?: (cardId: string) => void;
+  /** Puts a card directly under another one in a pile, or (with null) takes it out of its pile. */
+  onStackOnto?: (cardId: string, targetId: string | null) => void;
   /**
    * The stacks on this board, keyed by every member's id.
    *
@@ -609,9 +603,7 @@ export function BoardGrid({
   onDissolveGroup,
   onRecolourGroup,
   states,
-  onToggleDone,
-  onSetPredecessor,
-  onShowChain,
+  onStackOnto,
   stacks,
   expandedStackIds,
   onToggleStack,
@@ -653,25 +645,6 @@ export function BoardGrid({
 
   /** The cards on screen, in the order they are drawn. */
   const shownIds = useMemo(() => board.cards.map((card) => card.id), [board.cards]);
-
-  /**
-   * What finishing each card would free, counted once for the whole board.
-   *
-   * A question about *other* cards, like "blocked" is — so it is answered in one pass here rather
-   * than by every card asking the same question about the same forty.
-   */
-  const unblocksById = useMemo(
-    () =>
-      states
-        ? new Map(
-            board.cards.map((card) => [
-              card.id,
-              unblockedByFinishing(board.cards, states, card.id),
-            ]),
-          )
-        : null,
-    [board.cards, states],
-  );
 
   /**
    * The whole board's order, filtered cards included.
@@ -1095,12 +1068,7 @@ export function BoardGrid({
         onTogglePinned={onTogglePinned}
         allCards={board.cards}
         state={states?.get(card.id)}
-        onToggleDone={onToggleDone}
-        onSetPredecessor={isArranging ? onSetPredecessor : undefined}
-        // Unlike the pickers, this is not an arranging tool: the question it answers — why is this
-        // card closed — is asked hardest by somebody who is trying to work, not to rearrange.
-        onShowChain={onShowChain}
-        unblocks={unblocksById?.get(card.id)}
+        onStackOnto={onStackOnto}
         onDrop={handleCardDrop}
         onMove={move}
         onDismiss={onDismiss}
@@ -1429,15 +1397,10 @@ type BoardCardCellProps = {
   pinned: boolean;
   onToggleCollapsed?: (cardId: string) => void;
   onTogglePinned?: (cardId: string) => void;
-  /** Every card on the board, so this one can offer them as things to wait on. */
+  /** Every card on the board, so this one can offer them as cards to lie under. */
   allCards: BoardCard[];
   state?: CardState;
-  onToggleDone?: (cardId: string, done: boolean) => void;
-  onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
-  /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
-  onShowChain?: (cardId: string) => void;
-  /** How many cards this one alone is holding up, already counted by the grid. */
-  unblocks?: number;
+  onStackOnto?: (cardId: string, targetId: string | null) => void;
   /**
    * Set only on the top card of a *closed* pile — the one standing in for the others.
    *
@@ -1504,10 +1467,7 @@ function BoardCardCell({
   onTogglePinned,
   allCards,
   state,
-  onToggleDone,
-  onSetPredecessor,
-  onShowChain,
-  unblocks,
+  onStackOnto,
   stack,
   origin,
   onCardAdded,
@@ -1535,17 +1495,8 @@ function BoardCardCell({
   const label =
     card.content.kind === "NOTE" ? "note" : card.content.kind.toLowerCase().replace(/_/g, " ");
 
-  /**
-   * The card this one waits on, for the picker to show.
-   *
-   * `blockedBy` only lists predecessors that are *not yet done*, which is right for the badge and
-   * wrong for the control: a hire who finished the predecessor should still see which card they
-   * put in front of this one, or the picker would silently forget the sequence they arranged.
-   */
+  /** The card this one lies directly under, if it is in a pile — see `restack`. */
   const predecessorId = state?.predecessorId ?? null;
-  const predecessorName = predecessorId
-    ? (allCards.find((other) => other.id === predecessorId) ?? null)
-    : null;
 
   /**
    * Folds a card, or opens a folded one, on a double click anywhere on it.
@@ -1645,53 +1596,27 @@ function BoardCardCell({
       pinned,
       accent: cardAccent(card.content.kind),
       state,
-      // Only for the kinds nothing can observe. A checklist reports its own progress, and a
-      // hand-set "done" beside three outstanding items is the board contradicting itself.
-      onToggleDone:
-        onToggleDone && !isSelfReporting(card)
-          ? () => onToggleDone(card.id, state?.status !== "DONE")
-          : undefined,
-      dependencyPicker: !onSetPredecessor ? undefined : state?.predecessorSource === "TEAM" ? (
-        // A rule the team wrote, shown rather than offered. The alternative was a select that
-        // silently refused what it let somebody choose — an affordance that lies is worse than a
-        // sentence that explains, and the sentence also answers the question the select could not:
-        // why this card is behind that one when the hire never put it there.
-        <span
-          className="flex max-w-40 items-center gap-1 text-xs text-app-text-muted"
-          title={teamLockSaid(predecessorName ? cardName(predecessorName) : null)}
-        >
-          <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
-          <span className="min-w-0 truncate">
-            {lockedAfter(predecessorName ? cardName(predecessorName) : "another card")}
-          </span>
-        </span>
-      ) : (
+      // The pile this card lies in, in both modes: piling is tidying, not planning, and somebody
+      // reading the board is the person who notices two cards belong together.
+      pilePicker: onStackOnto ? (
         <Select
           size="sm"
-          value={state?.blockedBy[0]?.id ?? predecessorId ?? ""}
-          aria-label={`What the ${label} card waits on`}
+          value={predecessorId ?? ""}
+          aria-label={`Put the ${label} card in a pile`}
+          title="Put this card under another one, so the two lie in one pile"
           className="max-w-40"
-          // A buddy's link is the hire's to change — it is a suggestion, not a rule — but it should
-          // not look like something they set themselves and forgot.
-          title={
-            state?.predecessorSource === "BUDDY" && predecessorName
-              ? buddyLockSaid(cardName(predecessorName))
-              : undefined
-          }
-          onChange={(event) => onSetPredecessor(card.id, event.target.value || null)}
+          onChange={(event) => onStackOnto(card.id, event.target.value || null)}
         >
-          <option value="">Waits on nothing</option>
+          <option value="">Not in a pile</option>
           {allCards
             .filter((other) => other.id !== card.id)
             .map((other) => (
               <option key={other.id} value={other.id}>
-                {lockedAfter(cardName(other))}
+                Under “{cardName(other)}”
               </option>
             ))}
         </Select>
-      ),
-      onShowChain: onShowChain ? () => onShowChain(card.id) : undefined,
-      unblocks,
+      ) : undefined,
       stack:
         stack && onToggleStack
           ? {
@@ -1771,15 +1696,11 @@ function BoardCardCell({
       index,
       label,
       onMove,
-      onSetPredecessor,
-      onShowChain,
-      unblocks,
+      onStackOnto,
       onToggleStack,
-      predecessorName,
       isArranging,
       onResize,
       onToggleCollapsed,
-      onToggleDone,
       onTogglePinned,
       size,
       pinned,
@@ -2095,9 +2016,11 @@ function BoardGroupSection({
             {group.cardIds.length}
           </span>
 
-          {/* The stage comes from the path, so it is a fact here and never a control. */}
-          {stage && (
-            <Badge variant={stage === "NOW" ? "brand" : "neutral"} size="sm">
+          {/* Said only of an area whose cards are all from finished phases: "Now" on every other
+              area would be the board labelling itself. The stage comes from the path, so it is a
+              fact here and never a control. */}
+          {stage === "BEHIND" && (
+            <Badge variant="neutral" size="sm">
               {STAGE_LABELS[stage].title}
             </Badge>
           )}

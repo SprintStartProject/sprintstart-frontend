@@ -2,13 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { BoardCard } from "../types";
 import { subscribeToBoardStorageReplaced } from "../layout/boardStorage";
 import {
-  clearHireDependencies,
   deriveCardStates,
   EMPTY_STRUCTURE,
   pruneStructure,
   readBoardStructure,
-  setDependency,
-  setMarkedDone,
+  restack,
   writeBoardStructure,
   type BoardStage,
   type BoardStructure,
@@ -19,18 +17,8 @@ export type UseBoardStructureResult = {
   structure: BoardStructure;
   /** Every card's derived status, keyed by id. Recomputed whenever the board or the structure moves. */
   states: Map<string, CardState>;
-  toggleDone: (cardId: string, done: boolean) => void;
-  toggleDependency: (cardId: string, blockerId: string, depends: boolean) => void;
-  /**
-   * Makes a card wait on exactly one other card, or on nothing.
-   *
-   * The model holds a set, because a blueprint can reasonably say "after both of these". The
-   * *control* offers one, because a hire sequencing their own board is describing a chain — this
-   * before that before the other — and a multi-select in a card header to express something almost
-   * nobody needs is chrome charged to everybody. Setting one predecessor replaces whatever set was
-   * there, so the two never drift into disagreeing.
-   */
-  setPredecessor: (cardId: string, blockerId: string | null) => void;
+  /** Puts a card on another card's pile, or (with null) takes it off its own — see `restack`. */
+  stackOnto: (cardId: string, targetId: string | null) => void;
 };
 
 /**
@@ -96,15 +84,14 @@ export function useBoardStructure(
   return {
     structure,
     states,
-    toggleDone: (cardId, done) => save(setMarkedDone(structure, cardId, done)),
-    toggleDependency: (cardId, blockerId, depends) =>
-      save(setDependency(structure, cardId, blockerId, depends)),
-    setPredecessor: (cardId, blockerId) => {
-      // Only the hire's own edges go: the control offers one predecessor at a time, so choosing
-      // a new one drops the last one *they* set and leaves a rule the team wrote where it is.
-      const cleared = clearHireDependencies(structure, cardId);
-
-      save(blockerId ? setDependency(cleared, cardId, blockerId, true, "HIRE") : cleared);
-    },
+    stackOnto: (cardId, targetId) =>
+      save(
+        restack(
+          structure,
+          cards.map((card) => card.id),
+          cardId,
+          targetId,
+        ),
+      ),
   };
 }

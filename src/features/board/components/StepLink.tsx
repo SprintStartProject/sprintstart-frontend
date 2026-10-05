@@ -1,63 +1,77 @@
-import { ListChecks, Milestone } from "lucide-react";
+import { Layers, ListChecks, Milestone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { onboardingPlaceUrl } from "../../onboarding/onboardingPlace";
 import { useBoardPath } from "../hooks/boardPath";
-import { linkTarget, titleKey } from "../layout/stepLinks";
+import { resolveLink, type ResolvedLink } from "../layout/pathStages";
+import { titleKey } from "../layout/stepLinks";
 
 type StepLinkProps =
-  /** A `[[Step]]` or `[[Step#Task]]` as written in the note. */
+  /** The inside of a `[[…]]` as written in the note: `Phase`, `Phase#Step` or `Phase#Step#Task`. */
   | { title: string; stepId?: never }
   /** An in-app link to a step by id — what the buddy writes. */
   | { stepId: string; title?: never };
 
 /**
- * A link to a step (or a task in it) in a note, drawn as a small chip that opens the step.
+ * A link into the path in a note — a phase, a step, or a task in a step — drawn as a small chip
+ * that opens it on the Onboarding page.
  *
- * A title that matches no step on the path — renamed, rebuilt away, or simply mistyped — stays
+ * Something that matches nothing on the path — renamed, rebuilt away, or simply mistyped — stays
  * readable and says why it does not go anywhere, rather than disappearing or pretending to link.
  */
 export function StepLink(props: StepLinkProps) {
   const { phases } = useBoardPath();
-  const target = props.title !== undefined ? linkTarget(props.title) : null;
-  const stepId =
-    props.stepId ?? (target ? phases?.stepByTitle.get(titleKey(target.step)) : undefined);
-  const step = stepId ? phases?.steps.get(stepId) : undefined;
 
-  if (!stepId || !step) {
+  let link: ResolvedLink | null = null;
+  if (phases && props.title !== undefined) link = resolveLink(props.title, phases);
+  if (phases && props.stepId !== undefined) {
+    const phaseId = phases.phaseOfStep.get(props.stepId);
+    link = phaseId ? { phaseId, stepId: props.stepId, task: null } : null;
+  }
+
+  const phase = link ? phases?.phaseInfo.get(link.phaseId) : undefined;
+  if (!link || !phase) {
     return (
       <span
         className="rounded-sm border-b border-dashed border-app-text-subtle text-app-text-muted"
-        title={phases ? "No step with this name on your path" : undefined}
+        title={phases ? "Nothing with this name on your path" : undefined}
       >
         {props.title ?? "a step"}
       </span>
     );
   }
 
-  // The task as the step spells it, when it is there; as written, when it is not.
-  const task = target?.task
-    ? (step.tasks.find((candidate) => titleKey(candidate.title) === titleKey(target.task ?? ""))
-        ?.title ?? target.task)
+  const step = link.stepId ? phases?.steps.get(link.stepId) : undefined;
+  // The task as the step spells it, when the path carries it; as written, when it does not.
+  const task = link.task
+    ? (step?.tasks.find((candidate) => titleKey(candidate.title) === titleKey(link.task ?? ""))
+        ?.title ?? link.task)
     : null;
+
+  const to = link.stepId
+    ? onboardingPlaceUrl({ kind: "step", id: link.stepId })
+    : onboardingPlaceUrl({ kind: "phase", id: link.phaseId });
+  const full = [phase.title, step?.title, task].filter(Boolean).join(" › ");
 
   return (
     <Link
-      to={onboardingPlaceUrl({ kind: "step", id: stepId })}
-      title={task ? `${step.title} › ${task}` : step.title}
+      to={to}
+      title={full}
       className="inline-flex max-w-full items-baseline gap-1 rounded-md bg-app-brand-soft px-1 align-baseline font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
     >
       {task ? (
         <ListChecks className="h-3 w-3 shrink-0 self-center" aria-hidden="true" />
-      ) : (
+      ) : step ? (
         <Milestone className="h-3 w-3 shrink-0 self-center" aria-hidden="true" />
+      ) : (
+        <Layers className="h-3 w-3 shrink-0 self-center" aria-hidden="true" />
       )}
       <span className="min-w-0 truncate">
-        {task ? (
+        {task && step ? (
           <>
             <span className="font-normal opacity-80">{step.title} ›</span> {task}
           </>
         ) : (
-          step.title
+          (step?.title ?? phase.title)
         )}
       </span>
     </Link>

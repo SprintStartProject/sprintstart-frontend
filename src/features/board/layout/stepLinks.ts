@@ -1,5 +1,11 @@
 /**
- * `[[Step title]]` in a note: a link to a step of the hire's path, the way Obsidian links notes.
+ * `[[Phase#Step]]` in a note: a link into the hire's path, the way Obsidian links notes.
+ *
+ * Phase first, then `#` and a step of it, then `#` and a task of that — the path's own nesting, as
+ * Obsidian nests a note's headings (`[[Note#Heading#Subheading]]`). Phase first because a path holds
+ * a handful of phases and dozens of steps: picking a phase, then a step in it, is a short list twice
+ * instead of a long one once. `[[Phase]]` alone links the whole phase. A link written as `[[Step]]`
+ * still works. Resolution against the path is `resolveLink` in `pathStages.ts`.
  *
  * A note kept while a step was open is tied to that step by where it was made (its origin). This is
  * the other way: a note written anywhere — on the board, about the evening's debugging — that the
@@ -10,10 +16,6 @@
  * on every machine, and `[[Set up SSH]]` reads as what it means even where nothing draws it. The
  * price is that a step renamed or rebuilt away leaves a link that no longer resolves — which is
  * drawn as such, and is the same bargain Obsidian makes.
- *
- * **A task too, the Obsidian way:** `[[Set up SSH#Generate a key]]` — the step, then `#` and one of
- * its tasks, as Obsidian points at a heading inside a note. It opens the step and files the note
- * there; the task is what the chip says.
  *
  * **And what the buddy already writes.** The buddy is handed each step's app link and writes
  * "[#3](/onboarding?step=…)" into its replies. A reply kept on the board with such a link is linked
@@ -38,14 +40,6 @@ export function splitStepLinks(text: string): LinkRun[] {
   if (last < text.length) runs.push({ text: text.slice(last), link: false });
 
   return runs;
-}
-
-/** What a `[[…]]` names: a step, and perhaps one of its tasks after a `#`. */
-export function linkTarget(text: string): { step: string; task: string | null } {
-  const at = text.indexOf("#");
-  if (at === -1) return { step: text.trim(), task: null };
-
-  return { step: text.slice(0, at).trim(), task: text.slice(at + 1).trim() || null };
 }
 
 /**
@@ -102,4 +96,23 @@ export function completeLink(
   const link = `[[${title}]]`;
 
   return { text: text.slice(0, open.start) + link + after, caret: open.start + link.length };
+}
+
+/**
+ * The open `[[query` before the caret replaced by `[[prefix#`, without closing it — one level
+ * deeper, so the next list (a phase's steps, a step's tasks) is offered straight away.
+ */
+export function deepenLink(
+  text: string,
+  caret: number,
+  prefix: string,
+): { text: string; caret: number } | null {
+  const open = openLinkBefore(text, caret);
+  if (!open) return null;
+
+  const link = `[[${prefix}#`;
+  return {
+    text: text.slice(0, open.start) + link + text.slice(caret),
+    caret: open.start + link.length,
+  };
 }

@@ -71,9 +71,11 @@ import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardS
 import { forgetCard } from "../features/board/layout/forgetCard";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
 import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardMarks";
+import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
 import {
   assignToGroup,
   dissolveGroup,
+  groupOf,
   newBoardGroup,
   readBoardGroups,
   writeBoardGroups,
@@ -569,7 +571,51 @@ export function BoardPage() {
     return null;
   }, [path, pathPlace]);
 
-  const { states, toggleDone, setPredecessor } = useBoardStructure(boardId, allCards, stageOf);
+  const { states, stackOnto } = useBoardStructure(boardId, allCards, stageOf);
+
+  /**
+   * The piles on this board, and which of them are spread out.
+   *
+   * A pile is cards the hire put one under another with the "Pile" control (see `restack`). It is
+   * drawn as its top card with the others fanned beneath, and opens on a click. A pile only forms
+   * inside one area, so piling a card under one in another area takes it into that area too — see
+   * {@link handleStackOnto}.
+   *
+   * Which piles are open is kept for the visit rather than stored: opening one is looking into it,
+   * not rearranging the board.
+   */
+  const stacks = useMemo(
+    () => buildStacks(allCards, states, (cardId) => groupOf(groups, cardId)?.id ?? null),
+    [allCards, groups, states],
+  );
+  const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
+
+  /** Every pile spread out while the board is being arranged, so each card can be moved. */
+  const openStackIds = useMemo(
+    () => (isArranging ? allRootIds(stacks) : expandedStackIds),
+    [expandedStackIds, isArranging, stacks],
+  );
+
+  function toggleStack(rootId: string) {
+    setExpandedStackIds((current) => {
+      const next = new Set(current);
+      if (next.has(rootId)) next.delete(rootId);
+      else next.add(rootId);
+
+      return next;
+    });
+  }
+
+  /** Piles a card under another one, and into that card's area so the two can lie together. */
+  function handleStackOnto(cardId: string, targetId: string | null) {
+    stackOnto(cardId, targetId);
+    if (!targetId) return;
+
+    const area = groupOf(groups, targetId)?.id ?? null;
+    if ((groupOf(groups, cardId)?.id ?? null) !== area) {
+      saveGroups(assignToGroup(groups, cardId, area));
+    }
+  }
 
   // Lends these cards to the app shell, so the selection toolbar mounted above the router can offer
   // the marker pen on text that turns out to be on one of them. Taken back when this page leaves.
@@ -742,6 +788,7 @@ export function BoardPage() {
     setOpenStages(new Set(BOARD_STAGES));
     setSectionId(null);
     setFilter("all");
+    setExpandedStackIds(allRootIds(stacks));
     if (pathPlace) setSearchParams({}, { replace: true });
   }
 
@@ -759,9 +806,11 @@ export function BoardPage() {
   const shownCards = useMemo(() => {
     // The step or phase the board was opened for, first: it is the narrowest question anybody asks
     // of this page, and the other cuts still apply within it.
+    // Piles fold first, so every later cut sees one card where there is one pile.
+    const folded = collapseStacks(allCards, stacks, openStackIds);
     const atPlace = pathPlace
-      ? allCards.filter((card) => isCardAt(card, pathPlace, phases, cardOrigins))
-      : allCards;
+      ? folded.filter((card) => isCardAt(card, pathPlace, phases, cardOrigins))
+      : folded;
     const bySource = atPlace.filter((card) => matchesFilter(card, filter));
     const visible = cardsInSection(
       bySource,
@@ -778,10 +827,12 @@ export function BoardPage() {
     cardOrigins,
     filter,
     groups,
+    openStackIds,
     pathPlace,
     phases,
     pinnedIds,
     shownSectionId,
+    stacks,
     states,
   ]);
 
@@ -798,6 +849,9 @@ export function BoardPage() {
    */
   const activeCuts = useMemo(() => {
     const cuts: string[] = [];
+
+    const piled = allCards.length - collapseStacks(allCards, stacks, openStackIds).length;
+    if (piled > 0) cuts.push(`${piled} under other cards in piles`);
 
     if (pathPlace) {
       cuts.push(
@@ -821,7 +875,16 @@ export function BoardPage() {
     // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
     // page explaining something that is not hidden.
     return cuts;
-  }, [filter, pathPlace, pathPlaceTitle, shownSectionId, sections]);
+  }, [
+    allCards,
+    filter,
+    openStackIds,
+    pathPlace,
+    pathPlaceTitle,
+    shownSectionId,
+    sections,
+    stacks,
+  ]);
 
   const handleReorder = (cardIds: string[]) => void reorder(cardIds);
 
@@ -1262,8 +1325,10 @@ export function BoardPage() {
                     onDissolveGroup={handleDissolveGroup}
                     onRecolourGroup={handleRecolourGroup}
                     states={states}
-                    onToggleDone={toggleDone}
-                    onSetPredecessor={setPredecessor}
+                    onStackOnto={handleStackOnto}
+                    stacks={stacks}
+                    expandedStackIds={openStackIds}
+                    onToggleStack={toggleStack}
                     openStages={openStages}
                     onToggleStage={toggleStage}
                     cardSizes={cardSizes}
@@ -1278,4 +1343,9 @@ export function BoardPage() {
       </div>
     </BoardPathContext.Provider>
   );
+}
+
+/** Every pile's root id — what "open all of them" means. */
+function allRootIds(stacks: Map<string, { rootId: string }>): Set<string> {
+  return new Set([...stacks.values()].map((stack) => stack.rootId));
 }

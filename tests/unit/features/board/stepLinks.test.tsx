@@ -7,9 +7,15 @@ import { describe, expect, it, vi } from "vitest";
 import { NoteMarkdown } from "../../../../src/features/board/components/NoteMarkdown";
 import { StepLinkTextarea } from "../../../../src/features/board/components/StepLinkTextarea";
 import { BoardPathContext } from "../../../../src/features/board/hooks/boardPath";
-import { isCardAt, pathPhases, pathStages } from "../../../../src/features/board/layout/pathStages";
+import {
+  isCardAt,
+  pathPhases,
+  pathStages,
+  resolveLink,
+} from "../../../../src/features/board/layout/pathStages";
 import {
   completeLink,
+  deepenLink,
   linkedTitles,
   openLinkBefore,
   splitStepLinks,
@@ -25,15 +31,7 @@ const path = {
       id: "p1",
       title: "Setup",
       position: 1,
-      steps: [
-        {
-          id: "s1",
-          title: "Set up SSH",
-          status: "IN_PROGRESS",
-          position: 0,
-          tasks: [{ id: "t1", title: "Generate a key", position: 0 }],
-        },
-      ],
+      steps: [{ id: "s1", title: "Set up SSH", status: "FINISHED", position: 0 }],
       questions: [],
     },
     {
@@ -58,61 +56,75 @@ const note = (id: string, text: string) =>
     content: { kind: "NOTE", text },
   }) as BoardCard;
 
-describe("[[step]] links in a note", () => {
+function Editor() {
+  const [value, setValue] = useState("");
+  return (
+    <BoardPathContext.Provider value={{ path, phases }}>
+      <StepLinkTextarea aria-label="Note" value={value} onValueChange={setValue} />
+      <output>{value}</output>
+    </BoardPathContext.Provider>
+  );
+}
+
+describe("[[Phase#Step]] links in a note", () => {
   it("are read out of the text", () => {
-    expect(splitStepLinks("See [[Set up SSH]] first")).toEqual([
+    expect(splitStepLinks("See [[Setup#Set up SSH]] first")).toEqual([
       { text: "See ", link: false },
-      { text: "Set up SSH", link: true },
+      { text: "Setup#Set up SSH", link: true },
       { text: " first", link: false },
     ]);
     expect(linkedTitles("[[a]] and [[ b ]]")).toEqual(["a", "b"]);
   });
 
-  it("tie the note to the step they name, case aside", () => {
-    const card = note("n", "Ask Sam before [[open your first pr]]");
-
-    expect(pathStages(phases, {})(card)).toBe("LATER");
-    expect(isCardAt(card, { kind: "step", id: "s2" }, phases, {})).toBe(true);
-    expect(isCardAt(card, { kind: "step", id: "s1" }, phases, {})).toBe(false);
+  it("resolve phase first, then a step in it, then a task in that", () => {
+    expect(resolveLink("setup", phases)).toEqual({ phaseId: "p1", stepId: null, task: null });
+    expect(resolveLink("Setup#set up ssh", phases)).toEqual({
+      phaseId: "p1",
+      stepId: "s1",
+      task: null,
+    });
+    expect(resolveLink("Ship#Open your first PR#Ask for review", phases)).toEqual({
+      phaseId: "p2",
+      stepId: "s2",
+      task: "Ask for review",
+    });
+    expect(resolveLink("Setup#Nope", phases)).toBeNull();
   });
 
-  it("can name a task in the step, and a buddy's app link counts too", () => {
+  it("still resolve a link written by step name alone", () => {
+    expect(resolveLink("Open your first PR", phases)).toEqual({
+      phaseId: "p2",
+      stepId: "s2",
+      task: null,
+    });
+  });
+
+  it("tie the note to what they name, and the buddy's app links count too", () => {
+    const linked = note("n", "Ask Sam before [[Ship#open your first pr]]");
+
+    expect(isCardAt(linked, { kind: "step", id: "s2" }, phases, {})).toBe(true);
+    expect(pathStages(phases, {})(note("old", "[[Setup]]"))).toBe("BEHIND");
     expect(
-      isCardAt(
-        note("t", "see [[Set up SSH#Generate a key]]"),
-        { kind: "step", id: "s1" },
-        phases,
-        {},
-      ),
-    ).toBe(true);
-    expect(
-      isCardAt(
-        note("u", "Try [#3](/onboarding?step=s2) next"),
-        { kind: "step", id: "s2" },
-        phases,
-        {},
-      ),
+      isCardAt(note("u", "Try [#3](/onboarding?step=s2)"), { kind: "step", id: "s2" }, phases, {}),
     ).toBe(true);
   });
 
-  it("are completed from what is typed after [[", () => {
+  it("are completed, or gone into, from what is typed after [[", () => {
     expect(openLinkBefore("note [[set", 10)).toEqual({ query: "set", start: 5 });
     expect(openLinkBefore("note [[set]] done", 17)).toBeNull();
-    expect(completeLink("x [[se]] y", 6, "Set up SSH")).toEqual({
-      text: "x [[Set up SSH]] y",
-      caret: 16,
-    });
+    expect(completeLink("x [[se]] y", 6, "Setup")).toEqual({ text: "x [[Setup]] y", caret: 11 });
+    expect(deepenLink("x [[se", 6, "Setup")).toEqual({ text: "x [[Setup#", caret: 10 });
   });
 });
 
 describe("drawing and writing them", () => {
-  it("draws a link as the step, and an unknown title as plain text", () => {
+  it("draws phases, steps and tasks as chips, and an unknown name as plain text", () => {
     render(
       <MemoryRouter>
         <BoardPathContext.Provider value={{ path, phases }}>
           <NoteMarkdown
             text={
-              "## Plan\n- do [[Set up SSH]]\n- [[Set up SSH#Generate a key]]\n- [#3](/onboarding?step=s2)\n- then [[Nope]]"
+              "## Plan\n- [[Setup]]\n- [[Setup#Set up SSH]]\n- [[Setup#Set up SSH#Generate a key]]\n- [#3](/onboarding?step=s2)\n- [[Nope]]"
             }
             marks={[]}
             cardId="n"
@@ -121,68 +133,56 @@ describe("drawing and writing them", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByRole("link", { name: "Setup" })).toHaveAttribute(
+      "href",
+      "/onboarding?phase=p1",
+    );
     expect(screen.getByRole("link", { name: "Set up SSH" })).toHaveAttribute(
       "href",
       "/onboarding?step=s1&open=1",
     );
-    expect(screen.queryByRole("link", { name: "Nope" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /generate a key/i })).toHaveAttribute(
-      "href",
-      "/onboarding?step=s1&open=1",
-    );
+    expect(screen.getByRole("link", { name: /generate a key/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open your first PR" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Nope" })).not.toBeInTheDocument();
     expect(screen.getByText("Nope")).toBeInTheDocument();
   });
 
-  it("offers the path's steps after [[ and fills one in", async () => {
-    function Editor() {
-      const [value, setValue] = useState("");
-      return (
-        <BoardPathContext.Provider value={{ path, phases }}>
-          <StepLinkTextarea aria-label="Note" value={value} onValueChange={setValue} />
-          <output>{value}</output>
-        </BoardPathContext.Provider>
-      );
-    }
+  it("offers phases after [[, a phase's steps after Tab, and links one with Enter", async () => {
     render(<Editor />);
 
-    await userEvent.type(screen.getByLabelText("Note"), "Before [[[[first");
+    await userEvent.type(screen.getByLabelText("Note"), "Before [[[[");
+    expect(screen.getByRole("option", { name: /setup/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /ship.*locked/i })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Note"), "sh");
+    expect(screen.queryByRole("option", { name: /setup/i })).not.toBeInTheDocument();
+
+    await userEvent.keyboard("{Tab}");
+    expect(screen.getByRole("status")).toHaveTextContent("Before [[Ship#");
     expect(screen.getByRole("option", { name: /open your first pr/i })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /set up ssh/i })).not.toBeInTheDocument();
 
     await userEvent.keyboard("{Enter}");
-    expect(screen.getByRole("status")).toHaveTextContent("Before [[Open your first PR]]");
+    expect(screen.getByRole("status")).toHaveTextContent("Before [[Ship#Open your first PR]]");
   });
 
-  it("offers a step's tasks after [[Step#, fetched for that step", async () => {
-    const fetchTasks = vi
-      .spyOn(onboardingService, "fetchTasks")
-      .mockResolvedValue([
-        {
-          id: "t1",
-          stepId: "s1",
-          position: 0,
-          title: "Generate a key",
-          description: "",
-          finished: false,
-        },
-      ]);
-    function Editor() {
-      const [value, setValue] = useState("");
-      return (
-        <BoardPathContext.Provider value={{ path, phases }}>
-          <StepLinkTextarea aria-label="Note" value={value} onValueChange={setValue} />
-          <output>{value}</output>
-        </BoardPathContext.Provider>
-      );
-    }
+  it("offers a step's tasks after [[Phase#Step#, fetched for that step", async () => {
+    const fetchTasks = vi.spyOn(onboardingService, "fetchTasks").mockResolvedValue([
+      {
+        id: "t1",
+        stepId: "s1",
+        position: 0,
+        title: "Generate a key",
+        description: "",
+        finished: false,
+      },
+    ]);
     render(<Editor />);
 
-    await userEvent.type(screen.getByLabelText("Note"), "[[[[Set up SSH#gen");
+    await userEvent.type(screen.getByLabelText("Note"), "[[[[Setup#Set up SSH#gen");
     expect(await screen.findByRole("option", { name: /generate a key/i })).toBeInTheDocument();
     expect(fetchTasks).toHaveBeenCalledWith("s1");
 
     await userEvent.keyboard("{Enter}");
-    expect(screen.getByRole("status")).toHaveTextContent("[[Set up SSH#Generate a key]]");
+    expect(screen.getByRole("status")).toHaveTextContent("[[Setup#Set up SSH#Generate a key]]");
   });
 });
