@@ -21,6 +21,7 @@ import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
 import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
+import { BoardPathContext } from "../features/board/hooks/boardPath";
 import { isCardAt, pathPhases, pathStages } from "../features/board/layout/pathStages";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
@@ -537,6 +538,7 @@ export function BoardPage() {
   const path = useOnboardingPath();
   const phases = useMemo(() => (path ? pathPhases(path) : null), [path]);
   const stageOf = useMemo(() => pathStages(phases, cardOrigins), [phases, cardOrigins]);
+  const boardPath = useMemo(() => ({ path, phases }), [path, phases]);
 
   /**
    * One step or phase the board was opened for: `/board?step=<id>` or `/board?phase=<id>`.
@@ -851,69 +853,71 @@ export function BoardPage() {
   const frameClass = isFocused ? "px-4 sm:px-6 lg:pr-20 lg:pl-6" : "app-page-frame";
 
   return (
-    <div className="min-h-screen">
-      {/* Gone in focus mode, with everything on it either in the tool rail already or one Escape
+    // The path, for the notes that link into it with `[[…]]` — see `hooks/boardPath.ts`.
+    <BoardPathContext.Provider value={boardPath}>
+      <div className="min-h-screen">
+        {/* Gone in focus mode, with everything on it either in the tool rail already or one Escape
           away. */}
-      {!isFocused && (
-        <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-          <div className={`${frameClass} py-6`}>
-            <PageHeader
-              icon={LayoutDashboard}
-              title="Board"
-              subtitle={
-                isArranging
-                  ? "Say when each card is due and what it waits on."
-                  : "Where your work stays put between conversations."
-              }
-              actions={
-                isArranging ? (
-                  <Button
-                    variant="primary"
-                    onClick={() => setIsArranging(false)}
-                    icon={<Check className="h-4 w-4" aria-hidden="true" />}
-                  >
-                    Done
-                  </Button>
-                ) : (
-                  <>
-                    {/* The one switch from the rail worth a copy here, for the widths where
+        {!isFocused && (
+          <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+            <div className={`${frameClass} py-6`}>
+              <PageHeader
+                icon={LayoutDashboard}
+                title="Board"
+                subtitle={
+                  isArranging
+                    ? "Say when each card is due and what it waits on."
+                    : "Where your work stays put between conversations."
+                }
+                actions={
+                  isArranging ? (
+                    <Button
+                      variant="primary"
+                      onClick={() => setIsArranging(false)}
+                      icon={<Check className="h-4 w-4" aria-hidden="true" />}
+                    >
+                      Done
+                    </Button>
+                  ) : (
+                    <>
+                      {/* The one switch from the rail worth a copy here, for the widths where
                         there is no margin to put a rail in. `lg:hidden` rather than a second
                         implementation: one state, two places it can be reached from. */}
-                    <Button
-                      variant="secondary"
-                      iconOnly
-                      className="lg:hidden"
-                      onClick={startArranging}
-                      disabled={!board}
-                      title="Plan the board"
-                      aria-label="Plan the board"
-                    >
-                      <ListTree className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={refresh}
-                      disabled={!selectedProjectId}
-                      loading={loading}
-                      icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
-                    >
-                      Refresh
-                    </Button>
-                  </>
-                )
-              }
-            />
-          </div>
-        </header>
-      )}
+                      <Button
+                        variant="secondary"
+                        iconOnly
+                        className="lg:hidden"
+                        onClick={startArranging}
+                        disabled={!board}
+                        title="Plan the board"
+                        aria-label="Plan the board"
+                      >
+                        <ListTree className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={refresh}
+                        disabled={!selectedProjectId}
+                        loading={loading}
+                        icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+                      >
+                        Refresh
+                      </Button>
+                    </>
+                  )
+                }
+              />
+            </div>
+          </header>
+        )}
 
-      <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
-        {/*
+        <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
+          {/*
           On the board rather than in the header. The header was a place for furniture about the
           page; this is about the work, and it belongs where the work is.
         */}
-        {isPathShown && <BoardPathWindow path={path} onRemove={removePathWindow} />}
-        {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
+          {isPathShown && <BoardPathWindow path={path} onRemove={removePathWindow} />}
+          {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
             space: the board is a column of cards and the margin is where a hand rests. So the
             offers live there — always in reach, never in the way, and out of the row above the
             board where they were competing with the controls that decide what is *shown*.
@@ -924,337 +928,356 @@ export function BoardPage() {
             one of the switches on it, and a switch that takes its own rail off the screen leaves
             nothing to switch back with — in focus mode, where the header's "Done" is gone too,
             nothing at all. */}
-        {selectedProjectId && (
-          <div
-            className={
-              // Centred on the viewport once the page is the whole screen. With the header gone
-              // there is nothing at the top for it to hang under, and a rail pinned to a corner of
-              // a screen this wide is a long way from wherever the pointer is.
-              isFocused
-                ? "fixed top-1/2 right-3 z-20 hidden -translate-y-1/2 lg:block"
-                : "absolute top-6 right-3 z-20 hidden lg:top-8 lg:block"
-            }
-          >
+          {selectedProjectId && (
             <div
-              className={[
-                "flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur",
-                // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
-                // itself on a short screen rather than losing its last buttons off the bottom.
-                isFocused ? "max-h-[calc(100vh-2rem)] overflow-y-auto" : "sticky top-6",
-              ].join(" ")}
+              className={
+                // Centred on the viewport once the page is the whole screen. With the header gone
+                // there is nothing at the top for it to hang under, and a rail pinned to a corner of
+                // a screen this wide is a long way from wherever the pointer is.
+                isFocused
+                  ? "fixed top-1/2 right-3 z-20 hidden -translate-y-1/2 lg:block"
+                  : "absolute top-6 right-3 z-20 hidden lg:top-8 lg:block"
+              }
             >
-              {/* Widest change first: expanding takes the app's own navigation and this page's
+              <div
+                className={[
+                  "flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur",
+                  // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
+                  // itself on a short screen rather than losing its last buttons off the bottom.
+                  isFocused ? "max-h-[calc(100vh-2rem)] overflow-y-auto" : "sticky top-6",
+                ].join(" ")}
+              >
+                {/* Widest change first: expanding takes the app's own navigation and this page's
                   header off the screen, so it is the one switch that has to be found before any of
                   the others are worth reaching for — and the one that has to stay put afterwards,
                   because it is the way back. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => setFocused(!isFocused)}
-                aria-pressed={isFocused}
-                title={isFocused ? "Back to the app (Esc)" : "Expand the board"}
-                aria-label={isFocused ? "Back to the app" : "Expand the board"}
-              >
-                {isFocused ? (
-                  <Minimize2 className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <Maximize2 className="h-4 w-4" aria-hidden="true" />
-                )}
-              </Button>
-
-              <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-
-              {/* Planning and making an area are the two ways of changing the board's *shape*,
-                  which is why they sit together and away from the three that add something to it.
-                  It is a toggle rather than a door: the way out has to be where the way in was,
-                  especially with the header's "Done" gone in focus mode. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
-                disabled={!board}
-                aria-pressed={isArranging}
-                title={isArranging ? "Done planning" : "Plan the board"}
-                aria-label={isArranging ? "Done planning" : "Plan the board"}
-              >
-                {isArranging ? (
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <ListTree className="h-4 w-4" aria-hidden="true" />
-                )}
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => setNamingArea(true)}
-                disabled={!board}
-                aria-pressed={namingArea}
-                title="New area"
-                aria-label="New area"
-              >
-                <FolderPlus className="h-4 w-4" aria-hidden="true" />
-              </Button>
-
-              {/* The strip saying where the hire stands, on or off this board. The switch lives
-                  here rather than on the strip, because the strip is the thing being switched: a
-                  control that takes its own surface away leaves nothing to press to get it back. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => showPathWindow(!isPathShown)}
-                disabled={!board}
-                aria-pressed={isPathShown}
-                title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-                aria-label={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-              >
-                <Milestone className="h-4 w-4" aria-hidden="true" />
-              </Button>
-
-              {/* The task pool, on or off — the same kind of switch as the path strip above, and
-                  for the same reason: the card's own X only hides it, so the way back has to live
-                  somewhere the card is not. */}
-              {hasTaskPool && (
                 <Button
                   variant="ghost"
                   size="sm"
                   iconOnly
-                  onClick={() => showTaskPool(!isTaskPoolShown)}
-                  aria-pressed={isTaskPoolShown}
-                  title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
-                  aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                  onClick={() => setFocused(!isFocused)}
+                  aria-pressed={isFocused}
+                  title={isFocused ? "Back to the app (Esc)" : "Expand the board"}
+                  aria-label={isFocused ? "Back to the app" : "Expand the board"}
                 >
-                  <LayoutList className="h-4 w-4" aria-hidden="true" />
+                  {isFocused ? (
+                    <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                  )}
                 </Button>
-              )}
 
-              {/* Which cards, by where they came from. It sits below the switches that change the
+                <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+
+                {/* Planning and making an area are the two ways of changing the board's *shape*,
+                  which is why they sit together and away from the three that add something to it.
+                  It is a toggle rather than a door: the way out has to be where the way in was,
+                  especially with the header's "Done" gone in focus mode. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
+                  disabled={!board}
+                  aria-pressed={isArranging}
+                  title={isArranging ? "Done planning" : "Plan the board"}
+                  aria-label={isArranging ? "Done planning" : "Plan the board"}
+                >
+                  {isArranging ? (
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <ListTree className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => setNamingArea(true)}
+                  disabled={!board}
+                  aria-pressed={namingArea}
+                  title="New area"
+                  aria-label="New area"
+                >
+                  <FolderPlus className="h-4 w-4" aria-hidden="true" />
+                </Button>
+
+                {/* The strip saying where the hire stands, on or off this board. The switch lives
+                  here rather than on the strip, because the strip is the thing being switched: a
+                  control that takes its own surface away leaves nothing to press to get it back. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => showPathWindow(!isPathShown)}
+                  disabled={!board}
+                  aria-pressed={isPathShown}
+                  title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
+                  aria-label={
+                    isPathShown ? "Hide where you are in your path" : "Show where you are"
+                  }
+                >
+                  <Milestone className="h-4 w-4" aria-hidden="true" />
+                </Button>
+
+                {/* The task pool, on or off — the same kind of switch as the path strip above, and
+                  for the same reason: the card's own X only hides it, so the way back has to live
+                  somewhere the card is not. */}
+                {hasTaskPool && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={() => showTaskPool(!isTaskPoolShown)}
+                    aria-pressed={isTaskPoolShown}
+                    title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                    aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                  >
+                    <LayoutList className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                )}
+
+                {/* Which cards, by where they came from. It sits below the switches that change the
                   board's shape because it changes neither the board nor its shape — it only
                   narrows what is drawn, and it is the one control here that is undone by pressing
                   a different button in the same group rather than the same one again. */}
-              {allCards.length > 2 && (
-                <>
-                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-                  <BoardFilterTriggers value={filter} onChange={setFilter} compact vertical />
-                </>
-              )}
-
-              {/* Directly under it, because it is the same kind of thing: it narrows what is drawn
-                  and nothing else. Where they came from, then what you marked on them. */}
-              <MarkFilterRail
-                sections={markSections}
-                selectedId={shownSectionId}
-                onSelect={setSectionId}
-                vertical
-              />
-
-              {/* Nothing is added to a board somebody is rearranging: the three forms open over the
-                  cards, which is exactly where the arranging is happening. */}
-              {!isArranging && (
-                <>
-                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-                  <AddCardTriggers onPick={setAddingKind} active={addingKind} compact vertical />
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {!selectedProjectId && !projectsLoading ? (
-          <EmptyState
-            icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
-            title="No project yet"
-          >
-            You&apos;re not on a project yet, so there&apos;s nothing to put on a board. Whoever set
-            up your account can add you to one.
-          </EmptyState>
-        ) : showLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size="lg" label="Loading your board" />
-          </div>
-        ) : error ? (
-          <div
-            role="alert"
-            className="flex items-start gap-3 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
-          >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <div className="min-w-0 space-y-2">
-              <p>Your board couldn&apos;t be loaded.</p>
-              <Button variant="secondary" size="sm" onClick={refresh}>
-                Try again
-              </Button>
-            </div>
-          </div>
-        ) : griddedBoard ? (
-          <div className="min-w-0 space-y-5">
-            {/* One row: which part of the board on the left, what to do with it on the right. The
-                filter used to sit on a line of its own under the tabs, which read as a second
-                navigation for the same board — they are two halves of "what am I looking at", and
-                they belong side by side. `items-start` so the tab bar's own status line hangs
-                under the tabs rather than dragging the controls down with it. */}
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              {hasSectionTabs ? (
-                <div className="min-w-0 flex-1">
-                  <BoardSectionTabs
-                    sections={tabSections}
-                    selectedId={shownSectionId}
-                    // A colour is not one of the tabs, but it is still what is being shown, so its
-                    // line of counts is handed over rather than the bar falling back to
-                    // "Everything" and reporting a number that belongs to a different view.
-                    selected={sections.find((section) => section.id === shownSectionId)}
-                    onSelect={setSectionId}
-                  />
-                </div>
-              ) : (
-                <span />
-              )}
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* The rail in the margin takes over from `lg` up, where there is a margin to
-                      put it in. Below that these are the only offers on the page — and there is
-                      room for the words, which the rail's glyphs do without. */}
                 {allCards.length > 2 && (
-                  <BoardFilterTriggers value={filter} onChange={setFilter} className="lg:hidden" />
+                  <>
+                    <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+                    <BoardFilterTriggers value={filter} onChange={setFilter} compact vertical />
+                  </>
                 )}
 
-                {/* Same reason as the filter beside it: the rail these live in only exists from
-                    `lg` up, and a colour you can only filter by on a laptop is a colour half the
-                    board's readers do not have. */}
+                {/* Directly under it, because it is the same kind of thing: it narrows what is drawn
+                  and nothing else. Where they came from, then what you marked on them. */}
                 <MarkFilterRail
                   sections={markSections}
                   selectedId={shownSectionId}
                   onSelect={setSectionId}
-                  className="lg:hidden"
+                  vertical
                 />
 
-                <AddCardTriggers onPick={setAddingKind} active={addingKind} className="lg:hidden" />
+                {/* Nothing is added to a board somebody is rearranging: the three forms open over the
+                  cards, which is exactly where the arranging is happening. */}
+                {!isArranging && (
+                  <>
+                    <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+                    <AddCardTriggers onPick={setAddingKind} active={addingKind} compact vertical />
+                  </>
+                )}
               </div>
             </div>
+          )}
 
-            {/* Over the board rather than in the rail: the rail is 10rem of page margin, which is
+          {!selectedProjectId && !projectsLoading ? (
+            <EmptyState
+              icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
+              title="No project yet"
+            >
+              You&apos;re not on a project yet, so there&apos;s nothing to put on a board. Whoever
+              set up your account can add you to one.
+            </EmptyState>
+          ) : showLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Spinner size="lg" label="Loading your board" />
+            </div>
+          ) : error ? (
+            <div
+              role="alert"
+              className="flex items-start gap-3 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <div className="min-w-0 space-y-2">
+                <p>Your board couldn&apos;t be loaded.</p>
+                <Button variant="secondary" size="sm" onClick={refresh}>
+                  Try again
+                </Button>
+              </div>
+            </div>
+          ) : griddedBoard ? (
+            <div className="min-w-0 space-y-5">
+              {/* One row: which part of the board on the left, what to do with it on the right. The
+                filter used to sit on a line of its own under the tabs, which read as a second
+                navigation for the same board — they are two halves of "what am I looking at", and
+                they belong side by side. `items-start` so the tab bar's own status line hangs
+                under the tabs rather than dragging the controls down with it. */}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                {hasSectionTabs ? (
+                  <div className="min-w-0 flex-1">
+                    <BoardSectionTabs
+                      sections={tabSections}
+                      selectedId={shownSectionId}
+                      // A colour is not one of the tabs, but it is still what is being shown, so its
+                      // line of counts is handed over rather than the bar falling back to
+                      // "Everything" and reporting a number that belongs to a different view.
+                      selected={sections.find((section) => section.id === shownSectionId)}
+                      onSelect={setSectionId}
+                    />
+                  </div>
+                ) : (
+                  <span />
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* The rail in the margin takes over from `lg` up, where there is a margin to
+                      put it in. Below that these are the only offers on the page — and there is
+                      room for the words, which the rail's glyphs do without. */}
+                  {allCards.length > 2 && (
+                    <BoardFilterTriggers
+                      value={filter}
+                      onChange={setFilter}
+                      className="lg:hidden"
+                    />
+                  )}
+
+                  {/* Same reason as the filter beside it: the rail these live in only exists from
+                    `lg` up, and a colour you can only filter by on a laptop is a colour half the
+                    board's readers do not have. */}
+                  <MarkFilterRail
+                    sections={markSections}
+                    selectedId={shownSectionId}
+                    onSelect={setSectionId}
+                    className="lg:hidden"
+                  />
+
+                  <AddCardTriggers
+                    onPick={setAddingKind}
+                    active={addingKind}
+                    className="lg:hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Over the board rather than in the rail: the rail is 10rem of page margin, which is
                 room for a few glyphs and not for a form. */}
-            {addingKind && (
-              <AddCardForm kind={addingKind} onAdd={addCard} onClose={() => setAddingKind(null)} />
-            )}
+              {addingKind && (
+                <AddCardForm
+                  kind={addingKind}
+                  onAdd={addCard}
+                  onClose={() => setAddingKind(null)}
+                />
+              )}
 
-            {namingArea && (
-              <NewAreaForm onCreate={handleNewArea} onClose={() => setNamingArea(false)} />
-            )}
+              {namingArea && (
+                <NewAreaForm onCreate={handleNewArea} onClose={() => setNamingArea(false)} />
+              )}
 
-            <div className="min-w-0 space-y-4">
-              {/* Only the cards travel. The controls above are the same controls whatever section
+              <div className="min-w-0 space-y-4">
+                {/* Only the cards travel. The controls above are the same controls whatever section
                   is open, and sliding them out and back would be the page redrawing its own
                   furniture every time somebody moved one tab across. */}
-              <SlidingTabPanel activeKey={sectionValue} index={sectionIndex} className="space-y-4">
-                {/* A board with nothing on it is the first thing a new hire sees, and an empty page
+                <SlidingTabPanel
+                  activeKey={sectionValue}
+                  index={sectionIndex}
+                  className="space-y-4"
+                >
+                  {/* A board with nothing on it is the first thing a new hire sees, and an empty page
                 cannot say what the board is *for*. Named after what it will hold rather than after
                 its own emptiness — and it says where the onboarding is, because it is not here. */}
-                {allCards.length === 0 && (
-                  <EmptyState
-                    icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
-                    title="Nothing on your board yet"
-                  >
-                    This is where things stay put between conversations — the task you are on, work
-                    worth picking up, what your buddy remembers. Add a note, a link or a list of
-                    your own at any time. Your onboarding itself is on the{" "}
-                    <Link
-                      to="/onboarding"
-                      className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  {allCards.length === 0 && (
+                    <EmptyState
+                      icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
+                      title="Nothing on your board yet"
                     >
-                      Onboarding page
-                    </Link>
-                    .
-                  </EmptyState>
-                )}
-
-                {/* The section is empty rather than the board: different states, and only one of them
-                  is fixed by generating anything. */}
-                {allCards.length > 0 && shownCards.length === 0 && (
-                  <EmptyState size="sm">
-                    Nothing here right now.{" "}
-                    {hiddenCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={showEverything}
+                      This is where things stay put between conversations — the task you are on,
+                      work worth picking up, what your buddy remembers. Add a note, a link or a list
+                      of your own at any time. Your onboarding itself is on the{" "}
+                      <Link
+                        to="/onboarding"
                         className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
                       >
-                        Show all {allCards.length} cards
-                      </button>
-                    )}
-                  </EmptyState>
-                )}
+                        Onboarding page
+                      </Link>
+                      .
+                    </EmptyState>
+                  )}
 
-                {/* Above the status line: "showing 6 of 34" is about the view, and these are about
+                  {/* The section is empty rather than the board: different states, and only one of them
+                  is fixed by generating anything. */}
+                  {allCards.length > 0 && shownCards.length === 0 && (
+                    <EmptyState size="sm">
+                      Nothing here right now.{" "}
+                      {hiddenCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={showEverything}
+                          className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                        >
+                          Show all {allCards.length} cards
+                        </button>
+                      )}
+                    </EmptyState>
+                  )}
+
+                  {/* Above the status line: "showing 6 of 34" is about the view, and these are about
                     the work — the phase just finished, and the check closing the one the hire is
                     in. What is next on the path is on the path card at the top of the board. */}
-                <BoardPhaseRecap boardId={boardId} path={path} />
+                  <BoardPhaseRecap boardId={boardId} path={path} />
 
-                <BoardPhaseCheck
-                  path={path}
-                  phases={phases}
-                  cards={allCards}
-                  origins={cardOrigins}
-                  marks={cardMarks}
-                />
+                  <BoardPhaseCheck
+                    path={path}
+                    phases={phases}
+                    cards={allCards}
+                    origins={cardOrigins}
+                    marks={cardMarks}
+                  />
 
-                <BoardViewStatus
-                  shown={shownCards.length}
-                  total={allCards.length}
-                  cuts={activeCuts}
-                  onShowEverything={showEverything}
-                />
+                  <BoardViewStatus
+                    shown={shownCards.length}
+                    total={allCards.length}
+                    cuts={activeCuts}
+                    onShowEverything={showEverything}
+                  />
 
-                {/* Under the line about what is shown, because it is the same kind of fact about
+                  {/* Under the line about what is shown, because it is the same kind of fact about
                     the board rather than about the work: that one says how much of it you are
                     looking at, this one says where the arrangement is being kept. */}
-                <BoardLocalOnlyNotice localOnly={localOnly} />
+                  <BoardLocalOnlyNotice localOnly={localOnly} />
 
-                <BoardGrid
-                  board={griddedBoard}
-                  onDismiss={handleDismiss}
-                  dismissingId={dismissingId}
-                  onEdit={(cardId, request) => void editCard(cardId, request)}
-                  onRestorePrevious={(cardId, replacedAt) =>
-                    void restorePrevious(cardId, replacedAt)
-                  }
-                  restoringIds={restoringIds}
-                  savingIds={savingIds}
-                  undoNotices={undoNotices}
-                  // A checklist broken out of a task is a *new* card, which only a re-read can
-                  // show. Without this the write lands and the board keeps drawing what it read
-                  // before the press.
-                  onCardAdded={refresh}
-                  onReorder={handleReorder}
-                  boardOrder={allCards.map((card) => card.id)}
-                  isArranging={isArranging}
-                  collapsedIds={collapsedIds}
-                  onToggleCollapsed={toggleCollapsed}
-                  pinnedIds={pinnedIds}
-                  onTogglePinned={togglePinned}
-                  groups={groups}
-                  onAssignGroup={handleAssignGroup}
-                  onRenameGroup={handleRenameGroup}
-                  onToggleGroup={handleToggleGroup}
-                  onDissolveGroup={handleDissolveGroup}
-                  onRecolourGroup={handleRecolourGroup}
-                  states={states}
-                  onToggleDone={toggleDone}
-                  onSetPredecessor={setPredecessor}
-                  openStages={openStages}
-                  onToggleStage={toggleStage}
-                  cardSizes={cardSizes}
-                  cardOrigins={cardOrigins}
-                  onResizeCard={resizeCard}
-                />
-              </SlidingTabPanel>
+                  <BoardGrid
+                    board={griddedBoard}
+                    onDismiss={handleDismiss}
+                    dismissingId={dismissingId}
+                    onEdit={(cardId, request) => void editCard(cardId, request)}
+                    onRestorePrevious={(cardId, replacedAt) =>
+                      void restorePrevious(cardId, replacedAt)
+                    }
+                    restoringIds={restoringIds}
+                    savingIds={savingIds}
+                    undoNotices={undoNotices}
+                    // A checklist broken out of a task is a *new* card, which only a re-read can
+                    // show. Without this the write lands and the board keeps drawing what it read
+                    // before the press.
+                    onCardAdded={refresh}
+                    onReorder={handleReorder}
+                    boardOrder={allCards.map((card) => card.id)}
+                    isArranging={isArranging}
+                    collapsedIds={collapsedIds}
+                    onToggleCollapsed={toggleCollapsed}
+                    pinnedIds={pinnedIds}
+                    onTogglePinned={togglePinned}
+                    groups={groups}
+                    onAssignGroup={handleAssignGroup}
+                    onRenameGroup={handleRenameGroup}
+                    onToggleGroup={handleToggleGroup}
+                    onDissolveGroup={handleDissolveGroup}
+                    onRecolourGroup={handleRecolourGroup}
+                    states={states}
+                    onToggleDone={toggleDone}
+                    onSetPredecessor={setPredecessor}
+                    openStages={openStages}
+                    onToggleStage={toggleStage}
+                    cardSizes={cardSizes}
+                    cardOrigins={cardOrigins}
+                    onResizeCard={resizeCard}
+                  />
+                </SlidingTabPanel>
+              </div>
             </div>
-          </div>
-        ) : null}
-      </main>
-    </div>
+          ) : null}
+        </main>
+      </div>
+    </BoardPathContext.Provider>
   );
 }

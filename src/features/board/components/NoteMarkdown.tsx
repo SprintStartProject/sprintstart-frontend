@@ -2,7 +2,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import type { CardMark } from "../marks/cardMarks";
-import { remarkNoteText } from "../layout/noteMarkdown";
+import { remarkNoteText, STEP_LINK_HREF } from "../layout/noteMarkdown";
+import { StepLink } from "./StepLink";
 import { Marked } from "./Marked";
 
 type NoteMarkdownProps = { text: string; marks: CardMark[]; cardId: string };
@@ -23,11 +24,14 @@ export function NoteMarkdown({ text, marks, cardId }: NoteMarkdownProps) {
           mark: ({ node }) => (
             <Marked text={`==${textOf(node)}==`} marks={marks} parse cardId={cardId} />
           ),
-          a: ({ children, href }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              {children}
-            </a>
-          ),
+          a: ({ children, href }) =>
+            href?.startsWith(STEP_LINK_HREF) ? (
+              <StepLink title={decodeURIComponent(href.slice(STEP_LINK_HREF.length))} />
+            ) : (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            ),
         }}
       >
         {text}

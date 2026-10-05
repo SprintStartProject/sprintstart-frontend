@@ -3,13 +3,15 @@ import { Check, ChevronDown, ChevronUp, PenLine, Pencil, X } from "lucide-react"
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
-import { Textarea } from "../../../components/ui/Textarea";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutNote } from "../generation/cardQuestion";
 import { Marked } from "./Marked";
 import { NoteMarkdown } from "./NoteMarkdown";
+import { StepLink } from "./StepLink";
+import { StepLinkTextarea } from "./StepLinkTextarea";
+import { splitStepLinks } from "../layout/stepLinks";
 import { looksLikeMarkdown, plainHeading } from "../layout/noteMarkdown";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardMark } from "../marks/cardMarks";
@@ -165,10 +167,10 @@ export function NoteCard({
             <label className="sr-only" htmlFor={`note-${card.id}`}>
               Note text
             </label>
-            <Textarea
+            <StepLinkTextarea
               id={`note-${card.id}`}
               value={bodyDraft}
-              onChange={(event) => setBodyDraft(event.target.value)}
+              onValueChange={setBodyDraft}
               minRows={4}
             />
           </div>
@@ -264,7 +266,14 @@ function NoteBody({ body, marks, cardId }: { body: string; marks: CardMark[]; ca
       <NoteMarkdown text={text} marks={marks} cardId={cardId} />
     ) : (
       <p className="text-sm whitespace-pre-wrap text-app-text">
-        <Marked text={text} marks={marks} parse cardId={cardId} />
+        {/* `[[Step]]` links first, then each run between them marked as usual. */}
+        {splitStepLinks(text).map((run, index) =>
+          run.link ? (
+            <StepLink key={index} title={run.text} />
+          ) : (
+            <Marked key={index} text={run.text} marks={marks} parse cardId={cardId} />
+          ),
+        )}
       </p>
     );
 

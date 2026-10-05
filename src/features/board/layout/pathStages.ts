@@ -2,6 +2,7 @@ import { phaseState } from "../../onboarding/journey";
 import type { OnboardingPathEndpoint } from "../../onboarding/types";
 import type { BoardCard } from "../types";
 import type { CardOrigins } from "./cardOrigins";
+import { linkedTitles, titleKey } from "./stepLinks";
 import type { BoardStage } from "./boardStructure";
 
 /**
@@ -37,6 +38,8 @@ export type PathPhases = {
   aheadPhaseIds: Set<string>;
   /** Phases with nothing left in them: every step finished or skipped, every question passed. */
   finishedPhaseIds: Set<string>;
+  /** Every step by its title as `[[…]]` matches it (see `stepLinks.ts`), first one on a tie. */
+  stepByTitle: Map<string, string>;
 };
 
 /**
@@ -51,8 +54,13 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
 
   const phaseOfStep = new Map<string, string>();
   const phaseOfQuestion = new Map<string, string>();
+  const stepByTitle = new Map<string, string>();
   for (const phase of phases) {
-    for (const step of phase.steps ?? []) phaseOfStep.set(step.id, phase.id);
+    for (const step of phase.steps ?? []) {
+      phaseOfStep.set(step.id, phase.id);
+      const key = titleKey(step.title ?? "");
+      if (key && !stepByTitle.has(key)) stepByTitle.set(key, step.id);
+    }
     for (const question of phase.questions ?? []) phaseOfQuestion.set(question.id, phase.id);
   }
 
@@ -65,6 +73,7 @@ export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
     phaseOfQuestion,
     phaseIds: new Set(phases.map((phase) => phase.id)),
     aheadPhaseIds,
+    stepByTitle,
     finishedPhaseIds: new Set(
       phases.filter((phase) => phaseState(phase) === "done").map((phase) => phase.id),
     ),
@@ -124,7 +133,21 @@ export function stepOfCard(card: BoardCard, origins: CardOrigins): string | null
   return place?.kind === "step" ? place.id : null;
 }
 
-/** The phase a card belongs to, if it belongs to one. */
+/** The steps a note links to with `[[…]]` that are on this path, in order — see `stepLinks.ts`. */
+export function linkedSteps(card: BoardCard, phases: PathPhases): string[] {
+  if (card.content.kind !== "NOTE") return [];
+
+  return linkedTitles(card.content.text)
+    .map((title) => phases.stepByTitle.get(titleKey(title)))
+    .filter((stepId): stepId is string => stepId !== undefined);
+}
+
+/**
+ * The phase a card belongs to, if it belongs to one.
+ *
+ * Where it was kept wins; a note kept from nowhere in particular belongs to the first step it links
+ * to with `[[…]]`.
+ */
 export function phaseOfCard(
   card: BoardCard,
   phases: PathPhases,
@@ -135,7 +158,11 @@ export function phaseOfCard(
   }
 
   const url = origins[card.id]?.url;
-  return url ? phaseOfUrl(url, phases) : null;
+  const fromOrigin = url ? phaseOfUrl(url, phases) : null;
+  if (fromOrigin) return fromOrigin;
+
+  const [linked] = linkedSteps(card, phases);
+  return linked ? (phases.phaseOfStep.get(linked) ?? null) : null;
 }
 
 /**
@@ -151,7 +178,12 @@ export function isCardAt(
   phases: PathPhases | null,
   origins: CardOrigins,
 ): boolean {
-  if (place.kind === "step") return stepOfCard(card, origins) === place.id;
+  if (place.kind === "step") {
+    return (
+      stepOfCard(card, origins) === place.id ||
+      (phases !== null && linkedSteps(card, phases).includes(place.id))
+    );
+  }
   if (phases) return phaseOfCard(card, phases, origins) === place.id;
 
   const url = origins[card.id]?.url;

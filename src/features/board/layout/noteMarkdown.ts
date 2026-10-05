@@ -1,4 +1,12 @@
 import { splitMarks } from "../marks/markup";
+import { splitStepLinks } from "./stepLinks";
+
+/**
+ * Where a `[[Step]]` link points inside a Markdown note — a marker, not an address: `NoteMarkdown`
+ * draws every link starting with it as a `StepLink` chip. Root-relative, so Markdown's URL
+ * sanitising leaves it alone.
+ */
+export const STEP_LINK_HREF = "/__step/";
 
 /**
  * Whether a note is written in Markdown rather than as plain text.
@@ -19,6 +27,7 @@ export function looksLikeMarkdown(text: string): boolean {
 type MdNode = {
   type: string;
   value?: string;
+  url?: string;
   children?: MdNode[];
   data?: { hName?: string };
 };
@@ -29,6 +38,8 @@ type MdNode = {
  * - `==words==` is how a note carries its highlights (see `marks/markup.ts`). Markdown has no such
  *   syntax, so the run becomes a `mark` element, which is then drawn by `Marked` exactly as on a
  *   plain note — colour, popover and all.
+ * - `[[Step title]]` links a step of the path (see `stepLinks.ts`); it becomes a link `NoteMarkdown`
+ *   draws as a step chip.
  * - A single line break is a line break. In Markdown it is a space, which would run the "From …"
  *   line a selection appends into the sentence above it.
  *
@@ -38,8 +49,22 @@ export function remarkNoteText() {
   function split(node: MdNode): MdNode[] {
     if (node.type !== "text" || !node.value) return [node];
 
+    return splitStepLinks(node.value).flatMap((part): MdNode[] =>
+      part.link
+        ? [
+            {
+              type: "link",
+              url: `${STEP_LINK_HREF}${encodeURIComponent(part.text)}`,
+              children: [{ type: "text", value: part.text }],
+            },
+          ]
+        : splitText(part.text),
+    );
+  }
+
+  function splitText(value: string): MdNode[] {
     const out: MdNode[] = [];
-    for (const run of splitMarks(node.value)) {
+    for (const run of splitMarks(value)) {
       if (run.marked) {
         out.push({
           type: "highlight",
@@ -81,5 +106,6 @@ export function plainHeading(line: string): string {
     .replace(/\s+#+\s*$/, "")
     .replace(/\*\*(.+?)\*\*|__(.+?)__/g, "$1$2")
     .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[\[([^[\]\n]+?)\]\]/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
 }

@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
-import { Textarea } from "../../../components/ui/Textarea";
+import { StepLinkTextarea } from "./StepLinkTextarea";
 import type { AuthoredCardKind, AuthoredCardRequest } from "../types";
 
 type AddCardFormProps = {
@@ -128,11 +128,7 @@ export function AddCardForm({ kind, onAdd, onClose }: AddCardFormProps) {
 
           <Field label={promptFor(kind)} controlId={fieldId}>
             {kind === "NOTE" ? (
-              <Textarea
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                minRows={3}
-              />
+              <StepLinkTextarea value={text} onValueChange={setText} minRows={3} />
             ) : (
               <Input
                 value={text}
