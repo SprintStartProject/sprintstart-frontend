@@ -53,7 +53,22 @@ vi.mock("../../../../../src/services/sources/confluenceService", () => ({
   },
 }));
 
+vi.mock("../../../../../src/services/sources/notionService", () => ({
+  getMyNotionCredentials: vi.fn(),
+  addNotionCredential: vi.fn(),
+  notionService: {
+    discoverPages: vi.fn(),
+    createConnection: vi.fn(),
+    listConnections: vi.fn(),
+  },
+}));
+
 import { projectService } from "../../../../../src/services/projectService";
+import {
+  addNotionCredential,
+  getMyNotionCredentials,
+  notionService,
+} from "../../../../../src/services/sources/notionService";
 import {
   addGithubPat,
   addRepositoryToProject,
@@ -251,6 +266,39 @@ describe("CreateProjectWizard", () => {
     vi.mocked(knowledgeService.uploadDocuments).mockResolvedValue([
       { filename: "spec.md", status: "success" },
     ]);
+    vi.mocked(getMyNotionCredentials).mockResolvedValue([
+      {
+        name: "wiki",
+        workspaceId: "ws-1",
+        workspaceName: "Acme Workspace",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    ]);
+    vi.mocked(addNotionCredential).mockResolvedValue({
+      name: "fresh",
+      workspaceId: "ws-2",
+      workspaceName: "Fresh Workspace",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    });
+    vi.mocked(notionService.discoverPages).mockResolvedValue([
+      {
+        id: "page-1",
+        title: "Sprint Planning",
+        url: "https://www.notion.so/Sprint-Planning-page1",
+        lastEditedTime: "2026-03-04T10:00:00Z",
+      },
+      {
+        id: "page-2",
+        title: "Retro Notes",
+        url: "https://www.notion.so/Retro-Notes-page2",
+        lastEditedTime: "2026-03-05T10:00:00Z",
+      },
+    ]);
+    vi.mocked(notionService.createConnection).mockResolvedValue(
+      {} as Awaited<ReturnType<typeof notionService.createConnection>>,
+    );
     vi.mocked(confluenceService.createConnection).mockResolvedValue({
       id: "conn-1",
       projectId: "proj-new",
@@ -268,6 +316,19 @@ describe("CreateProjectWizard", () => {
       sourceEnabled: true,
     });
   });
+
+  /** From the sources step, open the Notion detail and wait for the workspace preview. */
+  async function openNotionDetail(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes the pages a notion token/i }));
+    await screen.findByText("Sprint Planning");
+  }
+
+  /** From the sources step, stage the Notion test workspace. */
+  async function stageNotionWorkspace(user: ReturnType<typeof userEvent.setup>) {
+    await openNotionDetail(user);
+    await user.click(screen.getByRole("button", { name: /add to list/i }));
+  }
 
   /** From the sources step, stage a Jira board through the add-source sub-flow. */
   async function stageJiraBoard(user: ReturnType<typeof userEvent.setup>) {
@@ -1011,6 +1072,82 @@ describe("CreateProjectWizard", () => {
     // The refreshed credential is adopted and shown as the picker's label.
     await screen.findByText(/Fresh cred - new@example.com/i);
     expect(screen.getByLabelText("Credential")).toHaveTextContent("Fresh cred");
+  });
+
+  it("stages the Notion workspace without touching the backend and shows it on Review", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await stageNotionWorkspace(user);
+
+    // Staged by workspace name with its credential and page count, nothing posted yet, and no
+    // project exists.
+    expect(screen.getByText("Acme Workspace")).toBeInTheDocument();
+    expect(screen.getByText(/wiki · 2 pages visible/)).toBeInTheDocument();
+    expect(vi.mocked(notionService.createConnection)).not.toHaveBeenCalled();
+    expect(vi.mocked(projectService.createProject)).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(screen.getByText("Acme Workspace")).toBeInTheDocument();
+    expect(screen.getAllByText("Notion").length).toBeGreaterThan(0);
+  });
+
+  it("connects the staged Notion workspace against the new project on Create", async () => {
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await stageNotionWorkspace(user);
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+    await user.click(screen.getByRole("button", { name: /create project/i }));
+
+    await waitFor(() => expect(vi.mocked(notionService.createConnection)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(notionService.createConnection)).toHaveBeenCalledWith("proj-new", {
+      credentialName: "wiki",
+    });
+    // The picker had no project to scope to, so it never asked for its connections.
+    expect(vi.mocked(notionService.listConnections)).not.toHaveBeenCalled();
+  });
+
+  it("adds a Notion credential inline while staging the workspace and selects the new one", async () => {
+    vi.mocked(getMyNotionCredentials)
+      .mockResolvedValueOnce([]) // initial load: none stored
+      .mockResolvedValue([
+        {
+          name: "fresh",
+          workspaceId: "ws-2",
+          workspaceName: "Fresh Workspace",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      ]);
+    const user = userEvent.setup();
+    renderWizard();
+
+    await goToSources(user);
+    await user.click(screen.getByRole("button", { name: /add source/i }));
+    await user.click(screen.getByRole("button", { name: /indexes the pages a notion token/i }));
+
+    await user.click(screen.getByRole("button", { name: /add notion credential/i }));
+    await user.type(screen.getByTestId("settings-notion-add-name"), "fresh");
+    await user.type(screen.getByTestId("settings-notion-add-token"), "secret");
+    await user.click(screen.getByTestId("settings-notion-add-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(addNotionCredential)).toHaveBeenCalledWith({
+        name: "fresh",
+        token: "secret",
+      }),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(notionService.discoverPages)).toHaveBeenCalledWith(
+        "fresh",
+        expect.anything(),
+      ),
+    );
+    expect(screen.getByLabelText("Notion credential")).toHaveTextContent("fresh");
   });
 
   it("stages uploaded files and uploads them against the new project on Create", async () => {

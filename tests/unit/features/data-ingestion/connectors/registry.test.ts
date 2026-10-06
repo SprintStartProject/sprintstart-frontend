@@ -68,7 +68,13 @@ describe("connector registry", () => {
         (definition) => definition.meta.system,
       ),
     );
-    expect(SCHEDULED_SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "CONFLUENCE", "BITBUCKET"]);
+    expect(SCHEDULED_SOURCE_SYSTEMS).toEqual([
+      "GITHUB",
+      "JIRA",
+      "CONFLUENCE",
+      "BITBUCKET",
+      "NOTION",
+    ]);
   });
 
   it("words the connectors modal from the registry and falls back to the backend name", () => {
@@ -91,6 +97,7 @@ describe("connector registry", () => {
     expect(toSourceSystem("github")).toBe("GITHUB");
     expect(toSourceSystem("Confluence")).toBe("CONFLUENCE");
     expect(toSourceSystem("Bitbucket")).toBe("BITBUCKET");
+    expect(toSourceSystem("notion")).toBe("NOTION");
     expect(toSourceSystem("sonarqube")).toBeNull();
   });
 
@@ -124,7 +131,7 @@ describe("connector registry", () => {
     });
 
     it("gives every other connector an identity card, an update or a sync, and a schedule", () => {
-      for (const system of ["GITHUB", "JIRA", "CONFLUENCE", "BITBUCKET"] as const) {
+      for (const system of ["GITHUB", "JIRA", "CONFLUENCE", "BITBUCKET", "NOTION"] as const) {
         const { actions, DetailsSection } = CONNECTORS[system];
 
         expect(DetailsSection).not.toBeNull();
@@ -140,6 +147,7 @@ describe("connector registry", () => {
         expect(actions.update !== undefined && actions.manualSync !== undefined).toBe(false);
       }
       expect(CONNECTORS.CONFLUENCE.actions.manualSync).toBeDefined();
+      expect(CONNECTORS.NOTION.actions.manualSync).toBeDefined();
     });
 
     it("offers no action on a card whose source could not be resolved", () => {
@@ -191,8 +199,52 @@ describe("connector registry", () => {
       expect(unlink?.isAvailable(unresolved)).toBe(false);
     });
 
+    it("scopes the run history of a Notion workspace by its connection id", () => {
+      const notion = createDataSource({
+        definition: CONNECTORS.NOTION,
+        status: { ...status, sourceSystem: "NOTION", sourceId: "ws-1", repositoryId: null },
+        connection: {
+          id: "notion-conn-1",
+          projectId: "p1",
+          workspaceId: "ws-1",
+          workspaceName: "Acme",
+          workspaceUrl: "https://www.notion.so/acme",
+          credentialName: "wiki",
+          sourceEnabled: true,
+          autoUpdate: false,
+          schedule: "every 60 minutes",
+          scheduleSpec: { type: "INTERVAL", everyMinutes: 60 },
+          nextSyncAt: null,
+          lastSyncedAt: null,
+          createdAt: "2026-10-05T09:00:00Z",
+          updatedAt: "2026-10-05T09:00:00Z",
+          version: 1,
+        },
+      });
+
+      expect(CONNECTORS.NOTION.runFilter?.param).toBe("repositoryId");
+      expect(CONNECTORS.NOTION.runFilter?.valueOf(notion)).toBe("notion-conn-1");
+      // A run carries the workspace id, or the connection id, as its source reference.
+      expect(CONNECTORS.NOTION.runReferences(notion.details)).toEqual(["ws-1", "notion-conn-1"]);
+    });
+
+    it("offers no action on a Notion card without a connection record", () => {
+      const unresolved = createDataSource({
+        definition: CONNECTORS.NOTION,
+        status: { ...status, sourceSystem: "NOTION", sourceId: "ws-1", repositoryId: null },
+      });
+      const { manualSync, unlink, setEnabled, schedule } = CONNECTORS.NOTION.actions;
+
+      expect(CONNECTORS.NOTION.runFilter?.valueOf(unresolved)).toBeNull();
+      expect(manualSync?.isAvailable(unresolved)).toBe(false);
+      expect(unlink?.isAvailable(unresolved)).toBe(false);
+      expect(setEnabled?.isAvailable(unresolved)).toBe(false);
+      expect(schedule?.isAvailable(unresolved)).toBe(false);
+    });
+
     it("tells a source apart whose scheduler skips it while auto update is off", () => {
       expect(CONNECTORS.BITBUCKET.actions.schedule?.skipsWhenAutoUpdateOff).toBe(true);
+      expect(CONNECTORS.NOTION.actions.schedule?.skipsWhenAutoUpdateOff).toBe(true);
       expect(CONNECTORS.GITHUB.actions.schedule?.skipsWhenAutoUpdateOff).toBeUndefined();
     });
 
@@ -201,6 +253,7 @@ describe("connector registry", () => {
       expect(CONNECTORS.BITBUCKET.actions.unlink?.removalHint).toMatch(/repository/);
       expect(CONNECTORS.JIRA.actions.unlink?.removalHint).toMatch(/instance/);
       expect(CONNECTORS.CONFLUENCE.actions.unlink?.removalHint).toMatch(/from scratch/);
+      expect(CONNECTORS.NOTION.actions.unlink?.removalHint).toMatch(/knowledge base/);
     });
   });
 
@@ -224,17 +277,18 @@ describe("connector registry", () => {
         "BITBUCKET",
         "JIRA",
         "CONFLUENCE",
+        "NOTION",
         "UPLOAD",
       ]);
     });
 
-    it("lets only uploads be deleted and only Confluence be forced to Markdown", () => {
+    it("lets only uploads be deleted and only Confluence and Notion be forced to Markdown", () => {
       expect(
         CONNECTOR_LIST.filter((d) => d.knowledgeBase.deletable).map((d) => d.meta.system),
       ).toEqual(["UPLOAD"]);
       expect(
         CONNECTOR_LIST.filter((d) => d.knowledgeBase.markdown).map((d) => d.meta.system),
-      ).toEqual(["CONFLUENCE"]);
+      ).toEqual(["CONFLUENCE", "NOTION"]);
     });
 
     it("shows a metadata view for a GitHub organization and a Bitbucket workspace only", () => {
@@ -260,8 +314,9 @@ describe("connector registry", () => {
       expect(hasRepositoryFacet([])).toBe(false);
     });
 
-    it("keeps Bitbucket out of the chat's source filter", () => {
-      expect(CHAT_SOURCE_SYSTEMS).not.toContain("BITBUCKET");
+    it("offers Bitbucket and Notion in the chat's source filter", () => {
+      expect(CHAT_SOURCE_SYSTEMS).toContain("BITBUCKET");
+      expect(CHAT_SOURCE_SYSTEMS).toContain("NOTION");
     });
 
     it("scopes the knowledge base to a Bitbucket repository by workspace/slug", () => {
@@ -310,6 +365,8 @@ describe("connector registry", () => {
       ["https://acme.atlassian.net/rest/x", "board", "JIRA"],
       ["https://acme.atlassian.net/wiki/spaces/ENG/pages/1", "onboarding", "CONFLUENCE"],
       ["https://wiki.corp.example/wiki/spaces/ENG/pages/1", "onboarding", "CONFLUENCE"],
+      ["https://www.notion.so/acme/Handbook-123", "handbook", "NOTION"],
+      ["https://acme.notion.site/Handbook-123", "handbook", "NOTION"],
       ["", "handbook.pdf", "UPLOAD"],
     ])("attributes the citation %s (%s) to %s", (url, name, system) => {
       expect(sourceSystemOfCitation(url, name)).toBe(system);

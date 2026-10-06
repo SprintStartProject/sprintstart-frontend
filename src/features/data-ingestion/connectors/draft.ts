@@ -3,6 +3,7 @@ import type { BitbucketDraftSource } from "./bitbucket/draft.ts";
 import type { ConfluenceDraftSource } from "./confluence/draft.ts";
 import type { GithubDraftSource } from "./github/draft.ts";
 import type { JiraDraftSource } from "./jira/draft.ts";
+import type { NotionDraftSource } from "./notion/draft.ts";
 import type { UploadDraftSource } from "./upload/draft.ts";
 
 /**
@@ -70,6 +71,7 @@ export type DraftSourceOf = {
   UPLOAD: UploadDraftSource;
   CONFLUENCE: ConfluenceDraftSource;
   BITBUCKET: BitbucketDraftSource;
+  NOTION: NotionDraftSource;
 };
 
 export type DraftSourceType = SourceSystem;

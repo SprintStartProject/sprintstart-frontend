@@ -53,7 +53,14 @@ const confluenceCard = (
 describe("data-ingestion data helpers", () => {
   describe("SOURCE_SYSTEMS / SOURCE_META", () => {
     it("lists all known source systems", () => {
-      expect(SOURCE_SYSTEMS).toEqual(["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE", "BITBUCKET"]);
+      expect(SOURCE_SYSTEMS).toEqual([
+        "GITHUB",
+        "JIRA",
+        "UPLOAD",
+        "CONFLUENCE",
+        "BITBUCKET",
+        "NOTION",
+      ]);
     });
 
     it("provides meta for every source system", () => {

@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useEffect, useRef } from "react";
 import type { ConfluenceConnectionDto } from "../../../services/sources/confluenceService.ts";
 import type { JiraInstanceDto } from "../../../services/sources/jiraService.ts";
+import type { NotionWorkspaceConnectionDto } from "../../../services/sources/notionService.ts";
 import type { ProjectSource } from "../../../services/projectService.ts";
 import {
   getIngestionRunsPage,
@@ -28,6 +29,7 @@ const NO_STATUSES: SourceInstanceIngestionStatus[] = [];
 const NO_PROJECT_SOURCES: ProjectSource[] = [];
 const NO_JIRA_INSTANCES: JiraInstanceDto[] = [];
 const NO_CONFLUENCE_CONNECTIONS: ConfluenceConnectionDto[] = [];
+const NO_NOTION_CONNECTIONS: NotionWorkspaceConnectionDto[] = [];
 
 function hasRunningRun(runs: readonly IngestionRun[] | undefined): boolean {
   return runs?.some((run) => isRunInProgress(run.status)) ?? false;
@@ -62,7 +64,7 @@ type UseIngestionDataOptions = {
  * open details drawer survives it.
  *
  * Which parts fail loudly is the connector's call: a project's own sources and the
- * status rows report an error, while Jira and Confluence degrade quietly (their
+ * status rows report an error, while Jira, Confluence and Notion degrade quietly (their
  * lists may be off limits to the viewer) and leave their cards out.
  */
 export function useIngestionData({
@@ -121,7 +123,7 @@ export function useIngestionData({
 
     void queryClient.invalidateQueries({ queryKey: queryKeys.ingestion.statuses(scopeId) });
 
-    for (const { connections } of [CONNECTORS.JIRA, CONNECTORS.CONFLUENCE]) {
+    for (const { connections } of [CONNECTORS.JIRA, CONNECTORS.CONFLUENCE, CONNECTORS.NOTION]) {
       if (connections.live) {
         void queryClient.invalidateQueries({
           queryKey: queryKeys.ingestion.connections(connections.scope, scopeId),
@@ -163,12 +165,22 @@ export function useIngestionData({
     refetchInterval: confluenceConnections.live ? refetchInterval : false,
   });
 
+  const { connections: notionConnections } = CONNECTORS.NOTION;
+  const notionQuery = useQuery({
+    queryKey: queryKeys.ingestion.connections(notionConnections.scope, scopeId),
+    queryFn: () => notionConnections.load(scopeId),
+    enabled,
+    retry: false,
+    refetchInterval: notionConnections.live ? refetchInterval : false,
+  });
+
   return {
     statuses: statusesQuery.data ?? NO_STATUSES,
     latestRuns: latestRunsQuery.data ?? NO_RUNS,
     projectSources: projectSourcesQuery.data ?? NO_PROJECT_SOURCES,
     jiraInstances: jiraQuery.data ?? NO_JIRA_INSTANCES,
     confluenceConnections: confluenceQuery.data ?? NO_CONFLUENCE_CONNECTIONS,
+    notionConnections: notionQuery.data ?? NO_NOTION_CONNECTIONS,
 
     /** The run table's current page. */
     runs: runsPageQuery.data?.items ?? NO_RUNS,
@@ -187,6 +199,7 @@ export function useIngestionData({
       projectSourcesQuery,
       jiraQuery,
       confluenceQuery,
+      notionQuery,
       latestRunsQuery,
     ].some((query) => query.isLoading),
     statusErrorMessage: statusesQuery.isError

@@ -1,14 +1,18 @@
 import { useMemo } from "react";
-import { GitBranch, Ticket } from "lucide-react";
+import { GitBranch, NotebookText, Ticket } from "lucide-react";
 import { useGithubTokens } from "../settings/hooks/useGithubTokens";
 import { useAtlassianCredentials } from "../settings/hooks/useAtlassianCredentials";
+import { useNotionCredentials } from "../settings/hooks/useNotionCredentials";
 import { TokenAddForm } from "../settings/components/TokenAddForm";
 import {
   GithubTokenRow,
   AtlassianAccessAddForm,
   AtlassianAccessRow,
+  NotionAccessAddForm,
+  NotionAccessRow,
 } from "./components/connectorAdapters";
 import type { AtlassianCredentialDto } from "../../services/sources/atlassianService";
+import type { NotionCredentialDto } from "../../services/sources/notionService";
 import type { AccessConnector } from "./types";
 
 /**
@@ -81,6 +85,30 @@ export const atlassianConnector = defineAccessConnector<AtlassianCredentialDto>(
   Row: AtlassianAccessRow,
 });
 
+export const notionConnector = defineAccessConnector<NotionCredentialDto>({
+  id: "notion",
+  label: "Notion",
+  icon: NotebookText,
+  noun: { one: "credential", many: "credentials" },
+  addLabel: "Add credential",
+  emptyTitle: "No credentials yet",
+  emptyDescription:
+    "Add a Notion token to connect the pages it can see. Share the pages you want indexed with the integration in Notion first.",
+  useEntries: () => {
+    const { credentials, loaded, error, isRefreshing, reload } = useNotionCredentials();
+
+    // Notion credentials are keyed by name alone.
+    const entries = useMemo(
+      () => credentials.map((credential) => ({ key: credential.name, payload: credential })),
+      [credentials],
+    );
+
+    return { entries, loaded, error, isRefreshing, reload };
+  },
+  AddForm: NotionAccessAddForm,
+  Row: NotionAccessRow,
+});
+
 /**
  * Every source whose access is managed in the unified view, in display order.
  *
@@ -88,4 +116,8 @@ export const atlassianConnector = defineAccessConnector<AtlassianCredentialDto>(
  * form — no new tab, no page change, no layout change. Keep the list short
  * enough that the source filter stays useful.
  */
-export const ACCESS_CONNECTORS: AccessConnector[] = [githubConnector, atlassianConnector];
+export const ACCESS_CONNECTORS: AccessConnector[] = [
+  githubConnector,
+  atlassianConnector,
+  notionConnector,
+];

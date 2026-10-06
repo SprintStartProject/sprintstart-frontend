@@ -1,11 +1,13 @@
 import type { ProjectSource } from "../../../services/projectService.ts";
 import type { ConfluenceConnectionDto } from "../../../services/sources/confluenceService.ts";
 import type { JiraInstanceDto } from "../../../services/sources/jiraService.ts";
+import type { NotionWorkspaceConnectionDto } from "../../../services/sources/notionService.ts";
 import type { DraftSourceOf } from "./draft.ts";
 import { bitbucketConnector } from "./bitbucket/definition.ts";
 import { confluenceConnector } from "./confluence/definition.ts";
 import { githubConnector } from "./github/definition.ts";
 import { jiraConnector } from "./jira/definition.ts";
+import { notionConnector } from "./notion/definition.ts";
 import { SOURCE_SYSTEMS, type SourceSystem } from "./sourceSystems.ts";
 import type { ConnectorDefinition } from "./types.ts";
 import { uploadConnector } from "./upload/definition.ts";
@@ -17,6 +19,7 @@ export type ConnectionOf = {
   JIRA: JiraInstanceDto;
   UPLOAD: ProjectSource;
   CONFLUENCE: ConfluenceConnectionDto;
+  NOTION: NotionWorkspaceConnectionDto;
 };
 
 /**
@@ -32,6 +35,7 @@ export const CONNECTORS: {
   UPLOAD: uploadConnector,
   CONFLUENCE: confluenceConnector,
   BITBUCKET: bitbucketConnector,
+  NOTION: notionConnector,
 };
 
 /** The definitions in the order the source systems are offered. */
