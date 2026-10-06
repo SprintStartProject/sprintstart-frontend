@@ -87,18 +87,20 @@ describe("BuddyPage Accessibility", () => {
 
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <AuthWrapper>
-            <BuddyProvider>
-              <BuddyPage />
-            </BuddyProvider>
-          </AuthWrapper>
-        </main>
+        <AuthWrapper>
+          <BuddyProvider>
+            <BuddyPage />
+          </BuddyProvider>
+        </AuthWrapper>
       </MemoryRouter>,
     );
 
+    // The page draws its own `<main>` since the shell retired, so the harness must not wrap it
+    // in a second one — two nested main landmarks are exactly what this suite exists to catch.
+    // The wait is on the chips above the composer: without a project the page is the same
+    // conversation (the gate is gone), and the chips prove the interactive state settled.
     await waitFor(() => {
-      expect(screen.getByText(/not on a project yet/)).toBeInTheDocument();
+      expect(screen.getByText("What should I work on?")).toBeInTheDocument();
     });
 
     expect(await axe(baseElement)).toHaveNoViolations();
@@ -107,13 +109,11 @@ describe("BuddyPage Accessibility", () => {
   it("has no violations in mentor mode", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <AuthWrapper>
-            <BuddyProvider>
-              <BuddyPage />
-            </BuddyProvider>
-          </AuthWrapper>
-        </main>
+        <AuthWrapper>
+          <BuddyProvider>
+            <BuddyPage />
+          </BuddyProvider>
+        </AuthWrapper>
       </MemoryRouter>,
     );
 
