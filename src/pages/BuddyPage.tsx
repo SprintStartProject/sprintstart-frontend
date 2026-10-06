@@ -25,6 +25,7 @@ import {
 } from "../hooks/useNewConversationShortcut";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
 import { CitationPopover } from "../features/buddy/citations/CitationPopover";
+import { citationDrawerProjectId } from "../features/buddy/citations/citationArtifact";
 import { useCitationViewer } from "../features/buddy/citations/useCitationViewer";
 import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer";
 import { BuddyNewConversationButton } from "../features/buddy/components/BuddyNewConversationButton";
@@ -363,6 +364,15 @@ function BuddyMentorHome() {
   // bottom of this one. The handlers are stable, which is what the memoised thread compares.
   const citationViewer = useCitationViewer();
 
+  // The drawer's content read is project-scoped: open citations in the conversation's own
+  // project, not the globally selected one — the hire may have switched since it started.
+  const citationSession = sessions.find((session) => session.id === currentSessionId);
+  const citationProjectId = citationDrawerProjectId(
+    citationSession?.projectId,
+    teamProjectId,
+    selectedProjectId,
+  );
+
   /**
    * The suggestion row above the composer, held in one identity — the conversation below it is
    * memoised now, and an element built inline in the render would be the one prop that always
@@ -529,7 +539,7 @@ function BuddyMentorHome() {
           // No project to open a drawer in: pass no artifact opener, so the popover (and the
           // footer's chips) fall back to the external source link instead of dead-ending.
           onCitationClick={citationViewer.handleCitationClick}
-          onOpenArtifact={selectedProjectId ? citationViewer.handleOpenArtifact : undefined}
+          onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
           // `hasUserMessage`, not `canStartConversation`: the button withdraws mid-turn, the room
           // it withdraws from must not. Below `md` the two clearances differ by 24px, and for a
           // hire with no PM replies this is the only term that is ever true — so tying the space
@@ -553,22 +563,22 @@ function BuddyMentorHome() {
 
       {/* The citation popover and the artifact drawer, once a reply's sources are clicked:
           the popover near the `[N]`, the drawer for the source itself. Rendered by the surface
-          (not the thread) so the fixed overlays are not clipped by the scroll container, and
-          gated on a project the same way the chat gates its own — the drawer fetches the
-          artifact content by id within one. */}
+                    (not the thread) so the fixed overlays are not clipped by the scroll container, and
+                    gated on the conversation's project the same way the chat gates its own — the drawer
+                    fetches the artifact content by id within one. */}
       {citationViewer.selectedCitation && (
         <CitationPopover
           selected={citationViewer.selectedCitation}
           onClose={citationViewer.closeCitation}
-          onOpenArtifact={selectedProjectId ? citationViewer.handleOpenArtifact : undefined}
+          onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
         />
       )}
 
-      {citationViewer.citationArtifact && selectedProjectId && (
+      {citationViewer.citationArtifact && citationProjectId && (
         <ArtifactViewerDrawer
           artifact={citationViewer.citationArtifact}
           onClose={citationViewer.closeArtifact}
-          projectId={selectedProjectId}
+          projectId={citationProjectId}
           highlightLines={citationViewer.highlightLines}
           canDelete={false}
           onDelete={() => {}}

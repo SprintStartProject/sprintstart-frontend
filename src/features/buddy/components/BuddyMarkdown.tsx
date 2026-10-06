@@ -86,6 +86,10 @@ function BuddyMarkdownImpl({ content, citations, onCitationClick }: BuddyMarkdow
 
       if (match) {
         const n = Number(match[1]);
+        // Positional, like the model's own numbering: the stream emits citations in the order
+        // the reply referenced them, and the read-back must return them in that order too — a
+        // contract flagged in review (backend#281 has no explicit order yet). A wrong source
+        // would be worse than none.
         const citation = citations?.[n - 1];
 
         return (

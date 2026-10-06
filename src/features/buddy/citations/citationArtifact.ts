@@ -59,3 +59,20 @@ export function deriveArtifactFromCitation(citation: CitationArtifactOpen): Arti
     ingestionRunId: null,
   };
 }
+
+/**
+ * Which project the artifact drawer must fetch within for a conversation.
+ *
+ * A conversation is about the project it was started in, and the drawer's content read is
+ * project-scoped — so the conversation's own project wins over the global selection (the hire
+ * may have switched since it started). Team conversations carry their managed project on the
+ * session slice; an unscoped hire conversation falls back to whatever is selected. `null` means
+ * no project at all: there is no drawer to open, and the caller offers the source link instead.
+ */
+export function citationDrawerProjectId(
+  sessionProjectId: string | null | undefined,
+  teamProjectId: string | null | undefined,
+  selectedProjectId: string,
+): string | null {
+  return sessionProjectId ?? teamProjectId ?? (selectedProjectId || null);
+}

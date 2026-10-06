@@ -21,6 +21,7 @@ import { useBuddy } from "../hooks/useBuddy";
 import { useGreetingReveal } from "../hooks/useGreetingReveal";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { CitationPopover } from "../citations/CitationPopover";
+import { citationDrawerProjectId } from "../citations/citationArtifact";
 import { useCitationViewer } from "../citations/useCitationViewer";
 import { ArtifactViewerDrawer } from "../../knowledge-base/components/ArtifactViewerDrawer";
 import { BuddyModeSwitcher } from "./BuddyModeSwitcher";
@@ -59,13 +60,16 @@ export function BuddyWidget() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   // The artifact drawer the dock's citations open needs a project to fetch the source within —
-  // the same gate the chat applies to its own drawer.
+  // the conversation's own where it has one (see `citationProjectId`), the same gate the chat
+  // applies to its own drawer.
   const { selectedProjectId } = useProjectContext();
   // The dock's citation popover + artifact drawer, held here (not in the dock) for the same
   // reason the widget owns every other piece of surface state: the dock unmounts on close.
   const citationViewer = useCitationViewer();
   const {
     messages,
+    sessions,
+    currentSessionId,
     isThinking,
     isStreaming,
     isOpening,
@@ -93,6 +97,15 @@ export function BuddyWidget() {
     isGreeting,
     isDeciding,
   } = useBuddy();
+
+  // The drawer's content read is project-scoped: open citations in the conversation's own
+  // project, not the globally selected one — the hire may have switched since it started.
+  const citationSession = sessions.find((session) => session.id === currentSessionId);
+  const citationProjectId = citationDrawerProjectId(
+    citationSession?.projectId,
+    teamProjectId,
+    selectedProjectId,
+  );
 
   // The switcher (and the composer, and everything else) waits: a turn in flight cannot be
   // called back into a thread that a switch would clear. Same rule as the new-conversation
@@ -379,7 +392,7 @@ export function BuddyWidget() {
             // No project to open a drawer in: pass no artifact opener, so the popover (and the
             // footer's chips) fall back to the external source link instead of dead-ending.
             onCitationClick={citationViewer.handleCitationClick}
-            onOpenArtifact={selectedProjectId ? citationViewer.handleOpenArtifact : undefined}
+            onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
             onClose={toggleOpen}
             onOpenFull={openFull}
             suggestionsHidden={suggestionsHidden}
@@ -444,15 +457,15 @@ export function BuddyWidget() {
         <CitationPopover
           selected={citationViewer.selectedCitation}
           onClose={citationViewer.closeCitation}
-          onOpenArtifact={selectedProjectId ? citationViewer.handleOpenArtifact : undefined}
+          onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
         />
       )}
 
-      {citationViewer.citationArtifact && selectedProjectId && (
+      {citationViewer.citationArtifact && citationProjectId && (
         <ArtifactViewerDrawer
           artifact={citationViewer.citationArtifact}
           onClose={citationViewer.closeArtifact}
-          projectId={selectedProjectId}
+          projectId={citationProjectId}
           highlightLines={citationViewer.highlightLines}
           canDelete={false}
           onDelete={() => {}}
