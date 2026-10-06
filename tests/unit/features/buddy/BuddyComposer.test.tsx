@@ -49,4 +49,25 @@ describe("BuddyComposer", () => {
     await user.keyboard("{Enter}");
     expect(onSend).toHaveBeenCalledWith("Where am I on my path?");
   });
+
+  /**
+   * The dock sends with the same session filters as the page, so it has to show them: a
+   * narrowed search the hire cannot see is the one way a filter "loses" them knowledge. The
+   * popover itself stays a page affair — 384 px has no room for it — so only the chips show.
+   */
+  it("shows the active filters in the compact dock too", () => {
+    render(
+      <BuddyDraftContext.Provider value={{ draft: "", setDraft: vi.fn(), handleSubmit: vi.fn() }}>
+        <BuddyComposer
+          compact
+          filters={{ sourceSystems: ["GITHUB"], from: "", to: "" }}
+          onFiltersChange={vi.fn()}
+        />
+      </BuddyDraftContext.Provider>,
+    );
+
+    expect(screen.getByText("Filtering:")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove GitHub filter" })).toBeInTheDocument();
+    expect(screen.queryByTestId("buddy-filters-toggle")).not.toBeInTheDocument();
+  });
 });

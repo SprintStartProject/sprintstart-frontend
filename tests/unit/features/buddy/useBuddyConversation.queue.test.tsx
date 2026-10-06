@@ -7,6 +7,7 @@ import { server } from "../../setup/vitest.setup";
 
 const MESSAGES = "/api/v1/onboarding/me/buddy/messages";
 const OPEN = "/api/v1/onboarding/me/buddy/open/stream";
+const SESSIONS = "/api/v1/onboarding/me/buddy/sessions";
 
 /**
  * A reply stream the test drives event by event.
@@ -375,6 +376,65 @@ describe("buddy message queue", () => {
       expect(result.current.queued).toHaveLength(0);
       expect(result.current.queuePaused).toBe(false);
       expect(sent).toEqual(["Q1"]);
+    });
+
+    it("waits out a running turn when released mid-answer instead of starting a second", async () => {
+      const { result } = await stoppedWithQueue();
+      const fourth = openStream();
+      pending.push(fourth);
+
+      // A message sent after Stop goes straight out while the hold stays — the state this
+      // release has to survive: the hire asks for the queue while that turn is still running.
+      act(() => {
+        result.current.submitMessage("Q4");
+      });
+      await waitFor(() => expect(sent).toEqual(["Q1", "Q4"]));
+
+      act(() => {
+        result.current.resumeQueue();
+      });
+      await act(async () => {});
+
+      // The release is the flag, not a second stream: Q2 keeps waiting behind Q4.
+      expect(result.current.queuePaused).toBe(false);
+      expect(sent).toEqual(["Q1", "Q4"]);
+
+      const second = openStream();
+      const third = openStream();
+      pending.push(second, third);
+
+      act(() => {
+        fourth.finish();
+      });
+      await waitFor(() => expect(sent).toEqual(["Q1", "Q4", "Q2"]));
+
+      act(() => {
+        second.finish();
+      });
+      await waitFor(() => expect(sent).toEqual(["Q1", "Q4", "Q2", "Q3"]));
+    });
+  });
+
+  describe("a send that cannot find its conversation", () => {
+    it("does not wedge the queue behind a turn that never started", async () => {
+      server.use(http.get(SESSIONS, () => HttpResponse.error()));
+
+      const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+
+      act(() => {
+        result.current.submitMessage("Q1");
+      });
+      await waitFor(() => expect(result.current.openError).toBeTruthy());
+
+      act(() => {
+        result.current.submitMessage("Q2");
+      });
+
+      // The next message is attempted on its own feet, not parked behind a turn that will
+      // never end — a stuck in-flight marker queued it forever, and only a closing turn ever
+      // drains.
+      await waitFor(() => expect(result.current.queued).toHaveLength(0));
+      expect(result.current.isStreaming).toBe(false);
     });
   });
 });
