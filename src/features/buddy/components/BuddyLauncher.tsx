@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { motion, useReducedMotion, type MotionValue } from "framer-motion";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { SleepyBot } from "./SleepyBot";
 import { centralSpringToken } from "../../../styles/tokens";
 import {
   DEFAULT_CORNER,

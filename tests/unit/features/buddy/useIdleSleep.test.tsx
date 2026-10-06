@@ -5,7 +5,7 @@ import {
   DROWSY_MIN_MS,
   DROWSY_MAX_MS,
   ASLEEP_DELAY_MS,
-} from "../../../../src/features/chatbot/hooks/useIdleSleep";
+} from "../../../../src/features/buddy/hooks/useIdleSleep";
 
 /**
  * The idle window is drawn at random per cycle, so most of these tests pin

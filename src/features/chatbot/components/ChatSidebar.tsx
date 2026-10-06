@@ -11,7 +11,7 @@ import { useToast } from "../../../context/useToast";
 import { parseApiError } from "../../../services/apiError";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { Chat, ChatSidebarProps } from "../types";
-import { dateBucketLabel, formatRelativeDate } from "../format";
+import { dateBucketLabel, formatRelativeDate } from "../../buddy/format";
 
 /**
  * Ordered list of date-bucket labels — drives the grouping order in the sidebar

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, MessageSquareOff, UserRound } from "lucide-react";
-import { SleepyBot } from "../../chatbot/components/SleepyBot";
-import { BotGlyph } from "../../chatbot/components/BotGlyph";
+import { SleepyBot } from "./SleepyBot";
+import { BotGlyph } from "./BotGlyph";
 import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
 import { dinoCompletionProps } from "../../easter-eggs/lib/dinoOutcome.ts";
 import type { DinoTurnOutcome } from "../../easter-eggs/lib/dinoOutcome.ts";
@@ -114,6 +114,10 @@ export function BuddyMessage({
   return (
     <motion.div
       {...entrance}
+      // The one buddy answer's root, so the selection toolbar can tell a reply-to-the-answer
+      // apart from ordinary prose (see `selectionCapture`). The buddy speaks as the assistant;
+      // the hire and their PM are the other side of the conversation.
+      data-message-role={speaker === "BUDDY" ? "ASSISTANT" : "USER"}
       className={`flex w-full min-w-0 gap-2.5 ${isYou ? "flex-row-reverse" : "flex-row"}`}
     >
       {!(compact && isYou) && (

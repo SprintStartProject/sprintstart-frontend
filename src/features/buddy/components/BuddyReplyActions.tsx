@@ -1,5 +1,5 @@
 import { BookmarkPlus } from "lucide-react";
-import { CopyButton } from "../../chatbot/components/CopyButton";
+import { CopyButton } from "./CopyButton";
 import { SaveToBoard } from "../../board/save/SaveToBoard";
 import { buddyReplyNote } from "../../board/generation/chatToCard";
 import { BUDDY_ACTION_PLACE_CHECKLIST } from "../types";

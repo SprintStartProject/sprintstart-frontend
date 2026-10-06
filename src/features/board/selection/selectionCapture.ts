@@ -65,7 +65,7 @@ export type CapturedSelection = {
   inLink: boolean;
   /** Where the toolbar should sit, in viewport coordinates. */
   rect: DOMRect;
-  /** Whether the selection was made inside an AI assistant chat message. */
+  /** Whether the selection was made inside one of the buddy's answers. */
   isAiMessage: boolean;
 };
 
@@ -256,7 +256,7 @@ function elementOf(node: Node): Element | null {
 }
 
 /**
- * Whether the selection sits entirely inside one AI assistant message bubble.
+ * Whether the selection sits entirely inside one buddy answer.
  *
  * Both ends have to resolve to the same bubble, which keeps the answer independent of the drag
  * direction: a selection that runs from an answer into the next message is not a reply to that
@@ -264,7 +264,7 @@ function elementOf(node: Node): Element | null {
  */
 function isInsideAiMessage(range: Range): boolean {
   const bubbleOf = (node: Node): Element | null =>
-    elementOf(node)?.closest("[data-chat-message-role='ASSISTANT']") ?? null;
+    elementOf(node)?.closest("[data-message-role='ASSISTANT']") ?? null;
   const bubble = bubbleOf(range.startContainer);
   return bubble !== null && bubble === bubbleOf(range.endContainer);
 }

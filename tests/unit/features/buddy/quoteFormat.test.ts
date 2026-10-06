@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   formatMarkdownQuote,
   insertQuoteIntoDraft,
-} from "../../../../src/features/chatbot/utils/quoteFormat";
+} from "../../../../src/features/buddy/utils/quoteFormat";
 
 describe("quoteFormat", () => {
   describe("formatMarkdownQuote", () => {

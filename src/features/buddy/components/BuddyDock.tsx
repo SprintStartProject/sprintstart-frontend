@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion, type MotionValue } from "framer-motion";
 import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
-import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { SleepyBot } from "./SleepyBot";
 import { Button } from "../../../components/ui/Button";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";

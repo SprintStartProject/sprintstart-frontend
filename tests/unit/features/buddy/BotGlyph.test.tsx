@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { BotGlyph } from "../../../../src/features/chatbot/components/BotGlyph";
-import type { BotState } from "../../../../src/features/chatbot/components/BotGlyph";
+import { BotGlyph } from "../../../../src/features/buddy/components/BotGlyph";
+import type { BotState } from "../../../../src/features/buddy/components/BotGlyph";
 
 /**
  * The framer mock strips motion props, so these assert the glyph *renders* in

@@ -1,10 +1,11 @@
-import { useContext } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, MessageSquare, MessagesSquare } from "lucide-react";
 import { Spinner } from "../../../components/ui/Spinner";
 import { IconTile } from "../../../components/ui/IconTile";
-import { ChatContext } from "../../../context/ChatContext";
-import { formatRelativeDate } from "../../chatbot/format";
+import { useQueryFetch } from "../../../hooks/useQueryFetch";
+import { getSessions } from "../../../services/buddyService";
+import { queryKeys } from "../../../services/queryKeys";
+import { formatRelativeDate } from "../../buddy/format";
 
 const PREVIEW_COUNT = 4;
 
@@ -18,21 +19,15 @@ const PREVIEW_COUNT = 4;
  * than a third way to start something: the knowledge base card is what the project knows,
  * the composer below starts a new question, and this is where the user left off.
  *
- * Reads {@link ChatContext} directly, like the composer widget does. The provider at the
- * app root already holds the list for the selected project, so the card costs no request,
- * follows the project switcher, and picks up a chat created seconds ago. Reading the
- * context rather than `useChat` also matters: that hook is bound to the chat route's `:id`
- * and would redirect the dashboard away to the most recent conversation.
+ * Reads the hire's conversations from their own list endpoint rather than off the session
+ * the app root holds: that session's list is only as fresh as the last time a surface
+ * opened the buddy, and a summary card should be able to say what is there without opening
+ * anything. One small request, cached under `queryKeys.buddy.sessions`, so coming back to
+ * the dashboard serves it from cache.
  */
 export function RecentChatsWidget() {
-  const chat = useContext(ChatContext);
-
-  // `chatsProjectId` is null until the list arrives — but also forever when no project is
-  // selected, because the provider never fetches then. Without the second half of this the
-  // card would spin for good on an account with no project.
-  const isLoading =
-    chat !== undefined && chat.chatsProjectId === null && chat.selectedProjectId !== "";
-  const recentChats = (chat?.sortedChats ?? []).slice(0, PREVIEW_COUNT);
+  const { data, loading } = useQueryFetch(queryKeys.buddy.sessions(), getSessions);
+  const recentChats = (data ?? []).slice(0, PREVIEW_COUNT);
 
   return (
     <div className="group @container relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
@@ -48,44 +43,44 @@ export function RecentChatsWidget() {
         </div>
 
         <Link
-          to="/chat"
+          to="/buddy"
           className="flex shrink-0 items-center gap-1 rounded-lg text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text"
           // Named here because the words beside the arrow step aside on a narrow card.
-          aria-label="Open chat"
+          aria-label="Open your buddy"
         >
           {/* Same container-width rule as `WidgetShell`: in a quarter-row card the label beside
               the title ran the link to within a few pixels of the card's edge. */}
-          <span className="hidden @min-[17rem]:inline">Open chat</span>
+          <span className="hidden @min-[17rem]:inline">Open buddy</span>
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
 
-      {isLoading ? (
+      {loading ? (
         <div className="relative flex flex-1 items-center justify-center">
           <Spinner size="lg" label="Loading" />
         </div>
       ) : recentChats.length === 0 ? (
         <div className="relative flex flex-1 flex-col items-start justify-center gap-2">
           <p className="text-sm text-app-text-muted">
-            No conversations yet — ask the assistant below and it shows up here.
+            No conversations yet — ask your buddy below and it shows up here.
           </p>
         </div>
       ) : (
         <ul className="relative flex-1 space-y-1">
-          {recentChats.map((recentChat) => (
-            <li key={recentChat.id}>
+          {recentChats.map((conversation) => (
+            <li key={conversation.id}>
               <Link
-                to={`/chat/${recentChat.id}`}
+                to={`/buddy/${conversation.id}`}
                 className="flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-app-surface-hover"
               >
                 <MessageSquare className="h-3.5 w-3.5 shrink-0 text-app-text-muted" />
 
                 <span className="min-w-0 flex-1 truncate text-sm text-app-text">
-                  {recentChat.title || "Untitled chat"}
+                  {conversation.title || "Untitled conversation"}
                 </span>
 
                 <span className="shrink-0 text-xs text-app-text-muted tabular-nums">
-                  {formatRelativeDate(recentChat.createdAt)}
+                  {formatRelativeDate(conversation.createdAt)}
                 </span>
               </Link>
             </li>

@@ -3,9 +3,9 @@ import {
   daysSince,
   dateBucketLabel,
   formatRelativeDate,
-} from "../../../../src/features/chatbot/format";
+} from "../../../../src/features/buddy/format";
 
-describe("chatbot format", () => {
+describe("buddy format", () => {
   describe("daysSince", () => {
     it("returns 0 for today", () => {
       expect(daysSince(new Date().toISOString())).toBe(0);

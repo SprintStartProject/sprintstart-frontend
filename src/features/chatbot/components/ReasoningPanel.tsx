@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { ChevronRight } from "lucide-react";
-import { BotGlyph } from "./BotGlyph";
+import { BotGlyph } from "../../buddy/components/BotGlyph";
 
 // Hoisted to module scope — ReactMarkdown re-walks the AST whenever the plugin
 // arrays change identity, and this one re-renders on every reasoning token.

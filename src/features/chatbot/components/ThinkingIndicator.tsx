@@ -1,4 +1,4 @@
-import { BotGlyph } from "./BotGlyph";
+import { BotGlyph } from "../../buddy/components/BotGlyph";
 import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
 import { THINKING_LABELS, type ThinkingState } from "../constants";
 import { dinoCompletionProps, type DinoTurnOutcome } from "../../easter-eggs/lib/dinoOutcome.ts";

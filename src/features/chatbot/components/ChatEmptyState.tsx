@@ -1,4 +1,4 @@
-import { SleepyBot } from "./SleepyBot";
+import { SleepyBot } from "../../buddy/components/SleepyBot";
 
 const SUGGESTIONS = [
   "How do I set up the project locally?",

@@ -5,11 +5,11 @@ import type { SelectedCitation } from "../../buddy/citations/types";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { MessageCitations } from "../../buddy/citations/MessageCitations";
-import { CopyButton } from "./CopyButton";
+import { CopyButton } from "../../buddy/components/CopyButton";
 import { ReasoningPanel } from "./ReasoningPanel";
 import { SaveToBoard } from "../../board/save/SaveToBoard";
 import { chatMessageNote } from "../../board/generation/chatToCard";
-import { SleepyBot } from "./SleepyBot";
+import { SleepyBot } from "../../buddy/components/SleepyBot";
 
 type ArtifactOpenPayload = {
   artifactId: string;

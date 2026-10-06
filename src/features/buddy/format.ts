@@ -1,4 +1,4 @@
-// Shared display formatters for the chatbot feature.
+// Shared display formatters for the buddy feature.
 
 /**
  * Whole calendar days between the given ISO timestamp and today.

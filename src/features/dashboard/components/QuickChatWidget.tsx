@@ -1,9 +1,10 @@
-import { useCallback, useContext, useState, type RefCallback } from "react";
+import { useCallback, useState, type RefCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
-import { SleepyBot } from "../../chatbot/components/SleepyBot";
-import { ChatContext } from "../../../context/ChatContext";
+import { useBuddyDraftActions } from "../../buddy/buddyDraftContext";
+import { SleepyBot } from "../../buddy/components/SleepyBot";
+import { withSeed } from "../../buddy/hooks/useBuddy";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { DashboardWidgetSize } from "../layout/types";
 
@@ -55,14 +56,13 @@ function useFirstLineCount(): [RefCallback<HTMLDivElement>, number | null] {
 /**
  * Lets the user start a question straight from the dashboard.
  *
- * The text is handed to the global chat context and the user is routed to
- * `/chat` with the composer prefilled but *not* submitted, so they can still
- * edit before sending — the same behaviour as the suggestion chips inside the
- * chat empty state.
+ * The text is seeded into the buddy's composer and the user is routed to `/buddy` with it
+ * prefilled but *not* submitted, so they can still edit before sending — the same contract
+ * the buddy's suggestion chips and the selection toolbar use.
  *
- * Reads {@link ChatContext} directly rather than via `useChat`: that hook is
- * bound to the chat route's `:id` param and would redirect away from the
- * dashboard to the most recent conversation.
+ * Seeded through the draft context directly rather than through the session's own helpers:
+ * those are bound to the open conversation, and typing on the dashboard is not sending —
+ * the words should wait in the composer, not open or move anything.
  */
 export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
   // Only a whole row is wide enough to put the bot beside the composer. At half a row the
@@ -75,7 +75,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
   // count either wasted the room or, a few pixels short, wrapped below the 136px cell's edge.
   const suggestions = isWide ? SUGGESTIONS : SUGGESTIONS.slice(0, 2);
   const navigate = useNavigate();
-  const chat = useContext(ChatContext);
+  const { setDraft } = useBuddyDraftActions();
   const [question, setQuestion] = useState("");
   const [focused, setFocused] = useState(false);
   const [chipRowRef, fittingChips] = useFirstLineCount();
@@ -84,10 +84,11 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // A non-empty draft also suppresses the chat page's "jump to most
-    // recent conversation" redirect, so the user lands on a fresh chat.
-    chat?.setNewRequest(trimmed);
-    void navigate("/chat", { state: { newChat: true } });
+    // Seeded into the buddy's own composer and left unsent, so the hire can still edit
+    // before sending — the same contract the buddy's suggestion chips use. The words land
+    // in whichever box the buddy is showing: the page's after the route change below.
+    setDraft((current) => withSeed(current, trimmed));
+    void navigate("/buddy");
   }
 
   return (
@@ -125,7 +126,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
             isWide ? "w-40 shrink-0 @3xl:w-56" : ""
           }`}
         >
-          {/* The same assistant as in the chat, idle timer and all —
+          {/* The same assistant as in the buddy dock, idle timer and all —
               so the character is one creature that follows you around
               rather than a different mascot per screen.
               Negative margin rather than the parent's `gap`, which
@@ -134,8 +135,8 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
               from the inline element's own baseline slack, and only
               pulling the label up into that dead space actually
               closes the gap — a small positive one just stacks on
-              top of it. Matches the same pull used in the chat empty
-              state's bot, so the character sits the same distance
+              top of it. Matches the same pull used in the buddy's
+              other homes, so the character sits the same distance
               from whatever it introduces everywhere it appears. */}
           <span className="-mb-2 text-app-brand-text">
             <SleepyBot size={isWide ? 56 : 76} tracksPointer />
@@ -150,7 +151,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
               Ask the AI assistant
             </p>
             {/* A single grid row has no line to spare for a subtitle the arrow already implies. */}
-            {!isWide && <p className="text-xs text-app-text-muted">Continue in chat</p>}
+            {!isWide && <p className="text-xs text-app-text-muted">Continue with your buddy</p>}
           </div>
         </div>
 
@@ -180,7 +181,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
               <button
                 type="submit"
                 disabled={!question.trim()}
-                aria-label="Continue in chat"
+                aria-label="Continue with your buddy"
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
               >
                 <ArrowUpRight className="h-4 w-4" />

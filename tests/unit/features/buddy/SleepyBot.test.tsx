@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { describe, it, expect, afterEach } from "vitest";
-import { SleepyBot } from "../../../../src/features/chatbot/components/SleepyBot";
+import { SleepyBot } from "../../../../src/features/buddy/components/SleepyBot";
 import { announceRocketFlight } from "../../../../src/features/moments/rocketWatch";
 
 /**

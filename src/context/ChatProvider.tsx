@@ -14,7 +14,7 @@ import { ChatContext } from "./ChatContext";
 import type { ChatContextValue, ChatTurnOutcome } from "./ChatContext";
 import type { Citation, SelectedCitation } from "../features/buddy/citations/types";
 import type { Chat, ChatMessage, ChatQueueItem, SourceSystem } from "../features/chatbot/types";
-import { insertQuoteIntoDraft } from "../features/chatbot/utils/quoteFormat";
+import { insertQuoteIntoDraft } from "../features/buddy/utils/quoteFormat";
 
 type MessagesByChat = Record<string, ChatMessage[]>;
 
