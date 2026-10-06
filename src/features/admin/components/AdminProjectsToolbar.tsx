@@ -28,8 +28,10 @@ export function AdminProjectsToolbar({
         {pluralize(projectCount, "project")}
       </span>
 
-      <div className="flex flex-row items-center gap-2 sm:flex-row sm:items-center">
-        <div className="min-w-0 flex-1 sm:w-64 sm:min-w-[auto] sm:flex-initial">
+      {/* Below `sm` the search takes a row of its own, so the filter and the
+          button share the next one instead of squeezing the search field. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-full min-w-0 sm:w-64">
           <Input
             value={projectSearchValue}
             onChange={(event) => onProjectSearchChange(event.target.value)}
@@ -44,14 +46,14 @@ export function AdminProjectsToolbar({
           value={projectFilter}
           options={PROJECT_FILTER_OPTIONS}
           onChange={onProjectFilterChange}
-          className="w-36 sm:w-56"
+          className="min-w-0 flex-1 sm:w-56 sm:flex-none"
         />
 
         <Button
           variant="primary"
           onClick={onCreateProject}
           icon={<Plus className="h-4 w-4" />}
-          className="w-auto shrink-0 sm:w-auto sm:shrink"
+          className="shrink-0"
         >
           New Project
         </Button>

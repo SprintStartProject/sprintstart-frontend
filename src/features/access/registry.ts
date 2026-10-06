@@ -61,6 +61,7 @@ export const atlassianConnector = defineAccessConnector<AtlassianCredentialDto>(
   label: "Atlassian",
   icon: Ticket,
   noun: { one: "credential", many: "credentials" },
+  description: "For Jira, Confluence and Bitbucket",
   addLabel: "Add credential",
   emptyTitle: "No credentials yet",
   emptyDescription:

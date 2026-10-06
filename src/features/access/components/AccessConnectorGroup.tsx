@@ -85,7 +85,10 @@ export function AccessConnectorGroup({
         <div className="min-w-0">
           <p className="text-sm font-semibold text-app-text">{connector.label}</p>
           <p className="text-xs text-app-text-muted">
-            {count} {count === 1 ? connector.noun.one : connector.noun.many}
+            <span>
+              {count} {count === 1 ? connector.noun.one : connector.noun.many}
+            </span>
+            {connector.description && <span> · {connector.description}</span>}
           </p>
         </div>
       </div>

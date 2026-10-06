@@ -292,7 +292,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
           >
             <p className="mb-3 text-sm break-words text-app-danger-text">
               Delete <strong>{displayName}</strong>? This cannot be undone and may break connected
-              Jira instances and Confluence spaces.
+              Jira instances, Confluence spaces and Bitbucket repositories.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
