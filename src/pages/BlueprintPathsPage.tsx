@@ -234,158 +234,166 @@ export function BlueprintPathsPage() {
   const openCount = paths.filter((path) => path.status === "DRAFT").length;
 
   return (
-    // The swipe listens on the page rather than on the bar: having to be over the control to change
-    // scope makes the gesture feel like it only works in one corner.
-    <main
-      ref={swipeRef}
-      className="mx-auto w-full max-w-[calc(72rem+2*var(--app-page-gutter))] space-y-8 px-(--app-page-gutter) py-8"
-    >
-      <PageHeader
-        icon={Layers3}
-        title="Blueprint paths"
-        subtitle="Design reusable onboarding paths without changing an employee's live onboarding progress."
-        actions={
-          <Button
-            variant="primary"
-            icon={<FilePlus2 className="h-4 w-4" />}
-            onClick={() => setIsCreateOpen(true)}
-            disabled={!hasBlueprintScope || (!isGlobal && isProjectLoading)}
-          >
-            New blueprint path
-          </Button>
-        }
-      />
-
-      <div className="flex flex-wrap items-center gap-3">
-        {isAdmin ? (
-          <SegmentedTabs
-            value={isGlobal ? "global" : "project"}
-            options={[
-              { value: "project", label: "Project blueprints" },
-              { value: "global", label: "Global blueprints" },
-            ]}
-            onChange={(next) => setSearchParams(next === "global" ? { scope: "global" } : {})}
-            layoutId="blueprint-scope-pill"
-            ariaLabel="Blueprint scope"
+    <div className="min-h-screen">
+      <header className="border-b border-app-border bg-app-bg">
+        <div className="app-page-frame py-6">
+          <PageHeader
+            icon={Layers3}
+            title="Blueprint paths"
+            subtitle="Design reusable onboarding paths without changing an employee's live onboarding progress."
+            actions={
+              <Button
+                variant="primary"
+                icon={<FilePlus2 className="h-4 w-4" />}
+                onClick={() => setIsCreateOpen(true)}
+                disabled={!hasBlueprintScope || (!isGlobal && isProjectLoading)}
+              >
+                New blueprint path
+              </Button>
+            }
           />
-        ) : null}
-
-        {/* Shown from the first blueprint rather than past some threshold: a filter that appears
-            only once a page is already hard to read is a filter nobody knows exists. */}
-        {paths.length > 0 ? (
-          <div className="relative ml-auto min-w-52 flex-1 sm:max-w-64 sm:flex-none">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-app-text-subtle"
-              aria-hidden="true"
-            />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Find a blueprint"
-              aria-label="Find a blueprint"
-              className="pl-9"
-            />
-          </div>
-        ) : null}
-      </div>
-
-      {error ? (
-        <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
-          {error}
-        </p>
-      ) : null}
-
-      {(!isGlobal && isProjectLoading) || isLoading ? (
-        <div className="flex items-center gap-3 py-12 text-app-text-muted">
-          <Loader2 className="h-5 w-5 animate-spin" /> Loading blueprint paths…
         </div>
-      ) : !hasBlueprintScope ? (
-        <EmptyState icon={<BookOpenCheck className="h-8 w-8" />} title="No project available">
-          Create or join a project before adding project blueprint paths.
-        </EmptyState>
-      ) : paths.length === 0 ? (
-        <EmptyState icon={<BookOpenCheck className="h-8 w-8" />} title="No blueprint paths yet">
-          Create the first reusable onboarding path to begin authoring.
-        </EmptyState>
-      ) : groups.length === 0 ? (
-        <EmptyState icon={<Search className="h-8 w-8" />} title="Nothing matches that">
-          No blueprint has &ldquo;{query}&rdquo; in its title or description.
-        </EmptyState>
-      ) : (
-        <>
-          <p className="text-sm text-app-text-muted">
-            {paths.length} {paths.length === 1 ? "blueprint" : "blueprints"} in this scope
-            {openCount > 0
-              ? ` · ${openCount} with ${openCount === 1 ? "a draft" : "drafts"} open`
-              : ""}
-            .
-          </p>
+      </header>
 
-          {groups.map((group) => (
-            <section key={group.key} className="space-y-3">
-              <div>
-                <h2 className="text-sm font-semibold tracking-wide text-app-text uppercase">
-                  {group.title}
-                  <span className="ml-2 font-normal text-app-text-muted normal-case">
-                    ({group.rows.length})
-                  </span>
-                </h2>
-                <p className="mt-0.5 text-xs text-app-text-muted">{group.hint}</p>
-              </div>
-
-              <div className="space-y-3">
-                {group.rows.map((row) => (
-                  <BlueprintRowCard
-                    key={row.latest.id}
-                    row={row}
-                    contents={contents[row.latest.id]}
-                    onOpen={() =>
-                      void navigate(
-                        `/blueprints/${row.lifecycle.openId}${isGlobal ? "?scope=global" : ""}`,
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-        </>
-      )}
-
-      <Modal
-        isOpen={isCreateOpen}
-        title="New blueprint path"
-        description="Start with the purpose of this reusable onboarding path."
-        onClose={() => setIsCreateOpen(false)}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsCreateOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" form="create-blueprint-path" loading={isSaving}>
-              Create path
-            </Button>
-          </>
-        }
-      >
-        <form
-          id="create-blueprint-path"
-          className="space-y-4"
-          onSubmit={(event) => void createPath(event)}
-        >
-          <Field label="Title" required>
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
-          </Field>
-          <Field label="Description" required>
-            <Textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              required
+      {/* The swipe listens on the page body rather than on the bar: having to be over the control
+          to change scope makes the gesture feel like it only works in one corner. */}
+      <main ref={swipeRef} className="app-page-frame space-y-8 py-6 lg:py-8">
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin ? (
+            <SegmentedTabs
+              value={isGlobal ? "global" : "project"}
+              options={[
+                { value: "project", label: "Project blueprints" },
+                { value: "global", label: "Global blueprints" },
+              ]}
+              onChange={(next) => setSearchParams(next === "global" ? { scope: "global" } : {})}
+              layoutId="blueprint-scope-pill"
+              ariaLabel="Blueprint scope"
             />
-          </Field>
-        </form>
-      </Modal>
-    </main>
+          ) : null}
+
+          {/* Shown from the first blueprint rather than past some threshold: a filter that appears
+            only once a page is already hard to read is a filter nobody knows exists. */}
+          {paths.length > 0 ? (
+            <div className="relative ml-auto min-w-52 flex-1 sm:max-w-64 sm:flex-none">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-app-text-subtle"
+                aria-hidden="true"
+              />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find a blueprint"
+                aria-label="Find a blueprint"
+                className="pl-9"
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {error ? (
+          <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
+            {error}
+          </p>
+        ) : null}
+
+        {(!isGlobal && isProjectLoading) || isLoading ? (
+          <div className="flex items-center gap-3 py-12 text-app-text-muted">
+            <Loader2 className="h-5 w-5 animate-spin" /> Loading blueprint paths…
+          </div>
+        ) : !hasBlueprintScope ? (
+          <EmptyState icon={<BookOpenCheck className="h-8 w-8" />} title="No project available">
+            Create or join a project before adding project blueprint paths.
+          </EmptyState>
+        ) : paths.length === 0 ? (
+          <EmptyState icon={<BookOpenCheck className="h-8 w-8" />} title="No blueprint paths yet">
+            Create the first reusable onboarding path to begin authoring.
+          </EmptyState>
+        ) : groups.length === 0 ? (
+          <EmptyState icon={<Search className="h-8 w-8" />} title="Nothing matches that">
+            No blueprint has &ldquo;{query}&rdquo; in its title or description.
+          </EmptyState>
+        ) : (
+          <>
+            <p className="text-sm text-app-text-muted">
+              {paths.length} {paths.length === 1 ? "blueprint" : "blueprints"} in this scope
+              {openCount > 0
+                ? ` · ${openCount} with ${openCount === 1 ? "a draft" : "drafts"} open`
+                : ""}
+              .
+            </p>
+
+            {groups.map((group) => (
+              <section key={group.key} className="space-y-3">
+                <div>
+                  <h2 className="text-sm font-semibold tracking-wide text-app-text uppercase">
+                    {group.title}
+                    <span className="ml-2 font-normal text-app-text-muted normal-case">
+                      ({group.rows.length})
+                    </span>
+                  </h2>
+                  <p className="mt-0.5 text-xs text-app-text-muted">{group.hint}</p>
+                </div>
+
+                <div className="space-y-3">
+                  {group.rows.map((row) => (
+                    <BlueprintRowCard
+                      key={row.latest.id}
+                      row={row}
+                      contents={contents[row.latest.id]}
+                      onOpen={() =>
+                        void navigate(
+                          `/blueprints/${row.lifecycle.openId}${isGlobal ? "?scope=global" : ""}`,
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </>
+        )}
+
+        <Modal
+          isOpen={isCreateOpen}
+          title="New blueprint path"
+          description="Start with the purpose of this reusable onboarding path."
+          onClose={() => setIsCreateOpen(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setIsCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                form="create-blueprint-path"
+                loading={isSaving}
+              >
+                Create path
+              </Button>
+            </>
+          }
+        >
+          <form
+            id="create-blueprint-path"
+            className="space-y-4"
+            onSubmit={(event) => void createPath(event)}
+          >
+            <Field label="Title" required>
+              <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
+            </Field>
+            <Field label="Description" required>
+              <Textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                required
+              />
+            </Field>
+          </form>
+        </Modal>
+      </main>
+    </div>
   );
 }
 

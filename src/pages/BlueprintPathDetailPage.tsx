@@ -1798,12 +1798,7 @@ export function BlueprintPathDetailPage() {
     : null;
 
   return (
-    // The swipe listens on the page, not on the bar: a gesture that only works while the pointer is
-    // over a 20rem control reads as broken everywhere else.
-    <main
-      ref={swipeRef}
-      className="mx-auto w-full max-w-[calc(72rem+2*var(--app-page-gutter))] space-y-7 px-(--app-page-gutter) py-8"
-    >
+    <div className="min-h-screen">
       <AlertDialog
         isOpen={pendingDelete !== null}
         title={
@@ -1925,324 +1920,338 @@ export function BlueprintPathDetailPage() {
         }}
         onConfirm={() => void runLifecycleAction()}
       />
-      <PageHeader
-        icon={Layers3}
-        title={path.title}
-        subtitle={path.description || "No path description yet."}
-        actions={
-          <>
-            <Badge
-              variant={
-                path.status === "ACTIVE"
-                  ? "success"
-                  : path.status === "ARCHIVED"
-                    ? "neutral"
-                    : "warning"
-              }
-            >
-              {versionWord(path.status)} · v{path.version}
-            </Badge>
-            <Button
-              variant="secondary"
-              icon={<ArrowLeft className="h-4 w-4" />}
-              onClick={() => void navigate(blueprintListPath)}
-            >
-              All blueprints
-            </Button>
-            <Button
-              variant="secondary"
-              icon={<History className="h-4 w-4" />}
-              onClick={() => void openHistory()}
-            >
-              Version history
-            </Button>
-            {path.status === "ACTIVE" ? (
+      <header className="border-b border-app-border bg-app-bg">
+        <div className="app-page-frame py-6">
+          <PageHeader
+            icon={Layers3}
+            title={path.title}
+            subtitle={path.description || "No path description yet."}
+            actions={
               <>
-                <Button
-                  variant="dangerSoft"
-                  icon={<Archive className="h-4 w-4" />}
-                  loading={isArchiving}
-                  onClick={() => setIsArchiveConfirmOpen(true)}
-                >
-                  Archive
-                </Button>
-                <Button
-                  variant="primary"
-                  icon={<FilePlus2 className="h-4 w-4" />}
-                  onClick={() =>
-                    void blueprintService
-                      .openDraft(blueprintScope, path.blueprintKey)
-                      .then((draft) => {
-                        toast.info(`Editing draft v${draft.version}`, {
-                          description: `Version ${path.version} stays published until you publish this one.`,
-                        });
-                        return navigate(
-                          `/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`,
-                        );
-                      })
-                      .catch((reason: unknown) =>
-                        setError(
-                          reason instanceof Error ? reason.message : "Draft could not be opened.",
-                        ),
-                      )
+                <Badge
+                  variant={
+                    path.status === "ACTIVE"
+                      ? "success"
+                      : path.status === "ARCHIVED"
+                        ? "neutral"
+                        : "warning"
                   }
                 >
-                  Edit as draft
+                  {versionWord(path.status)} · v{path.version}
+                </Badge>
+                <Button
+                  variant="secondary"
+                  icon={<ArrowLeft className="h-4 w-4" />}
+                  onClick={() => void navigate(blueprintListPath)}
+                >
+                  All blueprints
                 </Button>
+                <Button
+                  variant="secondary"
+                  icon={<History className="h-4 w-4" />}
+                  onClick={() => void openHistory()}
+                >
+                  Version history
+                </Button>
+                {path.status === "ACTIVE" ? (
+                  <>
+                    <Button
+                      variant="dangerSoft"
+                      icon={<Archive className="h-4 w-4" />}
+                      loading={isArchiving}
+                      onClick={() => setIsArchiveConfirmOpen(true)}
+                    >
+                      Archive
+                    </Button>
+                    <Button
+                      variant="primary"
+                      icon={<FilePlus2 className="h-4 w-4" />}
+                      onClick={() =>
+                        void blueprintService
+                          .openDraft(blueprintScope, path.blueprintKey)
+                          .then((draft) => {
+                            toast.info(`Editing draft v${draft.version}`, {
+                              description: `Version ${path.version} stays published until you publish this one.`,
+                            });
+                            return navigate(
+                              `/blueprints/${draft.id}${isGlobal ? "?scope=global" : ""}`,
+                            );
+                          })
+                          .catch((reason: unknown) =>
+                            setError(
+                              reason instanceof Error
+                                ? reason.message
+                                : "Draft could not be opened.",
+                            ),
+                          )
+                      }
+                    >
+                      Edit as draft
+                    </Button>
+                  </>
+                ) : path.status === "ARCHIVED" ? (
+                  <Button
+                    variant="primary"
+                    icon={<RotateCcw className="h-4 w-4" />}
+                    disabled={isLifecycleBusy}
+                    onClick={() => setPendingLifecycle({ action: "rollback", version: path })}
+                  >
+                    Revert to this version
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    icon={<Rocket className="h-4 w-4" />}
+                    disabled={isLifecycleBusy}
+                    onClick={() => setPendingLifecycle({ action: "publish", version: path })}
+                  >
+                    Publish
+                  </Button>
+                )}
               </>
-            ) : path.status === "ARCHIVED" ? (
-              <Button
-                variant="primary"
-                icon={<RotateCcw className="h-4 w-4" />}
-                disabled={isLifecycleBusy}
-                onClick={() => setPendingLifecycle({ action: "rollback", version: path })}
-              >
-                Revert to this version
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                icon={<Rocket className="h-4 w-4" />}
-                disabled={isLifecycleBusy}
-                onClick={() => setPendingLifecycle({ action: "publish", version: path })}
-              >
-                Publish
-              </Button>
-            )}
-          </>
-        }
-      />
-      {error ? (
-        <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
-          {error}
-        </p>
-      ) : null}
-      <LifecycleNotice status={path.status} version={path.version} />
-      <SegmentedTabs
-        value={editorMode}
-        options={[
-          {
-            value: "list",
-            label: "Outline",
-            icon: <ListChecks className="h-4 w-4" />,
-          },
-          {
-            value: "graph",
-            label: "Graph",
-            icon: <Link className="h-4 w-4" />,
-          },
-        ]}
-        onChange={changeEditorMode}
-        layoutId="blueprint-editor-mode-pill"
-        ariaLabel="Blueprint view"
-      />
-      {editorMode === "graph" ? (
-        subGraphPhase ? (
-          <BlueprintSubGraphEditor
-            phase={subGraphPhase}
-            nodes={subGraphNodes}
-            editable={path.status === "DRAFT"}
-            onRequestDraft={(node) =>
-              void openDraftAndContinue({
-                phaseTitle: subGraphPhase.title,
-                nodeTitle: node.title,
-              })
             }
-            openNodeTitle={pendingOpenNodeTitle}
-            onOpenedNode={() => setPendingOpenNodeTitle(null)}
-            onBack={() => void returnToTopLevelGraph()}
-            onPositionChange={saveSubGraphPosition}
-            onAddBlocker={addSubGraphBlocker}
-            onRemoveBlocker={removeSubGraphBlocker}
-            onCreateNode={(kind, graphX, graphY) => {
-              openCreate(
-                kind,
-                subGraphPhase.id,
-                kind === "step"
-                  ? subGraphPhase.blueprintSteps.length
-                  : subGraphPhase.blueprintCheckQuestions.length,
-                { graphX, graphY },
-              );
-              return Promise.resolve();
-            }}
-            onUpdateQuestion={updateSubGraphQuestion}
-            onAddOption={addSubGraphQuestionOption}
-            onRemoveOption={removeSubGraphQuestionOption}
-            onUpdateStep={updateSubGraphStep}
-            onAddTask={(step) => openCreate("task", step.id, step.blueprintTasks.length)}
-            onRemoveTask={(task) => requestDelete("task", task.id, task.title)}
-            onAddResource={(step) =>
-              openCreate("resource", step.id, step.blueprintResources.length)
-            }
-            onRemoveResource={(resource) => requestDelete("resource", resource.id, resource.title)}
-            onEditTask={(task) => openEdit({ kind: "task", item: task })}
-            onEditResource={(resource) => openEdit({ kind: "resource", item: resource })}
-            onEditOption={(option) => openEdit({ kind: "option", item: option })}
-            onDeleteStep={(step) => deleteItem("step", step.id)}
-            onDeleteQuestion={(question) => deleteItem("question", question.id)}
           />
+        </div>
+      </header>
+
+      {/* The swipe listens on the page body, not on the bar: a gesture that only works while the
+          pointer is over a 20rem control reads as broken everywhere else. */}
+      <main ref={swipeRef} className="app-page-frame space-y-7 py-6 lg:py-8">
+        {error ? (
+          <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
+            {error}
+          </p>
+        ) : null}
+        <LifecycleNotice status={path.status} version={path.version} />
+        <SegmentedTabs
+          value={editorMode}
+          options={[
+            {
+              value: "list",
+              label: "Outline",
+              icon: <ListChecks className="h-4 w-4" />,
+            },
+            {
+              value: "graph",
+              label: "Graph",
+              icon: <Link className="h-4 w-4" />,
+            },
+          ]}
+          onChange={changeEditorMode}
+          layoutId="blueprint-editor-mode-pill"
+          ariaLabel="Blueprint view"
+        />
+        {editorMode === "graph" ? (
+          subGraphPhase ? (
+            <BlueprintSubGraphEditor
+              phase={subGraphPhase}
+              nodes={subGraphNodes}
+              editable={path.status === "DRAFT"}
+              onRequestDraft={(node) =>
+                void openDraftAndContinue({
+                  phaseTitle: subGraphPhase.title,
+                  nodeTitle: node.title,
+                })
+              }
+              openNodeTitle={pendingOpenNodeTitle}
+              onOpenedNode={() => setPendingOpenNodeTitle(null)}
+              onBack={() => void returnToTopLevelGraph()}
+              onPositionChange={saveSubGraphPosition}
+              onAddBlocker={addSubGraphBlocker}
+              onRemoveBlocker={removeSubGraphBlocker}
+              onCreateNode={(kind, graphX, graphY) => {
+                openCreate(
+                  kind,
+                  subGraphPhase.id,
+                  kind === "step"
+                    ? subGraphPhase.blueprintSteps.length
+                    : subGraphPhase.blueprintCheckQuestions.length,
+                  { graphX, graphY },
+                );
+                return Promise.resolve();
+              }}
+              onUpdateQuestion={updateSubGraphQuestion}
+              onAddOption={addSubGraphQuestionOption}
+              onRemoveOption={removeSubGraphQuestionOption}
+              onUpdateStep={updateSubGraphStep}
+              onAddTask={(step) => openCreate("task", step.id, step.blueprintTasks.length)}
+              onRemoveTask={(task) => requestDelete("task", task.id, task.title)}
+              onAddResource={(step) =>
+                openCreate("resource", step.id, step.blueprintResources.length)
+              }
+              onRemoveResource={(resource) =>
+                requestDelete("resource", resource.id, resource.title)
+              }
+              onEditTask={(task) => openEdit({ kind: "task", item: task })}
+              onEditResource={(resource) => openEdit({ kind: "resource", item: resource })}
+              onEditOption={(option) => openEdit({ kind: "option", item: option })}
+              onDeleteStep={(step) => deleteItem("step", step.id)}
+              onDeleteQuestion={(question) => deleteItem("question", question.id)}
+            />
+          ) : (
+            <BlueprintGraphEditor
+              // In the author's own order, which is what the graph falls back to when it steps from
+              // an opened phase to the one either side of it and there is no arrow to follow.
+              phases={orderedPhases}
+              pathTitle={path.title}
+              editable={path.status === "DRAFT"}
+              onRequestDraft={(phase) => void openDraftAndContinue({ phaseTitle: phase.title })}
+              openPhaseTitle={pendingOpenPhaseTitle}
+              onOpenedPhase={() => setPendingOpenPhaseTitle(null)}
+              onPositionChange={saveGraphPosition}
+              onAddBlocker={addGraphBlocker}
+              onRemoveBlocker={removeGraphBlocker}
+              onCreateNode={(graphX: number, graphY: number) => {
+                openCreate("phase", path.id, path.blueprintPhases.length, {
+                  graphX,
+                  graphY,
+                });
+                return Promise.resolve();
+              }}
+              onDeletePhase={(phase) => deleteItem("phase", phase.id)}
+              onOpenSubGraph={(phase) => void openSubGraph(phase)}
+              onUpdatePhase={updateGraphPhaseMetadata}
+            />
+          )
         ) : (
-          <BlueprintGraphEditor
-            // In the author's own order, which is what the graph falls back to when it steps from
-            // an opened phase to the one either side of it and there is no arrow to follow.
-            phases={orderedPhases}
-            pathTitle={path.title}
-            editable={path.status === "DRAFT"}
-            onRequestDraft={(phase) => void openDraftAndContinue({ phaseTitle: phase.title })}
-            openPhaseTitle={pendingOpenPhaseTitle}
-            onOpenedPhase={() => setPendingOpenPhaseTitle(null)}
-            onPositionChange={saveGraphPosition}
-            onAddBlocker={addGraphBlocker}
-            onRemoveBlocker={removeGraphBlocker}
-            onCreateNode={(graphX: number, graphY: number) => {
-              openCreate("phase", path.id, path.blueprintPhases.length, {
-                graphX,
-                graphY,
-              });
-              return Promise.resolve();
-            }}
-            onDeletePhase={(phase) => deleteItem("phase", phase.id)}
-            onOpenSubGraph={(phase) => void openSubGraph(phase)}
-            onUpdatePhase={updateGraphPhaseMetadata}
-          />
-        )
-      ) : (
-        <section className="space-y-5">
-          {/*
+          <section className="space-y-5">
+            {/*
             At the top as well as the bottom. A sixteen-phase blueprint is several screens of
             outline, and the only way to add a phase was to scroll past all of it — so adding one
             cost a journey through everything already written. Kept at the bottom too, because
             somebody who has just read to the end is also somebody about to add one.
           */}
-          {path.blueprintPhases.length > 0 && path.status === "DRAFT" ? (
-            <div className="flex justify-end">
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<Plus className="h-4 w-4" />}
-                onClick={() => openCreate("phase", path.id, path.blueprintPhases.length)}
-              >
-                Add phase
-              </Button>
-            </div>
-          ) : null}
-
-          {path.blueprintPhases.length === 0 ? (
-            <EmptyState
-              icon={<Milestone className="h-8 w-8" />}
-              title="No phases yet"
-              action={
+            {path.blueprintPhases.length > 0 && path.status === "DRAFT" ? (
+              <div className="flex justify-end">
                 <Button
-                  variant="primary"
+                  variant="secondary"
+                  size="sm"
                   icon={<Plus className="h-4 w-4" />}
-                  onClick={() => openCreate("phase", path.id, 0)}
+                  onClick={() => openCreate("phase", path.id, path.blueprintPhases.length)}
                 >
                   Add phase
                 </Button>
-              }
-            >
-              Build the path in phases, then add steps and a knowledge check to each phase.
-            </EmptyState>
-          ) : (
-            [...path.blueprintPhases]
-              .sort((a, b) => a.position - b.position)
-              .map((phase, phaseIndex) => (
-                <section
-                  key={phase.id}
-                  {...dragProps("phase", phase.id, phaseIndex)}
-                  className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-sm"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 items-start gap-2">
-                      <Button
-                        aria-label={`${collapsedPhaseIds.has(phase.id) ? "Expand" : "Collapse"} phase ${phase.title}`}
-                        aria-expanded={!collapsedPhaseIds.has(phase.id)}
-                        iconOnly
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => togglePhaseCollapsed(phase.id)}
-                      >
-                        {collapsedPhaseIds.has(phase.id) ? (
-                          <ChevronRight className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <div className="min-w-0">
-                        {!collapsedPhaseIds.has(phase.id) ? (
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs font-semibold tracking-wide text-app-brand-text uppercase">
-                              Phase {phase.position + 1}
-                            </p>
-                            <Badge variant={phase.type === "AI_ENHANCED" ? "warning" : "neutral"}>
-                              {phase.type === "AI_ENHANCED" ? "AI-enhanced" : "Fixed"}
-                            </Badge>
-                          </div>
-                        ) : null}
-                        <h2 className="mt-1 text-xl font-semibold text-app-text">{phase.title}</h2>
-                        <p className="mt-1 text-sm text-app-text-muted">
-                          {phase.description || "No phase description."}
-                        </p>
-                        {!collapsedPhaseIds.has(phase.id) &&
-                        phase.type === "AI_ENHANCED" &&
-                        phase.aiPrompt ? (
-                          <div className="mt-3 rounded-xl border border-app-warning-border bg-app-warning-bg p-3 text-sm">
-                            <p className="font-medium text-app-warning-text">AI prompt</p>
-                            <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
-                              {phase.aiPrompt}
-                            </p>
-                          </div>
-                        ) : null}
+              </div>
+            ) : null}
+
+            {path.blueprintPhases.length === 0 ? (
+              <EmptyState
+                icon={<Milestone className="h-8 w-8" />}
+                title="No phases yet"
+                action={
+                  <Button
+                    variant="primary"
+                    icon={<Plus className="h-4 w-4" />}
+                    onClick={() => openCreate("phase", path.id, 0)}
+                  >
+                    Add phase
+                  </Button>
+                }
+              >
+                Build the path in phases, then add steps and a knowledge check to each phase.
+              </EmptyState>
+            ) : (
+              [...path.blueprintPhases]
+                .sort((a, b) => a.position - b.position)
+                .map((phase, phaseIndex) => (
+                  <section
+                    key={phase.id}
+                    {...dragProps("phase", phase.id, phaseIndex)}
+                    className="rounded-2xl border border-app-border bg-app-surface p-5 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-2">
+                        <Button
+                          aria-label={`${collapsedPhaseIds.has(phase.id) ? "Expand" : "Collapse"} phase ${phase.title}`}
+                          aria-expanded={!collapsedPhaseIds.has(phase.id)}
+                          iconOnly
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => togglePhaseCollapsed(phase.id)}
+                        >
+                          {collapsedPhaseIds.has(phase.id) ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <div className="min-w-0">
+                          {!collapsedPhaseIds.has(phase.id) ? (
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-semibold tracking-wide text-app-brand-text uppercase">
+                                Phase {phase.position + 1}
+                              </p>
+                              <Badge variant={phase.type === "AI_ENHANCED" ? "warning" : "neutral"}>
+                                {phase.type === "AI_ENHANCED" ? "AI-enhanced" : "Fixed"}
+                              </Badge>
+                            </div>
+                          ) : null}
+                          <h2 className="mt-1 text-xl font-semibold text-app-text">
+                            {phase.title}
+                          </h2>
+                          <p className="mt-1 text-sm text-app-text-muted">
+                            {phase.description || "No phase description."}
+                          </p>
+                          {!collapsedPhaseIds.has(phase.id) &&
+                          phase.type === "AI_ENHANCED" &&
+                          phase.aiPrompt ? (
+                            <div className="mt-3 rounded-xl border border-app-warning-border bg-app-warning-bg p-3 text-sm">
+                              <p className="font-medium text-app-warning-text">AI prompt</p>
+                              <p className="mt-1 whitespace-pre-wrap text-app-text-muted">
+                                {phase.aiPrompt}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                    {!collapsedPhaseIds.has(phase.id) ? (
-                      <div className="flex shrink-0 items-center gap-1">
-                        {/*
+                      {!collapsedPhaseIds.has(phase.id) ? (
+                        <div className="flex shrink-0 items-center gap-1">
+                          {/*
                           The same phase, in the other view. Somebody reading down the outline who
                           wants to see where a phase actually sits had to switch views and then
                           find it again — two steps to ask one question about the thing already
                           under their cursor.
                         */}
-                        <Button
-                          aria-label={`Open phase ${phase.title} in the graph`}
-                          title="Open in the graph"
-                          iconOnly
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setPendingOpenPhaseTitle(phase.title);
-                            changeEditorMode("graph");
-                          }}
-                        >
-                          <Network className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          aria-label={`Edit phase ${phase.title}`}
-                          iconOnly
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            whenEditable(() => openEdit({ kind: "phase", item: phase }))
-                          }
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          aria-label={`Delete phase ${phase.title}`}
-                          iconOnly
-                          size="sm"
-                          variant="dangerGhost"
-                          loading={deletingId === phase.id}
-                          onClick={() => requestDelete("phase", phase.id, phase.title)}
-                        >
-                          <Minus className="h-4 w-4" strokeWidth={2.5} />
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                  {!collapsedPhaseIds.has(phase.id) ? (
-                    <>
-                      {/*
+                          <Button
+                            aria-label={`Open phase ${phase.title} in the graph`}
+                            title="Open in the graph"
+                            iconOnly
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setPendingOpenPhaseTitle(phase.title);
+                              changeEditorMode("graph");
+                            }}
+                          >
+                            <Network className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            aria-label={`Edit phase ${phase.title}`}
+                            iconOnly
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              whenEditable(() => openEdit({ kind: "phase", item: phase }))
+                            }
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            aria-label={`Delete phase ${phase.title}`}
+                            iconOnly
+                            size="sm"
+                            variant="dangerGhost"
+                            loading={deletingId === phase.id}
+                            onClick={() => requestDelete("phase", phase.id, phase.title)}
+                          >
+                            <Minus className="h-4 w-4" strokeWidth={2.5} />
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                    {!collapsedPhaseIds.has(phase.id) ? (
+                      <>
+                        {/*
                         The order the graph draws as arrows, written out. Without it the outline was
                         a list of phases in `position` order and nothing else — and `position` is a
                         suggestion, not a rule, so an author working from the list was reading an
@@ -2250,780 +2259,799 @@ export function BlueprintPathDetailPage() {
                         was only visible in the other view. Editable here too: the arrow is the same
                         edge whichever end it is drawn from.
                       */}
-                      <div className="mt-5 rounded-xl border border-app-border bg-app-surface-muted p-4">
-                        <PhasePrerequisites
-                          phase={phase}
-                          phases={path.blueprintPhases}
-                          editable
-                          onAdd={(blocked, blockerId) =>
-                            runGraphEdit(() => addGraphBlocker(blocked, blockerId))
-                          }
-                          onRemove={(blocked, blockerId) =>
-                            runGraphEdit(() => removeGraphBlocker(blocked, blockerId))
-                          }
-                        />
-                      </div>
-                      <div className="mt-5 rounded-xl border border-app-border bg-app-surface-muted p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <h3 className="font-semibold text-app-text">Phase requirements</h3>
-                            <p className="mt-1 text-sm text-app-text-muted">
-                              Skills or project roles required before this phase unlocks.
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={<Plus className="h-3.5 w-3.5" />}
-                            onClick={() => whenEditable(() => void openAddRequirements(phase.id))}
-                          >
-                            Add requirement
-                          </Button>
+                        <div className="mt-5 rounded-xl border border-app-border bg-app-surface-muted p-4">
+                          <PhasePrerequisites
+                            phase={phase}
+                            phases={path.blueprintPhases}
+                            editable
+                            onAdd={(blocked, blockerId) =>
+                              runGraphEdit(() => addGraphBlocker(blocked, blockerId))
+                            }
+                            onRemove={(blocked, blockerId) =>
+                              runGraphEdit(() => removeGraphBlocker(blocked, blockerId))
+                            }
+                          />
                         </div>
-                        {(phase.requirements ?? []).length === 0 ? (
-                          <p className="mt-3 text-sm text-app-text-subtle">No requirements yet.</p>
-                        ) : (
-                          <ul className="mt-3 flex flex-wrap gap-2">
-                            {(phase.requirements ?? []).map((requirement) => (
-                              <li
-                                key={requirement.id}
-                                className="flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface py-1 pr-1 pl-2 text-sm text-app-text"
-                              >
-                                <span className="text-xs text-app-text-subtle">
-                                  {requirement.type === "SKILL" ? "Skill:" : "Role:"}
-                                </span>
-                                <span>{requirement.displayName}</span>
+                        <div className="mt-5 rounded-xl border border-app-border bg-app-surface-muted p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <h3 className="font-semibold text-app-text">Phase requirements</h3>
+                              <p className="mt-1 text-sm text-app-text-muted">
+                                Skills or project roles required before this phase unlocks.
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              icon={<Plus className="h-3.5 w-3.5" />}
+                              onClick={() => whenEditable(() => void openAddRequirements(phase.id))}
+                            >
+                              Add requirement
+                            </Button>
+                          </div>
+                          {(phase.requirements ?? []).length === 0 ? (
+                            <p className="mt-3 text-sm text-app-text-subtle">
+                              No requirements yet.
+                            </p>
+                          ) : (
+                            <ul className="mt-3 flex flex-wrap gap-2">
+                              {(phase.requirements ?? []).map((requirement) => (
+                                <li
+                                  key={requirement.id}
+                                  className="flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface py-1 pr-1 pl-2 text-sm text-app-text"
+                                >
+                                  <span className="text-xs text-app-text-subtle">
+                                    {requirement.type === "SKILL" ? "Skill:" : "Role:"}
+                                  </span>
+                                  <span>{requirement.displayName}</span>
+                                  <Button
+                                    iconOnly
+                                    size="sm"
+                                    variant="dangerGhost"
+                                    aria-label={`Remove requirement ${requirement.displayName}`}
+                                    loading={removingRequirementId === requirement.id}
+                                    onClick={() =>
+                                      whenEditable(
+                                        () => void removeRequirement(phase.id, requirement.id),
+                                      )
+                                    }
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        {phase.type === "FIXED" ? (
+                          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <h3 className="flex items-center gap-2 font-semibold text-app-text">
+                                  <ListChecks className="h-4 w-4 text-app-brand-text" /> Steps
+                                </h3>
                                 <Button
-                                  iconOnly
                                   size="sm"
-                                  variant="dangerGhost"
-                                  aria-label={`Remove requirement ${requirement.displayName}`}
-                                  loading={removingRequirementId === requirement.id}
+                                  variant="secondary"
+                                  icon={<Plus className="h-3.5 w-3.5" />}
                                   onClick={() =>
-                                    whenEditable(
-                                      () => void removeRequirement(phase.id, requirement.id),
-                                    )
+                                    openCreate("step", phase.id, phase.blueprintSteps.length)
                                   }
                                 >
-                                  <X className="h-3.5 w-3.5" />
+                                  Add step
                                 </Button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      {phase.type === "FIXED" ? (
-                        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <h3 className="flex items-center gap-2 font-semibold text-app-text">
-                                <ListChecks className="h-4 w-4 text-app-brand-text" /> Steps
-                              </h3>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                icon={<Plus className="h-3.5 w-3.5" />}
-                                onClick={() =>
-                                  openCreate("step", phase.id, phase.blueprintSteps.length)
-                                }
-                              >
-                                Add step
-                              </Button>
-                            </div>
-                            {phase.blueprintSteps.length === 0 ? (
-                              <EmptyState size="sm">No steps in this phase.</EmptyState>
-                            ) : (
-                              [...phase.blueprintSteps]
-                                .sort((a, b) => a.position - b.position)
-                                .map((step, stepIndex) => (
-                                  <article
-                                    key={step.id}
-                                    {...dragProps("step", step.id, stepIndex)}
-                                    className="rounded-xl border border-app-border bg-app-surface p-4 shadow-sm"
-                                  >
-                                    <div className="flex items-start gap-2">
-                                      <Button
-                                        aria-label={`${collapsedStepIds.has(step.id) ? "Expand" : "Collapse"} step ${step.title}`}
-                                        aria-expanded={!collapsedStepIds.has(step.id)}
-                                        iconOnly
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => toggleStepCollapsed(step.id)}
-                                      >
-                                        {collapsedStepIds.has(step.id) ? (
-                                          <ChevronRight className="h-4 w-4" />
-                                        ) : (
-                                          <ChevronDown className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                      <div className="min-w-0">
-                                        <h4 className="font-medium text-app-text">
-                                          {step.position + 1}. {step.title}
-                                        </h4>
-                                        <p className="mt-1 text-sm text-app-text-muted">
-                                          {step.description}
-                                        </p>
-                                        {!collapsedStepIds.has(step.id) ? (
-                                          <p className="mt-2 text-xs text-app-text-subtle">
-                                            {step.type} · {step.estimatedMinutes} min ·{" "}
-                                            {step.expectedOutcome}
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                    {!collapsedStepIds.has(step.id) ? (
-                                      <>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            icon={<Pencil className="h-3.5 w-3.5" />}
-                                            onClick={() =>
-                                              whenEditable(() =>
-                                                openEdit({ kind: "step", item: step }),
-                                              )
-                                            }
-                                          >
-                                            Edit step
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            icon={<Plus className="h-3.5 w-3.5" />}
-                                            onClick={() =>
-                                              openCreate(
-                                                "task",
-                                                step.id,
-                                                step.blueprintTasks.length,
-                                              )
-                                            }
-                                          >
-                                            Add task
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            icon={<Plus className="h-3.5 w-3.5" />}
-                                            onClick={() => openCreate("resource", step.id, 0)}
-                                          >
-                                            Add resource
-                                          </Button>
-                                        </div>
-                                        {step.blueprintTasks.length > 0 ? (
-                                          <div className="mt-3">
-                                            <p className="mb-1 text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
-                                              Tasks
-                                            </p>
-                                            <ul className="space-y-1 text-sm text-app-text-muted">
-                                              {step.blueprintTasks.map((task, taskIndex) => (
-                                                <li
-                                                  key={task.id}
-                                                  {...dragProps("task", task.id, taskIndex)}
-                                                  className="flex items-center gap-2 rounded-lg border border-app-border-muted bg-app-surface-muted p-1"
-                                                >
-                                                  <div
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    className="min-w-0 flex-1 cursor-pointer px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                                                    onClick={() =>
-                                                      openEdit({
-                                                        kind: "task",
-                                                        item: task,
-                                                      })
-                                                    }
-                                                    onKeyDown={(event) => {
-                                                      if (
-                                                        event.key === "Enter" ||
-                                                        event.key === " "
-                                                      ) {
-                                                        event.preventDefault();
-                                                        openEdit({
-                                                          kind: "task",
-                                                          item: task,
-                                                        });
-                                                      }
-                                                    }}
-                                                  >
-                                                    • {task.title}
-                                                  </div>
-                                                  <Button
-                                                    aria-label={`Delete task ${task.title}`}
-                                                    iconOnly
-                                                    size="sm"
-                                                    variant="dangerGhost"
-                                                    loading={deletingId === task.id}
-                                                    onClick={() =>
-                                                      requestDelete("task", task.id, task.title)
-                                                    }
-                                                  >
-                                                    <Minus className="h-4 w-4" strokeWidth={2.5} />
-                                                  </Button>
-                                                </li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        ) : null}
-                                        {step.blueprintResources.length > 0 ? (
-                                          <div className="mt-3">
-                                            <p className="mb-1 text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
-                                              Resources
-                                            </p>
-                                            <ul className="space-y-1 text-sm text-app-text-muted">
-                                              {step.blueprintResources.map((resource) => (
-                                                <li
-                                                  key={resource.id}
-                                                  className="flex items-center gap-2 rounded-lg border border-app-border-muted bg-app-surface-muted p-1"
-                                                >
-                                                  <div
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                                                    onClick={() =>
-                                                      openEdit({
-                                                        kind: "resource",
-                                                        item: resource,
-                                                      })
-                                                    }
-                                                    onKeyDown={(event) => {
-                                                      if (
-                                                        event.key === "Enter" ||
-                                                        event.key === " "
-                                                      ) {
-                                                        event.preventDefault();
-                                                        openEdit({
-                                                          kind: "resource",
-                                                          item: resource,
-                                                        });
-                                                      }
-                                                    }}
-                                                  >
-                                                    <Link className="h-3.5 w-3.5 shrink-0" />
-                                                    {resource.title}
-                                                  </div>
-                                                  <Button
-                                                    aria-label={`Delete resource ${resource.title}`}
-                                                    iconOnly
-                                                    size="sm"
-                                                    variant="dangerGhost"
-                                                    loading={deletingId === resource.id}
-                                                    onClick={() =>
-                                                      requestDelete(
-                                                        "resource",
-                                                        resource.id,
-                                                        resource.title,
-                                                      )
-                                                    }
-                                                  >
-                                                    <Minus className="h-4 w-4" strokeWidth={2.5} />
-                                                  </Button>
-                                                </li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        ) : null}
-                                      </>
-                                    ) : null}
-                                  </article>
-                                ))
-                            )}
-                          </div>
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <h3 className="flex items-center gap-2 font-semibold text-app-text">
-                                <BookOpenCheck className="h-4 w-4 text-app-brand-text" /> Knowledge
-                                check
-                              </h3>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                icon={<Plus className="h-3.5 w-3.5" />}
-                                onClick={() =>
-                                  openCreate(
-                                    "question",
-                                    phase.id,
-                                    phase.blueprintCheckQuestions.length,
-                                  )
-                                }
-                              >
-                                Add question
-                              </Button>
-                            </div>
-                            {phase.blueprintCheckQuestions.length === 0 ? (
-                              <EmptyState size="sm">No questions in this phase.</EmptyState>
-                            ) : (
-                              [...phase.blueprintCheckQuestions]
-                                .sort((a, b) => a.position - b.position)
-                                .map((question, questionIndex) => (
-                                  <article
-                                    key={question.id}
-                                    {...dragProps("question", question.id, questionIndex)}
-                                    className="rounded-xl border border-app-border bg-app-surface p-4 shadow-sm"
-                                  >
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="flex min-w-0 items-start gap-2">
+                              </div>
+                              {phase.blueprintSteps.length === 0 ? (
+                                <EmptyState size="sm">No steps in this phase.</EmptyState>
+                              ) : (
+                                [...phase.blueprintSteps]
+                                  .sort((a, b) => a.position - b.position)
+                                  .map((step, stepIndex) => (
+                                    <article
+                                      key={step.id}
+                                      {...dragProps("step", step.id, stepIndex)}
+                                      className="rounded-xl border border-app-border bg-app-surface p-4 shadow-sm"
+                                    >
+                                      <div className="flex items-start gap-2">
                                         <Button
-                                          aria-label={`${collapsedQuestionIds.has(question.id) ? "Expand" : "Collapse"} question ${question.question}`}
-                                          aria-expanded={!collapsedQuestionIds.has(question.id)}
+                                          aria-label={`${collapsedStepIds.has(step.id) ? "Expand" : "Collapse"} step ${step.title}`}
+                                          aria-expanded={!collapsedStepIds.has(step.id)}
                                           iconOnly
                                           size="sm"
                                           variant="ghost"
-                                          onClick={() => toggleQuestionCollapsed(question.id)}
+                                          onClick={() => toggleStepCollapsed(step.id)}
                                         >
-                                          {collapsedQuestionIds.has(question.id) ? (
+                                          {collapsedStepIds.has(step.id) ? (
                                             <ChevronRight className="h-4 w-4" />
                                           ) : (
                                             <ChevronDown className="h-4 w-4" />
                                           )}
                                         </Button>
                                         <div className="min-w-0">
-                                          {!collapsedQuestionIds.has(question.id) ? (
-                                            <p className="text-xs text-app-text-subtle">
-                                              {question.type.replace("_", " ")}
-                                            </p>
-                                          ) : null}
-                                          <h4 className="mt-1 font-medium text-app-text">
-                                            {question.position + 1}. {question.question}
+                                          <h4 className="font-medium text-app-text">
+                                            {step.position + 1}. {step.title}
                                           </h4>
-                                          {question.explanation ? (
-                                            <p className="mt-1 text-sm text-app-text-muted">
-                                              {question.explanation}
+                                          <p className="mt-1 text-sm text-app-text-muted">
+                                            {step.description}
+                                          </p>
+                                          {!collapsedStepIds.has(step.id) ? (
+                                            <p className="mt-2 text-xs text-app-text-subtle">
+                                              {step.type} · {step.estimatedMinutes} min ·{" "}
+                                              {step.expectedOutcome}
                                             </p>
                                           ) : null}
                                         </div>
                                       </div>
-                                      {!collapsedQuestionIds.has(question.id) ? (
-                                        <div className="flex shrink-0 flex-wrap items-center gap-1">
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            icon={<Pencil className="h-3.5 w-3.5" />}
-                                            onClick={() =>
-                                              whenEditable(() =>
-                                                openEdit({ kind: "question", item: question }),
-                                              )
-                                            }
-                                          >
-                                            Edit
-                                          </Button>
-                                          {question.type === "MULTIPLE_CHOICE" ? (
+                                      {!collapsedStepIds.has(step.id) ? (
+                                        <>
+                                          <div className="mt-3 flex flex-wrap gap-2">
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              icon={<Pencil className="h-3.5 w-3.5" />}
+                                              onClick={() =>
+                                                whenEditable(() =>
+                                                  openEdit({ kind: "step", item: step }),
+                                                )
+                                              }
+                                            >
+                                              Edit step
+                                            </Button>
                                             <Button
                                               size="sm"
                                               variant="ghost"
                                               icon={<Plus className="h-3.5 w-3.5" />}
                                               onClick={() =>
                                                 openCreate(
-                                                  "option",
-                                                  question.id,
-                                                  question.blueprintCheckOptions.length,
+                                                  "task",
+                                                  step.id,
+                                                  step.blueprintTasks.length,
                                                 )
                                               }
                                             >
-                                              Add option
+                                              Add task
                                             </Button>
-                                          ) : null}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    {!collapsedQuestionIds.has(question.id) &&
-                                    question.blueprintCheckOptions.length > 0 ? (
-                                      <ul className="mt-3 space-y-1 text-sm text-app-text-muted">
-                                        {question.blueprintCheckOptions.map(
-                                          (option, optionIndex) => (
-                                            <li
-                                              key={option.id}
-                                              {...dragProps("option", option.id, optionIndex)}
-                                              className="flex items-center gap-2 rounded-lg border border-app-border-muted bg-app-surface-muted p-1"
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              icon={<Plus className="h-3.5 w-3.5" />}
+                                              onClick={() => openCreate("resource", step.id, 0)}
                                             >
-                                              <div
-                                                role="button"
-                                                tabIndex={0}
-                                                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                              Add resource
+                                            </Button>
+                                          </div>
+                                          {step.blueprintTasks.length > 0 ? (
+                                            <div className="mt-3">
+                                              <p className="mb-1 text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
+                                                Tasks
+                                              </p>
+                                              <ul className="space-y-1 text-sm text-app-text-muted">
+                                                {step.blueprintTasks.map((task, taskIndex) => (
+                                                  <li
+                                                    key={task.id}
+                                                    {...dragProps("task", task.id, taskIndex)}
+                                                    className="flex items-center gap-2 rounded-lg border border-app-border-muted bg-app-surface-muted p-1"
+                                                  >
+                                                    <div
+                                                      role="button"
+                                                      tabIndex={0}
+                                                      className="min-w-0 flex-1 cursor-pointer px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                      onClick={() =>
+                                                        openEdit({
+                                                          kind: "task",
+                                                          item: task,
+                                                        })
+                                                      }
+                                                      onKeyDown={(event) => {
+                                                        if (
+                                                          event.key === "Enter" ||
+                                                          event.key === " "
+                                                        ) {
+                                                          event.preventDefault();
+                                                          openEdit({
+                                                            kind: "task",
+                                                            item: task,
+                                                          });
+                                                        }
+                                                      }}
+                                                    >
+                                                      • {task.title}
+                                                    </div>
+                                                    <Button
+                                                      aria-label={`Delete task ${task.title}`}
+                                                      iconOnly
+                                                      size="sm"
+                                                      variant="dangerGhost"
+                                                      loading={deletingId === task.id}
+                                                      onClick={() =>
+                                                        requestDelete("task", task.id, task.title)
+                                                      }
+                                                    >
+                                                      <Minus
+                                                        className="h-4 w-4"
+                                                        strokeWidth={2.5}
+                                                      />
+                                                    </Button>
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          ) : null}
+                                          {step.blueprintResources.length > 0 ? (
+                                            <div className="mt-3">
+                                              <p className="mb-1 text-xs font-semibold tracking-wide text-app-text-subtle uppercase">
+                                                Resources
+                                              </p>
+                                              <ul className="space-y-1 text-sm text-app-text-muted">
+                                                {step.blueprintResources.map((resource) => (
+                                                  <li
+                                                    key={resource.id}
+                                                    className="flex items-center gap-2 rounded-lg border border-app-border-muted bg-app-surface-muted p-1"
+                                                  >
+                                                    <div
+                                                      role="button"
+                                                      tabIndex={0}
+                                                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                      onClick={() =>
+                                                        openEdit({
+                                                          kind: "resource",
+                                                          item: resource,
+                                                        })
+                                                      }
+                                                      onKeyDown={(event) => {
+                                                        if (
+                                                          event.key === "Enter" ||
+                                                          event.key === " "
+                                                        ) {
+                                                          event.preventDefault();
+                                                          openEdit({
+                                                            kind: "resource",
+                                                            item: resource,
+                                                          });
+                                                        }
+                                                      }}
+                                                    >
+                                                      <Link className="h-3.5 w-3.5 shrink-0" />
+                                                      {resource.title}
+                                                    </div>
+                                                    <Button
+                                                      aria-label={`Delete resource ${resource.title}`}
+                                                      iconOnly
+                                                      size="sm"
+                                                      variant="dangerGhost"
+                                                      loading={deletingId === resource.id}
+                                                      onClick={() =>
+                                                        requestDelete(
+                                                          "resource",
+                                                          resource.id,
+                                                          resource.title,
+                                                        )
+                                                      }
+                                                    >
+                                                      <Minus
+                                                        className="h-4 w-4"
+                                                        strokeWidth={2.5}
+                                                      />
+                                                    </Button>
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          ) : null}
+                                        </>
+                                      ) : null}
+                                    </article>
+                                  ))
+                              )}
+                            </div>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <h3 className="flex items-center gap-2 font-semibold text-app-text">
+                                  <BookOpenCheck className="h-4 w-4 text-app-brand-text" />{" "}
+                                  Knowledge check
+                                </h3>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  icon={<Plus className="h-3.5 w-3.5" />}
+                                  onClick={() =>
+                                    openCreate(
+                                      "question",
+                                      phase.id,
+                                      phase.blueprintCheckQuestions.length,
+                                    )
+                                  }
+                                >
+                                  Add question
+                                </Button>
+                              </div>
+                              {phase.blueprintCheckQuestions.length === 0 ? (
+                                <EmptyState size="sm">No questions in this phase.</EmptyState>
+                              ) : (
+                                [...phase.blueprintCheckQuestions]
+                                  .sort((a, b) => a.position - b.position)
+                                  .map((question, questionIndex) => (
+                                    <article
+                                      key={question.id}
+                                      {...dragProps("question", question.id, questionIndex)}
+                                      className="rounded-xl border border-app-border bg-app-surface p-4 shadow-sm"
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="flex min-w-0 items-start gap-2">
+                                          <Button
+                                            aria-label={`${collapsedQuestionIds.has(question.id) ? "Expand" : "Collapse"} question ${question.question}`}
+                                            aria-expanded={!collapsedQuestionIds.has(question.id)}
+                                            iconOnly
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => toggleQuestionCollapsed(question.id)}
+                                          >
+                                            {collapsedQuestionIds.has(question.id) ? (
+                                              <ChevronRight className="h-4 w-4" />
+                                            ) : (
+                                              <ChevronDown className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                          <div className="min-w-0">
+                                            {!collapsedQuestionIds.has(question.id) ? (
+                                              <p className="text-xs text-app-text-subtle">
+                                                {question.type.replace("_", " ")}
+                                              </p>
+                                            ) : null}
+                                            <h4 className="mt-1 font-medium text-app-text">
+                                              {question.position + 1}. {question.question}
+                                            </h4>
+                                            {question.explanation ? (
+                                              <p className="mt-1 text-sm text-app-text-muted">
+                                                {question.explanation}
+                                              </p>
+                                            ) : null}
+                                          </div>
+                                        </div>
+                                        {!collapsedQuestionIds.has(question.id) ? (
+                                          <div className="flex shrink-0 flex-wrap items-center gap-1">
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              icon={<Pencil className="h-3.5 w-3.5" />}
+                                              onClick={() =>
+                                                whenEditable(() =>
+                                                  openEdit({ kind: "question", item: question }),
+                                                )
+                                              }
+                                            >
+                                              Edit
+                                            </Button>
+                                            {question.type === "MULTIPLE_CHOICE" ? (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                icon={<Plus className="h-3.5 w-3.5" />}
                                                 onClick={() =>
-                                                  openEdit({
-                                                    kind: "option",
-                                                    item: option,
-                                                  })
+                                                  openCreate(
+                                                    "option",
+                                                    question.id,
+                                                    question.blueprintCheckOptions.length,
+                                                  )
                                                 }
-                                                onKeyDown={(event) => {
-                                                  if (event.key === "Enter" || event.key === " ") {
-                                                    event.preventDefault();
+                                              >
+                                                Add option
+                                              </Button>
+                                            ) : null}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                      {!collapsedQuestionIds.has(question.id) &&
+                                      question.blueprintCheckOptions.length > 0 ? (
+                                        <ul className="mt-3 space-y-1 text-sm text-app-text-muted">
+                                          {question.blueprintCheckOptions.map(
+                                            (option, optionIndex) => (
+                                              <li
+                                                key={option.id}
+                                                {...dragProps("option", option.id, optionIndex)}
+                                                className="flex items-center gap-2 rounded-lg border border-app-border-muted bg-app-surface-muted p-1"
+                                              >
+                                                <div
+                                                  role="button"
+                                                  tabIndex={0}
+                                                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                  onClick={() =>
                                                     openEdit({
                                                       kind: "option",
                                                       item: option,
-                                                    });
+                                                    })
                                                   }
-                                                }}
-                                              >
-                                                {option.correct ? (
-                                                  <CircleCheckBig className="h-4 w-4 text-app-success-text" />
-                                                ) : (
-                                                  <Square className="h-4 w-4" />
-                                                )}
-                                                {option.label}
-                                              </div>
-                                              <Button
-                                                aria-label={`Delete option ${option.label}`}
-                                                iconOnly
-                                                size="sm"
-                                                variant="dangerGhost"
-                                                loading={deletingId === option.id}
-                                                onClick={() =>
-                                                  requestDelete("option", option.id, option.label)
-                                                }
-                                              >
-                                                <Minus className="h-4 w-4" strokeWidth={2.5} />
-                                              </Button>
-                                            </li>
-                                          ),
-                                        )}
-                                      </ul>
-                                    ) : null}
-                                  </article>
-                                ))
-                            )}
+                                                  onKeyDown={(event) => {
+                                                    if (
+                                                      event.key === "Enter" ||
+                                                      event.key === " "
+                                                    ) {
+                                                      event.preventDefault();
+                                                      openEdit({
+                                                        kind: "option",
+                                                        item: option,
+                                                      });
+                                                    }
+                                                  }}
+                                                >
+                                                  {option.correct ? (
+                                                    <CircleCheckBig className="h-4 w-4 text-app-success-text" />
+                                                  ) : (
+                                                    <Square className="h-4 w-4" />
+                                                  )}
+                                                  {option.label}
+                                                </div>
+                                                <Button
+                                                  aria-label={`Delete option ${option.label}`}
+                                                  iconOnly
+                                                  size="sm"
+                                                  variant="dangerGhost"
+                                                  loading={deletingId === option.id}
+                                                  onClick={() =>
+                                                    requestDelete("option", option.id, option.label)
+                                                  }
+                                                >
+                                                  <Minus className="h-4 w-4" strokeWidth={2.5} />
+                                                </Button>
+                                              </li>
+                                            ),
+                                          )}
+                                        </ul>
+                                      ) : null}
+                                    </article>
+                                  ))
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : null}
-                </section>
-              ))
+                        ) : null}
+                      </>
+                    ) : null}
+                  </section>
+                ))
+            )}
+            {path.blueprintPhases.length > 0 ? (
+              <Button
+                variant="secondary"
+                icon={<Plus className="h-4 w-4" />}
+                onClick={() => openCreate("phase", path.id, path.blueprintPhases.length)}
+              >
+                Add phase
+              </Button>
+            ) : null}
+          </section>
+        )}
+        <Modal
+          isOpen={addRequirementTarget !== null}
+          title="Add phase requirements"
+          description="Select skills or project roles that must be met before this phase unlocks."
+          errorMessage={requirementError ?? undefined}
+          onClose={() => {
+            setAddRequirementTarget(null);
+            setRequirementError(null);
+          }}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setAddRequirementTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                form="add-phase-requirements"
+                loading={isRequirementSaving}
+                disabled={selectedRequirementIds.length === 0 || isRequirementCatalogLoading}
+              >
+                Add selected
+              </Button>
+            </>
+          }
+        >
+          {isRequirementCatalogLoading ? (
+            <div className="flex items-center gap-3 py-8 text-app-text-muted">
+              <Loader2 className="h-5 w-5 animate-spin" /> Loading requirement choices…
+            </div>
+          ) : (
+            <form
+              id="add-phase-requirements"
+              className="space-y-4"
+              onSubmit={(event) => void addRequirements(event)}
+            >
+              <Field label="Requirement type">
+                <Select
+                  value={requirementType}
+                  onChange={(event) => {
+                    setRequirementType(event.target.value as "SKILL" | "PROJECT_ROLE");
+                    setSelectedRequirementIds([]);
+                  }}
+                >
+                  <option value="SKILL">Skill</option>
+                  <option value="PROJECT_ROLE">Project role</option>
+                </Select>
+              </Field>
+              <fieldset>
+                <legend className="text-sm font-medium text-app-text">
+                  {requirementType === "SKILL" ? "Skills" : "Project roles"}
+                </legend>
+                <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-app-border bg-app-surface p-2">
+                  {getAvailableRequirementChoices().map((item) => (
+                    <label
+                      key={item.id}
+                      className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-app-text hover:bg-app-surface-muted"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRequirementIds.includes(item.id)}
+                        onChange={() => toggleRequirementSelection(item.id)}
+                        className="h-4 w-4 accent-[var(--color-app-brand)]"
+                      />
+                      {item.name}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            </form>
           )}
-          {path.blueprintPhases.length > 0 ? (
-            <Button
-              variant="secondary"
-              icon={<Plus className="h-4 w-4" />}
-              onClick={() => openCreate("phase", path.id, path.blueprintPhases.length)}
-            >
-              Add phase
-            </Button>
-          ) : null}
-        </section>
-      )}
-      <Modal
-        isOpen={addRequirementTarget !== null}
-        title="Add phase requirements"
-        description="Select skills or project roles that must be met before this phase unlocks."
-        errorMessage={requirementError ?? undefined}
-        onClose={() => {
-          setAddRequirementTarget(null);
-          setRequirementError(null);
-        }}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setAddRequirementTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              type="submit"
-              form="add-phase-requirements"
-              loading={isRequirementSaving}
-              disabled={selectedRequirementIds.length === 0 || isRequirementCatalogLoading}
-            >
-              Add selected
-            </Button>
-          </>
-        }
-      >
-        {isRequirementCatalogLoading ? (
-          <div className="flex items-center gap-3 py-8 text-app-text-muted">
-            <Loader2 className="h-5 w-5 animate-spin" /> Loading requirement choices…
-          </div>
-        ) : (
-          <form
-            id="add-phase-requirements"
-            className="space-y-4"
-            onSubmit={(event) => void addRequirements(event)}
-          >
-            <Field label="Requirement type">
-              <Select
-                value={requirementType}
-                onChange={(event) => {
-                  setRequirementType(event.target.value as "SKILL" | "PROJECT_ROLE");
-                  setSelectedRequirementIds([]);
+        </Modal>
+        <Modal
+          isOpen={isHistoryOpen}
+          title="Version history"
+          description="Select a version to inspect or restore it."
+          onClose={() => setIsHistoryOpen(false)}
+          size="lg"
+        >
+          {isHistoryLoading ? (
+            <div className="flex items-center gap-3 py-8 text-app-text-muted">
+              <Loader2 className="h-5 w-5 animate-spin" /> Loading versions…
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {history.map((version) => {
+                const badge = (
+                  <Badge
+                    variant={
+                      version.status === "ACTIVE"
+                        ? "success"
+                        : version.status === "ARCHIVED"
+                          ? "neutral"
+                          : "warning"
+                    }
+                  >
+                    {versionWord(version.status)}
+                  </Badge>
+                );
+
+                return (
+                  <article
+                    key={version.id}
+                    className="flex items-center gap-2 rounded-xl border border-app-border bg-app-surface p-1"
+                  >
+                    <Button
+                      variant="ghost"
+                      fullWidth
+                      className="h-auto min-w-0 flex-1 justify-between px-3 py-2 text-left"
+                      onClick={() => {
+                        setIsHistoryOpen(false);
+                        void navigate(
+                          `/blueprints/${version.id}${isGlobal ? "?scope=global" : ""}`,
+                        );
+                      }}
+                    >
+                      <span className="min-w-0">
+                        <span className="block font-semibold">Version {version.version}</span>
+                        <span className="mt-1 block truncate text-xs text-app-text-muted">
+                          {version.description || "No description"}
+                        </span>
+                      </span>
+                      {badge}
+                    </Button>
+                    {version.status === "DRAFT" ? (
+                      <Button
+                        aria-label={`Delete draft version ${version.version}`}
+                        iconOnly
+                        variant="dangerGhost"
+                        loading={isLifecycleBusy && pendingLifecycle?.version.id === version.id}
+                        onClick={() => setPendingLifecycle({ action: "delete-draft", version })}
+                      >
+                        <Minus className="h-4 w-4" strokeWidth={2.5} />
+                      </Button>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
+        <Modal
+          isOpen={target !== null || editTarget !== null}
+          zIndexClassName="z-[60]"
+          title={
+            editTarget
+              ? `Edit ${kindLabels[editTarget.kind]}`
+              : `Add ${target ? kindLabels[target.kind] : "item"}`
+          }
+          description="This is reusable blueprint content, not a change to an active onboarding path."
+          errorMessage={itemFormError ?? undefined}
+          onClose={() => {
+            setTarget(null);
+            setEditTarget(null);
+            setItemFormError(null);
+          }}
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setTarget(null);
+                  setEditTarget(null);
                 }}
               >
-                <option value="SKILL">Skill</option>
-                <option value="PROJECT_ROLE">Project role</option>
-              </Select>
-            </Field>
-            <fieldset>
-              <legend className="text-sm font-medium text-app-text">
-                {requirementType === "SKILL" ? "Skills" : "Project roles"}
-              </legend>
-              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-app-border bg-app-surface p-2">
-                {getAvailableRequirementChoices().map((item) => (
-                  <label
-                    key={item.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-app-text hover:bg-app-surface-muted"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedRequirementIds.includes(item.id)}
-                      onChange={() => toggleRequirementSelection(item.id)}
-                      className="h-4 w-4 accent-[var(--color-app-brand)]"
-                    />
-                    {item.name}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          </form>
-        )}
-      </Modal>
-      <Modal
-        isOpen={isHistoryOpen}
-        title="Version history"
-        description="Select a version to inspect or restore it."
-        onClose={() => setIsHistoryOpen(false)}
-        size="lg"
-      >
-        {isHistoryLoading ? (
-          <div className="flex items-center gap-3 py-8 text-app-text-muted">
-            <Loader2 className="h-5 w-5 animate-spin" /> Loading versions…
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {history.map((version) => {
-              const badge = (
-                <Badge
-                  variant={
-                    version.status === "ACTIVE"
-                      ? "success"
-                      : version.status === "ARCHIVED"
-                        ? "neutral"
-                        : "warning"
-                  }
-                >
-                  {versionWord(version.status)}
-                </Badge>
-              );
-
-              return (
-                <article
-                  key={version.id}
-                  className="flex items-center gap-2 rounded-xl border border-app-border bg-app-surface p-1"
-                >
-                  <Button
-                    variant="ghost"
-                    fullWidth
-                    className="h-auto min-w-0 flex-1 justify-between px-3 py-2 text-left"
-                    onClick={() => {
-                      setIsHistoryOpen(false);
-                      void navigate(`/blueprints/${version.id}${isGlobal ? "?scope=global" : ""}`);
-                    }}
-                  >
-                    <span className="min-w-0">
-                      <span className="block font-semibold">Version {version.version}</span>
-                      <span className="mt-1 block truncate text-xs text-app-text-muted">
-                        {version.description || "No description"}
-                      </span>
-                    </span>
-                    {badge}
-                  </Button>
-                  {version.status === "DRAFT" ? (
-                    <Button
-                      aria-label={`Delete draft version ${version.version}`}
-                      iconOnly
-                      variant="dangerGhost"
-                      loading={isLifecycleBusy && pendingLifecycle?.version.id === version.id}
-                      onClick={() => setPendingLifecycle({ action: "delete-draft", version })}
-                    >
-                      <Minus className="h-4 w-4" strokeWidth={2.5} />
-                    </Button>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </Modal>
-      <Modal
-        isOpen={target !== null || editTarget !== null}
-        zIndexClassName="z-[60]"
-        title={
-          editTarget
-            ? `Edit ${kindLabels[editTarget.kind]}`
-            : `Add ${target ? kindLabels[target.kind] : "item"}`
-        }
-        description="This is reusable blueprint content, not a change to an active onboarding path."
-        errorMessage={itemFormError ?? undefined}
-        onClose={() => {
-          setTarget(null);
-          setEditTarget(null);
-          setItemFormError(null);
-        }}
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setTarget(null);
-                setEditTarget(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" form="create-blueprint-item" loading={isSaving}>
-              {editTarget ? "Save changes" : `Add ${target ? kindLabels[target.kind] : "item"}`}
-            </Button>
-          </>
-        }
-      >
-        <form
-          id="create-blueprint-item"
-          className="space-y-4"
-          onSubmit={(event) => void createItem(event)}
-        >
-          {formKind === "question" ? (
-            <>
-              <Field label="Node title" required>
-                <Input
-                  value={questionTitle}
-                  onChange={(event) => setQuestionTitle(event.target.value)}
-                  required
-                />
-              </Field>
-              <Field label="Question" required>
-                <Textarea
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  required
-                />
-              </Field>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                form="create-blueprint-item"
+                loading={isSaving}
+              >
+                {editTarget ? "Save changes" : `Add ${target ? kindLabels[target.kind] : "item"}`}
+              </Button>
             </>
-          ) : (
-            <Field label={formKind === "option" ? "Label" : "Title"} required>
-              <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
-            </Field>
-          )}
-          {formKind !== null && formKind !== "option" && formKind !== "question" ? (
-            // A phase may have no description; everything else that has one must have one.
-            <Field label="Description" required={formKind !== "phase"}>
-              <Textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                required={formKind !== "phase"}
-              />
-            </Field>
-          ) : null}
-          {formKind === "phase" ? (
-            <>
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-app-border bg-app-surface-muted p-3">
-                <div>
-                  <p className="text-sm font-medium text-app-text">Phase type</p>
-                  <p className="text-xs text-app-text-muted">
-                    {phaseType === "FIXED" ? "Fixed blueprint" : "AI-enhanced blueprint"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-label="Use AI prompt for this phase"
-                  aria-checked={phaseType === "AI_ENHANCED"}
-                  onClick={() =>
-                    setPhaseType((current) => (current === "FIXED" ? "AI_ENHANCED" : "FIXED"))
-                  }
-                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-                    phaseType === "AI_ENHANCED"
-                      ? "border-app-brand bg-app-brand"
-                      : "border-app-border-strong bg-app-neutral-bg"
-                  }`}
-                >
-                  <span
-                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      phaseType === "AI_ENHANCED" ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-              {phaseType === "AI_ENHANCED" ? (
-                <Field label="AI prompt" required>
-                  <Textarea
-                    value={aiPrompt}
-                    onChange={(event) => setAiPrompt(event.target.value)}
-                    placeholder="Describe how AI should tailor this phase."
+          }
+        >
+          <form
+            id="create-blueprint-item"
+            className="space-y-4"
+            onSubmit={(event) => void createItem(event)}
+          >
+            {formKind === "question" ? (
+              <>
+                <Field label="Node title" required>
+                  <Input
+                    value={questionTitle}
+                    onChange={(event) => setQuestionTitle(event.target.value)}
                     required
                   />
                 </Field>
-              ) : null}
-            </>
-          ) : null}
-          {formKind === "resource" ? (
-            <Field label="URL" required>
-              <Input
-                type="url"
-                value={url}
-                onChange={(event) => setUrl(event.target.value)}
-                required
-              />
-            </Field>
-          ) : null}
-          {formKind === "step" ? (
-            <>
-              <Field label="Step type">
-                <Select value={stepType} onChange={(event) => setStepType(event.target.value)}>
-                  <option value="VIDEO">Video</option>
-                  <option value="DOCUMENT">Document</option>
-                  <option value="TASK">Task</option>
-                </Select>
+                <Field label="Question" required>
+                  <Textarea
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    required
+                  />
+                </Field>
+              </>
+            ) : (
+              <Field label={formKind === "option" ? "Label" : "Title"} required>
+                <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
               </Field>
-              <Field label="Estimated minutes" required>
+            )}
+            {formKind !== null && formKind !== "option" && formKind !== "question" ? (
+              // A phase may have no description; everything else that has one must have one.
+              <Field label="Description" required={formKind !== "phase"}>
+                <Textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  required={formKind !== "phase"}
+                />
+              </Field>
+            ) : null}
+            {formKind === "phase" ? (
+              <>
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-app-border bg-app-surface-muted p-3">
+                  <div>
+                    <p className="text-sm font-medium text-app-text">Phase type</p>
+                    <p className="text-xs text-app-text-muted">
+                      {phaseType === "FIXED" ? "Fixed blueprint" : "AI-enhanced blueprint"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-label="Use AI prompt for this phase"
+                    aria-checked={phaseType === "AI_ENHANCED"}
+                    onClick={() =>
+                      setPhaseType((current) => (current === "FIXED" ? "AI_ENHANCED" : "FIXED"))
+                    }
+                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                      phaseType === "AI_ENHANCED"
+                        ? "border-app-brand bg-app-brand"
+                        : "border-app-border-strong bg-app-neutral-bg"
+                    }`}
+                  >
+                    <span
+                      className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                        phaseType === "AI_ENHANCED" ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+                {phaseType === "AI_ENHANCED" ? (
+                  <Field label="AI prompt" required>
+                    <Textarea
+                      value={aiPrompt}
+                      onChange={(event) => setAiPrompt(event.target.value)}
+                      placeholder="Describe how AI should tailor this phase."
+                      required
+                    />
+                  </Field>
+                ) : null}
+              </>
+            ) : null}
+            {formKind === "resource" ? (
+              <Field label="URL" required>
                 <Input
-                  type="number"
-                  min="1"
-                  value={minutes}
-                  onChange={(event) => setMinutes(event.target.value)}
+                  type="url"
+                  value={url}
+                  onChange={(event) => setUrl(event.target.value)}
                   required
                 />
               </Field>
-              <Field label="Expected outcome" required>
-                <Textarea
-                  value={outcome}
-                  onChange={(event) => setOutcome(event.target.value)}
-                  required
-                />
-              </Field>
-            </>
-          ) : null}
-          {formKind === "question" ? (
-            <>
-              <Field label="Question type">
-                <Select
-                  value={questionType}
-                  onChange={(event) => setQuestionType(event.target.value)}
-                >
-                  <option value="MULTIPLE_CHOICE">Multiple choice</option>
-                  <option value="SHORT_TEXT">Short text</option>
-                </Select>
-              </Field>
-              <Field label="Explanation">
-                <Textarea
-                  value={explanation}
-                  onChange={(event) => setExplanation(event.target.value)}
-                />
-              </Field>
-              <Field label="Correct answer (for free text)">
-                <Input
-                  value={correctAnswer}
-                  onChange={(event) => setCorrectAnswer(event.target.value)}
-                />
-              </Field>
-            </>
-          ) : null}
-          {formKind === "option" ? (
-            <label className="flex items-center gap-2 text-sm text-app-text">
-              <input
-                type="checkbox"
-                checked={isCorrect}
-                onChange={(event) => setIsCorrect(event.target.checked)}
-              />{" "}
-              Correct answer
-            </label>
-          ) : null}
-        </form>
-      </Modal>
-    </main>
+            ) : null}
+            {formKind === "step" ? (
+              <>
+                <Field label="Step type">
+                  <Select value={stepType} onChange={(event) => setStepType(event.target.value)}>
+                    <option value="VIDEO">Video</option>
+                    <option value="DOCUMENT">Document</option>
+                    <option value="TASK">Task</option>
+                  </Select>
+                </Field>
+                <Field label="Estimated minutes" required>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={minutes}
+                    onChange={(event) => setMinutes(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Expected outcome" required>
+                  <Textarea
+                    value={outcome}
+                    onChange={(event) => setOutcome(event.target.value)}
+                    required
+                  />
+                </Field>
+              </>
+            ) : null}
+            {formKind === "question" ? (
+              <>
+                <Field label="Question type">
+                  <Select
+                    value={questionType}
+                    onChange={(event) => setQuestionType(event.target.value)}
+                  >
+                    <option value="MULTIPLE_CHOICE">Multiple choice</option>
+                    <option value="SHORT_TEXT">Short text</option>
+                  </Select>
+                </Field>
+                <Field label="Explanation">
+                  <Textarea
+                    value={explanation}
+                    onChange={(event) => setExplanation(event.target.value)}
+                  />
+                </Field>
+                <Field label="Correct answer (for free text)">
+                  <Input
+                    value={correctAnswer}
+                    onChange={(event) => setCorrectAnswer(event.target.value)}
+                  />
+                </Field>
+              </>
+            ) : null}
+            {formKind === "option" ? (
+              <label className="flex items-center gap-2 text-sm text-app-text">
+                <input
+                  type="checkbox"
+                  checked={isCorrect}
+                  onChange={(event) => setIsCorrect(event.target.checked)}
+                />{" "}
+                Correct answer
+              </label>
+            ) : null}
+          </form>
+        </Modal>
+      </main>
+    </div>
   );
 }
