@@ -79,7 +79,7 @@ export function PmHeaderStatus() {
         <Link
           to="/data-ingestion"
           title="Data ingestion"
-          className={`${chipClassName} ${sync.tone} transition-colors hover:border-app-brand-border-strong focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+          className={`${chipClassName} ${sync.tone} transition-colors hover:border-app-brand-border-strong`}
         >
           <sync.icon
             aria-hidden="true"

@@ -106,7 +106,7 @@ export function DonutChart({
               <span className="text-2xl leading-none font-bold text-app-text">
                 {activeDatum.value}
               </span>
-              <span className="mt-1 max-w-[70%] truncate text-[11px] text-app-text-muted">
+              <span className="mt-1 max-w-[70%] truncate text-xs text-app-text-muted">
                 {activeDatum.label} · {formatShare(activeDatum.value, total)}
               </span>
             </>

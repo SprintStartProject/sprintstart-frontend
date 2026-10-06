@@ -19,7 +19,7 @@ export function SourceLinks({ label, items }: SourceLinksProps) {
 
   return (
     <div className="mt-3 border-t border-app-border pt-2">
-      <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
+      <p className="mb-1.5 text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
         {label}
       </p>
       <ul className="flex flex-wrap gap-x-3 gap-y-1.5">
@@ -30,7 +30,7 @@ export function SourceLinks({ label, items }: SourceLinksProps) {
                 href={item.sourceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
               >
                 <FileText className="h-3 w-3" aria-hidden="true" />
                 {item.filename}

@@ -191,7 +191,9 @@ export function NotionWorkspacePicker({
         <div className="flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface px-4 py-3">
           <IconTile icon={NotebookText} size="lg" tone="neutral" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-app-text">{workspaceName}</p>
+            <p className="truncate text-sm font-medium text-app-text" title={workspaceName}>
+              {workspaceName}
+            </p>
             <p className="text-xs text-app-text-muted">
               {pageCount === null ? "Counting pages…" : pagesVisibleLabel(pageCount)}
             </p>
@@ -240,7 +242,10 @@ export function NotionWorkspacePicker({
                     className="flex items-center gap-3 rounded-xl border border-app-border bg-app-surface px-4 py-3"
                   >
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 sm:flex-nowrap">
-                      <span className="max-w-full min-w-0 truncate text-sm font-medium text-app-text sm:flex-1">
+                      <span
+                        className="max-w-full min-w-0 truncate text-sm font-medium text-app-text sm:flex-1"
+                        title={title}
+                      >
                         {title}
                       </span>
 

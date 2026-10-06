@@ -131,7 +131,7 @@ export function SkillWizard({
                           [skill.id]: level.value,
                         }))
                       }
-                      className={`rounded-xl border px-3 py-2 text-xs font-medium transition-all focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                      className={`rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
                         selectedLevels[skill.id] === level.value
                           ? "border-app-brand-border-strong bg-app-brand-soft text-app-brand-text shadow-lg"
                           : "border-app-border bg-app-surface text-app-text-muted hover:border-app-brand-border hover:bg-app-surface-hover hover:text-app-brand"

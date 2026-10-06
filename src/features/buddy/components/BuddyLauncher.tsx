@@ -175,7 +175,7 @@ export function BuddyLauncher({
       }}
       style={{ x: dragX, y: dragY }}
       // Above the page and above the rocket pet's corner (z-30), below the dock it opens.
-      className="fixed z-40 flex size-16 items-center justify-center rounded-full border border-app-brand-border bg-app-surface shadow-lg transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg focus-visible:outline-none"
+      className="fixed z-40 flex size-16 items-center justify-center rounded-full border border-app-brand-border bg-app-surface shadow-lg transition-colors hover:bg-app-surface-hover"
     >
       {/* A soft brand halo behind the character, so the circle reads as its own surface on a
                 busy page rather than as a hole punched in one. Decorative. */}

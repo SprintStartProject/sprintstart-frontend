@@ -64,7 +64,7 @@ function ItemBody({
       type="button"
       onClick={() => onOpenStep(stepId)}
       aria-label={`Open the step${stepTitle ? `: ${stepTitle}` : ""}`}
-      className="group -mx-1.5 flex min-w-48 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-app-surface/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group -mx-1.5 flex min-w-48 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-app-surface/70"
     >
       {children}
       <ChevronRight

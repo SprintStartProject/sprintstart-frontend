@@ -98,7 +98,7 @@ export function SpotlightCard({
 
   return (
     <motion.div
-      className={`group relative overflow-hidden ${roundedClassName} border border-app-border bg-app-surface transition-colors hover:border-app-brand-border-strong ${className}`}
+      className={`group relative overflow-hidden focus-ring-inset ${roundedClassName} border border-app-border bg-app-surface transition-colors hover:border-app-brand-border-strong ${className}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={onClick}

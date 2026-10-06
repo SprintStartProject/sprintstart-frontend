@@ -63,7 +63,7 @@ export function HireTimelineCard({ hire, onOpenMember }: HireTimelineCardProps) 
                 <button
                   type="button"
                   onClick={() => onOpenMember(hire.userId)}
-                  className="group inline-flex max-w-full items-center gap-1 rounded-md text-left text-base font-semibold text-app-text hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  className="group inline-flex max-w-full items-center gap-1 rounded-md text-left text-base font-semibold text-app-text hover:text-app-brand-text"
                 >
                   <span className="truncate">{hire.displayName}</span>
                   <ChevronRight
@@ -116,7 +116,7 @@ export function HireTimelineCard({ hire, onOpenMember }: HireTimelineCardProps) 
                     >
                       {moment.label}
                     </span>
-                    <span className="mt-0.5 flex items-center gap-0.5 text-[11px] text-app-text-muted">
+                    <span className="mt-0.5 flex items-center gap-0.5 text-xs text-app-text-muted">
                       {reached && (
                         <Check className="h-3 w-3 text-app-success-solid" aria-hidden="true" />
                       )}
@@ -133,7 +133,7 @@ export function HireTimelineCard({ hire, onOpenMember }: HireTimelineCardProps) 
                         aria-hidden="true"
                       />
                       {gap !== null && (
-                        <span className="mt-1 text-[10px] font-medium text-app-text-muted">
+                        <span className="mt-1 text-xs font-medium text-app-text-muted">
                           {formatDuration(gap)}
                         </span>
                       )}

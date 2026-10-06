@@ -73,7 +73,7 @@ function ProgressRing({ percentage, compact }: { percentage: number; compact: bo
         >
           {percentage}%
         </span>
-        <span className="text-[10px] font-medium tracking-wide text-app-text-muted uppercase">
+        <span className="text-2xs font-medium tracking-wide text-app-text-muted uppercase">
           done
         </span>
       </div>
@@ -193,7 +193,7 @@ export function NextStepWidget({
     <ClickableCard
       onClick={() => void navigate(content.to, { state: content.navigationState })}
       aria-label={content.ariaLabel}
-      className={`${CARD_CLASS_NAME} cursor-pointer hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+      className={`${CARD_CLASS_NAME} cursor-pointer focus-ring-inset hover:-translate-y-0.5`}
     >
       <div
         aria-hidden="true"
@@ -228,7 +228,7 @@ export function NextStepWidget({
         <div className={compact ? "max-w-full min-w-0" : "min-w-0 flex-1"}>
           {/* The eyebrow names the kind of action; at this size the title says it anyway. */}
           {!compact && (
-            <p className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+            <p className="text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
               {content.eyebrow}
             </p>
           )}

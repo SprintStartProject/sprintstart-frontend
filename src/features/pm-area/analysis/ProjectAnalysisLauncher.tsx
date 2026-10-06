@@ -110,7 +110,7 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
                     : "Project health — run the first analysis"
           }
           data-testid="project-analysis-open"
-          className="rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none enabled:hover:scale-105 disabled:cursor-wait"
+          className="rounded-full transition-transform enabled:hover:scale-105 disabled:cursor-wait"
         >
           {historyLoading || historyUnavailable ? (
             // Not known yet, or not readable: a quiet empty ring — never "no health score yet",
@@ -125,7 +125,7 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
               {historyLoading ? (
                 <span
                   aria-hidden="true"
-                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-app-text-subtle"
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-app-text-subtle motion-reduce:animate-none"
                 />
               ) : (
                 <CircleAlert aria-hidden="true" className="h-4 w-4 text-app-text-subtle" />
@@ -172,9 +172,7 @@ export function ProjectAnalysisLauncher({ onRefreshed }: ProjectAnalysisLauncher
               colorClassName={scoreColor(lastRun.score)}
               ariaLabel={`Last health score ${lastRun.score} of 100`}
             >
-              <span className="text-[11px] font-bold text-app-text tabular-nums">
-                {lastRun.score}
-              </span>
+              <span className="text-2xs font-bold text-app-text tabular-nums">{lastRun.score}</span>
             </RingGauge>
           )}
         </button>

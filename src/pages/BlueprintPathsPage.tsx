@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenCheck,
@@ -10,6 +11,7 @@ import {
   Loader2,
   Search,
   Sparkles,
+  TriangleAlert,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader.tsx";
@@ -257,7 +259,7 @@ export function BlueprintPathsPage() {
 
       {/* The swipe listens on the page body rather than on the bar: having to be over the control
           to change scope makes the gesture feel like it only works in one corner. */}
-      <main ref={swipeRef} className="app-page-frame space-y-8 py-6 lg:py-8">
+      <MainContent ref={swipeRef} className="app-page-frame space-y-8 py-6 lg:py-8">
         <div className="flex flex-wrap items-center gap-3">
           {isAdmin ? (
             <SegmentedTabs
@@ -292,7 +294,11 @@ export function BlueprintPathsPage() {
         </div>
 
         {error ? (
-          <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
+          <p
+            role="alert"
+            className="flex items-start gap-1.5 rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text"
+          >
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             {error}
           </p>
         ) : null}
@@ -392,7 +398,7 @@ export function BlueprintPathsPage() {
             </Field>
           </form>
         </Modal>
-      </main>
+      </MainContent>
     </div>
   );
 }
@@ -432,7 +438,7 @@ function BlueprintRowCard({
         {contents?.shape ? (
           <BlueprintShapeStrip shape={contents.shape} className="h-full w-full" />
         ) : (
-          <span className="text-[11px] text-app-text-subtle">
+          <span className="text-xs text-app-text-subtle">
             {contents ? "Nothing in it yet" : "Reading…"}
           </span>
         )}
@@ -454,7 +460,7 @@ function BlueprintRowCard({
             <button
               type="button"
               onClick={onOpen}
-              className="cursor-pointer text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-app-focus"
+              className="cursor-pointer text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-hidden focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-app-focus focus-visible:after:outline-solid"
             >
               {latest.title}
             </button>

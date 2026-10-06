@@ -115,7 +115,7 @@ export function SidebarAccountFlyout({ trigger, label, children }: SidebarAccoun
             );
           }
         }}
-        className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+        className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
           open
             ? "border-app-brand-border bg-app-brand-soft"
             : "border-app-border/70 bg-app-surface/70 hover:border-app-brand-border"

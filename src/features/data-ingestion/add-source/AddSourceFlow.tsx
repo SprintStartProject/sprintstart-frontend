@@ -52,7 +52,7 @@ function DetailHeader({ type, onBack }: { type: SourceSystem; onBack: () => void
       <IconTile icon={Icon} size="xl" tone="brand" />
 
       <div>
-        <p className="text-[15px] font-semibold text-app-text">{meta.label}</p>
+        <p className="text-base font-semibold text-app-text">{meta.label}</p>
         <p className="mt-0.5 text-xs leading-relaxed text-app-text-muted">{draft.formHint}</p>
       </div>
     </div>

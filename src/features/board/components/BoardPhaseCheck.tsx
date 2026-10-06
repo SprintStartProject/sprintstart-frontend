@@ -89,7 +89,7 @@ export function BoardPhaseCheck({
         </Badge>
         <Link
           to={`/onboarding?question=${encodeURIComponent(open[0].id)}`}
-          className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-app-brand-text hover:underline"
         >
           Go to the check
           <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -113,7 +113,7 @@ export function BoardPhaseCheck({
                   .querySelector(`[data-card-id="${CSS.escape(card.id)}"]`)
                   ?.scrollIntoView({ behavior: "smooth", block: "center" })
               }
-              className="inline-flex items-center gap-1 font-medium text-app-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              className="inline-flex items-center gap-1 font-medium text-app-text hover:underline"
             >
               {(marks[card.id]?.length ?? 0) > 0 && (
                 <Highlighter className="h-3 w-3 text-app-warning-text" aria-label="Highlighted" />
@@ -124,7 +124,7 @@ export function BoardPhaseCheck({
           {kept.length > listed.length && (
             <Link
               to={`/board?phase=${encodeURIComponent(phase.id)}`}
-              className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              className="font-medium text-app-brand-text underline underline-offset-2"
             >
               and {kept.length - listed.length} more
             </Link>

@@ -46,7 +46,7 @@ function CardSkeleton({ label }: { label: string }) {
 }
 
 const rowClassName =
-  "group -mx-2 block rounded-xl px-2 py-2 transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none";
+  "group -mx-2 block rounded-xl px-2 py-2 transition-colors hover:bg-app-surface-hover";
 
 /** The most asked questions as bars, longest first; each opens its detail panel. */
 export function QuestionsCard() {
@@ -183,26 +183,29 @@ export function KnowledgeGapsCard() {
           />
 
           <ul className="mt-3 space-y-0.5">
-            {worst.map((gap) => (
-              <li key={gap.id}>
-                <Link to={`/insights/knowledge-gaps/${gap.id}`} className={rowClassName}>
-                  <span className="flex items-center gap-2.5">
-                    <span
-                      aria-hidden="true"
-                      className={`h-2 w-2 shrink-0 rounded-full ${SEVERITY_STYLES[gap.severity].bar}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-app-text">{gap.component}</span>
-                      <span className="block truncate text-xs text-app-text-muted">
-                        {gap.missingTypes.length > 0
-                          ? `missing ${gap.missingTypes.join(", ")}`
-                          : SEVERITY_STYLES[gap.severity].longLabel}
+            {worst.map((gap) => {
+              const { icon: SeverityIcon, label, longLabel, text } = SEVERITY_STYLES[gap.severity];
+
+              return (
+                <li key={gap.id}>
+                  <Link to={`/insights/knowledge-gaps/${gap.id}`} className={rowClassName}>
+                    <span className="flex items-center gap-2.5">
+                      <SeverityIcon aria-hidden="true" className={`h-4 w-4 shrink-0 ${text}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-app-text">
+                          {gap.component}
+                        </span>
+                        <span className="block truncate text-xs text-app-text-muted">
+                          {gap.missingTypes.length > 0
+                            ? `${label} · missing ${gap.missingTypes.join(", ")}`
+                            : longLabel}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
@@ -237,7 +240,7 @@ function HealthFigure({
         <span className="block text-sm leading-tight font-semibold text-app-text tabular-nums">
           {value}
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted">{label}</span>
+        <span className="block truncate text-xs text-app-text-muted">{label}</span>
       </span>
     </li>
   );
@@ -278,7 +281,7 @@ export function OnboardingHealthSummary() {
   return (
     <section aria-label="Contribution health" className="min-w-0">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="flex items-center gap-2 text-[10px] font-semibold tracking-widest text-app-cyan-text uppercase">
+        <p className="flex items-center gap-2 text-2xs font-semibold tracking-wider text-app-cyan-text uppercase">
           <Gauge aria-hidden="true" className="h-3.5 w-3.5" />
           Contribution health
           {metrics && (
@@ -372,7 +375,7 @@ export function RecentMilestones() {
 
   return (
     <section aria-label="Recent milestones" className="min-w-0">
-      <p className="mb-3 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+      <p className="mb-3 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
         Recent milestones
       </p>
       {loading ? (

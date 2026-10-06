@@ -174,7 +174,7 @@ export function QuickChatWidget({ size }: { size: DashboardWidgetSize }) {
                 onBlur={() => setFocused(false)}
                 aria-label="Ask the AI assistant a question"
                 placeholder="Ask anything about your project…"
-                className="min-w-0 flex-1 bg-transparent text-sm text-app-text outline-none placeholder:text-app-text-muted"
+                className="min-w-0 flex-1 bg-transparent text-sm text-app-text outline-hidden placeholder:text-app-text-muted"
               />
 
               <button

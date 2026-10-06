@@ -760,7 +760,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
                     <span
                       aria-hidden="true"
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-app-focus ${
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-app-focus peer-focus-visible:outline-solid ${
                         isBeingAdded
                           ? "border-app-success-border bg-app-success-bg text-app-success-text"
                           : isBeingRemoved
@@ -808,7 +808,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
 
                     {(isBeingAdded || isBeingRemoved) && (
                       <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
                           isBeingAdded
                             ? "bg-app-success-solid/15 text-app-success-text"
                             : "bg-app-danger-solid/15 text-app-danger-text"
@@ -1033,7 +1033,7 @@ export function RoleManagementTab({ roles, users, onDataChanged }: RoleManagemen
               <button
                 type="button"
                 onClick={() => setMemberFilter("without")}
-                className="ml-auto shrink-0 rounded-md px-1 font-semibold underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                className="ml-auto shrink-0 rounded-md px-1 font-semibold underline-offset-2 hover:underline"
               >
                 Show them in {selectedRole.name}
               </button>

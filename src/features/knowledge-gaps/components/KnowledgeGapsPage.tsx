@@ -337,8 +337,10 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
                         type="button"
                         onClick={() => void navigate(`/insights/knowledge-gaps/${gap.id}`)}
                         aria-current={selected ? "true" : undefined}
-                        className={`group flex w-full items-stretch gap-3 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-                          selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
+                        className={`group flex w-full items-stretch gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
+                          selected
+                            ? "bg-app-brand-soft shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
+                            : "hover:bg-app-surface-hover"
                         }`}
                       >
                         <SeverityBar severity={gap.severity} />
@@ -349,7 +351,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
                               {gap.component}
                             </span>
                             <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${badge}`}
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}
                             >
                               {label}
                             </span>
@@ -366,7 +368,7 @@ export function KnowledgeGapsPage({ gapId }: { gapId?: string }) {
                             {types.map((type) => (
                               <span
                                 key={type}
-                                className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-[11px]"
+                                className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-xs"
                               >
                                 {type}
                               </span>

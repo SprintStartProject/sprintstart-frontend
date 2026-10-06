@@ -65,7 +65,7 @@ export function StepLink(props: StepLinkProps) {
     <Link
       to={to}
       title={full}
-      className="inline-flex max-w-full items-baseline gap-1 rounded-md bg-app-brand-soft px-1 align-baseline font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="inline-flex max-w-full items-baseline gap-1 rounded-md bg-app-brand-soft px-1 align-baseline font-medium text-app-brand-text hover:underline"
     >
       {task ? (
         <ListChecks className="h-3 w-3 shrink-0 self-center" aria-hidden="true" />

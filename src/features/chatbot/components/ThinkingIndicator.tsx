@@ -55,16 +55,23 @@ export function ThinkingIndicator({
 
   const StatusDots = (
     <>
-      <span className="size-2 animate-bounce rounded-full bg-app-brand" aria-hidden="true" />
       <span
-        className="size-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]"
+        className="size-2 animate-bounce rounded-full bg-app-brand motion-reduce:animate-none"
         aria-hidden="true"
       />
       <span
-        className="size-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]"
+        className="size-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms] motion-reduce:animate-none"
         aria-hidden="true"
       />
-      {label && <span className="animate-pulse pl-2 text-sm italic">{label}</span>}
+      <span
+        className="size-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms] motion-reduce:animate-none"
+        aria-hidden="true"
+      />
+      {label && (
+        <span className="animate-pulse pl-2 text-sm italic motion-reduce:animate-none">
+          {label}
+        </span>
+      )}
     </>
   );
 
@@ -90,10 +97,14 @@ export function ThinkingIndicator({
               className="mt-2 flex w-max items-center gap-1 rounded-2xl border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-app-text"
               aria-hidden="true"
             >
-              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
-              {label && <span className="animate-pulse pl-2 text-sm italic">{label}</span>}
+              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand motion-reduce:animate-none" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:150ms] motion-reduce:animate-none" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-app-brand [animation-delay:300ms] motion-reduce:animate-none" />
+              {label && (
+                <span className="animate-pulse pl-2 text-sm italic motion-reduce:animate-none">
+                  {label}
+                </span>
+              )}
             </div>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EggModalShell } from "../features/easter-eggs/components/EggModalShell.tsx";
@@ -18,7 +19,7 @@ export function NotFoundPage() {
   const [invadersOpen, setInvadersOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden text-app-text">
+    <MainContent className="flex h-screen w-full flex-col overflow-hidden text-app-text">
       <PageHeader
         title="404 Not Found"
         subtitle="The page you are looking for does not exist."
@@ -72,6 +73,6 @@ export function NotFoundPage() {
         open={invadersOpen}
         onClose={() => setInvadersOpen(false)}
       />
-    </div>
+    </MainContent>
   );
 }

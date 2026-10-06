@@ -401,7 +401,7 @@ export function PathReveal({ onLaunch, onDone }: PathRevealProps) {
       {/* The prompt doubles as the launch control: while the rocket
                 waits, it says so. Once flying, it is the usual way out. */}
       {!isLeaving && (
-        <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-[11px] font-medium tracking-[0.18em] text-app-text-subtle uppercase">
+        <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-2xs font-medium tracking-[0.18em] text-app-text-subtle uppercase">
           {stage === "waiting" ? "Press any key to launch" : "Press any key to skip"}
         </p>
       )}

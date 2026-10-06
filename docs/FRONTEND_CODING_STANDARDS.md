@@ -312,7 +312,12 @@ in [UI_DESIGN_DECISIONS.md](./UI_DESIGN_DECISIONS.md).
 - **Contrast** — meet **WCAG 2.1 AA** for text and interactive elements.
 
 - **Focus** — keep visible focus via the `--app-focus` token
-  (`focus-visible:ring-app-focus`); don't remove outlines.
+  (`--focus`). One global `:focus-visible` rule in `src/styles/index.css` draws it as a
+  2px `outline` with a 2px offset, so components add **no** `focus-visible:ring-*` of their
+  own and never `outline-none` (a Tailwind utility beats the global rule). Where something
+  else already shows focus (a container with `focus-within`, an element only focused by
+  script) use `outline-hidden`. Inside an `overflow-hidden` ancestor add `focus-ring-inset`
+  so the outline is drawn inside the element instead of being clipped.
 
 ---
 

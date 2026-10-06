@@ -19,6 +19,7 @@ import {
   useShortcutListener,
 } from "../../features/shortcuts";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useDialogFocus } from "../ui/useDialogFocus";
 import {
   AdminIcon,
   BlueprintsIcon,
@@ -321,7 +322,7 @@ function SidebarContent({
                 {profile.username}
               </span>
 
-              <span className="truncate text-[10px] font-medium tracking-wider text-app-text-muted uppercase">
+              <span className="truncate text-2xs font-medium tracking-wider text-app-text-muted uppercase">
                 {profile.permissionGroup.replace("_", " ")}
               </span>
             </div>
@@ -362,7 +363,7 @@ function SidebarContent({
         whileHover={status === "loading" ? undefined : { scale: 1.02 }}
         whileTap={status === "loading" ? undefined : { scale: 0.98 }}
         transition={hoverSpringToken}
-        className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-[40px] w-full items-center justify-center gap-[12px] rounded-[12px] border border-app-danger-border/40 bg-app-danger-bg/70 text-sm font-medium text-app-danger-text backdrop-blur-md transition-colors hover:border-app-danger-solid hover:bg-app-danger-solid hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         <LogOut aria-hidden="true" className="h-[16px] w-[16px]" />
         Logout
@@ -438,7 +439,7 @@ function SidebarContent({
                   />
                 </>
               ) : (
-                <p className="px-[12px] pb-[8px] text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+                <p className="px-[12px] pb-[8px] text-2xs font-semibold tracking-[0.18em] text-app-text-muted uppercase">
                   {section.heading}
                 </p>
               )
@@ -604,6 +605,14 @@ export function SideBar() {
   }, []);
   const isDesktopLayout = useMediaQuery("(min-width: 1024px)");
 
+  // The drawer is a modal layer over the page: focus moves into it, Tab stays inside, Escape shuts
+  // it and focus goes back to the button that opened it. Only while it is actually on screen -- a
+  // flag left set after the window grew past `lg` must not trap a keyboard behind a hidden panel.
+  const mobileDrawerRef = useDialogFocus<HTMLElement>(
+    isMobileSidebarOpen && !isDesktopLayout,
+    closeMobileSidebar,
+  );
+
   useShortcutListener(
     SIDEBAR_TOGGLE_SHORTCUT,
     isDesktopLayout ? sidebarLayout.toggleCollapsed : toggleMobileSidebar,
@@ -648,7 +657,7 @@ export function SideBar() {
             }}
           />
 
-          <span className="text-[16px] leading-none font-bold tracking-tight text-app-text">
+          <span className="text-base leading-none font-bold tracking-tight text-app-text">
             SprintStart
           </span>
         </div>
@@ -658,7 +667,7 @@ export function SideBar() {
           aria-label={isMobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
           aria-expanded={isMobileSidebarOpen}
           onClick={toggleMobileSidebar}
-          className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px] text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
         >
           {isMobileSidebarOpen ? (
             <X className="h-[22px] w-[22px]" />
@@ -678,13 +687,15 @@ export function SideBar() {
       ) : null}
 
       <aside
+        ref={mobileDrawerRef}
+        tabIndex={-1}
         aria-label="Mobile Sidebar"
         aria-hidden={!isMobileSidebarOpen}
         inert={!isMobileSidebarOpen}
         className={[
           // The cubic-bezier is the iOS sheet curve: fast out of the
           // gate, long soft settle — reads as gliding, not snapping.
-          "fixed top-0 bottom-0 left-0 z-[60] flex w-[var(--app-sidebar-width)] flex-col border-r border-app-border bg-app-bg transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden",
+          "fixed top-0 bottom-0 left-0 z-[60] flex w-[var(--app-sidebar-width)] flex-col border-r border-app-border bg-app-bg outline-hidden transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden",
           isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >

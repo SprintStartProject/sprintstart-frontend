@@ -869,7 +869,7 @@ export function TeamMemberDetailPage({ userId }: { userId?: string }) {
               <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wider text-app-warning-text uppercase">
                 <Hand aria-hidden="true" className="h-3.5 w-3.5" />
                 Waiting on you
-                <span className="rounded-full bg-app-surface px-1.5 py-0.5 text-[11px] tracking-normal normal-case tabular-nums">
+                <span className="rounded-full bg-app-surface px-1.5 py-0.5 text-2xs tracking-normal normal-case tabular-nums">
                   {openItemCount}
                 </span>
               </h2>

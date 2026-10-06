@@ -92,7 +92,7 @@ export function ChatSidebar({ chats, onNavigate, onDeleteChat }: ChatSidebarProp
           state={{ newChat: true }}
           data-testid="chat-new"
           title={`New chat (${NEW_CONVERSATION_CHORD})`}
-          className="group flex items-center justify-center gap-2 rounded-lg bg-app-brand p-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="group flex items-center justify-center gap-2 rounded-lg bg-app-brand p-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-app-brand-hover"
           onClick={onNavigate}
         >
           <Plus size={18} />
@@ -156,7 +156,7 @@ export function ChatSidebar({ chats, onNavigate, onDeleteChat }: ChatSidebarProp
                         onClick={onNavigate}
                         aria-label={chat.title || "Untitled chat"}
                         className={({ isActive }) =>
-                          `flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg py-2 pr-3 pl-3 text-sm transition-all focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                          `flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg py-2 pr-3 pl-3 text-sm transition-all ${
                             onDeleteChat ? "pr-9" : ""
                           } ${
                             isActive
@@ -166,8 +166,10 @@ export function ChatSidebar({ chats, onNavigate, onDeleteChat }: ChatSidebarProp
                         }
                       >
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="truncate">{chat.title || "Thinking..."}</span>
-                          <span className="text-[10px] opacity-70">
+                          <span className="truncate" title={chat.title || undefined}>
+                            {chat.title || "Thinking..."}
+                          </span>
+                          <span className="text-xs opacity-70">
                             {formatRelativeDate(chat.createdAt)}
                           </span>
                         </div>
@@ -178,7 +180,7 @@ export function ChatSidebar({ chats, onNavigate, onDeleteChat }: ChatSidebarProp
                           aria-label={`Delete conversation "${chat.title || "Untitled"}"`}
                           data-testid={`chat-delete-button-${chat.id}`}
                           onClick={() => setChatToDelete(chat)}
-                          className="absolute right-1.5 flex size-7 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/15 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-app-focus focus-visible:outline-none max-md:opacity-100 dark:hover:bg-white/20"
+                          className="absolute right-1.5 flex size-7 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-black/15 focus-visible:opacity-100 max-md:opacity-100 dark:hover:bg-white/20"
                         >
                           <Trash2 size={16} className="shrink-0 opacity-80 hover:opacity-100" />
                         </button>

@@ -355,6 +355,27 @@ describe("SideBar", () => {
     expect(screen.getByLabelText("Close sidebar")).toBeInTheDocument();
     expect(screen.getByLabelText("Close sidebar overlay")).toBeInTheDocument();
   });
+  it("moves focus into the mobile drawer, closes it on Escape and gives focus back", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuthHook.useAuth).mockReturnValue({
+      status: "authenticated",
+      profile: mockProfile,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetchProfile: vi.fn(),
+    });
+
+    renderWithProviders(<SideBar />);
+    const drawer = () => document.querySelector<HTMLElement>('aside[aria-label="Mobile Sidebar"]')!;
+
+    await user.click(screen.getByLabelText("Open sidebar"));
+    await waitFor(() => expect(drawer().contains(document.activeElement)).toBe(true));
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.getByLabelText("Open sidebar")).toHaveFocus();
+  });
+
   /**
    * The count is owned by `SideBar`, not by `SidebarContent` — that renders
    * twice at once, once for the desktop rail and once for the mobile drawer,

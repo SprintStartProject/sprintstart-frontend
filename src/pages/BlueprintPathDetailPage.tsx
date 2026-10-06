@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   Archive,
@@ -20,6 +21,7 @@ import {
   Rocket,
   RotateCcw,
   Square,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -1767,13 +1769,16 @@ export function BlueprintPathDetailPage() {
   // header described it. The `reopen` effect guards this the same way.
   if (isLoading && (!path || path.id !== pathId))
     return (
-      <main className="flex min-h-80 items-center justify-center gap-3 text-app-text-muted">
+      <MainContent
+        placeholder
+        className="flex min-h-80 items-center justify-center gap-3 text-app-text-muted"
+      >
         <Loader2 className="h-5 w-5 animate-spin" /> Loading blueprint…
-      </main>
+      </MainContent>
     );
   if (!path)
     return (
-      <main className="mx-auto max-w-3xl p-8">
+      <MainContent className="mx-auto max-w-3xl p-8">
         <Button
           variant="secondary"
           icon={<ArrowLeft className="h-4 w-4" />}
@@ -1781,10 +1786,11 @@ export function BlueprintPathDetailPage() {
         >
           Back to blueprints
         </Button>
-        <p role="alert" className="mt-6 text-app-danger-text">
+        <p role="alert" className="mt-6 flex items-start gap-1.5 text-app-danger-text">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {error || "Blueprint path not found."}
         </p>
-      </main>
+      </MainContent>
     );
 
   // What the overlay is about, whichever way it was opened. The field conditions below used to ask
@@ -2016,9 +2022,13 @@ export function BlueprintPathDetailPage() {
 
       {/* The swipe listens on the page body, not on the bar: a gesture that only works while the
           pointer is over a 20rem control reads as broken everywhere else. */}
-      <main ref={swipeRef} className="app-page-frame space-y-7 py-6 lg:py-8">
+      <MainContent ref={swipeRef} className="app-page-frame space-y-7 py-6 lg:py-8">
         {error ? (
-          <p role="alert" className="rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text">
+          <p
+            role="alert"
+            className="flex items-start gap-1.5 rounded-xl bg-app-danger-bg p-4 text-sm text-app-danger-text"
+          >
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             {error}
           </p>
         ) : null}
@@ -2435,7 +2445,7 @@ export function BlueprintPathDetailPage() {
                                                     <div
                                                       role="button"
                                                       tabIndex={0}
-                                                      className="min-w-0 flex-1 cursor-pointer px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                      className="min-w-0 flex-1 cursor-pointer px-2 py-1"
                                                       onClick={() =>
                                                         openEdit({
                                                           kind: "task",
@@ -2491,7 +2501,7 @@ export function BlueprintPathDetailPage() {
                                                     <div
                                                       role="button"
                                                       tabIndex={0}
-                                                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1"
                                                       onClick={() =>
                                                         openEdit({
                                                           kind: "resource",
@@ -2654,7 +2664,7 @@ export function BlueprintPathDetailPage() {
                                                 <div
                                                   role="button"
                                                   tabIndex={0}
-                                                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                                                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1"
                                                   onClick={() =>
                                                     openEdit({
                                                       kind: "option",
@@ -2952,7 +2962,7 @@ export function BlueprintPathDetailPage() {
                     onClick={() =>
                       setPhaseType((current) => (current === "FIXED" ? "AI_ENHANCED" : "FIXED"))
                     }
-                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
                       phaseType === "AI_ENHANCED"
                         ? "border-app-brand bg-app-brand"
                         : "border-app-border-strong bg-app-neutral-bg"
@@ -3051,7 +3061,7 @@ export function BlueprintPathDetailPage() {
             ) : null}
           </form>
         </Modal>
-      </main>
+      </MainContent>
     </div>
   );
 }

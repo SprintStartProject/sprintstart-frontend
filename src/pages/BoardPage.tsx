@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -1049,7 +1050,7 @@ export function BoardPage() {
           </header>
         )}
 
-        <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
+        <MainContent ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
           {/* The page keeps a margin either side from `lg` up (at least 5rem on the right here, see
             `frameClass`), and on this page it is dead space: the board is a column of cards and
             the margin is where a hand rests. So the offers live there — always in reach, never in
@@ -1329,7 +1330,7 @@ export function BoardPage() {
                       of your own at any time. Your onboarding itself is on the{" "}
                       <Link
                         to="/onboarding"
-                        className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                        className="font-medium text-app-brand-text underline underline-offset-2"
                       >
                         Onboarding page
                       </Link>
@@ -1346,7 +1347,7 @@ export function BoardPage() {
                         <button
                           type="button"
                           onClick={showEverything}
-                          className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                          className="font-medium text-app-brand-text hover:underline"
                         >
                           Show all {allCards.length} cards
                         </button>
@@ -1409,7 +1410,7 @@ export function BoardPage() {
               </div>
             </div>
           ) : null}
-        </main>
+        </MainContent>
       </div>
     </BoardPathContext.Provider>
   );

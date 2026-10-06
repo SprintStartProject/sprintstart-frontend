@@ -2,6 +2,8 @@ import {
   AlertTriangle,
   Check,
   CheckCircle2,
+  CircleCheck,
+  CircleSlash,
   ExternalLink,
   GitBranch,
   Loader2,
@@ -545,7 +547,7 @@ export function RepositoryDiscovery({
                       />
                       <span
                         aria-hidden="true"
-                        className={`flex h-5 w-5 items-center justify-center rounded-md border transition peer-focus-visible:ring-2 peer-focus-visible:ring-app-focus peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-app-surface ${
+                        className={`flex h-5 w-5 items-center justify-center rounded-md border transition peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-app-focus peer-focus-visible:outline-solid ${
                           isSelected
                             ? "border-app-brand bg-app-brand text-white"
                             : "border-app-border-strong bg-app-surface"
@@ -560,22 +562,30 @@ export function RepositoryDiscovery({
                         name to a couple of characters. Stays single-line and
                         right-aligned from sm up (name grows via sm:flex-1). */}
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 sm:flex-nowrap">
-                      {repository.alreadyConnected && (
-                        <span
-                          role="img"
-                          aria-label={repository.isEnabled === false ? "Disabled" : "Enabled"}
-                          title={repository.isEnabled === false ? "Disabled" : "Enabled"}
-                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                            repository.isEnabled === false
-                              ? "bg-app-text-disabled"
-                              : "bg-app-success-solid"
-                          }`}
-                        />
-                      )}
+                      {repository.alreadyConnected &&
+                        (repository.isEnabled === false ? (
+                          <CircleSlash
+                            role="img"
+                            aria-label="Disabled"
+                            className="h-4 w-4 shrink-0 text-app-text-subtle"
+                          />
+                        ) : (
+                          <CircleCheck
+                            role="img"
+                            aria-label="Enabled"
+                            className="h-4 w-4 shrink-0 text-app-success-text"
+                          />
+                        ))}
 
                       <span className="max-w-full min-w-0 truncate text-sm font-medium text-app-text sm:flex-1">
                         {repository.label ?? repository.name}
                       </span>
+
+                      {repository.alreadyConnected && repository.isEnabled === false && (
+                        <Badge variant="neutral" size="sm">
+                          Disabled
+                        </Badge>
+                      )}
 
                       <Badge
                         variant={repository.isPrivate ? "orange" : "success"}

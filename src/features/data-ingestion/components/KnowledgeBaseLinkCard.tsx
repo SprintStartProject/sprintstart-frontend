@@ -31,7 +31,7 @@ export function KnowledgeBaseLinkCard({
     <DrawerCard bare index={index} className="mt-4 sm:mt-5">
       <Link
         to={knowledgeBaseHrefFor(source)}
-        className="group flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface p-5 transition-colors hover:border-app-brand-border hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none sm:p-6"
+        className="group flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface p-5 transition-colors hover:border-app-brand-border hover:bg-app-surface-hover sm:p-6"
       >
         <IconTile icon={BookOpen} size="md" tone="brand" />
 

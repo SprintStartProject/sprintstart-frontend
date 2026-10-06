@@ -269,7 +269,7 @@ function Tile({
 }) {
   return (
     <div className="rounded-xl border border-app-border bg-app-surface-muted px-4 py-3">
-      <p className="flex items-center gap-1.5 text-[11px] text-app-text-subtle">
+      <p className="flex items-center gap-1.5 text-xs text-app-text-subtle">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </p>
@@ -323,9 +323,9 @@ function Stage({ stage, isLast }: { stage: StageInfo; isLast: boolean }) {
 function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-center gap-3 border-t border-app-border py-2.5 first:border-t-0">
-      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
+      <dt className="w-24 shrink-0 text-xs text-app-text-muted">{label}</dt>
       <dd
-        className={`min-w-0 text-[13px] font-semibold break-words text-app-text ${
+        className={`min-w-0 text-sm font-semibold break-words text-app-text ${
           mono ? "font-mono text-xs font-medium" : ""
         }`}
       >

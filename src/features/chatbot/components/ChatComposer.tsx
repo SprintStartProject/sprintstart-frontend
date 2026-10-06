@@ -1,4 +1,14 @@
-import { Calendar, Check, Filter, ListPlus, RotateCcw, Send, Square, X } from "lucide-react";
+import {
+  Calendar,
+  Check,
+  Filter,
+  ListPlus,
+  RotateCcw,
+  Send,
+  Square,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -278,7 +288,7 @@ export function ChatComposer({
             transition={centralSpringToken}
             className="mb-2.5 flex flex-wrap items-center gap-1.5 overflow-hidden px-1"
           >
-            <span className="mr-0.5 flex items-center gap-1 text-[11px] font-semibold tracking-wider text-app-text-muted uppercase">
+            <span className="mr-0.5 flex items-center gap-1 text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
               <Filter size={11} className="text-app-brand" />
               <span>Filtering:</span>
             </span>
@@ -360,7 +370,7 @@ export function ChatComposer({
           >
             <Filter size={18} />
             {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-app-brand text-[10px] font-bold text-white shadow-sm ring-1 ring-app-surface">
+              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-app-brand text-xs font-bold text-white shadow-sm ring-1 ring-app-surface">
                 {activeFilterCount}
               </span>
             )}
@@ -425,10 +435,10 @@ export function ChatComposer({
                 {/* Sources Selection */}
                 <div className="space-y-2 pt-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold tracking-wider text-app-text-muted uppercase">
+                    <span className="text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
                       Sources
                     </span>
-                    <span className="text-[11px] text-app-text-subtle">
+                    <span className="text-xs text-app-text-subtle">
                       {sourceSystems.length === 0
                         ? "Searching all sources"
                         : `${sourceSystems.length} selected`}
@@ -493,7 +503,7 @@ export function ChatComposer({
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold tracking-wider text-app-text-muted uppercase">
+                    <span className="text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
                       Indexed Date
                     </span>
                     {(from || to) && (
@@ -503,7 +513,7 @@ export function ChatComposer({
                           setFrom("");
                           setTo("");
                         }}
-                        className="text-[11px] font-medium text-app-brand-text hover:underline"
+                        className="text-xs font-medium text-app-brand-text hover:underline"
                       >
                         Clear dates
                       </button>
@@ -544,7 +554,7 @@ export function ChatComposer({
                   {/* Custom Inputs */}
                   <div className="flex items-center gap-2 pt-1">
                     <div className={dateRangeWrapperClass}>
-                      <span className="text-[10px] font-semibold tracking-wide text-app-text-disabled uppercase">
+                      <span className="text-2xs font-semibold tracking-wide text-app-text-disabled uppercase">
                         From
                       </span>
                       <input
@@ -554,14 +564,14 @@ export function ChatComposer({
                         max={to || undefined}
                         value={from}
                         onChange={(e) => setFrom(e.target.value)}
-                        className="w-full min-w-0 bg-transparent text-xs text-app-text outline-none"
+                        className="w-full min-w-0 bg-transparent text-xs text-app-text outline-hidden"
                       />
                     </div>
 
                     <span className="text-xs text-app-text-disabled">→</span>
 
                     <div className={dateRangeWrapperClass}>
-                      <span className="text-[10px] font-semibold tracking-wide text-app-text-disabled uppercase">
+                      <span className="text-2xs font-semibold tracking-wide text-app-text-disabled uppercase">
                         To
                       </span>
                       <input
@@ -571,17 +581,21 @@ export function ChatComposer({
                         min={from || undefined}
                         value={to}
                         onChange={(e) => setTo(e.target.value)}
-                        className="w-full min-w-0 bg-transparent text-xs text-app-text outline-none"
+                        className="w-full min-w-0 bg-transparent text-xs text-app-text outline-hidden"
                       />
                     </div>
                   </div>
 
                   {rangeInvalid ? (
-                    <p className="text-[11px] text-app-danger-text" role="alert">
+                    <p
+                      className="flex items-start gap-1.5 text-xs text-app-danger-text"
+                      role="alert"
+                    >
+                      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                       Start date cannot be after end date.
                     </p>
                   ) : (
-                    <p className="text-[10px] text-app-text-subtle">
+                    <p className="text-xs text-app-text-subtle">
                       Filter documents indexed within this date range.
                     </p>
                   )}
@@ -599,7 +613,7 @@ export function ChatComposer({
               ? "Ask anything about the project..."
               : "Select a project to start asking questions"
           }
-          className="max-h-44 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-none placeholder:text-app-text-disabled"
+          className="max-h-44 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-sm text-app-text outline-hidden placeholder:text-app-text-disabled"
           value={value}
           rows={1}
           onChange={(e) => {
@@ -685,12 +699,16 @@ export function ChatComposer({
       </form>
 
       {!hasProject && (
-        <p className="mt-2 text-center text-[11px] text-app-danger-text" role="alert">
+        <p
+          className="mt-2 flex items-start gap-1.5 text-center text-xs text-app-danger-text"
+          role="alert"
+        >
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           No project selected — pick one in the header to ask a question.
         </p>
       )}
 
-      <p className="mt-2 text-center text-[11px] text-app-text-disabled">
+      <p className="mt-2 text-center text-xs text-app-text-disabled">
         {isBusy
           ? "Enter to queue a follow-up · Shift + Enter for a new line"
           : "Enter to send · Shift + Enter for a new line"}

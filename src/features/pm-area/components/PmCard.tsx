@@ -73,7 +73,7 @@ export function PmCard({
         <Link
           to={to}
           aria-label={linkLabel ?? ariaLabel}
-          className="absolute inset-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset"
+          className="absolute inset-0 rounded-2xl focus-ring-inset"
         />
       )}
       <div
@@ -125,7 +125,7 @@ export function PmCardLink({ to, children }: { to: string; children: ReactNode }
   return (
     <Link
       to={to}
-      className="group flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text"
     >
       {children}
       <ArrowRight
@@ -146,7 +146,7 @@ export function PmEyebrow({
 }) {
   return (
     <p
-      className={`text-[10px] font-semibold tracking-widest text-app-brand-text uppercase ${className}`}
+      className={`text-2xs font-semibold tracking-wider text-app-brand-text uppercase ${className}`}
     >
       {children}
     </p>
@@ -198,7 +198,7 @@ export function PmStat({
           <span className="text-xl leading-none font-bold tracking-tight text-app-text tabular-nums">
             {value}
           </span>
-          <span className="truncate text-[12.5px] font-medium text-app-text-muted">{label}</span>
+          <span className="truncate text-xs font-medium text-app-text-muted">{label}</span>
         </span>
         <span className="mt-1 block truncate text-xs text-app-text-subtle">{hint}</span>
       </span>
@@ -207,7 +207,7 @@ export function PmStat({
 
   const className =
     "flex h-full items-center gap-3 rounded-2xl border border-app-border bg-app-surface px-3.5 py-3 text-left";
-  const interactiveClassName = `${className} transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-md focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none motion-reduce:hover:translate-y-0`;
+  const interactiveClassName = `${className} transition-all hover:-translate-y-0.5 hover:border-app-brand-border-strong hover:shadow-md motion-reduce:hover:translate-y-0`;
 
   if (to) {
     return (

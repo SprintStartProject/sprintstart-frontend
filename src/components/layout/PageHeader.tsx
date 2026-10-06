@@ -59,7 +59,7 @@ export function PageHeader({
                   type="button"
                   onClick={onIconClick}
                   data-egg-hint={eggHint ? "true" : undefined}
-                  className="page-header-icon-button rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand"
+                  className="page-header-icon-button rounded-md"
                   aria-label={`${title} icon`}
                 >
                   <Icon className="page-header-icon h-6 w-6 shrink-0 text-app-brand-text transition-transform active:scale-95" />

@@ -1,3 +1,4 @@
+import { MainContent } from "./MainContent";
 import { useCallback } from "react";
 import { useLocation, useNavigate, useOutlet } from "react-router-dom";
 import { Sparkles } from "lucide-react";
@@ -84,7 +85,7 @@ export function AssistantShell() {
         </div>
       </header>
 
-      <div ref={swipeRef} className="flex min-h-0 flex-1 flex-col">
+      <MainContent ref={swipeRef} className="flex min-h-0 flex-1 flex-col">
         <SlidingTabPanel
           activeKey={surface}
           index={ASSISTANT_SURFACES.indexOf(surface)}
@@ -92,7 +93,7 @@ export function AssistantShell() {
         >
           {outlet}
         </SlidingTabPanel>
-      </div>
+      </MainContent>
     </div>
   );
 }

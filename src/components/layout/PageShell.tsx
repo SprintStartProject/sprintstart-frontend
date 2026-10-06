@@ -6,6 +6,7 @@ import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
 import { SkeletonLine } from "../ui/Skeleton";
 import { PageHeader } from "./PageHeader";
+import { MainContent } from "./MainContent";
 
 export type PageShellFrame = "page" | "content" | "admin";
 
@@ -97,9 +98,9 @@ export function PageShell({
           </div>
         </header>
       )}
-      <main ref={mainRef} className={`${frameClass} ${mainClassName}`}>
+      <MainContent ref={mainRef} className={`${frameClass} ${mainClassName}`}>
         {children}
-      </main>
+      </MainContent>
     </div>
   );
 }
@@ -122,9 +123,9 @@ export function PageShellSkeleton({ frame = "page" }: { frame?: PageShellFrame }
           <SkeletonLine className="h-8 w-48" />
         </div>
       </header>
-      <main className={`${frameClass} flex justify-center py-16`}>
+      <MainContent placeholder className={`${frameClass} flex justify-center py-16`}>
         <Spinner size="lg" />
-      </main>
+      </MainContent>
     </div>
   );
 }

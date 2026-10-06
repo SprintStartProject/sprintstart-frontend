@@ -57,7 +57,7 @@ export function TaskCheckItem({ index, title, description, isDone, onToggle }: T
         onClick={onToggle}
         aria-pressed={isDone}
         aria-label={`${index + 1}. ${title}`}
-        className="relative mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:ring-offset-2 focus-visible:outline-none"
+        className="relative mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
         whileTap={reduceMotion ? undefined : { scale: 0.9 }}
       >
         {/* Pulse that rings out of the tick on completion. Keyed on the

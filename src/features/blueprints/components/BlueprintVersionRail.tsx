@@ -25,7 +25,7 @@ export function BlueprintVersionRail({ lifecycle }: { lifecycle: BlueprintLifecy
   const hidden = earlier - shown;
 
   return (
-    <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-app-text-muted">
+    <p className="flex flex-wrap items-center gap-1.5 text-xs text-app-text-muted">
       {hidden > 0 ? <span className="tabular-nums">+{hidden} earlier</span> : null}
 
       {Array.from({ length: shown }, (_, index) => (

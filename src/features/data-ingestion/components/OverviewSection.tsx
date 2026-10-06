@@ -233,7 +233,7 @@ function Kpi({
   const body = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[12.5px] text-app-text-muted">{label}</span>
+        <span className="min-w-0 truncate text-xs text-app-text-muted">{label}</span>
         <Icon
           size={20}
           className={`shrink-0 ${TONE_TILE[tone]} ${iconSpin ? "animate-spin" : ""}`}
@@ -265,7 +265,7 @@ function Kpi({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-app-border bg-app-surface p-4 text-left transition hover:border-app-brand-border focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none sm:p-[18px]"
+      className="rounded-2xl border border-app-border bg-app-surface p-4 text-left transition hover:border-app-brand-border sm:p-[18px]"
     >
       {body}
     </button>
@@ -292,15 +292,13 @@ function ActivityRow({ run, sourceLabel }: { run: IngestionRun; sourceLabel: str
         )}
       </IconTile>
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-semibold text-app-text">{sourceLabel}</p>
-        <p className="text-[11.5px] text-app-text-subtle">
-          {formatNumber(run.ingestedCount)} artifacts
-        </p>
+        <p className="truncate text-sm font-semibold text-app-text">{sourceLabel}</p>
+        <p className="text-xs text-app-text-subtle">{formatNumber(run.ingestedCount)} artifacts</p>
       </div>
 
       <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
         <Badge variant={badgeVariant}>{label}</Badge>
-        <span className="text-[11.5px] text-app-text-subtle">{formatDateTime(run.startedAt)}</span>
+        <span className="text-xs text-app-text-subtle">{formatDateTime(run.startedAt)}</span>
       </div>
     </li>
   );

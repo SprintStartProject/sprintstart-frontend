@@ -110,14 +110,14 @@ export function UserOverviewWidget({ size }: { size: DashboardWidgetSize }) {
 
           <div className="flex flex-col justify-center gap-4">
             <div>
-              <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+              <p className="mb-2 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
                 Permission groups
               </p>
               <WidgetBar segments={permissionSegments} />
             </div>
 
             <div>
-              <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+              <p className="mb-2 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
                 Not in a project
               </p>
 

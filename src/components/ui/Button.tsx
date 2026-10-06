@@ -93,7 +93,7 @@ export type ButtonProps = ButtonOwnProps & ForwardedButtonAttributes;
  */
 const baseClasses =
   "inline-flex select-none items-center justify-center whitespace-nowrap border font-medium " +
-  "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus " +
+  "transition-colors " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
 /**

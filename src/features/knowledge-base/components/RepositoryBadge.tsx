@@ -10,7 +10,7 @@ import { FolderGit2 } from "lucide-react";
  * `FolderGit2` reads as "repository" — `GitBranch` reads as "branch".
  */
 const BADGE_CLASSES =
-  "flex min-w-0 items-center gap-1.5 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-[10px] font-bold text-app-text-muted";
+  "flex min-w-0 items-center gap-1.5 rounded-md border border-app-border bg-app-bg-soft px-2 py-0.5 text-xs font-bold text-app-text-muted";
 
 interface RepositoryBadgeProps {
   /** The `owner/repository` string to display; also the tooltip text. */

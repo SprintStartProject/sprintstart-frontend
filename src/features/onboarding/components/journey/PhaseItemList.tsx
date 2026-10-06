@@ -110,14 +110,14 @@ export function PhaseItemList({
                 onClick={() => canUnfold && onToggle(item)}
                 aria-expanded={canUnfold ? isExpanded : undefined}
                 disabled={!canUnfold}
-                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-default"
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left disabled:cursor-default"
               >
                 <ItemGlyph item={item} state={state} />
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     {isNext && !isExpanded ? (
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase ${
+                        className={`rounded-full px-2 py-0.5 text-2xs font-bold tracking-wide text-white uppercase ${
                           isQuestion ? "bg-app-question-solid" : "bg-app-brand"
                         }`}
                       >
