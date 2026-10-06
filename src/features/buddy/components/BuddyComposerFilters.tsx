@@ -4,6 +4,7 @@ import { Calendar, Check, Filter, RotateCcw, TriangleAlert, X } from "lucide-rea
 import { centralSpringToken } from "../../../styles/tokens";
 import { SOURCE_META } from "../../data-ingestion/data";
 import type { SourceSystem } from "../../data-ingestion/connectors/sourceSystems";
+import { useProjectContext } from "../../projects/useProjectContext";
 import { useAvailableSources } from "../hooks/useAvailableSources";
 import { isFilterRangeInvalid } from "../utils/filterRange";
 import type { BuddySessionFilters } from "../types";
@@ -145,7 +146,10 @@ export function BuddyFiltersButton({ filters, onFiltersChange }: BuddyFiltersBut
   const [showFilters, setShowFilters] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const { sources: availableSources, loading: sourcesLoading } = useAvailableSources();
+  const { selectedProjectId } = useProjectContext();
+  const { sources: availableSources, loading: sourcesLoading } = useAvailableSources(
+    selectedProjectId || null,
+  );
 
   // Close the floating popover on Escape or a click outside it.
   useEffect(() => {

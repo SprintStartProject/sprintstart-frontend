@@ -2,68 +2,87 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useAvailableSources } from "../../../../src/features/buddy/hooks/useAvailableSources";
 
-const { mockListConnectors } = vi.hoisted(() => ({ mockListConnectors: vi.fn() }));
+const { mockGetArtifactFacets } = vi.hoisted(() => ({ mockGetArtifactFacets: vi.fn() }));
 
-vi.mock("../../../../src/services/connectorService", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../src/services/connectorService")>();
+vi.mock("../../../../src/services/knowledgeService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../../src/services/knowledgeService")>();
   return {
     ...actual,
-    connectorService: { ...actual.connectorService, listConnectors: mockListConnectors },
+    knowledgeService: { ...actual.knowledgeService, getArtifactFacets: mockGetArtifactFacets },
   };
 });
 
-function connector(id: string, enabled = true) {
+function facets(sources: Array<[string, number]>) {
   return {
-    id,
-    name: `${id} connector`,
-    enabled,
-    firstConfiguredAt: null,
-    lastConfiguredAt: null,
+    types: [],
+    sources: sources.map(([value, count]) => ({ value, count })),
+    formats: [],
+    repositories: [],
   };
 }
 
 describe("useAvailableSources", () => {
-  it("offers every enabled connector the chat can filter by, uploads included", async () => {
-    mockListConnectors.mockResolvedValue([
-      connector("github"),
-      connector("jira"),
-      connector("confluence"),
-    ]);
+  it("offers every source the project has indexed that the chat can filter by, uploads included", async () => {
+    mockGetArtifactFacets.mockResolvedValue(
+      facets([
+        ["GITHUB", 12],
+        ["JIRA", 3],
+        ["CONFLUENCE", 1],
+      ]),
+    );
 
-    const { result } = renderHook(() => useAvailableSources());
+    const { result } = renderHook(() => useAvailableSources("project-1"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockGetArtifactFacets).toHaveBeenCalledWith("project-1");
     expect([...result.current.sources].sort()).toEqual(["CONFLUENCE", "GITHUB", "JIRA", "UPLOAD"]);
   });
 
-  it("offers Bitbucket when its connector is enabled", async () => {
-    mockListConnectors.mockResolvedValue([connector("github"), connector("bitbucket")]);
+  it("offers Bitbucket and Notion when the project has them indexed", async () => {
+    mockGetArtifactFacets.mockResolvedValue(
+      facets([
+        ["BITBUCKET", 2],
+        ["NOTION", 4],
+      ]),
+    );
 
-    const { result } = renderHook(() => useAvailableSources());
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect([...result.current.sources].sort()).toEqual(["BITBUCKET", "GITHUB", "UPLOAD"]);
-  });
-
-  it("offers Notion when its connector is enabled", async () => {
-    mockListConnectors.mockResolvedValue([connector("github"), connector("notion")]);
-
-    const { result } = renderHook(() => useAvailableSources());
+    const { result } = renderHook(() => useAvailableSources("project-1"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect([...result.current.sources].sort()).toEqual(["GITHUB", "NOTION", "UPLOAD"]);
+    expect([...result.current.sources].sort()).toEqual(["BITBUCKET", "NOTION", "UPLOAD"]);
   });
 
-  it("leaves out a disabled connector and any id the chat has no filter for", async () => {
-    mockListConnectors.mockResolvedValue([
-      connector("github"),
-      connector("confluence", false),
-      connector("sonarqube"),
-    ]);
+  it("leaves out a source with nothing indexed and any system the chat has no filter for", async () => {
+    mockGetArtifactFacets.mockResolvedValue(
+      facets([
+        ["GITHUB", 5],
+        ["JIRA", 0],
+        ["SONARQUBE", 7],
+      ]),
+    );
 
-    const { result } = renderHook(() => useAvailableSources());
+    const { result } = renderHook(() => useAvailableSources("project-1"));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect([...result.current.sources].sort()).toEqual(["GITHUB", "UPLOAD"]);
+  });
+
+  it("offers uploads only when the lookup fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetArtifactFacets.mockRejectedValue(new Error("403"));
+
+    const { result } = renderHook(() => useAvailableSources("project-1"));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.sources).toEqual(["UPLOAD"]);
+  });
+
+  it("makes no request and offers uploads only without a project", () => {
+    mockGetArtifactFacets.mockClear();
+
+    const { result } = renderHook(() => useAvailableSources(null));
+
+    expect(result.current).toEqual({ sources: ["UPLOAD"], loading: false });
+    expect(mockGetArtifactFacets).not.toHaveBeenCalled();
   });
 });
