@@ -61,14 +61,14 @@ describe("deriveArtifactFromCitation", () => {
 });
 
 describe("citationDrawerProjectId", () => {
-  it("prefers the conversation's own project over the global selection", () => {
-    expect(citationDrawerProjectId("conversation-project", "team-project", "selected")).toBe(
-      "conversation-project",
+  it("prefers the team conversation's project over the hire session behind the switch", () => {
+    expect(citationDrawerProjectId("session-project", "team-project", "selected")).toBe(
+      "team-project",
     );
   });
 
-  it("falls back to the managed team project, then the global selection", () => {
-    expect(citationDrawerProjectId(null, "team-project", "selected")).toBe("team-project");
+  it("falls back to the conversation's own project, then the global selection", () => {
+    expect(citationDrawerProjectId("session-project", null, "selected")).toBe("session-project");
     expect(citationDrawerProjectId(null, null, "selected")).toBe("selected");
   });
 
