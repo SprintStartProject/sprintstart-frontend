@@ -1,11 +1,11 @@
-import { sourceSystemOfCitation } from "../data-ingestion/connectors/registry.ts";
-import type { Artifact, ArtifactType } from "../knowledge-base/types.ts";
+import { sourceSystemOfCitation } from "../../data-ingestion/connectors/registry.ts";
+import type { Artifact, ArtifactType } from "../../knowledge-base/types.ts";
 
-/** What a clicked citation hands the chat page so it can open the artifact drawer. */
+/** What a clicked citation hands the surface so it can open the artifact drawer. */
 export type CitationArtifactOpen = {
   artifactId: string;
   filename: string;
-  sourceUrl?: string;
+  sourceUrl?: string | null;
   lines: number[];
 };
 
@@ -58,4 +58,21 @@ export function deriveArtifactFromCitation(citation: CitationArtifactOpen): Arti
     contentHash: null,
     ingestionRunId: null,
   };
+}
+
+/**
+ * Which project the artifact drawer must fetch within for a conversation.
+ *
+ * A conversation is about the project it was started in, and the drawer's content read is
+ * project-scoped — so the conversation's own project wins over the global selection (the hire
+ * may have switched since it started). Team conversations carry their managed project on the
+ * session slice; an unscoped hire conversation falls back to whatever is selected. `null` means
+ * no project at all: there is no drawer to open, and the caller offers the source link instead.
+ */
+export function citationDrawerProjectId(
+  sessionProjectId: string | null | undefined,
+  teamProjectId: string | null | undefined,
+  selectedProjectId: string,
+): string | null {
+  return sessionProjectId ?? teamProjectId ?? (selectedProjectId || null);
 }

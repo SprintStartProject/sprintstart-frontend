@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ExternalLink, Plus } from "lucide-react";
-import type { SelectedCitation } from "../../../context/ChatContext";
-import { getCitationPopoverStyle } from "../utils/popoverPosition";
+import type { SelectedCitation } from "./types";
+import { getCitationPopoverStyle } from "./popoverPosition";
 
 type CitationPopoverProps = {
   /** The citation the user clicked, plus the anchor rect for positioning. */
@@ -12,7 +12,7 @@ type CitationPopoverProps = {
   onOpenArtifact?: (data: {
     artifactId: string;
     filename: string;
-    sourceUrl?: string;
+    sourceUrl?: string | null;
     lines: number[];
   }) => void;
 };
@@ -55,6 +55,10 @@ export function CitationPopover({ selected, onClose, onOpenArtifact }: CitationP
   }, [onClose]);
 
   const { citation } = selected;
+  // The wire sends `null` for absent fields (not omitted), and a source has a line (text/code)
+  // or a page (PDF) — guard against both so no literal "Line null" / "Page null" can render.
+  const hasLine = citation.startLine !== undefined && citation.startLine !== null;
+  const hasPage = citation.startPage !== undefined && citation.startPage !== null;
 
   return (
     <div
@@ -66,6 +70,7 @@ export function CitationPopover({ selected, onClose, onOpenArtifact }: CitationP
         <h3 className="truncate pr-4 text-sm font-semibold text-app-text">{citation.filename}</h3>
 
         <button
+          type="button"
           aria-label="Close citation"
           onClick={onClose}
           className="text-app-text-muted transition-colors hover:text-app-text"
@@ -75,8 +80,9 @@ export function CitationPopover({ selected, onClose, onOpenArtifact }: CitationP
       </div>
 
       <div className="mb-2 text-xs leading-relaxed text-app-text-muted">
-        {citation.startLine !== undefined && `Line ${citation.startLine}`}
-        {citation.startPage !== undefined && `Page ${citation.startPage}`}
+        {hasLine && `Line ${citation.startLine}`}
+        {hasLine && hasPage && " · "}
+        {hasPage && `Page ${citation.startPage}`}
       </div>
 
       {onOpenArtifact && citation.artifactId ? (

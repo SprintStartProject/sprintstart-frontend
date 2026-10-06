@@ -2,6 +2,8 @@ import { memo, useCallback } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import type { ActionDrafts } from "../actionDrafts";
+import type { SelectedCitation } from "../citations/types";
+import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
 import { BuddyReplyActions } from "./BuddyReplyActions";
@@ -62,6 +64,15 @@ type BuddyConversationProps = {
   dinoGameActive?: boolean;
   /** Called when the player leaves the dino waiting-game. */
   onDinoGameExit?: () => void;
+  /**
+   * Called when the hire clicks a `[N]` citation reference in a reply.
+   *
+   * Held in one identity by the page, like the render callbacks above — the thread's memo
+   * compares it.
+   */
+  onCitationClick?: (citation: SelectedCitation) => void;
+  /** Opens the artifact drawer from a reply's citations footer — see `BuddyThread`. */
+  onOpenArtifact?: (data: CitationArtifactOpen) => void;
 };
 
 /**
@@ -103,6 +114,8 @@ function BuddyConversationImpl({
   isStreaming = false,
   dinoGameActive = false,
   onDinoGameExit,
+  onCitationClick,
+  onOpenArtifact,
 }: BuddyConversationProps) {
   const { containerRef, onScroll } = useStickToBottom(messages);
 
@@ -179,6 +192,8 @@ function BuddyConversationImpl({
             onRetryOpen={onRetryOpen}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={onDinoGameExit}
+            onCitationClick={onCitationClick}
+            onOpenArtifact={onOpenArtifact}
           />
         </div>
       </div>

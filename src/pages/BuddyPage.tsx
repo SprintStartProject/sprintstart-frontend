@@ -24,6 +24,10 @@ import {
   useNewConversationShortcut,
 } from "../hooks/useNewConversationShortcut";
 import { BuddyConversation } from "../features/buddy/components/BuddyConversation";
+import { CitationPopover } from "../features/buddy/citations/CitationPopover";
+import { citationDrawerProjectId } from "../features/buddy/citations/citationArtifact";
+import { useCitationViewer } from "../features/buddy/citations/useCitationViewer";
+import { ArtifactViewerDrawer } from "../features/knowledge-base/components/ArtifactViewerDrawer";
 import { BuddyNewConversationButton } from "../features/buddy/components/BuddyNewConversationButton";
 import { BuddyConversationList } from "../features/buddy/components/BuddyConversationList";
 import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
@@ -188,6 +192,7 @@ function BuddyMentorHome() {
     currentSessionId,
     newConversation,
     selectSession,
+    binSession,
     presentedGreetingId,
     markGreetingPresented,
     teamProjectId,
@@ -308,7 +313,7 @@ function BuddyMentorHome() {
   // one project, and to nobody else, so a hire never meets a row of nothing. Read here rather
   // than inside the page-wide gate above: the gate is about *having* a project, the switcher
   // about *managing* one.
-  const { projects } = useProjectContext();
+  const { projects, selectedProjectId } = useProjectContext();
   const canSwitchModes = projects.some((project) => project.isManaged);
 
   // Memoised so the listener is bound once rather than torn down and rebuilt on every token
@@ -354,6 +359,19 @@ function BuddyMentorHome() {
   );
 
   const isSmUp = useIsSmUp();
+
+  // The citation popover and the artifact drawer — one state pair per surface, rendered at the
+  // bottom of this one. The handlers are stable, which is what the memoised thread compares.
+  const citationViewer = useCitationViewer();
+
+  // The drawer's content read is project-scoped: open citations in the conversation's own
+  // project, not the globally selected one — the hire may have switched since it started.
+  const citationSession = sessions.find((session) => session.id === currentSessionId);
+  const citationProjectId = citationDrawerProjectId(
+    citationSession?.projectId,
+    teamProjectId,
+    selectedProjectId,
+  );
 
   /**
    * The suggestion row above the composer, held in one identity — the conversation below it is
@@ -412,125 +430,161 @@ function BuddyMentorHome() {
   // the greeting arrives in its own bubble — as the buddy typing, which is the honest picture
   // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
-    <BuddyPageShell
-      reserveFloatingClearance={needsFloatingRoom}
-      isRailOpen={rail.open}
-      rail={
-        // Mounted whenever it holds something, open or not: the count on the control that
-        // reopens it is read from the same list the rail is showing, and a rail that unmounted
-        // would lose its scroll position every time it was put away. The hire's conversations
-        // are always one of the things it holds — a hire with two of them has something to
-        // switch between — plus, once there is one, whatever came back from their PM.
-        // Hire-flow only: a team-mode conversation is not one of the hire's own, and what came
-        // back from the PM is an answer to the hire's own questions.
-        isHireMode && (sessions.length > 1 || replies.hasAny) ? (
-          <ConversationRail
-            id={RAIL_ID}
-            isOpen={rail.open}
-            label={RAIL_LABEL}
-            onDismiss={() => setRailOpen(false)}
-            dismissLabel="Close your conversations"
-          >
-            <div className="flex h-full min-h-0 flex-col">
-              <BuddyConversationList
-                sessions={sessions}
-                currentSessionId={currentSessionId}
-                disabled={isBusy || isOpening || isGreeting || isDeciding}
-                onSelect={selectConversation}
-                // The rail's one cross, at its top: the replies panel used to carry one
-                // mid-rail, which read as closing that section alone — and a conversations-only
-                // rail had no way out at all. See the list's own `onClose`.
-                onClose={() => setRailOpen(false)}
-                // The cap only exists to leave the PM replies their share of the rail; with
-                // none to show, the conversations are the whole rail.
-                className={replies.hasAny ? "max-h-[45%] shrink-0" : "min-h-0 flex-1"}
-              />
+    <>
+      <BuddyPageShell
+        reserveFloatingClearance={needsFloatingRoom}
+        isRailOpen={rail.open}
+        rail={
+          // Mounted whenever it holds something, open or not: the count on the control that
+          // reopens it is read from the same list the rail is showing, and a rail that unmounted
+          // would lose its scroll position every time it was put away. The hire's conversations
+          // are always one of the things it holds — a hire with two of them has something to
+          // switch between — plus, once there is one, whatever came back from their PM.
+          // Hire-flow only: a team-mode conversation is not one of the hire's own, and what came
+          // back from the PM is an answer to the hire's own questions.
+          isHireMode && (sessions.length > 1 || replies.hasAny) ? (
+            <ConversationRail
+              id={RAIL_ID}
+              isOpen={rail.open}
+              label={RAIL_LABEL}
+              onDismiss={() => setRailOpen(false)}
+              dismissLabel="Close your conversations"
+            >
+              <div className="flex h-full min-h-0 flex-col">
+                <BuddyConversationList
+                  sessions={sessions}
+                  currentSessionId={currentSessionId}
+                  disabled={isBusy || isOpening || isGreeting || isDeciding}
+                  onSelect={selectConversation}
+                  // Binning needs the awaited promise (the dialog shows its spinner on it), so
+                  // this one is not wrapped in `void` like the selection above.
+                  onBin={binSession}
+                  // The rail's one cross, at its top: the replies panel used to carry one
+                  // mid-rail, which read as closing that section alone — and a conversations-only
+                  // rail had no way out at all. See the list's own `onClose`.
+                  onClose={() => setRailOpen(false)}
+                  // The cap only exists to leave the PM replies their share of the rail; with
+                  // none to show, the conversations are the whole rail.
+                  className={replies.hasAny ? "max-h-[45%] shrink-0" : "min-h-0 flex-1"}
+                />
 
-              {replies.hasAny && (
-                <div className="min-h-0 flex-1">
-                  <BuddyPmReplies {...replies} />
-                </div>
-              )}
-            </div>
-          </ConversationRail>
-        ) : undefined
-      }
-      newConversationControl={
-        canStartConversation ? (
-          <BuddyNewConversationButton
-            onClick={startConversation}
-            shortcut={NEW_CONVERSATION_CHORD}
-          />
-        ) : undefined
-      }
-      modeControl={
-        canSwitchModes ? (
-          <BuddyModeSwitcher
-            teamProjectId={teamProjectId}
-            onSwitch={(projectId) => void switchTeamProject(projectId)}
-            disabled={isBusy || isOpening || isGreeting || isDeciding}
-            className="max-w-xs"
-          />
-        ) : undefined
-      }
-      railToggle={
-        // Only offered when there is something behind it: a control that opens an empty panel
-        // is worse than no control. Hire-flow only, for the same reason the rail itself is.
-        // The badge counts PM replies — an answer from a person is why a hire presses this; a
-        // second conversation with nothing in it is not news.
-        isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open ? (
-          <RailToggle
-            label={RAIL_LABEL}
-            controls={RAIL_ID}
-            icon={<MessagesSquare className="h-4 w-4" aria-hidden="true" />}
-            count={
-              replies.hasAny
-                ? replies.answered.length + replies.waiting.length + replies.dismissed.length
-                : undefined
-            }
-            onClick={() => setRailOpen(true)}
-          />
-        ) : undefined
-      }
-    >
-      <BuddyConversation
-        messages={greeting.messages}
-        isThinking={isThinking || isOpening || greeting.isThinking}
-        isStreaming={isStreaming}
-        activeTool={activeTool}
-        confirmAction={confirmAction}
-        dismissAction={dismissAction}
-        actionDrafts={actionDrafts}
-        setActionDraft={setActionDraft}
-        dinoGameActive={dinoGameActive}
-        onDinoGameExit={closeDinoGame}
-        // Both held in one identity above, with the reasons written there — the thread's memo
-        // compares them.
-        lastMessageFooter={lastMessageFooter}
-        // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
-        // team-mode conversation is not one — the offer must not even render there.
-        renderQuestionAction={renderQuestionAction}
-        openError={openError}
-        onRetryOpen={retryOpenAction}
-        // `hasUserMessage`, not `canStartConversation`: the button withdraws mid-turn, the room
-        // it withdraws from must not. Below `md` the two clearances differ by 24px, and for a
-        // hire with no PM replies this is the only term that is ever true — so tying the space
-        // to the button shunted the whole transcript down and back on every single turn.
-        // Visible while the transcript is shorter than the viewport, which is exactly the
-        // first few turns this control exists for.
-        // When the mode row renders it is the element the floating controls overlap, and it
-        // already carries their clearance (see the shell above) — the transcript below must
-        // not reserve a second gap for the same controls.
-        hasFloatingControl={
-          !canSwitchModes &&
-          ((isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage)
+                {replies.hasAny && (
+                  <div className="min-h-0 flex-1">
+                    <BuddyPmReplies {...replies} />
+                  </div>
+                )}
+              </div>
+            </ConversationRail>
+          ) : undefined
         }
-        // Built above, in one identity — the conversation is memoised, and the chips' own reasons
-        // are written where they are built.
-        aboveComposer={aboveComposer}
-        focusComposerOnMount
-      />
-    </BuddyPageShell>
+        newConversationControl={
+          canStartConversation ? (
+            <BuddyNewConversationButton
+              onClick={startConversation}
+              shortcut={NEW_CONVERSATION_CHORD}
+            />
+          ) : undefined
+        }
+        modeControl={
+          canSwitchModes ? (
+            <BuddyModeSwitcher
+              teamProjectId={teamProjectId}
+              onSwitch={(projectId) => void switchTeamProject(projectId)}
+              disabled={isBusy || isOpening || isGreeting || isDeciding}
+              className="max-w-xs"
+            />
+          ) : undefined
+        }
+        railToggle={
+          // Only offered when there is something behind it: a control that opens an empty panel
+          // is worse than no control. Hire-flow only, for the same reason the rail itself is.
+          // The badge counts PM replies — an answer from a person is why a hire presses this; a
+          // second conversation with nothing in it is not news.
+          isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open ? (
+            <RailToggle
+              label={RAIL_LABEL}
+              controls={RAIL_ID}
+              icon={<MessagesSquare className="h-4 w-4" aria-hidden="true" />}
+              count={
+                replies.hasAny
+                  ? replies.answered.length + replies.waiting.length + replies.dismissed.length
+                  : undefined
+              }
+              onClick={() => setRailOpen(true)}
+            />
+          ) : undefined
+        }
+      >
+        <BuddyConversation
+          messages={greeting.messages}
+          isThinking={isThinking || isOpening || greeting.isThinking}
+          isStreaming={isStreaming}
+          activeTool={activeTool}
+          confirmAction={confirmAction}
+          dismissAction={dismissAction}
+          actionDrafts={actionDrafts}
+          setActionDraft={setActionDraft}
+          dinoGameActive={dinoGameActive}
+          onDinoGameExit={closeDinoGame}
+          // Both held in one identity above, with the reasons written there — the thread's memo
+          // compares them.
+          lastMessageFooter={lastMessageFooter}
+          // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+          // team-mode conversation is not one — the offer must not even render there.
+          renderQuestionAction={renderQuestionAction}
+          openError={openError}
+          onRetryOpen={retryOpenAction}
+          // Citation interaction for this surface: a `[N]` click opens the popover, and the
+          // footer's "Open source" hands the artifact to the drawer — both mounted below.
+          // No project to open a drawer in: pass no artifact opener, so the popover (and the
+          // footer's chips) fall back to the external source link instead of dead-ending.
+          onCitationClick={citationViewer.handleCitationClick}
+          onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
+          // `hasUserMessage`, not `canStartConversation`: the button withdraws mid-turn, the room
+          // it withdraws from must not. Below `md` the two clearances differ by 24px, and for a
+          // hire with no PM replies this is the only term that is ever true — so tying the space
+          // to the button shunted the whole transcript down and back on every single turn.
+          // Visible while the transcript is shorter than the viewport, which is exactly the
+          // first few turns this control exists for.
+          // When the mode row renders it is the element the floating controls overlap, and it
+          // already carries their clearance (see the shell above) — the transcript below must
+          // not reserve a second gap for the same controls.
+          hasFloatingControl={
+            !canSwitchModes &&
+            ((isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open) ||
+              hasUserMessage)
+          }
+          // Built above, in one identity — the conversation is memoised, and the chips' own reasons
+          // are written where they are built.
+          aboveComposer={aboveComposer}
+          focusComposerOnMount
+        />
+      </BuddyPageShell>
+
+      {/* The citation popover and the artifact drawer, once a reply's sources are clicked:
+          the popover near the `[N]`, the drawer for the source itself. Rendered by the surface
+                    (not the thread) so the fixed overlays are not clipped by the scroll container, and
+                    gated on the conversation's project the same way the chat gates its own — the drawer
+                    fetches the artifact content by id within one. */}
+      {citationViewer.selectedCitation && (
+        <CitationPopover
+          selected={citationViewer.selectedCitation}
+          onClose={citationViewer.closeCitation}
+          onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
+        />
+      )}
+
+      {citationViewer.citationArtifact && citationProjectId && (
+        <ArtifactViewerDrawer
+          artifact={citationViewer.citationArtifact}
+          onClose={citationViewer.closeArtifact}
+          projectId={citationProjectId}
+          highlightLines={citationViewer.highlightLines}
+          canDelete={false}
+          onDelete={() => {}}
+        />
+      )}
+    </>
   );
 }
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { MessageCitations } from "../../../../../src/features/chatbot/components/MessageCitations";
-import type { Citation } from "../../../../../src/features/chatbot/types";
+import { MessageCitations } from "../../../../../src/features/buddy/citations/MessageCitations";
+import type { Citation } from "../../../../../src/features/buddy/citations/types";
 
 // Two chunks from the same file so the grouping logic produces one chip
 // with locations "Line 1" / "Line 5" — the "Open source / Line 1" popover.
@@ -59,5 +59,30 @@ describe("MessageCitations", () => {
     fireEvent.click(screen.getByRole("link", { name: /Open source/ }));
 
     expect(screen.queryByRole("link", { name: /Open source/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps two different files that share a filename apart", () => {
+    const onOpenArtifact = vi.fn();
+    render(
+      <MessageCitations
+        citations={[
+          { artifactId: "a1", filename: "README.md", startLine: 1 },
+          { artifactId: "a2", filename: "README.md", startLine: 9 },
+        ]}
+        onOpenArtifact={onOpenArtifact}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Sources/ }));
+
+    // Two chips, not one collapsed group: they are different artifacts.
+    const chips = screen.getAllByRole("button", { name: /README\.md/ });
+    expect(chips).toHaveLength(2);
+
+    fireEvent.click(chips[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Open source/ }));
+    expect(onOpenArtifact).toHaveBeenCalledWith(
+      expect.objectContaining({ artifactId: "a1", filename: "README.md" }),
+    );
   });
 });

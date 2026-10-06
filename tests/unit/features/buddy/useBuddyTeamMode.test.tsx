@@ -214,6 +214,24 @@ describe("useBuddyConversation — team mode", () => {
     expect(result.current.teamProjectId).toBeNull();
   });
 
+  it("refuses to bin a conversation in team mode", async () => {
+    localStorage.setItem("buddyTeamMode:user-1", "true");
+    const { result } = renderHook(
+      ({ selection }: { selection: ProjectSelectionSlice }) =>
+        useBuddyConversation(selection, vi.fn()),
+      { initialProps: { selection: sel("p1", true) }, wrapper: authWrapper },
+    );
+    await waitFor(() => expect(result.current.teamProjectId).toBe("p1"));
+
+    let rejection: unknown;
+    await act(async () => {
+      rejection = await result.current.binSession("s1").catch((e: unknown) => e);
+    });
+
+    expect(rejection).toBeInstanceOf(Error);
+    expect(String(rejection)).toMatch(/team mode/);
+  });
+
   it("exits audibly when the selection moves to another project while the buddy is mid-conversation", async () => {
     // Team mode is live from restore: the preference was left on in a previous session, and
     // the loaded list vouches for this selection.

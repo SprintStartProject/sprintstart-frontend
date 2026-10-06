@@ -8,6 +8,8 @@ import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
 import { useBuddyDraftActions } from "../buddyDraftContext";
 import type { BuddyMessageView } from "../types";
+import type { SelectedCitation } from "../citations/types";
+import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyQuestionActions } from "./BuddyQuestionActions";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
@@ -81,6 +83,14 @@ type BuddyDockProps = Pick<
   /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
   dinoGameActive?: boolean;
   /**
+   * Called when the hire clicks a `[N]` citation reference in a reply.
+   *
+   * Held in one identity by the widget, like the callbacks above — the thread's memo compares it.
+   */
+  onCitationClick?: (citation: SelectedCitation) => void;
+  /** Opens the artifact drawer from a reply's citations footer — see `BuddyThread`. */
+  onOpenArtifact?: (data: CitationArtifactOpen) => void;
+  /**
    * Called when the player leaves the dino waiting-game. Named `onDinoGameExit` to match
    * BuddyThread, which is what the dock forwards it to — one name across the dock → thread
    * boundary so callers pass it once and forget.
@@ -142,6 +152,8 @@ function BuddyDockImpl({
   suggestions,
   dinoGameActive = false,
   onDinoGameExit,
+  onCitationClick,
+  onOpenArtifact,
   newConversation,
   isOpening,
   isGreeting,
@@ -373,6 +385,8 @@ function BuddyDockImpl({
             onRetryOpen={onRetryOpen}
             dinoGameActive={dinoGameActive}
             onDinoGameExit={onDinoGameExit}
+            onCitationClick={onCitationClick}
+            onOpenArtifact={onOpenArtifact}
           />
         </div>
 

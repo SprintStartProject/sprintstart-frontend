@@ -61,6 +61,23 @@ export async function createSession(): Promise<string> {
 }
 
 /**
+ * Bins one of the hire's conversations.
+ *
+ * The conversation leaves the hire's list — the backend keeps it, messages and all, until its
+ * retention window ends and then deletes it for good. The list read no longer returns it, so
+ * taking the row out client-side is the same thing the next read would show.
+ *
+ * @param sessionId - The conversation to bin. One of the hire's own; the backend answers `404`
+ *   for anyone else's.
+ */
+export async function binSession(sessionId: string): Promise<void> {
+  await apiClient.fetch<void>(
+    `/api/v1/onboarding/me/buddy/sessions/${encodeURIComponent(sessionId)}`,
+    { method: "DELETE" },
+  );
+}
+
+/**
  * Retrieves one conversation's messages, oldest first (the window since its last opening —
  * not the whole transcript).
  *

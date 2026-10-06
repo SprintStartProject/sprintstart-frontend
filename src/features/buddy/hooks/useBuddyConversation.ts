@@ -4,6 +4,7 @@ import {
   getMessages,
   getSessions,
   createSession,
+  binSession as binSessionApi,
   streamOpenBuddy,
   performAction,
   confirmStoredProposal,
@@ -58,6 +59,9 @@ const REPLY_FAILED = "Your buddy could not finish that reply. Ask again in a mom
 const GREETING_FAILED = "Your buddy could not be reached just now.";
 const HISTORY_FAILED = "Your conversation could not be loaded.";
 const CONVERSATION_FAILED = "Your buddy could not start a new conversation. Ask again in a moment.";
+/** The bin landed, but the move off the binned conversation did not — the list must not claim a clean success. */
+const BIN_MOVE_FAILED =
+  'Binned, but the next conversation couldn\'t open — use "Try again" to retry.';
 /** The one sentence for a proposal that no longer exists for this caller (HTTP 404). */
 const PROPOSAL_GONE = "This proposal is no longer available.";
 
@@ -216,6 +220,15 @@ export function useBuddyConversation(
    */
   const [sessions, setSessions] = useState<BuddySessionSummary[]>([]);
   const sessionsRef = useRef<BuddySessionSummary[]>([]);
+  /**
+   * The conversations this app session has binned, by id.
+   *
+   * A list read that started before a bin still carries the binned row — the read is a moment,
+   * and `refreshSessions` merges what it returns — so the ids are remembered and filtered out
+   * of every later read. The backend never returns a binned conversation again, so the set only
+   * ever grows within one app session, and never needs clearing.
+   */
+  const binnedSessionIdsRef = useRef<Set<string>>(new Set());
   /** Which conversation is on screen. `null` only before the first open has resolved one. */
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const currentSessionIdRef = useRef<string | null>(null);
@@ -507,7 +520,9 @@ export function useBuddyConversation(
     setMessages((prev) => [
       ...history.map((message) => ({
         ...message,
-        id: crypto.randomUUID(),
+        // The backend ids persisted messages; a turn this client streamed has none and gets a
+        // local one. The fallback keeps a backend without the field working too.
+        id: message.id ?? crypto.randomUUID(),
         // The one-message window: a greeting nobody answered, replayed as it was.
         isGreeting: history.length === 1 && message.role === "ASSISTANT",
       })),
@@ -571,13 +586,16 @@ export function useBuddyConversation(
    */
   const refreshSessions = useCallback(async () => {
     try {
-      const fetched = await getSessions();
+      const read = await getSessions();
 
-      // The read is a moment, and a conversation created while it was in flight is newer
-      // than that moment: it stays, in front, rather than being replaced away. Without the
-      // merge, a slow refresh landing after a create dropped the new row from the rail until
-      // a reload — and the reuse pick then read a list that no longer held it. (Nothing
-      // deletes a conversation server-side yet; when one can, this needs the tombstone too.)
+      // A conversation binned while this read was in flight is still in it — the read is a
+      // moment — so the tombstone wins over the row (see `binnedSessionIdsRef`).
+      const fetched = read.filter((session) => !binnedSessionIdsRef.current.has(session.id));
+
+      // ...and a conversation created while it was in flight is newer than that moment: it
+      // stays, in front, rather than being replaced away. Without the merge, a slow refresh
+      // landing after a create dropped the new row from the rail until a reload — and the
+      // reuse pick then read a list that no longer held it.
       const fetchedIds = new Set(fetched.map((session) => session.id));
       const createdMeanwhile = sessionsRef.current.filter((session) => !fetchedIds.has(session.id));
 
@@ -878,6 +896,72 @@ export function useBuddyConversation(
     applyCurrentSession,
     selectSession,
   ]);
+
+  /**
+   * Bins one of the hire's conversations and takes it out of the list.
+   *
+   * Binned, not deleted: the backend keeps the conversation — messages included — until its
+   * retention window ends, and simply stops returning it. So the local removal is the same
+   * thing the next read would show, and the id is tombstoned so a read already in flight
+   * cannot put the row back (see `binnedSessionIdsRef`).
+   *
+   * When the conversation binned was the one on screen, the next newest takes its place — or,
+   * with none left, a fresh conversation starts, so the hire is never left on a thread they
+   * just binned. `selectSession`/`newConversation` own that move and its clears; both are
+   * called with nothing in flight, so neither refuses.
+   *
+   * Refused while anything is in flight — the rail's own controls are disabled for the same
+   * window, so this is the guard behind them — and unlike the other moves that clear the
+   * thread, the refusal throws: the list tells the user the bin worked, so returning silently
+   * would toast "Conversation binned" over a conversation that never left.
+   *
+   * A `404` is settled, not failed: the conversation was binned in another tab, or purged after
+   * its retention window — the local removal below is what the next read would show anyway. And
+   * the throw is not only for refusals: if the move off a binned conversation fails, this throws
+   * too, so the success toast cannot sit over a screen still showing the thread that was binned.
+   */
+  const binSession = useCallback(
+    async (sessionId: string) => {
+      if (teamProjectIdRef.current !== null)
+        throw new Error("Conversations can't be binned while you're in team mode.");
+      if (
+        greetingRef.current ||
+        isOpening ||
+        isDeciding ||
+        isThinking ||
+        isStreaming ||
+        pendingDecisionsRef.current > 0
+      )
+        throw new Error("Your buddy is still working — try again once the reply finishes.");
+
+      try {
+        await binSessionApi(sessionId);
+      } catch (e) {
+        // See the doc above: "gone already" is settled, and settled for this call only.
+        // Anything else is a real failure and belongs to the caller.
+        if (!isNotFound(e)) throw e;
+      }
+      binnedSessionIdsRef.current.add(sessionId);
+
+      const remaining = sessionsRef.current.filter((session) => session.id !== sessionId);
+      applySessions(remaining);
+
+      if (currentSessionIdRef.current !== sessionId) return;
+
+      const next = remaining[0];
+      if (next) {
+        await selectSession(next.id);
+      } else {
+        await newConversation();
+      }
+
+      // The move can fail and still resolve (see `newConversation`'s catch, which surfaces the
+      // failure through `openError`): if the hire is still on the conversation they just binned,
+      // the caller must hear it — its success toast would otherwise lie about the screen.
+      if (currentSessionIdRef.current === sessionId) throw new Error(BIN_MOVE_FAILED);
+    },
+    [applySessions, isOpening, isDeciding, isThinking, isStreaming, selectSession, newConversation],
+  );
 
   /**
    * Tries again after [ensureOpened] failed.
@@ -1516,12 +1600,13 @@ export function useBuddyConversation(
     retryOpen,
 
     // The conversations on this surface: what the hire has, which one is on screen, and the
-    // two moves across them. A new conversation starts empty — the composer is the hire's
-    // from there (see `newConversation`).
+    // moves across them — a new one, a switch, and a bin. A new conversation starts empty —
+    // the composer is the hire's from there (see `newConversation`).
     sessions,
     currentSessionId,
     newConversation,
     selectSession,
+    binSession,
 
     presentedGreetingId,
     markGreetingPresented: setPresentedGreetingId,

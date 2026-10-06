@@ -3,9 +3,8 @@ import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markd
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { linkifyCitations } from "../markdown/linkifyCitations";
-import type { Citation } from "../types";
-import type { SelectedCitation } from "../../../context/ChatContext";
+import { linkifyCitations } from "../../buddy/citations/linkifyCitations";
+import type { Citation, SelectedCitation } from "../../buddy/citations/types";
 
 // Hoisted to module scope so the plugin arrays have a stable identity across
 // renders — ReactMarkdown would otherwise see a new array each render and

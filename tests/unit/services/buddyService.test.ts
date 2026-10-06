@@ -3,6 +3,7 @@ import {
   getMessages,
   getSessions,
   createSession,
+  binSession,
   performAction,
   streamMessage,
   streamOpenBuddy,
@@ -35,6 +36,36 @@ describe("buddyService", () => {
       expect(result).toHaveLength(2);
       expect(result[0].role).toBe("USER");
       expect(result[1].content).toBe("hello!");
+    });
+  });
+
+  describe("binSession", () => {
+    it("bins the conversation with a DELETE on its own URL", async () => {
+      let seenMethod: string | null = null;
+      let seenPath: string | null = null;
+      server.use(
+        http.delete("/api/v1/onboarding/me/buddy/sessions/:sessionId", ({ request, params }) => {
+          seenMethod = request.method;
+          seenPath = new URL(request.url).pathname;
+          expect(params.sessionId).toBe("session-9");
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+
+      await binSession("session-9");
+
+      expect(seenMethod).toBe("DELETE");
+      expect(seenPath).toBe("/api/v1/onboarding/me/buddy/sessions/session-9");
+    });
+
+    it("lets a refusal reach the caller", async () => {
+      server.use(
+        http.delete("/api/v1/onboarding/me/buddy/sessions/:sessionId", () =>
+          HttpResponse.json({ message: "Session not found for current user" }, { status: 404 }),
+        ),
+      );
+
+      await expect(binSession("session-9")).rejects.toThrow();
     });
   });
 

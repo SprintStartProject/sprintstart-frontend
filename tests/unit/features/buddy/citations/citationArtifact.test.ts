@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { deriveArtifactFromCitation } from "../../../../src/features/chatbot/citationArtifact";
+import {
+  citationDrawerProjectId,
+  deriveArtifactFromCitation,
+} from "../../../../../src/features/buddy/citations/citationArtifact";
 
 describe("deriveArtifactFromCitation", () => {
   const open = (filename: string, sourceUrl?: string) =>
@@ -54,5 +57,23 @@ describe("deriveArtifactFromCitation", () => {
     expect(open("main.ts", "https://github.com/acme/api/blob/main/main.ts").mime).toBe(
       "text/plain",
     );
+  });
+});
+
+describe("citationDrawerProjectId", () => {
+  it("prefers the conversation's own project over the global selection", () => {
+    expect(citationDrawerProjectId("conversation-project", "team-project", "selected")).toBe(
+      "conversation-project",
+    );
+  });
+
+  it("falls back to the managed team project, then the global selection", () => {
+    expect(citationDrawerProjectId(null, "team-project", "selected")).toBe("team-project");
+    expect(citationDrawerProjectId(null, null, "selected")).toBe("selected");
+  });
+
+  it("is null when no project exists anywhere — there is no drawer to open", () => {
+    expect(citationDrawerProjectId(null, null, "")).toBeNull();
+    expect(citationDrawerProjectId(undefined, undefined, "")).toBeNull();
   });
 });
