@@ -74,7 +74,7 @@ describe("buddy message options", () => {
     count: number,
     text: string,
   ) {
-    await act(async () => {
+    act(() => {
       result.current.submitMessage(text);
     });
     await waitFor(() => expect(bodies).toHaveLength(count));
