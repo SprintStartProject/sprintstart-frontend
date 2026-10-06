@@ -44,6 +44,16 @@ type BuddyDockProps = Pick<
   | "messages"
   | "isThinking"
   | "isStreaming"
+  | "stopStreaming"
+  | "queued"
+  | "queuePaused"
+  | "removeQueued"
+  | "pullQueuedMessage"
+  | "resumeQueue"
+  | "filters"
+  | "setFilters"
+  | "capabilitiesEnabled"
+  | "setCapabilitiesEnabled"
   | "activeTool"
   | "confirmAction"
   | "dismissAction"
@@ -144,6 +154,16 @@ function BuddyDockImpl({
   messages,
   isThinking,
   isStreaming,
+  stopStreaming,
+  queued,
+  queuePaused,
+  removeQueued,
+  pullQueuedMessage,
+  resumeQueue,
+  filters,
+  setFilters,
+  capabilitiesEnabled,
+  setCapabilitiesEnabled,
   activeTool,
   confirmAction,
   dismissAction,
@@ -428,7 +448,25 @@ function BuddyDockImpl({
                         `focusOnMount` rather than a bare `focus()`. A focused textarea with a value
                         in it starts the caret at position 0, so "Ask your buddy about this" used to
                         hand over a question the hire then typed in front of. */}
-          <BuddyComposer compact focusOnMount busy={isBusy} gameActive={dinoGameActive} />
+          <BuddyComposer
+            compact
+            focusOnMount
+            busy={isBusy}
+            gameActive={dinoGameActive}
+            streaming={isStreaming}
+            onStop={stopStreaming}
+            queue={{
+              items: queued,
+              paused: queuePaused,
+              onRemove: removeQueued,
+              onPull: pullQueuedMessage,
+              onSendQueued: resumeQueue,
+            }}
+            filters={filters}
+            onFiltersChange={setFilters}
+            capabilitiesEnabled={capabilitiesEnabled}
+            onCapabilitiesChange={setCapabilitiesEnabled}
+          />
         </div>
       </motion.div>
     </motion.div>

@@ -1,4 +1,5 @@
 import type { Citation } from "./citations/types";
+import type { SourceSystem } from "../data-ingestion/connectors/sourceSystems";
 
 /**
  * An action the buddy has *proposed* — the hire must confirm it before anything changes. Carried on
@@ -328,6 +329,12 @@ export type BuddyMessage = {
 export type BuddyMessageView = BuddyMessage & {
   id: string;
   citations?: Citation[];
+  /**
+   * The mentor's visible thought process for this turn, as the backend streamed it — one string,
+   * grown in place. Absent for turns that ran none (and for messages read back from before the
+   * reasoning phase existed).
+   */
+  reasoning?: string;
   /** Actions the buddy proposed in this turn, each awaiting the hire's confirmation. */
   actions?: ProposedAction[];
   /**
@@ -351,14 +358,41 @@ export type BuddyMessageView = BuddyMessage & {
 };
 
 /**
+ * What narrows a message's retrieval: which source systems it may draw on, and the indexed-date
+ * window. Held in the session (one set, both surfaces) and sent per message.
+ *
+ * The composer's own shape (camelCase); `streamMessage` maps it onto the wire vocabulary the
+ * backend's `BuddySessionFilters` actually names.
+ */
+export type BuddySessionFilters = {
+  sourceSystems: SourceSystem[];
+  /** ISO dates (`YYYY-MM-DD`) or empty; both empty means "all time". */
+  from: string;
+  to: string;
+};
+
+/**
+ * One message the hire submitted while the buddy was still answering, waiting its turn.
+ *
+ * `id` so the strip can edit or drop a specific row; the text as submitted, because a message
+ * that has not been sent yet has to be visible somewhere the hire can still change their mind.
+ */
+export type QueuedBuddyMessage = {
+  id: string;
+  text: string;
+};
+
+/**
  * The stream callbacks a buddy visit needs.
  *
  * Deliberately its own type rather than a widening of the chat's `StreamHandlers`: the buddy's
- * stream has no reasoning phase and proposes actions, which chat never does. Loosening the shared
- * type to fit both would make handlers optional for chat, where they are required.
+ * stream proposes actions the chat never does, and the two age apart. Loosening the shared type
+ * to fit both would make handlers optional for chat, where they are required.
  */
 export type BuddyStreamHandlers = {
   onToken: (token: string) => void;
+  /** Optional: one event per thought the model reported, before the answer's words. */
+  onReasoning?: (reasoning: string) => void;
   onCitation: (citation: Citation) => void;
   onDone: () => void;
   /** Optional: a caller with no error surface of its own lets the failure pass silently. */

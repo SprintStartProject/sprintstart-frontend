@@ -192,8 +192,18 @@ export async function streamOpenBuddy(
  * and wire field names as the chat module's AiStreamMessage.
  */
 interface BuddyStreamChunk {
-  type: "tool_use" | "token" | "citation" | "action_proposal" | "opening_action" | "done" | "error";
+  type:
+    | "tool_use"
+    | "token"
+    | "citation"
+    | "action_proposal"
+    | "opening_action"
+    | "reasoning"
+    | "done"
+    | "error";
   content?: string;
+  /** Set on a `reasoning` chunk: one thought the model reported, before the answer's words. */
+  reasoning?: string;
   message?: string;
   name?: string;
   artifact_id?: string;
@@ -410,6 +420,7 @@ async function readBuddyStream(
   body: unknown,
   onChunk: (chunk: BuddyStreamChunk) => "stop" | void,
   onError?: (message: string) => void,
+  signal?: AbortSignal,
 ): Promise<BuddyStreamOutcome> {
   // Ensure the token is up to date (refresh if it expires in < 30s)
   try {
@@ -431,11 +442,15 @@ async function readBuddyStream(
         Authorization: `Bearer ${keycloak.token}`,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
     });
-  } catch {
-    // Reported rather than thrown, so "we never reached the server" arrives at the caller's
-    // error surface as a sentence instead of as a rejection it has to translate. The only thing
-    // the hire needs from this is whether trying again is worth it.
+  } catch (error) {
+    // An abort is the hire's Stop, not a failure: it is reported to nobody, and the caller
+    // reads it from the signal it passed in. Everything else is reported rather than thrown,
+    // so "we never reached the server" arrives at the caller's error surface as a sentence
+    // instead of as a rejection it has to translate. The only thing the hire needs from this
+    // is whether trying again is worth it.
+    if (isAbortError(error)) return "aborted";
     onError?.("Could not reach the server.");
     return "aborted";
   }
@@ -491,6 +506,8 @@ async function readBuddyStream(
       }
     }
   } catch (error) {
+    // An abort mid-read is the hire's Stop — the same silent path as above.
+    if (isAbortError(error)) return "aborted";
     // A connection dropped mid-stream. Without this it rejected out of the function, past every
     // `onError` the caller wired up, and whatever had streamed so far simply stopped.
     console.error("Buddy stream failed mid-response", error);
@@ -500,6 +517,39 @@ async function readBuddyStream(
 
   return "ended";
 }
+
+/**
+ * A stop the hire asked for, told apart from a failure.
+ *
+ * Both `fetch` and the reader reject with this on abort — `name` rather than `instanceof`,
+ * because a DOMException is not an `Error` subclass in every engine that runs this.
+ */
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
+/**
+ * Per-message switches that ride along with the content — see `streamMessage`.
+ */
+export type BuddyMessageOptions = {
+  /**
+   * Whether the mentor may act on this message (tools, action proposals, board writes). Sent
+   * per message rather than held on the session: it is a mood, not a setting — a hire who turned
+   * it off to look something up and then asks the mentor to *do* something should not have to
+   * remember which state they left the switch in.
+   */
+  capabilitiesEnabled?: boolean;
+  /**
+   * Narrows what this message may draw on. Field names as the backend serializes them
+   * (`BuddySessionFilters`' `@SerialName`s) — this module is the one place that speaks the wire
+   * vocabulary; callers hand over the composer's camelCase shape, already mapped.
+   */
+  filters?: { source_systems?: string[]; time_from?: string; time_to?: string };
+};
 
 /**
  * Sends a message to the user's persistent buddy and streams the grounded reply.
@@ -512,6 +562,10 @@ async function readBuddyStream(
  *   team target on the POST body and leaves the hire's own conversation to `sessionId`.
  * @param currentPage The app path the sender is on (`/team-management`), so the buddy's app
  *   guide can answer "where is this here?". Omitted when unknown, like `teamProjectId`.
+ * @param signal Stops the turn — the composer's Stop button. An abort resolves the read
+ *   silently (no `onError`, no `onDone`), so the caller reads `signal.aborted` to close the
+ *   turn out as cut short rather than failed.
+ * @param options Per-message switches (capabilities, filters); see `BuddyMessageOptions`.
  */
 export async function streamMessage(
   content: string,
@@ -519,6 +573,8 @@ export async function streamMessage(
   sessionId: string | undefined,
   teamProjectId?: string,
   currentPage?: string,
+  signal?: AbortSignal,
+  options?: BuddyMessageOptions,
 ): Promise<void> {
   const outcome = await readBuddyStream(
     `/api/v1/onboarding/me/buddy/messages`,
@@ -528,6 +584,10 @@ export async function streamMessage(
       content,
       ...(teamProjectId ? { teamProjectId } : { sessionId }),
       ...(currentPage ? { currentPage } : {}),
+      ...(options?.capabilitiesEnabled === undefined
+        ? {}
+        : { capabilitiesEnabled: options.capabilitiesEnabled }),
+      ...(options?.filters ? { filters: options.filters } : {}),
     },
     (event) => {
       switch (event.type) {
@@ -540,6 +600,12 @@ export async function streamMessage(
         case "token":
           if (event.content !== undefined) {
             handlers.onToken(event.content);
+          }
+          break;
+
+        case "reasoning":
+          if (event.reasoning !== undefined) {
+            handlers.onReasoning?.(event.reasoning);
           }
           break;
 
@@ -619,6 +685,7 @@ export async function streamMessage(
       }
     },
     handlers.onError,
+    signal,
   );
 
   // Fallback: ensure onDone is called when the stream ends without a terminal event.

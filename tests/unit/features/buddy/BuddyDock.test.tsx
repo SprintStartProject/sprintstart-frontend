@@ -57,6 +57,16 @@ function renderDock(
           messages={messages}
           isThinking={isThinking}
           isStreaming={isStreaming}
+          stopStreaming={vi.fn()}
+          queued={[]}
+          queuePaused={false}
+          removeQueued={vi.fn()}
+          pullQueuedMessage={vi.fn(() => null)}
+          resumeQueue={vi.fn()}
+          filters={{ sourceSystems: [], from: "", to: "" }}
+          setFilters={vi.fn()}
+          capabilitiesEnabled
+          setCapabilitiesEnabled={vi.fn()}
           activeTool={null}
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}

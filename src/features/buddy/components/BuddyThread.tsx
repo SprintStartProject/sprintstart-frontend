@@ -9,6 +9,7 @@ import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { toolLabel } from "../toolLabel";
 import { BuddyActionProposals } from "./BuddyActionProposals";
 import { BuddyMarkdown } from "./BuddyMarkdown";
+import { BuddyReasoningPanel } from "./BuddyReasoningPanel";
 import { MessageCitations } from "../citations/MessageCitations";
 import { BuddyMessage, BuddyTypingMessage } from "./BuddyMessage";
 
@@ -156,6 +157,7 @@ function BuddyThreadRowImpl({
 }: BuddyThreadRowProps) {
   const isUser = message.role === "USER";
   const hasText = message.content.trim().length > 0;
+  const hasReasoning = (message.reasoning ?? "").length > 0;
   const hasActions = (message.actions?.length ?? 0) > 0;
   const citations = message.citations ?? EMPTY_CITATIONS;
 
@@ -163,8 +165,9 @@ function BuddyThreadRowImpl({
   // nothing to show, and the typing bubble below already stands in for it — so skip it,
   // otherwise an empty second bubble appears while the buddy is working. A turn that
   // failed before writing a word is the exception: its reason *is* the message, and
-  // dropping it here is what made a failed reply look like no reply.
-  if (!isUser && !hasText && !hasActions && !message.error) return null;
+  // dropping it here is what made a failed reply look like no reply. Same for a turn whose
+  // only arrival so far is reasoning — its panel is worth showing on its own.
+  if (!isUser && !hasText && !hasActions && !message.error && !hasReasoning) return null;
 
   return (
     <BuddyMessage
@@ -194,17 +197,28 @@ function BuddyThreadRowImpl({
         </>
       }
     >
-      {hasText ? (
+      {hasText || hasReasoning ? (
         isUser ? (
           message.content
         ) : (
           <>
-            <BuddyMarkdown
-              content={message.content}
-              citations={citations}
-              onCitationClick={onCitationClick}
-            />
-            {citations.length > 0 && (
+            {hasReasoning && (
+              <BuddyReasoningPanel
+                reasoning={message.reasoning ?? ""}
+                isStreaming={isStreaming}
+                // How much answer text has arrived, in characters — the panel folds itself once
+                // an answer starts and re-opens when thinking resumes (see the panel's rules).
+                answerLength={message.content.length}
+              />
+            )}
+            {hasText && (
+              <BuddyMarkdown
+                content={message.content}
+                citations={citations}
+                onCitationClick={onCitationClick}
+              />
+            )}
+            {hasText && citations.length > 0 && (
               <MessageCitations citations={citations} onOpenArtifact={onOpenArtifact} />
             )}
           </>
@@ -340,8 +354,9 @@ function BuddyThreadImpl({
           showName={showNames}
           gameActive={dinoGameActive}
           replyReady={dinoGameActive && !isThinking && !isStreaming}
-          // A failed reply carries its error on the last turn; announcing it as
-          // "Reply ready" would be a lie. The buddy has no Stop, so only two outcomes.
+          // A failed reply carries its error on the last turn; announcing it as "Reply ready"
+          // would be a lie. A stopped turn never reaches here — Stop clears the thinking state,
+          // so this row is gone before an outcome is due.
           turnOutcome={messages[messages.length - 1]?.error ? "failed" : "done"}
           onGameExit={onDinoGameExit}
         />

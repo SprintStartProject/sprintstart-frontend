@@ -25,7 +25,7 @@ import { useBuddySession } from "./buddySessionContext";
  * for a keystroke — see that type for why the distinction is load-bearing.
  */
 export function BuddyDraftProvider({ children }: { children: ReactNode }) {
-  const { sendMessage, draftResetToken } = useBuddySession();
+  const { submitMessage, draftResetToken } = useBuddySession();
   const [draft, setDraft] = useState("");
 
   /**
@@ -47,9 +47,9 @@ export function BuddyDraftProvider({ children }: { children: ReactNode }) {
 
   /**
    * The one way a message leaves the box. The contract is unchanged from when this lived in the
-   * session: an egg phrase plays its effect and is swallowed, anything else is cleared and sent,
-   * and the return value says whether a turn actually started (the composer keeps the caret when
-   * one did not).
+   * session: an egg phrase plays its effect and is swallowed, anything else is cleared and handed
+   * to the session — which sends it, or queues it behind a running answer — and the return value
+   * says whether a turn actually started (the composer keeps the caret when one did not).
    */
   const handleSubmit = useCallback(
     (event: FormEvent) => {
@@ -69,10 +69,10 @@ export function BuddyDraftProvider({ children }: { children: ReactNode }) {
       if (!text.trim()) return false;
 
       setDraft("");
-      void sendMessage(text);
+      void submitMessage(text);
       return true;
     },
-    [draft, sendMessage],
+    [draft, submitMessage],
   );
 
   const value = useMemo<BuddyDraft>(

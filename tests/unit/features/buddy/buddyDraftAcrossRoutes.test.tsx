@@ -156,6 +156,16 @@ describe("the dock’s hand-off control", () => {
           messages={[]}
           isThinking={false}
           isStreaming={false}
+          stopStreaming={vi.fn()}
+          queued={[]}
+          queuePaused={false}
+          removeQueued={vi.fn()}
+          pullQueuedMessage={vi.fn(() => null)}
+          resumeQueue={vi.fn()}
+          filters={{ sourceSystems: [], from: "", to: "" }}
+          setFilters={vi.fn()}
+          capabilitiesEnabled
+          setCapabilitiesEnabled={vi.fn()}
           activeTool={null}
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}
@@ -186,6 +196,16 @@ describe("the dock’s hand-off control", () => {
           messages={[]}
           isThinking={false}
           isStreaming={false}
+          stopStreaming={vi.fn()}
+          queued={[]}
+          queuePaused={false}
+          removeQueued={vi.fn()}
+          pullQueuedMessage={vi.fn(() => null)}
+          resumeQueue={vi.fn()}
+          filters={{ sourceSystems: [], from: "", to: "" }}
+          setFilters={vi.fn()}
+          capabilitiesEnabled
+          setCapabilitiesEnabled={vi.fn()}
           activeTool={null}
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}

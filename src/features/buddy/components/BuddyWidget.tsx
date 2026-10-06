@@ -72,6 +72,16 @@ export function BuddyWidget() {
     currentSessionId,
     isThinking,
     isStreaming,
+    stopStreaming,
+    queued,
+    queuePaused,
+    removeQueued,
+    pullQueuedMessage,
+    resumeQueue,
+    filters,
+    setFilters,
+    capabilitiesEnabled,
+    setCapabilitiesEnabled,
     isOpening,
     activeTool,
     openerAction,
@@ -377,6 +387,16 @@ export function BuddyWidget() {
             // compares it.
             lastMessageFooter={lastMessageFooter}
             isStreaming={isStreaming}
+            stopStreaming={stopStreaming}
+            queued={queued}
+            queuePaused={queuePaused}
+            removeQueued={removeQueued}
+            pullQueuedMessage={pullQueuedMessage}
+            resumeQueue={resumeQueue}
+            filters={filters}
+            setFilters={setFilters}
+            capabilitiesEnabled={capabilitiesEnabled}
+            setCapabilitiesEnabled={setCapabilitiesEnabled}
             activeTool={activeTool}
             confirmAction={confirmAction}
             dismissAction={dismissAction}

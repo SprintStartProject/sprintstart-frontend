@@ -1,9 +1,12 @@
 import { useEffect, useRef } from "react";
 import type { KeyboardEvent } from "react";
-import { Send } from "lucide-react";
+import { ListPlus, Send, Square, Wand2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useAutoResize } from "../../../components/ui/useAutoResize";
 import { useBuddyDraft } from "../buddyDraftContext";
+import type { BuddySessionFilters, QueuedBuddyMessage } from "../types";
+import { BuddyFilterChips, BuddyFiltersButton, isFilterRangeInvalid } from "./BuddyComposerFilters";
+import { BuddyQueuedMessages } from "./BuddyQueuedMessages";
 
 type BuddyComposerProps = {
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
@@ -30,11 +33,48 @@ type BuddyComposerProps = {
    */
   busy?: boolean;
   /**
+   * Whether a reply is being written right now. While it is, Send queues the follow-up (see
+   * `queue`) and the Stop button appears beside it when `onStop` is given.
+   */
+  streaming?: boolean;
+  /** Stops the in-flight reply — the composer shows Stop only when it is given. */
+  onStop?: () => void;
+  /**
+   * The queue's data and actions — the composer shows the strip only when given one. While an
+   * answer is being written the Send button queues instead of sending, so this is also what
+   * makes that queue visible.
+   */
+  queue?: BuddyComposerQueue;
+  /**
+   * Retrieval filters for messages sent from here (sources + indexed date). The composer renders
+   * no filter UI without them; the session owns the state so both surfaces share one set.
+   */
+  filters?: BuddySessionFilters;
+  onFiltersChange?: (next: BuddySessionFilters) => void;
+  /** Whether the mentor may act on messages sent from here; paired with the setter below. */
+  capabilitiesEnabled?: boolean;
+  onCapabilitiesChange?: (next: boolean) => void;
+  /**
    * Whether the dino waiting-game is open. The caret is held back while it is: the game
    * ignores keys aimed at text fields, so a refocus mid-run (the reply arriving) would kill
    * the dino, deaden Escape and type Spaces in here. Closing the game hands the caret back.
    */
   gameActive?: boolean;
+};
+
+/**
+ * The queue strip's data and actions, bundled: the composer shows the strip only when given one.
+ */
+export type BuddyComposerQueue = {
+  items: QueuedBuddyMessage[];
+  /** True when Stop held the queue back — the strip offers to release it. */
+  paused: boolean;
+  /** Drops a queued message without sending it. */
+  onRemove: (id: string) => void;
+  /** Takes one back into the box for editing; returns its text (null if it went away first). */
+  onPull: (id: string) => string | null;
+  /** Releases a queue Stop paused, starting with the oldest message. */
+  onSendQueued: () => void;
 };
 
 /**
@@ -60,6 +100,13 @@ export function BuddyComposer({
   compact = false,
   focusOnMount = false,
   busy = false,
+  streaming = false,
+  onStop,
+  queue,
+  filters,
+  onFiltersChange,
+  capabilitiesEnabled = true,
+  onCapabilitiesChange,
   gameActive = false,
 }: BuddyComposerProps) {
   const { draft, setDraft, handleSubmit } = useBuddyDraft();
@@ -119,6 +166,9 @@ export function BuddyComposer({
     field.focus();
   }, [busy, gameActive]);
 
+  /** A start-after-end window. Flagged in the popover and refused on submit — see `submit`. */
+  const filtersInvalid = filters !== undefined && isFilterRangeInvalid(filters.from, filters.to);
+
   /**
    * Sends, then hands the caret back to the page.
    *
@@ -134,6 +184,10 @@ export function BuddyComposer({
    * refocus below hangs off `busy` flipping, and nothing ever became busy).
    */
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    // An inverted date range cannot go out anyway — the backend validates it — so refusing
+    // here turns a round-trip and a validation error into a correction beside the fields that
+    // caused it. Enter and the button both come through this one gate.
+    if (filtersInvalid) return;
     if (!handleSubmit(event)) return;
     const field = fieldRef.current;
     if (field && document.activeElement === field) {
@@ -147,6 +201,9 @@ export function BuddyComposer({
     // Enter also *commits* an IME candidate — a compose-key 'ü', or any CJK input. Sending
     // there would submit a half-written word with no way to get it back.
     if (event.nativeEvent.isComposing) return;
+    // Mid-reply the same Enter queues the message behind the running answer instead of cutting
+    // it off — the composer clears either way, and the strip keeps the message visible until
+    // its turn comes. See `BuddyQueuedMessages`.
     // Same condition as the send button being enabled, so the two cannot disagree about
     // whether there is anything to send.
     if (!draft.trim()) return;
@@ -159,10 +216,54 @@ export function BuddyComposer({
 
   return (
     <div className="min-w-0">
+      {queue && (
+        <BuddyQueuedMessages
+          items={queue.items}
+          paused={queue.paused}
+          onRemove={queue.onRemove}
+          onEdit={(id) => {
+            const text = queue.onPull(id);
+            if (text !== null) setDraft(text);
+          }}
+          onSendQueued={queue.onSendQueued}
+        />
+      )}
+
+      {!compact && filters && onFiltersChange && (
+        <BuddyFilterChips filters={filters} onFiltersChange={onFiltersChange} />
+      )}
+
       <form
         onSubmit={submit}
         className="flex items-end gap-1.5 rounded-xl border border-app-border-muted bg-app-surface-muted p-1.5 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
       >
+        {!compact && filters && onFiltersChange && (
+          <BuddyFiltersButton filters={filters} onFiltersChange={onFiltersChange} />
+        )}
+
+        {onCapabilitiesChange && (
+          <button
+            type="button"
+            aria-pressed={capabilitiesEnabled}
+            aria-label="Mentor tools"
+            title={
+              capabilitiesEnabled
+                ? "Mentor tools on — your buddy can act. Click for answers only."
+                : "Answers only — click to let your buddy act again."
+            }
+            data-testid="buddy-capabilities-toggle"
+            onClick={() => onCapabilitiesChange(!capabilitiesEnabled)}
+            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-medium transition-all ${
+              capabilitiesEnabled
+                ? "border-app-brand-border-strong bg-app-brand/10 text-app-brand-text shadow-xs"
+                : "border-app-border-muted bg-app-surface text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+            }`}
+          >
+            <Wand2 size={14} aria-hidden="true" />
+            <span>Actions</span>
+          </button>
+        )}
+
         <textarea
           ref={fieldRef}
           aria-label="Message"
@@ -177,6 +278,23 @@ export function BuddyComposer({
           className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-base text-app-text outline-hidden placeholder:text-app-text-disabled sm:text-sm pointer-coarse:text-base"
         />
 
+        {/* Stop and Send coexist while an answer is being written: Stop is "no more of this
+            answer", Send is "yes, and then this one" — it queues the follow-up instead of
+            cutting the answer off, which is the whole point of the queue. */}
+        {streaming && onStop && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            iconOnly
+            aria-label="Stop generation"
+            onClick={onStop}
+            className="max-sm:h-11 max-sm:w-11"
+          >
+            <Square className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
+
         <Button
           type="submit"
           variant="primary"
@@ -185,17 +303,23 @@ export function BuddyComposer({
           // one line it usually holds.
           size="sm"
           iconOnly
-          aria-label="Send message"
-          disabled={!draft.trim()}
+          aria-label={streaming ? "Queue message" : "Send message"}
+          title={streaming ? "Queued: it is sent once this answer finishes" : undefined}
+          disabled={!draft.trim() || filtersInvalid}
           className="max-sm:h-11 max-sm:w-11"
         >
-          <Send className="h-4 w-4" aria-hidden="true" />
+          {streaming ? (
+            <ListPlus className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Send className="h-4 w-4" aria-hidden="true" />
+          )}
         </Button>
       </form>
 
       {!compact && (
         <p className="mt-1.5 hidden px-1 text-xs text-app-text-disabled pointer-fine:block">
-          <kbd className="font-sans font-medium">Enter</kbd> to send ·{" "}
+          <kbd className="font-sans font-medium">Enter</kbd>{" "}
+          {streaming ? "to queue a follow-up" : "to send"} ·{" "}
           <kbd className="font-sans font-medium">Shift</kbd> +{" "}
           <kbd className="font-sans font-medium">Enter</kbd> for a new line
         </p>

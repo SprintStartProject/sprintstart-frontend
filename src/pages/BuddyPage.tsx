@@ -233,6 +233,16 @@ function BuddyMentorHome() {
     switchTeamProject,
     isGreeting,
     isDeciding,
+    stopStreaming,
+    queued,
+    queuePaused,
+    removeQueued,
+    pullQueuedMessage,
+    resumeQueue,
+    filters,
+    setFilters,
+    capabilitiesEnabled,
+    setCapabilitiesEnabled,
   } = useBuddySession();
 
   // The page fills the composer (the chips, the hand-off from the dock) but never reads it — so
@@ -629,6 +639,18 @@ function BuddyMentorHome() {
               messages={greeting.messages}
               isThinking={isThinking || isOpening || greeting.isThinking}
               isStreaming={isStreaming}
+              onStop={stopStreaming}
+              queue={{
+                items: queued,
+                paused: queuePaused,
+                onRemove: removeQueued,
+                onPull: pullQueuedMessage,
+                onSendQueued: resumeQueue,
+              }}
+              filters={filters}
+              onFiltersChange={setFilters}
+              capabilitiesEnabled={capabilitiesEnabled}
+              onCapabilitiesChange={setCapabilitiesEnabled}
               activeTool={activeTool}
               confirmAction={confirmAction}
               dismissAction={dismissAction}

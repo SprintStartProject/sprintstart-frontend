@@ -1,10 +1,12 @@
 import { memo, useCallback } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
+import type { BuddySessionFilters } from "../types";
 import type { ActionDrafts } from "../actionDrafts";
 import type { SelectedCitation } from "../citations/types";
 import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { BuddyComposer } from "./BuddyComposer";
+import type { BuddyComposerQueue } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
 import { BuddyReplyActions } from "./BuddyReplyActions";
 import { MessagesSquare } from "lucide-react";
@@ -60,6 +62,16 @@ type BuddyConversationProps = {
    * thread draws.
    */
   isStreaming?: boolean;
+  /** Stops the in-flight reply — the composer's Stop button (see `BuddyComposer`). */
+  onStop?: () => void;
+  /** The queue's data and actions for the composer — see `BuddyComposerQueue`. */
+  queue?: BuddyComposerQueue;
+  /** Retrieval filters for the composer; the session owns the state. */
+  filters?: BuddySessionFilters;
+  onFiltersChange?: (next: BuddySessionFilters) => void;
+  /** Whether the mentor may act on messages sent from here; paired with the setter below. */
+  capabilitiesEnabled?: boolean;
+  onCapabilitiesChange?: (next: boolean) => void;
   /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
   dinoGameActive?: boolean;
   /** Called when the player leaves the dino waiting-game. */
@@ -112,6 +124,12 @@ function BuddyConversationImpl({
   hasFloatingControl = false,
   focusComposerOnMount = false,
   isStreaming = false,
+  onStop,
+  queue,
+  filters,
+  onFiltersChange,
+  capabilitiesEnabled,
+  onCapabilitiesChange,
   dinoGameActive = false,
   onDinoGameExit,
   onCitationClick,
@@ -209,6 +227,13 @@ function BuddyConversationImpl({
             focusOnMount={focusComposerOnMount}
             busy={isThinking || isStreaming}
             gameActive={dinoGameActive}
+            streaming={isStreaming}
+            onStop={onStop}
+            queue={queue}
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            capabilitiesEnabled={capabilitiesEnabled}
+            onCapabilitiesChange={onCapabilitiesChange}
           />
         </div>
       </div>
