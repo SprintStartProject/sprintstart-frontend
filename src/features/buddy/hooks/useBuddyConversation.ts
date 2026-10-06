@@ -59,6 +59,9 @@ const REPLY_FAILED = "Your buddy could not finish that reply. Ask again in a mom
 const GREETING_FAILED = "Your buddy could not be reached just now.";
 const HISTORY_FAILED = "Your conversation could not be loaded.";
 const CONVERSATION_FAILED = "Your buddy could not start a new conversation. Ask again in a moment.";
+/** The bin landed, but the move off the binned conversation did not — the list must not claim a clean success. */
+const BIN_MOVE_FAILED =
+  'Binned, but the next conversation couldn\'t open — use "Try again" to retry.';
 /** The one sentence for a proposal that no longer exists for this caller (HTTP 404). */
 const PROPOSAL_GONE = "This proposal is no longer available.";
 
@@ -910,6 +913,11 @@ export function useBuddyConversation(
    * window, so this is the guard behind them — and unlike the other moves that clear the
    * thread, the refusal throws: the list tells the user the bin worked, so returning silently
    * would toast "Conversation binned" over a conversation that never left.
+   *
+   * A `404` is settled, not failed: the conversation was binned in another tab, or purged after
+   * its retention window — the local removal below is what the next read would show anyway. And
+   * the throw is not only for refusals: if the move off a binned conversation fails, this throws
+   * too, so the success toast cannot sit over a screen still showing the thread that was binned.
    */
   const binSession = useCallback(
     async (sessionId: string) => {
@@ -925,7 +933,13 @@ export function useBuddyConversation(
       )
         throw new Error("Your buddy is still working — try again once the reply finishes.");
 
-      await binSessionApi(sessionId);
+      try {
+        await binSessionApi(sessionId);
+      } catch (e) {
+        // See the doc above: "gone already" is settled, and settled for this call only.
+        // Anything else is a real failure and belongs to the caller.
+        if (!isNotFound(e)) throw e;
+      }
       binnedSessionIdsRef.current.add(sessionId);
 
       const remaining = sessionsRef.current.filter((session) => session.id !== sessionId);
@@ -939,6 +953,11 @@ export function useBuddyConversation(
       } else {
         await newConversation();
       }
+
+      // The move can fail and still resolve (see `newConversation`'s catch, which surfaces the
+      // failure through `openError`): if the hire is still on the conversation they just binned,
+      // the caller must hear it — its success toast would otherwise lie about the screen.
+      if (currentSessionIdRef.current === sessionId) throw new Error(BIN_MOVE_FAILED);
     },
     [applySessions, isOpening, isDeciding, isThinking, isStreaming, selectSession, newConversation],
   );

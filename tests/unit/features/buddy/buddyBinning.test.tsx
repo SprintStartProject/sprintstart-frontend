@@ -228,4 +228,54 @@ describe("binning a conversation", () => {
       await send;
     });
   });
+
+  it("settles a conversation that is already gone (404) instead of failing the bin", async () => {
+    server.use(
+      sessionsHandler(() => TWO),
+      messagesHandler(),
+      http.delete(
+        "/api/v1/onboarding/me/buddy/sessions/:sessionId",
+        () => new HttpResponse(null, { status: 404 }),
+      ),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    await waitFor(() => expect(result.current.currentSessionId).toBe("s2"));
+
+    await act(async () => {
+      await result.current.binSession("s2");
+    });
+
+    // Gone is settled: the row is out and the hire moved off it, exactly as a real bin leaves
+    // things — instead of an undeletable row every retry would fail on.
+    expect(result.current.sessions.map((s) => s.id)).toEqual(["s1"]);
+    expect(result.current.currentSessionId).toBe("s1");
+  });
+
+  it("throws when the move off a binned conversation fails, so the list cannot toast a clean bin", async () => {
+    const { binned, handler } = recordBins();
+    server.use(
+      sessionsHandler(() => [session("s1", "Only", "2026-10-01T09:00:00.000Z")]),
+      messagesHandler(),
+      handler,
+      http.post("/api/v1/onboarding/me/buddy/sessions", () =>
+        HttpResponse.json({ message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    await waitFor(() => expect(result.current.currentSessionId).toBe("s1"));
+
+    let rejection: unknown;
+    await act(async () => {
+      rejection = await result.current.binSession("s1").catch((e: unknown) => e);
+    });
+
+    expect(rejection).toBeInstanceOf(Error);
+    expect(String(rejection)).toMatch(/next conversation/);
+    // The DELETE went through, but the screen did not move — the throw is the caller's cue.
+    expect(binned).toEqual(["s1"]);
+    expect(result.current.sessions).toEqual([]);
+    expect(result.current.currentSessionId).toBe("s1");
+  });
 });
