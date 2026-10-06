@@ -6,6 +6,7 @@ import {
   isEmptyDocument,
   readBoardDocument,
   toWire,
+  withLocalOrigins,
   type BoardDocument,
 } from "../../../../src/features/board/sync/boardDocument";
 
@@ -107,3 +108,23 @@ function emptyDocument(): BoardDocument {
     markLabels: {},
   };
 }
+
+describe("origins kept while the board was closed", () => {
+  const kept = { url: "/onboarding?step=s1", label: "Set up SSH" };
+
+  it("survive the server's copy winning, and the server's own entries still win", () => {
+    const local: BoardDocument = {
+      ...arranged,
+      origins: { c1: { url: "/elsewhere", label: "Old" }, c9: kept },
+    };
+
+    expect(withLocalOrigins(arranged, local)?.origins).toEqual({
+      c1: arranged.origins.c1,
+      c9: kept,
+    });
+  });
+
+  it("change nothing when the server already has them all", () => {
+    expect(withLocalOrigins(arranged, arranged)).toBeNull();
+  });
+});

@@ -1,4 +1,5 @@
 import { PATH_STEP_FALLBACK_TITLE, type BoardCard } from "../types";
+import { plainHeading } from "./noteMarkdown";
 
 /**
  * The invisible marks the retired "Build my path" generator put at the front of a checklist title:
@@ -61,5 +62,7 @@ function firstLine(text: string): string {
       .find((candidate) => candidate.trim().length > 0)
       ?.trim() ?? "";
 
-  return line.length > 48 ? `${line.slice(0, 47)}…` : line;
+  const plain = plainHeading(line);
+
+  return plain.length > 48 ? `${plain.slice(0, 47)}…` : plain;
 }

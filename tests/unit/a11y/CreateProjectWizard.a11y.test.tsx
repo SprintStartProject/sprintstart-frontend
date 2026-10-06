@@ -86,6 +86,12 @@ async function openGithubDetail(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /indexes repositories/i }));
 }
 
+/** From the sources step, open the add-source flow and pick the Notion type. */
+async function openNotionDetail(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /add source/i }));
+  await user.click(screen.getByRole("button", { name: /indexes the pages a notion token/i }));
+}
+
 /** From the sources step, open the add-source flow and pick the Bitbucket type. */
 async function openBitbucketDetail(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /add source/i }));
@@ -173,6 +179,36 @@ describe("CreateProjectWizard Accessibility", () => {
     // At or above 1280px the form slides in beside the wizard, portalled to
     // <body> — `baseElement` is the whole body, so axe sees it too.
     expect(await screen.findByRole("dialog", { name: "New GitHub token" })).toBeInTheDocument();
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no axe violations on the Notion detail", async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderWizard();
+
+    await screen.findByRole("dialog", { name: "New Project" });
+    await waitFor(() => expect(screen.getByLabelText(/^Name/)).toBeInTheDocument());
+    await goToSources(user);
+    await openNotionDetail(user);
+
+    // No credential is stored in this suite, so the picker is locked and the chip says why.
+    expect(await screen.findByText("No credential yet")).toBeInTheDocument();
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no axe violations with the inline Notion credential form open", async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderWizard();
+
+    await screen.findByRole("dialog", { name: "New Project" });
+    await waitFor(() => expect(screen.getByLabelText(/^Name/)).toBeInTheDocument());
+    await goToSources(user);
+    await openNotionDetail(user);
+
+    await user.click(screen.getByRole("button", { name: /add notion credential/i }));
+
+    expect(await screen.findByTestId("settings-notion-add-name")).toBeInTheDocument();
     expect(await axe(baseElement)).toHaveNoViolations();
   });
 

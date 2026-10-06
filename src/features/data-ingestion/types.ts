@@ -88,8 +88,8 @@ export type IngestionRun = {
 
 /**
  * Per-source ingestion health from `/api/v1/ingestion-sources/status` — one row
- * per connected GitHub or Bitbucket repository, Jira instance, Confluence space or upload
- * source. This is the authoritative source for the Data Ingestion source cards:
+ * per connected GitHub or Bitbucket repository, Jira instance, Confluence space,
+ * Notion workspace or upload source. This is the authoritative source for the Data Ingestion source cards:
  * it carries the source identity, connection status, enabled flag, the last
  * run's counters, the total stored artifact count and the per-artifact-type
  * last-sync timestamps in a single call, so the UI does not have to reconstruct
@@ -99,7 +99,8 @@ export type SourceInstanceIngestionStatus = {
   sourceSystem: SourceSystem;
   /**
    * Key of the source within its system: GitHub `"owner/name"`, Bitbucket
-   * `"workspace/slug"`, Jira the instance URL, Confluence the base URL and space.
+   * `"workspace/slug"`, Jira the instance URL, Confluence the base URL and space,
+   * Notion the workspace id (the connection id when Notion names none).
    */
   sourceId: string;
   /**
@@ -227,6 +228,20 @@ export type ConfluenceSpaceSourceDetails = {
 };
 
 /**
+ * Notion-specific identity for a source card. A connected workspace is addressed by
+ * its connection's UUID (`connectionId`), which updating, removing, the schedule and
+ * the run history key on. It is null when the viewer may not read the project's
+ * connections, and the card then only shows what the status row carries.
+ */
+export type NotionWorkspaceSourceDetails = {
+  connectionId: string | null;
+  /** The status row's `sourceId`, which a run carries as its own: the workspace id, else the connection id. */
+  sourceRef: string;
+  workspaceName: string;
+  credentialName: string | null;
+};
+
+/**
  * The section the overview-first Data Ingestion page is filtered to. `overview`
  * is the dashboard view and shows everything (overview + sources + runs); the
  * other two narrow to a single section.
@@ -308,6 +323,10 @@ export type SourceDetails =
   | {
       system: "CONFLUENCE";
       space: ConfluenceSpaceSourceDetails | null;
+    }
+  | {
+      system: "NOTION";
+      workspace: NotionWorkspaceSourceDetails | null;
     }
   | { system: "UPLOAD" };
 

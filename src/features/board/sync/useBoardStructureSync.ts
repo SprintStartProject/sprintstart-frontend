@@ -8,6 +8,7 @@ import {
   isEmptyDocument,
   readBoardDocument,
   toWire,
+  withLocalOrigins,
 } from "./boardDocument";
 
 /**
@@ -90,7 +91,11 @@ export function useBoardStructureSync(boardId: string, projectId: string): boole
           const local = readBoardDocument(boardId, projectId);
           if (!isEmptyDocument(local)) await boardService.saveStructure(projectId, toWire(local));
         } else {
-          applyBoardDocument(boardId, projectId, server);
+          // Origins recorded while the board was closed are kept, and sent up — see
+          // `withLocalOrigins`.
+          const merged = withLocalOrigins(server, readBoardDocument(boardId, projectId));
+          applyBoardDocument(boardId, projectId, merged ?? server);
+          if (merged) await boardService.saveStructure(projectId, toWire(merged));
         }
         if (active) settled(true);
       } catch {

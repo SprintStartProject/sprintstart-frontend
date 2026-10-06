@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../../../../src/context/ThemeProvider";
@@ -125,7 +125,9 @@ describe("AccessManagementView", () => {
     await selectSource(user, "All sources");
 
     await waitFor(() => expect(screen.getByTestId("access-group-atlassian")).toBeVisible());
-    expect(screen.getByText("No credentials yet")).toBeVisible();
+    expect(
+      within(screen.getByTestId("access-group-atlassian")).getByText("No credentials yet"),
+    ).toBeVisible();
   });
 
   it("keeps loading every source while unused ones are hidden", async () => {

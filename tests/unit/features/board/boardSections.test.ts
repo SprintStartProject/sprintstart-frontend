@@ -42,7 +42,10 @@ const group = (id: string, name: string, cardIds: string[]): BoardGroup => ({
 
 describe("the sections a board offers", () => {
   const cards = [card("a"), card("b"), card("c")];
-  const states = () => deriveCardStates(cards, structure({ a: "NOW", b: "LATER", c: "LATER" }));
+  const states = () =>
+    deriveCardStates(cards, structure({ a: "NOW", b: "LATER", c: "LATER" }), (card) =>
+      card.id === "a" ? "NOW" : "BEHIND",
+    );
 
   it("offers no focus section unless it is asked for", () => {
     const sections = summariseSections(cards, [], states());

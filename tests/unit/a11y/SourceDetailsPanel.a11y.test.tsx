@@ -20,6 +20,19 @@ vi.mock("../../../src/services/sources/bitbucketService", () => ({
   }),
 }));
 
+vi.mock("../../../src/services/sources/notionService", () => ({
+  notionService: {
+    listConnections: vi.fn().mockResolvedValue([
+      {
+        id: "notion-conn-1",
+        autoUpdate: true,
+        scheduleSpec: { type: "INTERVAL", everyMinutes: 30 },
+        nextSyncAt: null,
+      },
+    ]),
+  },
+}));
+
 const source: DataSource = {
   sourceId: "source-github",
   sourceSystem: "GITHUB",
@@ -64,6 +77,45 @@ describe("SourceDetailsPanel Accessibility", () => {
     await waitFor(() => {
       expect(screen.getByText("GitHub Repository")).toBeInTheDocument();
     });
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no a11y violations for a Notion workspace with all actions", async () => {
+    const notionSource: DataSource = {
+      ...source,
+      sourceId: "notion-conn-1",
+      sourceSystem: "NOTION",
+      name: "Acme Workspace",
+      type: "Notion",
+      details: {
+        system: "NOTION",
+        workspace: {
+          connectionId: "notion-conn-1",
+          sourceRef: "ws-1",
+          workspaceName: "Acme Workspace",
+          credentialName: "wiki",
+        },
+      },
+    };
+
+    const { baseElement } = render(
+      <MemoryRouter>
+        <SourceDetailsPanel
+          source={notionSource}
+          projectId="p1"
+          canManage
+          canUnlink
+          onChanged={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Acme Workspace").length).toBeGreaterThan(0);
+    });
+    await screen.findByLabelText("Minutes");
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });

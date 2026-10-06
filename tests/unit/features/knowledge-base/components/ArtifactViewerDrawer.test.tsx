@@ -248,11 +248,11 @@ describe("ArtifactViewerDrawer", () => {
     });
 
     it("opens an artifact of a source system the frontend does not know with a neutral source link", async () => {
-      const sourceUrl = "https://www.notion.so/acme/Page-123";
+      const sourceUrl = "https://linear.app/acme/issue/ACME-123";
       renderDrawer(
         createArtifact({
           // A connector the backend may ship before the frontend registers it.
-          sourceSystem: "NOTION" as Artifact["sourceSystem"],
+          sourceSystem: "LINEAR" as Artifact["sourceSystem"],
           sourceUrl,
         }),
         { canDelete: true },
@@ -263,6 +263,16 @@ describe("ArtifactViewerDrawer", () => {
       expect(link).toHaveAttribute("href", sourceUrl);
       await screen.findByTestId("raw-content");
       expect(screen.queryByTestId("delete-artifact-btn")).not.toBeInTheDocument();
+    });
+
+    it("opens a Notion page with an Open in Notion link", async () => {
+      const sourceUrl = "https://www.notion.so/acme/Page-123";
+      renderDrawer(createArtifact({ sourceSystem: "NOTION", sourceUrl }));
+
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toHaveTextContent("Open in Notion");
+      expect(link).toHaveAttribute("href", sourceUrl);
+      await screen.findByTestId("raw-content");
     });
 
     it("shows no source link when sourceUrl is null or whitespace", () => {

@@ -108,10 +108,14 @@ function AppContent() {
           // the same direct flex child of the page it has always been. It only becomes a box in
           // focus mode, and only from `lg` up — below that there is no hovering to reveal anything
           // with, and the sidebar's own mobile header is the way back.
+          //
+          // The box carries the sidebar's width itself. Everything inside it is `fixed`, so without
+          // one it is zero wide, and `-translate-x-full` of nothing moves nothing: the sidebar
+          // stayed where it was, on top of a page that had already taken its margin back.
           <div
             className={
               isFocused
-                ? `contents lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:transition-transform lg:duration-300 lg:ease-out ${peeking ? "lg:translate-x-0" : "lg:-translate-x-full"}`
+                ? `contents lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-[var(--app-sidebar-desktop-width,var(--app-sidebar-width))] lg:transition-transform lg:duration-300 lg:ease-out ${peeking ? "lg:translate-x-0" : "lg:-translate-x-full"}`
                 : "contents"
             }
             onMouseLeave={() => {

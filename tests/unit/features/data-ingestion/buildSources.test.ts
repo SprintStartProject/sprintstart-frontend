@@ -7,6 +7,7 @@ import {
   confluenceSpaceOf,
   githubRepositoryOf,
   jiraInstanceOf,
+  notionWorkspaceOf,
 } from "../../../../src/features/data-ingestion/sourceDetails";
 import type {
   IngestionRun,
@@ -15,6 +16,7 @@ import type {
 import type { ProjectSource } from "../../../../src/services/projectService";
 import type { ConfluenceConnectionDto } from "../../../../src/services/sources/confluenceService";
 import type { JiraInstanceDto } from "../../../../src/services/sources/jiraService";
+import type { NotionWorkspaceConnectionDto } from "../../../../src/services/sources/notionService";
 
 function status(overrides: Partial<SourceInstanceIngestionStatus>): SourceInstanceIngestionStatus {
   return {
@@ -88,11 +90,41 @@ const confluenceConnection: ConfluenceConnectionDto = {
   sourceEnabled: true,
 };
 
+const notionConnection: NotionWorkspaceConnectionDto = {
+  id: "notion-conn-1",
+  projectId: "p1",
+  workspaceId: "ws-1",
+  workspaceName: "Acme Workspace",
+  workspaceUrl: "https://www.notion.so/acme",
+  credentialName: "wiki",
+  sourceEnabled: true,
+  autoUpdate: false,
+  schedule: "every 60 minutes",
+  scheduleSpec: { type: "INTERVAL", everyMinutes: 60 },
+  nextSyncAt: null,
+  lastSyncedAt: null,
+  createdAt: "2026-07-01T00:00:00Z",
+  updatedAt: "2026-07-01T00:00:00Z",
+  version: 1,
+};
+
+const notionStatus = status({
+  sourceSystem: "NOTION",
+  sourceId: "ws-1",
+  displayName: "Acme Workspace",
+  repositoryId: null,
+  owner: null,
+  name: null,
+  sourceUrl: "https://www.notion.so/acme",
+  artifactCount: 12,
+});
+
 const none = {
   projectSources: [],
   statuses: [],
   jiraInstances: [],
   confluenceConnections: [],
+  notionConnections: [],
   latestRuns: [],
   connectorEnabledById: new Map<string, boolean>(),
 };
@@ -368,6 +400,75 @@ describe("buildDataSources", () => {
     });
 
     expect(cards.every((card) => card.sharesSourceSystem)).toBe(true);
+  });
+});
+
+describe("buildDataSources for Notion", () => {
+  it("builds a card from the status row keyed by the connection record", () => {
+    const [card] = buildDataSources({
+      ...none,
+      statuses: [notionStatus],
+      notionConnections: [notionConnection],
+    });
+
+    expect(card.sourceSystem).toBe("NOTION");
+    expect(card.sourceId).toBe("notion-conn-1");
+    expect(card.name).toBe("Acme Workspace");
+    expect(card.totalArtifactCount).toBe(12);
+    expect(notionWorkspaceOf(card)).toEqual({
+      connectionId: "notion-conn-1",
+      sourceRef: "ws-1",
+      workspaceName: "Acme Workspace",
+      credentialName: "wiki",
+    });
+  });
+
+  it("still shows the card, without a connection id, when the connections cannot be read", () => {
+    const [card] = buildDataSources({ ...none, statuses: [notionStatus] });
+
+    expect(card.sourceId).toBe("ws-1");
+    expect(notionWorkspaceOf(card)).toMatchObject({
+      connectionId: null,
+      workspaceName: "Acme Workspace",
+      credentialName: null,
+    });
+  });
+
+  it("matches a connection without a workspace id through its own id", () => {
+    const [card] = buildDataSources({
+      ...none,
+      statuses: [{ ...notionStatus, sourceId: "notion-conn-1" }],
+      notionConnections: [{ ...notionConnection, workspaceId: null }],
+    });
+
+    expect(notionWorkspaceOf(card)?.connectionId).toBe("notion-conn-1");
+  });
+
+  it("gives two connections that see the same workspace one card each", () => {
+    const second = { ...notionConnection, id: "notion-conn-2", credentialName: "docs" };
+
+    const cards = buildDataSources({
+      ...none,
+      statuses: [notionStatus, notionStatus],
+      notionConnections: [notionConnection, second],
+    });
+
+    expect(cards.map((card) => card.sourceId)).toEqual(["notion-conn-1", "notion-conn-2"]);
+    expect(cards.map((card) => notionWorkspaceOf(card)?.credentialName)).toEqual(["wiki", "docs"]);
+  });
+
+  it("takes the AI-sync stage from the connection's own run", () => {
+    const [card] = buildDataSources({
+      ...none,
+      statuses: [notionStatus],
+      notionConnections: [notionConnection],
+      latestRuns: [
+        run({ sourceSystem: "NOTION", repositoryId: "other", status: "FAILED" }),
+        run({ sourceSystem: "NOTION", repositoryId: "notion-conn-1", status: "RUNNING" }),
+      ],
+    });
+
+    expect(card.statusView.state).toBe("syncing");
   });
 });
 

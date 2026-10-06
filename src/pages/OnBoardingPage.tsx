@@ -74,6 +74,7 @@ import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
 import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
+import { setOnboardingPlace } from "../features/onboarding/onboardingPlace";
 import {
   askAboutEmptyPhase,
   askAboutEmptyPhases,
@@ -191,6 +192,9 @@ export function OnBoardingPage() {
    */
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedStepId = searchParams.get("step");
+  // `&open=1` beside `?step=`: unfold the step as well as finding it -- still without starting it.
+  // What a card's "Back to" on the board sends, since the words it was kept from are inside the step.
+  const linkOpensStep = searchParams.get("open") === "1";
   const linkedQuestionId = searchParams.get("question");
   const linkedPhaseId = searchParams.get("phase");
 
@@ -499,8 +503,13 @@ export function OnBoardingPage() {
       if (arrival.kind === "link-step" || arrival.kind === "link-question") {
         setSelectedPhaseId(owningPhase.id);
         // "You're on #3" is most likely clicked while #3 is open -- collapsing it would throw away
-        // a typed answer or skip reason.
-        setExpandedItemId((current) => (current === arrival.id ? current : null));
+        // a typed answer or skip reason. A link that asks for the step open unfolds it instead.
+        if (arrival.kind === "link-step" && linkOpensStep) {
+          scrollToItemRef.current = arrival.id;
+          setExpandedItemId(arrival.id);
+        } else {
+          setExpandedItemId((current) => (current === arrival.id ? current : null));
+        }
         setLinkHighlight({ id: arrival.id, key: arrivalKey });
         clearLinkRef.current();
         return;
@@ -515,7 +524,7 @@ export function OnBoardingPage() {
       const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
       if (item) startStepRef.current(item, { byAddress: true });
     });
-  }, [arrival, arrivalKey, loadingState, navigate, path, toast]);
+  }, [arrival, arrivalKey, linkOpensStep, loadingState, navigate, path, toast]);
 
   useEffect(() => {
     clearLinkRef.current = () =>
@@ -524,6 +533,7 @@ export function OnBoardingPage() {
           params.delete("step");
           params.delete("question");
           params.delete("phase");
+          params.delete("open");
           return params;
         },
         { replace: true },
@@ -592,6 +602,35 @@ export function OnBoardingPage() {
   const focusPhaseId =
     nextAction?.kind === "step" || nextAction?.kind === "question" ? nextAction.phase.id : null;
   const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0] ?? null;
+
+  // Where the hire is on this page, for whatever they keep on their board from here: the step they
+  // have open, or the phase they are looking at. See `onboardingPlace.ts`.
+  useEffect(() => {
+    const openItemId = viewMode === "graph" ? graphItemId : expandedItemId;
+    const shownPhase =
+      viewMode === "graph"
+        ? (phases.find((phase) => phase.id === openGraphPhaseId) ?? null)
+        : selectedPhase;
+    const openItem = openItemId
+      ? phases.flatMap(phaseItems).find((item) => item.id === openItemId)
+      : undefined;
+    // A question is not a place a note is kept *about*; its phase is.
+    const itemPhase =
+      openItem?.kind === "question"
+        ? phases.find((phase) => phase.id === openItem.question.phaseId)
+        : undefined;
+    const phase = itemPhase ?? shownPhase;
+
+    setOnboardingPlace(
+      openItem?.kind === "step"
+        ? { kind: "step", id: openItem.id, title: openItem.title }
+        : phase
+          ? { kind: "phase", id: phase.id, title: phase.title }
+          : null,
+    );
+  }, [expandedItemId, graphItemId, openGraphPhaseId, phases, selectedPhase, viewMode]);
+
+  useEffect(() => () => setOnboardingPlace(null), []);
   const overall = path ? pathProgress(path) : null;
   const generationIssues = path?.generationIssues ?? [];
   const generationIssueSummary = generationIssues

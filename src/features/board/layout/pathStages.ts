@@ -1,0 +1,342 @@
+import { phaseState, type PhaseState } from "../../onboarding/journey";
+import type { OnboardingPathEndpoint } from "../../onboarding/types";
+import type { BoardCard } from "../types";
+import type { CardOrigins } from "./cardOrigins";
+import { linkedStepIds, linkedTitles, titleKey } from "./stepLinks";
+import type { BoardStage } from "./boardStructure";
+
+/**
+ * A card's stage, read off the onboarding path instead of set by hand.
+ *
+ * Now and Later used to be a second timeline the hire (or, through card blueprints, their PM) kept
+ * next to the path — and since the path became the one plan (#311) it was a timeline nobody else
+ * looked at. The path already knows where somebody stands: which phase is open, which ones come
+ * after it. So the board asks the path instead of asking the hire.
+ *
+ * **Behind you means "belongs to a phase you have finished"**; everything else is Now. Later is
+ * gone: a phase not reached yet is the path's to show, and a card about it is simply on the board.
+ * "Finished" is the Onboarding page's own reading of a phase (`phaseState` in `journey.ts`): phases
+ * are not a queue, and several can be open at once. A card is tied to a phase through its origin
+ * (the live step card names its step; a card kept on the Onboarding page carries the step or phase
+ * it was kept from, see `onboardingOrigin.ts`) or through a `[[…]]` link in its text. A card tied
+ * to nothing — most notes, the current task, the pull requests — is about the work in front of the
+ * hire, so it is Now. That is also why a board
+ * with no path reads as a single band, which the grid does not draw: no path, no ramp.
+ *
+ * Derived on every render rather than stored, for the same reason "blocked" is: the moment the hire
+ * finishes a phase, its cards move behind them without anybody touching them.
+ */
+export type PathStages = (card: BoardCard) => BoardStage;
+
+/** What the board needs from the path: the phase of every step and question, and where each is. */
+export type PathPhases = {
+  phaseOfStep: Map<string, string>;
+  phaseOfQuestion: Map<string, string>;
+  phaseIds: Set<string>;
+  /** Phases still waiting on another phase that is not done. */
+  aheadPhaseIds: Set<string>;
+  /** Phases with nothing left in them: every step finished or skipped, every question passed. */
+  finishedPhaseIds: Set<string>;
+  /** Every step by its title as `[[…]]` matches it (see `stepLinks.ts`), first one on a tie. */
+  stepByTitle: Map<string, string>;
+  /** Every step's title and tasks, by id — what a link to it is drawn as. */
+  steps: Map<string, { title: string; tasks: { id: string; title: string }[] }>;
+  /** Every phase by its title as `[[…]]` matches it, first one on a tie. */
+  phaseByTitle: Map<string, string>;
+  /** Every phase's title and where the hire stands with it, by id, in path order. */
+  phaseInfo: Map<string, { title: string; state: PhaseState; stepIds: string[] }>;
+  /** A step by its phase and its title: `${phaseId}|${titleKey}`. */
+  stepInPhase: Map<string, string>;
+};
+
+/**
+ * Reads the path once into the lookups a card's stage and its `[[…]]` links need.
+ */
+export function pathPhases(path: OnboardingPathEndpoint): PathPhases {
+  const phases = [...path.phases].sort((left, right) => left.position - right.position);
+
+  const phaseOfStep = new Map<string, string>();
+  const phaseOfQuestion = new Map<string, string>();
+  const stepByTitle = new Map<string, string>();
+  const steps: PathPhases["steps"] = new Map();
+  const phaseByTitle = new Map<string, string>();
+  const phaseInfo: PathPhases["phaseInfo"] = new Map();
+  const stepInPhase = new Map<string, string>();
+  for (const phase of phases) {
+    const phaseKey = titleKey(phase.title ?? "");
+    if (phaseKey && !phaseByTitle.has(phaseKey)) phaseByTitle.set(phaseKey, phase.id);
+    const ordered = [...(phase.steps ?? [])].sort((left, right) => left.position - right.position);
+    phaseInfo.set(phase.id, {
+      title: phase.title,
+      state: phaseState(phase),
+      stepIds: ordered.map((step) => step.id),
+    });
+
+    for (const step of ordered) {
+      const inPhase = `${phase.id}|${titleKey(step.title ?? "")}`;
+      if (!stepInPhase.has(inPhase)) stepInPhase.set(inPhase, step.id);
+      phaseOfStep.set(step.id, phase.id);
+      steps.set(step.id, {
+        title: step.title,
+        tasks: [...(step.tasks ?? [])]
+          .sort((left, right) => left.position - right.position)
+          .map((task) => ({ id: task.id, title: task.title })),
+      });
+      const key = titleKey(step.title ?? "");
+      if (key && !stepByTitle.has(key)) stepByTitle.set(key, step.id);
+    }
+    for (const question of phase.questions ?? []) phaseOfQuestion.set(question.id, phase.id);
+  }
+
+  const aheadPhaseIds = new Set(
+    phases.filter((phase) => phaseState(phase) === "locked").map((phase) => phase.id),
+  );
+
+  return {
+    phaseOfStep,
+    phaseOfQuestion,
+    phaseIds: new Set(phases.map((phase) => phase.id)),
+    aheadPhaseIds,
+    stepByTitle,
+    steps,
+    phaseByTitle,
+    phaseInfo,
+    stepInPhase,
+    finishedPhaseIds: new Set(
+      phases.filter((phase) => phaseState(phase) === "done").map((phase) => phase.id),
+    ),
+  };
+}
+
+/** A piece of the path an in-app address points at. */
+export type PathPlace = { kind: "step" | "question" | "phase"; id: string };
+
+/**
+ * Which piece of the path an in-app address points at, if it points at one.
+ *
+ * Every way the app writes a link into the path: `/onboarding/<stepId>` (the old step page, and what
+ * a selection on it recorded), and `/onboarding?step=`, `?question=` or `?phase=` (what the buddy
+ * writes, and what `onboardingOrigin.ts` records now). Anything else — a chat, the knowledge base —
+ * points at nothing on the path.
+ */
+export function placeOfUrl(url: string): PathPlace | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url, "http://app.invalid");
+  } catch {
+    return null;
+  }
+
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  if (segments[0] !== "onboarding") return null;
+
+  let stepId: string | null;
+  try {
+    stepId = segments[1] ? decodeURIComponent(segments[1]) : parsed.searchParams.get("step");
+  } catch {
+    return null;
+  }
+  if (stepId) return { kind: "step", id: stepId };
+
+  const questionId = parsed.searchParams.get("question");
+  if (questionId) return { kind: "question", id: questionId };
+
+  const phaseId = parsed.searchParams.get("phase");
+  return phaseId ? { kind: "phase", id: phaseId } : null;
+}
+
+/**
+ * Whether an in-app address into the path still leads somewhere on it.
+ *
+ * True for anything that is not an address into the path at all — a chat, the knowledge base —
+ * since this is only a question about links into the path. With no path (`null`), nothing on it
+ * can be reached.
+ */
+export function leadsOntoPath(url: string, phases: PathPhases | null): boolean {
+  const place = placeOfUrl(url);
+  if (!place) return true;
+  if (!phases) return false;
+
+  if (place.kind === "step") return phases.steps.has(place.id);
+  if (place.kind === "question") return phases.phaseOfQuestion.has(place.id);
+  return phases.phaseIds.has(place.id);
+}
+
+/** The phase an in-app address points into, if it points into one on this path. */
+export function phaseOfUrl(url: string, phases: PathPhases): string | null {
+  const place = placeOfUrl(url);
+  if (!place) return null;
+
+  if (place.kind === "step") return phases.phaseOfStep.get(place.id) ?? null;
+  if (place.kind === "question") return phases.phaseOfQuestion.get(place.id) ?? null;
+
+  return phases.phaseIds.has(place.id) ? place.id : null;
+}
+
+/** The step a card belongs to, if it belongs to one — readable without the path. */
+export function stepOfCard(card: BoardCard, origins: CardOrigins): string | null {
+  if (card.content.kind === "PATH_STEP") return card.content.stepId;
+
+  const url = origins[card.id]?.url;
+  const place = url ? placeOfUrl(url) : null;
+
+  return place?.kind === "step" ? place.id : null;
+}
+
+/** What a `[[…]]` resolves to on this path: a phase, perhaps a step in it, perhaps a task in that. */
+export type ResolvedLink = { phaseId: string; stepId: string | null; task: string | null };
+
+/**
+ * Resolves the inside of a `[[…]]` against the path.
+ *
+ * `[[Phase]]`, `[[Phase#Step]]` and `[[Phase#Step#Task]]` — the path's own nesting, the way Obsidian
+ * nests headings in a note. A link written before phases came first, `[[Step]]` or `[[Step#Task]]`,
+ * still resolves by the step's title. Null when it names nothing on the path, or names a step the
+ * phase does not have.
+ */
+export function resolveLink(text: string, phases: PathPhases): ResolvedLink | null {
+  const trimmed = text.trim();
+  // Titles may contain `#` themselves ("C# basics"), so every `#` is only a candidate separator: try
+  // the splits from the left and take the first one whose parts are all on the path.
+  const cuts = [...trimmed.matchAll(/#/g)].map((match) => match.index);
+  const head = (end: number) => trimmed.slice(0, end).trim();
+
+  for (const cut of [...cuts, trimmed.length]) {
+    const phaseId = phases.phaseByTitle.get(titleKey(head(cut)));
+    if (!phaseId) continue;
+    if (cut === trimmed.length) return { phaseId, stepId: null, task: null };
+
+    const rest = trimmed.slice(cut + 1);
+    const restCuts = [...[...rest.matchAll(/#/g)].map((match) => match.index), rest.length];
+    for (const stepCut of restCuts) {
+      const stepId = phases.stepInPhase.get(
+        `${phaseId}|${titleKey(rest.slice(0, stepCut).trim())}`,
+      );
+      if (stepId) return { phaseId, stepId, task: rest.slice(stepCut + 1).trim() || null };
+    }
+  }
+
+  // Written before phases came first: `[[Step]]` or `[[Step#Task]]`.
+  for (const cut of [...cuts, trimmed.length]) {
+    const stepId = phases.stepByTitle.get(titleKey(head(cut)));
+    const stepPhase = stepId ? phases.phaseOfStep.get(stepId) : undefined;
+    if (stepId && stepPhase) {
+      return { phaseId: stepPhase, stepId, task: trimmed.slice(cut + 1).trim() || null };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Where a half-typed `[[…` stands: still choosing a phase, a step in one, or a task in a step.
+ *
+ * The same reading as {@link resolveLink}: a `#` only separates levels when what comes before it
+ * names something on the path, so `[[Phase #1` is still a phase being typed and `[[C# basics#`
+ * goes on to that phase's steps. `query` is what is left to filter the current level by.
+ */
+export type OpenLinkLevel =
+  | { level: "phase"; query: string }
+  | { level: "step"; phaseId: string; query: string }
+  | { level: "task"; phaseId: string; stepId: string; query: string };
+
+export function openLinkLevel(typed: string, phases: PathPhases | null): OpenLinkLevel {
+  const cutsOf = (text: string) => [...text.matchAll(/#/g)].map((match) => match.index);
+
+  if (phases) {
+    for (const cut of cutsOf(typed)) {
+      const phaseId = phases.phaseByTitle.get(titleKey(typed.slice(0, cut)));
+      if (!phaseId) continue;
+
+      const rest = typed.slice(cut + 1);
+      for (const stepCut of cutsOf(rest)) {
+        const stepId = phases.stepInPhase.get(`${phaseId}|${titleKey(rest.slice(0, stepCut))}`);
+        if (stepId) return { level: "task", phaseId, stepId, query: rest.slice(stepCut + 1) };
+      }
+
+      return { level: "step", phaseId, query: rest };
+    }
+  }
+
+  return { level: "phase", query: typed };
+}
+
+/** Everything on the path a note links to, `[[…]]` first and the buddy's app links after. */
+export function linkedPlaces(card: BoardCard, phases: PathPhases): ResolvedLink[] {
+  if (card.content.kind !== "NOTE") return [];
+
+  const byTitle = linkedTitles(card.content.text)
+    .map((title) => resolveLink(title, phases))
+    .filter((link): link is ResolvedLink => link !== null);
+  const byUrl = linkedStepIds(card.content.text).flatMap((stepId) => {
+    const phaseId = phases.phaseOfStep.get(stepId);
+    return phaseId ? [{ phaseId, stepId, task: null }] : [];
+  });
+
+  return [...byTitle, ...byUrl];
+}
+
+/** The steps a note links to, in order — see {@link linkedPlaces}. */
+export function linkedSteps(card: BoardCard, phases: PathPhases): string[] {
+  return linkedPlaces(card, phases)
+    .map((link) => link.stepId)
+    .filter((stepId): stepId is string => stepId !== null);
+}
+
+/**
+ * The phase a card belongs to, if it belongs to one.
+ *
+ * Where it was kept wins; a note kept from nowhere in particular belongs to the phase of the first
+ * thing it links to with `[[…]]`.
+ */
+export function phaseOfCard(
+  card: BoardCard,
+  phases: PathPhases,
+  origins: CardOrigins,
+): string | null {
+  if (card.content.kind === "PATH_STEP") {
+    return card.content.stepId ? (phases.phaseOfStep.get(card.content.stepId) ?? null) : null;
+  }
+
+  const url = origins[card.id]?.url;
+  const fromOrigin = url ? phaseOfUrl(url, phases) : null;
+  if (fromOrigin) return fromOrigin;
+
+  return linkedPlaces(card, phases)[0]?.phaseId ?? null;
+}
+
+/**
+ * Whether a card belongs to one phase — what "cards on your board from this phase" counts.
+ *
+ * A phase holds what was kept from any of its steps as well as what was kept about the phase itself.
+ * Without the path a phase can only be matched by name — a card kept while the phase was open — and
+ * a card kept from one of its steps is not counted, which undercounts rather than guessing. The live
+ * step card is never counted: it is the path itself, not something the hire kept from it.
+ */
+export function isCardAt(
+  card: BoardCard,
+  phaseId: string,
+  phases: PathPhases | null,
+  origins: CardOrigins,
+): boolean {
+  if (card.content.kind === "PATH_STEP") return false;
+  if (phases) return phaseOfCard(card, phases, origins) === phaseId;
+
+  const url = origins[card.id]?.url;
+  const at = url ? placeOfUrl(url) : null;
+  return at?.kind === "phase" && at.id === phaseId;
+}
+
+/** The stage of every card on a board, given its path (or none) and where its cards came from. */
+export function pathStages(phases: PathPhases | null, origins: CardOrigins): PathStages {
+  return (card) => {
+    if (!phases) return "NOW";
+
+    const phaseId = phaseOfCard(card, phases, origins);
+
+    // Later is gone: a card about a phase that is still locked is on the board like any other —
+    // the path says what is not reachable yet, and the board does not need to say it twice. What
+    // the board does keep apart is what is finished.
+    return phaseId && phases.finishedPhaseIds.has(phaseId) ? "BEHIND" : "NOW";
+  };
+}

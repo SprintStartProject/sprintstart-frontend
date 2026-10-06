@@ -3,12 +3,16 @@ import { Check, ChevronDown, ChevronUp, PenLine, Pencil, X } from "lucide-react"
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
-import { Textarea } from "../../../components/ui/Textarea";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutNote } from "../generation/cardQuestion";
 import { Marked } from "./Marked";
+import { NoteMarkdown } from "./NoteMarkdown";
+import { StepLink } from "./StepLink";
+import { StepLinkTextarea } from "./StepLinkTextarea";
+import { splitStepLinks } from "../layout/stepLinks";
+import { looksLikeMarkdown, plainHeading } from "../layout/noteMarkdown";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardMark } from "../marks/cardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";
@@ -124,7 +128,7 @@ export function NoteCard({
           // The first line is the note's own words, so it can be marked like any other part of it.
           // `controlLabel` below keeps the card's controls saying "the note card" rather than
           // trying to put a highlighted sentence inside an accessible name.
-          <Marked text={heading} marks={marks} parse cardId={card.id} />
+          <Marked text={plainHeading(heading)} marks={marks} parse cardId={card.id} />
         )
       }
       controlLabel="note"
@@ -163,10 +167,10 @@ export function NoteCard({
             <label className="sr-only" htmlFor={`note-${card.id}`}>
               Note text
             </label>
-            <Textarea
+            <StepLinkTextarea
               id={`note-${card.id}`}
               value={bodyDraft}
-              onChange={(event) => setBodyDraft(event.target.value)}
+              onValueChange={setBodyDraft}
               minRows={4}
             />
           </div>
@@ -255,23 +259,34 @@ function NoteBody({ body, marks, cardId }: { body: string; marks: CardMark[]; ca
   const [expanded, setExpanded] = useState(false);
 
   const long = body.length > COLLAPSE_AFTER_CHARS || body.split("\n").length > COLLAPSE_AFTER_LINES;
-  if (!long)
-    return (
+  // What the buddy writes is Markdown, and is drawn as such; see `NoteMarkdown`.
+  const markdown = looksLikeMarkdown(body);
+  const draw = (text: string) =>
+    markdown ? (
+      <NoteMarkdown text={text} marks={marks} cardId={cardId} />
+    ) : (
       <p className="text-sm whitespace-pre-wrap text-app-text">
-        <Marked text={body} marks={marks} parse cardId={cardId} />
+        {/* `[[Step]]` links first, then each run between them marked as usual. */}
+        {splitStepLinks(text).map((run, index) =>
+          run.link ? (
+            <StepLink key={index} title={run.text} />
+          ) : (
+            <Marked key={index} text={run.text} marks={marks} parse cardId={cardId} />
+          ),
+        )}
       </p>
     );
 
+  if (!long) return draw(body);
+
   return (
     <div>
-      <p className="text-sm whitespace-pre-wrap text-app-text">
-        {/* The fold cuts the *raw* text, delimiters and all, so a highlight that straddles the cut
-            would lose its closing `==` and stop being one. `preview` keeps whole lines and whole
-            words, so the only way to split a mark is to have written one across a line break —
-            and `Marked` renders an unclosed pair as ordinary text rather than lighting up the
-            rest of the card. */}
-        <Marked text={expanded ? body : preview(body)} marks={marks} parse cardId={cardId} />
-      </p>
+      {/* The fold cuts the *raw* text, delimiters and all, so a highlight that straddles the cut
+          would lose its closing `==` and stop being one. `preview` keeps whole lines and whole
+          words, so the only way to split a mark is to have written one across a line break — and
+          `Marked` renders an unclosed pair as ordinary text rather than lighting up the rest of
+          the card. */}
+      {draw(expanded ? body : preview(body))}
 
       <Button
         variant="ghost"

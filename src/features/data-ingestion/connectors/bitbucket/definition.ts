@@ -52,8 +52,7 @@ export const bitbucketConnector: ConnectorDefinition<ProjectSource, BitbucketDra
     },
   },
   chat: {
-    // The AI service's source filter does not accept BITBUCKET yet.
-    filterable: false,
+    filterable: true,
     matchesCitationUrl: (url) => url.includes("bitbucket.org"),
   },
   knowledgeBase: {
