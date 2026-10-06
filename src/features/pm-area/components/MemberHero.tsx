@@ -45,7 +45,7 @@ export function MemberHero({
   const next = index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
 
   const stepperClassName =
-    "flex h-9 w-9 items-center justify-center rounded-xl border border-app-border text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none";
+    "flex h-9 w-9 items-center justify-center rounded-xl border border-app-border text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text";
 
   return (
     <div className="space-y-4">
@@ -74,7 +74,7 @@ export function MemberHero({
                   disabled={savingRoleId === role.id}
                   aria-label={`Remove ${role.name}`}
                   title={`Remove ${role.name}`}
-                  className="flex h-4.5 w-4.5 items-center justify-center rounded-full opacity-60 transition hover:bg-app-brand/15 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:opacity-30"
+                  className="-my-1 flex h-6 w-6 items-center justify-center rounded-full opacity-60 transition hover:bg-app-brand/15 hover:opacity-100 disabled:opacity-30"
                 >
                   <X aria-hidden="true" className="h-3 w-3" />
                 </button>

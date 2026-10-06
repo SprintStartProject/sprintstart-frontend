@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { Rocket, LogIn } from "lucide-react";
@@ -32,7 +33,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-4 text-app-text sm:p-6">
+    <MainContent className="relative flex min-h-screen items-center justify-center p-4 text-app-text sm:p-6">
       <div className="absolute top-4 right-4 sm:top-8 sm:right-8">
         <ThemeToggle
           showLabel={false}
@@ -85,6 +86,6 @@ export function LoginPage() {
           </p>
         </div>
       </SpotlightCard>
-    </div>
+    </MainContent>
   );
 }

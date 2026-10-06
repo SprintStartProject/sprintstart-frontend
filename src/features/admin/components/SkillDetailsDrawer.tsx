@@ -1,5 +1,13 @@
 import { useId, useState } from "react";
-import { Check, GraduationCap, RotateCcw, ShieldCheck, Trash2, Users } from "lucide-react";
+import {
+  Check,
+  GraduationCap,
+  RotateCcw,
+  ShieldCheck,
+  Trash2,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Button } from "../../../components/ui/Button";
@@ -372,7 +380,11 @@ export function SkillDetailsDrawer({
             </ul>
 
             {roleValidationError && (
-              <p className="mt-2 text-xs font-medium text-app-danger-text" role="alert">
+              <p
+                className="mt-2 flex items-start gap-1.5 text-xs font-medium text-app-danger-text"
+                role="alert"
+              >
+                <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {roleValidationError}
               </p>
             )}

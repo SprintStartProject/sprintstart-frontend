@@ -125,7 +125,7 @@ export function FileUploadZone({ onUpload, isUploading }: FileUploadZoneProps) {
         }}
         className={[
           "group relative flex cursor-pointer flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed p-6 transition-all duration-200 sm:p-10",
-          "focus:ring-2 focus:ring-app-focus focus:outline-none",
+          "focus:__DEL__",
           isDragActive
             ? "border-app-brand-border-strong bg-app-brand-soft"
             : "border-app-border-muted bg-app-bg hover:border-app-brand-border hover:bg-app-surface-hover",
@@ -169,12 +169,12 @@ export function FileUploadZone({ onUpload, isUploading }: FileUploadZoneProps) {
         </div>
 
         <div className="mt-2 flex flex-wrap justify-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-md border border-app-brand-border bg-app-brand-soft px-3 py-1.5 text-[10px] font-bold tracking-wider text-app-brand-text uppercase">
+          <div className="flex items-center gap-1.5 rounded-md border border-app-brand-border bg-app-brand-soft px-3 py-1.5 text-2xs font-bold tracking-wider text-app-brand-text uppercase">
             <FileCode className="h-3 w-3" />
             Docs (.md, .pdf)
           </div>
 
-          <div className="flex items-center gap-1.5 rounded-md border border-app-neutral-border bg-app-neutral-bg px-3 py-1.5 text-[10px] font-bold tracking-wider text-app-neutral-text uppercase">
+          <div className="flex items-center gap-1.5 rounded-md border border-app-neutral-border bg-app-neutral-bg px-3 py-1.5 text-2xs font-bold tracking-wider text-app-neutral-text uppercase">
             <ImageIcon className="h-3 w-3" />
             Images (.png, .webp)
           </div>

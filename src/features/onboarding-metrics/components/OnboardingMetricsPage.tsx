@@ -118,7 +118,7 @@ function UnattributedNotice({
                   <button
                     type="button"
                     onClick={() => onOpenMember(hire.userId)}
-                    className="font-medium text-app-text underline decoration-app-border underline-offset-2 hover:decoration-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    className="font-medium text-app-text underline decoration-app-border underline-offset-2 hover:decoration-app-text"
                   >
                     {hire.displayName}
                   </button>

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ExternalLink, LayoutList, Search, UserCheck } from "lucide-react";
+import { Check, ChevronDown, ExternalLink, LayoutList, Search, UserCheck } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { Input } from "../../../components/ui/Input";
@@ -258,12 +258,13 @@ function FilterChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition ${
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition ${
         active
           ? "border-app-brand-border bg-app-brand-soft text-app-brand-text"
           : "border-app-border text-app-text-muted hover:text-app-text"
       }`}
     >
+      {active ? <Check className="h-3 w-3" aria-hidden="true" /> : null}
       {children}
     </button>
   );

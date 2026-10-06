@@ -874,10 +874,10 @@ export function DinoGame({
       {/* Top bar: score + exit */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-2" aria-hidden="true">
-          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-semibold text-app-text-muted tabular-nums backdrop-blur-sm">
+          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-2xs font-semibold text-app-text-muted tabular-nums backdrop-blur-sm">
             HI {String(highScore).padStart(5, "0")}
           </span>
-          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-bold text-app-text tabular-nums backdrop-blur-sm">
+          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-2xs font-bold text-app-text tabular-nums backdrop-blur-sm">
             {String(score).padStart(5, "0")}
           </span>
         </div>
@@ -911,7 +911,7 @@ export function DinoGame({
       {/* Controls hint */}
       {status !== "over" && (
         <div className="pointer-events-none absolute inset-x-0 top-9 flex justify-center">
-          <span className="rounded bg-app-surface/70 px-2 py-0.5 text-[10px] text-app-text-disabled backdrop-blur-sm">
+          <span className="rounded bg-app-surface/70 px-2 py-0.5 text-xs text-app-text-disabled backdrop-blur-sm">
             Hold Space = high jump · ↓ duck
           </span>
         </div>

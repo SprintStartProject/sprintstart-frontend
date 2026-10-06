@@ -99,7 +99,7 @@ export function SkillsTab({
             <button
               type="button"
               onClick={() => onOpenSkillDetails(skill)}
-              className="absolute inset-0 z-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow focus-visible:ring-inset"
+              className="absolute inset-0 z-0 focus-ring-inset"
               aria-label={`Open details for ${skill.name}`}
             />
 

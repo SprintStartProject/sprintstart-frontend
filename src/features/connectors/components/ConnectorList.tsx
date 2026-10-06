@@ -144,7 +144,7 @@ export function ConnectorList({
                       }}
                       aria-pressed={isSelected}
                       aria-expanded={isExpanded}
-                      className="relative z-10 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="relative z-10 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left"
                     >
                       <IconTile icon={Icon} size="lg" tone="neutral" />
 

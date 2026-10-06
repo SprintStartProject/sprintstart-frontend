@@ -220,8 +220,10 @@ describe("Input", () => {
     expect(screen.getByTestId("icon").closest('[aria-hidden="true"]')).not.toBeNull();
   });
 
-  it("carries the shared focus ring token", () => {
+  it("leaves the focus outline to the global :focus-visible rule", () => {
     render(<Input aria-label="Search" />);
-    expect(screen.getByLabelText("Search").className).toContain("focus:ring-app-focus");
+    expect(screen.getByLabelText("Search").className).not.toMatch(
+      /outline-(none|hidden)|ring-app-focus/,
+    );
   });
 });

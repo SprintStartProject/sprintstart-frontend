@@ -266,7 +266,7 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
               <RocketGlyph size={54} flame />
             </motion.div>
 
-            <p className="relative text-[11px] font-semibold tracking-[0.22em] text-app-brand-text uppercase">
+            <p className="relative text-2xs font-semibold tracking-[0.22em] text-app-brand-text uppercase">
               Onboarding complete
             </p>
 
@@ -286,7 +286,7 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
               ref={actionRef}
               type="button"
               onClick={onDismiss}
-              className="relative mt-8 rounded-xl bg-app-brand px-7 py-3 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              className="relative mt-8 rounded-xl bg-app-brand px-7 py-3 text-sm font-medium text-white transition-colors hover:bg-app-brand-hover"
             >
               Let&apos;s go
             </button>
@@ -296,7 +296,7 @@ export function MissionComplete({ displayName, onDismiss }: MissionCompleteProps
 
       {/* Skip affordance, so the sequence never feels like a lock-in. */}
       {stage !== "arrival" && (
-        <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-[11px] font-medium tracking-[0.18em] text-app-text-subtle uppercase">
+        <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-2xs font-medium tracking-[0.18em] text-app-text-subtle uppercase">
           Press any key to skip
         </p>
       )}

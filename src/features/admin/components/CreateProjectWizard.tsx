@@ -592,7 +592,7 @@ export function CreateProjectWizard({
           {screenAnnouncement}
         </p>
 
-        <div ref={bodyRef} tabIndex={-1} className="focus:outline-none">
+        <div ref={bodyRef} tabIndex={-1} className="focus:outline-hidden">
           {phase === "details" && (
             <WizardDetailsStep
               name={name}

@@ -12,7 +12,7 @@ type ProjectMonogramProps = {
 
 const SIZE_CLASSES: Record<ProjectMonogramSize, string> = {
   // Small enough to sit inside a badge, e.g. in the user table's project column.
-  xs: "h-5 w-5 rounded-md text-[10px] leading-none",
+  xs: "h-5 w-5 rounded-md text-xs leading-none",
   sm: "h-9 w-9 rounded-[10px] text-xs",
   md: "h-10 w-10 rounded-xl text-sm",
   lg: "h-16 w-16 rounded-2xl text-xl",

@@ -1,3 +1,4 @@
+import { MainContent } from "../../components/layout/MainContent";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -376,7 +377,7 @@ export function PmWorkspace() {
         </div>
       </header>
 
-      <div ref={swipeRef} className="app-page-frame flex-1 py-6 pb-24 lg:py-8">
+      <MainContent ref={swipeRef} className="app-page-frame flex-1 py-6 pb-24 lg:py-8">
         {noProject ? (
           // One calm state for the whole area instead of six cards each reporting a failed
           // request: without a project there is nothing to ask the backend about.
@@ -428,7 +429,7 @@ export function PmWorkspace() {
             </div>
           </>
         )}
-      </div>
+      </MainContent>
 
       <MemberPeekPanel />
     </div>

@@ -30,14 +30,27 @@ export const EDGE_TONE_STYLE: Record<GraphEdgeTone, JourneyEdgeTone> = {
   suggestion: "waiting",
 };
 
-/** What each of the canvas's edge styles looks like, for a legend drawn beside the canvas. */
-export const EDGE_STYLE_SWATCH: Record<
-  JourneyEdgeTone,
-  { className: string; dash?: string; width: number }
-> = {
-  done: { className: "stroke-app-success-solid/70", width: 2 },
-  active: { className: "stroke-app-brand", dash: "10 8", width: 2 },
-  waiting: { className: "stroke-app-text-subtle/50", dash: "6 6", width: 2 },
-  upstream: { className: "stroke-app-orange-text", width: 2 },
-  rule: { className: "stroke-app-brand", width: 2 },
+/** How one edge style is drawn: colour class, dash pattern, width and the end cap of a dash. */
+export type EdgeStyleSwatch = {
+  className: string;
+  dash?: string;
+  width: number;
+  linecap: "round" | "butt";
+};
+
+/**
+ * What each of the canvas's edge styles looks like. The canvas strokes its arrows from this table
+ * and the legends draw their swatches from it, so the two cannot drift apart.
+ *
+ * Every style has its own line pattern as well as its colour (WCAG 1.4.1): solid for done, dashed
+ * for what is ready now, dotted for what is still waiting, dash-dot for what has to come first. The
+ * dotted pattern is a dash of almost no length with round caps, which draws as a dot. The dash-dot
+ * keeps flat caps, because round ones would eat the short gaps between its parts.
+ */
+export const EDGE_STYLE_SWATCH: Record<JourneyEdgeTone, EdgeStyleSwatch> = {
+  done: { className: "stroke-app-success-solid/70", width: 2.5, linecap: "round" },
+  active: { className: "stroke-app-brand", dash: "10 8", width: 2.5, linecap: "round" },
+  waiting: { className: "stroke-app-text-subtle/50", dash: "0.1 6", width: 2.5, linecap: "round" },
+  upstream: { className: "stroke-app-orange-text", dash: "14 4 2 4", width: 2, linecap: "butt" },
+  rule: { className: "stroke-app-brand", width: 2, linecap: "round" },
 };

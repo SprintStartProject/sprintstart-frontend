@@ -105,7 +105,7 @@ export function BuddyConversationList({
             type="button"
             onClick={onClose}
             aria-label="Close your conversations"
-            className="shrink-0 rounded p-1 text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            className="shrink-0 rounded p-1 text-app-text-muted transition-colors hover:text-app-text"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -131,7 +131,6 @@ export function BuddyConversationList({
                   isCurrent
                     ? "bg-app-brand-soft font-medium text-app-brand-text"
                     : "text-app-text hover:bg-app-surface-hover",
-                  "focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
                   disabled ? "cursor-not-allowed opacity-60" : "",
                 ].join(" ")}
               >

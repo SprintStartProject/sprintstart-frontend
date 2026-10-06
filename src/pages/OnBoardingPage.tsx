@@ -2,6 +2,7 @@
 // OnBoardingPage.tsx
 // ============================================================
 
+import { MainContent } from "../components/layout/MainContent";
 import {
   AlertCircle,
   AlertTriangle,
@@ -1041,7 +1042,7 @@ export function OnBoardingPage() {
         </div>
       </header>
 
-      <main className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
+      <MainContent className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <SegmentedTabs
             layoutId="onboarding-view-mode"
@@ -1056,7 +1057,7 @@ export function OnBoardingPage() {
           {overall ? (
             <div className="flex items-center gap-3">
               <ProgressRing value={overall.percentage} size={44} stroke={4.5}>
-                <span className="text-[11px] font-bold text-app-text tabular-nums">
+                <span className="text-2xs font-bold text-app-text tabular-nums">
                   {overall.percentage}%
                 </span>
               </ProgressRing>
@@ -1152,7 +1153,7 @@ export function OnBoardingPage() {
             />
           )}
         </SlidingTabPanel>
-      </main>
+      </MainContent>
     </div>
   );
 }

@@ -75,7 +75,7 @@ export function MarkFilterRail({
               aria-pressed={active}
               aria-label={label}
               title={label}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+              className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-app-surface-hover ${
                 active ? "bg-app-surface-hover" : ""
               }`}
             >

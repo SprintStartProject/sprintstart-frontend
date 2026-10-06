@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useState } from "react";
 import { ChartColumn, Check, LayoutGrid, Plus, RotateCcw } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -103,7 +104,7 @@ export function DashboardPage() {
         </div>
       </header>
 
-      <main className="app-page-frame py-6 pb-24 lg:py-8">
+      <MainContent className="app-page-frame py-6 pb-24 lg:py-8">
         <DashboardGrid
           controller={controller}
           isEditing={isEditing}
@@ -113,7 +114,7 @@ export function DashboardPage() {
             setPickerOpen(true);
           }}
         />
-      </main>
+      </MainContent>
 
       <WidgetPickerModal
         isOpen={isPickerOpen}

@@ -1,4 +1,5 @@
 import {
+  AlarmClock,
   CalendarClock,
   CheckCircle2,
   CircleDashed,
@@ -43,10 +44,15 @@ const PHASE_LABEL: Record<PhaseState, string> = {
 };
 
 const LEVEL_SEGMENTS = [
-  { level: "BEGINNER", label: "beginner", className: "bg-app-warning-solid" },
-  { level: "INTERMEDIATE", label: "intermediate", className: "bg-app-cyan-text" },
-  { level: "ADVANCED", label: "advanced", className: "bg-app-brand" },
-  { level: "EXPERT", label: "expert", className: "bg-app-success-solid" },
+  { level: "BEGINNER", label: "beginner", short: "beginner", className: "bg-app-warning-solid" },
+  {
+    level: "INTERMEDIATE",
+    label: "intermediate",
+    short: "intermed.",
+    className: "bg-app-cyan-text",
+  },
+  { level: "ADVANCED", label: "advanced", short: "adv.", className: "bg-app-brand" },
+  { level: "EXPERT", label: "expert", short: "expert", className: "bg-app-success-solid" },
 ] as const;
 
 /**
@@ -66,7 +72,7 @@ function Signal({
 }) {
   const body = (
     <>
-      <span className="flex items-center gap-1 text-[10px] font-semibold tracking-wider text-app-text-subtle uppercase">
+      <span className="flex items-center gap-1 text-2xs font-semibold tracking-wider text-app-text-subtle uppercase">
         <Icon aria-hidden="true" className="h-3 w-3" />
         {title}
       </span>
@@ -80,7 +86,7 @@ function Signal({
     <button
       type="button"
       onClick={onOpen}
-      className={`${className} transition-colors hover:border-app-brand-border-strong focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+      className={`${className} transition-colors hover:border-app-brand-border-strong`}
     >
       {body}
     </button>
@@ -151,7 +157,7 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
         type="button"
         onClick={() => onOpenPhase(phase.id)}
         title={`Show ${phase.title} in the path`}
-        className={`rounded text-left hover:text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${className}`}
+        className={`rounded text-left hover:text-app-brand-text hover:underline ${className}`}
       >
         {children}
       </button>
@@ -174,7 +180,7 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
             ariaLabel={`${percent}% of the onboarding path complete`}
           >
             <span className="text-xl leading-none font-bold text-app-text">{percent}%</span>
-            <span className="mt-1 text-[11px] text-app-text-muted">{STAGE_LABEL[stage]}</span>
+            <span className="mt-1 text-xs text-app-text-muted">{STAGE_LABEL[stage]}</span>
           </RingGauge>
           <div className="min-w-0 space-y-1 text-xs text-app-text-muted @xl:max-w-44">
             {data.progress && (
@@ -194,8 +200,13 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
               <p
                 className={`flex items-center gap-1 ${isAtRisk(member) ? "font-medium text-app-orange-text" : ""}`}
               >
-                <Clock aria-hidden="true" className="h-3 w-3" />
+                {isAtRisk(member) ? (
+                  <AlarmClock aria-hidden="true" className="h-3 w-3" />
+                ) : (
+                  <Clock aria-hidden="true" className="h-3 w-3" />
+                )}
                 {formatDays(days)} on this step
+                {isAtRisk(member) ? " · long" : null}
               </p>
             )}
           </div>
@@ -295,7 +306,7 @@ export function MemberSummary({ member, path, feedback, onOpenPhase }: MemberSum
                             type="button"
                             onClick={() => onOpenPhase(phase.id)}
                             title={`Show ${phase.title} in the path`}
-                            className={`${cardClassName} transition-colors hover:border-app-brand-border-strong hover:bg-app-brand-soft/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+                            className={`${cardClassName} transition-colors hover:border-app-brand-border-strong hover:bg-app-brand-soft/70`}
                           >
                             {content}
                           </button>
@@ -416,7 +427,7 @@ export function MemberSignals({
         <span className="font-semibold">
           {data.runningDays === null ? "—" : formatDays(data.runningDays)}
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted">since the path began</span>
+        <span className="block truncate text-xs text-app-text-muted">since the path began</span>
       </Signal>
 
       <Signal icon={MessageSquareText} title="What they said" onOpen={onOpen}>
@@ -440,7 +451,7 @@ export function MemberSignals({
             className="text-app-warning-text"
           />
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted">
+        <span className="block truncate text-xs text-app-text-muted">
           {data.pendingSkips > 0
             ? `${data.pendingSkips} skip ${data.pendingSkips === 1 ? "request" : "requests"} open`
             : `${data.comments} ${data.comments === 1 ? "comment" : "comments"}`}
@@ -451,12 +462,9 @@ export function MemberSignals({
         {assessed === 0 ? (
           <span className="text-app-text-muted">Not assessed yet</span>
         ) : (
-          // The bar alone, with the levels in its tooltip: the legend under it took three lines
-          // in a tile this size.
-          <span
-            className="block"
-            title={levels.map((segment) => `${segment.value} ${segment.label}`).join(" · ")}
-          >
+          // The bar is only a picture of the counts; the line under it says them in words, in the
+          // order of the segments, so the levels are not left to a tooltip or to the colours.
+          <span className="block">
             <span className="font-semibold tabular-nums">{assessed}</span>
             <span className="text-app-text-muted"> assessed</span>
             <span aria-hidden="true" className="mt-1 flex h-1 gap-0.5 overflow-hidden rounded-full">
@@ -468,13 +476,26 @@ export function MemberSignals({
                 />
               ))}
             </span>
-            <span className="sr-only">
-              : {levels.map((segment) => `${segment.value} ${segment.label}`).join(", ")}
+            <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-app-text-muted">
+              {levels
+                .filter((segment) => segment.value > 0)
+                .map((segment, position) => (
+                  <span key={segment.level} className="inline-flex items-center gap-1.5">
+                    {position > 0 ? <span aria-hidden="true">·</span> : null}
+                    <span
+                      aria-hidden="true"
+                      className={`h-1.5 w-1.5 rounded-full ${segment.className}`}
+                    />
+                    <span>
+                      <span className="tabular-nums">{segment.value}</span> {segment.short}
+                    </span>
+                  </span>
+                ))}
             </span>
           </span>
         )}
         {knowledgeGapCount > 0 && (
-          <span className="block truncate text-[11px] text-app-text-muted">
+          <span className="block truncate text-xs text-app-text-muted">
             {knowledgeGapCount} knowledge {knowledgeGapCount === 1 ? "gap" : "gaps"}
           </span>
         )}

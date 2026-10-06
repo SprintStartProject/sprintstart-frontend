@@ -1038,7 +1038,7 @@ export function ArtifactViewerDrawer({
           onClick={openDeleteConfirm}
           data-testid="delete-artifact-btn"
           disabled={isDeleting}
-          className="flex items-center gap-2 rounded-md border border-app-danger-border bg-app-danger-bg px-3 py-1.5 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-text/10 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-2 rounded-md border border-app-danger-border bg-app-danger-bg px-3 py-1.5 text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-text/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Trash2 className="h-4 w-4" />
           Delete
@@ -1103,7 +1103,7 @@ export function ArtifactViewerDrawer({
       ) : viewMode === "raw" ? (
         <div ref={contentContainerRef} data-testid="raw-content" aria-busy={isLoading}>
           {isLoading ? (
-            <div className="animate-pulse space-y-4">
+            <div className="animate-pulse space-y-4 motion-reduce:animate-none">
               <div className="h-4 w-3/4 rounded bg-app-border"></div>
               <div className="h-4 w-1/2 rounded bg-app-border"></div>
               <div className="h-4 w-5/6 rounded bg-app-border"></div>
@@ -1159,7 +1159,7 @@ export function ArtifactViewerDrawer({
                       <a
                         href={content.content}
                         download={artifact?.title || "document.pdf"}
-                        className="text-app-brand hover:underline"
+                        className="text-app-brand underline underline-offset-2"
                       >
                         Download
                       </a>{" "}

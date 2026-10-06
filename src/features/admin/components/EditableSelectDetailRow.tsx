@@ -56,7 +56,7 @@ export function EditableSelectDetailRow({
         <button
           type="button"
           onClick={() => setIsOpen((current) => !current)}
-          className={`flex h-10 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left text-sm font-medium transition-colors outline-none focus:ring-2 focus:ring-app-brand-glow ${
+          className={`flex h-10 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left text-sm font-medium transition-colors ${
             isOpen
               ? "border-app-brand-border bg-app-brand-soft text-app-brand-text"
               : "border-app-border bg-app-surface text-app-text hover:bg-app-surface-hover"
@@ -87,7 +87,7 @@ export function EditableSelectDetailRow({
                   role="option"
                   aria-selected={isSelected}
                   onClick={() => selectOption(option)}
-                  className={`flex min-h-11 w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors ${
+                  className={`flex min-h-11 w-full items-center justify-between px-4 py-3 text-left text-sm focus-ring-inset transition-colors ${
                     isSelected
                       ? "bg-app-brand-soft text-app-brand-text"
                       : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"

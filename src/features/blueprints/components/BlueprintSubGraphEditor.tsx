@@ -7,6 +7,7 @@ import {
   Minus,
   Plus,
   Trash2,
+  TriangleAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
@@ -699,7 +700,8 @@ function StepDetails({
         />
       </Field>
       {saveError ? (
-        <p role="alert" className="text-sm text-app-danger-text">
+        <p role="alert" className="flex items-start gap-1.5 text-sm text-app-danger-text">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {saveError}
         </p>
       ) : null}
@@ -954,7 +956,8 @@ function QuestionDetails({
         />
       </Field>
       {saveError ? (
-        <p role="alert" className="text-sm text-app-danger-text">
+        <p role="alert" className="flex items-start gap-1.5 text-sm text-app-danger-text">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {saveError}
         </p>
       ) : null}
@@ -1010,7 +1013,8 @@ function QuestionDetails({
               Correct option
             </label>
             {optionError ? (
-              <p role="alert" className="text-sm text-app-danger-text">
+              <p role="alert" className="flex items-start gap-1.5 text-sm text-app-danger-text">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 {optionError}
               </p>
             ) : null}

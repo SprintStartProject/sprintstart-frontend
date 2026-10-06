@@ -1,4 +1,4 @@
-import { BookCheck, Clock, MessageSquareOff } from "lucide-react";
+import { AlarmClock, BookCheck, Clock, MessageSquareOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { formatDateTime, formatWaiting, hasWaitedADay } from "../../knowledge-request/format";
 import type { PmReplies } from "../hooks/usePmReplies";
@@ -85,8 +85,13 @@ export function BuddyPmReplies({ answered, waiting, dismissed }: PmReplies) {
                       : "text-app-text-disabled"
                   }`}
                 >
-                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  {hasWaitedADay(request.createdAt) ? (
+                    <AlarmClock className="h-3 w-3" aria-hidden="true" />
+                  ) : (
+                    <Clock className="h-3 w-3" aria-hidden="true" />
+                  )}
                   Waiting {formatWaiting(request.createdAt)}
+                  {hasWaitedADay(request.createdAt) ? " · long" : null}
                 </span>
               </li>
             ))}

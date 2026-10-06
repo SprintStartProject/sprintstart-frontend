@@ -54,7 +54,7 @@ export function AssignedProjectCard({
         type="button"
         onClick={() => onOpen(project.id)}
         aria-label={`Open ${project.name} project details`}
-        className="flex min-w-0 flex-1 items-start gap-3 rounded-2xl px-3 py-4 text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none sm:px-4"
+        className="flex min-w-0 flex-1 items-start gap-3 rounded-2xl px-3 py-4 text-left sm:px-4"
       >
         <ProjectMonogram
           projectId={project.id}

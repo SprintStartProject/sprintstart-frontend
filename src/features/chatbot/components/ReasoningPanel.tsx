@@ -120,7 +120,7 @@ export function ReasoningPanel({ reasoning, isStreaming, answerLength }: Reasoni
         type="button"
         onClick={toggle}
         aria-expanded={isOpen}
-        className="flex w-full items-center gap-2 px-4 py-2 text-left font-medium text-app-text-muted transition-colors select-none hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="flex w-full items-center gap-2 px-4 py-2 text-left font-medium text-app-text-muted transition-colors select-none hover:text-app-text"
       >
         <ChevronRight
           aria-hidden="true"
@@ -131,7 +131,7 @@ export function ReasoningPanel({ reasoning, isStreaming, answerLength }: Reasoni
         {/* Says which of the two states it is in without relying on the animation alone:
             still being written, or finished and available to read back. */}
         {isThinkingNow ? (
-          <span className="animate-pulse text-xs italic">thinking…</span>
+          <span className="animate-pulse text-xs italic motion-reduce:animate-none">thinking…</span>
         ) : (
           !isOpen && <span className="text-xs text-app-text-disabled">(hidden)</span>
         )}

@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useReducedMotion } from "framer-motion";
@@ -131,7 +132,7 @@ export function SettingsPage() {
         </div>
       </header>
 
-      <main className="app-page-content py-6 md:py-8">
+      <MainContent className="app-page-content py-6 md:py-8">
         <div className="mx-auto max-w-4xl">
           <nav
             aria-label="Settings sections"
@@ -142,7 +143,7 @@ export function SettingsPage() {
                 key={id}
                 href={`#${id}`}
                 onClick={(event) => scrollToSection(event, id)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none max-sm:py-3"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text max-sm:py-3"
               >
                 <Icon className="h-4 w-4" aria-hidden />
                 {label}
@@ -164,7 +165,7 @@ export function SettingsPage() {
             ))}
           </div>
         </div>
-      </main>
+      </MainContent>
     </div>
   );
 }

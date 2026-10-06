@@ -95,7 +95,7 @@ export function AutoResizeTextarea({
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
       rows={minRows}
-      className={`w-full resize-none overflow-hidden rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand ${className}`.trim()}
+      className={`w-full resize-none overflow-hidden rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-hidden focus:border-app-brand ${className}`.trim()}
     />
   );
 }

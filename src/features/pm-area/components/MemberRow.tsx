@@ -1,4 +1,5 @@
 import {
+  AlarmClock,
   ArrowUpRight,
   CheckCircle2,
   ChevronRight,
@@ -129,21 +130,21 @@ export function MemberFlags({ member }: { member: TeamOverviewUser }) {
   return (
     <span className="flex flex-wrap items-center gap-1">
       {waiting.includes("skip") && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-app-warning-bg px-2 py-0.5 text-[11px] font-medium text-app-warning-text">
+        <span className="inline-flex items-center gap-1 rounded-full bg-app-warning-bg px-2 py-0.5 text-xs font-medium text-app-warning-text">
           <SkipForward aria-hidden="true" className="h-3 w-3" />
           Skip request
         </span>
       )}
       {waiting.includes("feedback") && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-app-brand-soft px-2 py-0.5 text-[11px] font-medium text-app-brand-text">
+        <span className="inline-flex items-center gap-1 rounded-full bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text">
           <MessageSquareText aria-hidden="true" className="h-3 w-3" />
           Feedback
         </span>
       )}
       {atRisk && days !== null && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-app-orange-bg px-2 py-0.5 text-[11px] font-medium text-app-orange-text">
-          <Clock aria-hidden="true" className="h-3 w-3" />
-          {formatDays(days)} on step
+        <span className="inline-flex items-center gap-1 rounded-full bg-app-orange-bg px-2 py-0.5 text-xs font-medium text-app-orange-text">
+          <AlarmClock aria-hidden="true" className="h-3 w-3" />
+          {formatDays(days)} on step · long
         </span>
       )}
     </span>
@@ -183,7 +184,7 @@ function OpenItems({ member, reasons }: { member: TeamOverviewUser; reasons: Att
         return (
           <span key={reason.kind} className="flex min-w-0 items-center gap-1.5 text-xs">
             <span
-              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.tone}`}
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${meta.tone}`}
             >
               <Icon aria-hidden="true" className="h-3 w-3" />
               {meta.label}
@@ -195,7 +196,7 @@ function OpenItems({ member, reasons }: { member: TeamOverviewUser; reasons: Att
         );
       })}
       {folded > 0 && (
-        <span className="text-[11px] text-app-text-subtle">
+        <span className="text-xs text-app-text-subtle">
           +{folded} more:{" "}
           {reasons
             .slice(VISIBLE_REASONS)
@@ -272,8 +273,10 @@ export function MemberRow({
       onDoubleClick={handleDoubleClick}
       title="Click for a quick look · double-click for the full profile"
       aria-current={selected ? "true" : undefined}
-      className={`group grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-        selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
+      className={`group grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-3 py-3 text-left transition-colors ${
+        selected
+          ? "bg-app-brand-soft shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
+          : "hover:bg-app-surface-hover"
       } ${
         isFull
           ? `grid-cols-[minmax(0,1fr)_auto] ${ROSTER_COLUMNS}`
@@ -295,7 +298,7 @@ export function MemberRow({
                 member.roles.map((role) => (
                   <span
                     key={role.id}
-                    className="truncate rounded-md bg-app-brand-soft px-1.5 py-0.5 text-[11px] font-medium text-app-brand-text"
+                    className="truncate rounded-md bg-app-brand-soft px-1.5 py-0.5 text-xs font-medium text-app-brand-text"
                   >
                     {role.name}
                   </span>
@@ -324,8 +327,13 @@ export function MemberRow({
                     isAtRisk(member) ? "font-medium text-app-orange-text" : ""
                   }`}
                 >
-                  <Clock aria-hidden="true" className="h-3 w-3" />
+                  {isAtRisk(member) ? (
+                    <AlarmClock aria-hidden="true" className="h-3 w-3" />
+                  ) : (
+                    <Clock aria-hidden="true" className="h-3 w-3" />
+                  )}
                   {days <= 0 ? "started today" : `${formatDays(days)} on step`}
+                  {isAtRisk(member) ? " · long" : null}
                 </span>
               )}
             </span>
@@ -379,7 +387,7 @@ export function MemberRow({
         to={`/team/${member.userId}`}
         aria-label={`Open full profile of ${name}`}
         title="Full profile"
-        className="absolute top-3 right-9 flex h-8 w-8 items-center justify-center rounded-lg text-app-text-subtle transition-colors hover:bg-app-brand-soft hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none md:top-1/2 md:-translate-y-1/2"
+        className="absolute top-3 right-9 flex h-8 w-8 items-center justify-center rounded-lg text-app-text-subtle transition-colors hover:bg-app-brand-soft hover:text-app-brand-text md:top-1/2 md:-translate-y-1/2"
       >
         <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
       </Link>

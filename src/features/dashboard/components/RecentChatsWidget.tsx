@@ -49,7 +49,7 @@ export function RecentChatsWidget() {
 
         <Link
           to="/chat"
-          className="flex shrink-0 items-center gap-1 rounded-lg text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="flex shrink-0 items-center gap-1 rounded-lg text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text"
           // Named here because the words beside the arrow step aside on a narrow card.
           aria-label="Open chat"
         >
@@ -84,7 +84,7 @@ export function RecentChatsWidget() {
                   {recentChat.title || "Untitled chat"}
                 </span>
 
-                <span className="shrink-0 text-[11px] text-app-text-muted tabular-nums">
+                <span className="shrink-0 text-xs text-app-text-muted tabular-nums">
                   {formatRelativeDate(recentChat.createdAt)}
                 </span>
               </Link>

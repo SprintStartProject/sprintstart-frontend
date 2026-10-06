@@ -1886,7 +1886,7 @@ function BoardCardCell({
             }}
             title="Drag sideways to make this card narrower or wider, or use the arrow keys"
             aria-label={`Resize the ${label} card — drag sideways, or use the arrow keys`}
-            className="absolute right-1 bottom-1 z-20 hidden h-5 w-5 cursor-ew-resize items-center justify-center rounded text-app-text-subtle opacity-0 transition-opacity duration-150 group-hover/stack:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none lg:flex"
+            className="absolute right-1 bottom-1 z-20 hidden h-6 w-6 cursor-ew-resize items-center justify-center rounded text-app-text-subtle opacity-0 transition-opacity duration-150 group-hover/stack:opacity-100 focus-visible:opacity-100 lg:flex"
           >
             <span
               aria-hidden="true"
@@ -2243,7 +2243,7 @@ function BoardGroupSection({
                   type="button"
                   onClick={() => setDraft(group.name)}
                   title="Rename this area"
-                  className="max-w-full truncate rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  className="max-w-full truncate rounded-sm hover:underline"
                 >
                   {group.name}
                 </button>
@@ -2281,14 +2281,19 @@ function BoardGroupSection({
                   aria-pressed={(group.accent ?? "blue") === option}
                   title={`Paint the ${group.name} area ${areaAccent(option).label.toLowerCase()}`}
                   aria-label={`Paint the ${group.name} area ${areaAccent(option).label.toLowerCase()}`}
-                  className={`h-3.5 w-3.5 rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-                    areaAccent(option).swatch
-                  } ${
-                    (group.accent ?? "blue") === option
-                      ? "ring-2 ring-app-text/40 ring-offset-1 ring-offset-app-surface"
-                      : "hover:scale-125"
-                  }`}
-                />
+                  className="group/accent flex h-6 w-6 items-center justify-center rounded-full"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-3.5 w-3.5 rounded-full transition-transform ${
+                      areaAccent(option).swatch
+                    } ${
+                      (group.accent ?? "blue") === option
+                        ? "ring-2 ring-app-text/40 ring-offset-1 ring-offset-app-surface"
+                        : "group-hover/accent:scale-125"
+                    }`}
+                  />
+                </button>
               ))}
             </span>
           )}

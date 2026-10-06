@@ -46,7 +46,7 @@ export function Page() {
           <div id="kc-registration">
             <span>
               ${msg("noAccount")}{" "}
-              <a tabIndex={6} href={url.registrationUrl}>
+              <a href={url.registrationUrl}>
                 {msg("doRegister")}
               </a>
             </span>
@@ -166,7 +166,6 @@ export function Page() {
                       {msg("passkey-autofill-select")}
                     </label>
                     <input
-                      tabIndex={1}
                       id="username"
                       aria-invalid={messagesPerField.existsError("username")}
                       className={kcClsx("kcInputClass")}

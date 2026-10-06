@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, TriangleAlert } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
@@ -119,7 +119,8 @@ export function TokenRotateForm({ name, onClose, onSaved }: TokenRotateFormProps
       </div>
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-app-danger-text">
+        <p role="alert" className="mt-3 flex items-start gap-1.5 text-sm text-app-danger-text">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </p>
       )}

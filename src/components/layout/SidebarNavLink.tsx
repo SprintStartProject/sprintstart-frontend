@@ -196,8 +196,8 @@ type SidebarNavLinkProps = {
 };
 
 const BASE_LINK_CLASS = [
-  "group relative flex h-[40px] items-center rounded-[10px] px-[12px] text-[14px] font-medium leading-none",
-  "transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus",
+  "group relative flex h-[40px] items-center rounded-[10px] px-[12px] text-sm font-medium leading-none",
+  "transition-colors duration-200",
 ].join(" ");
 
 function getLinkStateClass(isHighlighted: boolean): string {
@@ -538,7 +538,7 @@ export function SidebarNavLink({
                         }
                       : { duration: 0.2 }
                   }
-                  className={`flex shrink-0 transition-colors ${
+                  className={`relative flex shrink-0 transition-colors ${
                     needsAttention
                       ? "text-app-warning-solid"
                       : isHighlighted
@@ -563,7 +563,19 @@ export function SidebarNavLink({
                                         would read out "Escalation Inbox, open
                                         escalations, 3 open escalations". */}
                   {needsAttention && count === 0 && (
-                    <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                    <>
+                      {/* The shape that stays when the movement does not: the icon wobbles for the
+                          people who can see it move, and this badge is there for everybody else,
+                          reduced motion included (WCAG 1.4.1). A count takes its place when there is
+                          one. */}
+                      <span
+                        aria-hidden="true"
+                        className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-app-warning-solid text-xs leading-none font-bold text-white ring-2 ring-app-surface"
+                      >
+                        !
+                      </span>
+                      <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                    </>
                   )}
                 </motion.span>
 
@@ -618,7 +630,7 @@ export function SidebarNavLink({
                                             kind of thing carrying a number. */}
                     <span
                       aria-hidden="true"
-                      className="min-w-[20px] rounded-full bg-app-warning-bg px-1.5 py-0.5 text-center text-[11px] font-semibold text-app-warning-text"
+                      className="min-w-[20px] rounded-full bg-app-warning-bg px-1.5 py-0.5 text-center text-xs font-semibold text-app-warning-text"
                     >
                       {count}
                     </span>
@@ -645,15 +657,15 @@ export function SidebarNavLink({
           >
             {label}
             {busy ? (
-              <span className="block text-[11px] font-normal text-app-text-muted">
+              <span className="block text-xs font-normal text-app-text-muted">
                 {busyLabel ?? "In progress"}
               </span>
             ) : count > 0 ? (
-              <span className="block text-[11px] font-normal text-app-text-muted">
+              <span className="block text-xs font-normal text-app-text-muted">
                 {countLabel?.(count) ?? `${count} waiting`}
               </span>
             ) : needsAttention ? (
-              <span className="block text-[11px] font-normal text-app-text-muted">
+              <span className="block text-xs font-normal text-app-text-muted">
                 {attentionLabel ?? "Needs attention"}
               </span>
             ) : null}

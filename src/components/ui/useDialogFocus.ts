@@ -28,14 +28,27 @@ export function getFocusableElements(container: HTMLElement): HTMLElement[] {
  *
  * Returns the ref to put on the dialog element. Give that element `tabIndex={-1}` so it can take
  * focus itself when it holds no focusable control.
+ *
+ * `onEscape` is for the dialogs that close themselves (an off-canvas drawer); a `Modal` brings
+ * its own Escape handling and passes nothing. Escape is left alone when something inside has
+ * already used it (`defaultPrevented`), such as an open menu.
  */
-export function useDialogFocus<T extends HTMLElement>(isOpen: boolean): RefObject<T | null> {
+export function useDialogFocus<T extends HTMLElement>(
+  isOpen: boolean,
+  onEscape?: () => void,
+): RefObject<T | null> {
   const dialogRef = useRef<T | null>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const onEscapeRef = useRef(onEscape);
+
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+  }, [onEscape]);
 
   useEffect(() => {
     if (!isOpen) return;
 
+    const dialogAtOpen = dialogRef.current;
     previouslyFocused.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
@@ -53,7 +66,12 @@ export function useDialogFocus<T extends HTMLElement>(isOpen: boolean): RefObjec
     });
 
     return () => {
-      previouslyFocused.current?.focus();
+      // Give focus back only if it is still in the dialog or nowhere. If a route change (or
+      // anything else) has already moved it somewhere on purpose, taking it back would undo that.
+      const active = document.activeElement;
+      const focusIsFree =
+        !active || active === document.body || (dialogAtOpen?.contains(active) ?? false);
+      if (focusIsFree) previouslyFocused.current?.focus();
     };
   }, [isOpen]);
 
@@ -61,6 +79,12 @@ export function useDialogFocus<T extends HTMLElement>(isOpen: boolean): RefObjec
     if (!isOpen) return;
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && onEscapeRef.current && !event.defaultPrevented) {
+        event.preventDefault();
+        onEscapeRef.current();
+        return;
+      }
+
       if (event.key !== "Tab") return;
 
       const dialog = dialogRef.current;

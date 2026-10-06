@@ -75,7 +75,7 @@ export function ScanPanel({ tasks, log, startedAt }: ScanPanelProps) {
       </div>
 
       <section aria-label="Now checking">
-        <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">
+        <p className="mb-2 text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
           Now checking
         </p>
         {running.length === 0 ? (
@@ -120,7 +120,7 @@ export function ScanPanel({ tasks, log, startedAt }: ScanPanelProps) {
       </section>
 
       <section aria-label="Checks">
-        <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">
+        <p className="mb-2 text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
           Found so far
         </p>
         <ul className="space-y-1">
@@ -169,10 +169,10 @@ export function ScanPanel({ tasks, log, startedAt }: ScanPanelProps) {
       </section>
 
       <section aria-label="Log">
-        <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-text-muted uppercase">
+        <p className="mb-2 text-2xs font-semibold tracking-wider text-app-text-muted uppercase">
           Log
         </p>
-        <ol className="space-y-1 font-mono text-[11px] leading-relaxed">
+        <ol className="space-y-1 font-mono text-xs leading-relaxed">
           <AnimatePresence initial={false}>
             {log.slice(-LOG_LINES).map((entry) => (
               <motion.li

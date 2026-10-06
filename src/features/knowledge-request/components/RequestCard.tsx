@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Clock, MessageSquareText } from "lucide-react";
+import { AlarmClock, Clock, MessageSquareText } from "lucide-react";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Button } from "../../../components/ui/Button";
 import type { EscalationHire, KnowledgeRequest } from "../types";
@@ -44,8 +44,13 @@ export function RequestCard({ request, onAnswer, onDismiss }: RequestCardProps) 
           }`}
           title="How long this has waited on a person"
         >
-          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          {isStale ? (
+            <AlarmClock className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
           {waited}
+          {isStale ? " · long" : null}
         </span>
       </div>
 
@@ -111,7 +116,7 @@ function HireIdentity({ hire }: { hire: EscalationHire }) {
           // `block` so `truncate` has something to work on: ellipsis needs a block box, and an
           // anchor is inline -- a long name would otherwise push the wait time sideways instead
           // of ending in an ellipsis the way the line below it does.
-          className="block truncate rounded text-sm font-semibold text-app-text transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="block truncate rounded text-sm font-semibold text-app-text transition-colors hover:text-app-brand-text"
         >
           {hire.displayName}
         </Link>

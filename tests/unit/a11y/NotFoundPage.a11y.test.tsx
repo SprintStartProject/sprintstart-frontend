@@ -14,9 +14,7 @@ describe("NotFoundPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <NotFoundPage />
-        </main>
+        <NotFoundPage />
       </MemoryRouter>,
     );
     expect(await axe(baseElement)).toHaveNoViolations();

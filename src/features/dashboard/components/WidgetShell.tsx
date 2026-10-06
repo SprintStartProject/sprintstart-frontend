@@ -167,7 +167,7 @@ export function WidgetShell({
     <ClickableCard
       onClick={activate}
       aria-label={actionLabel}
-      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 focus-ring-inset transition-all hover:-translate-y-0.5"
     >
       {contents}
     </ClickableCard>

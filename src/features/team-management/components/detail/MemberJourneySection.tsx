@@ -738,8 +738,8 @@ function MemberItemList({
           aria-label={`Stage ${stageIndex + 1}`}
           className="relative pl-5 before:absolute before:top-7 before:bottom-2 before:left-[7px] before:w-px before:bg-app-border"
         >
-          <h4 className="relative mb-1.5 -ml-5 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
-            <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-app-border bg-app-surface text-[9px] tabular-nums">
+          <h4 className="relative mb-1.5 -ml-5 flex items-center gap-2 text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
+            <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-app-border bg-app-surface text-2xs tabular-nums">
               {stageIndex + 1}
             </span>
             {stageIndex === 0 ? "First" : "Then"}
@@ -815,15 +815,11 @@ function MemberItemRow({
           <ItemGlyph item={item} state={state} />
         </span>
         <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={onOpen}
-            className="w-full rounded-lg text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-          >
+          <button type="button" onClick={onOpen} className="w-full rounded-lg text-left">
             <span className="flex flex-wrap items-center gap-2">
               {isNext ? (
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase ${
+                  className={`rounded-full px-2 py-0.5 text-2xs font-bold tracking-wide text-white uppercase ${
                     isQuestion ? "bg-app-question-solid" : "bg-app-brand"
                   }`}
                 >
@@ -891,14 +887,14 @@ function MemberItemRow({
       <div className="group/insert relative flex h-5 items-center justify-center">
         <span
           aria-hidden="true"
-          className="absolute inset-x-10 top-1/2 border-t border-dashed border-app-border opacity-0 transition-opacity group-hover/insert:opacity-100"
+          className="absolute inset-x-10 top-1/2 border-t border-dashed border-app-border opacity-0 transition-opacity group-focus-within/insert:opacity-100 group-hover/insert:opacity-100"
         />
         <button
           type="button"
           onClick={onAddAfter}
           aria-label={`Add a step after ${item.title}`}
           title={`Add a step after ${item.title}`}
-          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-1.5 py-0.5 text-[11px] font-semibold text-app-brand-text shadow-sm transition-all hover:bg-app-brand-soft hover:px-2.5 focus-visible:px-2.5"
+          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-1.5 py-0.5 text-xs font-semibold text-app-brand-text shadow-sm transition-all hover:bg-app-brand-soft hover:px-2.5 focus-visible:px-2.5"
         >
           <Plus className="h-3 w-3" aria-hidden="true" />
           <span className="hidden group-focus-within/insert:inline group-hover/insert:inline">

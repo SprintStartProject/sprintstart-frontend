@@ -53,7 +53,7 @@ function PhaseRow({
       aria-pressed={selected}
       aria-current={isFocus ? "step" : undefined}
       onClick={onSelect}
-      className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+      className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ${
         selected
           ? "border-app-brand bg-app-brand-soft"
           : "border-transparent hover:border-app-border hover:bg-app-surface-hover"
@@ -70,7 +70,7 @@ function PhaseRow({
         ) : state === "locked" ? (
           <Lock className="h-3 w-3 text-app-text-subtle" aria-hidden="true" />
         ) : (
-          <span className="text-[11px] font-bold text-app-text tabular-nums">{index + 1}</span>
+          <span className="text-2xs font-bold text-app-text tabular-nums">{index + 1}</span>
         )}
       </ProgressRing>
       <span className="min-w-0 flex-1">
@@ -81,7 +81,7 @@ function PhaseRow({
         >
           {phase.title}
         </span>
-        <span className="mt-0.5 block truncate text-[11px] text-app-text-subtle">
+        <span className="mt-0.5 block truncate text-xs text-app-text-subtle">
           {hasUpdate ? (
             <span className="font-semibold text-app-brand-text">New answer · </span>
           ) : null}
@@ -136,7 +136,7 @@ export function PhaseNavigator({
         return (
           <section key={group.state} aria-label={group.title}>
             <div className="flex items-center justify-between px-3 pb-1">
-              <h3 className="text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
+              <h3 className="text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
                 {group.title}
                 <span className="ml-1.5 font-normal tabular-nums">{members.length}</span>
               </h3>
@@ -144,7 +144,7 @@ export function PhaseNavigator({
                 <button
                   type="button"
                   onClick={() => setShowDone((current) => !current)}
-                  className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
+                  className="rounded-md px-1.5 py-0.5 text-xs font-medium text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"
                 >
                   {folded ? "Show" : "Hide"}
                 </button>
@@ -185,7 +185,7 @@ export function PhaseNavigator({
           className="flex w-full items-center justify-between gap-3 rounded-2xl border border-app-border bg-app-surface px-4 py-3 text-left"
         >
           <span className="min-w-0">
-            <span className="block text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
+            <span className="block text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
               Phase {selectedIndex + 1} of {phases.length}
             </span>
             <span className="block truncate text-sm font-semibold text-app-text">

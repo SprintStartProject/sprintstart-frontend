@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./services/queryClient";
 import { AppRouter } from "./router/AppRouter";
@@ -18,6 +19,7 @@ import { SelectionActions } from "./features/board/selection/SelectionActions";
 import { CardMarksProvider } from "./features/board/marks/CardMarksProvider";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
+import { MAIN_CONTENT_ID, requestMainContentFocus } from "./components/layout/mainFocus";
 import { EggEffectsLayer } from "./features/easter-eggs/components/EggEffectsLayer";
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
@@ -31,6 +33,17 @@ function AppContent() {
   const { isFocused } = useFocusMode();
   useScrollRestoration();
   useBuddyPathSync();
+
+  // Hands keyboard focus to the new page after a route change, so the next Tab starts in the page
+  // and not on the sidebar link that was just pressed. Not on the first load: the browser starts
+  // at the top of the document, which is where the skip link is.
+  const { pathname } = useLocation();
+  const previousPathname = useRef(pathname);
+  useEffect(() => {
+    if (previousPathname.current === pathname) return;
+    previousPathname.current = pathname;
+    requestMainContentFocus();
+  }, [pathname]);
 
   // Signed in at all — the shell is drawn for anyone past the login screen, onboarding included.
   // `signingOut` stays out on purpose: it is the boot script's "this load is a logout return"
@@ -70,6 +83,25 @@ function AppContent() {
     // `/buddy` page. Two instances is what made them disagree about what had been said.
     <BuddyProvider>
       <div className="flex min-h-screen w-full bg-app-bg text-app-text">
+        {/* First stop for a keyboard: lets it jump over the whole sidebar to the page (WCAG 2.4.1).
+            Parked above the viewport until focused. Only with the sidebar, so only when signed in. Focuses the
+            target in script instead of following the hash, which would add #main-content to
+            every URL. */}
+        {signedIn && (
+          <a
+            href={`#${MAIN_CONTENT_ID}`}
+            onClick={(event) => {
+              event.preventDefault();
+              const main = document.getElementById(MAIN_CONTENT_ID);
+              main?.focus();
+              main?.scrollIntoView({ block: "start" });
+            }}
+            className="fixed top-3 left-3 z-[210] -translate-y-24 rounded-xl bg-app-brand px-4 py-2 text-sm font-semibold text-white shadow-app-brand-lift focus:translate-y-0"
+          >
+            Skip to main content
+          </a>
+        )}
+
         <AuroraBackground />
         {signedIn && (
           // `contents` while the shell is whole: the wrapper has no box at all, so the sidebar is
@@ -116,7 +148,7 @@ function AppContent() {
         {/* `data-moment-stage`: the area the page-scoped moments (the
           onboarding launch and landing) cover, instead of the whole
           screen — see momentStage.ts in the moments feature. */}
-        <main
+        <div
           data-moment-stage
           className={`app-sidebar-eases relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0 ${
             // The sidebar is `fixed` from `lg` up (see SideBar), so it is out of
@@ -130,7 +162,7 @@ function AppContent() {
           }`}
         >
           <AppRouter />
-        </main>
+        </div>
 
         {/* The buddy in the corner of every page, and the dock it opens. Mounted here
           rather than per-route so one conversation survives navigation — that is what

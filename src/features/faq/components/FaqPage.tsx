@@ -357,8 +357,10 @@ export function FaqPage({ groupId }: { groupId?: string }) {
                       type="button"
                       onClick={() => openGroup(group)}
                       aria-current={selected ? "true" : undefined}
-                      className={`group flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-                        selected ? "bg-app-brand-soft" : "hover:bg-app-surface-hover"
+                      className={`group flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left transition-colors ${
+                        selected
+                          ? "bg-app-brand-soft shadow-[inset_3px_0_0_0_var(--color-app-brand)]"
+                          : "hover:bg-app-surface-hover"
                       }`}
                     >
                       {/* A rank only means something while the list is ordered by how often. */}
@@ -389,14 +391,14 @@ export function FaqPage({ groupId }: { groupId?: string }) {
                           {group.topDocuments.slice(0, 2).map((doc) => (
                             <span
                               key={doc.id}
-                              className="inline-flex max-w-56 items-center gap-1 rounded-full bg-app-surface-muted px-2 py-0.5 text-[11px] text-app-text-muted"
+                              className="inline-flex max-w-56 items-center gap-1 rounded-full bg-app-surface-muted px-2 py-0.5 text-xs text-app-text-muted"
                             >
                               <FileText aria-hidden="true" className="h-3 w-3 shrink-0" />
                               <span className="truncate">{doc.title}</span>
                             </span>
                           ))}
                           {group.lastAskedAt && (
-                            <span className="text-[11px] text-app-text-subtle">
+                            <span className="text-xs text-app-text-subtle">
                               Last asked {formatAskedAt(group.lastAskedAt)}
                             </span>
                           )}
@@ -424,7 +426,7 @@ export function FaqPage({ groupId }: { groupId?: string }) {
                         >
                           {group.count}
                         </span>
-                        <span className="mt-1 text-[11px] text-app-text-subtle">asked</span>
+                        <span className="mt-1 text-xs text-app-text-subtle">asked</span>
                       </span>
 
                       <ChevronRight

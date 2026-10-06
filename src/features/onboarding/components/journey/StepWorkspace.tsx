@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import {
   AlertCircle,
+  Check,
   CheckCircle2,
   ChevronRight,
   Clock3,
@@ -480,7 +481,7 @@ export function StepWorkspace({
                           {resource.title}
                         </span>
                         {resource.description ? (
-                          <span className="block truncate text-[11px] text-app-text-subtle">
+                          <span className="block truncate text-xs text-app-text-subtle">
                             {resource.description}
                           </span>
                         ) : null}
@@ -546,11 +547,14 @@ export function StepWorkspace({
                 }`}
               >
                 {value ? (
-                  <ThumbsUp className="h-3.5 w-3.5" />
+                  <ThumbsUp className={`h-3.5 w-3.5 ${helpful === value ? "fill-current" : ""}`} />
                 ) : (
-                  <ThumbsDown className="h-3.5 w-3.5" />
+                  <ThumbsDown
+                    className={`h-3.5 w-3.5 ${helpful === value ? "fill-current" : ""}`}
+                  />
                 )}
                 {value ? "Helpful" : "Not helpful"}
+                {helpful === value ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
               </button>
             ))}
           </div>

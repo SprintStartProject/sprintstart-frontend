@@ -305,7 +305,7 @@ export function ChatPage() {
             type="button"
             aria-label="Close the conversation list"
             onClick={() => setRailOpen(false)}
-            className="rounded p-1 text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            className="rounded p-1 text-app-text-muted transition-colors hover:text-app-text"
           >
             <X size={18} />
           </button>

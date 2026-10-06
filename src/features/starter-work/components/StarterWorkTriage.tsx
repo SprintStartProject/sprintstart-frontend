@@ -136,9 +136,7 @@ export function StarterWorkTriage({ tasks, onApprove, onReject, onClose }: Start
             <div className="mt-3 grid grid-cols-1 gap-5 md:grid-cols-[1fr_16rem]">
               <div className="min-w-0">
                 {current.summary && (
-                  <p className="text-[15px] leading-relaxed text-app-text-muted">
-                    {current.summary}
-                  </p>
+                  <p className="text-base leading-relaxed text-app-text-muted">{current.summary}</p>
                 )}
                 {current.rationale && (
                   <div className="mt-3 rounded-xl bg-app-surface-muted px-3 py-2.5 text-sm text-app-text-muted">

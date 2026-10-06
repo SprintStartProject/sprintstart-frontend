@@ -42,6 +42,7 @@ import { itemKindLabel, itemStateLabel, phaseStateLabel } from "../../graph/node
 import { layeredLayout, resolveLayout, type GraphPoint } from "../../graph/layout";
 import type { OnboardingPhaseEndpoint } from "../../types";
 import type { GraphNodePosition } from "../../../../services/onboardingGraphService";
+import { EdgeLegend } from "../../../graph-diagram/EdgeLegend";
 
 type PhaseNode = {
   id: string;
@@ -97,6 +98,9 @@ type Props = {
 
 const PHASE_KEY = (id: string) => `phase:${id}`;
 const MAP_KEY = "journey";
+
+/** The arrow styles the journey graphs actually draw, for the legend beside them. */
+const MAP_EDGE_TONES: readonly JourneyEdgeTone[] = ["done", "active", "waiting"];
 
 /**
  * A path as one zoomable graph: the journey map of all phases, and inside every phase the graph of
@@ -396,16 +400,19 @@ export function JourneyGraph({
         onConnect={connect}
         onDisconnect={editing ? disconnect : undefined}
         overlay={
-          <div className="flex items-center gap-2 rounded-2xl border border-app-border/70 bg-app-surface/90 px-3 py-2 shadow-lg backdrop-blur-md">
-            <MapIcon className="h-4 w-4 text-app-brand-text" aria-hidden="true" />
-            <span className="text-sm font-semibold text-app-text">Journey map</span>
-            <span className="hidden text-xs text-app-text-subtle sm:inline">
-              {arranging
-                ? editing
-                  ? "· Drag phases, or from a phase’s port to what it unlocks"
-                  : "· Drag phases to arrange them"
-                : "· Click a phase to step inside"}
-            </span>
+          <div className="rounded-2xl border border-app-border/70 bg-app-surface/90 px-3 py-2 shadow-lg backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <MapIcon className="h-4 w-4 text-app-brand-text" aria-hidden="true" />
+              <span className="text-sm font-semibold text-app-text">Journey map</span>
+              <span className="hidden text-xs text-app-text-subtle sm:inline">
+                {arranging
+                  ? editing
+                    ? "· Drag phases, or from a phase’s port to what it unlocks"
+                    : "· Drag phases to arrange them"
+                  : "· Click a phase to step inside"}
+              </span>
+            </div>
+            <EdgeLegend tones={MAP_EDGE_TONES} className="mt-1.5" />
           </div>
         }
         toolbar={arrangeTools}
@@ -517,6 +524,7 @@ export function JourneyGraph({
                 </span>
               ) : null}
             </div>
+            <EdgeLegend tones={MAP_EDGE_TONES} className="mt-1.5 pl-2" />
             {editing ? (
               // Named and up front: as a "+" among the zoom controls it read as "zoom in".
               <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-app-border/70 pt-2 pl-2">
@@ -528,7 +536,7 @@ export function JourneyGraph({
                   <ListPlus className="h-4 w-4" aria-hidden="true" />
                   Add step
                 </button>
-                <span className="text-[11px] text-app-text-subtle">
+                <span className="text-xs text-app-text-subtle">
                   or double-click the canvas where it should go
                 </span>
               </div>
@@ -608,7 +616,7 @@ function ItemFocus({
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        className={`flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border bg-app-surface shadow-2xl outline-none ${
+        className={`flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border bg-app-surface shadow-2xl outline-hidden ${
           isQuestion ? "border-app-question-border" : "border-app-brand-border"
         }`}
       >
@@ -643,7 +651,7 @@ function ItemFocus({
             <ItemGlyph item={item} state={state} />
             <div className="min-w-0 flex-1">
               <p
-                className={`text-[11px] font-semibold tracking-wide uppercase ${
+                className={`text-2xs font-semibold tracking-wide uppercase ${
                   isQuestion ? "text-app-question-text" : "text-app-brand-text"
                 }`}
               >

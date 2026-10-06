@@ -229,7 +229,12 @@ export function BoardCardFrame({
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <h2 className="line-clamp-2 text-sm font-semibold text-app-text">{title}</h2>
+                <h2
+                  className="line-clamp-2 text-sm font-semibold text-app-text"
+                  title={typeof title === "string" ? title : undefined}
+                >
+                  {title}
+                </h2>
 
                 {pinned && (
                   <Badge variant="neutral" size="sm" className="gap-1">
@@ -259,7 +264,7 @@ export function BoardCardFrame({
                     onClick={stack.onToggle}
                     aria-expanded={false}
                     aria-label={`Show all ${stack.total} cards in this pile`}
-                    className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:bg-app-brand hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:bg-app-brand hover:text-white"
                   >
                     <Layers className="h-3 w-3" aria-hidden="true" />
                     <span className="tabular-nums">{stack.total} cards</span>

@@ -74,7 +74,7 @@ export function ProjectSwitcher({ className = "" }: ProjectSwitcherProps) {
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         transition={hoverSpringToken}
-        className="group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 px-[10px] text-left backdrop-blur-md transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="group flex h-[52px] w-full items-center gap-[10px] rounded-[14px] border border-app-border/70 bg-app-bg/60 px-[10px] text-left backdrop-blur-md transition-colors hover:border-app-brand-border hover:bg-app-surface-hover/70"
       >
         {selectedProject ? (
           <ProjectMonogram projectId={selectedProject.id} name={selectedProject.name} size="sm" />

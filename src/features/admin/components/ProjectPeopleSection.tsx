@@ -127,7 +127,7 @@ function RowIdentity({
       type="button"
       onClick={onOpen}
       aria-label={label}
-      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left"
     >
       {children}
     </button>
@@ -469,7 +469,7 @@ export function ProjectPeopleSection({
 
       {addableUsers.length > 0 && (
         <div className="mt-5">
-          <p className="mb-2 text-[10px] font-semibold tracking-[0.18em] text-app-text-muted uppercase">
+          <p className="mb-2 text-2xs font-semibold tracking-[0.18em] text-app-text-muted uppercase">
             Add to project
           </p>
 

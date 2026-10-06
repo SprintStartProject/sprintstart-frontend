@@ -44,7 +44,7 @@ function DiagramCardNodeComponent({ data }: NodeProps<DiagramCardFlowNode>) {
       style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
       className={[
         "flex flex-col justify-center gap-1 rounded-xl border border-app-border bg-app-surface px-3 py-2 transition-all duration-200",
-        selected ? "ring-2 ring-app-focus" : "",
+        selected ? "ring-2 ring-app-brand-border-strong" : "",
         dimmed ? "opacity-30" : "opacity-100",
       ]
         .filter(Boolean)

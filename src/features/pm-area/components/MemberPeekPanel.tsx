@@ -281,7 +281,7 @@ function MemberPeekSidePanel({ userId, onClose }: { userId: string; onClose: () 
       actions={
         <Link
           to={`/team/${userId}`}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-app-brand-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-app-brand px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-app-brand-hover"
         >
           Full profile
           <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
