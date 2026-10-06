@@ -82,21 +82,6 @@ const NAVIGATE_BOARD: ShortcutItem = {
   path: "/board",
 };
 
-/**
- * The chat's own chord. The handed-over plan left Chat without one while giving `Alt+U` to
- * the buddy — which is the same sidebar entry's second half (`/buddy` lights up Chat), so
- * the entry people actually click every day would have stayed the only unlabelled one.
- */
-const NAVIGATE_CHAT: ShortcutItem = {
-  id: "nav-chat",
-  label: "Chat",
-  category: "Navigation",
-  scope: "global",
-  code: "KeyC",
-  altKey: true,
-  path: "/chat",
-};
-
 const NAVIGATE_BUDDY: ShortcutItem = {
   id: "nav-buddy",
   label: "Buddy",
@@ -209,7 +194,7 @@ export const SIDEBAR_TOGGLE_SHORTCUT: ShortcutItem = {
  * German keyboard `/` is Shift+7, on a US one it is the slash key unshifted, and the
  * character is the part both keyboards agree on.
  *
- * Exported because ChatPage answers it (`useShortcutListener`). Before that it had its own
+ * Exported because BuddyPage answers it (`useShortcutListener`). Before that it had its own
  * listener, which made this row a description of behaviour rather than the source of it.
  */
 export const FOCUS_COMPOSER_SHORTCUT: ShortcutItem = {
@@ -218,7 +203,7 @@ export const FOCUS_COMPOSER_SHORTCUT: ShortcutItem = {
   category: "Actions",
   scope: "surface",
   key: "/",
-  note: "in Chat",
+  note: "on the Buddy page",
 };
 
 /**
@@ -255,7 +240,6 @@ const DISMISS: ShortcutItem = {
 export const SHORTCUTS: readonly ShortcutItem[] = [
   NAVIGATE_DASHBOARD,
   NAVIGATE_BOARD,
-  NAVIGATE_CHAT,
   NAVIGATE_BUDDY,
   NAVIGATE_KNOWLEDGE_BASE,
   NAVIGATE_PM_DASHBOARD,

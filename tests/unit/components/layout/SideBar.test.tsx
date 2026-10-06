@@ -683,25 +683,25 @@ describe("SideBar", () => {
   });
 
   /**
-   * The buddy is the other half of the chat's page, not a page of its own — one header, one
-   * switch, two conversations. Before this the sidebar highlighted nothing at all on `/buddy`,
-   * so the app claimed the hire was nowhere while they were looking at half of Chat.
+   * The one conversation surface: the entry lights for every address of its page — the bare one
+   * and a named conversation — because the entry now leads where the page lives. It used to need
+   * a forced highlight while the entry pointed at `/chat` and the page rendered at `/buddy`.
    */
-  it("keeps the Chat entry lit while the buddy half is open", () => {
+  it("keeps the Buddy entry lit on a conversation's address", () => {
     vi.mocked(useAuthHook.useAuth).mockReturnValue({
       profile: mockProfile,
     } as unknown as ReturnType<typeof useAuthHook.useAuth>);
 
-    renderWithProviders(<SideBar />, "/buddy");
+    renderWithProviders(<SideBar />, "/buddy/conv-1");
 
-    // `aria-current` is `NavLink`'s own "this is the page you are on", and `/buddy` is not
-    // `/chat` — so this is the forced highlight, asserted the way a user perceives it.
-    const chat = screen.getAllByRole("link", { name: /Chat/ })[0];
-    expect(chat).not.toHaveAttribute("aria-current", "page");
+    // `aria-current` is `NavLink`'s own "this is the page you are on", and on a child address
+    // it says exactly that — no forcing involved.
+    const buddy = screen.getAllByRole("link", { name: /Buddy/ })[0];
+    expect(buddy).toHaveAttribute("aria-current", "page");
 
     // Asserted through the active pill rather than the entry's classes: the highlight is what
     // this test is about, and a class list is a styling decision that can change without it.
-    expect(chat.querySelector("[data-layout-id]")).not.toBeNull();
+    expect(buddy.querySelector("[data-layout-id]")).not.toBeNull();
   });
 
   /**

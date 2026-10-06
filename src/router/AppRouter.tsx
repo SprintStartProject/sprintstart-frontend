@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { canAccessRoute, getDefaultRoute, type AppRoute } from "../auth/accessPolicy";
-import { AssistantShell } from "../components/layout/AssistantShell";
 import { PageShellSkeleton } from "../components/layout/PageShell";
 import { PageTransition } from "../components/layout/PageTransition";
 import { AuthGuard } from "./AuthGuard";
@@ -14,9 +13,6 @@ import { AuthGuard } from "./AuthGuard";
 // right before this replaces it. Bundling it eagerly removes the wait Suspense would show.
 import { LoginPage } from "../pages/LoginPage";
 
-const ChatPage = lazy(() =>
-  import("../pages/ChatPage").then((module) => ({ default: module.ChatPage })),
-);
 const DashboardPage = lazy(() =>
   import("../pages/DashboardPage.tsx").then((module) => ({ default: module.DashboardPage })),
 );
@@ -96,11 +92,11 @@ function ManagerAreaGuard({ route, children }: { route: AppRoute; children: Reac
 /**
  * Every route of the app, inside one `AuthGuard` and one shared `Suspense` fallback.
  *
- * Pages are lazy-loaded except `LoginPage` (see the comment on its import). Two layout
- * routes group pages that share a header: `AssistantShell` for `/chat` and `/buddy`, and
- * `PmWorkspace` for the PM area. Routes a user without access must not reach by URL are
- * wrapped in `ManagerAreaGuard`; the others rely on the sidebar not offering them. Which
- * groups may open which route is defined in `src/auth/accessPolicy.ts`.
+ * Pages are lazy-loaded except `LoginPage` (see the comment on its import). One layout
+ * route groups pages that share a header: `PmWorkspace` for the PM area. Routes a user
+ * without access must not reach by URL are wrapped in `ManagerAreaGuard`; the others rely
+ * on the sidebar not offering them. Which groups may open which route is defined in
+ * `src/auth/accessPolicy.ts`.
  */
 export function AppRouter() {
   return (
@@ -111,17 +107,16 @@ export function AppRouter() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/skill-wizard" element={<SkillWizardPage />} />
             <Route path="/" element={<DashboardPage />} />
-            {/* One layout route for both halves of the assistant, so the shared header survives
-              the crossing and the panel underneath can slide instead of cut. Their URLs are
-              unchanged — `/buddy` is still `/buddy`; only who draws the header moved. */}
-            <Route element={<AssistantShell />}>
-              <Route path="/chat" element={<ChatPage />} />
-              <Route path="/chat/:id" element={<ChatPage />} />
-              <Route path="/buddy" element={<BuddyPage />} />
-              {/* The address the dock's expand hands over, and the one a reload of the page
-                lands on: one conversation, named by id, read by the page itself. */}
-              <Route path="/buddy/:id" element={<BuddyPage />} />
-            </Route>
+            {/* The one conversation surface, and the address the dock's expand hands over —
+              `/buddy/:id` is one conversation, named by id and read by the page itself. */}
+            <Route path="/buddy" element={<BuddyPage />} />
+            <Route path="/buddy/:id" element={<BuddyPage />} />
+            {/* The retired chat. Both of its addresses land on the buddy rather than a 404, and
+              the id is dropped deliberately: nothing migrated — the backfill went the way of the
+              chat tables it fed — so no `/chat/:id` can map to a conversation that still exists,
+              and a dead link would be a worse answer than the one conversation surface. */}
+            <Route path="/chat" element={<Navigate to="/buddy" replace />} />
+            <Route path="/chat/:id" element={<Navigate to="/buddy" replace />} />
             <Route path="/onboarding" element={<OnBoardingPage />} />
             {/* Guarded for the same reason as `/hire-setup` below: the policy calls authoring
               PM/HR/ADMIN-only and the sidebar merely hides it, which leaves the URL. Both
@@ -176,8 +171,7 @@ export function AppRouter() {
             </Route>
             <Route path="/admin" element={<AdminPage />} />
             {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
-              in place of it: both ways in stay open. The buddy itself now sits with the chat,
-              under `AssistantShell`. */}
+              in place of it: both ways in stay open. The buddy itself is its own page, `/buddy`. */}
             <Route path="/board" element={<BoardPage />} />
             {/* Guarded, because the access policy says it is PM/HR/ADMIN-only and the sidebar
               merely hides it -- which leaves the URL. The page already gates its *actions* by

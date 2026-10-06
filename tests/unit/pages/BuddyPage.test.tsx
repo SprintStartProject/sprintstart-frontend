@@ -4,7 +4,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
 import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
-import { AssistantShell } from "../../../src/components/layout/AssistantShell";
 import { mockResizableViewport } from "../setup/matchMedia";
 
 const projectState = { selectedProjectId: "p1" };
@@ -121,18 +120,15 @@ function renderPage() {
                 views of it. Rendering the page without one is not a supported arrangement, and
                 `useBuddySession` says so rather than quietly making a second conversation.
 
-                Under `AssistantShell`, because that is the arrangement the app runs: the page
-                is a panel inside a layout route that owns the header, the switch between the
-                two assistants, and "New chat". Testing the page bare would leave the controls
-                it depends on untested from either side. */}
+                The page draws its own header and frame now; it used to be a panel inside a
+                layout route shared with the chat, and this harness carried that arrangement
+                until the two surfaces became one. */}
       <BuddyProvider>
         <Routes>
-          <Route element={<AssistantShell />}>
-            <Route path="/buddy" element={<BuddyPage />} />
-            {/* The per-conversation address the dock's expand hands over — part of the real
-              arrangement since the page gained it, so the harness carries it too. */}
-            <Route path="/buddy/:id" element={<BuddyPage />} />
-          </Route>
+          <Route path="/buddy" element={<BuddyPage />} />
+          {/* The per-conversation address the dock's expand hands over — part of the real
+            arrangement since the page gained it, so the harness carries it too. */}
+          <Route path="/buddy/:id" element={<BuddyPage />} />
         </Routes>
       </BuddyProvider>
     </MemoryRouter>,
@@ -445,42 +441,6 @@ describe("BuddyPage", () => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });
     expect(createSession).toHaveBeenCalledTimes(1);
-  });
-
-  /**
-   * The chord belongs to whichever half is on screen, and while the panel slides *both* are
-   * mounted — `AssistantShell` keeps the page being left there for the length of the animation,
-   * and this listener is on `window`. Without the gate one keypress started a new conversation
-   * in each. Mounted under a catch-all route at the chat's URL, which is that window exactly:
-   * the buddy still rendered, the location already the other half's.
-   */
-  it("ignores Alt+N while the chat is the half on screen", async () => {
-    vi.mocked(getMessages).mockResolvedValue([
-      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
-    ]);
-
-    const user = userEvent.setup();
-
-    render(
-      <MemoryRouter initialEntries={["/chat"]}>
-        <BuddyProvider>
-          <Routes>
-            <Route element={<AssistantShell />}>
-              <Route path="*" element={<BuddyPage />} />
-            </Route>
-          </Routes>
-        </BuddyProvider>
-      </MemoryRouter>,
-    );
-
-    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
-
-    await user.keyboard("{Alt>}n{/Alt}");
-
-    // Still there: the conversation was not restarted under the half the hire is actually
-    // looking at.
-    expect(screen.getByText("where do I start?")).toBeInTheDocument();
-    expect(createSession).not.toHaveBeenCalled();
   });
 
   /**

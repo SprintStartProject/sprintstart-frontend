@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { MessagesSquare, Sparkles } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import {
@@ -8,6 +8,8 @@ import {
   RailToggle,
   RAIL_DESKTOP_QUERY,
 } from "../components/layout/ConversationRail";
+import { PageHeader } from "../components/layout/PageHeader";
+import { MainContent } from "../components/layout/MainContent";
 import { useIsSmUp } from "../hooks/useIsSmUp";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
@@ -33,7 +35,6 @@ import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
 import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestionActions";
-import { surfaceFromPathname } from "../components/common/assistantSurfaces";
 
 /**
  * Names the rail — the hire's conversations, and what came back from their PM — for assistive
@@ -82,10 +83,9 @@ function writeRailOpen(open: boolean): void {
  * The page's shape, shared by the mentor and the no-project state so nothing moves between
  * them.
  *
- * It fills the panel `AssistantShell` gives it rather than claiming a height of its own — the
- * shell owns the viewport, the page header and the switch. What is left here is the
- * conversation, the rail beside it, and the handful of controls that only mean anything on
- * this half of the assistant.
+ * It fills the panel the page's frame gives it rather than claiming a height of its own — the
+ * frame owns the viewport and the page header. What is left here is the conversation, the rail
+ * beside it, and the handful of controls that only mean anything on this page.
  *
  * It still never grows past that panel, for the reason it used to set its own fixed height:
  * the composer has to stay on screen. A conversation whose input scrolls away is one you have
@@ -439,16 +439,11 @@ function BuddyMentorHome() {
     [isHireMode, hasUserMessage, suggestions, setDraft, isSmUp],
   );
 
-  // The keyboard half of the buttons that start a conversation. Gated the same way they are: a
-  // conversation nobody has spoken in is already the new one — and, like the chat's, only
-  // while this is the half on screen, since the shell keeps the page being left mounted for the
-  // length of the slide.
-  const { pathname } = useLocation();
-
-  useNewConversationShortcut(
-    startConversation,
-    canStartConversation && surfaceFromPathname(pathname) === "buddy",
-  );
+  // The keyboard half of the buttons that start a conversation, gated the same way they are:
+  // a conversation nobody has spoken in is already the new one, so the chord would only replay
+  // the greeting. (There used to be a second gate on being the visible half of the assistant;
+  // one surface later, the page is only ever mounted at its own addresses.)
+  useNewConversationShortcut(startConversation, canStartConversation);
 
   // The floating controls withdraw mid-turn (the new-conversation button while a reply streams),
   // and the room they need must not go with them — so the mode row reserves it from the stable
@@ -644,11 +639,32 @@ function BuddyMentorHome() {
  * The dock (`BuddyWidget`, mounted app-wide) shares the same one buddy session, so a hire can
  * pick the conversation up from anywhere and grow it into this page when it needs room.
  *
- * Bound to `/buddy`, open to every permission group, and rendered inside `AssistantShell`
- * next to the chat. A user without a selected project gets the conversation anyway: the hire's
- * buddy is not one project's, and a dead end for everyone redirected here from `/chat` is
- * exactly what the merge of the two surfaces is not allowed to leave behind.
+ * Bound to `/buddy` — and `/buddy/:id` for one named conversation — open to every permission
+ * group, and drawn as its own page now that the two-surface shell is gone: this header and
+ * frame used to belong to the chat-and-buddy pair. A user without a selected project gets the
+ * conversation anyway: the hire's buddy is not one project's, and a dead end for everyone
+ * redirected here from `/chat` is exactly what the merge of the two surfaces is not allowed to
+ * leave behind.
  */
 export function BuddyPage() {
-  return <BuddyMentorHome />;
+  return (
+    <div className="flex h-[calc(100dvh-64px)] flex-col overflow-hidden bg-app-bg lg:h-dvh">
+      <header className="shrink-0 border-b border-app-border bg-app-bg">
+        <div className="app-page-frame py-6">
+          <PageHeader
+            icon={Sparkles}
+            title="Buddy"
+            subtitle="Your onboarding mentor — here whenever you're stuck."
+            // The subtitle is the line with the least to say on a phone, so it is the one that
+            // makes room rather than pushing the conversation further down.
+            hideSubtitleBelow="md"
+          />
+        </div>
+      </header>
+
+      <MainContent className="flex min-h-0 flex-1 flex-col">
+        <BuddyMentorHome />
+      </MainContent>
+    </div>
+  );
 }
