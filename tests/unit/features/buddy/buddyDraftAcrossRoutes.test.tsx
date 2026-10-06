@@ -76,12 +76,14 @@ describe("the composer's words across navigation", () => {
 
   /**
    * The app's own shape: the provider above the router, so the one box outlives any single route.
-   * The session is stubbed to the two things the draft provider reads from it.
+   * The session is stubbed to the things the draft provider reads from it — the submit, and the
+   * conversation each draft is filed under.
    */
   function renderApp() {
     const session = {
-      sendMessage: vi.fn().mockResolvedValue(undefined),
-      draftResetToken: 0,
+      submitMessage: vi.fn(),
+      currentSessionId: null,
+      teamProjectId: null,
     } as unknown as BuddySession;
 
     return render(
