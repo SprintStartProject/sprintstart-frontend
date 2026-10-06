@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Search, Trash2, X } from "lucide-react";
+import { MessageSquarePlus, Search, Trash2, X } from "lucide-react";
 import type { BuddySessionSummary } from "../../../services/buddyService";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
@@ -26,6 +26,15 @@ type BuddyConversationListProps = {
    * refused.
    */
   onBin?: (sessionId: string) => Promise<void>;
+  /**
+   * Starts a new conversation — the button at the top of the list, where the conversations it
+   * adds to are. Omitted, no button is drawn.
+   */
+  onNew?: () => void;
+  /** Whether starting one is possible right now; the button stays on screen, greyed out. */
+  newDisabled?: boolean;
+  /** Named in the button's tooltip, so the chord is discoverable from the control it repeats. */
+  newShortcut?: string;
   /**
    * Closes the rail from its header. This list is the rail's top row, so the cross for the whole
    * panel lives here — one rail, one way out, the same shape as the chat's "Chats" rail. (The
@@ -113,6 +122,9 @@ export function BuddyConversationList({
   disabled = false,
   onSelect,
   onBin,
+  onNew,
+  newDisabled = false,
+  newShortcut,
   onClose,
   className,
 }: BuddyConversationListProps) {
@@ -170,6 +182,29 @@ export function BuddyConversationList({
           </button>
         )}
       </div>
+
+      {onNew && (
+        <div className="shrink-0 px-4 pb-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            fullWidth
+            onClick={onNew}
+            disabled={newDisabled}
+            // Named like the floating button it stands in for. The visible text alone would
+            // collide with an untitled row, which is also called "New conversation".
+            aria-label="Start a new conversation"
+            icon={<MessageSquarePlus className="h-4 w-4" aria-hidden="true" />}
+            title={
+              newShortcut
+                ? `Start a new conversation (${newShortcut}) \u2014 your buddy keeps what it has learned about you`
+                : "Start a new conversation \u2014 your buddy keeps what it has learned about you"
+            }
+          >
+            New conversation
+          </Button>
+        </div>
+      )}
 
       {sessions.length > 0 && (
         <div className="shrink-0 px-4 pb-2">

@@ -638,6 +638,11 @@ function BuddyMentorHome() {
                     // Binning needs the awaited promise (the dialog shows its spinner on it), so
                     // this one is not wrapped in `void` like the selection above.
                     onBin={binSession}
+                    // The new-conversation button lives with the conversations it adds to. The
+                    // floating one below only stands in while this rail is shut.
+                    onNew={startConversation}
+                    newDisabled={!canStartConversation}
+                    newShortcut={NEW_CONVERSATION_CHORD}
                     // The rail's one cross, at its top: the replies panel used to carry one
                     // mid-rail, which read as closing that section alone — and a conversations-only
                     // rail had no way out at all. See the list's own `onClose`.
@@ -650,11 +655,15 @@ function BuddyMentorHome() {
               </ConversationRail>
             }
             newConversationControl={
-              <BuddyNewConversationButton
-                onClick={startConversation}
-                shortcut={NEW_CONVERSATION_CHORD}
-                disabled={!canStartConversation}
-              />
+              // Only while the rail is shut: open, the same button is at the top of its list,
+              // and two of them on one screen would read as two different things.
+              !rail.open ? (
+                <BuddyNewConversationButton
+                  onClick={startConversation}
+                  shortcut={NEW_CONVERSATION_CHORD}
+                  disabled={!canStartConversation}
+                />
+              ) : undefined
             }
             railToggle={
               // Whenever the rail is shut, in either mode and with any number of conversations —
@@ -711,14 +720,10 @@ function BuddyMentorHome() {
               // footer's chips) fall back to the external source link instead of dead-ending.
               onCitationClick={citationViewer.handleCitationClick}
               onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
-              // `hasUserMessage`, not `canStartConversation`: the button withdraws mid-turn, the room
-              // it withdraws from must not. Below `md` the two clearances differ by 24px, and for a
-              // hire with one conversation this is the only term that is ever true — so tying the
-              // space to the button shunted the whole transcript down and back on every single turn.
-              // Visible while the transcript is shorter than the viewport, which is exactly the
-              // first few turns this control exists for. The rail toggle floats over the same
-              // corner whenever the rail is shut, so it reserves the room too.
-              hasFloatingControl={!rail.open || hasUserMessage}
+              // The rail toggle and the new-conversation button both float over the column's top
+              // corners, and both are there exactly while the rail is shut — so that is the one
+              // fact the room is reserved from, never the controls' own enabled state.
+              hasFloatingControl={!rail.open}
               // Built above, in one identity — the conversation is memoised, and the chips' own reasons
               // are written where they are built.
               aboveComposer={aboveComposer}

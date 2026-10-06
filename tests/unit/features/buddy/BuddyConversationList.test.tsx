@@ -21,6 +21,8 @@ function renderList(
   overrides: {
     onSelect?: (id: string) => void;
     onBin?: (id: string) => Promise<void>;
+    onNew?: () => void;
+    newDisabled?: boolean;
     disabled?: boolean;
     toast?: ReturnType<typeof recordingToast>;
   } = {},
@@ -34,11 +36,53 @@ function renderList(
         disabled={overrides.disabled}
         onSelect={overrides.onSelect ?? vi.fn()}
         onBin={overrides.onBin ?? vi.fn().mockResolvedValue(undefined)}
+        onNew={overrides.onNew}
+        newDisabled={overrides.newDisabled}
+        newShortcut="Alt + N"
       />
     </BuddyTestProviders>,
   );
   return toast;
 }
+
+describe("starting a conversation from the rail", () => {
+  it("offers the button above the list, with the chord in its tooltip", async () => {
+    const onNew = vi.fn();
+    renderList({ onNew });
+
+    const button = screen.getByRole("button", { name: "Start a new conversation" });
+    expect(button).toHaveAttribute(
+      "title",
+      "Start a new conversation (Alt + N) — your buddy keeps what it has learned about you",
+    );
+
+    await userEvent.click(button);
+    expect(onNew).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the button on screen, greyed out, while starting one is not possible", async () => {
+    const onNew = vi.fn();
+    renderList({ onNew, newDisabled: true });
+
+    const button = screen.getByRole("button", { name: "Start a new conversation" });
+    expect(button).toBeDisabled();
+
+    await userEvent.click(button);
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  it("draws no button for a list nobody can start from", () => {
+    renderList();
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  it("is not stood down with the rows, which a running turn locks but a new one may cut short", () => {
+    renderList({ onNew: vi.fn(), disabled: true });
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeEnabled();
+  });
+});
 
 describe("binning a conversation from the rail", () => {
   it("asks before anything happens, naming the conversation", async () => {

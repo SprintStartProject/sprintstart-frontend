@@ -446,6 +446,43 @@ describe("BuddyPage", () => {
   });
 
   /**
+   * The new-conversation button sits with the conversations it adds to. While the rail is open
+   * the floating copy steps aside, so one screen never carries two of the same control.
+   */
+  it("starts a new conversation from the open rail, in place of the floating button", async () => {
+    const undo = reportDesktopViewport();
+    try {
+      vi.mocked(getMessages).mockResolvedValue([
+        { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+      ]);
+
+      const user = userEvent.setup();
+      renderPage();
+
+      // Rail shut: the floating button is the one on screen.
+      expect(
+        await screen.findByRole("button", { name: "Start a new conversation" }),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByTitle("Your conversations"));
+      const rail = await screen.findByRole("complementary", { name: "Your conversations" });
+      await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "false"));
+
+      // Open: it moves into the rail, and the floating one is gone — one button, not two.
+      const buttons = screen.getAllByRole("button", { name: "Start a new conversation" });
+      expect(buttons).toHaveLength(1);
+      const inRail = within(rail).getByRole("button", { name: "Start a new conversation" });
+      expect(buttons[0]).toBe(inRail);
+      await waitFor(() => expect(inRail).toBeEnabled());
+
+      await user.click(inRail);
+      await waitFor(() => expect(createSession).toHaveBeenCalledTimes(1));
+    } finally {
+      undo();
+    }
+  });
+
+  /**
    * The control that opens the conversations rail is always there while the rail is shut — it used
    * to appear only once a second conversation existed, which read as a missing button.
    */
