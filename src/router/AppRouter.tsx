@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { canAccessRoute, getDefaultRoute, type AppRoute } from "../auth/accessPolicy";
@@ -90,6 +90,21 @@ function ManagerAreaGuard({ route, children }: { route: AppRoute; children: Reac
 }
 
 /**
+ * `/chat/:id` → the conversation it names.
+ *
+ * The retired chat's ids live on as the ids of the conversations the backfill migrated: it
+ * copied `chat.id` onto the buddy session it created, so an old "Keep this chat" card's link
+ * still names a conversation that exists, and this opens it. Where no such conversation is
+ * there to open — an environment the backfill never reached, a binned conversation —
+ * `BuddyPage`'s own reconciler falls back to the bare page, because a stale link is not a
+ * failed read.
+ */
+function ChatRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/buddy/${id}` : "/buddy"} replace />;
+}
+
+/**
  * Every route of the app, inside one `AuthGuard` and one shared `Suspense` fallback.
  *
  * Pages are lazy-loaded except `LoginPage` (see the comment on its import). One layout
@@ -112,11 +127,12 @@ export function AppRouter() {
             <Route path="/buddy" element={<BuddyPage />} />
             <Route path="/buddy/:id" element={<BuddyPage />} />
             {/* The retired chat. Both of its addresses land on the buddy rather than a 404, and
-              the id is dropped deliberately: nothing migrated — the backfill went the way of the
-              chat tables it fed — so no `/chat/:id` can map to a conversation that still exists,
-              and a dead link would be a worse answer than the one conversation surface. */}
+              `/chat/:id` keeps its id — the backfill that ran before the chat tables were
+              dropped copied each chat's id onto the session it created (see `ChatRedirect`),
+              so an old "Keep this chat" card still names a conversation that can open. A link
+              whose id has no conversation behind it falls back to the bare page, never a 404. */}
             <Route path="/chat" element={<Navigate to="/buddy" replace />} />
-            <Route path="/chat/:id" element={<Navigate to="/buddy" replace />} />
+            <Route path="/chat/:id" element={<ChatRedirect />} />
             <Route path="/onboarding" element={<OnBoardingPage />} />
             {/* Guarded for the same reason as `/hire-setup` below: the policy calls authoring
               PM/HR/ADMIN-only and the sidebar merely hides it, which leaves the URL. Both

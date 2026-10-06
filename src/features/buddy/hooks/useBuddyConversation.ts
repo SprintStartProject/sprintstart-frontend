@@ -61,6 +61,7 @@ export type ProjectSelectionSlice = {
  * nobody asked. What matters is whether trying again is worth it, so each line says so.
  */
 const REPLY_FAILED = "Your buddy could not finish that reply. Ask again in a moment.";
+const REPLY_TIMED_OUT = "Your buddy stopped responding for five minutes. Try again.";
 const GREETING_FAILED = "Your buddy could not be reached just now.";
 const HISTORY_FAILED = "Your conversation could not be loaded.";
 const CONVERSATION_FAILED = "Your buddy could not start a new conversation. Ask again in a moment.";
@@ -69,6 +70,16 @@ const BIN_MOVE_FAILED =
   'Binned, but the next conversation couldn\'t open — use "Try again" to retry.';
 /** The one sentence for a proposal that no longer exists for this caller (HTTP 404). */
 const PROPOSAL_GONE = "This proposal is no longer available.";
+/**
+ * How long a turn may go without a single event before it is failed.
+ *
+ * The read has no timeout of its own — a stream that stops arriving leaves the request open
+ * forever — so the turn is failed from here, the same inter-event watchdog the retired chat
+ * ran: every event (a tool, a thought, a token, a citation) re-arms it, and five silent
+ * minutes mean the stream is wedged. Measured between events, not from the start: a long
+ * tool-heavy turn keeps talking, and each event is proof of life.
+ */
+const STREAM_TIMEOUT_MS = 300_000;
 
 function isNotFound(e: unknown): boolean {
   return e instanceof Error && "status" in e && (e as { status: number }).status === 404;
@@ -290,16 +301,6 @@ export function useBuddyConversation(
     setCurrentSessionId(sessionId);
   }, []);
 
-  /**
-   * Bumped whenever the conversation on screen is replaced — a new conversation, a selection,
-   * a project switch.
-   *
-   * The composer's words are not this hook's any more (see `BuddyDraftProvider`), so the one
-   * thing this session still owes them is the news that they belonged to a thread that is gone.
-   * Told as a token rather than a call: the composer's state lives *below* this hook's provider,
-   * and a parent cannot reach into a child's setter.
-   */
-  const [draftResetToken, setDraftResetToken] = useState(0);
   /**
    * The hire's wording for the proposals that carry an editable message — a flag's question, the
    * only payload a person reads and the hire therefore rewords (see `actionDrafts` for the key).
@@ -887,9 +888,11 @@ export function useBuddyConversation(
       setMessages([]);
       setOpenerAction(null);
       setOpenError(null);
-      setDraftResetToken((token) => token + 1);
-      // Anything queued was written for the conversation being left, like the draft that just
-      // reset — it has no thread to speak into any more.
+      // The composer's words follow the session by themselves: `BuddyDraftProvider` keys each
+      // draft on the conversation, so the one written about the conversation being left stays
+      // with it, and this conversation's own comes back.
+      // Anything queued was written for the conversation being left, like the draft — it has
+      // no thread to speak into any more.
       commitQueued([]);
       setQueuePaused(false);
       // Bound to the offers of the conversation being left, not to the tab: a switch starts
@@ -1016,9 +1019,8 @@ export function useBuddyConversation(
       setMessages([]);
       setOpenerAction(null);
       setOpenError(null);
-      // The box is emptied through the token: a question typed about the conversation being
-      // left is about a thread that no longer exists. See `draftResetToken`.
-      setDraftResetToken((token) => token + 1);
+      // The box follows the conversation by itself: a question typed about the conversation
+      // being left stays with it — `BuddyDraftProvider` keys each draft on the session.
       // Same rule for anything queued behind a running answer: it was written for the
       // conversation being left.
       commitQueued([]);
@@ -1145,12 +1147,12 @@ export function useBuddyConversation(
    * saying it stopped is more use than a bubble that silently ends mid-sentence. The turn is
    * also what makes the failure visible at all -- an assistant turn with no text and no error
    * renders as nothing, which left the hire's question sitting under a reply that never came.
+   * The `reason` is what the line says — a timed-out turn says so, everything else keeps the
+   * generic line.
    */
-  const failReply = useCallback((messageId: string) => {
+  const failReply = useCallback((messageId: string, reason: string = REPLY_FAILED) => {
     setMessages((prev) =>
-      prev.map((message) =>
-        message.id === messageId ? { ...message, error: REPLY_FAILED } : message,
-      ),
+      prev.map((message) => (message.id === messageId ? { ...message, error: reason } : message)),
     );
   }, []);
 
@@ -1186,6 +1188,29 @@ export function useBuddyConversation(
       const controller = new AbortController();
       abortRef.current = controller;
       streamingRef.current = true;
+
+      /**
+       * The inter-event watchdog — see [STREAM_TIMEOUT_MS]. Re-armed by every event, so it
+       * measures silence rather than duration; when it fires it aborts the turn the way Stop
+       * would, and the close-out below reads `timedOut` to fail the reply instead of calling
+       * it stopped.
+       */
+      let timedOut = false;
+      let watchdogId: ReturnType<typeof setTimeout> | null = null;
+      const clearWatchdog = () => {
+        if (watchdogId !== null) {
+          clearTimeout(watchdogId);
+          watchdogId = null;
+        }
+      };
+      const armWatchdog = () => {
+        clearWatchdog();
+        watchdogId = setTimeout(() => {
+          timedOut = true;
+          console.error(`Buddy stream timed out (no events for ${STREAM_TIMEOUT_MS}ms)`);
+          controller.abort();
+        }, STREAM_TIMEOUT_MS);
+      };
 
       // The hire's surface must name the conversation it speaks into. The composer is live
       // from the first paint, so a send can beat the opening read; resolution is shared and
@@ -1296,17 +1321,34 @@ export function useBuddyConversation(
         refreshTitleIfUntitled();
       };
 
+      /**
+       * Closes a turn the watchdog cut off: the same closing as a Stop — the busy states go,
+       * the tool label clears — but the reply says it failed (it went silent) instead of
+       * claiming the hire stopped it.
+       */
+      const failTimedOut = () => {
+        setIsStreaming(false);
+        setIsThinking(false);
+        setActiveTool(null);
+        failReply(assistantId, REPLY_TIMED_OUT);
+        refreshTitleIfUntitled();
+      };
+
+      armWatchdog();
+
       try {
         await streamMessage(
           text,
           {
             onToolUse: (name) => {
+              armWatchdog();
               setActiveTool(name);
               touched.any = true;
               if (BUDDY_BOARD_TOOLS.has(name)) touched.board = true;
             },
 
             onReasoning: (reasoningText) => {
+              armWatchdog();
               // The model's visible thinking, kept on the message so the ported panel can render
               // it. `isThinking` stays true here — the typing row keeps the turn's place until
               // the first real token arrives — but the turn counts as streaming, so the thread
@@ -1332,6 +1374,7 @@ export function useBuddyConversation(
             },
 
             onToken: (token) => {
+              armWatchdog();
               setIsStreaming(true);
               setIsThinking(false);
               setActiveTool(null);
@@ -1342,6 +1385,7 @@ export function useBuddyConversation(
             },
 
             onCitation: (citation) => {
+              armWatchdog();
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
@@ -1352,6 +1396,7 @@ export function useBuddyConversation(
             },
 
             onActionProposal: (proposal) => {
+              armWatchdog();
               // The buddy is offering to do something. Nothing has changed yet and nothing will
               // until the hire confirms — so this is only recorded here, and attached to the reply
               // once the reply exists. The confirm payloads ride along so the action runs against
@@ -1394,6 +1439,7 @@ export function useBuddyConversation(
             },
 
             onStoredProposal: (proposal) => {
+              armWatchdog();
               // A team-mode offer: stored server-side, confirmed by id. Recorded the same way —
               // held back until the reply exists, so the card never lands above an empty bubble.
               setActiveTool(null);
@@ -1408,6 +1454,7 @@ export function useBuddyConversation(
             },
 
             onDone: () => {
+              clearWatchdog();
               setIsStreaming(false);
               // Also here, not only in `onToken`: a turn whose whole answer is a proposal never
               // emits a token, and the typing dots would sit under it forever.
@@ -1428,11 +1475,15 @@ export function useBuddyConversation(
             },
 
             onError: (err) => {
+              clearWatchdog();
               console.error(err);
               setIsStreaming(false);
               setIsThinking(false);
               setActiveTool(null);
               failReply(assistantId);
+              // The backend names the conversation before the turn, so even a failed turn has
+              // a title waiting — the same re-read `markStopped` does, for the same reason.
+              refreshTitleIfUntitled();
             },
           },
           // Read at call time: a turn speaks to whichever conversation is current when it starts.
@@ -1454,18 +1505,27 @@ export function useBuddyConversation(
         syncBoardIfTouched();
 
         // ...or it ended because Stop cut it off: an abort resolves the read silently, so the
-        // terminal `onDone` never ran and the close-out happens here.
-        if (controller.signal.aborted) markStopped();
+        // terminal `onDone` never ran and the close-out happens here. The watchdog's abort
+        // arrives through the same door and is a failure, not a stop.
+        if (controller.signal.aborted) {
+          if (timedOut) failTimedOut();
+          else markStopped();
+        }
       } catch (e) {
         console.error(e);
         setIsStreaming(false);
         setIsThinking(false);
         setActiveTool(null);
-        if (controller.signal.aborted) markStopped();
-        else failReply(assistantId);
+        if (controller.signal.aborted) {
+          if (timedOut) failTimedOut();
+          else markStopped();
+        } else {
+          failReply(assistantId);
+        }
         // Same reason as above: a turn that placed a card and then broke still wrote it.
         syncBoardIfTouched();
       } finally {
+        clearWatchdog();
         if (abortRef.current === controller) abortRef.current = null;
         streamingRef.current = false;
         // The turn is over — done, failed or stopped — so the next queued message may go.
@@ -1496,6 +1556,32 @@ export function useBuddyConversation(
       void sendMessage(text);
     },
     [commitQueued, setQueuePaused, sendMessage],
+  );
+
+  /**
+   * Re-asks the question a failed turn was answering — the "Try again" under its error line.
+   *
+   * Goes through [submitMessage], the composer's own entry point: idle it sends, mid-turn it
+   * queues, exactly as if the hire had typed the question again. The failed pair stays in the
+   * thread — the retired chat's toast retry did the same; trying again does not erase what
+   * happened — and the question is read back out of the messages, so nothing extra is stored.
+   * A turn that failed before any question (the greeting) has nothing to re-ask, and the
+   * caller offers no button for it.
+   */
+  const retryReply = useCallback(
+    (messageId: string) => {
+      const list = messagesRef.current;
+      const index = list.findIndex((message) => message.id === messageId);
+      if (index < 0) return;
+      for (let i = index - 1; i >= 0; i -= 1) {
+        const message = list[i];
+        if (message.role === "USER") {
+          submitMessage(message.content);
+          return;
+        }
+      }
+    },
+    [submitMessage],
   );
 
   /** Drops one queued message without sending it. */
@@ -1830,8 +1916,8 @@ export function useBuddyConversation(
     setMessages([]);
     setOpenerAction(null);
     setOpenError(null);
-    // Same rule as a fresh visit: the words belonged to the conversation that just went away.
-    setDraftResetToken((token) => token + 1);
+    // Same rule as a fresh visit: the words belonged to the conversation that just went away,
+    // and `BuddyDraftProvider` swaps them for the new conversation's own when it keys on it.
     commitQueued([]);
     setQueuePaused(false);
     // Bound to the offers of the conversation being left, not to the tab: a switch starts
@@ -1919,16 +2005,15 @@ export function useBuddyConversation(
     isDeciding,
     switchTeamProject,
 
-    // The composer's words live in `BuddyDraftProvider`, below this provider; this is the only
-    // thing about them the session still owns — the news that the thread they belonged to is
-    // gone. See `draftResetToken`.
-    draftResetToken,
+    // The composer's words live in `BuddyDraftProvider`, below this provider — keyed there on
+    // the conversation below (`currentSessionId`/`teamProjectId`), so each thread keeps its own.
     // The same idea for the fields a proposal carries: a flag's question is the hire's to word,
     // and the session is what keeps that wording across a closed dock and a handed-over page.
     actionDrafts,
     setActionDraft,
     sendMessage,
     submitMessage,
+    retryReply,
     stopStreaming,
     queued,
     queuePaused,

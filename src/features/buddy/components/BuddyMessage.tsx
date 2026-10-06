@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, MessageSquareOff, UserRound } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
 import { SleepyBot } from "./SleepyBot";
 import { BotGlyph } from "./BotGlyph";
 import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
@@ -71,6 +72,12 @@ type BuddyMessageProps = {
   stopped?: boolean;
   /** Rendered under the bubble, inside the speaker's column: the escalation offer, mostly. */
   footer?: ReactNode;
+  /**
+   * Re-asks the question this failed turn was answering — rendered inside the error box, so
+   * the line that says the reply failed is also where trying again lives. Only given when
+   * there is a question to re-ask (see `BuddyThread`).
+   */
+  onRetry?: () => void;
   /** True for the turn currently receiving tokens — that bot is working, so it stays awake. */
   isStreaming?: boolean;
 };
@@ -105,6 +112,7 @@ export function BuddyMessage({
   incomplete = false,
   stopped = false,
   footer,
+  onRetry,
   isStreaming = false,
 }: BuddyMessageProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -164,12 +172,17 @@ export function BuddyMessage({
 
         {error && (
           <div
-            className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm leading-relaxed text-app-danger-text ${
+            className={`flex max-w-full min-w-0 items-center gap-2 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm leading-relaxed text-app-danger-text ${
               children === undefined ? "" : "mt-1"
             }`}
           >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{error}</span>
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1">{error}</span>
+            {onRetry && (
+              <Button variant="secondary" size="sm" onClick={onRetry}>
+                Try again
+              </Button>
+            )}
           </div>
         )}
 

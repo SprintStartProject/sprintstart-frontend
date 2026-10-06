@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion, type MotionValue } from "framer-motion";
-import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
+import { ArrowDown, Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
 import { SleepyBot } from "./SleepyBot";
 import { Button } from "../../../components/ui/Button";
 import { centralSpringToken } from "../../../styles/tokens";
@@ -45,6 +45,7 @@ type BuddyDockProps = Pick<
   | "isThinking"
   | "isStreaming"
   | "stopStreaming"
+  | "retryReply"
   | "queued"
   | "queuePaused"
   | "removeQueued"
@@ -155,6 +156,7 @@ function BuddyDockImpl({
   isThinking,
   isStreaming,
   stopStreaming,
+  retryReply,
   queued,
   queuePaused,
   removeQueued,
@@ -195,7 +197,7 @@ function BuddyDockImpl({
 }: BuddyDockProps) {
   const prefersReducedMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
-  const { containerRef, onScroll } = useStickToBottom(messages);
+  const { containerRef, onScroll, isPinned, jumpToLatest } = useStickToBottom(messages);
 
   // The chips fill the composer through the write-only half, so this window does not follow
   // every character typed into the box — see `useBuddyDraftActions`.
@@ -380,34 +382,51 @@ function BuddyDockImpl({
           </Button>
         </header>
 
-        <div
-          ref={containerRef}
-          onScroll={onScroll}
-          data-testid="buddy-dock-transcript"
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
-        >
-          <BuddyThread
-            renderReplyAction={renderReplyAction}
-            compact
-            messages={messages}
-            isThinking={isThinking}
-            isStreaming={isStreaming}
-            activeTool={activeTool}
-            lastMessageFooter={lastMessageFooter}
-            confirmAction={confirmAction}
-            dismissAction={dismissAction}
-            actionDrafts={actionDrafts}
-            setActionDraft={setActionDraft}
-            // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
-            // team-mode conversation is not one — the offer must not even render there.
-            renderQuestionAction={renderQuestionAction}
-            openError={openError}
-            onRetryOpen={onRetryOpen}
-            dinoGameActive={dinoGameActive}
-            onDinoGameExit={onDinoGameExit}
-            onCitationClick={onCitationClick}
-            onOpenArtifact={onOpenArtifact}
-          />
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div
+            ref={containerRef}
+            onScroll={onScroll}
+            data-testid="buddy-dock-transcript"
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
+          >
+            <BuddyThread
+              renderReplyAction={renderReplyAction}
+              compact
+              messages={messages}
+              isThinking={isThinking}
+              isStreaming={isStreaming}
+              activeTool={activeTool}
+              lastMessageFooter={lastMessageFooter}
+              confirmAction={confirmAction}
+              dismissAction={dismissAction}
+              actionDrafts={actionDrafts}
+              setActionDraft={setActionDraft}
+              // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+              // team-mode conversation is not one — the offer must not even render there.
+              renderQuestionAction={renderQuestionAction}
+              openError={openError}
+              onRetryOpen={onRetryOpen}
+              onRetryReply={retryReply}
+              dinoGameActive={dinoGameActive}
+              onDinoGameExit={onDinoGameExit}
+              onCitationClick={onCitationClick}
+              onOpenArtifact={onOpenArtifact}
+            />
+          </div>
+
+          {/* The way back to the newest message after scrolling up to re-read — the auto-scroll
+            deliberately does not drag a reader down (see `useStickToBottom`). */}
+          {!isPinned && (
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              data-testid="buddy-jump-to-latest"
+              className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text shadow-md transition-colors hover:bg-app-surface-hover"
+            >
+              <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+              Jump to latest
+            </button>
+          )}
         </div>
 
         <div className="shrink-0 border-t border-app-border bg-app-surface px-4 py-3">

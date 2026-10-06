@@ -65,14 +65,16 @@ export function deriveArtifactFromCitation(citation: CitationArtifactOpen): Arti
  *
  * A conversation is about the project it was started in, and the drawer's content read is
  * project-scoped — so the conversation's own project wins over the global selection (the hire
- * may have switched since it started). Team conversations carry their managed project on the
- * session slice; an unscoped hire conversation falls back to whatever is selected. `null` means
- * no project at all: there is no drawer to open, and the caller offers the source link instead.
+ * may have switched since it started). A team conversation's project is the managed one: a hire
+ * session sits behind the switch carrying its own project, and reading that one first opened the
+ * drawer in the wrong project for a PM on several — so the managed project comes first. An
+ * unscoped hire conversation falls back to whatever is selected. `null` means no project at all:
+ * there is no drawer to open, and the caller offers the source link instead.
  */
 export function citationDrawerProjectId(
   sessionProjectId: string | null | undefined,
   teamProjectId: string | null | undefined,
   selectedProjectId: string,
 ): string | null {
-  return sessionProjectId ?? teamProjectId ?? (selectedProjectId || null);
+  return teamProjectId ?? sessionProjectId ?? (selectedProjectId || null);
 }
