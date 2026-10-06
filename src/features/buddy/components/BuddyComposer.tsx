@@ -34,8 +34,11 @@ type BuddyComposerProps = {
    */
   busy?: boolean;
   /**
-   * Whether a reply is being written right now. While it is, Send queues the follow-up (see
-   * `queue`) and the Stop button appears beside it when `onStop` is given.
+   * Whether a message turn is in flight — thinking about the hire's message or writing the
+   * answer. While it is, Send queues the follow-up (see `queue`) and the Stop button appears
+   * beside it when `onStop` is given. Armed from the first moment of the turn, not from the
+   * first token: a slow or wedged turn has to be stoppable while it is still thinking, the
+   * same way the retired chat surface's `isBusy` armed its Stop.
    */
   streaming?: boolean;
   /** Stops the in-flight reply — the composer shows Stop only when it is given. */
@@ -185,9 +188,9 @@ export function BuddyComposer({
    * refocus below hangs off `busy` flipping, and nothing ever became busy).
    */
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
-    // An inverted date range cannot go out anyway — the backend validates it — so refusing
-    // here turns a round-trip and a validation error into a correction beside the fields that
-    // caused it. Enter and the button both come through this one gate.
+    // An inverted window would go out unchecked and silently match nothing — nothing
+    // downstream rejects it — so refusing here turns a dead search into a correction beside
+    // the fields that caused it. Enter and the button both come through this one gate.
     if (filtersInvalid) return;
     if (!handleSubmit(event)) return;
     const field = fieldRef.current;
@@ -230,7 +233,10 @@ export function BuddyComposer({
         />
       )}
 
-      {!compact && filters && onFiltersChange && (
+      {/* Not gated on `compact`: the dock sends with the same session filters, so it has to show
+          them too — a narrowed search the hire cannot see is the one way a filter "loses" them
+          knowledge. Only the popover needs the page's room (see `BuddyFiltersButton`). */}
+      {filters && onFiltersChange && (
         <BuddyFilterChips filters={filters} onFiltersChange={onFiltersChange} />
       )}
 

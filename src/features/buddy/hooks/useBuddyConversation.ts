@@ -496,10 +496,6 @@ export function useBuddyConversation(
     filtersRef.current = filters;
   }, [filters]);
 
-  const clearFilters = useCallback(() => {
-    setFilters({ sourceSystems: [], from: "", to: "" });
-  }, []);
-
   const [capabilitiesEnabled, setCapabilitiesEnabledState] = useState(true);
   const capabilitiesEnabledRef = useRef(true);
   // Read once per user, the way team mode is: a preference, not conversation state. Deferred to
@@ -1170,6 +1166,14 @@ export function useBuddyConversation(
           // "new conversation" marker must not outvote the move that actually failed.
           retryRef.current = null;
           setOpenError(HISTORY_FAILED);
+          // The turn never got off the ground, but this send already claimed the in-flight
+          // markers. Without releasing them every later submit queues behind a turn that will
+          // never end, and the drain — which only fires when a turn closes — never runs. (A
+          // queued turn failing here has messages behind it; the drain hands the next one its
+          // turn.)
+          if (abortRef.current === controller) abortRef.current = null;
+          streamingRef.current = false;
+          drainRef.current();
           return;
         }
       }
@@ -1256,8 +1260,8 @@ export function useBuddyConversation(
             onReasoning: (reasoningText) => {
               // The model's visible thinking, kept on the message so the ported panel can render
               // it. `isThinking` stays true here — the typing row keeps the turn's place until
-              // the first real token arrives — but the turn counts as streaming, which is what
-              // arms the composer's Stop.
+              // the first real token arrives — but the turn counts as streaming, so the thread
+              // marks it live from the first thought and the panel follows it (see `BuddyThread`).
               setIsStreaming(true);
               setMessages((prev) =>
                 prev.map((m) =>
@@ -1489,9 +1493,18 @@ export function useBuddyConversation(
     drainRef.current = drainNextQueued;
   }, [drainNextQueued]);
 
-  /** Releases a queue Stop paused, starting with the oldest message. */
+  /**
+   * Releases a queue Stop paused, starting with the oldest message.
+   *
+   * Unless a turn is running again — Stop holds the queue, but a message sent after it goes
+   * straight out while the hold stays (see `submitMessage`), and the hire may then ask for the
+   * queue before that turn is done. Starting a second stream beside it would interleave two
+   * answers; the release is then only the flag, and the running turn's close-out drains the
+   * queue, in order, the moment it finishes.
+   */
   const resumeQueue = useCallback(() => {
     setQueuePaused(false);
+    if (streamingRef.current) return;
     const next = queuedRef.current[0];
     if (next) startQueuedTurn(next);
   }, [setQueuePaused, startQueuedTurn]);
@@ -1869,7 +1882,6 @@ export function useBuddyConversation(
     resumeQueue,
     filters,
     setFilters,
-    clearFilters,
     capabilitiesEnabled,
     setCapabilitiesEnabled,
     confirmAction,

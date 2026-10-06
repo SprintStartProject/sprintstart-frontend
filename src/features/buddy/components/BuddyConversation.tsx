@@ -62,6 +62,14 @@ type BuddyConversationProps = {
    * thread draws.
    */
   isStreaming?: boolean;
+  /**
+   * Whether a message turn is in flight — the buddy is thinking about what the hire asked, or
+   * writing the answer. Distinct from `isThinking` above, which the page hands in already
+   * combined with opening and greeting work (it drives the typing dots). This one is the
+   * composer's: like the retired chat surface's `isBusy`, it arms Stop and turns Send into the
+   * queue's entry point from the moment a send starts, not from the first token.
+   */
+  turnActive?: boolean;
   /** Stops the in-flight reply — the composer's Stop button (see `BuddyComposer`). */
   onStop?: () => void;
   /** The queue's data and actions for the composer — see `BuddyComposerQueue`. */
@@ -124,6 +132,7 @@ function BuddyConversationImpl({
   hasFloatingControl = false,
   focusComposerOnMount = false,
   isStreaming = false,
+  turnActive = false,
   onStop,
   queue,
   filters,
@@ -227,7 +236,7 @@ function BuddyConversationImpl({
             focusOnMount={focusComposerOnMount}
             busy={isThinking || isStreaming}
             gameActive={dinoGameActive}
-            streaming={isStreaming}
+            streaming={isStreaming || turnActive}
             onStop={onStop}
             queue={queue}
             filters={filters}

@@ -453,7 +453,7 @@ function BuddyDockImpl({
             focusOnMount
             busy={isBusy}
             gameActive={dinoGameActive}
-            streaming={isStreaming}
+            streaming={isThinking || isStreaming}
             onStop={stopStreaming}
             queue={{
               items: queued,

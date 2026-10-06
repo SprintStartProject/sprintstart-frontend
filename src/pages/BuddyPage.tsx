@@ -639,6 +639,7 @@ function BuddyMentorHome() {
               messages={greeting.messages}
               isThinking={isThinking || isOpening || greeting.isThinking}
               isStreaming={isStreaming}
+              turnActive={isThinking || isStreaming}
               onStop={stopStreaming}
               queue={{
                 items: queued,
