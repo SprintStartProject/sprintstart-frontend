@@ -162,7 +162,7 @@ export function BuddyMessage({
           </div>
         )}
 
-        {incomplete && (
+        {incomplete && !error && (
           <div
             data-testid="buddy-message-incomplete"
             className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-sm leading-relaxed text-app-text-muted ${

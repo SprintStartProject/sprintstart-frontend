@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Trash2, X } from "lucide-react";
 import type { BuddySessionSummary } from "../../../services/buddyService";
 import { Button } from "../../../components/ui/Button";
@@ -39,6 +39,9 @@ type BuddyConversationListProps = {
 /** What a conversation is called before its first message has written it a title. */
 const UNTITLED = "New conversation";
 
+/** The backend's own retention window for binned conversations (`BuddySessionCleanupService`). */
+const BIN_RETENTION_DAYS = 7;
+
 /** A short "when" for a row: the day the conversation was started, as a person reads it. */
 function formatStartedOn(createdAt: string): string {
   const date = new Date(createdAt);
@@ -78,6 +81,9 @@ export function BuddyConversationList({
   const [sessionToBin, setSessionToBin] = useState<BuddySessionSummary | null>(null);
   const [isBinning, setIsBinning] = useState(false);
   const toast = useToast();
+  // Where focus lands after a successful bin: the dialog restores to the trash it was opened
+  // from, but that row is gone by then — the first remaining conversation takes it instead.
+  const listRef = useRef<HTMLUListElement>(null);
 
   const handleConfirmBin = async () => {
     if (!sessionToBin || !onBin || isBinning) return;
@@ -86,6 +92,12 @@ export function BuddyConversationList({
       await onBin(sessionToBin.id);
       toast.success("Conversation binned");
       setSessionToBin(null);
+      // The dialog hands focus back to the trash button it was opened from — but that row is
+      // gone now. Land the keyboard on the first conversation still in the list (the one that
+      // took over when the binned conversation was on screen).
+      window.requestAnimationFrame(() => {
+        listRef.current?.querySelector<HTMLElement>("li button")?.focus();
+      });
     } catch (err) {
       toast.error(parseApiError(err, "Couldn't bin that conversation."));
     } finally {
@@ -112,7 +124,7 @@ export function BuddyConversationList({
         )}
       </div>
 
-      <ul className="m-0 min-h-0 list-none space-y-1 overflow-y-auto px-2 pb-3">
+      <ul ref={listRef} className="m-0 min-h-0 list-none space-y-1 overflow-y-auto px-2 pb-3">
         {sessions.map((session) => {
           const isCurrent = session.id === currentSessionId;
           const title = session.title.trim() || UNTITLED;
@@ -149,7 +161,7 @@ export function BuddyConversationList({
                   disabled={disabled}
                   className={[
                     "absolute right-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-app-text-muted",
-                    "opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
+                    "opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100",
                     // No focus ring of its own: the app-wide outline (styles/index.css) covers
                     // every keyboard-focusable control, and a per-element ring would replace it.
                     "hover:bg-app-surface-hover hover:text-app-text",
@@ -165,8 +177,9 @@ export function BuddyConversationList({
       </ul>
 
       {/* Binned, not deleted: the backend keeps the conversation until its retention window
-          ends, and the dialog says so — "deleted for good after 7 days" is the backend's own
-          cleanup rule, and the reason this wording differs from the chat's "cannot be undone". */}
+          ends, and the dialog says so — the window below is the backend's own cleanup rule
+          (`BuddySessionCleanupService`), and the reason this wording differs from the chat's
+          "cannot be undone". */}
       <Modal
         isOpen={sessionToBin !== null}
         onClose={() => {
@@ -175,7 +188,7 @@ export function BuddyConversationList({
         }}
         role="alertdialog"
         title="Bin conversation?"
-        description={`"${sessionToBin?.title.trim() || UNTITLED}" leaves your conversation list and is deleted for good after 7 days.`}
+        description={`"${sessionToBin?.title.trim() || UNTITLED}" leaves your conversation list and is deleted for good after ${BIN_RETENTION_DAYS} days.`}
         size="sm"
         testId="bin-conversation-modal"
         footer={
