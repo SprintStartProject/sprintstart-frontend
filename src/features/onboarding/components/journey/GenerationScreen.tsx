@@ -1,7 +1,8 @@
 import { CheckCircle2, CircleDashed, Loader2, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { DinoGame } from "../../../chatbot/components/DinoGame";
+import { DinoGameLazy } from "../../../easter-eggs/components/DinoGameLazy";
+import { DinoPlayHint } from "../../../easter-eggs/components/DinoPlayHint";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../../easter-eggs/hooks/useDinoWaitingGame";
 import type { GenerationPhaseProgress } from "../../generation/OnboardingJourneyContext";
 
@@ -59,7 +60,7 @@ export function GenerationScreen({
   const isGenerating = isRunning && !isCompleted;
   const shownPhases = isCompleted ? settle(phases) : phases;
 
-  const [gameActive, closeGame] = useSpaceOpensDino(isGenerating, dinoUnlocked, {
+  const [gameActive, closeGame, openGame] = useSpaceOpensDino(isGenerating, dinoUnlocked, {
     keepActiveUntilExit: true,
   });
 
@@ -173,18 +174,14 @@ export function GenerationScreen({
         </div>
 
         {dinoUnlocked && !gameActive && isGenerating && (
-          <p className="mt-4 text-center text-xs text-app-text-subtle">
-            Press{" "}
-            <kbd className="rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-app-text shadow-2xs">
-              Space
-            </kbd>{" "}
-            to pass the time 🦖
-          </p>
+          <div className="mt-4 flex justify-center">
+            <DinoPlayHint onPlay={openGame} />
+          </div>
         )}
 
         {gameActive ? (
           <div className="mt-6">
-            <DinoGame
+            <DinoGameLazy
               onExit={closeGame}
               replyReady={!isGenerating && gameActive}
               completionLabel="Path ready"

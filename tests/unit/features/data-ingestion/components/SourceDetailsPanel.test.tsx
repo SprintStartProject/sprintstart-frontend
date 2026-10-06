@@ -952,7 +952,7 @@ describe("SourceDetailsPanel", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("shows space hint when syncing and dino is unlocked, and starts DinoGame on Space", () => {
+    it("shows space hint when syncing and dino is unlocked, and starts DinoGame on Space", async () => {
       window.localStorage.setItem("dinoUnlocked", "true");
 
       render(panel(syncing(mockSource)));
@@ -960,16 +960,20 @@ describe("SourceDetailsPanel", () => {
       expect(screen.getByText(/to pass the time/i)).toBeInTheDocument();
       fireEvent.keyDown(window, { code: "Space" });
 
-      expect(screen.getByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
+      expect(
+        await screen.findByRole("application", { name: /mini dino game/i }),
+      ).toBeInTheDocument();
     });
 
-    it("shows 'Sync complete' badge when syncing finishes while game is active", () => {
+    it("shows 'Sync complete' badge when syncing finishes while game is active", async () => {
       window.localStorage.setItem("dinoUnlocked", "true");
 
       const { rerender } = render(panel(syncing(mockSource)));
 
       fireEvent.keyDown(window, { code: "Space" });
-      expect(screen.getByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
+      expect(
+        await screen.findByRole("application", { name: /mini dino game/i }),
+      ).toBeInTheDocument();
       expect(screen.queryByText(/sync complete/i)).not.toBeInTheDocument();
 
       // Source finishes syncing
@@ -1000,7 +1004,7 @@ describe("SourceDetailsPanel", () => {
       // Space on a disabled control has no meaning of its own, so it opens the game.
       expect(screen.getByRole("button", { name: /Update repo/ })).toHaveFocus();
       fireEvent.keyDown(window, { code: "Space" });
-      expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
 
       // Status still reads "connected", but the update has not settled yet.
       expect(screen.queryByTestId("dino-game-reply-ready")).not.toBeInTheDocument();
@@ -1013,7 +1017,7 @@ describe("SourceDetailsPanel", () => {
       expect(screen.getByTestId("dino-game-reply-ready")).toHaveAttribute("data-tone", "success");
     });
 
-    it("reports 'Sync failed' instead of 'Sync complete' when the sync ends in attention", () => {
+    it("reports 'Sync failed' instead of 'Sync complete' when the sync ends in attention", async () => {
       window.localStorage.setItem("dinoUnlocked", "true");
       const failedSource: DataSource = {
         ...mockSource,
@@ -1022,6 +1026,7 @@ describe("SourceDetailsPanel", () => {
 
       const { rerender } = render(panel(syncing(mockSource)));
       fireEvent.keyDown(window, { code: "Space" });
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
 
       rerender(panel(failedSource));
 
@@ -1031,7 +1036,7 @@ describe("SourceDetailsPanel", () => {
       expect(screen.queryByText(/sync complete/i)).not.toBeInTheDocument();
     });
 
-    it("first Escape closes the dino game but not the drawer; second Escape closes the drawer", () => {
+    it("first Escape closes the dino game but not the drawer; second Escape closes the drawer", async () => {
       window.localStorage.setItem("dinoUnlocked", "true");
       const onDrawerClose = vi.fn();
 
@@ -1042,7 +1047,7 @@ describe("SourceDetailsPanel", () => {
       );
 
       fireEvent.keyDown(window, { code: "Space" });
-      expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
 
       fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
       expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();

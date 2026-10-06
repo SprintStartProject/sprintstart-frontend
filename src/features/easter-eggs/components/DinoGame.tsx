@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../../../components/ui/Button.tsx";
-import { isTypingTarget } from "../../easter-eggs/lib/keyTargets.ts";
+import { isTypingTarget } from "../lib/keyTargets.ts";
 
 /**
  * How the work the player is waiting on ended. Drives the badge colour *and*
@@ -16,7 +16,7 @@ const TONE_DOT: Record<DinoCompletionTone, string> = {
   danger: "bg-app-danger-solid",
 };
 
-type DinoGameProps = {
+export type DinoGameProps = {
   /**
    * Called when the player leaves the game (Escape or the exit button).
    */
@@ -144,8 +144,15 @@ const DRONE_MIN_SCORE = 40;
 const HIGH_SCORE_KEY = "sprintstart-dino-highscore";
 
 function loadHighScore(): number {
-  const stored = Number(localStorage.getItem(HIGH_SCORE_KEY) ?? "0");
-  return Number.isNaN(stored) ? 0 : stored;
+  // Guarded like every other egg storage access: privacy modes and sandboxed
+  // frames can throw on `localStorage`, and the game must never be the reason
+  // a surface fails to render. A lost high score is the acceptable outcome.
+  try {
+    const stored = Number(localStorage.getItem(HIGH_SCORE_KEY) ?? "0");
+    return Number.isNaN(stored) ? 0 : stored;
+  } catch {
+    return 0;
+  }
 }
 
 function readPalette(el: HTMLElement): Palette {
@@ -783,7 +790,11 @@ export function DinoGame({
               highScoreRef.current = finalScore;
               setHighScore(finalScore);
               setNewHighScore(true);
-              localStorage.setItem(HIGH_SCORE_KEY, String(finalScore));
+              try {
+                localStorage.setItem(HIGH_SCORE_KEY, String(finalScore));
+              } catch {
+                // The run keeps its score on screen; only persistence is lost.
+              }
             }
             break;
           }

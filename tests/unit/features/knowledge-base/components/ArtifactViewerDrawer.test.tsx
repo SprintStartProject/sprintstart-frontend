@@ -1,4 +1,4 @@
-import { act, render as rtlRender, screen } from "@testing-library/react";
+import { act, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
@@ -1204,5 +1204,98 @@ describe("ArtifactViewerDrawer", () => {
     renderDrawer();
     const panel = screen.getByTestId("side-panel");
     expect(panel).toHaveAttribute("data-lock-scroll", "true");
+  });
+
+  describe("dino waiting game on the summary", () => {
+    beforeEach(() => {
+      window.localStorage.setItem("dinoUnlocked", "true");
+    });
+
+    afterEach(() => {
+      window.localStorage.clear();
+    });
+
+    it("offers a tappable hint while the summary streams, and the tap opens the game", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+
+      // The wait runs minutes; the invitation is a real button so a touch user
+      // can act on it (Space stays the keyboard path).
+      const hint = await screen.findByTestId("dino-play-hint");
+      await userEvent.click(hint);
+
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+      // One wait, one opener: the hint steps aside once the game is up.
+      expect(screen.queryByTestId("dino-play-hint")).not.toBeInTheDocument();
+    });
+
+    it("says 'Summary ready' when the stream finishes while the game is open", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      let handlers: SummaryStreamHandlers | null = null;
+      vi.mocked(knowledgeService.streamArtifactSummary).mockImplementation((_p, _a, h) => {
+        handlers = h;
+        return new Promise<void>(() => {});
+      });
+
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+
+      fireEvent.keyDown(window, { code: "Space" });
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+      expect(screen.queryByTestId("dino-game-reply-ready")).not.toBeInTheDocument();
+
+      act(() => {
+        handlers?.onToken("The summary, finished.");
+        handlers?.onDone();
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent(/summary ready/i),
+      );
+      expect(screen.getByTestId("dino-game-reply-ready")).toHaveAttribute("data-tone", "success");
+    });
+
+    it("says 'Summary failed' when the stream errors while the game is open", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      let rejectStream: ((error: unknown) => void) | null = null;
+      vi.mocked(knowledgeService.streamArtifactSummary).mockImplementation(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectStream = reject;
+          }),
+      );
+
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+
+      fireEvent.keyDown(window, { code: "Space" });
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+
+      act(() => {
+        rejectStream?.(new Error("stream broke"));
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent(/summary failed/i),
+      );
+      expect(screen.getByTestId("dino-game-reply-ready")).toHaveAttribute("data-tone", "danger");
+    });
+
+    it("keeps the hint and the Space trigger away while the dino is locked", async () => {
+      window.localStorage.clear();
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+      await screen.findByText("Generating summary...");
+
+      expect(screen.queryByTestId("dino-play-hint")).not.toBeInTheDocument();
+      fireEvent.keyDown(window, { code: "Space" });
+      expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+    });
   });
 });

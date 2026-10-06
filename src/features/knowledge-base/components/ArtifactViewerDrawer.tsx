@@ -35,6 +35,9 @@ import { SidePanel } from "../../../components/ui/SidePanel";
 import { Modal } from "../../../components/ui/Modal";
 import { useAuth } from "../../../context/useAuth";
 import { CitationsList } from "./CitationsList";
+import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame.ts";
+import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
+import { DinoPlayHint } from "../../easter-eggs/components/DinoPlayHint.tsx";
 
 /**
  * Props for the ArtifactViewerDrawer component.
@@ -863,6 +866,22 @@ export function ArtifactViewerDrawer({
     error,
   } = state;
 
+  // The waiting game: Space while the summary streams — and, because this wait
+  // runs minutes, the same opening behind a tap so it is not keyboard-only.
+  // `artifact !== null` keeps the trigger disarmed while the drawer is closed
+  // but its last summary state is still on the reducer (the stream aborts, the
+  // flags stay).
+  const dinoUnlocked = useDinoUnlocked();
+  const [dinoActive, closeDino, openDino] = useSpaceOpensDino(
+    isFetchingSummary && artifact !== null,
+    dinoUnlocked,
+    { keepActiveUntilExit: true },
+  );
+  // Only the summary stream can set `error` while the summary view is up
+  // (`summarizeStart` clears it and the retry loop keeps fetching), so the
+  // game's badge can read a failure from it.
+  const summaryFailed = !isFetchingSummary && error !== null;
+
   /**
    * Deletes the currently selected uploaded artifact.
    *
@@ -1208,6 +1227,23 @@ export function ArtifactViewerDrawer({
             <Sparkles className="h-5 w-5" />
             <span className="text-lg">AI Summary</span>
           </div>
+
+          {dinoUnlocked && isFetchingSummary && !dinoActive && (
+            <DinoPlayHint onPlay={openDino} className="mb-4" />
+          )}
+
+          {dinoActive && (
+            <div className="mb-4">
+              <DinoGameLazy
+                onExit={closeDino}
+                // The badge may only claim the state the summary actually
+                // reached, and only once nothing is in flight.
+                replyReady={dinoActive && !isFetchingSummary}
+                completionLabel={summaryFailed ? "Summary failed" : "Summary ready"}
+                completionTone={summaryFailed ? "danger" : "success"}
+              />
+            </div>
+          )}
 
           {!summary && isFetchingSummary ? (
             <div

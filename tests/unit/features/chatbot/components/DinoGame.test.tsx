@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { DinoGame } from "../../../../../src/features/chatbot/components/DinoGame.tsx";
+import { DinoGame } from "../../../../../src/features/easter-eggs/components/DinoGame.tsx";
 
 /**
  * The game chrome around the canvas: what it tells assistive tech, and how it hands Escape

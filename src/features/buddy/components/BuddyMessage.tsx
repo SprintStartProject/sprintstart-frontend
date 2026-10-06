@@ -3,9 +3,9 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, UserRound } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { BotGlyph } from "../../chatbot/components/BotGlyph";
-import { DinoGame } from "../../chatbot/components/DinoGame.tsx";
-import { dinoCompletionProps } from "../../chatbot/dinoOutcome.ts";
-import type { DinoTurnOutcome } from "../../chatbot/dinoOutcome.ts";
+import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
+import { dinoCompletionProps } from "../../easter-eggs/lib/dinoOutcome.ts";
+import type { DinoTurnOutcome } from "../../easter-eggs/lib/dinoOutcome.ts";
 import { centralSpringToken } from "../../../styles/tokens.ts";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { useAuth } from "../../../context/useAuth";
@@ -278,7 +278,7 @@ export function BuddyTypingMessage({
         </div>
 
         <div className="min-w-0 flex-1">
-          <DinoGame onExit={onGameExit} {...dinoCompletionProps(replyReady, turnOutcome)} />
+          <DinoGameLazy onExit={onGameExit} {...dinoCompletionProps(replyReady, turnOutcome)} />
 
           {!replyReady && (
             <div className="mt-2 flex w-max max-w-full items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-2.5 shadow-sm">

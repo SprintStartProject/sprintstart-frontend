@@ -80,7 +80,8 @@ async function renderWithGameOpen() {
   const view = render(page(RUNNING));
   expect(await screen.findByText("Building your onboarding path")).toBeInTheDocument();
   fireEvent.keyDown(window, { code: "Space" });
-  expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+  // The game chunk arrives behind the shared Suspense boundary; await the mount.
+  expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
   return view;
 }
 

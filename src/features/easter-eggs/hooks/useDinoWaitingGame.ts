@@ -71,7 +71,9 @@ export type SpaceOpensDinoOptions = {
  * {@link isInteractiveTarget}), in which case Space keeps its meaning. A
  * modified, auto-repeated or already-handled press is never the trigger.
  *
- * Returns whether the game should be shown, plus a way to close it early.
+ * Returns whether the game should be shown, a way to close it early, and
+ * `open` — the same opening the Space trigger performs, for hosts that also
+ * offer a tap (a wait long enough to play in must not be keyboard-only).
  * The game belongs to the wait it was opened under, so it closes by itself
  * the moment `armed` flips off — unless `keepActiveUntilExit` is set, in which
  * case an ongoing run is allowed to finish.
@@ -80,7 +82,7 @@ export function useSpaceOpensDino(
   armed: boolean,
   isUnlocked: boolean,
   options?: SpaceOpensDinoOptions,
-): [boolean, () => void] {
+): [gameActive: boolean, close: () => void, open: () => void] {
   const keepActiveUntilExit = options?.keepActiveUntilExit ?? false;
   const [gameActive, setGameActive] = useState(false);
 
@@ -89,6 +91,14 @@ export function useSpaceOpensDino(
   // it (`react-hooks/refs` forbids that, and rightly: a handler registered in
   // the first effect would capture a ref that is still null).
   const [host] = useState(() => Symbol("dino-waiting-game"));
+
+  // One claim for both ways in — the Space trigger below and a host's tap —
+  // so the shared-slot rules hold for either path.
+  const open = useCallback(() => {
+    if (!armed || !isUnlocked || gameHost !== null) return;
+    gameHost = host;
+    setGameActive(true);
+  }, [armed, isUnlocked, host]);
 
   useEffect(() => {
     if (!armed || !isUnlocked || gameActive) return;
@@ -100,13 +110,12 @@ export function useSpaceOpensDino(
       if (isInteractiveTarget(document.activeElement) || isInteractiveTarget(e.target)) return;
       if (gameHost !== null) return;
       e.preventDefault();
-      gameHost = host;
-      setGameActive(true);
+      open();
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [armed, isUnlocked, gameActive, host]);
+  }, [armed, isUnlocked, gameActive, host, open]);
 
   // A host that goes away mid-game (navigating off the page) must not take
   // the slot with it, or every other surface loses the trigger for good.
@@ -156,5 +165,5 @@ export function useSpaceOpensDino(
     releaseGameSlot(host);
     setGameActive(false);
   }, [host]);
-  return [gameActive, close];
+  return [gameActive, close, open];
 }
