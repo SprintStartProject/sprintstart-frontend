@@ -252,7 +252,10 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Start a new conversation" }));
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Start a new conversation" });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
 
     await waitFor(() => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
@@ -279,13 +282,13 @@ describe("BuddyPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps it off a visit nobody has spoken in — that visit is already the fresh one", async () => {
+  it("shows it disabled on a visit nobody has spoken in — that visit is already the fresh one", async () => {
     vi.mocked(getMessages).mockResolvedValue([]);
 
     renderPage();
 
     expect(await screen.findByText("Welcome back!")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeDisabled();
   });
 
   it("starts a new conversation from it, and says which chord does the same", async () => {
@@ -302,6 +305,7 @@ describe("BuddyPage", () => {
       "Start a new conversation (Alt + N) — your buddy keeps what it has learned about you",
     );
 
+    await waitFor(() => expect(control).toBeEnabled());
     await user.click(control);
 
     await waitFor(() => {
@@ -318,13 +322,10 @@ describe("BuddyPage", () => {
    * down and back on every turn. Visible precisely while the transcript is shorter than the
    * viewport, which is the first few turns this control exists for.
    *
-   * The room lives in the mode row: when it renders it is the element the floating controls
-   * overlap, so the row reserves the space from the stable facts (this conversation has been
-   * spoken in) and the transcript below adds no second gap of its own.
+   * The transcript reserves the space from the stable facts (this conversation has been spoken
+   * in, or the rail toggle is up), not from the button's own presence.
    */
   it("keeps the room the floating control needs, even while the control is withdrawn", async () => {
-    // No PM replies, so the rail toggle is not there to reserve the room on the button's
-    // behalf — which is the ordinary hire, and the only configuration where this can be seen.
     pmRepliesState.hasAny = false;
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
@@ -334,27 +335,19 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    const band = () => screen.getByTestId("buddy-mode-band");
     const framed = () =>
       screen.getByTestId("buddy-transcript").querySelector(".app-page-frame") as HTMLElement;
 
-    expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
-    expect(band().className).toContain("pt-14");
-    // The floor is the phone value up to `min-[1660px]` — below that the fluid page gutter is
-    // narrower than the counted rail toggle's halo, and the select sits at the gutter edge.
-    expect(band().className).toContain("min-[1660px]:pt-4");
-    // One reservation, not two: the transcript adds none under the mode row.
-    expect(framed().className).toContain("pt-8");
+    const control = await screen.findByRole("button", { name: "Start a new conversation" });
+    await waitFor(() => expect(control).toBeEnabled());
+    expect(framed().className).toContain("pt-14");
 
     await user.type(screen.getByLabelText("Message"), "and after that?");
     await user.click(screen.getByLabelText("Send message"));
 
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
-    });
-    // The control is gone and the padding it stands in has not moved.
-    expect(band().className).toContain("pt-14");
-    expect(framed().className).toContain("pt-8");
+    await waitFor(() => expect(control).toBeDisabled());
+    // The control stands down and the padding it stands in has not moved.
+    expect(framed().className).toContain("pt-14");
   });
 
   /**
@@ -404,14 +397,13 @@ describe("BuddyPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    expect(await screen.findByRole("button", { name: "Start a new conversation" })).toBeVisible();
+    const control = await screen.findByRole("button", { name: "Start a new conversation" });
+    await waitFor(() => expect(control).toBeEnabled());
 
     await user.type(screen.getByLabelText("Message"), "and after that?");
     await user.click(screen.getByLabelText("Send message"));
 
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
-    });
+    await waitFor(() => expect(control).toBeDisabled());
 
     // The chord is gated on the same condition, so it is not a way around the button.
     await user.keyboard("{Alt>}n{/Alt}");
@@ -441,6 +433,19 @@ describe("BuddyPage", () => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });
     expect(createSession).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The control that opens the conversations rail is always there while the rail is shut — it used
+   * to appear only once a second conversation existed, which read as a missing button.
+   */
+  it("offers the conversations toggle even with a single conversation", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByTitle("Your conversations"));
+
+    expect(await screen.findByRole("complementary", { name: "Your conversations" })).toBeVisible();
   });
 
   /**
@@ -633,7 +638,9 @@ describe("BuddyPage", () => {
     renderPage();
 
     // Start a second one from the standing control...
-    await user.click(await screen.findByRole("button", { name: "Start a new conversation" }));
+    const newConversation = await screen.findByRole("button", { name: "Start a new conversation" });
+    await waitFor(() => expect(newConversation).toBeEnabled());
+    await user.click(newConversation);
     await waitFor(() => {
       expect(screen.queryByText("where do I start?")).not.toBeInTheDocument();
     });

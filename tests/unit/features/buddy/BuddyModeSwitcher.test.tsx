@@ -15,6 +15,8 @@ import type { SelectableProject } from "../../../../src/features/projects/Projec
  * stored conversation is one this user no longer runs.
  */
 
+const SWITCHER_NAME = "Which conversation is your buddy in";
+
 function project(id: string, isManaged: boolean): SelectableProject {
   return {
     id,
@@ -72,29 +74,29 @@ describe("BuddyModeSwitcher", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("lists the hire's own conversation plus one row per managed project", () => {
+  it("lists the hire's own conversation plus one row per managed project", async () => {
     renderSwitcher(null);
 
-    const select = screen.getByRole<HTMLSelectElement>("combobox", {
-      name: "Which conversation is your buddy in",
-    });
-    expect(select.value).toBe(""); // hire mode
+    const trigger = screen.getByRole("combobox", { name: SWITCHER_NAME });
+    // Hire mode is the one showing.
+    expect(trigger).toHaveTextContent("Your onboarding");
 
-    const options = [...select.options].map((option) => option.value);
+    await userEvent.click(trigger);
+
+    const options = screen.getAllByRole("option").map((option) => option.textContent);
     // Managed projects only, with the hire's own always on top.
-    expect(options).toEqual(["", "p1", "p3"]);
+    expect(options).toEqual(["Your onboarding", "Aurora", "Companion"]);
   });
 
   it("switches to a managed project, and back to the hire's own", async () => {
     const onSwitch = renderSwitcher(null);
-    const select = screen.getByRole<HTMLSelectElement>("combobox", {
-      name: "Which conversation is your buddy in",
-    });
 
-    await userEvent.selectOptions(select, "p1");
+    await userEvent.click(screen.getByRole("combobox", { name: SWITCHER_NAME }));
+    await userEvent.click(screen.getByRole("option", { name: "Aurora" }));
     expect(onSwitch).toHaveBeenLastCalledWith("p1");
 
-    await userEvent.selectOptions(select, "");
+    await userEvent.click(screen.getByRole("combobox", { name: SWITCHER_NAME }));
+    await userEvent.click(screen.getByRole("option", { name: "Your onboarding" }));
     expect(onSwitch).toHaveBeenLastCalledWith(null);
   });
 
@@ -105,9 +107,6 @@ describe("BuddyModeSwitcher", () => {
       </ProjectContext.Provider>,
     );
 
-    const select = screen.getByRole<HTMLSelectElement>("combobox", {
-      name: "Which conversation is your buddy in",
-    });
-    expect(select).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: SWITCHER_NAME })).toBeDisabled();
   });
 });

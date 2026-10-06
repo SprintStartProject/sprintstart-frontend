@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { MessagesSquare, Send, Sparkles } from "lucide-react";
+import { MessageSquare, MessagesSquare, Send, Sparkles } from "lucide-react";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import {
@@ -129,8 +129,6 @@ function BuddyPageShell({
   rail,
   railToggle,
   newConversationControl,
-  modeControl,
-  reserveFloatingClearance = false,
   isRailOpen = false,
   children,
 }: {
@@ -144,19 +142,6 @@ function BuddyPageShell({
    * with Chat, and only the buddy half has conversations to start.
    */
   newConversationControl?: ReactNode;
-  /**
-   * The conversation switcher, in a slim row above the transcript. In flow, not floating: it
-   * is a standing answer to "which conversation am I in", not a transient control. Omitted for
-   * a hire-only user, so nobody gets a row of nothing.
-   */
-  modeControl?: ReactNode;
-  /**
-   * Whether the floating controls above the column (the rail toggle, "start a new conversation")
-   * need their room reserved. Computed by the page from the stable facts — a control withdraws
-   * mid-turn, the room it withdraws from must not — and applied to the mode row, which is the
-   * element those controls overlap when it renders.
-   */
-  reserveFloatingClearance?: boolean;
   /** Whether that column is currently taking width, which decides this column's left gutter. */
   isRailOpen?: boolean;
   children: ReactNode;
@@ -183,14 +168,6 @@ function BuddyPageShell({
       >
         {railToggle}
         {newConversationControl}
-        {modeControl && (
-          <div
-            data-testid="buddy-mode-band"
-            className={`app-page-frame shrink-0 ${reserveFloatingClearance ? "pt-14 min-[1660px]:pt-4" : "pt-4"}`}
-          >
-            {modeControl}
-          </div>
-        )}
 
         {children}
       </div>
@@ -474,6 +451,9 @@ function BuddyMentorHome() {
   // about *managing* one.
   const { projects, selectedProjectId } = useProjectContext();
   const canSwitchModes = projects.some((project) => project.isManaged);
+  // Hire-flow only, like the replies themselves: what came back from the PM is an answer to the
+  // hire's own questions, and a team thread has none.
+  const showReplies = isHireMode && replies.hasAny;
 
   // Memoised so the listener is bound once rather than torn down and rebuilt on every token
   // that arrives while the buddy is answering.
@@ -573,19 +553,6 @@ function BuddyMentorHome() {
   const focusComposer = useCallback(() => setComposerFocusToken((token) => token + 1), []);
   useShortcutListener(FOCUS_COMPOSER_SHORTCUT, focusComposer);
 
-  // The floating controls withdraw mid-turn (the new-conversation button while a reply streams),
-  // and the room they need must not go with them — so the mode row reserves it from the stable
-  // facts rather than from the controls' own presence: the rail toggle's conditions, or simply
-  // that this conversation has been spoken in. The row keeps the phone value of that clearance
-  // up to `min-[1660px]`, where the fluid page gutter (clamp(2rem, 9vw - 4rem, 10rem)) first
-  // clears the counted rail toggle with a real margin: a two-digit reply count puts its halo at
-  // ~79px, and the gutter only passes that with ~6px to spare at 1660px. Below it a select
-  // sitting at the column edge would tuck its top-left corner under the toggle. Hire-flow only;
-  // a team conversation has no floating controls to clear.
-  // The PM button lives in the page header, so only the rail toggle and the new-conversation
-  // button still float over the conversation and need their room reserved.
-  const needsFloatingRoom = isHireMode && ((sessions.length > 1 && !rail.open) || hasUserMessage);
-
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
   // Nothing here needs the greeting in order to work: the composer sends, the chips render, and
@@ -599,33 +566,46 @@ function BuddyMentorHome() {
         <header className="shrink-0 border-b border-app-border bg-app-bg">
           <div className="app-page-frame py-6">
             <PageHeader
-              icon={Sparkles}
+              icon={MessageSquare}
               title="Buddy"
               subtitle="Your onboarding mentor — here whenever you're stuck."
               // The subtitle is the line with the least to say on a phone, so it is the one
               // that makes room rather than pushing the conversation further down.
               hideSubtitleBelow="md"
               actions={
-                // Hire-flow only, like the replies themselves: what came back from the PM is
-                // an answer to the hire's own questions, and a team thread has none.
-                isHireMode && replies.hasAny ? (
-                  <Button
-                    variant="secondary"
-                    onClick={openReplies}
-                    icon={<Send className="h-4 w-4" aria-hidden="true" />}
-                    aria-label={
-                      unseenReplyCount > 0
-                        ? `Sent to your PM — ${unseenReplyCount} not looked at yet`
-                        : undefined
-                    }
-                  >
-                    Sent to your PM
-                    {unseenReplyCount > 0 && (
-                      <Badge variant="brand" size="sm" className="ml-1.5" aria-hidden="true">
-                        {unseenReplyCount}
-                      </Badge>
+                canSwitchModes || showReplies ? (
+                  <>
+                    {/* Which conversation the buddy is in — offered to whoever manages a project
+                        and to nobody else, so a hire never meets a control with one choice. */}
+                    {canSwitchModes && (
+                      <BuddyModeSwitcher
+                        teamProjectId={teamProjectId}
+                        onSwitch={(projectId) => void switchTeamProject(projectId)}
+                        disabled={isBusy || isOpening || isGreeting || isDeciding}
+                        className="w-full sm:w-56"
+                      />
                     )}
-                  </Button>
+
+                    {showReplies && (
+                      <Button
+                        variant="secondary"
+                        onClick={openReplies}
+                        icon={<Send className="h-4 w-4" aria-hidden="true" />}
+                        aria-label={
+                          unseenReplyCount > 0
+                            ? `Sent to your PM — ${unseenReplyCount} not looked at yet`
+                            : undefined
+                        }
+                      >
+                        Sent to your PM
+                        {unseenReplyCount > 0 && (
+                          <Badge variant="brand" size="sm" className="ml-1.5" aria-hidden="true">
+                            {unseenReplyCount}
+                          </Badge>
+                        )}
+                      </Button>
+                    )}
+                  </>
                 ) : undefined
               }
             />
@@ -634,67 +614,55 @@ function BuddyMentorHome() {
 
         <MainContent className="flex min-h-0 flex-1 flex-col">
           <BuddyPageShell
-            reserveFloatingClearance={needsFloatingRoom}
             isRailOpen={rail.open}
             rail={
-              // Mounted whenever it holds something, open or not: a rail that unmounted would lose
-              // its scroll position every time it was put away. The hire's conversations are all it
-              // holds now — what came back from the PM moved to the drawer the header button opens —
-              // and two of them are the point: with one, there is nothing to switch between.
-              // Hire-flow only: a team-mode conversation is not one of the hire's own.
-              isHireMode && sessions.length > 1 ? (
-                <ConversationRail
-                  id={RAIL_ID}
-                  isOpen={rail.open}
-                  label={RAIL_LABEL}
-                  onDismiss={() => setRailOpen(false)}
-                  dismissLabel="Close your conversations"
-                >
-                  <div className="flex h-full min-h-0 flex-col">
-                    <BuddyConversationList
-                      sessions={sessions}
-                      currentSessionId={currentSessionId}
-                      disabled={isBusy || isOpening || isGreeting || isDeciding}
-                      onSelect={selectConversation}
-                      // Binning needs the awaited promise (the dialog shows its spinner on it), so
-                      // this one is not wrapped in `void` like the selection above.
-                      onBin={binSession}
-                      // The rail's one cross, at its top: the replies panel used to carry one
-                      // mid-rail, which read as closing that section alone — and a conversations-only
-                      // rail had no way out at all. See the list's own `onClose`.
-                      onClose={() => setRailOpen(false)}
-                      // The cap only ever existed to leave the PM replies their share of the rail;
-                      // they have their own drawer now, so the conversations are the whole rail.
-                      className="min-h-0 flex-1"
-                    />
-                  </div>
-                </ConversationRail>
-              ) : undefined
+              // Always mounted, open or not: a rail that unmounted would lose its scroll position
+              // every time it was put away, and the control that brings it back has to be there
+              // from the first conversation on — not only once there is a second to switch to.
+              // The hire's conversations are all it holds — what came back from the PM moved to
+              // the drawer the header button opens.
+              <ConversationRail
+                id={RAIL_ID}
+                isOpen={rail.open}
+                label={RAIL_LABEL}
+                onDismiss={() => setRailOpen(false)}
+                dismissLabel="Close your conversations"
+              >
+                <div className="flex h-full min-h-0 flex-col">
+                  <BuddyConversationList
+                    sessions={sessions}
+                    currentSessionId={currentSessionId}
+                    // A team-mode conversation is not one of the hire's own, so the list is
+                    // there to look at but not to switch away with.
+                    disabled={!isHireMode || isBusy || isOpening || isGreeting || isDeciding}
+                    onSelect={selectConversation}
+                    // Binning needs the awaited promise (the dialog shows its spinner on it), so
+                    // this one is not wrapped in `void` like the selection above.
+                    onBin={binSession}
+                    // The rail's one cross, at its top: the replies panel used to carry one
+                    // mid-rail, which read as closing that section alone — and a conversations-only
+                    // rail had no way out at all. See the list's own `onClose`.
+                    onClose={() => setRailOpen(false)}
+                    // The cap only ever existed to leave the PM replies their share of the rail;
+                    // they have their own drawer now, so the conversations are the whole rail.
+                    className="min-h-0 flex-1"
+                  />
+                </div>
+              </ConversationRail>
             }
             newConversationControl={
-              canStartConversation ? (
-                <BuddyNewConversationButton
-                  onClick={startConversation}
-                  shortcut={NEW_CONVERSATION_CHORD}
-                />
-              ) : undefined
-            }
-            modeControl={
-              canSwitchModes ? (
-                <BuddyModeSwitcher
-                  teamProjectId={teamProjectId}
-                  onSwitch={(projectId) => void switchTeamProject(projectId)}
-                  disabled={isBusy || isOpening || isGreeting || isDeciding}
-                  className="max-w-xs"
-                />
-              ) : undefined
+              <BuddyNewConversationButton
+                onClick={startConversation}
+                shortcut={NEW_CONVERSATION_CHORD}
+                disabled={!canStartConversation}
+              />
             }
             railToggle={
-              // Only offered when there is something behind it: a control that opens an empty panel
-              // is worse than no control. Hire-flow only, for the same reason the rail itself is.
+              // Whenever the rail is shut, in either mode and with any number of conversations —
+              // a way back that comes and goes with the list's length or the mode reads as broken.
               // No count: what a count on this toggle used to say was "your PM answered", and that
               // signal lives on the header button now.
-              isHireMode && sessions.length > 1 && !rail.open ? (
+              !rail.open ? (
                 <RailToggle
                   label={RAIL_LABEL}
                   controls={RAIL_ID}
@@ -748,14 +716,9 @@ function BuddyMentorHome() {
               // hire with one conversation this is the only term that is ever true — so tying the
               // space to the button shunted the whole transcript down and back on every single turn.
               // Visible while the transcript is shorter than the viewport, which is exactly the
-              // first few turns this control exists for.
-              // When the mode row renders it is the element the floating controls overlap, and it
-              // already carries their clearance (see the shell above) — the transcript below must
-              // not reserve a second gap for the same controls.
-              hasFloatingControl={
-                !canSwitchModes &&
-                ((isHireMode && sessions.length > 1 && !rail.open) || hasUserMessage)
-              }
+              // first few turns this control exists for. The rail toggle floats over the same
+              // corner whenever the rail is shut, so it reserves the room too.
+              hasFloatingControl={!rail.open || hasUserMessage}
               // Built above, in one identity — the conversation is memoised, and the chips' own reasons
               // are written where they are built.
               aboveComposer={aboveComposer}

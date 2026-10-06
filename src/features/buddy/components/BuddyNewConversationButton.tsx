@@ -13,16 +13,20 @@ import { MessageSquarePlus } from "lucide-react";
  * would undo what one shared header is for. Same chrome and same corner treatment as
  * `RailToggle`, on the opposite side, so the two never meet.
  *
- * Withdrawn mid-turn by its caller, for the reason `BuddyDock` withdraws its own copy:
- * `newConversation` clears the thread, but cannot call back a request already streaming into it.
+ * Always on screen, disabled by its caller while starting one is not possible — mid-turn, for the
+ * reason `BuddyDock` withdraws its own copy (`newConversation` clears the thread, but cannot call
+ * back a request already streaming into it), or while the conversation is still empty. A control
+ * that came and went read as a missing button.
  */
 export function BuddyNewConversationButton({
   onClick,
   shortcut,
+  disabled = false,
 }: {
   onClick: () => void;
   /** Named in the tooltip so the chord is discoverable from the control it duplicates. */
   shortcut?: string;
+  disabled?: boolean;
 }) {
   const label = "Start a new conversation";
 
@@ -30,13 +34,14 @@ export function BuddyNewConversationButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       title={
         shortcut
           ? `${label} (${shortcut}) — your buddy keeps what it has learned about you`
           : `${label} — your buddy keeps what it has learned about you`
       }
-      className="absolute top-3 right-2 z-30 shrink-0 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:bg-app-surface-hover hover:text-app-text"
+      className="absolute top-3 right-2 z-30 shrink-0 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-app-surface disabled:hover:text-app-text-muted"
     >
       <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
     </button>
