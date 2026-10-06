@@ -118,6 +118,9 @@ export function AppRouter() {
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/chat/:id" element={<ChatPage />} />
               <Route path="/buddy" element={<BuddyPage />} />
+              {/* The address the dock's expand hands over, and the one a reload of the page
+                lands on: one conversation, named by id, read by the page itself. */}
+              <Route path="/buddy/:id" element={<BuddyPage />} />
             </Route>
             <Route path="/onboarding" element={<OnBoardingPage />} />
             {/* Guarded for the same reason as `/hire-setup` below: the policy calls authoring

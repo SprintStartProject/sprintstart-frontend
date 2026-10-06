@@ -221,8 +221,12 @@ export function BuddyWidget() {
    * keystroke rebuilt `goToPage`, then `openFull`, then the dock.
    */
   const goToPage = useCallback(() => {
-    void navigate(BUDDY_PAGE);
-  }, [navigate]);
+    // The conversation on screen is the one the page should open — the hand-off lands on the
+    // thread the hire was reading, not on whichever conversation the page happens to resolve
+    // as newest. A dock that has not opened a conversation yet has nothing to name and falls
+    // back to the plain route; the page resolves it the way it always did.
+    void navigate(currentSessionId ? `${BUDDY_PAGE}/${currentSessionId}` : BUDDY_PAGE);
+  }, [navigate, currentSessionId]);
 
   /**
    * The props the dock's memoised thread compares, each held in one identity.
@@ -340,17 +344,18 @@ export function BuddyWidget() {
 
   // The dock is a surface the dino game may live in only while it is actually on screen:
   // minimised, or hidden behind `/buddy`, a Space press must not open a game nobody can see.
-  const dockVisible = isOpen && !(pathname === BUDDY_PAGE && handoff === "idle");
+  const dockVisible = isOpen && !(pathname.startsWith(BUDDY_PAGE) && handoff === "idle");
   useEffect(() => {
     if (!dockVisible) return;
     return registerDinoSurface();
   }, [dockVisible, registerDinoSurface]);
 
-  // Normally the widget takes itself off `/buddy` — the launcher would offer the page you are
-  // reading, and the dock would put a second composer over the first. During the hand-off it
+  // Normally the widget takes itself off the buddy page — the launcher would offer the page you
+  // are reading, and the dock would put a second composer over the first. During the hand-off it
   // has to stay: it *is* the transition, and unmounting it the instant the route changes is
-  // precisely the flash this sequencing exists to remove.
-  if (pathname === BUDDY_PAGE && handoff === "idle") return null;
+  // precisely the flash this sequencing exists to remove. `startsWith`, because the page has
+  // per-conversation addresses (`/buddy/:id`) that are just as much "the page".
+  if (pathname.startsWith(BUDDY_PAGE) && handoff === "idle") return null;
 
   return (
     <>

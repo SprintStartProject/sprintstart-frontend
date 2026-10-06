@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { MessagesSquare, Sparkles, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { MessagesSquare, Sparkles } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { EmptyState } from "../components/ui/EmptyState";
 import {
   ConversationRail,
   RailToggle,
@@ -206,6 +205,7 @@ function BuddyMentorHome() {
   // is what keeps a character typed into the box from re-rendering this page at all. See
   // `BuddyDraftProvider`.
   const { setDraft } = useBuddyDraftActions();
+  const navigate = useNavigate();
 
   // The page shows the thread, so Space may open the dino game here; leaving the page releases
   // it (and closes a game still running) — see `registerDinoSurface`.
@@ -225,6 +225,44 @@ function BuddyMentorHome() {
   useEffect(() => {
     void ensureOpened();
   }, [ensureOpened]);
+
+  // A conversation named in the URL — the address the dock's expand hands over, and the one a
+  // reload has to land on — is opened instead of the resolved newest, and the address follows
+  // the conversation when it changes under it. One reconciler for both directions, because two
+  // would fight: a rail pick moves the conversation while the URL still names where it was, and
+  // a "honour the URL" pass reading that stale name would drag the hire straight back.
+  //
+  // Precedence: a URL that names neither where we are nor where we just were is an explicit
+  // address — a deep link, a reload, the back button — and wins; it opens when the list knows
+  // it and falls back to the bare page when it does not (a stale link is not a failed read, and
+  // the banner's retry would only fail again). Otherwise a conversation that *changed* — a rail
+  // pick, a bin of the current row, a new conversation — takes the address with it. The first
+  // resolve is deliberately left out: the bare page keeps its bare address, and naming happens
+  // up front only through the dock's hand-off, which navigates to `/buddy/<id>` itself.
+  const { id: urlSessionId } = useParams<{ id: string }>();
+  const previousSessionIdRef = useRef<string | null>(currentSessionId);
+  useEffect(() => {
+    const previousSessionId = previousSessionIdRef.current;
+    previousSessionIdRef.current = currentSessionId;
+
+    if (urlSessionId && urlSessionId !== previousSessionId && urlSessionId !== currentSessionId) {
+      if (sessions.length === 0) return;
+
+      if (!sessions.some((session) => session.id === urlSessionId)) {
+        void navigate("/buddy", { replace: true });
+        return;
+      }
+
+      void selectSession(urlSessionId);
+      return;
+    }
+
+    if (!currentSessionId || previousSessionId === null) return;
+    if (urlSessionId === currentSessionId) return;
+    if (urlSessionId !== undefined && urlSessionId !== previousSessionId) return;
+
+    void navigate(`/buddy/${currentSessionId}`, { replace: true });
+  }, [urlSessionId, sessions, currentSessionId, selectSession, navigate]);
 
   // Hire-only: the suggestions describe the *hire's* next useful question, and the backend has
   // no team-scoped list, so a team-mode conversation asks for none and shows no chips.
@@ -607,28 +645,10 @@ function BuddyMentorHome() {
  * pick the conversation up from anywhere and grow it into this page when it needs room.
  *
  * Bound to `/buddy`, open to every permission group, and rendered inside `AssistantShell`
- * next to the chat. A user without a selected project gets an empty state instead of the
- * conversation.
+ * next to the chat. A user without a selected project gets the conversation anyway: the hire's
+ * buddy is not one project's, and a dead end for everyone redirected here from `/chat` is
+ * exactly what the merge of the two surfaces is not allowed to leave behind.
  */
 export function BuddyPage() {
-  const { selectedProjectId, isLoading } = useProjectContext();
-
-  if (!isLoading && !selectedProjectId) {
-    return (
-      <BuddyPageShell>
-        <div className="app-page-frame flex flex-1 items-center justify-center py-8">
-          <EmptyState
-            icon={<Users className="h-8 w-8" aria-hidden="true" />}
-            title="No project yet"
-            className="w-full max-w-md"
-          >
-            You&rsquo;re not on a project yet — once you&rsquo;re added to one, your buddy will meet
-            you here.
-          </EmptyState>
-        </div>
-      </BuddyPageShell>
-    );
-  }
-
   return <BuddyMentorHome />;
 }

@@ -129,6 +129,9 @@ function renderPage() {
         <Routes>
           <Route element={<AssistantShell />}>
             <Route path="/buddy" element={<BuddyPage />} />
+            {/* The per-conversation address the dock's expand hands over — part of the real
+              arrangement since the page gained it, so the harness carries it too. */}
+            <Route path="/buddy/:id" element={<BuddyPage />} />
           </Route>
         </Routes>
       </BuddyProvider>
@@ -189,14 +192,23 @@ describe("BuddyPage", () => {
     vi.mocked(createSession).mockResolvedValue("s2");
   });
 
-  it("shows the no-project state when the hire is not on a project yet", async () => {
+  it("opens the conversation for a hire who is not on a project yet", async () => {
     projectState.selectedProjectId = "";
+    vi.mocked(getMessages).mockResolvedValue([
+      { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
+      {
+        role: "ASSISTANT",
+        content: "With the setup guide.",
+        createdAt: "2026-08-24T10:00:01.000Z",
+      },
+    ]);
 
     renderPage();
 
-    expect(await screen.findByText(/not on a project yet/)).toBeInTheDocument();
-    // Nothing is opened for somebody with nowhere to onboard.
-    expect(streamOpenBuddy).not.toHaveBeenCalled();
+    // No dead end: the hire's buddy is not one project's, and everyone arriving here from the
+    // retired `/chat` has nowhere else to be sent. The page opens the conversation as usual.
+    expect(await screen.findByText("where do I start?")).toBeInTheDocument();
+    expect(screen.getByText("With the setup guide.")).toBeInTheDocument();
   });
 
   /**

@@ -14,7 +14,7 @@ import { pageTransitionToken } from "../../styles/tokens";
  * slide between each other on their own.
  */
 function transitionKey(pathname: string): string {
-  if (pathname.startsWith("/chat") || pathname === "/buddy") return "assistant-shell";
+  if (pathname.startsWith("/chat") || pathname.startsWith("/buddy")) return "assistant-shell";
   if (isPmWorkspacePath(pathname)) return "pm-workspace";
 
   return pathname;
