@@ -1,6 +1,7 @@
 /**
- * Recognized chat phrases → effect ids. Kept verbatim from ChatPage's old
- * inline matching so existing behaviour (and muscle memory) is unchanged:
+ * Recognized chat phrases → effect ids. The matching rules are kept from the
+ * retired chat surface's inline matcher so existing behaviour (and muscle
+ * memory) is unchanged:
  * {@link matchEggPhrase} trims/lowercases before comparing, and folds curly
  * apostrophes to straight ones — macOS/iOS smart punctuation turns "let's"
  * into "let’s" as it is typed.

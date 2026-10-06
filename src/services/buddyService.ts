@@ -187,9 +187,9 @@ export async function streamOpenBuddy(
 }
 
 /**
- * Generic stream event returned by the backend when sending a buddy message. Mirrors
- * chatService's ChatEvent -- the backend's BuddyStreamEvent uses the identical shape
- * and wire field names as the chat module's AiStreamMessage.
+ * Generic stream event returned by the backend when sending a buddy message. Mirrors the
+ * backend's `BuddyStreamEvent`, which reuses the `sse_event` vocabulary the AI service has
+ * always spoken (`tool_use`/`token`/`citation`/…).
  */
 interface BuddyStreamChunk {
   type:

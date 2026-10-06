@@ -133,7 +133,7 @@ export function useSpaceOpensDino(
 
   // Locking mid-game (triple-click toggle elsewhere, another tab) closes
   // it. Uses React's documented "adjust state when a value changes"
-  // pattern instead of an effect, mirroring ChatPage — see
+  // pattern instead of an effect — see
   // https://react.dev/learn/you-might-not-need-an-effect
   const [prevUnlocked, setPrevUnlocked] = useState(isUnlocked);
   if (prevUnlocked !== isUnlocked) {

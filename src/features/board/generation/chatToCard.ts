@@ -4,18 +4,10 @@ import { HEADING_LIMIT, composeNote, normalise, truncateAtWord } from "./noteCom
 /**
  * Keeping something out of a conversation, on the board.
  *
- * Two conversations feed this and they are not the same shape, which is the whole reason it exists.
- * A chat has an id and a page of its own, so the thing worth keeping is often a *link* — the answer
- * stays where it is and the card is a way back to it. The buddy's conversation has neither: it is
- * deliberately not durable, every visit opens fresh, and a link to it would point at whatever the
- * buddy says tomorrow. So what gets kept there is the text itself, frozen.
- *
- * That difference is a design decision and not an oversight, so nothing here tries to paper over
- * it by inventing an id for the buddy or a transcript for the chat.
+ * The buddy's conversation is deliberately not durable — every visit opens fresh — so what gets
+ * kept is the text itself, frozen; a link to it would point at whatever the buddy says tomorrow.
+ * (The chat surface kept links instead, while it existed; that shape left with it.)
  */
-
-/** What a saved chat message says it is, in the attribution line. */
-const CHAT_SOURCE = "the assistant";
 
 /** What a saved buddy reply says it is. */
 const BUDDY_SOURCE = "your buddy";
@@ -71,35 +63,9 @@ export function messageNote(content: string, from: string): AuthoredCardRequest 
   return { kind: "NOTE", text: composeNote(plainFromMarkdown(content), from) };
 }
 
-/** One chat answer, kept as a note. */
-export function chatMessageNote(content: string): AuthoredCardRequest {
-  return messageNote(content, CHAT_SOURCE);
-}
-
 /** One buddy reply, frozen — there is nowhere to link back to. See the module comment. */
 export function buddyReplyNote(content: string): AuthoredCardRequest {
   return messageNote(content, BUDDY_SOURCE);
-}
-
-/**
- * A whole chat, kept as a link to itself.
- *
- * A link rather than a transcript because the chat is still there and still growing: a card holding
- * a copy of it would be out of date the next time the hire asks a follow-up, and two versions of
- * the same conversation is worse than one of them being a click away.
- *
- * An untitled chat still gets a card. The title is written by the backend a moment after the first
- * message, so "Thinking..." is a real state a hire can be looking at, and refusing to keep the chat
- * because of it would be refusing over something that fixes itself.
- */
-export function chatLink(chat: { id: string; title: string }): AuthoredCardRequest {
-  const label = normalise(chat.title);
-
-  return {
-    kind: "LINK",
-    url: `/chat/${chat.id}`,
-    label: label.length > 0 ? label : "Chat",
-  };
 }
 
 /** One turn of a conversation, as it is written into a transcript. */

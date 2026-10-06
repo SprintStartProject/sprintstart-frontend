@@ -5,7 +5,8 @@ import { Button } from "../../../components/ui/Button";
 import { useAutoResize } from "../../../components/ui/useAutoResize";
 import { useBuddyDraft } from "../buddyDraftContext";
 import type { BuddySessionFilters, QueuedBuddyMessage } from "../types";
-import { BuddyFilterChips, BuddyFiltersButton, isFilterRangeInvalid } from "./BuddyComposerFilters";
+import { isFilterRangeInvalid } from "../utils/filterRange";
+import { BuddyFilterChips, BuddyFiltersButton } from "./BuddyComposerFilters";
 import { BuddyQueuedMessages } from "./BuddyQueuedMessages";
 
 type BuddyComposerProps = {
@@ -26,8 +27,8 @@ type BuddyComposerProps = {
    *
    * Used for one thing: the caret comes back to this box when the answer
    * finishes, undoing the deliberate blur a send performs (see `submit`).
-   * The chat page runs the same two-way dance — see `ChatPage`'s focus
-   * effect — and for the same reason: Space starts the dino waiting-game
+   * The retired chat surface ran the same two-way dance, and for the same
+   * reason: Space starts the dino waiting-game
    * only while nothing is focused, so a box that keeps the caret after a
    * send would quietly make that egg unreachable on this surface.
    */

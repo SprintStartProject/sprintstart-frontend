@@ -13,7 +13,7 @@ import { join, relative, resolve } from "node:path";
  * sorts them. The leading space inside `" sidebar-open"` disappears and the
  * result is `flex-colsidebar-open` — two classes glued into one that doesn't
  * exist. Nothing errors, nothing warns, the layout just quietly breaks. It
- * happened once, to `ChatPage`, and it turned the whole page into a flex row.
+ * happened once, to the old chat page, and it turned the whole page into a flex row.
  *
  * The rule that survives the formatter: the separating space belongs in the
  * template literal, *outside* the `${…}`.

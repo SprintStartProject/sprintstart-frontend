@@ -518,11 +518,15 @@ export function useBuddyConversation(
 
   const [capabilitiesEnabled, setCapabilitiesEnabledState] = useState(true);
   const capabilitiesEnabledRef = useRef(true);
-  // Read once per user, the way team mode is: a preference, not conversation state.
+  // Read once per user, the way team mode is: a preference, not conversation state. Deferred to
+  // a microtask so the setState never runs synchronously in the effect body.
   useEffect(() => {
-    const stored = userId === null ? true : readStoredMentorTools(userId);
-    setCapabilitiesEnabledState(stored);
-    capabilitiesEnabledRef.current = stored;
+    void (async () => {
+      await Promise.resolve();
+      const stored = userId === null ? true : readStoredMentorTools(userId);
+      setCapabilitiesEnabledState(stored);
+      capabilitiesEnabledRef.current = stored;
+    })();
   }, [userId]);
   const setCapabilitiesEnabled = useCallback((next: boolean) => {
     setCapabilitiesEnabledState(next);
@@ -907,6 +911,8 @@ export function useBuddyConversation(
       isStreaming,
       applyCurrentSession,
       openSession,
+      commitQueued,
+      setQueuePaused,
     ],
   );
 
@@ -1027,6 +1033,8 @@ export function useBuddyConversation(
     applySessions,
     applyCurrentSession,
     selectSession,
+    commitQueued,
+    setQueuePaused,
   ]);
 
   /**
@@ -1798,6 +1806,8 @@ export function useBuddyConversation(
     isDeciding,
     ensureOpened,
     closeDinoGame,
+    commitQueued,
+    setQueuePaused,
   ]);
 
   /**

@@ -64,9 +64,9 @@ export interface Toast extends ToastOptions {
  * Split out from {@link ToastContextType} so a component that only ever *raises*
  * toasts can subscribe to something that never changes identity: the visible
  * list changes on every appearance and auto-dismiss, and anything consuming it
- * re-renders each time. `ChatProvider` is the reason this exists — it raises
- * chat errors from inside the streaming hot path, and re-rendering every
- * message row because an unrelated "Copied" toast came and went is waste.
+ * re-renders each time. A streaming surface is the reason this exists — errors
+ * are raised from inside a token hot path, and re-rendering every message row
+ * because an unrelated "Copied" toast came and went is waste.
  * Read it through {@link useToastApi}.
  */
 export interface ToastApi {

@@ -5,6 +5,7 @@ import { centralSpringToken } from "../../../styles/tokens";
 import { SOURCE_META } from "../../data-ingestion/data";
 import type { SourceSystem } from "../../data-ingestion/connectors/sourceSystems";
 import { useAvailableSources } from "../hooks/useAvailableSources";
+import { isFilterRangeInvalid } from "../utils/filterRange";
 import type { BuddySessionFilters } from "../types";
 
 function formatDateFilterLabel(from: string, to: string): string {
@@ -39,17 +40,6 @@ function getSourceMeta(source: SourceSystem): SourceMeta {
       icon: Filter,
     }
   );
-}
-
-/**
- * Whether the chosen window is inverted (start after end).
- *
- * The popover flags it in place and the composer refuses to submit on it: the backend validates
- * the range anyway, so blocking here turns a round-trip and a validation error into a correction
- * beside the fields that caused it.
- */
-export function isFilterRangeInvalid(from: string, to: string): boolean {
-  return Boolean(from && to && from > to);
 }
 
 /** The active filter count both the toggle's badge and the chips strip report. */

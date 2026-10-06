@@ -11,8 +11,8 @@ import { getPmAttentionCount } from "../../../../src/services/teamManagementServ
 import { mockViewport } from "../../setup/matchMedia";
 
 // Mutable so individual tests can flip it mid-suite. Module-level mock
-// factories cannot close over `let`, hence the `vi.hoisted` shared object
-// (same pattern as `useChat.test.tsx`). Reset in `beforeEach`.
+// factories cannot close over `let`, hence the `vi.hoisted` shared object.
+// Reset in `beforeEach`.
 const { projectState } = vi.hoisted(() => ({
   projectState: { canManageSelected: true },
 }));

@@ -178,7 +178,7 @@ function BuddyPageShell({
                 gutter instead of shoving the conversation right. The separating space belongs
                 before the `${'{'}` — prettier-plugin-tailwindcss trims class strings when it sorts
                 them, and gluing two classes together here once turned a whole page into a flex
-                row (see ChatPage). */}
+                row. */}
       <div
         className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${isRailOpen ? "app-rail-open" : ""}`}
       >
