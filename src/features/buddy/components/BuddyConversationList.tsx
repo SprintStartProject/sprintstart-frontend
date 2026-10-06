@@ -150,7 +150,9 @@ export function BuddyConversationList({
                   className={[
                     "absolute right-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-app-text-muted",
                     "opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100",
-                    "hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-1 focus-visible:ring-app-focus focus-visible:outline-none",
+                    // No focus ring of its own: the app-wide outline (styles/index.css) covers
+                    // every keyboard-focusable control, and a per-element ring would replace it.
+                    "hover:bg-app-surface-hover hover:text-app-text",
                     disabled ? "cursor-not-allowed" : "",
                   ].join(" ")}
                 >
