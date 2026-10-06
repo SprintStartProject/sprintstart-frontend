@@ -19,6 +19,10 @@ import {
 import { onBuddyPageReady } from "../aiBuddyBus";
 import { useBuddy } from "../hooks/useBuddy";
 import { useGreetingReveal } from "../hooks/useGreetingReveal";
+import { useProjectContext } from "../../projects/useProjectContext";
+import { CitationPopover } from "../citations/CitationPopover";
+import { useCitationViewer } from "../citations/useCitationViewer";
+import { ArtifactViewerDrawer } from "../../knowledge-base/components/ArtifactViewerDrawer";
 import { BuddyModeSwitcher } from "./BuddyModeSwitcher";
 import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
@@ -54,6 +58,12 @@ const HANDOFF_FALLBACK_MS = 1200;
 export function BuddyWidget() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // The artifact drawer the dock's citations open needs a project to fetch the source within —
+  // the same gate the chat applies to its own drawer.
+  const { selectedProjectId } = useProjectContext();
+  // The dock's citation popover + artifact drawer, held here (not in the dock) for the same
+  // reason the widget owns every other piece of surface state: the dock unmounts on close.
+  const citationViewer = useCitationViewer();
   const {
     messages,
     isThinking,
@@ -364,6 +374,10 @@ export function BuddyWidget() {
             teamProjectId={teamProjectId}
             openError={openError}
             onRetryOpen={retryOpenAction}
+            // Citation interaction for this surface: a `[N]` click opens the popover, and the
+            // footer's "Open source" hands the artifact to the drawer — both rendered below.
+            onCitationClick={citationViewer.handleCitationClick}
+            onOpenArtifact={citationViewer.handleOpenArtifact}
             onClose={toggleOpen}
             onOpenFull={openFull}
             suggestionsHidden={suggestionsHidden}
@@ -416,6 +430,30 @@ export function BuddyWidget() {
           onDrag={handleDrag}
           onDragRelease={handleDragRelease}
           onMoveCorner={handleMoveCorner}
+        />
+      )}
+
+      {/* The citation popover and the artifact drawer, once a reply's sources are clicked. Kept
+          out of the dock's own tree so the fixed overlays are not clipped by its scroll
+          container, and rendered after it in the DOM so they sit above the window (both are
+          `z-50`). The widget is off `/buddy`, where the page renders its own pair — the two
+          never share a screen. */}
+      {citationViewer.selectedCitation && (
+        <CitationPopover
+          selected={citationViewer.selectedCitation}
+          onClose={citationViewer.closeCitation}
+          onOpenArtifact={citationViewer.handleOpenArtifact}
+        />
+      )}
+
+      {citationViewer.citationArtifact && selectedProjectId && (
+        <ArtifactViewerDrawer
+          artifact={citationViewer.citationArtifact}
+          onClose={citationViewer.closeArtifact}
+          projectId={selectedProjectId}
+          highlightLines={citationViewer.highlightLines}
+          canDelete={false}
+          onDelete={() => {}}
         />
       )}
     </>

@@ -4,13 +4,19 @@ import { AlertCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import type { BuddyMessageView, ProposedAction } from "../types";
 import type { ActionDrafts } from "../actionDrafts";
+import type { Citation, SelectedCitation } from "../citations/types";
+import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { toolLabel } from "../toolLabel";
 import { BuddyActionProposals } from "./BuddyActionProposals";
 import { BuddyMarkdown } from "./BuddyMarkdown";
+import { MessageCitations } from "../citations/MessageCitations";
 import { BuddyMessage, BuddyTypingMessage } from "./BuddyMessage";
 
 /** The drafts a row without any proposal gets: one shared object, so its memo is never broken. */
 const EMPTY_ACTION_DRAFTS: ActionDrafts = {};
+
+/** The citations a row without any gets: one shared array, so its memo is never broken. */
+const EMPTY_CITATIONS: Citation[] = [];
 
 type BuddyThreadProps = {
   messages: BuddyMessageView[];
@@ -63,6 +69,19 @@ type BuddyThreadProps = {
    */
   renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
   /**
+   * Called when the hire clicks a `[N]` citation reference in a reply.
+   *
+   * Must be referentially stable, like `renderReplyAction`: the rows below are memoised, and a
+   * fresh function per render of the caller would re-render every turn with it.
+   */
+  onCitationClick?: (citation: SelectedCitation) => void;
+  /**
+   * Opens the artifact drawer from a reply's citations footer — see `MessageCitations`.
+   *
+   * Same stability contract as `onCitationClick`, for the same reason.
+   */
+  onOpenArtifact?: (data: CitationArtifactOpen) => void;
+  /**
    * Why the conversation could not be brought on screen at all, if it could not.
    *
    * Distinct from a turn that failed, which carries its own reason: this one has no turn to hang
@@ -96,6 +115,10 @@ type BuddyThreadRowProps = {
   setActionDraft: (key: string, text: string) => void;
   renderQuestionAction?: (question: string) => ReactNode;
   renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
+  /** See `BuddyThreadProps.onCitationClick`. */
+  onCitationClick?: (citation: SelectedCitation) => void;
+  /** See `BuddyThreadProps.onOpenArtifact`. */
+  onOpenArtifact?: (data: CitationArtifactOpen) => void;
   /** The greeting's suggested next step — present on the row it hangs under, nowhere else. */
   lastMessageFooter?: ReactNode;
 };
@@ -127,11 +150,14 @@ function BuddyThreadRowImpl({
   setActionDraft,
   renderQuestionAction,
   renderReplyAction,
+  onCitationClick,
+  onOpenArtifact,
   lastMessageFooter,
 }: BuddyThreadRowProps) {
   const isUser = message.role === "USER";
   const hasText = message.content.trim().length > 0;
   const hasActions = (message.actions?.length ?? 0) > 0;
+  const citations = message.citations ?? EMPTY_CITATIONS;
 
   // Until the first token (or an action proposal) arrives the streaming placeholder has
   // nothing to show, and the typing bubble below already stands in for it — so skip it,
@@ -147,6 +173,9 @@ function BuddyThreadRowImpl({
       compact={compact}
       isStreaming={isStreaming}
       error={message.error}
+      // A cut-short reply is the backend's story (history read); the hire's own turns never
+      // carry it, so it is gated the same way the rest of the buddy-only chrome is.
+      incomplete={!isUser && message.isIncomplete === true}
       footer={
         <>
           {isUser && renderQuestionAction?.(message.content)}
@@ -165,7 +194,22 @@ function BuddyThreadRowImpl({
         </>
       }
     >
-      {hasText ? isUser ? message.content : <BuddyMarkdown content={message.content} /> : undefined}
+      {hasText ? (
+        isUser ? (
+          message.content
+        ) : (
+          <>
+            <BuddyMarkdown
+              content={message.content}
+              citations={citations}
+              onCitationClick={onCitationClick}
+            />
+            {citations.length > 0 && (
+              <MessageCitations citations={citations} onOpenArtifact={onOpenArtifact} />
+            )}
+          </>
+        )
+      ) : undefined}
     </BuddyMessage>
   );
 }
@@ -203,6 +247,8 @@ function BuddyThreadImpl({
   lastMessageFooter,
   renderQuestionAction,
   renderReplyAction,
+  onCitationClick,
+  onOpenArtifact,
   openError,
   onRetryOpen,
   dinoGameActive = false,
@@ -270,6 +316,8 @@ function BuddyThreadImpl({
           setActionDraft={setActionDraft}
           renderQuestionAction={renderQuestionAction}
           renderReplyAction={renderReplyAction}
+          onCitationClick={onCitationClick}
+          onOpenArtifact={onOpenArtifact}
           // Resolved here rather than inside the row: only the buddy's latest reply gets it, and
           // only once the thinking bubble is gone — so the offer lands under a finished answer
           // rather than under a promise.

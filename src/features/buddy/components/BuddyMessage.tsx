@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertCircle, UserRound } from "lucide-react";
+import { AlertCircle, MessageSquareOff, UserRound } from "lucide-react";
 import { SleepyBot } from "../../chatbot/components/SleepyBot";
 import { BotGlyph } from "../../chatbot/components/BotGlyph";
 import { DinoGame } from "../../chatbot/components/DinoGame.tsx";
@@ -54,6 +54,15 @@ type BuddyMessageProps = {
    * this is the whole message.
    */
   error?: string;
+  /**
+   * True when this reply was cut short — the stream ended before the answer finished, and the
+   * backend kept the words that had arrived.
+   *
+   * A quiet line under the bubble, the shape the chat gives a stopped turn: the partial answer
+   * is still an answer, and this says why it ends where it does. Only ever read from history —
+   * a live failure carries `error` instead, and the two never render together.
+   */
+  incomplete?: boolean;
   /** Rendered under the bubble, inside the speaker's column: the escalation offer, mostly. */
   footer?: ReactNode;
   /** True for the turn currently receiving tokens — that bot is working, so it stays awake. */
@@ -87,6 +96,7 @@ export function BuddyMessage({
   compact = false,
   meta,
   error,
+  incomplete = false,
   footer,
   isStreaming = false,
 }: BuddyMessageProps) {
@@ -149,6 +159,18 @@ export function BuddyMessage({
           >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {incomplete && (
+          <div
+            data-testid="buddy-message-incomplete"
+            className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-sm leading-relaxed text-app-text-muted ${
+              children === undefined ? "" : "mt-1"
+            }`}
+          >
+            <MessageSquareOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>This reply was cut short.</span>
           </div>
         )}
 
