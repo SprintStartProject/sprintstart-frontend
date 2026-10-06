@@ -56,8 +56,10 @@ function renderAt(path: string) {
 
 /**
  * The chat is retired, and its addresses — bookmarks, old board links, a sidebar habit — land on
- * the one conversation surface rather than on a 404. The id is dropped on purpose: nothing was
- * migrated, so no chat id names a conversation that still exists.
+ * the one conversation surface rather than on a 404. `/chat/:id` keeps its id: the backfill that
+ * ran before the chat tables were dropped copied each chat's id onto the session it created, so
+ * an old "Keep this chat" card still names a conversation that can open — and an id with no
+ * conversation behind it falls back to the bare page inside `BuddyPage`, never a 404.
  */
 describe("the retired chat's addresses", () => {
   it("send /chat to the buddy page", async () => {
@@ -66,11 +68,12 @@ describe("the retired chat's addresses", () => {
     expect(await screen.findByText("buddy page at /buddy")).toBeInTheDocument();
   });
 
-  it("send /chat/:id to the bare buddy page, without the id", async () => {
+  it("carry /chat/:id to the conversation it names", async () => {
     renderAt("/chat/old-chat-id");
 
-    expect(await screen.findByText("buddy page at /buddy")).toBeInTheDocument();
-    expect(screen.queryByText(/old-chat-id/)).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("buddy page at /buddy/old-chat-id for old-chat-id"),
+    ).toBeInTheDocument();
   });
 
   it("serve one conversation at /buddy/:id", async () => {
