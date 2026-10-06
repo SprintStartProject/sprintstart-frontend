@@ -19,7 +19,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
         ref={ref}
         type="checkbox"
         disabled={disabled}
-        className={`peer absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none rounded-md border border-app-border-strong bg-app-surface transition-all checked:border-app-brand checked:bg-app-brand hover:border-app-brand-border-strong hover:bg-app-brand-soft checked:hover:bg-app-brand focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:ring-offset-1 focus-visible:ring-offset-app-surface focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+        className={`peer absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none rounded-md border border-app-border-strong bg-app-surface transition-all checked:border-app-brand checked:bg-app-brand hover:border-app-brand-border-strong hover:bg-app-brand-soft checked:hover:bg-app-brand disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
         {...props}
       />
       <Check

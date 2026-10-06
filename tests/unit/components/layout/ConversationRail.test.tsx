@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { ConversationRail } from "../../../../src/components/layout/ConversationRail";
@@ -63,6 +63,23 @@ describe("ConversationRail", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Close the PM replies" }));
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes focus while it is a drawer, and closes on Escape", async () => {
+    const user = userEvent.setup();
+    const onDismiss = vi.fn();
+
+    render(
+      <ConversationRail isOpen label="Sent to your PM" onDismiss={onDismiss}>
+        <button type="button">answered</button>
+      </ConversationRail>,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "answered" })).toHaveFocus());
+
+    await user.keyboard("{Escape}");
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });

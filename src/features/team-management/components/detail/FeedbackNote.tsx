@@ -51,7 +51,7 @@ export function FeedbackNote({
           {tone.label}
         </p>
         <span
-          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
             isUnread ? "bg-app-surface text-app-brand-text" : "text-app-text-muted"
           }`}
         >

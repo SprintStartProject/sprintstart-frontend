@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { IconTile } from "../../../components/ui/IconTile";
@@ -98,9 +99,10 @@ export function AccessConnectorGroup({
       {!showInitialLoading && error && (
         <div
           role="alert"
-          className="rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
+          className="flex items-start gap-1.5 rounded-xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
           data-testid={`access-error-${connector.id}`}
         >
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {error}
         </div>
       )}

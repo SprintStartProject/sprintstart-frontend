@@ -39,7 +39,7 @@ function documentsMissing(gaps: readonly KnowledgeGap[]): number {
 /** Small uppercase caption over a chip group. */
 function ChipLabel({ children }: { children: string }) {
   return (
-    <p className="mb-1.5 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+    <p className="mb-1.5 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
       {children}
     </p>
   );

@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { useId, useMemo } from "react";
 import type { ReactNode } from "react";
 import { FieldContext, type FieldContextValue } from "./fieldContext";
@@ -135,7 +136,12 @@ export function Field({
       )}
 
       {hasError && (
-        <p id={errorId} role="alert" className="text-xs font-medium text-app-danger-text">
+        <p
+          id={errorId}
+          role="alert"
+          className="flex items-start gap-1.5 text-xs font-medium text-app-danger-text"
+        >
+          <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           {error}
         </p>
       )}

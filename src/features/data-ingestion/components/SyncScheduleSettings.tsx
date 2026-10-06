@@ -335,7 +335,7 @@ export function SyncScheduleSettings({
                   value={everyMinutes}
                   disabled={isBusy}
                   onChange={(event) => setEveryMinutes(event.target.value)}
-                  className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-sm font-semibold text-app-text focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-sm font-semibold text-app-text focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <span className="pr-3 text-sm text-app-text-muted">minutes</span>
               </div>

@@ -174,7 +174,7 @@ export function BuddyComposer({
             setDraft(event.target.value);
           }}
           onKeyDown={handleKeyDown}
-          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-base text-app-text outline-none placeholder:text-app-text-disabled sm:text-sm pointer-coarse:text-base"
+          className="min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-base text-app-text outline-hidden placeholder:text-app-text-disabled sm:text-sm pointer-coarse:text-base"
         />
 
         <Button
@@ -194,7 +194,7 @@ export function BuddyComposer({
       </form>
 
       {!compact && (
-        <p className="mt-1.5 hidden px-1 text-[11px] text-app-text-disabled pointer-fine:block">
+        <p className="mt-1.5 hidden px-1 text-xs text-app-text-disabled pointer-fine:block">
           <kbd className="font-sans font-medium">Enter</kbd> to send ·{" "}
           <kbd className="font-sans font-medium">Shift</kbd> +{" "}
           <kbd className="font-sans font-medium">Enter</kbd> for a new line

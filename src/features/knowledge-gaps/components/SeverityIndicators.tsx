@@ -53,8 +53,8 @@ export function GapTypeChips({
 
   const chip =
     tone === "present"
-      ? "rounded border border-app-success-border bg-app-success-bg px-1.5 py-0.5 text-[11px] text-app-success-text"
-      : "rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-[11px] text-app-text-muted";
+      ? "rounded border border-app-success-border bg-app-success-bg px-1.5 py-0.5 text-xs text-app-success-text"
+      : "rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-xs text-app-text-muted";
 
   if (types.length === 0) return null;
 

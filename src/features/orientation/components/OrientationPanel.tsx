@@ -51,7 +51,7 @@ function EditButton({ onEdit, label }: { onEdit: () => void; label: string }) {
       type="button"
       data-testid="edit-orientation"
       onClick={onEdit}
-      className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
     >
       <PencilLine className="h-3 w-3" aria-hidden="true" />
       {label}
@@ -68,7 +68,7 @@ function Packet({ packet, onEdit }: { packet: OrientationPacket; onEdit?: () => 
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           {isHuman && (
-            <span className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-text-subtle">
+            <span className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-app-text-subtle">
               <UserRound className="h-3 w-3" aria-hidden="true" />
               Written by a person, not assembled
             </span>
@@ -88,7 +88,7 @@ function Packet({ packet, onEdit }: { packet: OrientationPacket; onEdit?: () => 
         ))}
       </ul>
       <SourceLinks label={isHuman ? "Sources" : "Assembled from"} items={packet.sources} />
-      <p className="mt-2 text-[11px] text-app-text-subtle">
+      <p className="mt-2 text-xs text-app-text-subtle">
         {isHuman
           ? "Written by the team for this task. Reading it is optional."
           : "Gathered from what the team has already written — nothing here was written for you, and it is not something you have to finish. Reading it is optional."}
@@ -150,7 +150,7 @@ export function OrientationPanel({
             <button
               type="button"
               onClick={onRetry}
-              className="mt-1.5 inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+              className="mt-1.5 inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline"
             >
               <RefreshCw className="h-3 w-3" aria-hidden="true" />
               Try again

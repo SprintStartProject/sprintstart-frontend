@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
@@ -235,9 +236,9 @@ export function KnowledgeBasePage() {
         </div>
       </header>
 
-      <main
+      <MainContent
         // Unlike Access Management, nothing above this page caps its height (the wrapper
-        // and App's own <main> are both `min-h-screen`), so `overflow-y-auto` never actually
+        // and App's own wrapper are both `min-h-screen`), so `overflow-y-auto` never actually
         // engages -- the document scrolls. No `SCROLL_CONTAINER_ATTRIBUTE` here for that
         // reason: marking this element would point scroll restoration and the dialog scroll
         // lock at something whose `scrollTop` never moves, both silently doing nothing.
@@ -406,7 +407,7 @@ export function KnowledgeBasePage() {
             }}
           />
         )}
-      </main>
+      </MainContent>
     </div>
   );
 }

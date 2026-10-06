@@ -222,7 +222,7 @@ export function SegmentedTabs<TValue extends string>({
               isCompact
                 ? "gap-1.5 rounded-lg px-3 py-1.5 text-xs"
                 : "gap-2 rounded-xl px-4 py-2 text-sm max-sm:py-3"
-            } font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+            } font-semibold whitespace-nowrap transition-colors ${
               fullWidth && !wrap ? (wrapBelow ? "lg:flex-1" : "flex-1") : ""
             } ${grown ? (isCompact ? "pr-2" : "pr-2.5") : ""} ${
               isActive ? "text-white" : "text-app-text-muted hover:text-app-text"
@@ -254,7 +254,7 @@ export function SegmentedTabs<TValue extends string>({
               // otherwise brings a smaller line box.
               <span
                 className={`relative z-10 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 leading-none font-bold tabular-nums ${
-                  isCompact ? "min-w-4 text-[10px]" : "min-w-5 text-[11px]"
+                  isCompact ? "min-w-4 text-xs" : "min-w-5 text-xs"
                 } ${isActive ? "bg-white/20 text-white" : "bg-app-surface text-app-text-subtle"}`}
               >
                 {option.count}
@@ -300,8 +300,8 @@ export function SegmentedTabs<TValue extends string>({
                           type="button"
                           aria-pressed={selected}
                           onClick={() => option.onSubChange?.(sub.value)}
-                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:outline-none ${
-                            isCompact ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors ${
+                            isCompact ? "px-2 py-1 text-xs" : "px-2.5 py-1 text-xs"
                           } ${
                             selected
                               ? "bg-app-surface text-app-text shadow-sm"
@@ -311,7 +311,7 @@ export function SegmentedTabs<TValue extends string>({
                           <span className="leading-none">{sub.label}</span>
                           {typeof sub.count === "number" && (
                             <span
-                              className={`inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] leading-none font-bold tabular-nums ${
+                              className={`inline-flex min-w-4 items-center justify-center rounded-full px-1.5 py-0.5 text-2xs leading-none font-bold tabular-nums ${
                                 selected
                                   ? "bg-app-brand-soft text-app-brand-text"
                                   : "bg-white/20 text-white"

@@ -237,7 +237,7 @@ export function MultiSelectFilter<TValue extends string>({
         onClick={() => (isOpen ? close() : open())}
         {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}
         data-testid={`${testId}-trigger`}
-        className={`inline-flex w-full cursor-pointer items-center gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 text-sm text-app-text backdrop-blur-md transition-colors outline-none hover:border-app-brand-border-strong hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70 ${triggerSizeClasses[size]}`}
+        className={`inline-flex w-full cursor-pointer items-center gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 text-sm text-app-text backdrop-blur-md transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70 ${triggerSizeClasses[size]}`}
       >
         <SlidersHorizontal aria-hidden="true" className="h-4 w-4 shrink-0 text-app-text-muted" />
 
@@ -285,7 +285,7 @@ export function MultiSelectFilter<TValue extends string>({
                 maxWidth: position.maxWidth,
                 zIndex: MENU_Z_INDEX,
               }}
-              className="fixed overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl outline-none"
+              className="fixed overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] outline-hidden backdrop-blur-xl"
               data-testid={`${testId}-menu`}
             >
               {sections.length === 0 && (
@@ -296,7 +296,7 @@ export function MultiSelectFilter<TValue extends string>({
                 const renderOption = (option: MultiSelectFilterOption<TValue>) => (
                   <label
                     key={option.value}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover max-sm:py-3"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover has-[:focus-visible]:bg-app-brand-soft max-sm:py-3"
                   >
                     <Checkbox
                       checked={selected.has(option.value)}

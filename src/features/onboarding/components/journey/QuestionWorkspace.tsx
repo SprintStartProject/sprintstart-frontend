@@ -137,9 +137,9 @@ export function QuestionWorkspace({
         >
           <XCircle className="h-5 w-5 shrink-0 text-app-danger-solid" aria-hidden="true" />
           <p className="text-sm font-semibold text-app-text">
-            Not correct yet
+            Not quite.
             <span className="block text-xs font-normal text-app-text-muted">
-              Look at the answer below and try again.
+              The correct answer is marked below.
             </span>
             {/* Where another guess used to be the only thing on offer. The buddy is not given the
                 answer, so this is help with the material -- what a wrong answer calls for. */}

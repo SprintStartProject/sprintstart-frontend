@@ -121,7 +121,7 @@ function SortHeader({
       aria-label={`Sort by ${sortLabel}`}
       aria-pressed={active}
       title={`Sort by ${sortLabel}`}
-      className={`-mx-1 inline-flex items-center gap-1 rounded px-1 tracking-wider uppercase transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+      className={`-mx-1 inline-flex items-center gap-1 rounded px-1 tracking-wider uppercase transition-colors ${
         active ? "text-app-text" : "hover:text-app-text"
       }`}
     >
@@ -431,7 +431,7 @@ export function TeamManagementPage() {
 
             <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface">
               <div
-                className={`hidden gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-[11px] font-semibold tracking-wider text-app-text-subtle uppercase md:grid ${ROSTER_COLUMNS}`}
+                className={`hidden gap-x-4 border-b border-app-border-muted px-6 py-2.5 text-2xs font-semibold tracking-wider text-app-text-subtle uppercase md:grid ${ROSTER_COLUMNS}`}
               >
                 <span>Member</span>
                 {/* Named for what it sorts by, not for what the rows show: "Where they are"

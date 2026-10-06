@@ -134,7 +134,7 @@ function GapRing({ summary }: { summary: GapSummary }) {
           ring is 74px across, and "COMPONENTS" set in caps with letter-spacing runs straight
           under the stroke.
         */}
-        <span className="text-[10px] leading-none font-medium text-app-text-muted">
+        <span className="text-xs leading-none font-medium text-app-text-muted">
           {summary.componentCount === 1 ? "component" : "components"}
         </span>
       </div>
@@ -198,26 +198,25 @@ function GapList({ gaps }: { gaps: readonly KnowledgeGap[] }) {
 
   return (
     <ul className="space-y-2">
-      {worstFirst.map((gap) => (
-        <li key={gap.id} className="flex items-start gap-2">
-          <span
-            aria-hidden="true"
-            className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${
-              SEVERITY_STYLES[gap.severity].bar
-            }`}
-          />
+      {worstFirst.map((gap) => {
+        const { icon: SeverityIcon, label, longLabel, text } = SEVERITY_STYLES[gap.severity];
 
-          <div className="min-w-0">
-            <p className="truncate text-sm text-app-text">{gap.component}</p>
-            <p className="truncate text-xs text-app-text-muted">
-              {/* The severity is already in the dot; the words say what would fix it. */}
-              {gap.missingTypes.length > 0
-                ? `missing ${gap.missingTypes.join(", ")}`
-                : SEVERITY_STYLES[gap.severity].longLabel.toLowerCase()}
-            </p>
-          </div>
-        </li>
-      ))}
+        return (
+          <li key={gap.id} className="flex items-start gap-2">
+            <SeverityIcon aria-hidden="true" className={`mt-0.5 h-4 w-4 shrink-0 ${text}`} />
+
+            <div className="min-w-0">
+              <p className="truncate text-sm text-app-text">{gap.component}</p>
+              <p className="truncate text-xs text-app-text-muted">
+                {/* The icon carries the step; the words start with it and then say what would fix it. */}
+                {gap.missingTypes.length > 0
+                  ? `${label} · missing ${gap.missingTypes.join(", ")}`
+                  : longLabel}
+              </p>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -226,7 +225,7 @@ function GapList({ gaps }: { gaps: readonly KnowledgeGap[] }) {
 function ColumnHeading({ label, total }: { label: string; total: string }) {
   return (
     <div className="mb-3 flex items-baseline justify-between gap-2">
-      <span className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+      <span className="text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
         {label}
       </span>
       <span className="text-xs text-app-text-muted tabular-nums">{total}</span>
@@ -295,7 +294,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
     <ClickableCard
       onClick={() => void navigate("/pm-dashboard")}
       aria-label="Open the PM Dashboard for the full team insights"
-      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 focus-ring-inset transition-all hover:-translate-y-0.5"
     >
       <div
         aria-hidden="true"

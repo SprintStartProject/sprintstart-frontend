@@ -97,7 +97,7 @@ export function BoardStageBand({
             onToggle();
           }}
           aria-expanded={open}
-          className="flex w-full flex-wrap items-center gap-2 rounded-xl px-1 py-1 text-left transition-colors hover:bg-app-surface-muted focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="flex w-full flex-wrap items-center gap-2 rounded-xl px-1 py-1 text-left transition-colors hover:bg-app-surface-muted"
         >
           {open ? (
             <ChevronDown className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />

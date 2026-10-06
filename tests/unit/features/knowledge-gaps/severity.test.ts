@@ -84,6 +84,14 @@ describe("knowledge-gaps severity", () => {
       expect(SEVERITY_STYLES.covered.longLabel).toBe("No gaps found");
     });
 
+    // Colour alone must not be what separates the steps (WCAG 1.4.1): each carries its own icon.
+    it("gives every step a different icon to go with its colour", () => {
+      const icons = SEVERITIES.map((severity) => SEVERITY_STYLES[severity].icon);
+
+      for (const icon of icons) expect(icon).toBeTruthy();
+      expect(new Set(icons).size).toBe(SEVERITIES.length);
+    });
+
     it("provides a style entry for every severity in SEVERITIES", () => {
       for (const severity of SEVERITIES) {
         expect(SEVERITY_STYLES[severity]).toBeDefined();

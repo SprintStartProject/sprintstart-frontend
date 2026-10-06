@@ -186,7 +186,7 @@ export function AnalysisOrbit({ tasks, active, projectName }: AnalysisOrbitProps
       <div className="pointer-events-none absolute inset-0 flex scale-[0.62] items-center justify-center sm:scale-100">
         <NeonRing value={percent} size={188} active={active}>
           <span className="text-4xl leading-none font-bold text-app-text">{percent}%</span>
-          <span className="mt-1.5 text-[11px] font-medium tracking-wider text-app-text-muted uppercase">
+          <span className="mt-1.5 text-2xs font-medium tracking-wider text-app-text-muted uppercase">
             {finished} of {tasks.length} checks
           </span>
           {projectName && (

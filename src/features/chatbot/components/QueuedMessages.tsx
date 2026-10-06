@@ -96,7 +96,7 @@ export function QueuedMessages({
                     onClick={() => onEdit(item.id)}
                     title="Edit this message"
                     aria-label={`Edit queued message ${index + 1}`}
-                    className="min-w-0 flex-1 truncate rounded-lg px-1 py-0.5 text-left text-sm text-app-text transition-colors hover:bg-app-surface-muted focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    className="min-w-0 flex-1 truncate rounded-lg px-1 py-0.5 text-left text-sm text-app-text transition-colors hover:bg-app-surface-muted"
                   >
                     {item.text}
                   </button>

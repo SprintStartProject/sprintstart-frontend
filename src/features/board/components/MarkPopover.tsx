@@ -191,7 +191,7 @@ export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPo
               aria-pressed={color === option}
               aria-label={labelFor(labels, option)}
               title={labelFor(labels, option)}
-              className={`h-6 w-6 rounded-full transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+              className={`h-6 w-6 rounded-full transition-transform hover:scale-110 ${
                 HIGHLIGHT_CLASS[option]
               } ${
                 color === option
@@ -208,7 +208,7 @@ export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPo
             onClick={rename}
             aria-label={`Rename ${labelFor(labels, color)}`}
             title={`Rename ${labelFor(labels, color)}`}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
           >
             <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
@@ -218,7 +218,7 @@ export function MarkPopover({ anchor, color, onPick, onRemove, onClose }: MarkPo
             onClick={onRemove}
             aria-label="Remove this highlight"
             title="Remove this highlight"
-            className="flex h-6 w-6 items-center justify-center rounded-md text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-danger-text"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>

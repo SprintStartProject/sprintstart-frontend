@@ -90,14 +90,14 @@ function FindingRow({
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${severity.badge}`}
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${severity.badge}`}
           >
             <SeverityIcon aria-hidden="true" className="h-3 w-3" />
             {severity.label}
           </span>
           {showArea && (
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${area.chip}`}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${area.chip}`}
             >
               <AreaIcon aria-hidden="true" className="h-3 w-3" />
               {area.label}
@@ -126,7 +126,7 @@ function FindingRow({
       onClick={() => onOpen(finding.to ?? "")}
       aria-label={`Open: ${finding.title}`}
       style={glowStyle}
-      className={`${className} transition-colors hover:border-app-border-strong hover:bg-app-surface focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none`}
+      className={`${className} transition-colors hover:border-app-border-strong hover:bg-app-surface`}
     >
       {body}
     </button>
@@ -161,13 +161,15 @@ function AreaCard({
   selected: boolean;
   onClick: () => void;
 }) {
+  const WorstIcon = worst ? SEVERITY_META[worst].icon : null;
+
   return (
     <button
       type="button"
       data-anchor={anchor}
       onClick={onClick}
       aria-pressed={selected}
-      className={`flex min-w-36 flex-1 items-center gap-3 rounded-xl border px-3 py-2 text-left backdrop-blur-md transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none lg:flex-none ${
+      className={`flex min-w-36 flex-1 items-center gap-3 rounded-xl border px-3 py-2 text-left backdrop-blur-md transition-colors lg:flex-none ${
         selected
           ? "border-app-brand-border-strong bg-app-surface"
           : "border-app-border-muted bg-app-surface/50 hover:bg-app-surface/80"
@@ -190,19 +192,19 @@ function AreaCard({
             <CheckCircle2 aria-label="Nothing here" className="h-4 w-4 text-app-success-text" />
           )}
         </span>
-        <span className="block truncate text-[11px] text-app-text-muted">{label}</span>
+        <span className="block truncate text-xs text-app-text-muted">{label}</span>
       </span>
       {worst && (
+        // The area's worst finding, as the icon and the words of its severity -- the colour alone
+        // was a dot, and a dot is only a colour.
         <span
           aria-label={SEVERITY_META[worst].label}
           title={SEVERITY_META[worst].label}
           role="img"
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{
-            background: SEVERITY_META[worst].glow,
-            boxShadow: `0 0 8px ${SEVERITY_META[worst].glow}`,
-          }}
-        />
+          className={`shrink-0 ${SEVERITY_META[worst].text}`}
+        >
+          {WorstIcon && <WorstIcon aria-hidden="true" className="h-4 w-4" />}
+        </span>
       )}
     </button>
   );
@@ -395,7 +397,7 @@ export function AnalysisMap({
                 <span className="text-4xl leading-none font-bold text-app-text">
                   {score ?? "—"}
                 </span>
-                <span className="mt-1 text-[11px] font-medium tracking-wider text-app-text-muted uppercase">
+                <span className="mt-1 text-2xs font-medium tracking-wider text-app-text-muted uppercase">
                   {score === null ? "no score" : "of 100"}
                 </span>
               </NeonRing>

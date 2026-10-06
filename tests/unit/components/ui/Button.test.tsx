@@ -66,7 +66,7 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
-  it("carries a focus ring in every variant — the rule the component exists to enforce", () => {
+  it("leaves the focus outline to the global :focus-visible rule in every variant", () => {
     const variants = [
       "primary",
       "secondary",
@@ -78,7 +78,9 @@ describe("Button", () => {
 
     for (const variant of variants) {
       const { unmount } = render(<Button variant={variant}>Go</Button>);
-      expect(screen.getByRole("button").className).toContain("focus-visible:ring-app-focus");
+      expect(screen.getByRole("button").className).not.toMatch(
+        /outline-(none|hidden)|ring-app-focus/,
+      );
       unmount();
     }
   });

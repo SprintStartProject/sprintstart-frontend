@@ -68,13 +68,13 @@ export function TeamProgressCard({ roster, loading, error }: TeamProgressCardPro
                     <span className="text-lg leading-none font-bold text-app-text">
                       {averageProgress}%
                     </span>
-                    <span className="mt-0.5 text-[10px] text-app-text-muted">avg.</span>
+                    <span className="mt-0.5 text-xs text-app-text-muted">avg.</span>
                   </>
                 }
               />
               {shownPhases.length > 0 && (
                 <div className="mt-4">
-                  <p className="mb-1.5 text-[11px] font-medium text-app-text-muted">
+                  <p className="mb-1.5 text-xs font-medium text-app-text-muted">
                     Underway, by phase
                   </p>
                   <ul className="space-y-1.5">
@@ -102,7 +102,7 @@ export function TeamProgressCard({ roster, loading, error }: TeamProgressCardPro
                     ))}
                   </ul>
                   {folded > 0 && (
-                    <p className="mt-1.5 text-[11px] text-app-text-subtle">
+                    <p className="mt-1.5 text-xs text-app-text-subtle">
                       +{folded} in {phases.length - PHASES} more{" "}
                       {phases.length - PHASES === 1 ? "phase" : "phases"}
                     </p>

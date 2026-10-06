@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   Plus,
   Search,
+  TriangleAlert,
   Waypoints,
   X,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { Badge } from "../../../components/ui/Badge.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Spinner } from "../../../components/ui/Spinner.tsx";
 import { useDialogFocus } from "../../../components/ui/useDialogFocus.ts";
+import { EdgeSwatch } from "../../graph-diagram/EdgeLegend.tsx";
 import {
   SWIPE_IGNORE_ATTRIBUTE,
   useHorizontalWheelNavigation,
@@ -916,7 +918,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                     half
                       ? HALF_RING[half]
                       : node.id === selectedId
-                        ? "ring-2 ring-app-focus ring-offset-2 ring-offset-app-bg-soft"
+                        ? "ring-2 ring-app-brand-border-strong"
                         : ""
                   }`}
                 >
@@ -955,7 +957,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Find a node"
                       aria-label="Find a node on the canvas"
-                      className="h-8 w-44 rounded-lg border border-app-border bg-app-surface/95 pr-2 pl-8 text-xs text-app-text shadow-sm backdrop-blur placeholder:text-app-text-subtle focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="h-8 w-44 rounded-lg border border-app-border bg-app-surface/95 pr-2 pl-8 text-xs text-app-text shadow-sm backdrop-blur placeholder:text-app-text-subtle"
                     />
                   </div>
                 ) : null}
@@ -968,7 +970,7 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
                   // in a corner.
                   <div className="max-w-56 rounded-xl border border-app-border bg-app-surface/95 px-3 py-2 shadow-md backdrop-blur">
                     <p className="truncate text-xs font-semibold text-app-text">{focusTitle}</p>
-                    <p className="mt-1 flex flex-col gap-1 text-[11px] text-app-text-muted">
+                    <p className="mt-1 flex flex-col gap-1 text-xs text-app-text-muted">
                       <span className="flex items-center gap-1.5">
                         <span
                           aria-hidden="true"
@@ -1084,8 +1086,9 @@ export function BlueprintGraphCanvas<TNode extends BlueprintGraphCanvasNode>({
           {saveError ? (
             <p
               role="alert"
-              className="absolute bottom-4 left-4 z-40 max-w-sm rounded-lg bg-app-danger-bg px-3 py-2 text-xs text-app-danger-text shadow-lg"
+              className="absolute bottom-4 left-4 z-40 flex max-w-sm items-start gap-1.5 rounded-lg bg-app-danger-bg px-3 py-2 text-xs text-app-danger-text shadow-lg"
             >
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {saveError}
             </p>
           ) : null}
@@ -1210,7 +1213,7 @@ function NodeCover({
         initial={{ opacity: 0, scale: 0.9, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface shadow-2xl outline-none"
+        className="flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-app-brand-border bg-app-surface shadow-2xl outline-hidden"
       >
         <header className="border-b border-app-border bg-app-brand-soft/30 px-4 py-3 sm:px-6">
           <nav
@@ -1281,12 +1284,12 @@ function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => 
   const arrowId = `${useId()}-legend-arrow`;
 
   return (
-    <div className="relative flex max-w-96 flex-col gap-2 rounded-2xl border border-app-border bg-app-surface/95 p-3 pr-8 text-[11px] leading-snug text-app-text-muted shadow-md backdrop-blur">
+    <div className="relative flex max-w-96 flex-col gap-2 rounded-2xl border border-app-border bg-app-surface/95 p-3 pr-8 text-xs leading-snug text-app-text-muted shadow-md backdrop-blur">
       <button
         type="button"
         onClick={onClose}
         aria-label="Hide the legend"
-        className="absolute top-2 right-2 rounded p-0.5 text-app-text-subtle transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="absolute top-1 right-1 rounded p-1.5 text-app-text-subtle transition-colors hover:text-app-text"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
@@ -1315,11 +1318,11 @@ function GraphLegend({ editable, onClose }: { editable: boolean; onClose: () => 
       </span>
       <span className="flex items-center gap-2">
         <span aria-hidden="true" className="flex shrink-0 flex-col gap-1">
-          <span className="h-0.5 w-6 rounded-full bg-app-orange-text" />
-          <span className="h-0.5 w-6 rounded-full bg-app-brand" />
+          <EdgeSwatch tone="upstream" />
+          <EdgeSwatch tone="active" />
         </span>
-        Point at a node and its run lights up: orange for what has to happen before it, the brand
-        colour for what finishing it opens.
+        Point at a node and its run lights up: the orange dash-dot line for what has to happen
+        before it, the dashed brand line for what finishing it opens.
       </span>
       <span className="flex items-center gap-2">
         <KeyRound className="h-3.5 w-3.5 shrink-0 text-app-text-muted" aria-hidden="true" />

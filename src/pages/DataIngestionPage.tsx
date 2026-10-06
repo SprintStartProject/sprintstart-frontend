@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -627,7 +628,7 @@ export function DataIngestionPage() {
           onRefresh={() => void handleRefresh()}
         />
 
-        <main ref={swipeRef} className="app-page-shell">
+        <MainContent ref={swipeRef} className="app-page-shell">
           <div className="space-y-8">
             {runsErrorMessage && <WarningBanner>{runsErrorMessage}</WarningBanner>}
             {sourceStatusErrorMessage && <WarningBanner>{sourceStatusErrorMessage}</WarningBanner>}
@@ -783,7 +784,7 @@ export function DataIngestionPage() {
               </SlidingTabPanel>
             )}
           </div>
-        </main>
+        </MainContent>
       </div>
 
       <PanelPresence value={selectedSource}>

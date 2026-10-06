@@ -10,9 +10,9 @@ export function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
-      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
+      <dt className="w-24 shrink-0 text-xs text-app-text-muted">{label}</dt>
       <dd
-        className={`min-w-0 text-[13px] font-semibold wrap-break-word text-app-text ${
+        className={`min-w-0 text-sm font-semibold wrap-break-word text-app-text ${
           mono ? "font-mono text-xs font-medium" : ""
         }`}
       >
@@ -26,8 +26,8 @@ export function InfoRow({
 export function InfoLinkRow({ label, value }: { label: string; value?: string }) {
   return (
     <div className="flex items-start gap-3 border-t border-app-border py-2.5 first:border-t-0">
-      <dt className="w-24 shrink-0 text-[12.5px] text-app-text-muted">{label}</dt>
-      <dd className="min-w-0 text-[13px] font-semibold wrap-break-word">
+      <dt className="w-24 shrink-0 text-xs text-app-text-muted">{label}</dt>
+      <dd className="min-w-0 text-sm font-semibold wrap-break-word">
         {value ? (
           <a
             href={value}

@@ -66,7 +66,7 @@ export function ReportOrientationProblem({ taskTitle }: ReportOrientationProblem
         type="button"
         data-testid="report-orientation"
         onClick={() => setIsOpen(true)}
-        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-app-text-muted transition-colors hover:text-app-text"
       >
         <Flag className="h-3 w-3" aria-hidden="true" />
         Something here is wrong
@@ -89,7 +89,7 @@ export function ReportOrientationProblem({ taskTitle }: ReportOrientationProblem
         onChange={(event) => setMessage(event.target.value)}
         rows={3}
         placeholder="The setup step mentions a script that isn't in the repo any more."
-        className="w-full rounded-lg border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text transition-colors focus:border-app-brand focus:ring-1 focus:ring-app-brand focus:outline-none"
+        className="w-full rounded-lg border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text transition-colors focus:border-app-brand"
       />
       {error && (
         <p className="mt-2 inline-flex items-start gap-1.5 text-xs text-app-danger-text">
@@ -110,7 +110,7 @@ export function ReportOrientationProblem({ taskTitle }: ReportOrientationProblem
         <button
           type="button"
           onClick={() => setIsOpen(false)}
-          className="text-xs font-medium text-app-text-muted hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="text-xs font-medium text-app-text-muted hover:text-app-text"
         >
           Cancel
         </button>

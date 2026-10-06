@@ -178,7 +178,7 @@ export function SidebarResizeHandle({
       onKeyDown={onKeyDown}
       // A wide, invisible grip centred on the border; the line itself only shows on hover, focus
       // or drag.
-      className="group absolute top-0 -right-1.5 z-20 flex h-full w-3 cursor-col-resize touch-none justify-center focus-visible:outline-none"
+      className="group absolute top-0 -right-1.5 z-20 flex h-full w-3 cursor-col-resize touch-none justify-center"
     >
       <span
         aria-hidden="true"

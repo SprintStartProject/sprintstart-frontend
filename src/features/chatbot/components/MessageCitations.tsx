@@ -170,7 +170,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
         className="flex items-center gap-1.5 text-app-text-subtle transition-colors hover:text-app-text-muted"
       >
         <BookText size={12} />
-        <span className="text-[11px] font-semibold tracking-wide uppercase">
+        <span className="text-2xs font-semibold tracking-wide uppercase">
           Sources · {groups.length}
         </span>
         <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
@@ -195,7 +195,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                       setActiveRect(e.currentTarget.getBoundingClientRect());
                     }
                   }}
-                  className={`flex max-w-[220px] items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] transition-colors ${
+                  className={`flex max-w-[220px] items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs transition-colors ${
                     isActive
                       ? "border-app-brand-border bg-app-brand-soft text-app-brand-text"
                       : "border-app-border-muted bg-app-bg-soft text-app-text-muted hover:bg-app-surface-hover"
@@ -225,7 +225,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                           });
                           setActiveFile(null);
                         }}
-                        className="mb-1 inline-flex cursor-pointer items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline"
+                        className="mb-1 inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
                       >
                         Open source
                         <ExternalLink size={10} />
@@ -236,7 +236,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => setActiveFile(null)}
-                        className="mb-1 inline-flex items-center gap-1 text-[11px] font-medium text-app-brand-text hover:underline"
+                        className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
                       >
                         Open source
                         <ExternalLink size={10} />
@@ -246,7 +246,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                       {group.locations.map((location, idx) => (
                         <span
                           key={idx}
-                          className="font-mono text-[11px] leading-relaxed text-app-text-muted"
+                          className="font-mono text-xs leading-relaxed text-app-text-muted"
                         >
                           {location}
                         </span>

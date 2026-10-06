@@ -69,7 +69,7 @@ export function BoardPathWindow({ path, onRemove, children }: BoardPathWindowPro
         )}
         <Link
           to="/onboarding"
-          className="min-w-0 flex-1 text-sm font-medium text-app-text after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-app-focus"
+          className="min-w-0 flex-1 text-sm font-medium text-app-text after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-hidden focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-app-focus focus-visible:after:outline-solid"
         >
           {next.kind === "done"
             ? "Your path is done — every phase finished."
@@ -105,7 +105,7 @@ export function BoardPathWindow({ path, onRemove, children }: BoardPathWindowPro
           </p>
           <Link
             to={onboardingPlaceUrl({ kind: "phase", id: phase.id })}
-            className="block truncate text-sm font-semibold text-app-text after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-app-focus"
+            className="block truncate text-sm font-semibold text-app-text after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-hidden focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-app-focus focus-visible:after:outline-solid"
           >
             {phase.title}
           </Link>
@@ -134,7 +134,7 @@ export function BoardPathWindow({ path, onRemove, children }: BoardPathWindowPro
         <span>Next:</span>
         <Link
           to={nextUrl}
-          className="relative z-10 inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="relative z-10 inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline"
         >
           {nextTitle}
           <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />

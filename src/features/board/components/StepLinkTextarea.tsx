@@ -65,6 +65,9 @@ export function StepLinkTextarea({
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const [caret, setCaret] = useState(value.length);
   const [active, setActive] = useState(0);
+  // Whether the highlighted offer was reached with the arrow keys: only then does it get the strong
+  // outline. One the pointer is over keeps the quiet tint.
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   /** Where the `[[` that Escape put away starts, so the same one does not reopen at once. */
   const [dismissedAt, setDismissedAt] = useState<number | null>(null);
   /** Tasks fetched so far, by step id. */
@@ -181,6 +184,7 @@ export function StepLinkTextarea({
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         const step = event.key === "ArrowDown" ? 1 : -1;
+        setIsKeyboardNav(true);
         setActive((current) => (current + step + offered.length) % offered.length);
         return;
       }
@@ -247,8 +251,15 @@ export function StepLinkTextarea({
                   pick(offer, false);
                 }}
                 onMouseEnter={() => setActive(index)}
+                onMouseMove={() => setIsKeyboardNav(false)}
                 className={`flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-sm ${
-                  index === active ? "bg-app-brand-soft text-app-brand-text" : "text-app-text"
+                  index === active
+                    ? `bg-app-brand-soft text-app-brand-text ${
+                        isKeyboardNav
+                          ? "outline-2 -outline-offset-2 outline-app-focus outline-solid"
+                          : ""
+                      }`
+                    : "text-app-text"
                 } ${offer.state === "locked" ? "opacity-70" : ""}`}
               >
                 {offer.level === "task" ? (
@@ -263,13 +274,17 @@ export function StepLinkTextarea({
                   <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 )}
                 <span className="min-w-0">
-                  <span className="block truncate font-medium">{offer.title}</span>
-                  <span className="block truncate text-xs text-app-text-muted">{offer.detail}</span>
+                  <span className="block truncate font-medium" title={offer.title}>
+                    {offer.title}
+                  </span>
+                  <span className="block truncate text-xs text-app-text-muted" title={offer.detail}>
+                    {offer.detail}
+                  </span>
                 </span>
               </li>
             ))}
           </ul>
-          <p className="px-2 pt-1 pb-0.5 text-[11px] text-app-text-subtle">
+          <p className="px-2 pt-1 pb-0.5 text-xs text-app-text-subtle">
             Enter links it
             {offered.some((offer) => offer.deeper) && <> · Tab goes into it</>}
           </p>

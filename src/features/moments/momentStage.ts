@@ -10,7 +10,7 @@
  * to two animations.
  */
 
-/** Marks the element the page-scoped moments should cover. Set on `<main>`. */
+/** Marks the element the page-scoped moments should cover. Set on the app shell's page wrapper (`App`). */
 export const MOMENT_STAGE_ATTRIBUTE = "data-moment-stage";
 
 export interface StageRect {

@@ -234,7 +234,7 @@ export function ChecklistCard({
         <button
           type="button"
           onClick={() => setShowingAll(true)}
-          className="mt-2 text-xs font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="mt-2 text-xs font-medium text-app-brand-text hover:underline"
         >
           {overflow} more {overflow === 1 ? "line" : "lines"}
         </button>
