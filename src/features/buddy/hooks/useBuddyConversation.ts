@@ -19,6 +19,7 @@ import type { ActionDrafts } from "../actionDrafts";
 import { BUDDY_PATH_ACTIONS } from "../types";
 import { useAuth } from "../../../context/useAuth";
 import { useInvalidateBoard } from "../../board/hooks/useInvalidateBoard";
+import { toWireFilters } from "../utils/filterRange";
 import {
   BUDDY_ACTION_AMEND_CHECKLIST,
   BUDDY_ACTION_CLAIM_GOAL,
@@ -150,23 +151,6 @@ function writeStoredMentorTools(userId: string, value: boolean): void {
   } catch {
     // Nothing to do: the switch still works, it just will not be remembered.
   }
-}
-
-/**
- * Maps the composer's filter shape onto the wire shape the backend deserializes.
- *
- * The backend's `BuddySessionFilters` names its fields `source_systems`/`time_from`/`time_to`
- * on the wire, so that is what has to go out. `undefined` for "nothing filtered": an empty
- * object would be a filter object the backend has to interpret; absent is the contract's own
- * "no filters".
- */
-function toWireFilters(filters: BuddySessionFilters) {
-  if (filters.sourceSystems.length === 0 && !filters.from && !filters.to) return undefined;
-  return {
-    ...(filters.sourceSystems.length ? { source_systems: filters.sourceSystems } : {}),
-    ...(filters.from ? { time_from: filters.from } : {}),
-    ...(filters.to ? { time_to: filters.to } : {}),
-  };
 }
 
 /**
