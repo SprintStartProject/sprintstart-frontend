@@ -484,32 +484,6 @@ describe("buddy message queue", () => {
     });
   });
 
-  describe("reasoning", () => {
-    it("keeps each reported thought as its own paragraph", async () => {
-      // The backend emits one `reasoning` event per whole thought, not token deltas — glued
-      // together, the end of one sentence ran into the start of the next.
-      const first = openStream();
-      pending.push(first);
-      const { result } = await mount();
-
-      act(() => {
-        result.current.submitMessage("Q1");
-      });
-      await waitFor(() => expect(sent).toEqual(["Q1"]));
-
-      act(() => {
-        first.reasoning("I should check the board.");
-        first.reasoning("Then look at the docs.");
-      });
-
-      await waitFor(() =>
-        expect(result.current.messages.at(-1)?.reasoning).toBe(
-          "I should check the board.\n\nThen look at the docs.",
-        ),
-      );
-    });
-  });
-
   describe("a send that cannot find its conversation", () => {
     it("does not wedge the queue behind a turn that never started", async () => {
       server.use(http.get(SESSIONS, () => HttpResponse.error()));

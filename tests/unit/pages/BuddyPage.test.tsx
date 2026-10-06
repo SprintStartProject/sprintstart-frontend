@@ -325,7 +325,7 @@ describe("BuddyPage", () => {
    * The transcript reserves the space from the stable facts (this conversation has been spoken
    * in, or the rail toggle is up), not from the button's own presence.
    */
-  it("keeps the room the floating control needs, even while the control is withdrawn", async () => {
+  it("keeps the room the floating control needs, mid-turn too", async () => {
     pmRepliesState.hasAny = false;
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
@@ -345,8 +345,9 @@ describe("BuddyPage", () => {
     await user.type(screen.getByLabelText("Message"), "and after that?");
     await user.click(screen.getByLabelText("Send message"));
 
-    await waitFor(() => expect(control).toBeDisabled());
-    // The control stands down and the padding it stands in has not moved.
+    await waitFor(() => expect(screen.getByLabelText("Stop generation")).toBeInTheDocument());
+    // The control stays on offer through the turn, and the padding it stands in has not moved.
+    expect(control).toBeEnabled();
     expect(framed().className).toContain("pt-14");
   });
 
@@ -376,13 +377,12 @@ describe("BuddyPage", () => {
   });
 
   /**
-   * Both routes withdraw together while a reply is in flight, and they have to: they call one
-   * function. `newConversation` clears the thread, but cannot call back the request already
-   * streaming into it — that stream's callbacks hold the shared session, so its tool events
-   * land in the new conversation and its completion clears its thinking state. Leaving either
-   * route live mid-turn would be a door onto that bug.
+   * Both routes stay on offer while a reply is in flight, and both do the same thing: stop that
+   * reply, then start the conversation. `newConversation` clears the thread, and a request
+   * already streaming into it would keep calling back into the new one — so the session aborts
+   * the stream first, and waits for it to close out.
    */
-  it("withdraws every way of starting a conversation while a reply is still arriving", async () => {
+  it("starts a new conversation mid-answer by stopping that answer", async () => {
     vi.mocked(getMessages).mockResolvedValue([
       { role: "USER", content: "where do I start?", createdAt: "2026-08-24T10:00:00.000Z" },
       {
@@ -391,8 +391,16 @@ describe("BuddyPage", () => {
         createdAt: "2026-08-24T10:00:01.000Z",
       },
     ]);
-    // A turn that starts and never finishes: `isThinking` stays true for the rest of the test.
-    vi.mocked(streamMessage).mockReturnValue(new Promise(() => {}));
+    // A turn that runs until it is aborted.
+    let turnSignal: AbortSignal | undefined;
+    vi.mocked(streamMessage).mockImplementation(
+      (_content, _handlers, _sessionId, _team, _page, signal) => {
+        turnSignal = signal;
+        return new Promise<void>((resolve) => {
+          signal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+      },
+    );
 
     const user = userEvent.setup();
     renderPage();
@@ -402,14 +410,16 @@ describe("BuddyPage", () => {
 
     await user.type(screen.getByLabelText("Message"), "and after that?");
     await user.click(screen.getByLabelText("Send message"));
+    await waitFor(() => expect(screen.getByLabelText("Stop generation")).toBeInTheDocument());
+    // Mid-answer the control is still there to press.
+    expect(control).toBeEnabled();
 
-    await waitFor(() => expect(control).toBeDisabled());
-
-    // The chord is gated on the same condition, so it is not a way around the button.
+    // The chord is gated on the same condition as the button.
     await user.keyboard("{Alt>}n{/Alt}");
 
-    expect(screen.getByText("where do I start?")).toBeInTheDocument();
-    expect(createSession).not.toHaveBeenCalled();
+    await waitFor(() => expect(turnSignal?.aborted).toBe(true));
+    await waitFor(() => expect(createSession).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText("where do I start?")).not.toBeInTheDocument());
   });
 
   /**

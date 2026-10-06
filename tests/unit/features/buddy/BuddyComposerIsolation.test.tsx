@@ -147,10 +147,14 @@ describe("the composer in a long conversation", () => {
     });
     expect(markdown).toHaveBeenCalledTimes(1);
 
+    // The first word is written at once; the ones after it wait for the frame, so a burst of
+    // them within one frame costs a single parse rather than one each.
     act(() => {
       streamHandlers?.onToken(" second");
+      streamHandlers?.onToken(" third");
     });
-    expect(markdown).toHaveBeenCalledTimes(2);
+    expect(markdown).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(markdown).toHaveBeenCalledTimes(2));
 
     act(() => {
       streamHandlers?.onDone();
@@ -158,7 +162,7 @@ describe("the composer in a long conversation", () => {
     });
 
     // The turn lands: what the tokens built is on screen, and no assertion above needed it to.
-    await screen.findByText(/first\s*second/);
+    await screen.findByText(/first\s*second\s*third/);
   });
 });
 

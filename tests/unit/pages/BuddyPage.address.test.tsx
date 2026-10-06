@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { BuddyPage } from "../../../src/pages/BuddyPage";
 import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
-import type { BuddyStreamHandlers } from "../../../src/features/buddy/types";
 
 vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({
@@ -199,20 +198,21 @@ describe("BuddyPage address", () => {
   });
 
   /**
-   * The bug this replaced: an address that could not be followed mid-turn was followed later,
-   * on its own — the switch fired the moment the answer finished, and a switch clears the
-   * composer, so a follow-up typed in the meantime was gone. Until then the address named a
-   * conversation the screen was not showing.
+   * An address that moves while an answer is being written does not wait for it, and is not put
+   * back either: the switch cuts the answer short (a Stop, minus the pause) and follows the
+   * address. The earlier rule held the address back for the length of the turn, which made the
+   * back button dead for as long as the buddy was writing.
    */
-  it("puts the address back instead of switching later when it moves mid-turn", async () => {
-    let handlers: BuddyStreamHandlers | null = null;
-    let finish: () => void = () => {};
-    vi.mocked(streamMessage).mockImplementation((_content, streamHandlers) => {
-      handlers = streamHandlers;
-      return new Promise<void>((resolve) => {
-        finish = resolve;
-      });
-    });
+  it("cuts a running answer short and follows the address when it moves mid-turn", async () => {
+    let turnSignal: AbortSignal | undefined;
+    vi.mocked(streamMessage).mockImplementation(
+      (_content, _handlers, _sessionId, _team, _page, signal) => {
+        turnSignal = signal;
+        return new Promise<void>((resolve) => {
+          signal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+      },
+    );
 
     const user = userEvent.setup();
     renderAt("/buddy/s1");
@@ -221,23 +221,16 @@ describe("BuddyPage address", () => {
     const composer = screen.getByRole("textbox", { name: "Message" });
     await user.type(composer, "Q1{Enter}");
     await waitFor(() => expect(streamMessage).toHaveBeenCalled());
-    await user.type(composer, "a follow-up");
+    expect(turnSignal?.aborted).toBe(false);
 
     await user.click(screen.getByRole("button", { name: "go to s2" }));
 
-    await waitFor(() => expect(address()).toBe("/buddy/s1"));
-    expect(getMessages).not.toHaveBeenCalledWith("s2");
-
-    // The turn ends — and nothing switches behind the hire's back.
-    handlers!.onDone();
-    finish();
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Stop generation" })).toBeNull(),
-    );
-
-    expect(getMessages).not.toHaveBeenCalledWith("s2");
-    expect(address()).toBe("/buddy/s1");
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("a follow-up");
+    // The answer in s1 is stopped, and s2 is what the address names and the screen shows.
+    await waitFor(() => expect(turnSignal?.aborted).toBe(true));
+    expect(await screen.findByText("said in s2")).toBeInTheDocument();
+    await waitFor(() => expect(address()).toBe("/buddy/s2"));
+    expect(getMessages).toHaveBeenCalledWith("s2");
+    expect(screen.queryByRole("button", { name: "Stop generation" })).toBeNull();
   });
 });
 

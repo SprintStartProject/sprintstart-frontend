@@ -13,6 +13,8 @@ import {
   BuddySessionContext,
   type BuddySession,
 } from "../../../../src/features/buddy/buddySessionContext";
+import { AuthContext } from "../../../../src/context/AuthContext";
+import { createAuthValue } from "./buddyTestHarness";
 
 /**
  * The composer's words across navigation.
@@ -84,19 +86,22 @@ describe("the composer's words across navigation", () => {
       submitMessage: vi.fn(),
       currentSessionId: null,
       teamProjectId: null,
+      isSessionBinned: () => false,
     } as unknown as BuddySession;
 
     return render(
-      <BuddySessionContext.Provider value={session}>
-        <BuddyDraftProvider>
-          <MemoryRouter initialEntries={["/board"]}>
-            <Routes>
-              <Route path="/board" element={<Board />} />
-              <Route path="/buddy" element={<Page />} />
-            </Routes>
-          </MemoryRouter>
-        </BuddyDraftProvider>
-      </BuddySessionContext.Provider>,
+      <AuthContext.Provider value={createAuthValue()}>
+        <BuddySessionContext.Provider value={session}>
+          <BuddyDraftProvider>
+            <MemoryRouter initialEntries={["/board"]}>
+              <Routes>
+                <Route path="/board" element={<Board />} />
+                <Route path="/buddy" element={<Page />} />
+              </Routes>
+            </MemoryRouter>
+          </BuddyDraftProvider>
+        </BuddySessionContext.Provider>
+      </AuthContext.Provider>,
     );
   }
 

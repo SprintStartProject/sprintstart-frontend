@@ -266,12 +266,13 @@ function BuddyMentorHome() {
   // `resolveHireSession` — so this only has to switch for an address that changed after.)
   //
   // An address that cannot be followed *now* is never left to be followed later. A switch
-  // clears the thread, the composer and the queue, so one that waited out a running turn and
-  // then fired on its own threw away whatever the hire had typed in the meantime — and until
-  // it fired, the address named a conversation the screen was not showing. So while a turn or
-  // a decision is running, or in team mode, the address goes back to the conversation on
-  // screen. Only the first open is waited for: it is a moment, and nothing has been typed into
-  // a conversation that is not on screen yet.
+  // clears the thread, the composer and the queue, so one that waited out a decision and then
+  // fired on its own threw away whatever the hire had typed in the meantime — and until it
+  // fired, the address named a conversation the screen was not showing. So while a decision is
+  // running, or in team mode, the address goes back to the conversation on screen. A running
+  // answer does not hold it back: the switch cuts that answer short, as a rail pick does. Only
+  // the first open is waited for: it is a moment, and nothing has been typed into a
+  // conversation that is not on screen yet.
   const { id: urlSessionId } = useParams<{ id: string }>();
   const previousSessionIdRef = useRef<string | null>(currentSessionId);
   // The latest of both, for the continuations below that settle after the render that started them.
@@ -285,7 +286,7 @@ function BuddyMentorHome() {
   // not start a second one before the first has said whether it found the conversation.
   const refreshedForRef = useRef<string | null>(null);
   const isSettling = isOpening || isGreeting;
-  const cannotSwitch = isThinking || isStreaming || isDeciding || teamProjectId !== null;
+  const cannotSwitch = isDeciding || teamProjectId !== null;
   useEffect(() => {
     const previousSessionId = previousSessionIdRef.current;
     previousSessionIdRef.current = currentSessionId;
@@ -424,27 +425,24 @@ function BuddyMentorHome() {
    * Whether starting a new conversation is something that can be offered at all, right now.
    *
    * One gate for all three ways of doing it — the button, the chord and the dock's own copy —
-   * because they run the same function and a hire who found the one that is still live
-   * mid-answer would hit exactly the bug the others are avoiding.
+   * so a control that is live in one place is live in all of them.
    *
    * `hasUserMessage`: a conversation nobody has spoken in is already the new one, so asking
    * for another would only pile up empty ones.
    *
    * `isHireMode`: team mode has one conversation per project and nothing to start.
    *
-   * `!isBusy`: `newConversation` clears the thread, but it cannot call back a request already
-   * streaming into it. That stream's callbacks hold the shared session rather than the thread
-   * they started in, so its tool events land in the new one and its completion clears the new
-   * one's thinking state. Aborting the stream is the durable fix and belongs in the session;
-   * not offering the control mid-turn is the reachable half, and the same half `BuddyDock`
-   * applies to its own copy.
+   * Not `!isBusy`: `newConversation` clears the thread, and a request already streaming into it
+   * would keep calling back into the new one — so the session aborts that stream before it
+   * moves (see `stopRunningTurn`), and the control stays on offer mid-answer, in the dock too.
    */
   const isBusy = isThinking || isStreaming;
-  // A new conversation clears the thread, so it waits out everything writing into it — the
-  // turn, the greeting stream (past its first token), and any proposal decision whose outcome
-  // line would otherwise be cleared before it was read.
+  // A new conversation clears the thread, so it waits out what it cannot cut short — the
+  // greeting stream (past its first token), and any proposal decision whose outcome line would
+  // otherwise be cleared before it was read. A running answer is not on the list: the move
+  // stops it itself.
   const canStartConversation =
-    isHireMode && hasUserMessage && !isBusy && !isOpening && !isGreeting && !isDeciding;
+    isHireMode && hasUserMessage && !isOpening && !isGreeting && !isDeciding;
 
   // The switcher is offered on the page exactly like in the dock — to whoever manages at least
   // one project, and to nobody else, so a hire never meets a row of nothing. Read here rather
@@ -635,7 +633,7 @@ function BuddyMentorHome() {
                     currentSessionId={currentSessionId}
                     // A team-mode conversation is not one of the hire's own, so the list is
                     // there to look at but not to switch away with.
-                    disabled={!isHireMode || isBusy || isOpening || isGreeting || isDeciding}
+                    disabled={!isHireMode || isOpening || isGreeting || isDeciding}
                     onSelect={selectConversation}
                     // Binning needs the awaited promise (the dialog shows its spinner on it), so
                     // this one is not wrapped in `void` like the selection above.

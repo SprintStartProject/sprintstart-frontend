@@ -51,6 +51,7 @@ export function BuddyProvider({ children }: { children: ReactNode }) {
         "info",
         "Back to your own onboarding — the buddy only discusses a project this page still has selected and you still manage.",
       ),
+    () => show("info", "Stopped the answer in the other conversation"),
   );
 
   // The composer's words get a provider of their own, under the session's — one keystroke then

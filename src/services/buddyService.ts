@@ -199,10 +199,11 @@ interface BuddyStreamChunk {
     | "action_proposal"
     | "opening_action"
     | "reasoning"
+    | "reset"
     | "done"
     | "error";
   content?: string;
-  /** Set on a `reasoning` chunk: one thought the model reported, before the answer's words. */
+  /** Set on a `reasoning` chunk: a delta of the thought being written, appended as it comes. */
   reasoning?: string;
   message?: string;
   name?: string;
@@ -607,6 +608,10 @@ export async function streamMessage(
           if (event.reasoning !== undefined) {
             handlers.onReasoning?.(event.reasoning);
           }
+          break;
+
+        case "reset":
+          handlers.onReset?.();
           break;
 
         case "citation":

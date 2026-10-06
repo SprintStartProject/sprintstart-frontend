@@ -400,8 +400,13 @@ export type QueuedBuddyMessage = {
  */
 export type BuddyStreamHandlers = {
   onToken: (token: string) => void;
-  /** Optional: one event per thought the model reported, before the answer's words. */
+  /** Optional: a delta of the thought being written, before and between the answer's words. */
   onReasoning?: (reasoning: string) => void;
+  /**
+   * Optional: the words streamed so far are void — the backend is asking again (a reply that
+   * turned out to be a tool call written as text). The surface clears the reply's content.
+   */
+  onReset?: () => void;
   onCitation: (citation: Citation) => void;
   onDone: () => void;
   /** Optional: a caller with no error surface of its own lets the failure pass silently. */
