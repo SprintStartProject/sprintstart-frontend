@@ -88,6 +88,17 @@ describe("AccessManagementView", () => {
     expect(getMyAtlassianCredentials).toHaveBeenCalled();
   });
 
+  it("names the connectors a shared Atlassian token covers while credentials exist", async () => {
+    renderView();
+
+    await waitFor(() => expect(screen.getByText("atlassian-default")).toBeInTheDocument());
+    expect(
+      within(screen.getByTestId("access-group-atlassian")).getByText(
+        /For Jira, Confluence and Bitbucket/,
+      ),
+    ).toBeVisible();
+  });
+
   it("renders one group per registered connector, in registry order", async () => {
     renderView();
 
