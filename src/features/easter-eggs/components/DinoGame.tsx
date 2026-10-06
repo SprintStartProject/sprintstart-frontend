@@ -911,10 +911,14 @@ export function DinoGame({
         >
           {replyReady ? (
             <span data-testid="dino-game-reply-ready" data-tone={completionTone}>
-              {`${completionLabel ?? "Reply ready"} · Esc ✕`}
+              {completionLabel ?? "Reply ready"}
+              <span className="pointer-coarse:hidden"> · Esc ✕</span>
             </span>
           ) : (
-            "Esc ✕"
+            <>
+              <span className="pointer-coarse:hidden">Esc ✕</span>
+              <span className="hidden pointer-coarse:inline">✕</span>
+            </>
           )}
         </Button>
       </div>
@@ -923,7 +927,10 @@ export function DinoGame({
       {status !== "over" && (
         <div className="pointer-events-none absolute inset-x-0 top-9 flex justify-center">
           <span className="rounded bg-app-surface/70 px-2 py-0.5 text-xs text-app-text-disabled backdrop-blur-sm">
-            Hold Space = high jump · ↓ duck
+            <span className="pointer-coarse:hidden">Hold Space = high jump · ↓ duck</span>
+            {/* Touch has no duck control yet (a follow-up); the copy must not
+                promise one. */}
+            <span className="hidden pointer-coarse:inline">Tap = jump · hold = higher</span>
           </span>
         </div>
       )}
@@ -946,7 +953,8 @@ export function DinoGame({
           <div className="mt-1 flex gap-2">
             {replyReady ? (
               <Button variant="primary" size="xs" onClick={onExit} data-testid="dino-game-continue">
-                {`${continueLabel ?? completionLabel ?? "View Reply"} (Space)`}
+                {continueLabel ?? completionLabel ?? "View Reply"}
+                <span className="pointer-coarse:hidden"> (Space)</span>
               </Button>
             ) : (
               <Button
@@ -955,11 +963,13 @@ export function DinoGame({
                 onClick={pressJump}
                 data-testid="dino-game-replay"
               >
-                Play Again (Space)
+                Play Again
+                <span className="pointer-coarse:hidden"> (Space)</span>
               </Button>
             )}
             <Button variant="secondary" size="xs" onClick={onExit}>
-              Exit (Esc)
+              Exit
+              <span className="pointer-coarse:hidden"> (Esc)</span>
             </Button>
           </div>
         </div>

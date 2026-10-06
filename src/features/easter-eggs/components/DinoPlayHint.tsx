@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 type DinoPlayHintProps = {
   /** Opens the waiting game — the same opening the Space trigger performs. */
   onPlay: () => void;
@@ -11,22 +13,31 @@ type DinoPlayHintProps = {
  * used to be the only way in (Space), which left every touch user looking at
  * a hint they could not act on.
  *
- * Phones only, below `sm`: on anything wider the Space key is the way in and
- * the game opens silently — the hint shows nowhere there. Hosts render it
- * only while their wait is armed and the game is not already open.
+ * Shown where there is no keyboard to press Space on — below `sm`, or on any
+ * coarse pointer at any width, so landscape phones and tablets are covered
+ * too — and hidden on wide fine-pointer viewports, where Space is the way in
+ * and the game opens silently. Hosts render it only while their wait is
+ * armed and the game is not already open.
  *
- * Wide touch screens (tablets) are an accepted gap, not an oversight: the
- * product call is phone-only, so a tablet without a hardware keyboard has no
- * way into the egg. Detecting coarse pointers instead was considered and
- * deliberately left out; revisit here if that call changes.
+ * It preloads the game chunk on mount: the hint is on screen for minutes, so
+ * the tap should rarely meet a cold chunk — and the chunk still stays off the
+ * boot path, because a hint only exists once a wait is long enough to play in.
  */
 export function DinoPlayHint({ onPlay, className = "" }: DinoPlayHintProps) {
+  useEffect(() => {
+    // Fire and forget: a failed preload is the same failure the lazy import
+    // on open reports, and the boundary there handles it.
+    import("./DinoGame").catch(() => {
+      /* handled where the game is opened */
+    });
+  }, []);
+
   return (
     <button
       type="button"
       onClick={onPlay}
       data-testid="dino-play-hint"
-      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-2.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text sm:hidden ${className}`}
+      className={`hidden min-h-11 items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-2.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text max-sm:flex pointer-coarse:flex ${className}`}
     >
       <span aria-hidden="true">🦖</span>
       <span>Pass the time</span>

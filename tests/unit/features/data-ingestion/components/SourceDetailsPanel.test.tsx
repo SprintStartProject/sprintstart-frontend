@@ -960,8 +960,10 @@ describe("SourceDetailsPanel", () => {
       expect(screen.getByText(/pass the time/i)).toBeInTheDocument();
       fireEvent.keyDown(window, { code: "Space" });
 
+      // The first mount per file pays the game chunk's dynamic import; on a
+      // cold CI worker the default 1 s is thin.
       expect(
-        await screen.findByRole("application", { name: /mini dino game/i }),
+        await screen.findByRole("application", { name: /mini dino game/i }, { timeout: 5000 }),
       ).toBeInTheDocument();
     });
 

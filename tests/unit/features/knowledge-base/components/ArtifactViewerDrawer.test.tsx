@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { act, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
 import { useSpaceOpensDino } from "../../../../../src/features/easter-eggs/hooks/useDinoWaitingGame";
 import { ArtifactViewerDrawer } from "../../../../../src/features/knowledge-base/components/ArtifactViewerDrawer";
@@ -1264,7 +1264,11 @@ describe("ArtifactViewerDrawer", () => {
       const hint = await screen.findByTestId("dino-play-hint");
       await userEvent.click(hint);
 
-      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+      // The first mount in the file pays the game chunk's dynamic import; on a
+      // cold CI worker the default 1 s is thin.
+      expect(
+        await screen.findByTestId("dino-game", undefined, { timeout: 5000 }),
+      ).toBeInTheDocument();
       // One wait, one opener: the hint steps aside once the game is up.
       expect(screen.queryByTestId("dino-play-hint")).not.toBeInTheDocument();
     });

@@ -81,7 +81,9 @@ async function renderWithGameOpen() {
   expect(await screen.findByText("Building your onboarding path")).toBeInTheDocument();
   fireEvent.keyDown(window, { code: "Space" });
   // The game chunk arrives behind the shared Suspense boundary; await the mount.
-  expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+  // The first mount in the file pays the game chunk's dynamic import; on a
+  // cold CI worker the default 1 s is thin.
+  expect(await screen.findByTestId("dino-game", undefined, { timeout: 5000 })).toBeInTheDocument();
   return view;
 }
 

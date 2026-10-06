@@ -58,12 +58,23 @@ describe("GenerationScreen", () => {
     );
 
     expect(screen.getByText(/pass the time/i)).toBeInTheDocument();
-    // The wrapper hides with the chip inside it — no empty `mt-4` gap on desktop.
-    expect(screen.getByTestId("dino-play-hint").parentElement?.className).toContain("sm:hidden");
+    // The wrapper hides with the chip inside it — no empty `mt-4` gap wherever
+    // the chip is not invited (wide viewports with a fine pointer).
+    const wrapperClasses = screen
+      .getByTestId("dino-play-hint")
+      .parentElement?.className.split(/\s+/);
+    expect(wrapperClasses).toContain("hidden");
+    expect(wrapperClasses).toContain("max-sm:flex");
+    expect(wrapperClasses).toContain("pointer-coarse:flex");
+    expect(wrapperClasses).not.toContain("sm:hidden");
 
     fireEvent.keyDown(window, { code: "Space" });
 
-    expect(await screen.findByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
+    // The first mount in the file pays the game chunk's dynamic import; on a
+    // cold CI worker the default 1 s is thin.
+    expect(
+      await screen.findByRole("application", { name: /mini dino game/i }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(onGameActiveChange).toHaveBeenCalledWith(true);
   });
 

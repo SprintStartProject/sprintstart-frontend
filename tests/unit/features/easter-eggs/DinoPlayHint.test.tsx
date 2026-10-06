@@ -9,13 +9,18 @@ describe("DinoPlayHint", () => {
 
     const hint = screen.getByRole("button", { name: /pass the time/i });
     expect(hint).toHaveAttribute("data-testid", "dino-play-hint");
-    // Phones only: on anything wider the Space key is the way in, and the
-    // hint must not show there at all.
-    expect(hint.className).toContain("sm:hidden");
+    // Hidden by default, shown on narrow viewports *or* on coarse pointers:
+    // a phone in landscape is wider than `sm` and still has no Space key.
+    // (jsdom has no media queries — these pin the classes, not the layout.)
+    const classes = hint.className.split(/\s+/);
+    expect(classes).toContain("hidden");
+    expect(classes).toContain("max-sm:flex");
+    expect(classes).toContain("pointer-coarse:flex");
+    expect(classes).not.toContain("sm:hidden");
     // A touch floor: on a phone this tap is the only way in, and the Space
     // key does not exist there. Focus comes from the app's one global
     // outline — a component must never hide it with `outline-none`.
-    expect(hint.className).toContain("min-h-8");
+    expect(classes).toContain("min-h-11");
     expect(hint.className).not.toContain("outline-none");
     expect(hint).toHaveTextContent("Pass the time");
     // No desktop copy left inside — the chip reads the same at every width.
