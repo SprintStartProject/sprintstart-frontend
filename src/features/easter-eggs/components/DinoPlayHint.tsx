@@ -14,6 +14,11 @@ type DinoPlayHintProps = {
  * Phones only, below `sm`: on anything wider the Space key is the way in and
  * the game opens silently — the hint shows nowhere there. Hosts render it
  * only while their wait is armed and the game is not already open.
+ *
+ * Wide touch screens (tablets) are an accepted gap, not an oversight: the
+ * product call is phone-only, so a tablet without a hardware keyboard has no
+ * way into the egg. Detecting coarse pointers instead was considered and
+ * deliberately left out; revisit here if that call changes.
  */
 export function DinoPlayHint({ onPlay, className = "" }: DinoPlayHintProps) {
   return (

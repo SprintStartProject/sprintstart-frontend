@@ -1353,5 +1353,52 @@ describe("ArtifactViewerDrawer", () => {
       await userEvent.click(screen.getByTestId("dino-probe"));
       expect(screen.getByTestId("dino-probe")).toHaveTextContent("playing");
     });
+
+    it("leaves with the summary view — Back to File frees the slot and a later summarise does not resurrect the game", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      rtlRender(<DrawerWithProbeHarness />, { wrapper: ToastProvider });
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+      await userEvent.click(await screen.findByTestId("dino-play-hint"));
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+
+      // Back to File unmounts the game's box; the game must leave with it.
+      await userEvent.click(screen.getByTestId("back-to-file-btn"));
+      expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+
+      // The one shared slot is free again — the other host can claim it.
+      await userEvent.click(screen.getByTestId("dino-probe"));
+      expect(screen.getByTestId("dino-probe")).toHaveTextContent("playing");
+
+      // And a later summarise must not pop the abandoned game back.
+      await userEvent.click(screen.getByTestId("summarise-btn"));
+      expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+      expect(await screen.findByTestId("dino-play-hint")).toBeInTheDocument();
+    });
+
+    it("keeps Space a scroll key on the raw view while the summary streams", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      // Deliberately no second host here: an armed host of its own would swallow
+      // the press first, and this test is about the drawer's trigger alone.
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+      await userEvent.click(screen.getByTestId("back-to-file-btn"));
+
+      // The wait still runs in the background, but its trigger must not swallow
+      // a scroll press on a view where no game can be seen. Focus goes back to
+      // the page first, the way it is after scrolling the file.
+      (document.activeElement as HTMLElement | null)?.blur();
+      const notPrevented = fireEvent.keyDown(window, { code: "Space" });
+      expect(notPrevented).toBe(true);
+
+      // And no game was armed by the press: returning to the summary shows the
+      // hint, not a game the user never opened.
+      await userEvent.click(screen.getByTestId("summarise-btn"));
+      expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+      expect(await screen.findByTestId("dino-play-hint")).toBeInTheDocument();
+    });
   });
 });

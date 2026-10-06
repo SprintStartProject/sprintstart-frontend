@@ -58,6 +58,8 @@ describe("GenerationScreen", () => {
     );
 
     expect(screen.getByText(/pass the time/i)).toBeInTheDocument();
+    // The wrapper hides with the chip inside it — no empty `mt-4` gap on desktop.
+    expect(screen.getByTestId("dino-play-hint").parentElement?.className).toContain("sm:hidden");
 
     fireEvent.keyDown(window, { code: "Space" });
 

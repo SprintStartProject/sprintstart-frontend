@@ -174,7 +174,9 @@ export function GenerationScreen({
         </div>
 
         {dinoUnlocked && !gameActive && isGenerating && (
-          <div className="mt-4 flex justify-center">
+          // The wrapper hides with the chip inside it — otherwise an empty
+          // `mt-4` box leaves a ghost gap above the phases on desktop.
+          <div className="mt-4 flex justify-center sm:hidden">
             <DinoPlayHint onPlay={openGame} />
           </div>
         )}

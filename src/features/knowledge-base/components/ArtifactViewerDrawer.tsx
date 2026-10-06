@@ -870,25 +870,30 @@ export function ArtifactViewerDrawer({
   // runs minutes, the same opening behind a tap so it is not keyboard-only.
   // `artifact !== null` keeps the trigger disarmed while the drawer is closed
   // but its last summary state is still on the reducer (the stream aborts, the
-  // flags stay).
+  // flags stay); `viewMode === "summary"` keeps it disarmed on the raw view,
+  // where the stream may still be running in the background — a Space press
+  // there is a scroll, not an opening, and no game could be seen anyway.
   const dinoUnlocked = useDinoUnlocked();
   const [dinoActive, closeDino, openDino] = useSpaceOpensDino(
-    isFetchingSummary && artifact !== null,
+    isFetchingSummary && artifact !== null && viewMode === "summary",
     dinoUnlocked,
     { keepActiveUntilExit: true },
   );
-  // The drawer can close mid-run — the backdrop, the X, or the page clearing
-  // its selection — and `keepActiveUntilExit` deliberately keeps the game
-  // alive when the wait merely ends. Closing is the one exit it does not
-  // cover, and the drawer never unmounts (both host pages keep it mounted and
-  // toggle `artifact`), so without this the game would hold the one shared
-  // slot for good: no other surface could ever open it again. Closing is the
-  // hook's own `close`, which frees the slot eagerly.
+  // The game's box lives in the summary view, so the game must leave with it.
+  // `keepActiveUntilExit` deliberately keeps a run alive when the wait merely
+  // ends, but these exits do not end the wait — the drawer can close (the
+  // backdrop, the X, the page clearing its selection), "Back to File" flips
+  // `viewMode` to raw, and selecting another artifact resets the reducer to
+  // raw as well. The drawer never unmounts in any of them (both host pages
+  // keep it mounted and toggle `artifact`), so without this the game would
+  // hold the one shared slot invisibly — no other surface could ever open it
+  // again, and a later summarise would resurrect the abandoned game.
+  // Closing is the hook's own `close`, which frees the slot eagerly.
   useEffect(() => {
-    if (artifact === null && dinoActive) {
+    if ((artifact === null || viewMode !== "summary") && dinoActive) {
       closeDino();
     }
-  }, [artifact, dinoActive, closeDino]);
+  }, [artifact, viewMode, dinoActive, closeDino]);
   // Only the summary stream can set `error` while the summary view is up
   // (`summarizeStart` clears it and the retry loop keeps fetching), so the
   // game's badge can read a failure from it.
