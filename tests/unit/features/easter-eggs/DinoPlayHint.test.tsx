@@ -12,10 +12,11 @@ describe("DinoPlayHint", () => {
     // Phones only: on anything wider the Space key is the way in, and the
     // hint must not show there at all.
     expect(hint.className).toContain("sm:hidden");
-    // The shared focus ring, and a touch floor: on a phone this tap is the
-    // only way in, and the Space key does not exist there.
-    expect(hint.className).toContain("focus-visible:ring-app-focus");
+    // A touch floor: on a phone this tap is the only way in, and the Space
+    // key does not exist there. Focus comes from the app's one global
+    // outline — a component must never hide it with `outline-none`.
     expect(hint.className).toContain("min-h-8");
+    expect(hint.className).not.toContain("outline-none");
     expect(hint).toHaveTextContent("Pass the time");
     // No desktop copy left inside — the chip reads the same at every width.
     expect(hint).not.toHaveTextContent("Space");
