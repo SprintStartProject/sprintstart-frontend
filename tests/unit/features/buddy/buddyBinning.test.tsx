@@ -176,4 +176,56 @@ describe("binning a conversation", () => {
     expect(result.current.sessions.map((s) => s.id)).toEqual(["session-new"]);
     expect(result.current.messages).toEqual([]);
   });
+
+  it("refuses out loud while a turn is in flight, so the list can't toast a bin that never happened", async () => {
+    const { binned, handler } = recordBins();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    // A turn whose stream stays open until the test releases it: `isThinking` holds from the
+    // moment the message is sent until the first token — exactly the window the guard covers —
+    // and with the stream gated there is no token, so no state update happens outside the
+    // test's control.
+    server.use(
+      sessionsHandler(() => TWO),
+      messagesHandler(),
+      handler,
+      http.post("/api/v1/onboarding/me/buddy/messages", () => {
+        const encoder = new TextEncoder();
+        return new HttpResponse(
+          new ReadableStream({
+            async start(controller) {
+              await gate;
+              controller.enqueue(encoder.encode('data: {"type":"token","content":"Sure."}\n\n'));
+              controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+              controller.close();
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
+      }),
+    );
+
+    const { result } = renderHook(() => useBuddy(), { wrapper: BuddyProviderWithStubs });
+    await waitFor(() => expect(result.current.currentSessionId).toBe("s2"));
+
+    let send!: Promise<void>;
+    act(() => {
+      send = result.current.sendMessage("hello");
+    });
+    await waitFor(() => expect(result.current.isThinking).toBe(true));
+
+    await expect(result.current.binSession("s1")).rejects.toThrow(/still working/);
+
+    // Nothing was binned, and the list still has both conversations.
+    expect(binned).toEqual([]);
+    expect(result.current.sessions.map((s) => s.id)).toEqual(["s2", "s1"]);
+
+    release();
+    await act(async () => {
+      await send;
+    });
+  });
 });

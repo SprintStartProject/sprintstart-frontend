@@ -906,12 +906,15 @@ export function useBuddyConversation(
    * just binned. `selectSession`/`newConversation` own that move and its clears; both are
    * called with nothing in flight, so neither refuses.
    *
-   * Refused while anything is in flight, like every other move that clears the thread — the
-   * rail's own controls are disabled for the same window, so this is the guard behind them.
+   * Refused while anything is in flight — the rail's own controls are disabled for the same
+   * window, so this is the guard behind them — and unlike the other moves that clear the
+   * thread, the refusal throws: the list tells the user the bin worked, so returning silently
+   * would toast "Conversation binned" over a conversation that never left.
    */
   const binSession = useCallback(
     async (sessionId: string) => {
-      if (teamProjectIdRef.current !== null) return;
+      if (teamProjectIdRef.current !== null)
+        throw new Error("Conversations can't be binned while you're in team mode.");
       if (
         greetingRef.current ||
         isOpening ||
@@ -920,7 +923,7 @@ export function useBuddyConversation(
         isStreaming ||
         pendingDecisionsRef.current > 0
       )
-        return;
+        throw new Error("Your buddy is still working — try again once the reply finishes.");
 
       await binSessionApi(sessionId);
       binnedSessionIdsRef.current.add(sessionId);

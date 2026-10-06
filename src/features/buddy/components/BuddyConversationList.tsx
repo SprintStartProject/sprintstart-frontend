@@ -193,6 +193,7 @@ export function BuddyConversationList({
               variant="danger"
               size="sm"
               onClick={() => void handleConfirmBin()}
+              disabled={disabled}
               loading={isBinning}
               data-testid="confirm-bin-conversation-btn"
             >
