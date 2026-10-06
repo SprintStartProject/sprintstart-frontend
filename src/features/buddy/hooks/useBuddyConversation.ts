@@ -162,7 +162,7 @@ export function useBuddyConversation(
   // How many surfaces currently show this thread (the open dock, the mounted `/buddy` page).
   // The session lives app-wide in BuddyProvider, so arming on `isThinking` alone let Space open
   // a game inside a minimised dock nobody could see — and with `keepActiveUntilExit` that
-  // invisible game held the shared slot for good. Surfaces register via `useDinoSurface`.
+  // invisible game held the shared slot for good. Surfaces register via `registerDinoSurface`.
   const [dinoSurfaceCount, setDinoSurfaceCount] = useState(0);
   const dinoSurfaceVisible = dinoSurfaceCount > 0;
   const [dinoGameActive, closeDinoGame] = useSpaceOpensDino(
@@ -184,7 +184,8 @@ export function useBuddyConversation(
 
   /**
    * Declares that a surface showing this thread is on screen. Returns the matching release;
-   * meant to be called from an effect (see `useDinoSurface`).
+   * meant to be called from an effect; the returned release is the effect's cleanup (see
+   * `BuddyWidget` / `BuddyPage`).
    */
   const registerDinoSurface = useCallback(() => {
     setDinoSurfaceCount((count) => count + 1);

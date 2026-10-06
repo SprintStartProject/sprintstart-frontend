@@ -242,6 +242,56 @@ describe("useDinoWaitingGame hooks", () => {
     });
   });
 
+  describe("the direct open (tap path)", () => {
+    it("opens under the same rules as Space and closes through the same close", () => {
+      const { result } = renderHook(() => useSpaceOpensDino(true, true));
+      const open = result.current[2];
+
+      act(() => {
+        open();
+      });
+      expect(result.current[0]).toBe(true);
+
+      act(() => {
+        result.current[1]();
+      });
+      expect(result.current[0]).toBe(false);
+    });
+
+    it("refuses while locked, unarmed, or when another host holds the slot", () => {
+      const locked = renderHook(() => useSpaceOpensDino(true, false));
+      act(() => {
+        locked.result.current[2]();
+      });
+      expect(locked.result.current[0]).toBe(false);
+      locked.unmount();
+
+      const disarmed = renderHook(() => useSpaceOpensDino(false, true));
+      act(() => {
+        disarmed.result.current[2]();
+      });
+      expect(disarmed.result.current[0]).toBe(false);
+      disarmed.unmount();
+
+      // A first host claims the slot; a second host's tap must not open a
+      // second game behind it.
+      const first = renderHook(() => useSpaceOpensDino(true, true));
+      const second = renderHook(() => useSpaceOpensDino(true, true));
+      act(() => {
+        first.result.current[2]();
+      });
+      expect(first.result.current[0]).toBe(true);
+
+      act(() => {
+        second.result.current[2]();
+      });
+      expect(second.result.current[0]).toBe(false);
+
+      second.unmount();
+      first.unmount();
+    });
+  });
+
   describe("target helpers", () => {
     it("keeps isTypingTarget to text fields while isInteractiveTarget adds controls", () => {
       const input = document.createElement("input");

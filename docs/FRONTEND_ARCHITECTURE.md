@@ -74,7 +74,7 @@ src/
 │   ├── connectors/          # Connector + source allow/deny management
 │   ├── dashboard/           # Personal dashboard grid and widgets
 │   ├── data-ingestion/      # Sources, ingestion runs, artifacts
-│   ├── easter-eggs/         # Hidden mini-games
+│   ├── easter-eggs/         # Hidden mini-games, the dino waiting game, whole-window effects
 │   ├── faq/                 # AI FAQ clusters (insights)
 │   ├── graph-diagram/       # Shared xyflow diagram canvas with dagre layout
 │   ├── knowledge-base/      # Artifact browsing + streamed summaries

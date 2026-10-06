@@ -36,13 +36,13 @@ describe("GenerationScreen", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByText(/to pass the time/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pass the time/i)).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { code: "Space" });
     expect(screen.queryByRole("application", { name: /mini dino game/i })).not.toBeInTheDocument();
   });
 
-  it("shows space hint when dino is unlocked and starts game on Space", () => {
+  it("shows space hint when dino is unlocked and starts game on Space", async () => {
     window.localStorage.setItem("dinoUnlocked", "true");
     const onGameActiveChange = vi.fn();
 
@@ -57,15 +57,28 @@ describe("GenerationScreen", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/to pass the time/i)).toBeInTheDocument();
+    expect(screen.getByText(/pass the time/i)).toBeInTheDocument();
+    // The wrapper hides with the chip inside it — no empty `mt-4` gap wherever
+    // the chip is not invited (wide viewports with a fine pointer).
+    const wrapperClasses = screen
+      .getByTestId("dino-play-hint")
+      .parentElement?.className.split(/\s+/);
+    expect(wrapperClasses).toContain("hidden");
+    expect(wrapperClasses).toContain("max-sm:flex");
+    expect(wrapperClasses).toContain("pointer-coarse:flex");
+    expect(wrapperClasses).not.toContain("sm:hidden");
 
     fireEvent.keyDown(window, { code: "Space" });
 
-    expect(screen.getByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
+    // The first mount in the file pays the game chunk's dynamic import; on a
+    // cold CI worker the default 1 s is thin.
+    expect(
+      await screen.findByRole("application", { name: /mini dino game/i }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(onGameActiveChange).toHaveBeenCalledWith(true);
   });
 
-  it("passes replyReady when isCompleted is true while game is active", () => {
+  it("passes replyReady when isCompleted is true while game is active", async () => {
     window.localStorage.setItem("dinoUnlocked", "true");
 
     const { rerender } = render(
@@ -75,6 +88,7 @@ describe("GenerationScreen", () => {
     );
 
     fireEvent.keyDown(window, { code: "Space" });
+    expect(await screen.findByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
     expect(screen.queryByText(/reply ready/i)).not.toBeInTheDocument();
 
     // Rerender as completed
@@ -92,7 +106,7 @@ describe("GenerationScreen", () => {
     expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent(/path ready/i);
   });
 
-  it("keeps generating while the run is in flight, even with every phase reported done", () => {
+  it("keeps generating while the run is in flight, even with every phase reported done", async () => {
     // Last phase reported "Completed…" but the path is still being persisted: the run can still fail.
     window.localStorage.setItem("dinoUnlocked", "true");
     const allDone: GenerationPhaseProgress[] = mockPhases.map((phase) => ({
@@ -105,9 +119,9 @@ describe("GenerationScreen", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/to pass the time/i)).toBeInTheDocument();
+    expect(screen.getByText(/pass the time/i)).toBeInTheDocument();
     fireEvent.keyDown(window, { code: "Space" });
-    expect(screen.getByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
+    expect(await screen.findByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
     expect(screen.queryByTestId("dino-game-reply-ready")).not.toBeInTheDocument();
   });
 

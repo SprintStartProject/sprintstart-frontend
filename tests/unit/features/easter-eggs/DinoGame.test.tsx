@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { DinoGame } from "../../../../../src/features/chatbot/components/DinoGame.tsx";
+import { DinoGame } from "../../../../src/features/easter-eggs/components/DinoGame.tsx";
 
 /**
  * The game chrome around the canvas: what it tells assistive tech, and how it hands Escape
@@ -56,5 +56,34 @@ describe("DinoGame chrome", () => {
     render(<DinoGame onExit={onExit} />);
     fireEvent.click(screen.getByTestId("dino-game-close"));
     expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders even when localStorage refuses to be read", () => {
+    // Privacy modes and sandboxed frames can throw on access; a lost high
+    // score is fine, a broken render is not.
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("access denied");
+    });
+    render(<DinoGame onExit={vi.fn()} />);
+
+    expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+    expect(screen.getByTestId("dino-game-close")).toBeInTheDocument();
+    getItem.mockRestore();
+  });
+
+  it("speaks touch on coarse pointers and keys elsewhere", () => {
+    render(<DinoGame onExit={vi.fn()} />);
+
+    // Keyboard copy hides on touch devices, where those keys do not exist...
+    expect(screen.getByText("Hold Space = high jump · ↓ duck").className).toContain(
+      "pointer-coarse:hidden",
+    );
+    // ...and the touch copy shows there instead.
+    const touchHint = screen.getByText("Tap = jump · hold = higher");
+    const touchClasses = touchHint.className.split(/\s+/);
+    expect(touchClasses).toContain("hidden");
+    expect(touchClasses).toContain("pointer-coarse:inline");
+    // The key-name suffix on the exit affordance follows the same rule.
+    expect(screen.getByText("Esc ✕").className).toContain("pointer-coarse:hidden");
   });
 });

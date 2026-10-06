@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { ChatPage } from "../../../src/pages/ChatPage.tsx";
 import type { ChatMessage, ChatQueueItem } from "../../../src/features/chatbot/types.ts";
-import type { DinoTurnOutcome } from "../../../src/features/chatbot/dinoOutcome.ts";
+import type { DinoTurnOutcome } from "../../../src/features/easter-eggs/lib/dinoOutcome.ts";
 
 /**
  * The dino waiting-game as the chat page hosts it: focus must stay with the game while it
@@ -26,7 +26,7 @@ vi.mock("../../../src/features/projects/useProjectContext", () => ({
 }));
 
 // The canvas game itself is not under test; its props are.
-vi.mock("../../../src/features/chatbot/components/DinoGame", () => ({
+vi.mock("../../../src/features/easter-eggs/components/DinoGame", () => ({
   DinoGame: ({
     onExit,
     replyReady,
@@ -102,12 +102,13 @@ function ui() {
   );
 }
 
-function openGame() {
+async function openGame() {
   const view = render(ui());
   act(() => {
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true }));
   });
-  expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+  // The game chunk arrives behind the shared Suspense boundary; await the mount.
+  expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
   return view;
 }
 
@@ -127,8 +128,8 @@ describe("ChatPage dino waiting-game", () => {
     localStorage.clear();
   });
 
-  it("keeps focus off the composer when the reply lands mid-game, and returns it on close", () => {
-    const { rerender } = openGame();
+  it("keeps focus off the composer when the reply lands mid-game, and returns it on close", async () => {
+    const { rerender } = await openGame();
     const composer = screen.getByLabelText("Message");
 
     mockChatState.isThinking = false;
@@ -145,16 +146,16 @@ describe("ChatPage dino waiting-game", () => {
     expect(document.activeElement).toBe(composer);
   });
 
-  it("says the turn was stopped, not that a reply is ready", () => {
-    const { rerender } = openGame();
+  it("says the turn was stopped, not that a reply is ready", async () => {
+    const { rerender } = await openGame();
     mockChatState.isThinking = false;
     mockChatState.turnOutcome = "stopped";
     rerender(ui());
     expect(screen.getByTestId("dino-game")).toHaveAttribute("data-completion-label", "Stopped");
   });
 
-  it("says the reply failed after a stream error", () => {
-    const { rerender } = openGame();
+  it("says the reply failed after a stream error", async () => {
+    const { rerender } = await openGame();
     mockChatState.isThinking = false;
     mockChatState.turnOutcome = "failed";
     rerender(ui());
@@ -164,8 +165,8 @@ describe("ChatPage dino waiting-game", () => {
     );
   });
 
-  it("closes the game when switching chats", () => {
-    const { rerender } = openGame();
+  it("closes the game when switching chats", async () => {
+    const { rerender } = await openGame();
     mockChatState.chatId = "chat2";
     rerender(ui());
     expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();

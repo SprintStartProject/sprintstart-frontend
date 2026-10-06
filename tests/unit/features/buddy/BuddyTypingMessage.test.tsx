@@ -5,20 +5,23 @@ import { BuddyTypingMessage } from "../../../../src/features/buddy/components/Bu
 // The dino waiting-game as the buddy hosts it: its badge must say how the turn ended, and the
 // game must not sit inside the typing indicator's live region.
 describe("BuddyTypingMessage with the dino game", () => {
-  it("labels a failed reply as failed, not ready", () => {
+  it("labels a failed reply as failed, not ready", async () => {
     render(<BuddyTypingMessage gameActive replyReady turnOutcome="failed" onGameExit={vi.fn()} />);
-    expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent("Reply failed");
-    expect(screen.getByTestId("dino-game-reply-ready")).toHaveAttribute("data-tone", "danger");
+    // The game chunk arrives behind the shared Suspense boundary; await the mount.
+    const badge = await screen.findByTestId("dino-game-reply-ready");
+    expect(badge).toHaveTextContent("Reply failed");
+    expect(badge).toHaveAttribute("data-tone", "danger");
   });
 
-  it("says Reply ready when the reply arrived", () => {
+  it("says Reply ready when the reply arrived", async () => {
     render(<BuddyTypingMessage gameActive replyReady turnOutcome="done" onGameExit={vi.fn()} />);
-    expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent("Reply ready");
+    expect(await screen.findByTestId("dino-game-reply-ready")).toHaveTextContent("Reply ready");
   });
 
-  it("keeps the running game out of any live region", () => {
+  it("keeps the running game out of any live region", async () => {
     render(<BuddyTypingMessage gameActive onGameExit={vi.fn()} />);
-    expect(screen.getByTestId("dino-game").closest('[role="status"]')).toBeNull();
-    expect(screen.getByTestId("dino-game").closest("[aria-live]")).toBeNull();
+    const game = await screen.findByTestId("dino-game");
+    expect(game.closest('[role="status"]')).toBeNull();
+    expect(game.closest("[aria-live]")).toBeNull();
   });
 });

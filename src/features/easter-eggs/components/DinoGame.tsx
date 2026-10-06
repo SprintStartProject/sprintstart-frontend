@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../../../components/ui/Button.tsx";
-import { isTypingTarget } from "../../easter-eggs/lib/keyTargets.ts";
+import { isTypingTarget } from "../lib/keyTargets.ts";
 
 /**
  * How the work the player is waiting on ended. Drives the badge colour *and*
@@ -16,7 +16,7 @@ const TONE_DOT: Record<DinoCompletionTone, string> = {
   danger: "bg-app-danger-solid",
 };
 
-type DinoGameProps = {
+export type DinoGameProps = {
   /**
    * Called when the player leaves the game (Escape or the exit button).
    */
@@ -144,8 +144,15 @@ const DRONE_MIN_SCORE = 40;
 const HIGH_SCORE_KEY = "sprintstart-dino-highscore";
 
 function loadHighScore(): number {
-  const stored = Number(localStorage.getItem(HIGH_SCORE_KEY) ?? "0");
-  return Number.isNaN(stored) ? 0 : stored;
+  // Guarded like every other egg storage access: privacy modes and sandboxed
+  // frames can throw on `localStorage`, and the game must never be the reason
+  // a surface fails to render. A lost high score is the acceptable outcome.
+  try {
+    const stored = Number(localStorage.getItem(HIGH_SCORE_KEY) ?? "0");
+    return Number.isNaN(stored) ? 0 : stored;
+  } catch {
+    return 0;
+  }
 }
 
 function readPalette(el: HTMLElement): Palette {
@@ -783,7 +790,11 @@ export function DinoGame({
               highScoreRef.current = finalScore;
               setHighScore(finalScore);
               setNewHighScore(true);
-              localStorage.setItem(HIGH_SCORE_KEY, String(finalScore));
+              try {
+                localStorage.setItem(HIGH_SCORE_KEY, String(finalScore));
+              } catch {
+                // The run keeps its score on screen; only persistence is lost.
+              }
             }
             break;
           }
@@ -900,10 +911,14 @@ export function DinoGame({
         >
           {replyReady ? (
             <span data-testid="dino-game-reply-ready" data-tone={completionTone}>
-              {`${completionLabel ?? "Reply ready"} · Esc ✕`}
+              {completionLabel ?? "Reply ready"}
+              <span className="pointer-coarse:hidden"> · Esc ✕</span>
             </span>
           ) : (
-            "Esc ✕"
+            <>
+              <span className="pointer-coarse:hidden">Esc ✕</span>
+              <span className="hidden pointer-coarse:inline">✕</span>
+            </>
           )}
         </Button>
       </div>
@@ -912,7 +927,10 @@ export function DinoGame({
       {status !== "over" && (
         <div className="pointer-events-none absolute inset-x-0 top-9 flex justify-center">
           <span className="rounded bg-app-surface/70 px-2 py-0.5 text-xs text-app-text-disabled backdrop-blur-sm">
-            Hold Space = high jump · ↓ duck
+            <span className="pointer-coarse:hidden">Hold Space = high jump · ↓ duck</span>
+            {/* Touch has no duck control yet (a follow-up); the copy must not
+                promise one. */}
+            <span className="hidden pointer-coarse:inline">Tap = jump · hold = higher</span>
           </span>
         </div>
       )}
@@ -935,7 +953,8 @@ export function DinoGame({
           <div className="mt-1 flex gap-2">
             {replyReady ? (
               <Button variant="primary" size="xs" onClick={onExit} data-testid="dino-game-continue">
-                {`${continueLabel ?? completionLabel ?? "View Reply"} (Space)`}
+                {continueLabel ?? completionLabel ?? "View Reply"}
+                <span className="pointer-coarse:hidden"> (Space)</span>
               </Button>
             ) : (
               <Button
@@ -944,11 +963,13 @@ export function DinoGame({
                 onClick={pressJump}
                 data-testid="dino-game-replay"
               >
-                Play Again (Space)
+                Play Again
+                <span className="pointer-coarse:hidden"> (Space)</span>
               </Button>
             )}
             <Button variant="secondary" size="xs" onClick={onExit}>
-              Exit (Esc)
+              Exit
+              <span className="pointer-coarse:hidden"> (Esc)</span>
             </Button>
           </div>
         </div>

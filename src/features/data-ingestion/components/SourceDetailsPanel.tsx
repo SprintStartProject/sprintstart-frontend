@@ -27,7 +27,8 @@ import { KnowledgeBaseLinkCard } from "./KnowledgeBaseLinkCard.tsx";
 import { SyncScheduleSettings } from "./SyncScheduleSettings.tsx";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
-import { DinoGame } from "../../chatbot/components/DinoGame.tsx";
+import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
+import { DinoPlayHint } from "../../easter-eggs/components/DinoPlayHint.tsx";
 import { useDinoUnlocked, useSpaceOpensDino } from "../../easter-eggs/hooks/useDinoWaitingGame.ts";
 
 type SourceDetailsPanelProps = {
@@ -79,7 +80,7 @@ export function SourceDetailsPanel({
   const isSyncing = source.statusView.state === "syncing" || isUpdating;
   const syncFailed = source.statusView.state === "attention";
   const dinoUnlocked = useDinoUnlocked();
-  const [dinoActive, closeDino] = useSpaceOpensDino(isSyncing, dinoUnlocked, {
+  const [dinoActive, closeDino, openDino] = useSpaceOpensDino(isSyncing, dinoUnlocked, {
     keepActiveUntilExit: true,
   });
 
@@ -277,7 +278,7 @@ export function SourceDetailsPanel({
       <DrawerCard label="Ingestion" icon={Database} index={0}>
         {isSyncing && (
           <div className="mb-3 rounded-xl border border-app-brand-border bg-app-brand-soft px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-2 text-sm font-medium text-app-brand-text">
                 {/* The sentence beside it already says what is happening, so the
                     glyph stays silent rather than announcing a second time. */}
@@ -286,22 +287,14 @@ export function SourceDetailsPanel({
                   ? "Indexing artifacts into the knowledge base…"
                   : "Syncing the latest changes…"}
               </p>
-              {dinoUnlocked && !dinoActive && (
-                <span className="hidden items-center gap-1 text-xs font-normal text-app-brand-text/80 sm:inline-flex">
-                  Press{" "}
-                  <kbd className="rounded border border-app-brand-border bg-app-surface px-1.5 py-0.5 font-mono text-xs shadow-2xs">
-                    Space
-                  </kbd>{" "}
-                  to pass the time 🦖
-                </span>
-              )}
+              {dinoUnlocked && !dinoActive && <DinoPlayHint onPlay={openDino} />}
             </div>
           </div>
         )}
 
         {dinoActive && (
           <div className="mb-3">
-            <DinoGame
+            <DinoGameLazy
               onExit={closeDino}
               // The badge may only claim the state the source actually reached,
               // and only once nothing is in flight: an update request still

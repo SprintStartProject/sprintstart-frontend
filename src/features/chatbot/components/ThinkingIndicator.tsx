@@ -1,7 +1,7 @@
 import { BotGlyph } from "./BotGlyph";
-import { DinoGame } from "./DinoGame";
+import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
 import { THINKING_LABELS, type ThinkingState } from "../constants";
-import { dinoCompletionProps, type DinoTurnOutcome } from "../dinoOutcome";
+import { dinoCompletionProps, type DinoTurnOutcome } from "../../easter-eggs/lib/dinoOutcome.ts";
 
 type ThinkingIndicatorProps = {
   /** True while the assistant is working (before the first reply token arrives). */
@@ -90,7 +90,7 @@ export function ThinkingIndicator({
             {isThinking ? (label ?? "Thinking…") : ""}
           </span>
 
-          <DinoGame onExit={onGameExit} {...dinoCompletionProps(replyReady, turnOutcome)} />
+          <DinoGameLazy onExit={onGameExit} {...dinoCompletionProps(replyReady, turnOutcome)} />
 
           {isThinking && (
             <div

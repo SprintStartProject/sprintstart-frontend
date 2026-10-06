@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ThinkingIndicator } from "../../../../../src/features/chatbot/components/ThinkingIndicator";
 
 // Mock DinoGame to inspect props and interactions
-vi.mock("../../../../../src/features/chatbot/components/DinoGame", () => ({
+vi.mock("../../../../../src/features/easter-eggs/components/DinoGame", () => ({
   DinoGame: ({ onExit, replyReady }: { onExit: () => void; replyReady?: boolean }) => (
     <div data-testid="dino-game" data-reply-ready={String(Boolean(replyReady))}>
       <button onClick={onExit}>Exit Game</button>
@@ -54,7 +54,7 @@ describe("ThinkingIndicator", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders DinoGame when game is active even if thoughts/reasoning are streaming", () => {
+  it("renders DinoGame when game is active even if thoughts/reasoning are streaming", async () => {
     render(
       <ThinkingIndicator
         isThinking={true}
@@ -65,11 +65,11 @@ describe("ThinkingIndicator", () => {
       />,
     );
 
-    expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+    expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
     expect(screen.getByTestId("dino-game")).toHaveAttribute("data-reply-ready", "false");
   });
 
-  it("keeps DinoGame active with replyReady when reply arrives (isThinking flips to false)", () => {
+  it("keeps DinoGame active with replyReady when reply arrives (isThinking flips to false)", async () => {
     const onExit = vi.fn();
     render(
       <ThinkingIndicator
@@ -82,14 +82,14 @@ describe("ThinkingIndicator", () => {
       />,
     );
 
-    expect(screen.getByTestId("dino-game")).toBeInTheDocument();
+    expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
     expect(screen.getByTestId("dino-game")).toHaveAttribute("data-reply-ready", "true");
 
     fireEvent.click(screen.getByText("Exit Game"));
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the game out of the live region and announces only a concise status", () => {
+  it("keeps the game out of the live region and announces only a concise status", async () => {
     render(
       <ThinkingIndicator
         isThinking={true}
@@ -102,7 +102,7 @@ describe("ThinkingIndicator", () => {
     const status = screen.getByTestId("thinking-status");
     expect(status).toHaveAttribute("role", "status");
     expect(status).toHaveTextContent("Thinking…");
-    expect(status).not.toContainElement(screen.getByTestId("dino-game"));
-    expect(screen.getByTestId("dino-game").closest('[role="status"]')).toBeNull();
+    expect(status).not.toContainElement(await screen.findByTestId("dino-game"));
+    expect((await screen.findByTestId("dino-game")).closest('[role="status"]')).toBeNull();
   });
 });
