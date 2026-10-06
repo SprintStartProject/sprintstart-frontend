@@ -19,7 +19,7 @@ export function DinoPlayHint({ onPlay, className = "" }: DinoPlayHintProps) {
       type="button"
       onClick={onPlay}
       data-testid="dino-play-hint"
-      className={`inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-2.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text ${className}`}
+      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-2.5 py-1 text-xs font-medium text-app-text-muted transition-colors hover:border-app-brand-border hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${className}`}
     >
       <span aria-hidden="true">🦖</span>
       <span className="hidden sm:inline">Press</span>

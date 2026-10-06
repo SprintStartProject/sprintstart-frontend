@@ -9,6 +9,10 @@ describe("DinoPlayHint", () => {
 
     const hint = screen.getByRole("button", { name: /pass the time/i });
     expect(hint).toHaveAttribute("data-testid", "dino-play-hint");
+    // The shared focus ring, and a touch floor: on a phone this tap is the
+    // only way in, and the Space key it names does not exist there.
+    expect(hint.className).toContain("focus-visible:ring-app-focus");
+    expect(hint.className).toContain("min-h-8");
     // The desktop copy; the touch copy lives in a `sm:hidden` span beside it.
     expect(screen.getByText(/to pass the time/i)).toBeInTheDocument();
     expect(hint).toHaveTextContent("Pass the time");

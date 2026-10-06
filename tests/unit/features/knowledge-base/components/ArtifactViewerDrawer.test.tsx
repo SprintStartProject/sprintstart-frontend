@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { act, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
+import { useSpaceOpensDino } from "../../../../../src/features/easter-eggs/hooks/useDinoWaitingGame";
 import { ArtifactViewerDrawer } from "../../../../../src/features/knowledge-base/components/ArtifactViewerDrawer";
 import { preprocessMarkdown } from "../../../../../src/features/knowledge-base/markdown";
 import { ApiError } from "../../../../../src/services/apiClient";
@@ -126,6 +128,41 @@ function streamingSuccess(summary: string, citations: ArtifactSummaryCitation[] 
     handlers.onDone();
     return Promise.resolve();
   };
+}
+
+/**
+ * A second waiting-game host beside the drawer. The game slot is one module-level
+ * variable shared by every surface, so this probe proves what the drawer's game does
+ * to the rest of the app: while it runs the slot is taken, and the moment the drawer
+ * closes the slot must be free again.
+ */
+function DinoProbe() {
+  const [active, , open] = useSpaceOpensDino(true, true);
+  return (
+    <button type="button" data-testid="dino-probe" onClick={open}>
+      {active ? "playing" : "idle"}
+    </button>
+  );
+}
+
+/** The drawer with the probe beside it; closing clears the selection the way the page does. */
+function DrawerWithProbeHarness() {
+  const [artifact, setArtifact] = useState<Artifact | null>(createArtifact());
+  return (
+    <>
+      <button type="button" data-testid="close-drawer" onClick={() => setArtifact(null)}>
+        close drawer
+      </button>
+      <ArtifactViewerDrawer
+        artifact={artifact}
+        onClose={() => setArtifact(null)}
+        projectId="proj-1"
+        canDelete={false}
+        onDelete={vi.fn()}
+      />
+      <DinoProbe />
+    </>
+  );
 }
 
 describe("ArtifactViewerDrawer", () => {
@@ -1296,6 +1333,25 @@ describe("ArtifactViewerDrawer", () => {
       expect(screen.queryByTestId("dino-play-hint")).not.toBeInTheDocument();
       fireEvent.keyDown(window, { code: "Space" });
       expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+    });
+
+    it("hands the shared slot back when the drawer closes mid-run", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      rtlRender(<DrawerWithProbeHarness />, { wrapper: ToastProvider });
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+      await userEvent.click(await screen.findByTestId("dino-play-hint"));
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+
+      // The running game holds the one shared slot: the other host stays shut.
+      await userEvent.click(screen.getByTestId("dino-probe"));
+      expect(screen.getByTestId("dino-probe")).toHaveTextContent("idle");
+
+      // Closing the drawer closes its game with it — and frees the slot.
+      await userEvent.click(screen.getByTestId("close-drawer"));
+      await userEvent.click(screen.getByTestId("dino-probe"));
+      expect(screen.getByTestId("dino-probe")).toHaveTextContent("playing");
     });
   });
 });

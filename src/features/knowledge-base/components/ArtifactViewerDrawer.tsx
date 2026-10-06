@@ -877,6 +877,18 @@ export function ArtifactViewerDrawer({
     dinoUnlocked,
     { keepActiveUntilExit: true },
   );
+  // The drawer can close mid-run — the backdrop, the X, or the page clearing
+  // its selection — and `keepActiveUntilExit` deliberately keeps the game
+  // alive when the wait merely ends. Closing is the one exit it does not
+  // cover, and the drawer never unmounts (both host pages keep it mounted and
+  // toggle `artifact`), so without this the game would hold the one shared
+  // slot for good: no other surface could ever open it again. Closing is the
+  // hook's own `close`, which frees the slot eagerly.
+  useEffect(() => {
+    if (artifact === null && dinoActive) {
+      closeDino();
+    }
+  }, [artifact, dinoActive, closeDino]);
   // Only the summary stream can set `error` while the summary view is up
   // (`summarizeStart` clears it and the retry loop keeps fetching), so the
   // game's badge can read a failure from it.
