@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { BookText, ChevronDown, ExternalLink } from "lucide-react";
-import type { Citation } from "../types";
-import { getCitationPopoverStyle } from "../utils/popoverPosition";
+import type { Citation } from "./types";
+import { getCitationPopoverStyle } from "./popoverPosition";
 
 type MessageCitationsProps = {
   citations: Citation[];

@@ -1,7 +1,7 @@
-import { sourceSystemOfCitation } from "../data-ingestion/connectors/registry.ts";
-import type { Artifact, ArtifactType } from "../knowledge-base/types.ts";
+import { sourceSystemOfCitation } from "../../data-ingestion/connectors/registry.ts";
+import type { Artifact, ArtifactType } from "../../knowledge-base/types.ts";
 
-/** What a clicked citation hands the chat page so it can open the artifact drawer. */
+/** What a clicked citation hands the surface so it can open the artifact drawer. */
 export type CitationArtifactOpen = {
   artifactId: string;
   filename: string;

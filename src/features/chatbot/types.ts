@@ -1,3 +1,4 @@
+import type { Citation } from "../buddy/citations/types";
 import { CHAT_SOURCE_SYSTEMS } from "../data-ingestion/connectors/registry.ts";
 import type { SourceSystem } from "../data-ingestion/connectors/sourceSystems.ts";
 
@@ -105,33 +106,6 @@ export type ChatQueueItem = {
   chatId: string;
   /** The text as the user submitted it — never trimmed, so nothing is silently lost. */
   text: string;
-};
-
-export type Citation = {
-  /**
-   * Id of the artifact (file) the citation refers to.
-   */
-  artifactId: string;
-
-  /**
-   * Name of the file the citation refers to.
-   */
-  filename: string;
-
-  /**
-   * Where the artifact came from (e.g. a GitHub URL), if known.
-   */
-  sourceUrl?: string;
-
-  /**
-   * 1-based source line the citation starts on, for text/code sources.
-   */
-  startLine?: number;
-
-  /**
-   * 1-based page the citation was extracted from, for PDF sources.
-   */
-  startPage?: number;
 };
 
 export type ChatSidebarProps = {

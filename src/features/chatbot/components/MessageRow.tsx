@@ -1,10 +1,10 @@
 import { memo } from "react";
 import { BookmarkPlus, MessageSquareOff, Square } from "lucide-react";
 import type { ChatMessage } from "../types";
-import type { SelectedCitation } from "../../../context/ChatContext";
+import type { SelectedCitation } from "../../buddy/citations/types";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { MessageMarkdown } from "./MessageMarkdown";
-import { MessageCitations } from "./MessageCitations";
+import { MessageCitations } from "../../buddy/citations/MessageCitations";
 import { CopyButton } from "./CopyButton";
 import { ReasoningPanel } from "./ReasoningPanel";
 import { SaveToBoard } from "../../board/save/SaveToBoard";

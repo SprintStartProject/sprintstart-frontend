@@ -11,7 +11,7 @@ import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatSidebar } from "../features/chatbot/components/ChatSidebar.tsx";
 import { MessageRow } from "../features/chatbot/components/MessageRow.tsx";
 import { ThinkingIndicator } from "../features/chatbot/components/ThinkingIndicator.tsx";
-import { CitationPopover } from "../features/chatbot/components/CitationPopover.tsx";
+import { CitationPopover } from "../features/buddy/citations/CitationPopover.tsx";
 import { ChatEmptyState } from "../features/chatbot/components/ChatEmptyState.tsx";
 import { ChatComposer } from "../features/chatbot/components/ChatComposer.tsx";
 import { SaveToBoard } from "../features/board/save/SaveToBoard";
@@ -20,8 +20,8 @@ import { ArtifactViewerDrawer } from "../features/knowledge-base/components/Arti
 import {
   deriveArtifactFromCitation,
   type CitationArtifactOpen,
-} from "../features/chatbot/citationArtifact.ts";
-import type { SelectedCitation } from "../context/ChatContext.ts";
+} from "../features/buddy/citations/citationArtifact.ts";
+import type { SelectedCitation } from "../features/buddy/citations/types.ts";
 import { matchEggPhrase } from "../features/easter-eggs/lib/eggPhrases";
 import { playEggEffect } from "../features/easter-eggs/eggEffectBus";
 import {

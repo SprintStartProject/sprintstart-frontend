@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { linkifyCitations } from "../../../../src/features/chatbot/markdown/linkifyCitations";
+import { linkifyCitations } from "../../../../../src/features/buddy/citations/linkifyCitations";
 
 describe("linkifyCitations", () => {
   it("returns the input unchanged when max is 0", () => {

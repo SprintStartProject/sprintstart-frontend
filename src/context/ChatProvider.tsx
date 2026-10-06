@@ -11,14 +11,9 @@ import { useAuth } from "./useAuth";
 import { useToastApi } from "./useToast";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { ChatContext } from "./ChatContext";
-import type { ChatContextValue, ChatTurnOutcome, SelectedCitation } from "./ChatContext";
-import type {
-  Chat,
-  ChatMessage,
-  ChatQueueItem,
-  Citation,
-  SourceSystem,
-} from "../features/chatbot/types";
+import type { ChatContextValue, ChatTurnOutcome } from "./ChatContext";
+import type { Citation, SelectedCitation } from "../features/buddy/citations/types";
+import type { Chat, ChatMessage, ChatQueueItem, SourceSystem } from "../features/chatbot/types";
 import { insertQuoteIntoDraft } from "../features/chatbot/utils/quoteFormat";
 
 type MessagesByChat = Record<string, ChatMessage[]>;

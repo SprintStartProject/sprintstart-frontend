@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { CitationPopover } from "../../../../../src/features/chatbot/components/CitationPopover";
-import type { SelectedCitation } from "../../../../../src/context/ChatContext";
+import { CitationPopover } from "../../../../../src/features/buddy/citations/CitationPopover";
+import type { SelectedCitation } from "../../../../../src/features/buddy/citations/types";
 
 const mockCitation: SelectedCitation = {
   citation: {

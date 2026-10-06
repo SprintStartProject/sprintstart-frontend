@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveArtifactFromCitation } from "../../../../src/features/chatbot/citationArtifact";
+import { deriveArtifactFromCitation } from "../../../../../src/features/buddy/citations/citationArtifact";
 
 describe("deriveArtifactFromCitation", () => {
   const open = (filename: string, sourceUrl?: string) =>

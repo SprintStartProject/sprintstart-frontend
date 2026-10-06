@@ -1,24 +1,9 @@
 import { createContext } from "react";
-import type {
-  Chat,
-  ChatMessage,
-  ChatQueueItem,
-  Citation,
-  SourceSystem,
-} from "../features/chatbot/types";
+import type { Chat, ChatMessage, ChatQueueItem, SourceSystem } from "../features/chatbot/types";
+import type { SelectedCitation } from "../features/buddy/citations/types";
 import type { NavigateFunction } from "react-router-dom";
 
 type MessagesByChat = Record<string, ChatMessage[]>;
-
-/**
- * A citation selected by the user, paired with the screen-space bounding rect
- * of the element they clicked (e.g. a `[1]` superscript). The rect lets the
- * popover position itself near the click instead of at a hardcoded location.
- */
-export type SelectedCitation = {
-  citation: Citation;
-  rect: DOMRect;
-};
 
 /**
  * The shape of the global chat context. This state lives in a provider at the

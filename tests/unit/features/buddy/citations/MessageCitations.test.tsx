@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { MessageCitations } from "../../../../../src/features/chatbot/components/MessageCitations";
-import type { Citation } from "../../../../../src/features/chatbot/types";
+import { MessageCitations } from "../../../../../src/features/buddy/citations/MessageCitations";
+import type { Citation } from "../../../../../src/features/buddy/citations/types";
 
 // Two chunks from the same file so the grouping logic produces one chip
 // with locations "Line 1" / "Line 5" — the "Open source / Line 1" popover.

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { ExternalLink, Plus } from "lucide-react";
-import type { SelectedCitation } from "../../../context/ChatContext";
-import { getCitationPopoverStyle } from "../utils/popoverPosition";
+import type { SelectedCitation } from "./types";
+import { getCitationPopoverStyle } from "./popoverPosition";
 
 type CitationPopoverProps = {
   /** The citation the user clicked, plus the anchor rect for positioning. */

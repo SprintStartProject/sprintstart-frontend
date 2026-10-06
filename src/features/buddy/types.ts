@@ -1,4 +1,4 @@
-import type { Citation } from "../chatbot/types";
+import type { Citation } from "./citations/types";
 
 /**
  * An action the buddy has *proposed* — the hire must confirm it before anything changes. Carried on
@@ -294,11 +294,36 @@ export type BuddyMessage = {
    * When the message was sent.
    */
   createdAt: string;
+
+  /**
+   * The backend's id for a persisted message.
+   *
+   * Absent on a turn this client streamed, which it ids locally (see `BuddyMessageView`); a
+   * conversation read back from history carries the backend's own ids.
+   */
+  id?: string;
+
+  /**
+   * The sources a persisted reply was grounded in, read back with the conversation's history.
+   *
+   * Live turns collect the same list off the stream (see `useBuddyConversation`); this field is
+   * what makes them survive a reload.
+   */
+  citations?: Citation[];
+
+  /**
+   * True when a persisted reply was cut short: the stream ended before the answer finished and
+   * the backend kept the words that had already arrived.
+   *
+   * Only ever set by the backend — a live turn does not know it will be cut short, and its
+   * failure path carries its own `error` instead (see `BuddyMessageView`).
+   */
+  isIncomplete?: boolean;
 };
 
 /**
- * A buddy message as tracked in hook state: adds a locally-synthesized id (the backend
- * doesn't assign one) and in-memory citations for the current session's streamed replies.
+ * A buddy message as tracked in hook state: the same fields the read returned, with the id made
+ * required — a locally-synthesized one stands in for a turn that has not been read back yet.
  */
 export type BuddyMessageView = BuddyMessage & {
   id: string;
