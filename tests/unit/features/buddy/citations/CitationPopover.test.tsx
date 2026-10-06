@@ -45,4 +45,42 @@ describe("CitationPopover", () => {
     const link = screen.getByRole("link", { name: /Open source/ });
     expect(link).toHaveAttribute("href", "https://example.com/repo/README.md");
   });
+
+  it("renders only the line when the wire sends startPage: null (text/code files)", () => {
+    render(
+      <CitationPopover
+        selected={{ ...mockCitation, citation: { ...mockCitation.citation, startPage: null } }}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Line 12")).toBeInTheDocument();
+    expect(screen.queryByText(/null/i)).not.toBeInTheDocument();
+  });
+
+  it("renders only the page when the wire sends startLine: null (PDF files)", () => {
+    render(
+      <CitationPopover
+        selected={{
+          ...mockCitation,
+          citation: { ...mockCitation.citation, startLine: null, startPage: 3 },
+        }}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Page 3")).toBeInTheDocument();
+    expect(screen.queryByText(/null/i)).not.toBeInTheDocument();
+  });
+
+  it("separates line and page when both are present", () => {
+    render(
+      <CitationPopover
+        selected={{ ...mockCitation, citation: { ...mockCitation.citation, startPage: 3 } }}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Line 12 · Page 3")).toBeInTheDocument();
+  });
 });

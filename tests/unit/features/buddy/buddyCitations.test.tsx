@@ -76,14 +76,14 @@ describe("a reply's sources", () => {
     // The footer is there, collapsed…
     expect(screen.getByRole("button", { name: /Sources · 1/ })).toBeInTheDocument();
     // …and the `[N]` the mentor wrote is an interactive reference, not literal text.
-    expect(screen.getByRole("button", { name: "1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Citation 1: README.md" })).toBeInTheDocument();
   });
 
   it("hands a [N] click to the surface, with the source it names", async () => {
     const onCitationClick = vi.fn();
     renderConversation([REPLY], { onCitationClick });
 
-    await userEvent.click(screen.getByRole("button", { name: "1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Citation 1: README.md" }));
 
     expect(onCitationClick).toHaveBeenCalledTimes(1);
     expect(onCitationClick.mock.calls[0][0].citation).toEqual(README);
@@ -94,7 +94,7 @@ describe("a reply's sources", () => {
     renderConversation([REPLY], { onOpenArtifact });
 
     await userEvent.click(screen.getByRole("button", { name: /Sources · 1/ }));
-    await userEvent.click(screen.getByRole("button", { name: /README\.md/ }));
+    await userEvent.click(screen.getByRole("button", { name: "README.md" }));
     await userEvent.click(screen.getByRole("button", { name: /Open source/ }));
 
     expect(onOpenArtifact).toHaveBeenCalledWith({
@@ -115,7 +115,7 @@ describe("a reply's sources", () => {
       },
     ]);
 
-    expect(screen.queryByRole("button", { name: "1" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Citation 1: README.md" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Sources/ })).not.toBeInTheDocument();
   });
 });

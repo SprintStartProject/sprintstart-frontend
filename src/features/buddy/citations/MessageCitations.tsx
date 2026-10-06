@@ -8,7 +8,7 @@ type MessageCitationsProps = {
   onOpenArtifact?: (data: {
     artifactId: string;
     filename: string;
-    sourceUrl?: string;
+    sourceUrl?: string | null;
     lines: number[];
   }) => void;
 };
@@ -17,7 +17,7 @@ type CitationGroup = {
   filename: string;
   artifactId: string;
   count: number;
-  sourceUrl?: string;
+  sourceUrl?: string | null;
   firstLine?: number;
   locations: string[];
   rawLines: number[];
@@ -58,6 +58,10 @@ function formatRanges(prefix: string, numbers: number[]): string[] {
  * per source file. The backend streams a citation for every retrieved chunk, so
  * a single file can appear many times — grouping keeps the block compact.
  *
+ * Keyed by `artifactId`, not by filename: two different files can share a name
+ * (a `README.md` from two repositories), and they are different sources — one
+ * must not swallow the other's chip. The filename stays the label.
+ *
  * The whole block is collapsed by default (just a "Sources · N" line) so it
  * never dominates the message. Expanding reveals compact per-file chips; a chip
  * can be selected to list the individual locations (lines/pages) it cites, and
@@ -65,7 +69,7 @@ function formatRanges(prefix: string, numbers: number[]): string[] {
  */
 export function MessageCitations({ citations, onOpenArtifact }: MessageCitationsProps) {
   const [open, setOpen] = useState(false);
-  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
   // E3/E4: anchor rect of the chip that opened the sub-popover, so the
   // popover can be positioned fixed (viewport-clamped) and dismissed on
   // outside click / Escape.
@@ -73,16 +77,16 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!activeFile) return;
+    if (!activeArtifactId) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        setActiveFile(null);
+        setActiveArtifactId(null);
       }
     };
     const onPointerDown = (e: PointerEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setActiveFile(null);
+        setActiveArtifactId(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -94,7 +98,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
       window.removeEventListener("pointerdown", onPointerDown);
       window.clearTimeout(id);
     };
-  }, [activeFile]);
+  }, [activeArtifactId]);
 
   const groups = useMemo<CitationGroup[]>(() => {
     const map = new Map<
@@ -103,7 +107,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
         filename: string;
         artifactId: string;
         count: number;
-        sourceUrl?: string;
+        sourceUrl?: string | null;
         lines: Set<number>;
         pages: Set<number>;
         firstLine?: number;
@@ -111,7 +115,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
     >();
 
     for (const citation of citations) {
-      const existing = map.get(citation.filename);
+      const existing = map.get(citation.artifactId);
 
       if (existing) {
         existing.count += 1;
@@ -135,13 +139,13 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
           sourceUrl: citation.sourceUrl,
           lines: new Set<number>(),
           pages: new Set<number>(),
-          firstLine: citation.startLine,
+          firstLine: citation.startLine ?? undefined,
         };
         if (citation.startLine !== undefined && citation.startLine !== null)
           group.lines.add(citation.startLine);
         if (citation.startPage !== undefined && citation.startPage !== null)
           group.pages.add(citation.startPage);
-        map.set(citation.filename, group);
+        map.set(citation.artifactId, group);
       }
     }
 
@@ -179,19 +183,19 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
       {open && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {groups.map((group) => {
-            const isActive = group.filename === activeFile;
+            const isActive = group.artifactId === activeArtifactId;
             const canExpand = group.locations.length > 0 || !!onOpenArtifact;
 
             return (
-              <div key={group.filename} className="relative">
+              <div key={group.artifactId} className="relative">
                 <button
                   type="button"
                   onClick={(e) => {
                     if (!canExpand) return;
                     if (isActive) {
-                      setActiveFile(null);
+                      setActiveArtifactId(null);
                     } else {
-                      setActiveFile(group.filename);
+                      setActiveArtifactId(group.artifactId);
                       setActiveRect(e.currentTarget.getBoundingClientRect());
                     }
                   }}
@@ -223,7 +227,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                             sourceUrl: group.sourceUrl,
                             lines: group.rawLines,
                           });
-                          setActiveFile(null);
+                          setActiveArtifactId(null);
                         }}
                         className="mb-1 inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
                       >
@@ -235,7 +239,7 @@ export function MessageCitations({ citations, onOpenArtifact }: MessageCitations
                         href={group.sourceUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={() => setActiveFile(null)}
+                        onClick={() => setActiveArtifactId(null)}
                         className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
                       >
                         Open source

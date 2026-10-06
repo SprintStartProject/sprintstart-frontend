@@ -14,7 +14,7 @@ import { SleepyBot } from "./SleepyBot";
 type ArtifactOpenPayload = {
   artifactId: string;
   filename: string;
-  sourceUrl?: string;
+  sourceUrl?: string | null;
   lines: number[];
 };
 

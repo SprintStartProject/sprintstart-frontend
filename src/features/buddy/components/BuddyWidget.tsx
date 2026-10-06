@@ -376,8 +376,10 @@ export function BuddyWidget() {
             onRetryOpen={retryOpenAction}
             // Citation interaction for this surface: a `[N]` click opens the popover, and the
             // footer's "Open source" hands the artifact to the drawer — both rendered below.
+            // No project to open a drawer in: pass no artifact opener, so the popover (and the
+            // footer's chips) fall back to the external source link instead of dead-ending.
             onCitationClick={citationViewer.handleCitationClick}
-            onOpenArtifact={citationViewer.handleOpenArtifact}
+            onOpenArtifact={selectedProjectId ? citationViewer.handleOpenArtifact : undefined}
             onClose={toggleOpen}
             onOpenFull={openFull}
             suggestionsHidden={suggestionsHidden}
@@ -442,7 +444,7 @@ export function BuddyWidget() {
         <CitationPopover
           selected={citationViewer.selectedCitation}
           onClose={citationViewer.closeCitation}
-          onOpenArtifact={citationViewer.handleOpenArtifact}
+          onOpenArtifact={selectedProjectId ? citationViewer.handleOpenArtifact : undefined}
         />
       )}
 

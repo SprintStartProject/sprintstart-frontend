@@ -5,7 +5,7 @@ import type { Artifact, ArtifactType } from "../../knowledge-base/types.ts";
 export type CitationArtifactOpen = {
   artifactId: string;
   filename: string;
-  sourceUrl?: string;
+  sourceUrl?: string | null;
   lines: number[];
 };
 

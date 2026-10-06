@@ -60,4 +60,29 @@ describe("MessageCitations", () => {
 
     expect(screen.queryByRole("link", { name: /Open source/ })).not.toBeInTheDocument();
   });
+
+  it("keeps two different files that share a filename apart", () => {
+    const onOpenArtifact = vi.fn();
+    render(
+      <MessageCitations
+        citations={[
+          { artifactId: "a1", filename: "README.md", startLine: 1 },
+          { artifactId: "a2", filename: "README.md", startLine: 9 },
+        ]}
+        onOpenArtifact={onOpenArtifact}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Sources/ }));
+
+    // Two chips, not one collapsed group: they are different artifacts.
+    const chips = screen.getAllByRole("button", { name: /README\.md/ });
+    expect(chips).toHaveLength(2);
+
+    fireEvent.click(chips[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Open source/ }));
+    expect(onOpenArtifact).toHaveBeenCalledWith(
+      expect.objectContaining({ artifactId: "a1", filename: "README.md" }),
+    );
+  });
 });

@@ -94,6 +94,9 @@ function BuddyMarkdownImpl({ content, citations, onCitationClick }: BuddyMarkdow
               type="button"
               className="mx-[0.12em] cursor-help rounded-md border border-app-brand-border bg-app-brand-soft px-[0.35em] py-[0.05em] text-[0.7em] leading-none font-semibold text-app-brand-text transition-colors hover:bg-app-brand/20"
               title={citation ? citation.filename : `Source ${n}`}
+              // `title` is a tooltip, not a name: without this a screen reader announces a
+              // bare "1" for every reference.
+              aria-label={citation ? `Citation ${n}: ${citation.filename}` : `Source ${n}`}
               onClick={(e) => {
                 if (citation && onCitationClick) {
                   onCitationClick({

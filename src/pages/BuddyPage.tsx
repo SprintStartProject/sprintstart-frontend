@@ -526,8 +526,10 @@ function BuddyMentorHome() {
           onRetryOpen={retryOpenAction}
           // Citation interaction for this surface: a `[N]` click opens the popover, and the
           // footer's "Open source" hands the artifact to the drawer — both mounted below.
+          // No project to open a drawer in: pass no artifact opener, so the popover (and the
+          // footer's chips) fall back to the external source link instead of dead-ending.
           onCitationClick={citationViewer.handleCitationClick}
-          onOpenArtifact={citationViewer.handleOpenArtifact}
+          onOpenArtifact={selectedProjectId ? citationViewer.handleOpenArtifact : undefined}
           // `hasUserMessage`, not `canStartConversation`: the button withdraws mid-turn, the room
           // it withdraws from must not. Below `md` the two clearances differ by 24px, and for a
           // hire with no PM replies this is the only term that is ever true — so tying the space
@@ -558,7 +560,7 @@ function BuddyMentorHome() {
         <CitationPopover
           selected={citationViewer.selectedCitation}
           onClose={citationViewer.closeCitation}
-          onOpenArtifact={citationViewer.handleOpenArtifact}
+          onOpenArtifact={selectedProjectId ? citationViewer.handleOpenArtifact : undefined}
         />
       )}
 

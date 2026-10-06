@@ -35,6 +35,9 @@ export function getCitationPopoverStyle(rect: DOMRect, width = 320): CSSProperti
     top: `${top}px`,
     left: `${left}px`,
     width: `${WIDTH}px`,
+    // Never wider than the viewport on a narrow screen: the left clamp above keeps the left
+    // edge at MARGIN, so `100vw - 32` also keeps the right edge on-screen.
+    maxWidth: "calc(100vw - 32px)",
     zIndex: 50,
   };
 }
