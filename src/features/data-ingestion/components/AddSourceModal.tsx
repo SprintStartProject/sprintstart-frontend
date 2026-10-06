@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
@@ -401,8 +401,9 @@ export function AddSourceModal({
 /** Warning banner shown when the user may not connect sources to the project. */
 function IngestBlockedNotice({ reason }: { reason?: string }) {
   return (
-    <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-      {reason ?? "You can only connect sources to projects you manage."}
+    <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>{reason ?? "You can only connect sources to projects you manage."}</span>
     </div>
   );
 }
