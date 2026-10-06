@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { KeyboardEvent } from "react";
 import { ListPlus, Send, Square, Wand2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
@@ -59,6 +59,12 @@ type BuddyComposerProps = {
   capabilitiesEnabled?: boolean;
   onCapabilitiesChange?: (next: boolean) => void;
   /**
+   * Bumped by the surface to put the caret in the box, behind its text — the page's `/` chord.
+   * A counter rather than a callback ref, so the request crosses the memoised conversation as a
+   * plain prop. `0` (the default) asks for nothing.
+   */
+  focusToken?: number;
+  /**
    * Whether the dino waiting-game is open. The caret is held back while it is: the game
    * ignores keys aimed at text fields, so a refocus mid-run (the reply arriving) would kill
    * the dino, deaden Escape and type Spaces in here. Closing the game hands the caret back.
@@ -85,8 +91,8 @@ export type BuddyComposerQueue = {
  * The box you answer the buddy in, shared by the dock and the full page.
  *
  * One rounded surface holds the field and the send button and takes the focus ring as a unit —
- * the composer shape the chat page already draws, so the two places you type at a model in this
- * app are not two different controls. This is the composite case the standards carve out of
+ * one composer shape for both places you type at the buddy, so they are not two different
+ * controls. This is the composite case the standards carve out of
  * "every text field is `ui/Textarea`": the box is shared, so the field inside it is borderless
  * and borrows only the growing behaviour, via `useAutoResize`.
  *
@@ -111,6 +117,7 @@ export function BuddyComposer({
   onFiltersChange,
   capabilitiesEnabled = true,
   onCapabilitiesChange,
+  focusToken = 0,
   gameActive = false,
 }: BuddyComposerProps) {
   const { draft, setDraft, handleSubmit } = useBuddyDraft();
@@ -134,6 +141,14 @@ export function BuddyComposer({
     field.focus();
     field.setSelectionRange(field.value.length, field.value.length);
   }, [focusOnMount]);
+
+  useEffect(() => {
+    if (focusToken === 0) return;
+    const field = fieldRef.current;
+    if (!field) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [focusToken]);
 
   /**
    * The last value the hire typed here, so a draft written *from outside* can be told apart.
@@ -172,14 +187,15 @@ export function BuddyComposer({
 
   /** A start-after-end window. Flagged in the popover and refused on submit — see `submit`. */
   const filtersInvalid = filters !== undefined && isFilterRangeInvalid(filters.from, filters.to);
+  // Per instance: the dock and the page can both be mounted during the hand-off.
+  const invalidRangeHintId = useId();
 
   /**
    * Sends, then hands the caret back to the page.
    *
    * Space opens the dino waiting-game while the buddy works, and the trigger refuses to fire
-   * while a text field holds focus — otherwise it would eat the space bar. The chat page solves
-   * this by blurring its composer on submit; this box said nothing about focus, so the game was
-   * only reachable after clicking away from it. Pressing Escape or clicking the thread still
+   * while a text field holds focus — otherwise it would eat the space bar. So the composer blurs
+   * on submit; before it did, the game was only reachable after clicking away from it. Pressing Escape or clicking the thread still
    * works too: this only makes the documented gesture (just press Space) true here.
    *
    * Only a submission that started a turn counts. An egg phrase is swallowed by the caller —
@@ -240,6 +256,16 @@ export function BuddyComposer({
         <BuddyFilterChips filters={filters} onFiltersChange={onFiltersChange} />
       )}
 
+      {/* Why Send is off. The popover says so beside the fields, but only while it is open — and
+          the dock has no popover at all, so a range set on the page left the dock's Send disabled
+          with nothing on screen to say why. Not an alert: the popover's own line already is one,
+          and the same fault announced twice is noise. */}
+      {filtersInvalid && (
+        <p id={invalidRangeHintId} className="mb-2 px-1 text-xs text-app-danger-text">
+          The date filter starts after it ends — fix or clear it to send.
+        </p>
+      )}
+
       <form
         onSubmit={submit}
         className="flex items-end gap-1.5 rounded-xl border border-app-border-muted bg-app-surface-muted p-1.5 transition focus-within:border-app-brand-border focus-within:ring-2 focus-within:ring-app-focus/40"
@@ -252,7 +278,9 @@ export function BuddyComposer({
           <button
             type="button"
             aria-pressed={capabilitiesEnabled}
-            aria-label="Mentor tools"
+            // Named by its visible "Actions" — no `aria-label`: a spoken name that differs from
+            // the one on screen leaves a voice-control user saying a word the button does not
+            // answer to (WCAG 2.5.3). The title carries the longer explanation.
             title={
               capabilitiesEnabled
                 ? "Mentor tools on — your buddy can act. Click for answers only."
@@ -313,6 +341,7 @@ export function BuddyComposer({
           aria-label={streaming ? "Queue message" : "Send message"}
           title={streaming ? "Queued: it is sent once this answer finishes" : undefined}
           disabled={!draft.trim() || filtersInvalid}
+          aria-describedby={filtersInvalid ? invalidRangeHintId : undefined}
           className="max-sm:h-11 max-sm:w-11"
         >
           {streaming ? (

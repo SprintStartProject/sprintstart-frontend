@@ -80,6 +80,8 @@ type BuddyConversationProps = {
   /** Whether the mentor may act on messages sent from here; paired with the setter below. */
   capabilitiesEnabled?: boolean;
   onCapabilitiesChange?: (next: boolean) => void;
+  /** Bump to put the caret in the composer — see `BuddyComposer`'s `focusToken`. */
+  composerFocusToken?: number;
   /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
   dinoGameActive?: boolean;
   /** Called when the player leaves the dino waiting-game. */
@@ -139,6 +141,7 @@ function BuddyConversationImpl({
   onFiltersChange,
   capabilitiesEnabled,
   onCapabilitiesChange,
+  composerFocusToken,
   dinoGameActive = false,
   onDinoGameExit,
   onCitationClick,
@@ -243,6 +246,7 @@ function BuddyConversationImpl({
             onFiltersChange={onFiltersChange}
             capabilitiesEnabled={capabilitiesEnabled}
             onCapabilitiesChange={onCapabilitiesChange}
+            focusToken={composerFocusToken}
           />
         </div>
       </div>

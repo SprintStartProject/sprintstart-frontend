@@ -19,7 +19,7 @@ export type CapturedSelection = {
    *
    * [text] collapses every whitespace run because cards and highlights want one line of words; a
    * blockquote of a two-paragraph answer, though, is worth two paragraphs. The Reply offer sends
-   * this instead, and the chatbot's `formatMarkdownQuote` turns each line into its own quoted
+   * this instead, and the buddy's `formatMarkdownQuote` turns each line into its own quoted
    * paragraph.
    */
   quoteText: string;
@@ -110,7 +110,7 @@ export function captureSelection(selection: Selection | null): CapturedSelection
  * A browser's selection `toString` puts a newline at block boundaries — paragraphs, list items —
  * and hands back the stray spacing a drag across inline markup picks up. The quote keeps the
  * paragraph breaks, because that is the whole point of replying with a quote, while dropping
- * empty lines and collapsing horizontal whitespace — so the chatbot's `formatMarkdownQuote`
+ * empty lines and collapsing horizontal whitespace — so the buddy's `formatMarkdownQuote`
  * receives one line per paragraph and nothing else.
  */
 export function selectionQuoteText(raw: string): string {

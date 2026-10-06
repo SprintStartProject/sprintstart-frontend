@@ -331,8 +331,8 @@ export type BuddyMessageView = BuddyMessage & {
   citations?: Citation[];
   /**
    * The mentor's visible thought process for this turn, as the backend streamed it — one string,
-   * grown in place. Absent for turns that ran none (and for messages read back from before the
-   * reasoning phase existed).
+   * grown in place, one paragraph per thought. Absent for turns that ran none (and for messages
+   * read back from before the reasoning phase existed).
    */
   reasoning?: string;
   /** Actions the buddy proposed in this turn, each awaiting the hire's confirmation. */
@@ -355,6 +355,15 @@ export type BuddyMessageView = BuddyMessage & {
    * from the buddy having ignored them -- on the surface the whole feature is built around.
    */
   error?: string;
+  /**
+   * True for a live turn the hire stopped with the composer's Stop button.
+   *
+   * Its own flag rather than `isIncomplete`, which is the backend's account of a reply it kept
+   * half of: the backend writes the whole agent loop before it emits a word, so a Stop almost
+   * always lands before the first token — there is nothing to keep, and the turn would render as
+   * nothing at all. This is what keeps it on screen, with a line saying the hire stopped it.
+   */
+  stopped?: boolean;
 };
 
 /**

@@ -9,8 +9,8 @@ type MatrixRainProps = {
  * MatrixRain
  *
  * A full-screen "Matrix digital rain" canvas effect, triggered as a chat
- * easter egg (type "matrix" / "the matrix" / "do matrix" in the chat or
- * buddy composer — matched by `matchEggPhrase`, drawn by
+ * easter egg (type "matrix" / "the matrix" / "do matrix" in the buddy
+ * composer — matched by `matchEggPhrase`, drawn by
  * {@link EggEffectsLayer}). Renders a fixed, pointer-events-none canvas
  * above the app for ~6s, then auto-dismisses. Press Escape to dismiss early.
  *

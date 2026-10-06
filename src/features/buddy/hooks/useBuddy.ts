@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { onOpenAiBuddy } from "../aiBuddyBus";
+import { isBuddyPagePath } from "../buddyPagePath";
 import { useBuddyDraftActions } from "../buddyDraftContext";
 import { useBuddySession } from "../buddySessionContext";
 import { useBuddySuggestions } from "./useBuddySuggestions";
@@ -69,7 +70,11 @@ export function useBuddy() {
      * a draft to help the hire word their question.
      */
     return onOpenAiBuddy(({ draft: seed }) => {
-      setIsOpen(true);
+      // On the buddy page the page *is* the buddy: the seed lands in its composer (the draft is
+      // shared), and the dock behind it stays shut. Opening it there would only surface later,
+      // unasked, on whatever page the hire went to next. Read from the window rather than the
+      // router so this hook does not re-render the dock on every navigation.
+      if (!isBuddyPagePath(window.location.pathname)) setIsOpen(true);
       if (seed) setDraft((current) => withSeed(current, seed));
     });
   }, [setDraft]);

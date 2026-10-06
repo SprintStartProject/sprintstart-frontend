@@ -17,6 +17,7 @@ import {
   type BuddyCorner,
 } from "../buddyCorner";
 import { onBuddyPageReady } from "../aiBuddyBus";
+import { BUDDY_PAGE_PATH as BUDDY_PAGE, isBuddyPagePath } from "../buddyPagePath";
 import { useBuddy } from "../hooks/useBuddy";
 import { useGreetingReveal } from "../hooks/useGreetingReveal";
 import { useProjectContext } from "../../projects/useProjectContext";
@@ -27,9 +28,6 @@ import { ArtifactViewerDrawer } from "../../knowledge-base/components/ArtifactVi
 import { BuddyModeSwitcher } from "./BuddyModeSwitcher";
 import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
-
-/** Where the full conversation lives. The dock grows into it rather than getting bigger. */
-const BUDDY_PAGE = "/buddy";
 
 /** How long to wait for `/buddy` to announce itself before uncovering it anyway, in ms. */
 const HANDOFF_FALLBACK_MS = 1200;
@@ -354,7 +352,7 @@ export function BuddyWidget() {
 
   // The dock is a surface the dino game may live in only while it is actually on screen:
   // minimised, or hidden behind `/buddy`, a Space press must not open a game nobody can see.
-  const dockVisible = isOpen && !(pathname.startsWith(BUDDY_PAGE) && handoff === "idle");
+  const dockVisible = isOpen && !(isBuddyPagePath(pathname) && handoff === "idle");
   useEffect(() => {
     if (!dockVisible) return;
     return registerDinoSurface();
@@ -363,9 +361,9 @@ export function BuddyWidget() {
   // Normally the widget takes itself off the buddy page — the launcher would offer the page you
   // are reading, and the dock would put a second composer over the first. During the hand-off it
   // has to stay: it *is* the transition, and unmounting it the instant the route changes is
-  // precisely the flash this sequencing exists to remove. `startsWith`, because the page has
-  // per-conversation addresses (`/buddy/:id`) that are just as much "the page".
-  if (pathname.startsWith(BUDDY_PAGE) && handoff === "idle") return null;
+  // precisely the flash this sequencing exists to remove. The per-conversation addresses
+  // (`/buddy/:id`) are just as much "the page" — see `isBuddyPagePath`.
+  if (isBuddyPagePath(pathname) && handoff === "idle") return null;
 
   return (
     <>

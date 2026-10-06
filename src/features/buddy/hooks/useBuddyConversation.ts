@@ -13,7 +13,10 @@ import {
   type BuddyOpeningAction,
   type BuddySessionSummary,
 } from "../../../services/buddyService";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "../../../services/queryKeys";
 import { announceBuddyPathChanged } from "../aiBuddyBus";
+import { buddySessionIdFromPath } from "../buddyPagePath";
 import { actionDraftKey } from "../actionDrafts";
 import type { ActionDrafts } from "../actionDrafts";
 import { BUDDY_PATH_ACTIONS } from "../types";
@@ -268,10 +271,19 @@ export function useBuddyConversation(
    */
   const resolvingRef = useRef<Promise<string> | null>(null);
 
-  const applySessions = useCallback((next: BuddySessionSummary[]) => {
-    sessionsRef.current = next;
-    setSessions(next);
-  }, []);
+  // The dashboard's "Recent conversations" card reads the same list from the query cache. Every
+  // change made here — a create, a bin, a title the refresh brought back — is written through to
+  // it, so the card never lists a conversation the page no longer has (or misses one it does)
+  // for the length of a `staleTime`.
+  const queryClient = useQueryClient();
+  const applySessions = useCallback(
+    (next: BuddySessionSummary[]) => {
+      sessionsRef.current = next;
+      setSessions(next);
+      queryClient.setQueryData(queryKeys.buddy.sessions(), next);
+    },
+    [queryClient],
+  );
 
   const applyCurrentSession = useCallback((sessionId: string | null) => {
     currentSessionIdRef.current = sessionId;
@@ -643,7 +655,13 @@ export function useBuddyConversation(
    * have none at all.
    *
    * Prefers the conversation this app session was already in when the list still holds it —
-   * a team-mode round trip or a retry must not move the hire out of their conversation.
+   * a team-mode round trip or a retry must not move the hire out of their conversation. Before
+   * that, a conversation the address names (`/buddy/:id` — a reload, a shared link): resolving
+   * the newest and then switching would read a conversation nobody asked for and flash it, and
+   * the switch is refused while that first read is still running. Read from the window at
+   * resolve time, like `currentPage` on a send, because the dock resolves at app mount — before
+   * the lazily loaded page could hand the address over.
+   *
    * Memoised in flight, because the composer is live from the first paint: a send racing the
    * opening read must land on the same conversation, not create a second.
    */
@@ -654,10 +672,11 @@ export function useBuddyConversation(
       const list = await getSessions();
 
       if (list.length > 0) {
+        const holds = (id: string | null): id is string =>
+          id !== null && list.some((session) => session.id === id);
+        const addressed = buddySessionIdFromPath(window.location.pathname);
         const previous = currentSessionIdRef.current;
-        const chosen = list.some((session) => session.id === previous)
-          ? (previous as string)
-          : list[0].id;
+        const chosen = holds(addressed) ? addressed : holds(previous) ? previous : list[0].id;
         applySessions(list);
         applyCurrentSession(chosen);
         return chosen;
@@ -691,8 +710,12 @@ export function useBuddyConversation(
    * once at open and edited locally from there — so without this, every conversation started in
    * a session read "New conversation" in the rail until a reload. Called when a first turn
    * completes on a row that is still untitled; the refreshed read naturally stops needing it.
+   * The page also calls it once before giving up on an address the list does not hold — a
+   * conversation started in another tab is newer than this session's read.
+   *
+   * @returns The list as applied, or `null` when the read failed.
    */
-  const refreshSessions = useCallback(async () => {
+  const refreshSessions = useCallback(async (): Promise<BuddySessionSummary[] | null> => {
     try {
       const read = await getSessions();
 
@@ -707,10 +730,13 @@ export function useBuddyConversation(
       const fetchedIds = new Set(fetched.map((session) => session.id));
       const createdMeanwhile = sessionsRef.current.filter((session) => !fetchedIds.has(session.id));
 
-      applySessions([...createdMeanwhile, ...fetched]);
+      const next = [...createdMeanwhile, ...fetched];
+      applySessions(next);
+      return next;
     } catch (e) {
       // Cosmetic only: the rail keeps the titles it has; the next completed turn tries again.
       console.error(e);
+      return null;
     }
   }, [applySessions]);
 
@@ -837,11 +863,15 @@ export function useBuddyConversation(
    * one (see `openSession`), and everything else is a continuing thing the hire asked to see
    * again, not a fresh start. Refused while anything is in flight, like every other move that
    * clears the thread.
+   *
+   * @returns Whether the conversation asked for is the one on screen now — `false` only for a
+   *   refusal, so a caller acting on someone else's behalf (the page following its address) can
+   *   tell "switched" from "nothing happened" instead of guessing from state a render behind.
    */
   const selectSession = useCallback(
-    async (sessionId: string) => {
-      if (sessionId === currentSessionIdRef.current) return;
-      if (teamProjectIdRef.current !== null) return;
+    async (sessionId: string): Promise<boolean> => {
+      if (sessionId === currentSessionIdRef.current) return true;
+      if (teamProjectIdRef.current !== null) return false;
       if (
         greetingRef.current ||
         isOpening ||
@@ -850,7 +880,7 @@ export function useBuddyConversation(
         isStreaming ||
         pendingDecisionsRef.current > 0
       )
-        return;
+        return false;
       greetingRef.current = true;
 
       applyCurrentSession(sessionId);
@@ -882,6 +912,10 @@ export function useBuddyConversation(
       } finally {
         greetingRef.current = false;
       }
+
+      // Switched even when the read failed: the conversation on screen is the one asked for,
+      // and the banner owns the failure.
+      return true;
     },
     [
       closeDinoGame,
@@ -1234,17 +1268,32 @@ export function useBuddyConversation(
       };
 
       /**
-       * Closes a turn the hire stopped: what streamed is kept and marked cut short — the same
-       * state the backend persists for a cancelled turn, so a reload agrees with the screen —
-       * with no error line, because nothing failed.
+       * The first completed turn is when the backend has named the conversation; while its row
+       * is still untitled, re-read the list so the rail shows the name it just wrote. A stopped
+       * turn counts too: the title is written from the hire's message, which the backend already
+       * kept, so a Stop must not leave the row reading "New conversation" until the next turn.
+       */
+      const refreshTitleIfUntitled = () => {
+        if (sessionId === undefined) return;
+        const summary = sessionsRef.current.find((session) => session.id === sessionId);
+        if (summary && summary.title.trim() === "") void refreshSessions();
+      };
+
+      /**
+       * Closes a turn the hire stopped: what streamed is kept, and the turn says the hire stopped
+       * it — with no error line, because nothing failed. Marked `stopped` rather than left to
+       * whatever arrived: a Stop usually lands before the first word (see `stopped`), and an
+       * empty assistant turn renders as nothing, which left the question unanswered and
+       * unexplained.
        */
       const markStopped = () => {
         setIsStreaming(false);
         setIsThinking(false);
         setActiveTool(null);
         setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, isIncomplete: true } : m)),
+          prev.map((m) => (m.id === assistantId ? { ...m, stopped: true } : m)),
         );
+        refreshTitleIfUntitled();
       };
 
       try {
@@ -1262,11 +1311,21 @@ export function useBuddyConversation(
               // it. `isThinking` stays true here — the typing row keeps the turn's place until
               // the first real token arrives — but the turn counts as streaming, so the thread
               // marks it live from the first thought and the panel follows it (see `BuddyThread`).
+              //
+              // Each event is one whole thought (the backend emits its list item by item), not a
+              // token delta like the chat's stream was — so they are joined as paragraphs.
+              // Glued together, the last sentence of one ran into the next and the markdown lost
+              // every boundary between them.
               setIsStreaming(true);
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
-                    ? { ...m, reasoning: (m.reasoning ?? "") + reasoningText }
+                    ? {
+                        ...m,
+                        reasoning: m.reasoning
+                          ? `${m.reasoning}\n\n${reasoningText}`
+                          : reasoningText,
+                      }
                     : m,
                 ),
               );
@@ -1365,13 +1424,7 @@ export function useBuddyConversation(
                 );
               }
 
-              // The first completed turn is when the backend has named the conversation; while
-              // its row is still untitled, re-read the list so the rail shows the name it just
-              // wrote.
-              if (sessionId !== undefined) {
-                const summary = sessionsRef.current.find((session) => session.id === sessionId);
-                if (summary && summary.title.trim() === "") void refreshSessions();
-              }
+              refreshTitleIfUntitled();
             },
 
             onError: (err) => {
@@ -1428,14 +1481,16 @@ export function useBuddyConversation(
    *
    * A turn already running → the message joins the queue instead of cutting the answer off;
    * that is the whole point of the queue. Sending something new is also the hire taking over
-   * again, so a queue held back by Stop starts moving without another press.
+   * again, so a queue held back by Stop starts moving without another press — whether or not a
+   * turn is running when they send. (Idle, the new message goes out now and the held messages
+   * follow it once it closes; before, they stayed held behind a message that had overtaken them.)
    */
   const submitMessage = useCallback(
     (text: string) => {
       if (!text.trim()) return;
+      setQueuePaused(false);
       if (streamingRef.current) {
         commitQueued([...queuedRef.current, { id: crypto.randomUUID(), text }]);
-        setQueuePaused(false);
         return;
       }
       void sendMessage(text);
@@ -1903,6 +1958,7 @@ export function useBuddyConversation(
     newConversation,
     selectSession,
     binSession,
+    refreshSessions,
 
     presentedGreetingId,
     markGreetingPresented: setPresentedGreetingId,

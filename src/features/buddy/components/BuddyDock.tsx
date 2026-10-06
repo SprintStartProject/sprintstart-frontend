@@ -342,8 +342,8 @@ function BuddyDockImpl({
               onClick={() => void newConversation()}
               aria-label="Start a new conversation"
               // No chord named here, deliberately. The window floats over every page, and
-              // `Alt+N` belongs to whichever one is underneath it — on `/chat` it starts a new
-              // *chat*, and on most pages nothing binds it at all. Advertising it from the dock
+              // `Alt+N` belongs to whichever one is underneath it — on the buddy page it is the
+              // page's own, and on most pages nothing binds it at all. Advertising it from the dock
               // would be promising a key that does somebody else's job.
               title="Start a new conversation — your buddy keeps what it has learned about you"
             >

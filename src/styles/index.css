@@ -530,9 +530,9 @@ html[data-sidebar-resizing] .app-sidebar-eases {
    leaving a gap between the app sidebar and the page. Put it on the content
    column that sits beside the rail, not on the page root.
 
-   Used by ChatPage's history sidebar and by the buddy page's PM replies. It
-   started chat-specific; the second caller is what made it worth a name that
-   says what it does rather than where it was first needed. */
+   Used by the buddy page's conversation rail. It started on the retired chat's
+   history sidebar; a second caller is what made it worth a name that says what
+   it does rather than where it was first needed. */
 @media (min-width: 768px) {
   .app-rail-open .app-page-frame {
     padding-left: 1.5rem;

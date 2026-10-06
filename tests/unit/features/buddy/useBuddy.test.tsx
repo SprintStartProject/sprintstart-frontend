@@ -192,6 +192,32 @@ describe("useBuddy", () => {
     expect(result.current.draft).toBe("> The migration runs on deploy.\n\n");
   });
 
+  /**
+   * On the buddy page the page *is* the buddy: the widget is mounted but draws nothing there, so
+   * opening its dock would only surface later, unasked, on the next page the hire went to. The
+   * seed still lands — the draft is the page composer's too.
+   */
+  it("leaves the dock shut when the seed arrives on the buddy page", async () => {
+    server.use(http.get("/api/v1/onboarding/me/buddy/messages", () => HttpResponse.json([])));
+    const previousUrl = window.location.href;
+    window.history.replaceState(null, "", "/buddy/session-1");
+
+    try {
+      const { result } = renderHook(() => useBuddyWithDraft(), {
+        wrapper: BuddyProviderWithStubs,
+      });
+
+      act(() => {
+        openAiBuddy({ draft: "> The migration runs on deploy.\n\n" });
+      });
+
+      await waitFor(() => expect(result.current.draft).toBe("> The migration runs on deploy.\n\n"));
+      expect(result.current.isOpen).toBe(false);
+    } finally {
+      window.history.replaceState(null, "", previousUrl);
+    }
+  });
+
   /** Seeded, never sent: the question the hire is about to type is the point of the message. */
   it("does not send what it was handed", async () => {
     let sent = false;

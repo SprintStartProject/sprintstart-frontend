@@ -58,11 +58,17 @@ type BuddyMessageProps = {
    * True when this reply was cut short — the stream ended before the answer finished, and the
    * backend kept the words that had arrived.
    *
-   * A quiet line under the bubble, the shape the chat gives a stopped turn: the partial answer
+   * A quiet line under the bubble: the partial answer
    * is still an answer, and this says why it ends where it does. Only ever read from history —
    * a live failure carries `error` instead, and the two never render together.
    */
   incomplete?: boolean;
+  /**
+   * True for a live turn the hire stopped themselves. The same quiet line as `incomplete`, worded
+   * for what happened — and the whole message when the Stop came before the first word, which it
+   * usually does (see `BuddyMessageView.stopped`).
+   */
+  stopped?: boolean;
   /** Rendered under the bubble, inside the speaker's column: the escalation offer, mostly. */
   footer?: ReactNode;
   /** True for the turn currently receiving tokens — that bot is working, so it stays awake. */
@@ -97,6 +103,7 @@ export function BuddyMessage({
   meta,
   error,
   incomplete = false,
+  stopped = false,
   footer,
   isStreaming = false,
 }: BuddyMessageProps) {
@@ -136,7 +143,7 @@ export function BuddyMessage({
         // because the buddy's turn is the one that streams: a box re-measured on every token
         // widens word by word and snaps back whenever a re-parse changes the rendered markdown,
         // which is unreadable while it is being written. Everyone else's turns arrive whole and
-        // still hug. Same rule, and the same reason, as `MessageRow` in the chat.
+        // still hug.
         className={`flex min-w-0 flex-col gap-1 ${isYou ? "items-end" : "items-start"} ${
           compact && !isYou ? "flex-1" : "max-w-[min(85%,46rem)]"
         } ${speaker === "BUDDY" ? "w-full" : ""}`}
@@ -166,15 +173,15 @@ export function BuddyMessage({
           </div>
         )}
 
-        {incomplete && !error && (
+        {(incomplete || stopped) && !error && (
           <div
-            data-testid="buddy-message-incomplete"
+            data-testid={stopped ? "buddy-message-stopped" : "buddy-message-incomplete"}
             className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-sm leading-relaxed text-app-text-muted ${
               children === undefined ? "" : "mt-1"
             }`}
           >
             <MessageSquareOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>This reply was cut short.</span>
+            <span>{stopped ? "You stopped this reply." : "This reply was cut short."}</span>
           </div>
         )}
 

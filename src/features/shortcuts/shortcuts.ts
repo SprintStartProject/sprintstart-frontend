@@ -190,7 +190,7 @@ export const SIDEBAR_TOGGLE_SHORTCUT: ShortcutItem = {
 };
 
 /**
- * `/` focuses the chat composer — the way Slack and GitHub do it. Character-matched: on a
+ * `/` focuses the buddy page's composer — the way Slack and GitHub do it. Character-matched: on a
  * German keyboard `/` is Shift+7, on a US one it is the slash key unshifted, and the
  * character is the part both keyboards agree on.
  *

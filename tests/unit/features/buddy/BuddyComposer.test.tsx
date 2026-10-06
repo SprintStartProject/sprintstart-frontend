@@ -70,4 +70,63 @@ describe("BuddyComposer", () => {
     expect(screen.getByRole("button", { name: "Remove GitHub filter" })).toBeInTheDocument();
     expect(screen.queryByTestId("buddy-filters-toggle")).not.toBeInTheDocument();
   });
+
+  /**
+   * An inverted date range blocks Send. The popover says why beside the fields, but the dock has
+   * no popover — a range set on the page left the dock's Send disabled with nothing to explain it.
+   */
+  it("says why Send is off when the date filter is inverted, in the dock too", () => {
+    render(
+      <BuddyDraftContext.Provider
+        value={{ draft: "Where am I?", setDraft: vi.fn(), handleSubmit: vi.fn() }}
+      >
+        <BuddyComposer
+          compact
+          filters={{ sourceSystems: [], from: "2026-10-05", to: "2026-10-01" }}
+          onFiltersChange={vi.fn()}
+        />
+      </BuddyDraftContext.Provider>,
+    );
+
+    const send = screen.getByRole("button", { name: "Send message" });
+    expect(send).toBeDisabled();
+    expect(send).toHaveAccessibleDescription(
+      "The date filter starts after it ends — fix or clear it to send.",
+    );
+  });
+
+  /** The name it is spoken by is the word on screen (WCAG 2.5.3), the state rides on `aria-pressed`. */
+  it("names the mentor switch by its visible label", () => {
+    render(
+      <BuddyDraftContext.Provider value={{ draft: "", setDraft: vi.fn(), handleSubmit: vi.fn() }}>
+        <BuddyComposer capabilitiesEnabled onCapabilitiesChange={vi.fn()} />
+      </BuddyDraftContext.Provider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Actions", pressed: true })).toBeInTheDocument();
+  });
+
+  it("takes the caret when the surface asks for it", () => {
+    const { rerender } = render(
+      <BuddyDraftContext.Provider
+        value={{ draft: "half a question", setDraft: vi.fn(), handleSubmit: vi.fn() }}
+      >
+        <BuddyComposer />
+      </BuddyDraftContext.Provider>,
+    );
+    const field = screen.getByRole("textbox", { name: "Message" });
+    expect(field).not.toHaveFocus();
+
+    rerender(
+      <BuddyDraftContext.Provider
+        value={{ draft: "half a question", setDraft: vi.fn(), handleSubmit: vi.fn() }}
+      >
+        <BuddyComposer focusToken={1} />
+      </BuddyDraftContext.Provider>,
+    );
+
+    expect(field).toHaveFocus();
+    // Behind the words, so typing adds to them.
+    expect((field as HTMLTextAreaElement).selectionStart).toBe("half a question".length);
+  });
 });

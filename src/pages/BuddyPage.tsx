@@ -38,10 +38,11 @@ import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
 import { useAuth } from "../context/useAuth";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
 import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestionActions";
+import { FOCUS_COMPOSER_SHORTCUT, useShortcutListener } from "../features/shortcuts";
 
 /**
- * Names the rail — the hire's conversations, and what came back from their PM — for assistive
- * tech and labels the control that reopens it.
+ * Names the rail — the hire's conversations — for assistive tech and labels the control that
+ * reopens it.
  *
  * One constant, because those two have to say the same thing: `aria-controls` points the
  * second at the first, and a screen reader that announced two different names for one region
@@ -53,13 +54,12 @@ const RAIL_LABEL = "Your conversations";
 const RAIL_ID = "buddy-rail";
 
 /**
- * Where the rail's collapsed state lives between visits, next to the chat's own
- * (`chatSidebarOpen`) and for the same reason: it is a statement about how much room this
- * window has to spare, not about a conversation or a user.
+ * Where the rail's collapsed state lives between visits. Per window rather than per user: it is a
+ * statement about how much room this window has to spare, not about a conversation or a user.
  */
 const RAIL_OPEN_KEY = "buddyRailOpen";
 
-/** `null` when the hire has never said either way — see the auto-open in `BuddyMentorHome`. */
+/** `null` when the hire has never said either way — the rail then starts closed. */
 function readRailOpen(): boolean | null {
   try {
     // Read through the pre-rename key once: the rail used to be the PM-replies panel
@@ -115,8 +115,7 @@ function writeSeenReplyIds(userId: string, ids: string[]): void {
 }
 
 /**
- * The page's shape, shared by the mentor and the no-project state so nothing moves between
- * them.
+ * The page's shape: the conversation, with the rail and the floating controls around it.
  *
  * It fills the panel the page's frame gives it rather than claiming a height of its own — the
  * frame owns the viewport and the page header. What is left here is the conversation, the rail
@@ -227,6 +226,7 @@ function BuddyMentorHome() {
     newConversation,
     selectSession,
     binSession,
+    refreshSessions,
     presentedGreetingId,
     markGreetingPresented,
     teamProjectId,
@@ -283,22 +283,75 @@ function BuddyMentorHome() {
   // the banner's retry would only fail again). Otherwise a conversation that *changed* — a rail
   // pick, a bin of the current row, a new conversation — takes the address with it. The first
   // resolve is deliberately left out: the bare page keeps its bare address, and naming happens
-  // up front only through the dock's hand-off, which navigates to `/buddy/<id>` itself.
+  // up front only through the dock's hand-off, which navigates to `/buddy/<id>` itself. (A
+  // reload of `/buddy/<id>` resolves to that conversation in the first place — see
+  // `resolveHireSession` — so this only has to switch for an address that changed after.)
+  //
+  // An address that cannot be followed *now* is never left to be followed later. A switch
+  // clears the thread, the composer and the queue, so one that waited out a running turn and
+  // then fired on its own threw away whatever the hire had typed in the meantime — and until
+  // it fired, the address named a conversation the screen was not showing. So while a turn or
+  // a decision is running, or in team mode, the address goes back to the conversation on
+  // screen. Only the first open is waited for: it is a moment, and nothing has been typed into
+  // a conversation that is not on screen yet.
   const { id: urlSessionId } = useParams<{ id: string }>();
   const previousSessionIdRef = useRef<string | null>(currentSessionId);
+  // The latest of both, for the continuations below that settle after the render that started them.
+  const latestUrlSessionIdRef = useRef(urlSessionId);
+  const latestSessionIdRef = useRef(currentSessionId);
+  useEffect(() => {
+    latestUrlSessionIdRef.current = urlSessionId;
+    latestSessionIdRef.current = currentSessionId;
+  });
+  // The unknown address a list re-read is already answering, so the refreshed list arriving does
+  // not start a second one before the first has said whether it found the conversation.
+  const refreshedForRef = useRef<string | null>(null);
+  const isSettling = isOpening || isGreeting;
+  const cannotSwitch = isThinking || isStreaming || isDeciding || teamProjectId !== null;
   useEffect(() => {
     const previousSessionId = previousSessionIdRef.current;
     previousSessionIdRef.current = currentSessionId;
+    // A re-read answers the address it was started for; once the address has moved on, the
+    // next unknown one (or the same one, visited again) deserves its own.
+    if (refreshedForRef.current !== null && refreshedForRef.current !== urlSessionId) {
+      refreshedForRef.current = null;
+    }
+
+    const addressScreen = () => {
+      const onScreen = latestSessionIdRef.current;
+      void navigate(onScreen ? `/buddy/${onScreen}` : "/buddy", { replace: true });
+    };
 
     if (urlSessionId && urlSessionId !== previousSessionId && urlSessionId !== currentSessionId) {
-      if (sessions.length === 0) return;
+      if (sessions.length === 0 || isSettling) return;
 
       if (!sessions.some((session) => session.id === urlSessionId)) {
-        void navigate("/buddy", { replace: true });
+        // The list is this app session's read, and a conversation started in another tab (or
+        // listed by the dashboard's fresher read) is newer than it — so one re-read before the
+        // address counts as stale. Its arrival re-runs this effect, which opens a conversation
+        // it found; the continuation handles the one it did not.
+        if (refreshedForRef.current === urlSessionId) return;
+        const target = urlSessionId;
+        refreshedForRef.current = target;
+        void refreshSessions().then((list) => {
+          if (latestUrlSessionIdRef.current !== target) return;
+          if (list?.some((session) => session.id === target)) return;
+          void navigate("/buddy", { replace: true });
+        });
         return;
       }
 
-      void selectSession(urlSessionId);
+      if (cannotSwitch) {
+        addressScreen();
+        return;
+      }
+
+      // The session's own guards are read synchronously and can still refuse in the same frame
+      // a turn starts — the answer says so, and the address goes back the same way.
+      const target = urlSessionId;
+      void selectSession(target).then((switched) => {
+        if (!switched && latestUrlSessionIdRef.current === target) addressScreen();
+      });
       return;
     }
 
@@ -307,7 +360,16 @@ function BuddyMentorHome() {
     if (urlSessionId !== undefined && urlSessionId !== previousSessionId) return;
 
     void navigate(`/buddy/${currentSessionId}`, { replace: true });
-  }, [urlSessionId, sessions, currentSessionId, selectSession, navigate]);
+  }, [
+    urlSessionId,
+    sessions,
+    currentSessionId,
+    isSettling,
+    cannotSwitch,
+    selectSession,
+    refreshSessions,
+    navigate,
+  ]);
 
   // Hire-only: the suggestions describe the *hire's* next useful question, and the backend has
   // no team-scoped list, so a team-mode conversation asks for none and shows no chips.
@@ -504,6 +566,13 @@ function BuddyMentorHome() {
   // one surface later, the page is only ever mounted at its own addresses.)
   useNewConversationShortcut(startConversation, canStartConversation);
 
+  // `/` puts the caret in the composer — the chord the shortcut help lists for this page. It
+  // lived on the chat page and was not carried over when that page went, so the help promised a
+  // key nothing answered. Text fields keep their own `/` (see `isShortcutPress`).
+  const [composerFocusToken, setComposerFocusToken] = useState(0);
+  const focusComposer = useCallback(() => setComposerFocusToken((token) => token + 1), []);
+  useShortcutListener(FOCUS_COMPOSER_SHORTCUT, focusComposer);
+
   // The floating controls withdraw mid-turn (the new-conversation button while a reply streams),
   // and the room they need must not go with them — so the mode row reserves it from the stable
   // facts rather than from the controls' own presence: the rail toggle's conditions, or simply
@@ -652,6 +721,7 @@ function BuddyMentorHome() {
               onFiltersChange={setFilters}
               capabilitiesEnabled={capabilitiesEnabled}
               onCapabilitiesChange={setCapabilitiesEnabled}
+              composerFocusToken={composerFocusToken}
               activeTool={activeTool}
               confirmAction={confirmAction}
               dismissAction={dismissAction}

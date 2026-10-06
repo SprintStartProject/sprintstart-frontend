@@ -127,7 +127,7 @@ type BuddyThreadRowProps = {
 /**
  * One turn: the bubble.
  *
- * Extracted from the thread's map and memoised for the same reason `MessageRow` in the chat is:
+ * Extracted from the thread's map and memoised (the retired chat's `MessageRow` did the same):
  * with the thread memoised, a keystroke never reaches it — and when a token arrives, only the row
  * it belongs to re-renders, while every other row's props stay referentially equal and it bails
  * out instead of re-running `ReactMarkdown` over its reply. In a fifty-message thread that is the
@@ -166,8 +166,12 @@ function BuddyThreadRowImpl({
   // otherwise an empty second bubble appears while the buddy is working. A turn that
   // failed before writing a word is the exception: its reason *is* the message, and
   // dropping it here is what made a failed reply look like no reply. Same for a turn whose
-  // only arrival so far is reasoning — its panel is worth showing on its own.
-  if (!isUser && !hasText && !hasActions && !message.error && !hasReasoning) return null;
+  // only arrival so far is reasoning — its panel is worth showing on its own — and for a turn
+  // the hire stopped: a Stop usually lands before the first word, and the line saying so is
+  // then the only answer the question gets.
+  if (!isUser && !hasText && !hasActions && !message.error && !hasReasoning && !message.stopped) {
+    return null;
+  }
 
   return (
     <BuddyMessage
@@ -179,6 +183,7 @@ function BuddyThreadRowImpl({
       // A cut-short reply is the backend's story (history read); the hire's own turns never
       // carry it, so it is gated the same way the rest of the buddy-only chrome is.
       incomplete={!isUser && message.isIncomplete === true}
+      stopped={!isUser && message.stopped === true}
       footer={
         <>
           {isUser && renderQuestionAction?.(message.content)}
@@ -271,8 +276,7 @@ function BuddyThreadImpl({
   // The send loop appends an empty assistant message up front and streams into it, so the last
   // one is the turn receiving tokens — while a turn is running at all. Being last is not on its
   // own "live": holding the newest row awake forever is a bot that never sleeps, so the row is
-  // only flagged while tokens are actually arriving. The chat draws the same line in its
-  // `MessageRow` (`streamingMessageId` is null when idle) — see `SleepyBot`'s `canSleep`.
+  // only flagged while tokens are actually arriving — see `SleepyBot`'s `canSleep`.
   const streamingId = messages[messages.length - 1]?.id;
 
   // Which turn the footer hangs under: the buddy's most recent reply. Not every reply — the same

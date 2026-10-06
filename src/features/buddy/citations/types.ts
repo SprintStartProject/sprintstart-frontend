@@ -2,9 +2,8 @@
  * The citation vocabulary, in one place both surfaces can reach.
  *
  * Lived in `features/chatbot/types` until Buddy grew citations of its own (fe#266 slice 2,
- * 2026-10). The chat is being retired and Buddy renders the sources from now on, so the types
- * cannot stay inside the folder that is about to be deleted — `features/chatbot` re-points here
- * until #206 removes it, and nothing in `features/buddy` imports from the chat again.
+ * 2026-10). The chat has been retired since (#206) and Buddy renders the sources, so the types
+ * live with the one surface that uses them.
  */
 
 /**

@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { BuddyConversationList } from "../../../../src/features/buddy/components/BuddyConversationList";
 import type { BuddySessionSummary } from "../../../../src/services/buddyService";
 import { BuddyTestProviders, recordingToast } from "./buddyTestHarness";
@@ -102,5 +102,88 @@ describe("binning a conversation from the rail", () => {
         /"New conversation" leaves your conversation list and is deleted for good after 7 days\./,
       ),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * A list that only grows is a wall by the tenth conversation, so the rail groups rows by when
+ * they started and filters them by title — client-side, over the hire's own list.
+ */
+describe("finding a conversation in the rail", () => {
+  const NOW = new Date("2026-10-06T12:00:00");
+  const daysAgo = (days: number) =>
+    new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() - days, 9).toISOString();
+
+  const HISTORY: BuddySessionSummary[] = [
+    { id: "t", title: "Deploy checklist", projectId: null, createdAt: daysAgo(0) },
+    { id: "y", title: "Staging access", projectId: null, createdAt: daysAgo(1) },
+    { id: "w", title: "Deploy rollback", projectId: null, createdAt: daysAgo(3) },
+    { id: "o", title: "First week", projectId: null, createdAt: daysAgo(30) },
+  ];
+
+  function renderHistory() {
+    render(
+      <BuddyTestProviders>
+        <BuddyConversationList
+          sessions={HISTORY}
+          currentSessionId="t"
+          onSelect={vi.fn()}
+          onBin={vi.fn().mockResolvedValue(undefined)}
+        />
+      </BuddyTestProviders>,
+    );
+  }
+
+  /** The bucket label sitting right above a conversation's row. */
+  function bucketOf(title: string): string | null {
+    const group = screen.getByRole("button", { name: title }).closest("ul")?.parentElement;
+    return group?.querySelector("p")?.textContent ?? null;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("groups the rows by when they started, newest bucket first", () => {
+    renderHistory();
+
+    expect(bucketOf("Deploy checklist")).toBe("Today");
+    expect(bucketOf("Staging access")).toBe("Yesterday");
+    expect(bucketOf("Deploy rollback")).toBe("This week");
+    expect(bucketOf("First week")).toBe("Older");
+
+    const labels = screen
+      .getAllByText(/^(Today|Yesterday|This week|Older)$/)
+      .map((node) => node.textContent);
+    expect(labels).toEqual(["Today", "Yesterday", "This week", "Older"]);
+  });
+
+  it("filters by title, case-insensitively, and drops the buckets left empty", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderHistory();
+
+    await user.type(screen.getByRole("textbox", { name: "Search conversations" }), "DEPLOY");
+
+    expect(screen.getByRole("button", { name: "Deploy checklist" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Deploy rollback" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Staging access" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Yesterday")).not.toBeInTheDocument();
+    expect(screen.queryByText("Older")).not.toBeInTheDocument();
+  });
+
+  it("says so when nothing matches", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderHistory();
+
+    await user.type(screen.getByRole("textbox", { name: "Search conversations" }), "payroll");
+
+    expect(screen.getByText(/No conversations match/)).toHaveTextContent(
+      "No conversations match “payroll”.",
+    );
   });
 });

@@ -33,6 +33,7 @@ function openStream() {
   return {
     stream,
     token: (content: string) => send({ type: "token", content }),
+    reasoning: (reasoning: string) => send({ type: "reasoning", reasoning }),
     fail: (message: string) => {
       send({ type: "error", message });
       controller.close();
@@ -211,7 +212,7 @@ describe("buddy message queue", () => {
   });
 
   describe("Stop", () => {
-    it("aborts the request and closes the turn as cut short, not as failed", async () => {
+    it("aborts the request and closes the turn as stopped, not as failed", async () => {
       const first = openStream();
       pending.push(first);
       const { result } = await mount();
@@ -224,12 +225,71 @@ describe("buddy message queue", () => {
       await waitFor(() => expect(result.current.isStreaming).toBe(false));
       expect(signals[0].aborted).toBe(true);
       const reply = result.current.messages.at(-1);
-      // What arrived is kept and marked, the same state a reload would show...
+      // What arrived is kept and says the hire stopped it...
       expect(reply?.content).toBe("Partial answer");
-      expect(reply?.isIncomplete).toBe(true);
+      expect(reply?.stopped).toBe(true);
+      // ...`isIncomplete` stays the backend's own account of a reply it kept half of...
+      expect(reply?.isIncomplete).toBeUndefined();
       // ...and nothing failed, so there is no error line.
       expect(reply?.error).toBeUndefined();
       expect(result.current.isThinking).toBe(false);
+    });
+
+    it("keeps a turn stopped before its first word as a stopped turn", async () => {
+      // The usual case, not an edge: the backend runs the whole agent loop before it emits a
+      // word, so a Stop almost always lands in the thinking window.
+      const first = openStream();
+      pending.push(first);
+      const { result } = await mount();
+
+      act(() => {
+        result.current.submitMessage("Q1");
+      });
+      await waitFor(() => expect(sent).toEqual(["Q1"]));
+      await waitFor(() => expect(result.current.isThinking).toBe(true));
+
+      act(() => {
+        result.current.stopStreaming();
+      });
+
+      await waitFor(() => expect(result.current.isThinking).toBe(false));
+      const reply = result.current.messages.at(-1);
+      expect(reply?.role).toBe("ASSISTANT");
+      expect(reply?.content).toBe("");
+      expect(reply?.stopped).toBe(true);
+      expect(reply?.error).toBeUndefined();
+    });
+
+    it("re-reads the list after a stopped first turn, so the rail picks up its title", async () => {
+      let reads = 0;
+      server.use(
+        http.get(SESSIONS, () => {
+          reads += 1;
+          return HttpResponse.json({
+            sessions: [
+              {
+                id: "session-1",
+                title: reads === 1 ? "" : "Named after Q1",
+                userId: "1",
+                projectId: null,
+                createdAt: "2026-09-30T09:00:00.000Z",
+              },
+            ],
+          });
+        }),
+      );
+      const first = openStream();
+      pending.push(first);
+      const { result } = await mount();
+      await startTurn(result, first, "Q1");
+
+      act(() => {
+        result.current.stopStreaming();
+      });
+
+      // The title is written from the hire's message, which the backend kept — a Stop must not
+      // leave the row reading "New conversation" until the next turn completes.
+      await waitFor(() => expect(result.current.sessions[0]?.title).toBe("Named after Q1"));
     });
 
     it("holds the queue, keeping the messages visible", async () => {
@@ -340,18 +400,27 @@ describe("buddy message queue", () => {
       expect(result.current.queued).toHaveLength(2);
     });
 
-    it("a new message goes straight out while the old queue stays held", async () => {
+    it("a new message goes straight out and releases the held queue behind it", async () => {
       const { result } = await stoppedWithQueue();
+      const fourth = openStream();
       const second = openStream();
-      pending.push(second);
+      pending.push(fourth, second);
 
       act(() => {
         result.current.submitMessage("Q4");
       });
 
-      // Nothing is streaming any more, so Q4 goes straight out rather than behind the queue.
+      // Nothing is streaming any more, so Q4 goes straight out rather than behind the queue —
+      // and sending is the hire taking over again, the same as sending mid-answer would be.
       await waitFor(() => expect(sent).toEqual(["Q1", "Q4"]));
+      expect(result.current.queuePaused).toBe(false);
       expect(result.current.queued.map((item) => item.text)).toEqual(["Q2", "Q3"]);
+
+      // The held messages follow Q4, in order, instead of staying parked behind it.
+      act(() => {
+        fourth.finish();
+      });
+      await waitFor(() => expect(sent).toEqual(["Q1", "Q4", "Q2"]));
     });
 
     it("starting a new conversation empties the queue and the hold", async () => {
@@ -378,13 +447,13 @@ describe("buddy message queue", () => {
       expect(sent).toEqual(["Q1"]);
     });
 
-    it("waits out a running turn when released mid-answer instead of starting a second", async () => {
+    it("never starts a second stream when the queue is released mid-answer", async () => {
       const { result } = await stoppedWithQueue();
       const fourth = openStream();
       pending.push(fourth);
 
-      // A message sent after Stop goes straight out while the hold stays — the state this
-      // release has to survive: the hire asks for the queue while that turn is still running.
+      // A message sent after Stop goes straight out, so a turn is running again when the
+      // release arrives — the strip no longer offers it then, but the guard must hold anyway.
       act(() => {
         result.current.submitMessage("Q4");
       });
@@ -412,6 +481,32 @@ describe("buddy message queue", () => {
         second.finish();
       });
       await waitFor(() => expect(sent).toEqual(["Q1", "Q4", "Q2", "Q3"]));
+    });
+  });
+
+  describe("reasoning", () => {
+    it("keeps each reported thought as its own paragraph", async () => {
+      // The backend emits one `reasoning` event per whole thought, not token deltas — glued
+      // together, the end of one sentence ran into the start of the next.
+      const first = openStream();
+      pending.push(first);
+      const { result } = await mount();
+
+      act(() => {
+        result.current.submitMessage("Q1");
+      });
+      await waitFor(() => expect(sent).toEqual(["Q1"]));
+
+      act(() => {
+        first.reasoning("I should check the board.");
+        first.reasoning("Then look at the docs.");
+      });
+
+      await waitFor(() =>
+        expect(result.current.messages.at(-1)?.reasoning).toBe(
+          "I should check the board.\n\nThen look at the docs.",
+        ),
+      );
     });
   });
 

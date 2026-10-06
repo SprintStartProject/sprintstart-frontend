@@ -1,5 +1,5 @@
 // Shared display formatters for the FAQ feature.
-// Per-feature, matching the knowledge-gaps and chatbot features, rather than a
+// Per-feature, matching the knowledge-gaps and buddy features, rather than a
 // shared date module the app doesn't have.
 
 /**
