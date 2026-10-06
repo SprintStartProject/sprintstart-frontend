@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { MessagesSquare, Sparkles } from "lucide-react";
+import { MessagesSquare, Send, Sparkles } from "lucide-react";
+import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import {
   ConversationRail,
@@ -10,6 +11,7 @@ import {
 } from "../components/layout/ConversationRail";
 import { PageHeader } from "../components/layout/PageHeader";
 import { MainContent } from "../components/layout/MainContent";
+import { SidePanel } from "../components/ui/SidePanel";
 import { useIsSmUp } from "../hooks/useIsSmUp";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useRailOverlayGuard } from "../hooks/useRailOverlayGuard";
@@ -33,6 +35,7 @@ import { BuddyNewConversationButton } from "../features/buddy/components/BuddyNe
 import { BuddyConversationList } from "../features/buddy/components/BuddyConversationList";
 import { BuddyPmReplies } from "../features/buddy/components/BuddyPmReplies";
 import { usePmReplies } from "../features/buddy/hooks/usePmReplies";
+import { useAuth } from "../context/useAuth";
 import { BuddySuggestionChips } from "../features/buddy/components/BuddySuggestionChips";
 import { BuddyQuestionActions } from "../features/buddy/components/BuddyQuestionActions";
 
@@ -76,6 +79,38 @@ function writeRailOpen(open: boolean): void {
     localStorage.setItem(RAIL_OPEN_KEY, String(open));
   } catch {
     // Nothing to do: the rail still opens and closes, it just will not be remembered.
+  }
+}
+
+/**
+ * The answered replies the hire has already looked at, so the header's badge can say "new"
+ * rather than "ever".
+ *
+ * `usePmReplies` has no read state of its own and the backend has none to give: an answer is
+ * ANSWERED, and whether it has been seen is a fact about this browser. Ids, not a count — an
+ * answer read yesterday must not make today's answer look seen.
+ */
+function seenRepliesKey(userId: string): string {
+  return `buddyPmRepliesSeen:${userId}`;
+}
+
+function readSeenReplyIds(userId: string): string[] {
+  try {
+    const raw = localStorage.getItem(seenRepliesKey(userId));
+
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    // Private modes can refuse storage outright. Erring towards showing the badge says
+    // something rather than staying silent about an answer.
+    return [];
+  }
+}
+
+function writeSeenReplyIds(userId: string, ids: string[]): void {
+  try {
+    localStorage.setItem(seenRepliesKey(userId), JSON.stringify(ids));
+  } catch {
+    // Same as above: the badge stays up, nothing breaks.
   }
 }
 
@@ -270,32 +305,46 @@ function BuddyMentorHome() {
   const suggestions = useBuddySuggestions(isHireMode);
   const replies = usePmReplies(isHireMode);
 
+  // The PM drawer's own state, and the ids the badge has already been told about. Per user,
+  // because whether an answer has been seen is per person — a shared browser must not let one
+  // hire's read mark another's answer as seen.
+  const { profile } = useAuth();
+  const [repliesOpen, setRepliesOpen] = useState(false);
+  const [seenReplyIds, setSeenReplyIds] = useState<string[]>(() =>
+    readSeenReplyIds(profile?.id ?? "anonymous"),
+  );
+  const unseenReplyCount = replies.answered.filter(
+    (request) => !seenReplyIds.includes(request.id),
+  ).length;
+
+  const openReplies = () => {
+    setRepliesOpen(true);
+
+    // Opening is reading: everything answered so far is marked seen, so the badge answers "is
+    // there something I have not looked at?" rather than "has a PM ever answered me?".
+    const answeredIds = replies.answered.map((request) => request.id);
+    setSeenReplyIds(answeredIds);
+    writeSeenReplyIds(profile?.id ?? "anonymous", answeredIds);
+  };
+
   // Below `md` the rail is a drawer over the conversation, so it must never open by itself
-  // there — the auto-open below is a desktop courtesy, not a takeover.
+  // there: the stored preference does not reopen an overlay, and nothing else opens the rail
+  // on the hire's behalf.
   const isDesktop = useMediaQuery(RAIL_DESKTOP_QUERY);
 
   // The stored preference is only honoured where the rail is a column beside the conversation.
-  // Restoring it below `md` would put the hire behind their own PM replies on every visit from
-  // a phone — the rail is a drawer over the page there, with a backdrop, and nobody asked for
-  // it. Their choice is still remembered; it just does not reopen an overlay. Same rule, and
-  // the same reason, as `chatSidebarOpen` in `useChat`.
+  // Restoring it below `md` would put the hire behind their own conversation list on every
+  // visit from a phone — the rail is a drawer over the page there, with a backdrop, and nobody
+  // asked for it. Their choice is still remembered; it just does not reopen an overlay.
+  //
+  // The rail is the hire's conversations now, so nothing opens it on their behalf — what came
+  // back from the PM announces itself with the header button's badge, and a drawer nobody
+  // asked for would be an overlay on a page they may be reading.
   const [rail, setRail] = useState(() => {
     const stored = readRailOpen();
 
-    return { open: (stored ?? false) && isDesktop, decided: stored !== null };
+    return { open: (stored ?? false) && isDesktop };
   });
-
-  // Open when there is an answer waiting, closed otherwise — but only until the hire says
-  // otherwise, and never again after that. `FlagToPmButton` promises them the answer "will show
-  // up here", and a reply sitting behind a control they have to find does not keep that
-  // promise; a rail holding nothing but "still waiting" has nothing to say that the toggle's
-  // own count does not.
-  if (!rail.decided && replies.hasAny) {
-    // React's documented "adjust state when a prop changes" pattern — a guarded setState during
-    // render rather than an effect, so the first paint already has the right layout instead of
-    // showing the closed one and shifting.
-    setRail({ open: isDesktop && replies.answered.length > 0, decided: true });
-  }
 
   // The same rule the initial state applies, for the window narrowing after load. Not through
   // `setRailOpen` below: this is the column no longer fitting, not the hire choosing, so it
@@ -314,7 +363,7 @@ function BuddyMentorHome() {
   const setRailOpen = useCallback(
     (open: boolean) => {
       if (isDesktop) writeRailOpen(open);
-      setRail({ open, decided: true });
+      setRail({ open });
     },
     [isDesktop],
   );
@@ -454,8 +503,9 @@ function BuddyMentorHome() {
   // ~79px, and the gutter only passes that with ~6px to spare at 1660px. Below it a select
   // sitting at the column edge would tuck its top-left corner under the toggle. Hire-flow only;
   // a team conversation has no floating controls to clear.
-  const needsFloatingRoom =
-    isHireMode && (((sessions.length > 1 || replies.hasAny) && !rail.open) || hasUserMessage);
+  // The PM button lives in the page header, so only the rail toggle and the new-conversation
+  // button still float over the conversation and need their room reserved.
+  const needsFloatingRoom = isHireMode && ((sessions.length > 1 && !rail.open) || hasUserMessage);
 
   // Opening does not gate the page. The greeting costs a model call, and blanking everything
   // behind a spinner until it lands made the hire's landing page unusable for ~20 seconds.
@@ -464,135 +514,163 @@ function BuddyMentorHome() {
   // of what is happening and reads as somebody writing to you rather than as a page loading.
   return (
     <>
-      <BuddyPageShell
-        reserveFloatingClearance={needsFloatingRoom}
-        isRailOpen={rail.open}
-        rail={
-          // Mounted whenever it holds something, open or not: the count on the control that
-          // reopens it is read from the same list the rail is showing, and a rail that unmounted
-          // would lose its scroll position every time it was put away. The hire's conversations
-          // are always one of the things it holds — a hire with two of them has something to
-          // switch between — plus, once there is one, whatever came back from their PM.
-          // Hire-flow only: a team-mode conversation is not one of the hire's own, and what came
-          // back from the PM is an answer to the hire's own questions.
-          isHireMode && (sessions.length > 1 || replies.hasAny) ? (
-            <ConversationRail
-              id={RAIL_ID}
-              isOpen={rail.open}
-              label={RAIL_LABEL}
-              onDismiss={() => setRailOpen(false)}
-              dismissLabel="Close your conversations"
-            >
-              <div className="flex h-full min-h-0 flex-col">
-                <BuddyConversationList
-                  sessions={sessions}
-                  currentSessionId={currentSessionId}
-                  disabled={isBusy || isOpening || isGreeting || isDeciding}
-                  onSelect={selectConversation}
-                  // Binning needs the awaited promise (the dialog shows its spinner on it), so
-                  // this one is not wrapped in `void` like the selection above.
-                  onBin={binSession}
-                  // The rail's one cross, at its top: the replies panel used to carry one
-                  // mid-rail, which read as closing that section alone — and a conversations-only
-                  // rail had no way out at all. See the list's own `onClose`.
-                  onClose={() => setRailOpen(false)}
-                  // The cap only exists to leave the PM replies their share of the rail; with
-                  // none to show, the conversations are the whole rail.
-                  className={replies.hasAny ? "max-h-[45%] shrink-0" : "min-h-0 flex-1"}
-                />
-
-                {replies.hasAny && (
-                  <div className="min-h-0 flex-1">
-                    <BuddyPmReplies {...replies} />
-                  </div>
-                )}
-              </div>
-            </ConversationRail>
-          ) : undefined
-        }
-        newConversationControl={
-          canStartConversation ? (
-            <BuddyNewConversationButton
-              onClick={startConversation}
-              shortcut={NEW_CONVERSATION_CHORD}
-            />
-          ) : undefined
-        }
-        modeControl={
-          canSwitchModes ? (
-            <BuddyModeSwitcher
-              teamProjectId={teamProjectId}
-              onSwitch={(projectId) => void switchTeamProject(projectId)}
-              disabled={isBusy || isOpening || isGreeting || isDeciding}
-              className="max-w-xs"
-            />
-          ) : undefined
-        }
-        railToggle={
-          // Only offered when there is something behind it: a control that opens an empty panel
-          // is worse than no control. Hire-flow only, for the same reason the rail itself is.
-          // The badge counts PM replies — an answer from a person is why a hire presses this; a
-          // second conversation with nothing in it is not news.
-          isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open ? (
-            <RailToggle
-              label={RAIL_LABEL}
-              controls={RAIL_ID}
-              icon={<MessagesSquare className="h-4 w-4" aria-hidden="true" />}
-              count={
-                replies.hasAny
-                  ? replies.answered.length + replies.waiting.length + replies.dismissed.length
-                  : undefined
+      {/* The frame used to belong to `AssistantShell`, shared with the chat; one surface later
+          it belongs to this page, and the PM drawer's button joins the header it owns. */}
+      <div className="flex h-[calc(100dvh-64px)] flex-col overflow-hidden bg-app-bg lg:h-dvh">
+        <header className="shrink-0 border-b border-app-border bg-app-bg">
+          <div className="app-page-frame py-6">
+            <PageHeader
+              icon={Sparkles}
+              title="Buddy"
+              subtitle="Your onboarding mentor — here whenever you're stuck."
+              // The subtitle is the line with the least to say on a phone, so it is the one
+              // that makes room rather than pushing the conversation further down.
+              hideSubtitleBelow="md"
+              actions={
+                // Hire-flow only, like the replies themselves: what came back from the PM is
+                // an answer to the hire's own questions, and a team thread has none.
+                isHireMode && replies.hasAny ? (
+                  <Button
+                    variant="secondary"
+                    onClick={openReplies}
+                    icon={<Send className="h-4 w-4" aria-hidden="true" />}
+                    aria-label={
+                      unseenReplyCount > 0
+                        ? `Sent to your PM — ${unseenReplyCount} not looked at yet`
+                        : undefined
+                    }
+                  >
+                    Sent to your PM
+                    {unseenReplyCount > 0 && (
+                      <Badge variant="brand" size="sm" className="ml-1.5" aria-hidden="true">
+                        {unseenReplyCount}
+                      </Badge>
+                    )}
+                  </Button>
+                ) : undefined
               }
-              onClick={() => setRailOpen(true)}
             />
-          ) : undefined
-        }
-      >
-        <BuddyConversation
-          messages={greeting.messages}
-          isThinking={isThinking || isOpening || greeting.isThinking}
-          isStreaming={isStreaming}
-          activeTool={activeTool}
-          confirmAction={confirmAction}
-          dismissAction={dismissAction}
-          actionDrafts={actionDrafts}
-          setActionDraft={setActionDraft}
-          dinoGameActive={dinoGameActive}
-          onDinoGameExit={closeDinoGame}
-          // Both held in one identity above, with the reasons written there — the thread's memo
-          // compares them.
-          lastMessageFooter={lastMessageFooter}
-          // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
-          // team-mode conversation is not one — the offer must not even render there.
-          renderQuestionAction={renderQuestionAction}
-          openError={openError}
-          onRetryOpen={retryOpenAction}
-          // Citation interaction for this surface: a `[N]` click opens the popover, and the
-          // footer's "Open source" hands the artifact to the drawer — both mounted below.
-          // No project to open a drawer in: pass no artifact opener, so the popover (and the
-          // footer's chips) fall back to the external source link instead of dead-ending.
-          onCitationClick={citationViewer.handleCitationClick}
-          onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
-          // `hasUserMessage`, not `canStartConversation`: the button withdraws mid-turn, the room
-          // it withdraws from must not. Below `md` the two clearances differ by 24px, and for a
-          // hire with no PM replies this is the only term that is ever true — so tying the space
-          // to the button shunted the whole transcript down and back on every single turn.
-          // Visible while the transcript is shorter than the viewport, which is exactly the
-          // first few turns this control exists for.
-          // When the mode row renders it is the element the floating controls overlap, and it
-          // already carries their clearance (see the shell above) — the transcript below must
-          // not reserve a second gap for the same controls.
-          hasFloatingControl={
-            !canSwitchModes &&
-            ((isHireMode && (sessions.length > 1 || replies.hasAny) && !rail.open) ||
-              hasUserMessage)
-          }
-          // Built above, in one identity — the conversation is memoised, and the chips' own reasons
-          // are written where they are built.
-          aboveComposer={aboveComposer}
-          focusComposerOnMount
-        />
-      </BuddyPageShell>
+          </div>
+        </header>
+
+        <MainContent className="flex min-h-0 flex-1 flex-col">
+          <BuddyPageShell
+            reserveFloatingClearance={needsFloatingRoom}
+            isRailOpen={rail.open}
+            rail={
+              // Mounted whenever it holds something, open or not: a rail that unmounted would lose
+              // its scroll position every time it was put away. The hire's conversations are all it
+              // holds now — what came back from the PM moved to the drawer the header button opens —
+              // and two of them are the point: with one, there is nothing to switch between.
+              // Hire-flow only: a team-mode conversation is not one of the hire's own.
+              isHireMode && sessions.length > 1 ? (
+                <ConversationRail
+                  id={RAIL_ID}
+                  isOpen={rail.open}
+                  label={RAIL_LABEL}
+                  onDismiss={() => setRailOpen(false)}
+                  dismissLabel="Close your conversations"
+                >
+                  <div className="flex h-full min-h-0 flex-col">
+                    <BuddyConversationList
+                      sessions={sessions}
+                      currentSessionId={currentSessionId}
+                      disabled={isBusy || isOpening || isGreeting || isDeciding}
+                      onSelect={selectConversation}
+                      // Binning needs the awaited promise (the dialog shows its spinner on it), so
+                      // this one is not wrapped in `void` like the selection above.
+                      onBin={binSession}
+                      // The rail's one cross, at its top: the replies panel used to carry one
+                      // mid-rail, which read as closing that section alone — and a conversations-only
+                      // rail had no way out at all. See the list's own `onClose`.
+                      onClose={() => setRailOpen(false)}
+                      // The cap only ever existed to leave the PM replies their share of the rail;
+                      // they have their own drawer now, so the conversations are the whole rail.
+                      className="min-h-0 flex-1"
+                    />
+                  </div>
+                </ConversationRail>
+              ) : undefined
+            }
+            newConversationControl={
+              canStartConversation ? (
+                <BuddyNewConversationButton
+                  onClick={startConversation}
+                  shortcut={NEW_CONVERSATION_CHORD}
+                />
+              ) : undefined
+            }
+            modeControl={
+              canSwitchModes ? (
+                <BuddyModeSwitcher
+                  teamProjectId={teamProjectId}
+                  onSwitch={(projectId) => void switchTeamProject(projectId)}
+                  disabled={isBusy || isOpening || isGreeting || isDeciding}
+                  className="max-w-xs"
+                />
+              ) : undefined
+            }
+            railToggle={
+              // Only offered when there is something behind it: a control that opens an empty panel
+              // is worse than no control. Hire-flow only, for the same reason the rail itself is.
+              // No count: what a count on this toggle used to say was "your PM answered", and that
+              // signal lives on the header button now.
+              isHireMode && sessions.length > 1 && !rail.open ? (
+                <RailToggle
+                  label={RAIL_LABEL}
+                  controls={RAIL_ID}
+                  icon={<MessagesSquare className="h-4 w-4" aria-hidden="true" />}
+                  onClick={() => setRailOpen(true)}
+                />
+              ) : undefined
+            }
+          >
+            <BuddyConversation
+              messages={greeting.messages}
+              isThinking={isThinking || isOpening || greeting.isThinking}
+              isStreaming={isStreaming}
+              activeTool={activeTool}
+              confirmAction={confirmAction}
+              dismissAction={dismissAction}
+              actionDrafts={actionDrafts}
+              setActionDraft={setActionDraft}
+              dinoGameActive={dinoGameActive}
+              onDinoGameExit={closeDinoGame}
+              // Both held in one identity above, with the reasons written there — the thread's memo
+              // compares them.
+              lastMessageFooter={lastMessageFooter}
+              // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+              // team-mode conversation is not one — the offer must not even render there.
+              renderQuestionAction={renderQuestionAction}
+              openError={openError}
+              onRetryOpen={retryOpenAction}
+              // Citation interaction for this surface: a `[N]` click opens the popover, and the
+              // footer's "Open source" hands the artifact to the drawer — both mounted below.
+              // No project to open a drawer in: pass no artifact opener, so the popover (and the
+              // footer's chips) fall back to the external source link instead of dead-ending.
+              onCitationClick={citationViewer.handleCitationClick}
+              onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
+              // `hasUserMessage`, not `canStartConversation`: the button withdraws mid-turn, the room
+              // it withdraws from must not. Below `md` the two clearances differ by 24px, and for a
+              // hire with one conversation this is the only term that is ever true — so tying the
+              // space to the button shunted the whole transcript down and back on every single turn.
+              // Visible while the transcript is shorter than the viewport, which is exactly the
+              // first few turns this control exists for.
+              // When the mode row renders it is the element the floating controls overlap, and it
+              // already carries their clearance (see the shell above) — the transcript below must
+              // not reserve a second gap for the same controls.
+              hasFloatingControl={
+                !canSwitchModes &&
+                ((isHireMode && sessions.length > 1 && !rail.open) || hasUserMessage)
+              }
+              // Built above, in one identity — the conversation is memoised, and the chips' own reasons
+              // are written where they are built.
+              aboveComposer={aboveComposer}
+              focusComposerOnMount
+            />
+          </BuddyPageShell>
+        </MainContent>
+      </div>
 
       {/* The citation popover and the artifact drawer, once a reply's sources are clicked:
           the popover near the `[N]`, the drawer for the source itself. Rendered by the surface
@@ -617,6 +695,19 @@ function BuddyMentorHome() {
           onDelete={() => {}}
         />
       )}
+
+      {/* What the hire sent to a person, in the drawer the header button opens — out of the
+          rail, where it used to push the conversations down and hide behind the same toggle. */}
+      <SidePanel
+        isOpen={repliesOpen}
+        onClose={() => setRepliesOpen(false)}
+        title="Sent to your PM"
+        widthClassName="w-full sm:w-[26rem]"
+        contentClassName="py-4"
+        closeAriaLabel="Close what you sent to your PM"
+      >
+        <BuddyPmReplies {...replies} />
+      </SidePanel>
     </>
   );
 }
@@ -640,31 +731,12 @@ function BuddyMentorHome() {
  * pick the conversation up from anywhere and grow it into this page when it needs room.
  *
  * Bound to `/buddy` — and `/buddy/:id` for one named conversation — open to every permission
- * group, and drawn as its own page now that the two-surface shell is gone: this header and
- * frame used to belong to the chat-and-buddy pair. A user without a selected project gets the
- * conversation anyway: the hire's buddy is not one project's, and a dead end for everyone
- * redirected here from `/chat` is exactly what the merge of the two surfaces is not allowed to
- * leave behind.
+ * group, and drawn as its own page now that the two-surface shell is gone. The header and frame
+ * that used to belong to the chat-and-buddy pair live in `BuddyMentorHome` with the rest of the
+ * page. A user without a selected project gets the conversation anyway: the hire's buddy is not
+ * one project's, and a dead end for everyone redirected here from `/chat` is exactly what the
+ * merge of the two surfaces is not allowed to leave behind.
  */
 export function BuddyPage() {
-  return (
-    <div className="flex h-[calc(100dvh-64px)] flex-col overflow-hidden bg-app-bg lg:h-dvh">
-      <header className="shrink-0 border-b border-app-border bg-app-bg">
-        <div className="app-page-frame py-6">
-          <PageHeader
-            icon={Sparkles}
-            title="Buddy"
-            subtitle="Your onboarding mentor — here whenever you're stuck."
-            // The subtitle is the line with the least to say on a phone, so it is the one that
-            // makes room rather than pushing the conversation further down.
-            hideSubtitleBelow="md"
-          />
-        </div>
-      </header>
-
-      <MainContent className="flex min-h-0 flex-1 flex-col">
-        <BuddyMentorHome />
-      </MainContent>
-    </div>
-  );
+  return <BuddyMentorHome />;
 }

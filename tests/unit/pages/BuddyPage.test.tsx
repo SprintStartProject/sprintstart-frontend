@@ -452,9 +452,16 @@ describe("BuddyPage", () => {
     const viewport = mockResizableViewport();
 
     try {
+      vi.mocked(getSessions).mockResolvedValue([
+        { ...defaultSession, title: "Getting started" },
+        { ...defaultSession, id: "s2" },
+      ]);
+
+      const user = userEvent.setup();
       renderPage();
 
-      // A column, and an answer is waiting, so it opens itself.
+      // A column, and two conversations are something to switch between — the hire opens it.
+      await user.click(await screen.findByTitle("Your conversations"));
       const rail = await screen.findByRole("complementary", {
         name: "Your conversations",
       });
@@ -464,8 +471,7 @@ describe("BuddyPage", () => {
 
       await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
 
-      // Put away, not taken away: the control that brings it back is on screen, with the count
-      // read from the same list the rail is holding.
+      // Put away, not taken away: the control that brings it back is on screen.
       expect(screen.getByTitle("Your conversations")).toBeInTheDocument();
     } finally {
       viewport.restore();
@@ -473,28 +479,28 @@ describe("BuddyPage", () => {
   });
 
   /**
-   * The rail and its toggle were both `hidden … xl:*` once, which put a hire on anything
-   * narrower than 1280px out of reach of their PM's answer entirely — the one thing
-   * `FlagToPmButton` promises will show up here. It works like the chat's history rail now: a
-   * column beside the conversation from `md` up, a drawer over it below that, one element
-   * either way. jsdom computes no layout, so this asserts the contract that carries it —
-   * neither piece is gated on a breakpoint.
+   * The PM's answer was once unreachable below 1280px — both the rail and its toggle were
+   * `hidden … xl:*`, which put a hire on anything narrower out of reach of the one thing
+   * `FlagToPmButton` promises will show up here. The reply lives behind the header's button
+   * now, and that button has no breakpoint gate; jsdom computes no layout, so this asserts the
+   * contract that carries it — the button is on screen at any width and opens the drawer.
    */
   it("keeps the PM's answer reachable on a narrow screen", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const toggle = await screen.findByTitle("Your conversations");
-    expect(toggle.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+    const button = await screen.findByRole("button", { name: /Sent to your PM/ });
+    expect(button.className).not.toMatch(/(^|\s)hidden(\s|$)/);
 
-    await user.click(toggle);
+    await user.click(button);
 
-    const rail = await screen.findByRole("complementary", { name: "Your conversations" });
-    expect(rail.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByText("How do I get staging credentials?")).toBeInTheDocument();
+    expect(within(drawer).getByText("Ask in #platform.")).toBeInTheDocument();
   });
 
   /**
-   * The same preference the chat's rail keeps, for the same reason: it says how much room this
+   * The same preference the chat's rail kept, for the same reason: it says how much room this
    * window has to spare. Which is why it is a *column* the page remembers — see the drawer's
    * own case below.
    */
@@ -502,16 +508,20 @@ describe("BuddyPage", () => {
     const restoreViewport = reportDesktopViewport();
 
     try {
+      vi.mocked(getSessions).mockResolvedValue([
+        { ...defaultSession, title: "Getting started" },
+        { ...defaultSession, id: "s2" },
+      ]);
+
       const user = userEvent.setup();
       const first = renderPage();
 
-      // A column, and there is an answer waiting: the rail opens itself, which is the promise
-      // `FlagToPmButton` makes. Closing it is therefore the choice worth remembering here.
+      // A column, and two conversations to switch between: the hire opens the rail, then
+      // closes it — closing is therefore the choice worth remembering here.
+      await user.click(await screen.findByTitle("Your conversations"));
       const rail = await screen.findByRole("complementary", {
         name: "Your conversations",
       });
-      // Scoped to the rail's own cross: the drawer backdrop says the same words, and below `md`
-      // it is the one you press. jsdom computes no layout, so both are in the document here.
       await user.click(within(rail).getByRole("button", { name: "Close your conversations" }));
 
       await waitFor(() => expect(rail).toHaveAttribute("aria-hidden", "true"));
@@ -519,8 +529,9 @@ describe("BuddyPage", () => {
       first.unmount();
       renderPage();
 
-      // Back to the control that reopens it, rather than to the rail deciding again. The rail
-      // itself stays mounted — that is what keeps its scroll — but out of the tree while shut.
+      // Back to the control that reopens it: the closed choice was remembered across the
+      // remount. The rail itself stays mounted — that is what keeps its scroll — but out of
+      // the tree while shut.
       expect(await screen.findByTitle("Your conversations")).toBeInTheDocument();
       expect(
         screen.queryByRole("complementary", { name: "Your conversations" }),
@@ -567,12 +578,17 @@ describe("BuddyPage", () => {
 
   /**
    * Below `md` the rail is a drawer over the conversation, with a backdrop. Somebody opens one
-   * to read an answer and dismisses it again — that is not a hire saying how they want the page
-   * laid out, and restoring it would land them behind their own PM replies on every visit. So
-   * the preference is neither written nor honoured at this width; jsdom's default viewport is
-   * already below it, which is what makes this the plain case.
+   * to switch conversations and dismisses it again — that is not a hire saying how they want
+   * the page laid out, and restoring it would land them behind their own conversation list on
+   * every visit. So the preference is neither written nor honoured at this width; jsdom's
+   * default viewport is already below it, which is what makes this the plain case.
    */
   it("does not reopen the drawer by itself on a phone", async () => {
+    vi.mocked(getSessions).mockResolvedValue([
+      { ...defaultSession, title: "Getting started" },
+      { ...defaultSession, id: "s2" },
+    ]);
+
     const user = userEvent.setup();
     const first = renderPage();
 
