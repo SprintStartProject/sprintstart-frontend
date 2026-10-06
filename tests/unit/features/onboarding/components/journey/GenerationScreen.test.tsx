@@ -36,7 +36,7 @@ describe("GenerationScreen", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByText(/to pass the time/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pass the time/i)).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { code: "Space" });
     expect(screen.queryByRole("application", { name: /mini dino game/i })).not.toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("GenerationScreen", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/to pass the time/i)).toBeInTheDocument();
+    expect(screen.getByText(/pass the time/i)).toBeInTheDocument();
 
     fireEvent.keyDown(window, { code: "Space" });
 
@@ -106,7 +106,7 @@ describe("GenerationScreen", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(/to pass the time/i)).toBeInTheDocument();
+    expect(screen.getByText(/pass the time/i)).toBeInTheDocument();
     fireEvent.keyDown(window, { code: "Space" });
     expect(await screen.findByRole("application", { name: /mini dino game/i })).toBeInTheDocument();
     expect(screen.queryByTestId("dino-game-reply-ready")).not.toBeInTheDocument();

@@ -945,7 +945,7 @@ describe("SourceDetailsPanel", () => {
     it("does not show space hint or open DinoGame when dino is locked", () => {
       render(panel(syncing(mockSource)));
 
-      expect(screen.queryByText(/to pass the time/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/pass the time/i)).not.toBeInTheDocument();
       fireEvent.keyDown(window, { code: "Space" });
       expect(
         screen.queryByRole("application", { name: /mini dino game/i }),
@@ -957,7 +957,7 @@ describe("SourceDetailsPanel", () => {
 
       render(panel(syncing(mockSource)));
 
-      expect(screen.getByText(/to pass the time/i)).toBeInTheDocument();
+      expect(screen.getByText(/pass the time/i)).toBeInTheDocument();
       fireEvent.keyDown(window, { code: "Space" });
 
       expect(
