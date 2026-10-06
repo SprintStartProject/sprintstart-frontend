@@ -179,6 +179,7 @@ describe("the dock’s hand-off control", () => {
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}
+          retryReply={vi.fn()}
           onClose={vi.fn()}
         />,
       ),
@@ -219,6 +220,7 @@ describe("the dock’s hand-off control", () => {
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}
+          retryReply={vi.fn()}
           onClose={vi.fn()}
           onOpenFull={onOpenFull}
         />,

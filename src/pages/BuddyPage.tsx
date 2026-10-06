@@ -234,6 +234,7 @@ function BuddyMentorHome() {
     isGreeting,
     isDeciding,
     stopStreaming,
+    retryReply,
     queued,
     queuePaused,
     removeQueued,
@@ -737,6 +738,7 @@ function BuddyMentorHome() {
               renderQuestionAction={renderQuestionAction}
               openError={openError}
               onRetryOpen={retryOpenAction}
+              onRetryReply={retryReply}
               // Citation interaction for this surface: a `[N]` click opens the popover, and the
               // footer's "Open source" hands the artifact to the drawer — both mounted below.
               // No project to open a drawer in: pass no artifact opener, so the popover (and the

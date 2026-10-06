@@ -78,6 +78,7 @@ function renderDock(
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}
+          retryReply={vi.fn()}
           onClose={vi.fn()}
         />
       </BuddyDraftContext.Provider>
