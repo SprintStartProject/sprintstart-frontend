@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { ListPlus, Send, Square, Wand2 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
@@ -8,6 +8,9 @@ import type { BuddySessionFilters, QueuedBuddyMessage } from "../types";
 import { isFilterRangeInvalid } from "../utils/filterRange";
 import { BuddyFilterChips, BuddyFiltersButton } from "./BuddyComposerFilters";
 import { BuddyQueuedMessages } from "./BuddyQueuedMessages";
+
+/** The history a composer without one walks: nothing — see `promptHistory`. */
+const EMPTY_PROMPT_HISTORY: string[] = [];
 
 type BuddyComposerProps = {
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
@@ -70,6 +73,12 @@ type BuddyComposerProps = {
    * the dino, deaden Escape and type Spaces in here. Closing the game hands the caret back.
    */
   gameActive?: boolean;
+  /**
+   * Every question the hire has asked in this conversation, oldest first — the words the
+   * arrow keys walk. Read from the rendered thread rather than a store of its own, so it
+   * survives a reload and always matches what is on screen.
+   */
+  promptHistory?: string[];
 };
 
 /**
@@ -119,6 +128,7 @@ export function BuddyComposer({
   onCapabilitiesChange,
   focusToken = 0,
   gameActive = false,
+  promptHistory = EMPTY_PROMPT_HISTORY,
 }: BuddyComposerProps) {
   const { draft, setDraft, handleSubmit } = useBuddyDraft();
   const fieldRef = useRef<HTMLTextAreaElement>(null);
@@ -172,6 +182,24 @@ export function BuddyComposer({
     field.setSelectionRange(field.value.length, field.value.length);
   }, [draft]);
 
+  /**
+   * Where the arrow keys are in the prompt history — `null` while the hire is not walking it.
+   *
+   * `browsingIndex` is deliberately not just the raw index: once the recalled words are edited
+   * the walk is over and the box belongs to the hire again, so the index only counts while the
+   * box still holds the words it recalled. That check is what keeps ArrowUp from eating a
+   * draft that happens to start with an older question.
+   */
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  const browsingIndex =
+    historyIndex !== null && promptHistory[historyIndex] === draft ? historyIndex : null;
+
+  /** Puts a recalled question in the box; the caret effect above moves the caret behind it. */
+  const recall = (index: number) => {
+    setHistoryIndex(index);
+    setDraft(promptHistory[index]);
+  };
+
   // The mirror of the blur in `submit`: once the buddy has stopped writing, the caret comes
   // back so a follow-up question does not need a click first. Skipped when somebody else holds
   // focus, so this never pulls the caret out of a field the hire moved to in the meantime.
@@ -189,6 +217,21 @@ export function BuddyComposer({
   const filtersInvalid = filters !== undefined && isFilterRangeInvalid(filters.from, filters.to);
   // Per instance: the dock and the page can both be mounted during the hand-off.
   const invalidRangeHintId = useId();
+
+  /**
+   * "Message queued", for screen readers. The strip appearing is visual; the announcement is
+   * what says it happened — and it is cleared when the queue shrinks, so the next queue-up is
+   * a fresh text change, which is the only thing a live region announces. Derived during
+   * render (the documented adjust-state pattern) from the queue length, which is the signal.
+   */
+  const queuedCount = queue?.items.length ?? 0;
+  const [announcedQueuedCount, setAnnouncedQueuedCount] = useState(queuedCount);
+  const [queueAnnouncement, setQueueAnnouncement] = useState("");
+  if (announcedQueuedCount !== queuedCount) {
+    const grew = queuedCount > announcedQueuedCount;
+    setAnnouncedQueuedCount(queuedCount);
+    setQueueAnnouncement(grew ? "Message queued" : "");
+  }
 
   /**
    * Sends, then hands the caret back to the page.
@@ -216,7 +259,37 @@ export function BuddyComposer({
     }
   };
 
+  /**
+   * The arrow keys walk the questions this conversation has seen — ArrowUp back through them,
+   * ArrowDown forward and out. The retired chat's walk, ported: ArrowUp with words in the box
+   * that are not a recalled question stays out of the way (the caret moves), reaching the
+   * first question stops there rather than wrapping, and ArrowDown on the last one empties the
+   * box and hands it back to the hire.
+   */
+  const handleHistoryKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+
+    if (event.key === "ArrowUp") {
+      if (browsingIndex === null && draft) return;
+      if (promptHistory.length === 0) return;
+      event.preventDefault();
+      recall(browsingIndex === null ? promptHistory.length - 1 : Math.max(browsingIndex - 1, 0));
+      return;
+    }
+
+    if (browsingIndex === null) return;
+    event.preventDefault();
+    const next = browsingIndex + 1;
+    if (next >= promptHistory.length) {
+      setHistoryIndex(null);
+      setDraft("");
+      return;
+    }
+    recall(next);
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    handleHistoryKey(event);
     if (event.key !== "Enter" || event.shiftKey) return;
     // Enter also *commits* an IME candidate — a compose-key 'ü', or any CJK input. Sending
     // there would submit a half-written word with no way to get it back.
@@ -236,6 +309,10 @@ export function BuddyComposer({
 
   return (
     <div className="min-w-0">
+      {/* The queue's own announcement, always mounted so the text *change* is what speaks. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {queueAnnouncement}
+      </p>
       {queue && (
         <BuddyQueuedMessages
           items={queue.items}
