@@ -109,6 +109,36 @@ describe("buddyService", () => {
       expect(onError).not.toHaveBeenCalled();
     });
 
+    it("sends no Authorization header when no token is held", async () => {
+      mockKeycloakInstance.authenticated = false;
+      Object.assign(mockKeycloakInstance, { token: undefined });
+      let capturedAuthHeader: string | null = "unset";
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post("/api/v1/onboarding/me/buddy/messages", ({ request }) => {
+          capturedAuthHeader = request.headers.get("Authorization");
+          return new HttpResponse(stream, {
+            headers: { "Content-Type": "text/event-stream" },
+          });
+        }),
+      );
+
+      await streamMessage(
+        "hello",
+        { onToken: vi.fn(), onCitation: vi.fn(), onDone: vi.fn(), onError: vi.fn() },
+        "session-1",
+      );
+
+      // The literal "Bearer undefined" used to reach the backend here.
+      expect(capturedAuthHeader).toBeNull();
+    });
+
     it("calls login and skips streaming if token refresh fails", async () => {
       let messageSent = false;
       mockKeycloakInstance.updateToken.mockRejectedValueOnce(new Error("Refresh failed"));

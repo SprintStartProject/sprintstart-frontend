@@ -107,9 +107,10 @@ function ChatRedirect() {
 
 /**
  * Every route of the app, inside one `AuthGuard`, one `RouteErrorBoundary` and one shared
- * `Suspense` fallback. The boundary is keyed by pathname: a page that failed to load or render
+ * `Suspense` fallback. The boundary is reset by pathname: a page that failed to load or render
  * keeps the shell (the sidebar included) and can be left by navigating — the next route gets a
- * clean attempt, and the failure state is not carried across.
+ * clean attempt. A state reset, not a remount: the tree below stays mounted, as the grouped
+ * transition keys (`PageTransition`) intend for buddy conversations and the PM workspace.
  *
  * Pages are lazy-loaded except `LoginPage` (see the comment on its import). One layout
  * route groups pages that share a header: `PmWorkspace` for the PM area. Routes a user
@@ -123,7 +124,7 @@ export function AppRouter() {
   return (
     <AuthGuard>
       <PageTransition>
-        <RouteErrorBoundary key={pathname}>
+        <RouteErrorBoundary resetKey={pathname}>
           <Suspense fallback={<PageShellSkeleton />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
