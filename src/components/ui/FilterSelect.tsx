@@ -30,6 +30,8 @@ type FilterSelectProps<TValue extends string> = {
   onChange: (value: TValue) => void;
   disabled?: boolean;
   className?: string;
+  /** `data-testid` of the trigger, for end-to-end tests. */
+  testId?: string;
 };
 
 /** How long a typed sequence keeps accumulating before it starts a new search. */
@@ -69,8 +71,12 @@ export function FilterSelect<TValue extends string>({
   onChange,
   disabled = false,
   className = "",
+  testId,
 }: FilterSelectProps<TValue>) {
   const [activeIndex, setActiveIndex] = useState(0);
+  // Whether the highlighted option was reached with the keyboard. Only then does it get the
+  // strong outline; an option the pointer hovers keeps the quiet hover fill.
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   // Open/close state, measured placement and outside-dismissal all come from the
   // shared popover hook, so this control and `MultiSelectFilter` cannot drift
   // apart on where the menu lands or what counts as an outside press.
@@ -156,6 +162,8 @@ export function FilterSelect<TValue extends string>({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) return;
 
+    if (event.key !== "Tab" && event.key !== "Escape") setIsKeyboardNav(true);
+
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -226,10 +234,15 @@ export function FilterSelect<TValue extends string>({
         aria-haspopup="listbox"
         aria-activedescendant={isOpen ? `${optionIdPrefix}-${activeIndex}` : undefined}
         disabled={disabled}
-        onClick={() => (isOpen ? close() : openMenu())}
+        data-testid={testId}
+        onClick={(event) => {
+          if (event.detail > 0) setIsKeyboardNav(false);
+          if (isOpen) close();
+          else openMenu();
+        }}
         onKeyDown={handleKeyDown}
         {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}
-        className="inline-flex h-9 w-full cursor-pointer items-center justify-between gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 text-sm text-app-text backdrop-blur-md transition-colors outline-none hover:border-app-brand-border-strong hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70"
+        className="inline-flex h-9 w-full cursor-pointer items-center justify-between gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 text-sm text-app-text backdrop-blur-md transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70 max-sm:h-11"
       >
         <span className="truncate">{selectedLabel}</span>
 
@@ -288,6 +301,7 @@ export function FilterSelect<TValue extends string>({
                     role="option"
                     aria-selected={isSelected}
                     onMouseEnter={() => setActiveIndex(index)}
+                    onMouseMove={() => setIsKeyboardNav(false)}
                     onClick={() => commit(index)}
                     animate={{
                       scale: isActive && !prefersReducedMotion ? OPTION_HOVER_SCALE : 1,
@@ -296,7 +310,7 @@ export function FilterSelect<TValue extends string>({
                     // Anchored left so the label does not drift
                     // sideways as the row grows.
                     style={{ transformOrigin: "left center" }}
-                    className={`relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
+                    className={`relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors max-sm:py-3 ${
                       isSelected ? "font-semibold text-app-brand-text" : "text-app-text"
                     }`}
                   >
@@ -311,7 +325,11 @@ export function FilterSelect<TValue extends string>({
                         transition={
                           prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken
                         }
-                        className="absolute inset-0 rounded-xl bg-app-surface-hover/80 ring-1 ring-app-border/50 backdrop-blur-sm ring-inset"
+                        className={`absolute inset-0 rounded-xl ${
+                          isKeyboardNav
+                            ? "bg-app-brand-soft outline-2 -outline-offset-2 outline-app-focus outline-solid"
+                            : "bg-app-surface-hover/80 ring-1 ring-app-border/50 backdrop-blur-sm ring-inset"
+                        }`}
                       />
                     )}
 

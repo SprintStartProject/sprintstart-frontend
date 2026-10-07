@@ -2,7 +2,10 @@ import { useAuth } from "../../../context/useAuth";
 import { TokenRow } from "../../settings/components/TokenRow";
 import { AtlassianCredentialAddForm } from "../../settings/components/atlassian/AtlassianCredentialAddForm";
 import { AtlassianCredentialRow } from "../../settings/components/atlassian/AtlassianCredentialRow";
+import { NotionCredentialAddForm } from "../../settings/components/notion/NotionCredentialAddForm";
+import { NotionCredentialRow } from "../../settings/components/notion/NotionCredentialRow";
 import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService";
+import type { NotionCredentialDto } from "../../../services/sources/notionService";
 import type { AccessAddFormProps, AccessRowProps } from "../types";
 
 /**
@@ -37,4 +40,12 @@ export function AtlassianAccessAddForm({ onClose, onSaved }: AccessAddFormProps)
       onSaved={onSaved}
     />
   );
+}
+
+export function NotionAccessRow({ entry, onSaved }: AccessRowProps<NotionCredentialDto>) {
+  return <NotionCredentialRow credential={entry.payload} onSaved={onSaved} />;
+}
+
+export function NotionAccessAddForm({ onClose, onSaved }: AccessAddFormProps) {
+  return <NotionCredentialAddForm onClose={onClose} onSaved={onSaved} />;
 }

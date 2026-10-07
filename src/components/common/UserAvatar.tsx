@@ -7,6 +7,16 @@ export type UserAvatarProps = {
   size?: number;
 };
 
+/**
+ * A user's generated avatar (boring-avatars, `beam` variant).
+ *
+ * The picture is derived from a seed: the user's chosen `profileIcon`, else `seed`, else
+ * `fallbackName`. The same seed always gives the same face. `fallbackName` is also the
+ * accessible name.
+ *
+ * The palette is hex values rather than tokens on purpose: boring-avatars computes the
+ * contrasting face colour from the hex value itself, which a CSS variable cannot give it.
+ */
 export function UserAvatar({ profileIcon, fallbackName, seed, size = 40 }: UserAvatarProps) {
   const avatarSeed = profileIcon || seed || fallbackName || "User";
   const ariaName = fallbackName || "User";

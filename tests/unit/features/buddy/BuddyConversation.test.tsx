@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { BuddyConversation } from "../../../../src/features/buddy/components/BuddyConversation";
+import { BuddyDraftContext } from "../../../../src/features/buddy/buddyDraftContext";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 
 /**
@@ -31,23 +32,32 @@ vi.mock("../../../../src/context/useAuth", () => ({
 function renderConversation(overrides: {
   messages?: BuddyMessageView[];
   isThinking?: boolean;
+  isStreaming?: boolean;
+  turnActive?: boolean;
   activeTool?: string | null;
   openError?: string | null;
   onRetryOpen?: () => void;
+  onStop?: () => void;
 }) {
   return render(
-    <BuddyConversation
-      messages={overrides.messages ?? []}
-      isThinking={overrides.isThinking ?? false}
-      activeTool={overrides.activeTool ?? null}
-      draft=""
-      setDraft={vi.fn()}
-      handleSubmit={vi.fn()}
-      confirmAction={vi.fn()}
-      dismissAction={vi.fn()}
-      openError={overrides.openError ?? null}
-      onRetryOpen={overrides.onRetryOpen}
-    />,
+    // The composer inside reads the shared draft from its own provider now — see
+    // `BuddyDraftProvider`. The conversation itself never touches it.
+    <BuddyDraftContext.Provider value={{ draft: "", setDraft: vi.fn(), handleSubmit: vi.fn() }}>
+      <BuddyConversation
+        messages={overrides.messages ?? []}
+        isThinking={overrides.isThinking ?? false}
+        isStreaming={overrides.isStreaming ?? false}
+        turnActive={overrides.turnActive ?? false}
+        onStop={overrides.onStop}
+        activeTool={overrides.activeTool ?? null}
+        confirmAction={vi.fn()}
+        dismissAction={vi.fn()}
+        actionDrafts={{}}
+        setActionDraft={vi.fn()}
+        openError={overrides.openError ?? null}
+        onRetryOpen={overrides.onRetryOpen}
+      />
+    </BuddyDraftContext.Provider>,
   );
 }
 
@@ -128,6 +138,26 @@ describe("BuddyConversation", () => {
   it("always offers a way to send a message", () => {
     renderConversation({});
 
+    expect(screen.getByRole("button", { name: "Send message" })).toBeInTheDocument();
+  });
+
+  /**
+   * Stop and the queue arm from the moment a send starts, not from the first token — the same
+   * state the retired chat surface's `isBusy` armed them in. A turn that is still thinking (or
+   * stuck in a tool) has to be stoppable, and a follow-up typed into it has to be visibly the
+   * queue's, not a plain send.
+   */
+  it("arms Stop and the queue from the first moment of a turn", () => {
+    renderConversation({ isThinking: true, turnActive: true, onStop: vi.fn() });
+
+    expect(screen.getByRole("button", { name: "Stop generation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Queue message" })).toBeInTheDocument();
+  });
+
+  it("shows a plain Send and no Stop while no turn is running", () => {
+    renderConversation({});
+
+    expect(screen.queryByRole("button", { name: "Stop generation" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send message" })).toBeInTheDocument();
   });
 

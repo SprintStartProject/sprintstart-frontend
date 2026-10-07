@@ -1,17 +1,19 @@
-import { useCallback, useContext, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookmarkPlus, Eraser, Highlighter, MessageCircle, Reply } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { useFocusMode } from "../../../context/useFocusMode";
 import { useProjectContext } from "../../projects/useProjectContext";
-import { ChatContext } from "../../../context/ChatContext";
 import { boardService } from "../../../services/boardService";
+import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin } from "../layout/cardOrigins";
+import { withOnboardingPlace } from "../layout/onboardingOrigin";
 import { useCardMarks } from "../marks/useCardMarks";
 import { DEFAULT_HIGHLIGHT } from "../marks/highlightColors";
 import { openAiBuddy } from "../../buddy/aiBuddyBus";
 import { quoteFromSelection } from "../../buddy/quoteFromSelection";
+import { formatMarkdownQuote } from "../../buddy/utils/quoteFormat";
 import { cardFor } from "./selectionCapture";
 import { useTextSelection } from "./useTextSelection";
 
@@ -25,7 +27,7 @@ const TOOLBAR_HEIGHT = 44;
  * Offers to keep whatever the hire has just highlighted, from anywhere in the app.
  *
  * Mounted once beside the buddy dock rather than per page, for the same reason: something worth
- * keeping is almost never found on the board itself. It is found in the knowledge base, in a chat
+ * keeping is almost never found on the board itself. It is found in the knowledge base, in a buddy
  * answer, in an onboarding step — and the cost of keeping it has to be lower than the cost of
  * remembering to come back for it, or nobody does.
  *
@@ -44,10 +46,9 @@ export function SelectionActions() {
   const { selectedProjectId } = useProjectContext();
   const { isFocused } = useFocusMode();
   const { canMark, colorAt, enclosingColorAt, mark, unmark } = useCardMarks();
-  const chatContext = useContext(ChatContext);
-  const quoteSelection = chatContext?.quoteSelection;
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const invalidateBoard = useInvalidateBoard(selectedProjectId);
   const navigate = useNavigate();
 
   const add = useCallback(async () => {
@@ -62,9 +63,12 @@ export function SelectionActions() {
       // the hire asked for and the trail back is the extra. `rememberOrigin` swallows a storage
       // that refuses, so this cannot throw past the toast below.
       rememberOrigin(selectedProjectId, card.id, {
-        url: selection.origin,
+        // On the Onboarding page, the step that was open rather than the page as a whole.
+        url: withOnboardingPlace(selection.origin),
         label: selection.source ?? "where you were",
       });
+      // Found anywhere in the app, so the board is almost never on screen — see `useInvalidateBoard`.
+      invalidateBoard();
       toast.success(
         request.kind === "LINK" ? "Link saved to your board" : "Note saved to your board",
         {
@@ -78,7 +82,7 @@ export function SelectionActions() {
     } finally {
       setSaving(false);
     }
-  }, [selection, selectedProjectId, toast, navigate, clear]);
+  }, [selection, selectedProjectId, toast, navigate, clear, invalidateBoard]);
 
   /**
    * Hands the selection to the buddy as a quote, unsent.
@@ -235,14 +239,17 @@ export function SelectionActions() {
         </div>
       ) : (
         <div className="flex items-center gap-1">
-          {selection.isAiMessage && quoteSelection && (
+          {selection.isAiMessage && (
             <Button
               size="sm"
               variant="ghost"
               onClick={() => {
                 // quoteText rather than text: it keeps the answer's paragraph breaks, which
-                // `text` has collapsed away for the card paths.
-                quoteSelection(selection.quoteText);
+                // `text` has collapsed away for the card paths. The quote is seeded into the
+                // buddy's composer rather than sent, so the hire can wrap their actual
+                // question around it — the dock's box when the dock is open, the page's
+                // after it.
+                openAiBuddy({ draft: `${formatMarkdownQuote(selection.quoteText)}\n\n` });
                 clear();
               }}
               icon={<Reply className="h-4 w-4" />}

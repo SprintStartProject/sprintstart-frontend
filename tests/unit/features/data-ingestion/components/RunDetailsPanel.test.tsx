@@ -19,7 +19,7 @@ function makeRun(overrides: Partial<IngestionRun> = {}): IngestionRun {
     deletedCount: 0,
     failedCount: 3,
     status: "PARTIAL",
-    failedItems: [{ artifactIdentifier: "FILE: broken.md", reason: "Parse error" }],
+    failedItems: [{ artifactType: "FILE", reference: "broken.md", reason: "Parse error" }],
     failureReason: null,
     aiSyncStatus: "SUCCEEDED",
     aiSyncFailureReason: null,
@@ -91,11 +91,43 @@ describe("RunDetailsPanel", () => {
     expect(screen.getByText("acme.atlassian.net")).toBeInTheDocument();
   });
 
+  it("shows the Bitbucket workspace in the timing section", () => {
+    render(
+      <RunDetailsPanel
+        run={makeRun({
+          sourceSystem: "BITBUCKET",
+          sourceId: "acme/widgets",
+          owner: "acme",
+          name: "widgets",
+        })}
+        sourceLabel="acme/widgets"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Fetched from Bitbucket")).toBeInTheDocument();
+    expect(screen.getByText("Workspace")).toBeInTheDocument();
+    expect(screen.getByText("acme")).toBeInTheDocument();
+  });
+
+  it("falls back to the workspace/slug prefix when a Bitbucket run has no owner", () => {
+    render(
+      <RunDetailsPanel
+        run={makeRun({ sourceSystem: "BITBUCKET", sourceId: "acme/widgets", owner: null })}
+        sourceLabel="acme/widgets"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Workspace")).toBeInTheDocument();
+    expect(screen.getByText("acme")).toBeInTheDocument();
+  });
+
   it("lists failed items", () => {
     render(<RunDetailsPanel run={makeRun()} onClose={vi.fn()} />);
 
     expect(screen.getByText("Failed items (1)")).toBeInTheDocument();
-    expect(screen.getByText("FILE: broken.md")).toBeInTheDocument();
+    expect(screen.getByText("File: broken.md")).toBeInTheDocument();
     expect(screen.getByText("Parse error")).toBeInTheDocument();
   });
 

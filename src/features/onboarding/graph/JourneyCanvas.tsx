@@ -14,6 +14,7 @@ import {
   type Ref,
 } from "react";
 import { createPortal } from "react-dom";
+import { EDGE_STYLE_SWATCH } from "../../graph-diagram/edgeStyles.ts";
 import {
   collectDownstream,
   collectUpstream,
@@ -938,13 +939,13 @@ export function JourneyCanvas<TNode extends LayoutNode>({
         role="application"
         aria-label={ariaLabel}
         aria-roledescription="graph"
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the canvas is the focusable widget, see above
         tabIndex={0}
         // While a node is open as a page over the graph, the graph is not there to be used: its
         // nodes, the minimap and the zoom toolbar would otherwise all still be tab stops behind
         // what was opened, which is the long way round to the thing in front.
         inert={cover ? true : undefined}
-        className="absolute inset-0 cursor-grab touch-none select-none focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none focus-visible:ring-inset active:cursor-grabbing"
+        className="absolute inset-0 cursor-grab touch-none focus-ring-inset select-none active:cursor-grabbing"
         style={{
           backgroundImage: "radial-gradient(var(--color-app-border) 1.2px, transparent 1.2px)",
           backgroundSize: `${gridSize}px ${gridSize}px`,
@@ -974,8 +975,9 @@ export function JourneyCanvas<TNode extends LayoutNode>({
               const isSelected =
                 selectedEdge?.blockerId === edge.blockerId && selectedEdge?.nodeId === edge.nodeId;
               const dimmed = !!spotlightId || (!!emphasisSourceId && !edge.inChain);
-              const width = edge.inChain || isSelected ? 2.75 : 2;
-              const stroke = `${toneStroke[edge.tone]} ${isSelected ? "!stroke-app-danger-solid" : ""}`;
+              const style = EDGE_STYLE_SWATCH[edge.tone];
+              const width = edge.inChain || isSelected ? style.width + 0.75 : style.width;
+              const stroke = `${style.className} ${isSelected ? "!stroke-app-danger-solid" : ""}`;
               return (
                 <g key={`${edge.blockerId}->${edge.nodeId}`}>
                   <path
@@ -983,10 +985,8 @@ export function JourneyCanvas<TNode extends LayoutNode>({
                     data-edge={`${edge.blockerId}->${edge.nodeId}`}
                     fill="none"
                     strokeWidth={width}
-                    strokeLinecap="round"
-                    strokeDasharray={
-                      edge.tone === "waiting" ? "6 6" : edge.tone === "active" ? "10 8" : undefined
-                    }
+                    strokeLinecap={style.linecap}
+                    strokeDasharray={style.dash}
                     className={`transition-opacity duration-200 ${stroke} ${
                       edge.tone === "active" ? "journey-edge-flow" : ""
                     }`}
@@ -1066,7 +1066,7 @@ export function JourneyCanvas<TNode extends LayoutNode>({
                 tabIndex={isInteractive ? 0 : undefined}
                 aria-label={isInteractive ? nodeLabel(node) : undefined}
                 aria-pressed={isInteractive ? selected : undefined}
-                className={`group/node absolute rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-app-focus ${
+                className={`group/node absolute rounded-2xl focus-visible:outline-offset-6 ${
                   canMove ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
                 } ${dragging ? "z-30" : selected ? "z-20" : "z-10"}`}
                 style={{
@@ -1267,14 +1267,6 @@ export function JourneyCanvas<TNode extends LayoutNode>({
   );
 }
 
-const toneStroke: Record<JourneyEdgeTone, string> = {
-  done: "stroke-app-success-solid/70",
-  active: "stroke-app-brand",
-  waiting: "stroke-app-text-subtle/50",
-  upstream: "stroke-app-orange-text",
-  rule: "stroke-app-brand",
-};
-
 export function CanvasButton({
   label,
   onClick,
@@ -1296,7 +1288,7 @@ export function CanvasButton({
       aria-pressed={active || undefined}
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         active
           ? "bg-app-brand text-white"
           : "text-app-text-muted hover:bg-app-surface-hover hover:text-app-text"

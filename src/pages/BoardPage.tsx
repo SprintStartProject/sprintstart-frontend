@@ -1,17 +1,17 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
-  Bot,
   Check,
   FolderPlus,
   LayoutDashboard,
+  LayoutList,
   ListTree,
   Maximize2,
   Milestone,
   Minimize2,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
@@ -21,31 +21,39 @@ import { Spinner } from "../components/ui/Spinner";
 import { useSwipeableTabs } from "../hooks/useHorizontalWheelNavigation";
 import { useBoard } from "../features/board/hooks/useBoard";
 import { useBoardStructure } from "../features/board/hooks/useBoardStructure";
-import { BoardChainPanel } from "../features/board/components/BoardChainPanel";
-import { useGeneratedPathCards } from "../features/board/hooks/useGeneratedPathCards";
+import { useOnboardingPath } from "../features/board/hooks/useOnboardingPath";
+import { BoardPathContext } from "../features/board/hooks/boardPath";
+import { isCardAt, pathPhases, pathStages } from "../features/board/layout/pathStages";
 import { AddCardForm, AddCardTriggers } from "../features/board/components/AddCardForm";
 import type { AuthoredCardKind } from "../features/board/types";
 import { BoardGrid } from "../features/board/components/BoardGrid";
-import { BoardPathNotes } from "../features/board/components/BoardPathNotes";
 import { BoardPathWindow } from "../features/board/components/BoardPathWindow";
 import { BoardSectionTabs } from "../features/board/components/BoardSectionNav";
 import { BoardFilterTriggers } from "../features/board/components/BoardFilterTriggers";
 import { NewAreaForm } from "../features/board/components/NewAreaForm";
 import { BoardViewStatus } from "../features/board/components/BoardViewStatus";
 import { MarkFilterRail } from "../features/board/components/MarkFilterRail";
-import { BoardNextUp } from "../features/board/components/BoardNextUp";
+import { BoardPhaseCheck } from "../features/board/components/BoardPhaseCheck";
+import { BoardPhaseRecap } from "../features/board/components/BoardPhaseRecap";
 import { BoardLocalOnlyNotice } from "../features/board/components/BoardLocalOnlyNotice";
-import { nextUp } from "../features/board/layout/nextUp";
 import { useProjectContext } from "../features/projects/useProjectContext";
-import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useFocusMode } from "../context/useFocusMode";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { readCollapsedCards, writeCollapsedCards } from "../features/board/layout/collapsedCards";
+import {
+  hasNewlyBehind,
+  readBehindSeen,
+  writeBehindSeen,
+} from "../features/board/layout/behindSeen";
 import { readPathWindowShown, writePathWindowShown } from "../features/board/layout/pathWindowFold";
+import { readTaskPoolShown, writeTaskPoolShown } from "../features/board/layout/taskPoolShown";
 import { readPinnedCards, writePinnedCards } from "../features/board/layout/pinnedCards";
 import {
   ALL_SECTIONS,
   cardsInSection,
+  markSectionColor,
+  markedIn,
   sectionTabOrder,
   summariseSections,
 } from "../features/board/layout/boardSections";
@@ -54,7 +62,6 @@ import {
   currentStage,
   type BoardStage,
 } from "../features/board/layout/boardStructure";
-import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
 import {
   filterLabel,
   matchesFilter,
@@ -73,6 +80,7 @@ import { subscribeToBoardStorageReplaced } from "../features/board/layout/boardS
 import { forgetCard } from "../features/board/layout/forgetCard";
 import { useBoardStructureSync } from "../features/board/sync/useBoardStructureSync";
 import { useCardMarks, useMarkableBoard } from "../features/board/marks/useCardMarks";
+import { buildStacks, collapseStacks } from "../features/board/layout/cardStacks";
 import {
   assignToGroup,
   dissolveGroup,
@@ -90,33 +98,30 @@ import {
  * memory and never replayed — so anything durable it showed you was gone by the next visit. This is
  * where those things live instead. Chat is the conversation; this is the whiteboard beside it.
  *
- * Per project, because what belongs on it is: the path, the open work, later the current task. The
- * project switcher is the same one the rest of the app uses, so the choice is remembered across
- * pages rather than being a setting of this one.
+ * Per project, because what belongs on it is: the open work, the current task, what the buddy
+ * remembers. The project switcher is the same one the rest of the app uses, so the choice is
+ * remembered across pages rather than being a setting of this one.
+ *
+ * **Not the onboarding.** That is the path on the Onboarding page, which a PM's blueprint prescribes
+ * and the buddy tutors along. The board used to carry a second one -- a rail from joining to a first
+ * accepted contribution, and a button that copied the path's steps into checklists -- and two plans
+ * that drift apart are worse than one.
  *
  * The shell is the app's page shell — banner header over `app-page-frame`, `PageHeader` for the
  * title block, shared primitives for the actions and for every empty, loading and error state — so
  * the board sits at the same gutter and reads with the same weight as Starter Work beside it.
  *
- * **The path is lifted out of the grid into the header.** It is the one card that says where the
- * hire stands overall; every other card is a detail of some part of it, so it belongs above them
- * rather than competing with a checklist for a slot. It keeps its place in the board's order — the
- * grid renders the rest, and a reorder puts the path back at the index it came from, so lifting it
- * for display never quietly rewrites what the hire arranged.
- *
  * **The board is now a process, not a pile.** Three things carry that, and none of them changes the
  * board's own order:
  *
- * - a *stage* per card — now, next, later — so the board can say what is due rather than only what
- *   exists;
+ * - a *stage* per card — now or behind you, read off the onboarding path (`pathStages.ts`) — so the
+ *   board can say what is due rather than only what exists;
  * - a *predecessor* per card, so "read the runbook before you deploy" is a fact the board holds
  *   instead of one the hire has to remember;
  * - *sections* down the side, so a board of forty cards is read one part at a time.
  *
  * The reason for all three is the same. A board that shows everything at once is fine at eight
- * cards and unusable at forty, and forty is what a generated onboarding path produces. See
- * `layout/boardStructure.ts` for the model and `generation/pathToCards.ts` for where the cards come
- * from.
+ * cards and unusable at forty. See `layout/boardStructure.ts` for the model.
  */
 
 /**
@@ -139,24 +144,29 @@ const UNDO_WINDOW_MS = 7000;
 const FOLD_THRESHOLD = 8;
 
 /**
- * Which cards the board is showing.
+ * The rule between groups on the tool rail: a short horizontal line while the rail stands up the
+ * margin from `lg` up, a short vertical one while it lies across the page above the cards.
+ */
+const RAIL_SEPARATOR_CLASS = "mx-0.5 h-6 w-px bg-app-border lg:mx-0 lg:my-0.5 lg:h-px lg:w-6";
+
+/**
+ * The hire's board: their own cards and the buddy's, arranged in areas and stages and synced with
+ * the server. The onboarding path itself lives on the Onboarding page; the board only shows the
+ * current step of it, as a live `PATH_STEP` card. That card is `AI`-owned, so it counts as `buddy`.
  *
- * Not a search and not a sort — the one cut worth making by hand is *who put this here*, which is
- * the one thing a card's content never says on its own. Three sources, and they partition the
- * board:
+ * The filter rail cuts by *who put a card here*, the one thing a card's content never says on its
+ * own (see `layout/boardFilters.ts`). Two sources, and they partition the board:
  *
  * - `buddy` — placed for the hire in conversation, contents read live.
- * - `team` — a card blueprint their PM wrote for everybody in this role.
- * - `mine` — everything else they own: their own notes and lists, and the steps of their own
- *   personalised path. The path counts as theirs because it *is*: it was drafted for them, they
- *   edit it, and nobody else on the project has the same one.
+ * - `mine` — everything they wrote themselves: their own notes, links and lists.
  *
  * Where a card sits in the process is a separate question, and the stages, the focus view and the
  * section tabs answer that one.
+ *
+ * Bound to `/board`, open to every permission group, not wrapped in `ManagerAreaGuard`.
  */
 export function BoardPage() {
   const { selectedProjectId, isLoading: projectsLoading } = useProjectContext();
-  const { profile } = useAuth();
   const toast = useToast();
   const { isFocused, setFocused } = useFocusMode();
 
@@ -179,8 +189,6 @@ export function BoardPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFocused, setFocused]);
 
-  /** The hire's roles on this project, which decide which of the team's blueprints reach them. */
-  const roleIds = useMemo(() => (profile?.projectRoles ?? []).map((role) => role.id), [profile]);
   const [isArranging, setIsArranging] = useState(false);
   const [filter, setFilter] = useState<BoardFilter>("all");
   const [sectionId, setSectionId] = useState<string | null>(null);
@@ -195,6 +203,10 @@ export function BoardPage() {
     dismissError,
     addCard,
     editCard,
+    restorePrevious,
+    restoringIds,
+    savingIds,
+    undoNotices,
     reorder,
     writeError,
   } = useBoard(selectedProjectId);
@@ -312,6 +324,32 @@ export function BoardPage() {
       action: { label: "Undo", onClick: () => showPathWindow(true) },
     });
   }, [showPathWindow, toast]);
+
+  // The task pool card, on or off — a switch like the path strip rather than a dismissal. See
+  // `layout/taskPoolShown.ts` for why this one card does not get the sticky server-side removal.
+  const [isTaskPoolShown, setIsTaskPoolShown] = useState(true);
+  const [taskPoolReadFor, setTaskPoolReadFor] = useState<string | null>(null);
+
+  if (storedFor !== taskPoolReadFor) {
+    setTaskPoolReadFor(storedFor);
+    setIsTaskPoolShown(readTaskPoolShown(boardId));
+  }
+
+  const showTaskPool = useCallback(
+    (shown: boolean) => {
+      setIsTaskPoolShown(shown);
+      writeTaskPoolShown(boardId, shown);
+    },
+    [boardId],
+  );
+
+  const removeTaskPool = useCallback(() => {
+    showTaskPool(false);
+    toast.info("Task pool hidden", {
+      description: "You can put it back from the switches on the right.",
+      action: { label: "Undo", onClick: () => showTaskPool(true) },
+    });
+  }, [showTaskPool, toast]);
 
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [pinsReadFor, setPinsReadFor] = useState<string | null>(null);
@@ -436,6 +474,11 @@ export function BoardPage() {
   }
 
   function handleDismiss(cardId: string) {
+    if (board?.cards.find((card) => card.id === cardId)?.content.kind === "TASK_POOL") {
+      removeTaskPool();
+      return;
+    }
+
     setPendingRemovals((current) => new Set(current).add(cardId));
 
     const timer = window.setTimeout(() => {
@@ -458,14 +501,6 @@ export function BoardPage() {
     });
   }
 
-  // The path is drawn above the board -- the window for where they stand, `BoardPathNotes` for
-  // the two things the card says that nothing else does -- and the grid gets everything else. Its
-  // index is kept so a reorder of the visible cards can put it back where it was: the board's
-  // order is the hire's, and this is a display decision, not an edit to it.
-  const pathIndex =
-    board?.cards.findIndex((card) => card.content.kind === "PATH_TO_FIRST_CONTRIBUTION") ?? -1;
-  const pathCard = pathIndex === -1 ? null : (board?.cards[pathIndex] ?? null);
-
   /**
    * Every card the board is holding, whatever the current view.
    *
@@ -474,28 +509,125 @@ export function BoardPage() {
    * would be worse than no rail at all — the counts are about the board, and the view is about the
    * hire's attention.
    */
+  // Whether the backend put a pool card on this board at all. The rail switch only exists for a
+  // board that has one: a switch that toggles nothing visible reads as broken.
+  const hasTaskPool = board?.cards.some((card) => card.content.kind === "TASK_POOL") ?? false;
+
   const allCards = useMemo(
-    () => board?.cards.filter((card) => card !== pathCard && !pendingRemovals.has(card.id)) ?? [],
-    [board, pathCard, pendingRemovals],
+    () =>
+      board?.cards.filter(
+        (card) =>
+          !pendingRemovals.has(card.id) && (isTaskPoolShown || card.content.kind !== "TASK_POOL"),
+      ) ?? [],
+    [board, pendingRemovals, isTaskPoolShown],
   );
 
-  const {
-    structure,
-    states,
-    assignStage,
-    assignGroupStage,
-    toggleDone,
-    setPredecessor,
-    applyPlan,
-  } = useBoardStructure(boardId, allCards);
+  /**
+   * Where each card was found — see `cardOrigins.ts`.
+   *
+   * Read once when the board arrives and never written here: the origin is recorded by whoever
+   * made the card, which is always somewhere else in the app. The board only reads the trail.
+   *
+   * Keyed by project rather than by board, because the surfaces that write one — the selection
+   * toolbar, a chat, the buddy dock — know the project and not the board.
+   *
+   * Read under `selectedProjectId`, which is the id those surfaces write under, and *not* under the
+   * board's own `projectId`. The two are normally the same and the one time they are not — a board
+   * fetched for one project while the app has moved to another — reading the board's id would look
+   * up trails nobody stored there and show none of them.
+   */
+  const [cardOrigins, setCardOrigins] = useState<CardOrigins>({});
+  const [originsReadFor, setOriginsReadFor] = useState<string | null>(null);
+
+  // Keyed by project *and* revision: the origins follow the hire across a project, and a card
+  // saved from the buddy dock while this page is open writes them without leaving it.
+  const originsStoredFor = `${selectedProjectId}:${storageRevision}`;
+
+  if (originsStoredFor !== originsReadFor) {
+    setOriginsReadFor(originsStoredFor);
+    setCardOrigins(readCardOrigins(selectedProjectId));
+  }
 
   /**
-   * The card whose run is being looked at, or null.
-   *
-   * Held by the page rather than by a card: the picture is a panel over the whole board, and two
-   * cards each holding their own would be two panels racing to be the open one.
+   * Now and Behind you, read off the onboarding path — see `pathStages.ts`. Nothing on this page sets a
+   * stage any more: the path is the one plan, and the board files its cards against it.
    */
-  const [chainCardId, setChainCardId] = useState<string | null>(null);
+  const { path, settled: pathSettled } = useOnboardingPath();
+  const phases = useMemo(() => (path ? pathPhases(path) : null), [path]);
+  const stageOf = useMemo(() => pathStages(phases, cardOrigins), [phases, cardOrigins]);
+  const boardPath = useMemo(
+    () => ({ path, phases, settled: pathSettled }),
+    [path, phases, pathSettled],
+  );
+
+  /**
+   * The phase the board was opened for: `/board?phase=<id>`.
+   *
+   * What "N cards on your board from this phase" in the path card links to. In the address rather
+   * than in router state so it survives a reload and can be opened in a second tab, and so the
+   * browser's Back goes from the narrowed board to where it came from.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pathPlace = searchParams.get("phase");
+
+  /** What the phase is called, for the line saying the board is narrowed to it. */
+  const pathPlaceTitle = useMemo(
+    () =>
+      pathPlace ? (path?.phases.find((phase) => phase.id === pathPlace)?.title ?? null) : null,
+    [path, pathPlace],
+  );
+
+  const { states, stackOnto } = useBoardStructure(boardId, allCards, stageOf);
+
+  /**
+   * The piles on this board, and which of them are spread out.
+   *
+   * A pile is cards the hire put one under another with the "Pile" control (see `restack`). It is
+   * drawn as its top card with the others fanned beneath, and opens on a click. A pile only forms
+   * inside one area, so piling a card under one in another area takes it into that area too — see
+   * {@link handleStackOnto}.
+   *
+   * Which piles are open is kept for the visit rather than stored: opening one is looking into it,
+   * not rearranging the board.
+   */
+  const stacks = useMemo(
+    () => buildStacks(allCards, states, (cardId) => groupOf(groups, cardId)?.id ?? null),
+    [allCards, groups, states],
+  );
+  const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
+
+  /** Every pile spread out while the board is being arranged, so each card can be moved. */
+  const openStackIds = useMemo(
+    () => (isArranging ? allRootIds(stacks) : expandedStackIds),
+    [expandedStackIds, isArranging, stacks],
+  );
+
+  function toggleStack(rootId: string) {
+    setExpandedStackIds((current) => {
+      const next = new Set(current);
+      if (next.has(rootId)) next.delete(rootId);
+      else next.add(rootId);
+
+      return next;
+    });
+  }
+
+  /**
+   * Piles a card under another one, and into that card's area so the two can lie together.
+   *
+   * `carry` is a whole closed pile being moved — every card of it goes along, area included.
+   */
+  function handleStackOnto(cardId: string, targetId: string | null, carry?: readonly string[]) {
+    stackOnto(cardId, targetId, carry);
+    if (!targetId) return;
+
+    const area = groupOf(groups, targetId)?.id ?? null;
+    let next = groups;
+    for (const id of carry ?? [cardId]) {
+      if ((groupOf(next, id)?.id ?? null) !== area) next = assignToGroup(next, id, area);
+    }
+    if (next !== groups) saveGroups(next);
+  }
 
   // Lends these cards to the app shell, so the selection toolbar mounted above the router can offer
   // the marker pen on text that turns out to be on one of them. Taken back when this page leaves.
@@ -534,25 +666,6 @@ export function BoardPage() {
   const tabSections = useMemo(() => sections.filter((section) => !section.mark), [sections]);
 
   /**
-   * The one card to start with — see `layout/nextUp.ts`.
-   *
-   * Computed over every card rather than over what is currently shown: "where do I start" is a
-   * question about the board, and answering it from inside a filter would point at the best thing
-   * *in this view*, which is a different and much less useful answer.
-   */
-  const startHere = useMemo(
-    () => nextUp(allCards, states, { crowded: allCards.length > FOLD_THRESHOLD }),
-    [allCards, states],
-  );
-
-  /**
-   * The provenance cuts worth offering on *this* board.
-   *
-   * "From your team" only appears once the team has actually prescribed something. An option that
-   * can only ever come back empty is a promise the board cannot keep, and on an installation where
-   * nobody has written a blueprint that is every board.
-   */
-  /**
    * Whether the board has been divided into anything worth navigating.
    *
    * One section called "Everything" is a table of contents for a book with one chapter, so an
@@ -579,6 +692,40 @@ export function BoardPage() {
         : sectionId,
     [sectionId, sections],
   );
+
+  /**
+   * Piles opened because the colour picked on the right is on a card inside them.
+   *
+   * A closed pile shows only its top card, so filtering by a colour that sits on the second card
+   * showed nothing at all — the filter's count said there was one, and the board said there was
+   * none. Such a pile is spread out for as long as the colour is picked; the filter then leaves only
+   * the cards that carry it.
+   */
+  const heldOpenByMarks = useMemo(() => {
+    const color = markSectionColor(shownSectionId);
+    if (!color) return new Set<string>();
+
+    const hits = new Set(markedIn(allCards, cardMarks, color).map((card) => card.id));
+    const roots = new Set<string>();
+    for (const stack of stacks.values()) {
+      if (stack.memberIds.some((id) => hits.has(id))) roots.add(stack.rootId);
+    }
+    return roots;
+  }, [allCards, cardMarks, shownSectionId, stacks]);
+  const visibleStackIds = useMemo(
+    () =>
+      heldOpenByMarks.size === 0 ? openStackIds : new Set([...openStackIds, ...heldOpenByMarks]),
+    [heldOpenByMarks, openStackIds],
+  );
+
+  /**
+   * The grid's open-and-close, minus the piles the colour filter holds open: folding one of those
+   * from outside it would only hide the highlight the filter is there to show.
+   */
+  function toggleVisibleStack(rootId: string) {
+    if (heldOpenByMarks.has(rootId) && !openStackIds.has(rootId)) return;
+    toggleStack(rootId);
+  }
 
   /**
    * The sections as the tab machinery sees them: a fixed left-to-right order, and a string for the
@@ -627,10 +774,56 @@ export function BoardPage() {
 
   if (board && boardId !== bandsDecidedFor) {
     setBandsDecidedFor(boardId);
+    // "Behind you" never arrives open, at any size: it holds what is finished, and it fills in only
+    // once the path has been read, after this is decided.
     setOpenStages(
-      allCards.length > FOLD_THRESHOLD ? new Set([currentStage(states)]) : new Set(BOARD_STAGES),
+      allCards.length > FOLD_THRESHOLD
+        ? new Set([currentStage(states)])
+        : new Set(BOARD_STAGES.filter((stage) => stage !== "BEHIND")),
     );
   }
+
+  /**
+   * "Behind you" opens when cards have moved into it since the hire last looked.
+   *
+   * It arrives folded, but cards move there without the hire touching the board: a phase finished
+   * in the dock or on the Onboarding page, a note kept from a step of a finished phase. A band that
+   * silently swallows them reads as the cards being gone. So what was behind last time is
+   * remembered (`behindSeen.ts`) — across visits, and while the board stays open — and any card
+   * that is new there unfolds the band once. Folding it again is the hire's call and sticks.
+   */
+  const behindIds = useMemo(
+    () =>
+      pathSettled
+        ? allCards
+            .filter((card) => states.get(card.id)?.stage === "BEHIND")
+            .map((card) => card.id)
+            .sort()
+        : null,
+    [allCards, pathSettled, states],
+  );
+  const behindKey = behindIds?.join("|") ?? null;
+  const [knownBehind, setKnownBehind] = useState<{ boardId: string; key: string } | null>(null);
+
+  if (
+    board &&
+    behindIds !== null &&
+    behindKey !== null &&
+    (knownBehind?.boardId !== boardId || knownBehind.key !== behindKey)
+  ) {
+    const before =
+      knownBehind?.boardId === boardId
+        ? new Set(knownBehind.key.split("|").filter(Boolean))
+        : readBehindSeen(boardId);
+    setKnownBehind({ boardId, key: behindKey });
+    if (hasNewlyBehind(before, behindIds)) {
+      setOpenStages((current) => new Set([...current, "BEHIND"]));
+    }
+  }
+
+  useEffect(() => {
+    if (board && behindIds !== null) writeBehindSeen(boardId, behindIds);
+  }, [board, boardId, behindIds]);
 
   function toggleStage(stage: BoardStage) {
     setOpenStages((current) => {
@@ -642,22 +835,6 @@ export function BoardPage() {
     });
   }
 
-  /**
-   * The chains on this board, and which of them the hire has opened.
-   *
-   * Kept for the visit rather than stored: opening a stack is looking into it, not rearranging the
-   * board, and a pile that was still spread out a week later would have quietly become five cards
-   * again. Keyed by root id, which does not move as cards are ticked off — see `cardStacks.ts`.
-   */
-  // Area-aware, because a pile is drawn in one place and a chain that ran out of one area into
-  // another had two — see `cardStacks.ts`. Blueprints hit this routinely: a PM's "comes after"
-  // points at whatever card it names, wherever that card ended up filed.
-  const stacks = useMemo(
-    () => buildStacks(allCards, states, (cardId) => groupOf(groups, cardId)?.id ?? null),
-    [allCards, groups, states],
-  );
-  const [expandedStackIds, setExpandedStackIds] = useState<Set<string>>(new Set());
-
   /** The kind of card being written, or null when nothing is being added. */
   const [addingKind, setAddingKind] = useState<AuthoredCardKind | null>(null);
 
@@ -668,32 +845,6 @@ export function BoardPage() {
   if (storedFor !== sizesReadFor) {
     setSizesReadFor(storedFor);
     setCardSizes(readCardSizes(boardId));
-  }
-
-  /**
-   * Where each card was found — see `cardOrigins.ts`.
-   *
-   * Read once when the board arrives and never written here: the origin is recorded by whoever
-   * made the card, which is always somewhere else in the app. The board only reads the trail.
-   *
-   * Keyed by project rather than by board, because the surfaces that write one — the selection
-   * toolbar, a chat, the buddy dock — know the project and not the board.
-   *
-   * Read under `selectedProjectId`, which is the id those surfaces write under, and *not* under the
-   * board's own `projectId`. The two are normally the same and the one time they are not — a board
-   * fetched for one project while the app has moved to another — reading the board's id would look
-   * up trails nobody stored there and show none of them.
-   */
-  const [cardOrigins, setCardOrigins] = useState<CardOrigins>({});
-  const [originsReadFor, setOriginsReadFor] = useState<string | null>(null);
-
-  // Keyed by project *and* revision: the origins follow the hire across a project, and a card
-  // saved from the buddy dock while this page is open writes them without leaving it.
-  const originsStoredFor = `${selectedProjectId}:${storageRevision}`;
-
-  if (originsStoredFor !== originsReadFor) {
-    setOriginsReadFor(originsStoredFor);
-    setCardOrigins(readCardOrigins(selectedProjectId));
   }
 
   /**
@@ -715,50 +866,23 @@ export function BoardPage() {
   }
 
   /**
-   * The piles that are spread out — and while the board is being arranged, that is all of them.
-   *
-   * Derived rather than stored, because arranging is when chains get *made*. Saying "B comes after
-   * A" turns those two into a pile the moment it is set; a snapshot taken when arrange mode opened
-   * knows nothing about a pile that did not exist yet, so B folded away under A on the spot — out
-   * of the board, and out of the "waits on…" list on every other card. Which meant a run could
-   * never grow past two: the card you had just chained was gone before you could point the next one
-   * at it. Nothing was wrong with the chain; it was the surface refusing to show its own middle.
-   *
-   * The hire's own open set is kept untouched underneath, so leaving arrange mode puts the piles
-   * back exactly as they were before.
-   */
-  const openStackIds = useMemo(
-    () => (isArranging ? allRootIds(stacks) : expandedStackIds),
-    [expandedStackIds, isArranging, stacks],
-  );
-
-  /**
-   * Undoes every cut at once: the filter, the section, the focus view and every folded stack.
+   * Undoes every cut at once: the step it was opened for, the filter, the section and the focus view.
    *
    * One function because the line that offers it counts *all* the cards the board is holding back,
-   * and an offer that cleared the filters but left four cards folded inside a stack would be a
-   * button that does not do what the sentence above it says.
+   * and an offer that cleared some of them would be a button that does not do what the sentence
+   * above it says.
    */
   function showEverything() {
     setOpenStages(new Set(BOARD_STAGES));
     setSectionId(null);
     setFilter("all");
     setExpandedStackIds(allRootIds(stacks));
-  }
-
-  function toggleStack(rootId: string) {
-    setExpandedStackIds((current) => {
-      const next = new Set(current);
-      if (next.has(rootId)) next.delete(rootId);
-      else next.add(rootId);
-
-      return next;
-    });
+    if (pathPlace) setSearchParams({}, { replace: true });
   }
 
   /**
-   * The cards on screen: stacks folded to one card each, then the owner filter, then the section,
-   * then the focus view.
+   * The cards on screen: the phase the board was opened for, then the owner filter, then the
+   * section, then the focus view.
    *
    * Pinned last and stably, so pinning one card lifts that card and disturbs nothing else. A
    * display sort, not a write: what gets sent on a reorder is what is on screen, so pinning and
@@ -768,12 +892,14 @@ export function BoardPage() {
    * matters to me now*, and a mode that overrode it would be the board arguing with them.
    */
   const shownCards = useMemo(() => {
-    // Stacks fold first, so every later cut sees one card where there is one card to work on. The
-    // alternative — filtering the members and then folding — would let the focus view hide the card
-    // a stack was about to stand on and leave the pile claiming a depth it no longer had.
-    const folded = collapseStacks(allCards, stacks, openStackIds);
-
-    const bySource = folded.filter((card) => matchesFilter(card, filter));
+    // The phase the board was opened for, first: it is the narrowest question anybody asks
+    // of this page, and the other cuts still apply within it.
+    // Piles fold first, so every later cut sees one card where there is one pile.
+    const folded = collapseStacks(allCards, stacks, visibleStackIds);
+    const atPlace = pathPlace
+      ? folded.filter((card) => isCardAt(card, pathPlace, phases, cardOrigins))
+      : folded;
+    const bySource = atPlace.filter((card) => matchesFilter(card, filter));
     const visible = cardsInSection(
       bySource,
       groups,
@@ -786,9 +912,12 @@ export function BoardPage() {
   }, [
     allCards,
     cardMarks,
+    cardOrigins,
     filter,
     groups,
-    openStackIds,
+    visibleStackIds,
+    pathPlace,
+    phases,
     pinnedIds,
     shownSectionId,
     stacks,
@@ -809,8 +938,12 @@ export function BoardPage() {
   const activeCuts = useMemo(() => {
     const cuts: string[] = [];
 
-    const foldedAway = allCards.length - collapseStacks(allCards, stacks, openStackIds).length;
-    if (foldedAway > 0) cuts.push(`${foldedAway} folded into sequences`);
+    const piled = allCards.length - collapseStacks(allCards, stacks, visibleStackIds).length;
+    if (piled > 0) cuts.push(`${piled} under other cards in piles`);
+
+    if (pathPlace) {
+      cuts.push(pathPlaceTitle ? `From “${pathPlaceTitle}”` : "From one phase");
+    }
 
     const cut = filterLabel(filter);
     if (cut) cuts.push(cut);
@@ -824,14 +957,18 @@ export function BoardPage() {
     // — a heading on the board reading "Later · 8 to do" — and repeating it up here would be the
     // page explaining something that is not hidden.
     return cuts;
-  }, [allCards, filter, openStackIds, shownSectionId, sections, stacks]);
+  }, [
+    allCards,
+    filter,
+    visibleStackIds,
+    pathPlace,
+    pathPlaceTitle,
+    shownSectionId,
+    sections,
+    stacks,
+  ]);
 
-  const handleReorder = (cardIds: string[]) => {
-    if (!pathCard || pathIndex === -1) return void reorder(cardIds);
-    const next = [...cardIds];
-    next.splice(Math.min(pathIndex, next.length), 0, pathCard.id);
-    return void reorder(next);
-  };
+  const handleReorder = (cardIds: string[]) => void reorder(cardIds);
 
   /**
    * Opens the planning mode, with nothing folded away.
@@ -844,520 +981,442 @@ export function BoardPage() {
    * jumping to everything first.
    *
    * What is still opened is what is *folded*: planning is about what comes after what, and a
-   * dependency you cannot see is one you cannot set. Stacks spread out too, for as long as the
-   * mode lasts — see `openStackIds`, which derives that rather than snapshotting it.
+   * dependency you cannot see is one you cannot set.
    */
   function startArranging() {
     setOpenStages(new Set(BOARD_STAGES));
     setIsArranging(true);
   }
 
-  const { generate, generating } = useGeneratedPathCards();
-
-  /**
-   * Builds the hire's personalised onboarding path into cards, and files them.
-   *
-   * The cards are written server-side; the areas, stages and order between them are this client's
-   * to keep, so both halves are applied here rather than left for the hire to arrange by hand. A
-   * generated path that landed as forty loose cards would be the exact complaint this answers.
-   */
-  async function handleGenerate() {
-    if (!selectedProjectId) return;
-
-    const existingTitles = new Set(
-      allCards.flatMap((card) =>
-        card.content.kind === "CHECKLIST" && card.content.title ? [card.content.title] : [],
-      ),
-    );
-
-    const result = await generate(selectedProjectId, roleIds, existingTitles);
-
-    if (result === "NOTHING_TO_BUILD") {
-      toast.info("Nothing to build from yet", {
-        description:
-          "Generate your onboarding path on the Onboarding page, or ask your PM to set up card blueprints.",
-      });
-      return;
-    }
-    if (result === "NOTHING_NEW") {
-      toast.info("Your path is already on the board", {
-        description: "Every step that isn't finished is already a card here.",
-      });
-      return;
-    }
-    if (result === "FAILED") {
-      showErrorToast("Your path couldn't be built into cards", {
-        description: "Nothing was changed — try again.",
-      });
-      return;
-    }
-
-    // One area per phase, named after it — and a second run adds to the area it made the first
-    // time rather than making another one beside it. Without that, generating again after the PM
-    // added a blueprint left two areas called "From your team", one holding the old cards and one
-    // holding the new, which is the same card twice as far as anybody reading the board can tell.
-    //
-    // The index is in the id because a plan is applied inside a single millisecond and `Date.now()`
-    // alone would mint the same id for every phase.
-    const stamp = Date.now();
-    const filed = [...groups];
-    result.areas.forEach((area, index) => {
-      const existing = filed.findIndex((group) => group.name === area.name);
-      if (existing !== -1) {
-        filed[existing] = {
-          ...filed[existing],
-          cardIds: [...filed[existing].cardIds, ...area.cardIds],
-        };
-
-        return;
-      }
-
-      filed.push({
-        id: `group-path-${stamp}-${index}`,
-        name: area.name,
-        cardIds: area.cardIds,
-        collapsed: false,
-      });
-    });
-    saveGroups(filed);
-    applyPlan(result.stages, result.chain);
-
-    refresh();
-    toast.success(`${result.cardCount} cards added from your path`, {
-      description: "Grouped by phase, in the order the path puts them in.",
-    });
-  }
-
   /**
    * The gutters the page draws in.
    *
-   * Focus mode trades the 10rem page gutter for a margin wide enough to keep the tool rail off the
+   * Outside focus mode it is the page gutter, widened on the right from `lg` up to clear the tool
+   * rail parked there (`app-page-frame--rail`): the gutter is fluid now, and at 1024px it is only
+   * 2rem. Focus mode trades the page gutter for a margin wide enough to keep the tool rail off the
    * cards and no wider — the whole reason somebody expands the board is that the gutters were space
    * they were not using, and giving them back at the same width would be the button doing nothing.
    */
-  const frameClass = isFocused ? "px-4 sm:px-6 lg:pr-20 lg:pl-6" : "app-page-frame";
+  // The rail's own groups lay themselves out by a prop, not by CSS, so the rail has to know
+  // which way it is standing: up the margin from `lg`, across the page below it.
+  const isRailVertical = useMediaQuery("(min-width: 1024px)");
+
+  const frameClass = isFocused
+    ? "px-4 sm:px-6 lg:pr-20 lg:pl-6"
+    : "app-page-frame app-page-frame--rail";
 
   return (
-    <div className="min-h-screen">
-      {/* Gone in focus mode, with everything on it either in the tool rail already or one Escape
+    // The path, for the notes that link into it with `[[…]]` — see `hooks/boardPath.ts`.
+    <BoardPathContext.Provider value={boardPath}>
+      <div className="min-h-screen">
+        {/* Gone in focus mode, with everything on it either in the tool rail already or one Escape
           away. */}
-      {!isFocused && (
-        <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
-          <div className={`${frameClass} py-6`}>
-            <PageHeader
-              icon={LayoutDashboard}
-              title="Board"
-              subtitle={
-                isArranging
-                  ? "Say when each card is due and what it waits on."
-                  : "Where your onboarding stays put between conversations."
-              }
-              actions={
-                isArranging ? (
-                  <Button
-                    variant="primary"
-                    onClick={() => setIsArranging(false)}
-                    icon={<Check className="h-4 w-4" aria-hidden="true" />}
-                  >
-                    Done
-                  </Button>
-                ) : (
-                  <>
+        {!isFocused && (
+          <header className="border-b border-app-border bg-app-bg/90 backdrop-blur-xl">
+            <div className={`${frameClass} py-6`}>
+              <PageHeader
+                icon={LayoutDashboard}
+                title="Board"
+                subtitle={
+                  isArranging
+                    ? "Put cards into piles and areas, and move them where they belong."
+                    : "Where your work stays put between conversations."
+                }
+                actions={
+                  isArranging ? (
                     <Button
-                      variant="secondary"
-                      onClick={() => void handleGenerate()}
-                      disabled={!selectedProjectId}
-                      loading={generating}
-                      icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
-                      title="Turn your personalised onboarding path into checklists here"
+                      variant="primary"
+                      onClick={() => setIsArranging(false)}
+                      icon={<Check className="h-4 w-4" aria-hidden="true" />}
                     >
-                      Build my path
+                      Done
                     </Button>
-                    {/* The one switch from the rail worth a copy here, for the widths where
-                        there is no margin to put a rail in. `lg:hidden` rather than a second
-                        implementation: one state, two places it can be reached from. */}
-                    <Button
-                      variant="secondary"
-                      iconOnly
-                      className="lg:hidden"
-                      onClick={startArranging}
-                      disabled={!board}
-                      title="Plan the board"
-                      aria-label="Plan the board"
-                    >
-                      <ListTree className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={refresh}
-                      disabled={!selectedProjectId}
-                      loading={loading}
-                      icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
-                    >
-                      Refresh
-                    </Button>
-                  </>
-                )
-              }
-            />
-          </div>
-        </header>
-      )}
-
-      <main ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
-        {/*
-          On the board rather than in the header. The header was a place for furniture about the
-          page; this is about the work, and it belongs where the work is.
-        */}
-        {isPathShown && <BoardPathWindow boardId={boardId} onRemove={removePathWindow} />}
-        {pathCard?.content.kind === "PATH_TO_FIRST_CONTRIBUTION" && (
-          <BoardPathNotes content={pathCard.content} />
+                  ) : (
+                    <>
+                      <Button
+                        variant="secondary"
+                        onClick={refresh}
+                        disabled={!selectedProjectId}
+                        loading={loading}
+                        icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+                      >
+                        Refresh
+                      </Button>
+                    </>
+                  )
+                }
+              />
+            </div>
+          </header>
         )}
-        {/* The page keeps a 10rem margin either side from `lg` up, and on this page it is dead
-            space: the board is a column of cards and the margin is where a hand rests. So the
-            offers live there — always in reach, never in the way, and out of the row above the
-            board where they were competing with the controls that decide what is *shown*.
+
+        <MainContent ref={swipeRef} className={`${frameClass} relative space-y-5 py-6 lg:py-8`}>
+          {/* The page keeps a margin either side from `lg` up (at least 5rem on the right here, see
+            `frameClass`), and on this page it is dead space: the board is a column of cards and
+            the margin is where a hand rests. So the offers live there — always in reach, never in
+            the way, and out of the row above the board where they were competing with the
+            controls that decide what is *shown*.
             Absolute rather than a column of its own, so nothing about the board's own width or its
-            two-column packing changes; hidden below `lg`, where there is no margin to sit in.
+            two-column packing changes. Below `lg` there is no margin to sit in, and it lies across
+            the page above the cards instead.
 
             It stays up while the board is being arranged, which it did not use to: arranging is now
             one of the switches on it, and a switch that takes its own rail off the screen leaves
             nothing to switch back with — in focus mode, where the header's "Done" is gone too,
             nothing at all. */}
-        {selectedProjectId && (
-          <div
-            className={
-              // Centred on the viewport once the page is the whole screen. With the header gone
-              // there is nothing at the top for it to hang under, and a rail pinned to a corner of
-              // a screen this wide is a long way from wherever the pointer is.
-              isFocused
-                ? "fixed top-1/2 right-3 z-20 hidden -translate-y-1/2 lg:block"
-                : "absolute top-6 right-3 z-20 hidden lg:top-8 lg:block"
-            }
-          >
+          {selectedProjectId && (
             <div
-              className={[
-                "flex flex-col items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur",
-                // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
-                // itself on a short screen rather than losing its last buttons off the bottom.
-                isFocused ? "max-h-[calc(100vh-2rem)] overflow-y-auto" : "sticky top-6",
-              ].join(" ")}
+              className={
+                // Centred on the viewport once the page is the whole screen. With the header gone
+                // there is nothing at the top for it to hang under, and a rail pinned to a corner of
+                // a screen this wide is a long way from wherever the pointer is.
+                //
+                // Below `lg` there is no margin to park it in, so it is the same rail lying flat in
+                // the page above the cards -- not a second, smaller set of controls.
+                isFocused
+                  ? "z-20 lg:fixed lg:top-1/2 lg:right-3 lg:-translate-y-1/2"
+                  : "z-20 lg:absolute lg:top-8 lg:right-3"
+              }
             >
-              {/* Widest change first: expanding takes the app's own navigation and this page's
+              <div
+                // A group, not a toolbar: `toolbar` promises one tab stop with arrow keys between the
+                // buttons, and every button here is its own tab stop.
+                role="group"
+                aria-label="Board tools"
+                className={[
+                  "flex w-fit max-w-full flex-row flex-wrap items-center gap-1 rounded-2xl border border-app-border bg-app-surface/90 p-1 shadow-sm backdrop-blur lg:flex-col lg:flex-nowrap",
+                  // Fixed to the viewport it can no longer grow past the fold, so it scrolls in
+                  // itself on a short screen rather than losing its last buttons off the bottom.
+                  isFocused
+                    ? "lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+                    : "lg:sticky lg:top-6",
+                ].join(" ")}
+              >
+                {/* Widest change first: expanding takes the app's own navigation and this page's
                   header off the screen, so it is the one switch that has to be found before any of
                   the others are worth reaching for — and the one that has to stay put afterwards,
                   because it is the way back. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => setFocused(!isFocused)}
-                aria-pressed={isFocused}
-                title={isFocused ? "Back to the app (Esc)" : "Expand the board"}
-                aria-label={isFocused ? "Back to the app" : "Expand the board"}
-              >
-                {isFocused ? (
-                  <Minimize2 className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <Maximize2 className="h-4 w-4" aria-hidden="true" />
-                )}
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => setFocused(!isFocused)}
+                  aria-pressed={isFocused}
+                  title={isFocused ? "Back to the app (Esc)" : "Expand the board"}
+                  aria-label={isFocused ? "Back to the app" : "Expand the board"}
+                >
+                  {isFocused ? (
+                    <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </Button>
 
-              <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
+                <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
 
-              {/* Planning and making an area are the two ways of changing the board's *shape*,
+                {/* Planning and making an area are the two ways of changing the board's *shape*,
                   which is why they sit together and away from the three that add something to it.
                   It is a toggle rather than a door: the way out has to be where the way in was,
                   especially with the header's "Done" gone in focus mode. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
-                disabled={!board}
-                aria-pressed={isArranging}
-                title={isArranging ? "Done planning" : "Plan the board"}
-                aria-label={isArranging ? "Done planning" : "Plan the board"}
-              >
-                {isArranging ? (
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <ListTree className="h-4 w-4" aria-hidden="true" />
-                )}
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => (isArranging ? setIsArranging(false) : startArranging())}
+                  disabled={!board}
+                  aria-pressed={isArranging}
+                  title={isArranging ? "Done planning" : "Plan the board"}
+                  aria-label={isArranging ? "Done planning" : "Plan the board"}
+                >
+                  {isArranging ? (
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <ListTree className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => setNamingArea(true)}
-                disabled={!board}
-                aria-pressed={namingArea}
-                title="New area"
-                aria-label="New area"
-              >
-                <FolderPlus className="h-4 w-4" aria-hidden="true" />
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => setNamingArea(true)}
+                  disabled={!board}
+                  aria-pressed={namingArea}
+                  title="New area"
+                  aria-label="New area"
+                >
+                  <FolderPlus className="h-4 w-4" aria-hidden="true" />
+                </Button>
 
-              {/* The strip saying where the hire stands, on or off this board. The switch lives
+                {/* The strip saying where the hire stands, on or off this board. The switch lives
                   here rather than on the strip, because the strip is the thing being switched: a
                   control that takes its own surface away leaves nothing to press to get it back. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={() => showPathWindow(!isPathShown)}
-                disabled={!board}
-                aria-pressed={isPathShown}
-                title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-                aria-label={isPathShown ? "Hide where you are in your path" : "Show where you are"}
-              >
-                <Milestone className="h-4 w-4" aria-hidden="true" />
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  onClick={() => showPathWindow(!isPathShown)}
+                  disabled={!board}
+                  aria-pressed={isPathShown}
+                  title={isPathShown ? "Hide where you are in your path" : "Show where you are"}
+                  aria-label={
+                    isPathShown ? "Hide where you are in your path" : "Show where you are"
+                  }
+                >
+                  <Milestone className="h-4 w-4" aria-hidden="true" />
+                </Button>
 
-              {/* Which cards, by where they came from. It sits below the switches that change the
+                {/* The task pool, on or off — the same kind of switch as the path strip above, and
+                  for the same reason: the card's own X only hides it, so the way back has to live
+                  somewhere the card is not. */}
+                {hasTaskPool && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    onClick={() => showTaskPool(!isTaskPoolShown)}
+                    aria-pressed={isTaskPoolShown}
+                    title={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                    aria-label={isTaskPoolShown ? "Hide the task pool" : "Show the task pool"}
+                  >
+                    <LayoutList className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                )}
+
+                {/* Which cards, by where they came from. It sits below the switches that change the
                   board's shape because it changes neither the board nor its shape — it only
                   narrows what is drawn, and it is the one control here that is undone by pressing
                   a different button in the same group rather than the same one again. */}
-              {allCards.length > 2 && (
-                <>
-                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-                  <BoardFilterTriggers value={filter} onChange={setFilter} compact vertical />
-                </>
-              )}
-
-              {/* Directly under it, because it is the same kind of thing: it narrows what is drawn
-                  and nothing else. Where they came from, then what you marked on them. */}
-              <MarkFilterRail
-                sections={markSections}
-                selectedId={shownSectionId}
-                onSelect={setSectionId}
-                vertical
-              />
-
-              {/* Nothing is added to a board somebody is rearranging: the three forms open over the
-                  cards, which is exactly where the arranging is happening. */}
-              {!isArranging && (
-                <>
-                  <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />
-                  <AddCardTriggers onPick={setAddingKind} active={addingKind} compact vertical />
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {!selectedProjectId && !projectsLoading ? (
-          <EmptyState
-            icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
-            title="No project yet"
-          >
-            You&apos;re not on a project yet, so there&apos;s nothing to put on a board. Whoever set
-            up your account can add you to one.
-          </EmptyState>
-        ) : showLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size="lg" label="Loading your board" />
-          </div>
-        ) : error ? (
-          <div
-            role="alert"
-            className="flex items-start gap-3 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
-          >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <div className="min-w-0 space-y-2">
-              <p>Your board couldn&apos;t be loaded.</p>
-              <Button variant="secondary" size="sm" onClick={refresh}>
-                Try again
-              </Button>
-            </div>
-          </div>
-        ) : griddedBoard ? (
-          <div className="min-w-0 space-y-5">
-            {/* One row: which part of the board on the left, what to do with it on the right. The
-                filter used to sit on a line of its own under the tabs, which read as a second
-                navigation for the same board — they are two halves of "what am I looking at", and
-                they belong side by side. `items-start` so the tab bar's own status line hangs
-                under the tabs rather than dragging the controls down with it. */}
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              {hasSectionTabs ? (
-                <div className="min-w-0 flex-1">
-                  <BoardSectionTabs
-                    sections={tabSections}
-                    selectedId={shownSectionId}
-                    // A colour is not one of the tabs, but it is still what is being shown, so its
-                    // line of counts is handed over rather than the bar falling back to
-                    // "Everything" and reporting a number that belongs to a different view.
-                    selected={sections.find((section) => section.id === shownSectionId)}
-                    onSelect={setSectionId}
-                  />
-                </div>
-              ) : (
-                <span />
-              )}
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* The rail in the margin takes over from `lg` up, where there is a margin to
-                      put it in. Below that these are the only offers on the page — and there is
-                      room for the words, which the rail's glyphs do without. */}
                 {allCards.length > 2 && (
-                  <BoardFilterTriggers value={filter} onChange={setFilter} className="lg:hidden" />
+                  <>
+                    <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
+                    <BoardFilterTriggers
+                      value={filter}
+                      onChange={setFilter}
+                      vertical={isRailVertical}
+                    />
+                  </>
                 )}
 
-                {/* Same reason as the filter beside it: the rail these live in only exists from
-                    `lg` up, and a colour you can only filter by on a laptop is a colour half the
-                    board's readers do not have. */}
+                {/* Directly under it, because it is the same kind of thing: it narrows what is drawn
+                  and nothing else. Where they came from, then what you marked on them. */}
                 <MarkFilterRail
                   sections={markSections}
                   selectedId={shownSectionId}
                   onSelect={setSectionId}
-                  className="lg:hidden"
+                  vertical={isRailVertical}
                 />
 
-                <AddCardTriggers onPick={setAddingKind} active={addingKind} className="lg:hidden" />
+                {/* Nothing is added to a board somebody is rearranging: the three forms open over the
+                  cards, which is exactly where the arranging is happening. */}
+                {!isArranging && (
+                  <>
+                    <span className={RAIL_SEPARATOR_CLASS} aria-hidden="true" />
+                    <AddCardTriggers
+                      onPick={setAddingKind}
+                      active={addingKind}
+                      vertical={isRailVertical}
+                    />
+                  </>
+                )}
               </div>
             </div>
+          )}
 
-            {/* Over the board rather than in the rail: the rail is 10rem of page margin, which is
-                room for a few glyphs and not for a form. */}
-            {addingKind && (
-              <AddCardForm kind={addingKind} onAdd={addCard} onClose={() => setAddingKind(null)} />
-            )}
+          {!selectedProjectId && !projectsLoading ? (
+            <EmptyState
+              icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
+              title="No project yet"
+            >
+              You&apos;re not on a project yet, so there&apos;s nothing to put on a board. Whoever
+              set up your account can add you to one.
+            </EmptyState>
+          ) : showLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Spinner size="lg" label="Loading your board" />
+            </div>
+          ) : error ? (
+            <div
+              role="alert"
+              className="flex items-start gap-3 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <div className="min-w-0 space-y-2">
+                <p>Your board couldn&apos;t be loaded.</p>
+                <Button variant="secondary" size="sm" onClick={refresh}>
+                  Try again
+                </Button>
+              </div>
+            </div>
+          ) : griddedBoard ? (
+            <div className="min-w-0 space-y-5">
+              {/* One row: which part of the board on the left, what to do with it on the right. The
+                filter used to sit on a line of its own under the tabs, which read as a second
+                navigation for the same board — they are two halves of "what am I looking at", and
+                they belong side by side. `items-start` so the tab bar's own status line hangs
+                under the tabs rather than dragging the controls down with it. */}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                {hasSectionTabs ? (
+                  <div className="min-w-0 flex-1">
+                    <BoardSectionTabs
+                      sections={tabSections}
+                      selectedId={shownSectionId}
+                      // A colour is not one of the tabs, but it is still what is being shown, so its
+                      // line of counts is handed over rather than the bar falling back to
+                      // "Everything" and reporting a number that belongs to a different view.
+                      selected={sections.find((section) => section.id === shownSectionId)}
+                      onSelect={setSectionId}
+                    />
+                  </div>
+                ) : (
+                  <span />
+                )}
+              </div>
 
-            {namingArea && (
-              <NewAreaForm onCreate={handleNewArea} onClose={() => setNamingArea(false)} />
-            )}
+              {/* Over the board rather than in the rail: the rail is page margin, which is room for a
+                few glyphs and not for a form. */}
+              {addingKind && (
+                <AddCardForm
+                  kind={addingKind}
+                  onAdd={addCard}
+                  onClose={() => setAddingKind(null)}
+                />
+              )}
 
-            <div className="min-w-0 space-y-4">
-              {/* Only the cards travel. The controls above are the same controls whatever section
+              {namingArea && (
+                <NewAreaForm onCreate={handleNewArea} onClose={() => setNamingArea(false)} />
+              )}
+
+              <div className="min-w-0 space-y-4">
+                {/* Under the section tabs, and outside the panel that slides between them: these are
+                    about the work rather than about one section of the board — where the hire is in
+                    their path and what is next, the phase just finished, and the check closing the
+                    one they are in. Kept together, so "continue" and "the check" read as one place. */}
+                {/* The phase check rides inside the path card, so "show where you are" on the rail
+                    shows and hides both. */}
+                {isPathShown && (
+                  <BoardPathWindow path={path} onRemove={removePathWindow}>
+                    <BoardPhaseCheck
+                      path={path}
+                      phases={phases}
+                      cards={allCards}
+                      origins={cardOrigins}
+                      marks={cardMarks}
+                      embedded
+                    />
+                  </BoardPathWindow>
+                )}
+
+                <BoardPhaseRecap boardId={boardId} path={path} />
+
+                {/* Only the cards travel. The controls above are the same controls whatever section
                   is open, and sliding them out and back would be the page redrawing its own
                   furniture every time somebody moved one tab across. */}
-              <SlidingTabPanel activeKey={sectionValue} index={sectionIndex} className="space-y-4">
-                {/* A board with nothing on it is the first thing a new hire sees, and an empty page
+                <SlidingTabPanel
+                  activeKey={sectionValue}
+                  index={sectionIndex}
+                  className="space-y-4"
+                >
+                  {/* A board with nothing on it is the first thing a new hire sees, and an empty page
                 cannot say what the board is *for*. Named after what it will hold rather than after
-                its own emptiness — and it points at the two things that fill it: the path, and the
-                row of buttons directly above. */}
-                {allCards.length === 0 && (
-                  <EmptyState
-                    icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
-                    title="Nothing on your board yet"
-                    action={
-                      <Button
-                        variant="primary"
-                        onClick={() => void handleGenerate()}
-                        loading={generating}
-                        icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+                its own emptiness — and it says where the onboarding is, because it is not here. */}
+                  {allCards.length === 0 && (
+                    <EmptyState
+                      icon={<LayoutDashboard className="h-8 w-8" aria-hidden="true" />}
+                      title="Nothing on your board yet"
+                    >
+                      This is where things stay put between conversations — the task you are on,
+                      work worth picking up, what your buddy remembers. Add a note, a link or a list
+                      of your own at any time. Your onboarding itself is on the{" "}
+                      <Link
+                        to="/onboarding"
+                        className="font-medium text-app-brand-text underline underline-offset-2"
                       >
-                        Build my path
-                      </Button>
-                    }
-                  >
-                    This is where things stay put between conversations — the task you are on, work
-                    worth picking up, what your buddy remembers. Build your onboarding path into
-                    checklists here, and add a note, a link or a list of your own at any time.
-                  </EmptyState>
-                )}
+                        Onboarding page
+                      </Link>
+                      .
+                    </EmptyState>
+                  )}
 
-                {/* The section is empty rather than the board: different states, and only one of them
+                  {/* The section is empty rather than the board: different states, and only one of them
                   is fixed by generating anything. */}
-                {allCards.length > 0 && shownCards.length === 0 && (
-                  <EmptyState size="sm">
-                    Nothing here right now.{" "}
-                    {hiddenCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={showEverything}
-                        className="font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                      >
-                        Show all {allCards.length} cards
-                      </button>
-                    )}
-                  </EmptyState>
-                )}
+                  {allCards.length > 0 && shownCards.length === 0 && (
+                    <EmptyState size="sm">
+                      Nothing here right now.{" "}
+                      {hiddenCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={showEverything}
+                          className="font-medium text-app-brand-text hover:underline"
+                        >
+                          Show all {allCards.length} cards
+                        </button>
+                      )}
+                    </EmptyState>
+                  )}
 
-                {/* First, above the status line: "showing 6 of 34" is about the view, and this is
-                    about the work. The one line on this page that answers with a thing to do rather
-                    than with a smaller list to choose from. */}
-                <BoardNextUp next={startHere} />
+                  <BoardViewStatus
+                    shown={shownCards.length}
+                    total={allCards.length}
+                    cuts={activeCuts}
+                    onShowEverything={showEverything}
+                  />
 
-                <BoardViewStatus
-                  shown={shownCards.length}
-                  total={allCards.length}
-                  cuts={activeCuts}
-                  onShowEverything={showEverything}
-                />
-
-                {/* Under the line about what is shown, because it is the same kind of fact about
+                  {/* Under the line about what is shown, because it is the same kind of fact about
                     the board rather than about the work: that one says how much of it you are
                     looking at, this one says where the arrangement is being kept. */}
-                <BoardLocalOnlyNotice localOnly={localOnly} />
+                  <BoardLocalOnlyNotice localOnly={localOnly} />
 
-                <BoardGrid
-                  board={griddedBoard}
-                  onDismiss={handleDismiss}
-                  dismissingId={dismissingId}
-                  onEdit={(cardId, request) => void editCard(cardId, request)}
-                  // A checklist broken out of a task is a *new* card, which only a re-read can
-                  // show. Without this the write lands and the board keeps drawing what it read
-                  // before the press.
-                  onCardAdded={refresh}
-                  onReorder={handleReorder}
-                  boardOrder={allCards.map((card) => card.id)}
-                  isArranging={isArranging}
-                  collapsedIds={collapsedIds}
-                  onToggleCollapsed={toggleCollapsed}
-                  pinnedIds={pinnedIds}
-                  onTogglePinned={togglePinned}
-                  groups={groups}
-                  onAssignGroup={handleAssignGroup}
-                  onRenameGroup={handleRenameGroup}
-                  onToggleGroup={handleToggleGroup}
-                  onDissolveGroup={handleDissolveGroup}
-                  onRecolourGroup={handleRecolourGroup}
-                  states={states}
-                  onAssignStage={assignStage}
-                  onAssignGroupStage={assignGroupStage}
-                  onToggleDone={toggleDone}
-                  onSetPredecessor={setPredecessor}
-                  onShowChain={setChainCardId}
-                  stacks={stacks}
-                  expandedStackIds={openStackIds}
-                  onToggleStack={toggleStack}
-                  openStages={openStages}
-                  onToggleStage={toggleStage}
-                  cardSizes={cardSizes}
-                  cardOrigins={cardOrigins}
-                  onResizeCard={resizeCard}
-                />
-              </SlidingTabPanel>
+                  <BoardGrid
+                    board={griddedBoard}
+                    onDismiss={handleDismiss}
+                    dismissingId={dismissingId}
+                    onEdit={(cardId, request) => void editCard(cardId, request)}
+                    onRestorePrevious={(cardId, replacedAt) =>
+                      void restorePrevious(cardId, replacedAt)
+                    }
+                    restoringIds={restoringIds}
+                    savingIds={savingIds}
+                    undoNotices={undoNotices}
+                    // A checklist broken out of a task is a *new* card, which only a re-read can
+                    // show. Without this the write lands and the board keeps drawing what it read
+                    // before the press.
+                    onCardAdded={refresh}
+                    onReorder={handleReorder}
+                    boardOrder={allCards.map((card) => card.id)}
+                    isArranging={isArranging}
+                    collapsedIds={collapsedIds}
+                    onToggleCollapsed={toggleCollapsed}
+                    pinnedIds={pinnedIds}
+                    onTogglePinned={togglePinned}
+                    groups={groups}
+                    onAssignGroup={handleAssignGroup}
+                    onRenameGroup={handleRenameGroup}
+                    onToggleGroup={handleToggleGroup}
+                    onDissolveGroup={handleDissolveGroup}
+                    onRecolourGroup={handleRecolourGroup}
+                    states={states}
+                    onStackOnto={handleStackOnto}
+                    stacks={stacks}
+                    expandedStackIds={visibleStackIds}
+                    onToggleStack={toggleVisibleStack}
+                    openStages={openStages}
+                    onToggleStage={toggleStage}
+                    cardSizes={cardSizes}
+                    cardOrigins={cardOrigins}
+                    onResizeCard={resizeCard}
+                  />
+                </SlidingTabPanel>
+              </div>
             </div>
-          </div>
-        ) : null}
-
-        {/* The board is curated by the mentor, so it should always be one click from them. */}
-        <p className="text-sm text-app-text-muted">
-          <Link
-            to="/buddy"
-            className="inline-flex items-center gap-1.5 font-medium text-app-brand-text hover:underline"
-          >
-            <Bot className="h-4 w-4" aria-hidden="true" />
-            Ask your buddy about any of this
-          </Link>
-        </p>
-      </main>
-
-      <BoardChainPanel
-        cardId={chainCardId}
-        cards={allCards}
-        structure={structure}
-        states={states}
-        onClose={() => setChainCardId(null)}
-      />
-    </div>
+          ) : null}
+        </MainContent>
+      </div>
+    </BoardPathContext.Provider>
   );
 }
 
-/** Every stack's root id — what "open all of them" means. */
+/** Every pile's root id — what "open all of them" means. */
 function allRootIds(stacks: Map<string, { rootId: string }>): Set<string> {
   return new Set([...stacks.values()].map((stack) => stack.rootId));
 }

@@ -66,10 +66,10 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-app-border bg-app-surface p-6 shadow-sm">
+    <div className="rounded-xl border border-app-border bg-app-bg p-4 sm:p-6">
       <h2 className="mb-4 text-lg font-semibold text-app-text">Account Information</h2>
 
-      <div className="mb-6 flex items-center gap-6">
+      <div className="mb-6 flex flex-wrap items-center gap-6">
         <div className="group relative">
           <UserAvatar
             size={80}
@@ -78,8 +78,8 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
             seed={profile.id}
           />
         </div>
-        <div>
-          <h3 className="text-lg font-semibold text-app-text">{profile.username}</h3>
+        <div className="min-w-0">
+          <h3 className="text-lg font-semibold break-words text-app-text">{profile.username}</h3>
           <p className="mb-2 text-sm font-medium tracking-wider text-app-text-muted uppercase">
             {profile.projectRoles.length > 0
               ? profile.projectRoles.map((role) => role.name).join(", ")
@@ -92,7 +92,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
       </div>
 
       {isChoosingIcon && (
-        <div className="animate-in fade-in slide-in-from-top-2 mb-6 rounded-2xl border border-app-border bg-app-bg p-4 shadow-sm">
+        <div className="animate-in fade-in slide-in-from-top-2 mb-6 rounded-xl border border-app-border bg-app-surface p-4">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-medium text-app-text">Select an Avatar</span>
             <Button variant="ghost" size="sm" onClick={generateOptions}>
@@ -105,7 +105,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
                 key={seed}
                 type="button"
                 onClick={() => handleSelectIcon(seed)}
-                className="shrink-0 rounded-full transition-transform hover:scale-110 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none"
+                className="shrink-0 rounded-full transition-transform hover:scale-110"
                 aria-label={`Select avatar ${seed}`}
               >
                 <UserAvatar size={48} profileIcon={seed} />
@@ -122,7 +122,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
         className="space-y-4"
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Field label="First Name" controlId="firstName">
+          <Field label="First Name" controlId="firstName" required>
             <Input
               type="text"
               value={firstName}
@@ -130,7 +130,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
               required
             />
           </Field>
-          <Field label="Last Name" controlId="lastName">
+          <Field label="Last Name" controlId="lastName" required>
             <Input
               type="text"
               value={lastName}
@@ -140,7 +140,7 @@ export function AccountForm({ profile, onUpdate }: AccountFormProps) {
           </Field>
         </div>
 
-        <Field label="Email Address" controlId="email">
+        <Field label="Email Address" controlId="email" required>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </Field>
 

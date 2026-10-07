@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { Spinner } from "../../../components/ui/Spinner";
 import { centralSpringToken } from "../../../styles/tokens";
+import { RouteErrorBoundary } from "../../../router/RouteErrorBoundary";
 import {
   LAUNCHER_SIZE,
   isLeftCorner,
@@ -17,14 +20,70 @@ import {
   type BuddyCorner,
 } from "../buddyCorner";
 import { onBuddyPageReady } from "../aiBuddyBus";
+import { BUDDY_PAGE_PATH as BUDDY_PAGE, isBuddyPagePath } from "../buddyPagePath";
 import { useBuddy } from "../hooks/useBuddy";
 import { useGreetingReveal } from "../hooks/useGreetingReveal";
+import { useProjectContext } from "../../projects/useProjectContext";
+import { CitationPopover } from "../citations/CitationPopover";
+import { citationDrawerProjectId } from "../citations/citationArtifact";
+import { useCitationViewer } from "../citations/useCitationViewer";
 import { BuddyModeSwitcher } from "./BuddyModeSwitcher";
 import { BuddyDock, DOCK_EXPAND_S, DOCK_REVEAL_S } from "./BuddyDock";
 import { BuddyLauncher } from "./BuddyLauncher";
 
-/** Where the full conversation lives. The dock grows into it rather than getting bigger. */
-const BUDDY_PAGE = "/buddy";
+/**
+ * The citation drawer arrives only when a citation opens it. Its module carries Prism with every
+ * language grammar and KaTeX — the biggest chunk in the app — and this widget is mounted at the
+ * app root, so a static import put all of it in the boot graph that every visitor pays for before
+ * the first page settles, the login screen included. The Knowledge Base page and the buddy page
+ * reach the same chunk on their own routes; here it loads on the click that needs it.
+ */
+const ArtifactViewerDrawer = lazy(() =>
+  import("../../knowledge-base/components/ArtifactViewerDrawer").then((module) => ({
+    default: module.ArtifactViewerDrawer,
+  })),
+);
+
+/**
+ * The citation drawer's two non-happy states. The widget is mounted outside `AppRouter`'s
+ * boundary, so a rejected chunk (a stale deploy, a dropped connection) would otherwise travel
+ * to the React root and take the whole app down; the boundary at the render site keeps it
+ * local. The loading state answers the click while the chunk — Prism + KaTeX, the biggest in
+ * the app — arrives; without it the click read as dead.
+ */
+function CitationDrawerLoading(): ReactNode {
+  return (
+    <div
+      className="fixed inset-y-0 right-0 z-50 flex h-dvh w-full max-w-5xl flex-col items-center justify-center overflow-hidden border-l border-app-border bg-app-surface shadow-2xl sm:rounded-l-[28px]"
+      aria-busy="true"
+    >
+      <Spinner size="lg" label="Opening the artifact" />
+    </div>
+  );
+}
+
+function CitationDrawerFailure(): ReactNode {
+  return (
+    <div
+      className="fixed right-4 bottom-4 z-50 max-w-sm rounded-xl border border-app-border bg-app-surface p-4 shadow-app-brand-lift"
+      role="alert"
+    >
+      <p className="text-sm font-medium text-app-text">The artifact couldn&apos;t open.</p>
+      <p className="mt-1 text-xs leading-relaxed text-app-text-muted">
+        A reload usually fixes it — a new deployment may have replaced the file this page was built
+        from.
+      </p>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="mt-3"
+        onClick={() => window.location.reload()}
+      >
+        Reload page
+      </Button>
+    </div>
+  );
+}
 
 /** How long to wait for `/buddy` to announce itself before uncovering it anyway, in ms. */
 const HANDOFF_FALLBACK_MS = 1200;
@@ -35,7 +94,7 @@ const HANDOFF_FALLBACK_MS = 1200;
  *
  * Mounted once at the app root (see `App.tsx`) so it survives navigation and keeps one
  * conversation for the lifetime of the session — which is what "always-on" means, and the
- * reason it is not a per-page component. `useBuddy` warms the visit on mount for the same
+ * reason it is not a per-page component. `useBuddy` warms the conversation on mount for the same
  * reason: writing a greeting is the slow part of meeting the buddy, and doing it before the
  * click turns the click into the replay path.
  *
@@ -54,10 +113,29 @@ const HANDOFF_FALLBACK_MS = 1200;
 export function BuddyWidget() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // The artifact drawer the dock's citations open needs a project to fetch the source within —
+  // the conversation's own where it has one (see `citationProjectId`), the same gate the chat
+  // applies to its own drawer.
+  const { selectedProjectId } = useProjectContext();
+  // The dock's citation popover + artifact drawer, held here (not in the dock) for the same
+  // reason the widget owns every other piece of surface state: the dock unmounts on close.
+  const citationViewer = useCitationViewer();
   const {
     messages,
+    sessions,
+    currentSessionId,
     isThinking,
     isStreaming,
+    stopStreaming,
+    queued,
+    queuePaused,
+    removeQueued,
+    pullQueuedMessage,
+    resumeQueue,
+    filters,
+    setFilters,
+    capabilitiesEnabled,
+    setCapabilitiesEnabled,
     isOpening,
     activeTool,
     openerAction,
@@ -66,24 +144,37 @@ export function BuddyWidget() {
     markGreetingPresented,
     isOpen,
     toggleOpen,
-    draft,
-    setDraft,
-    handleSubmit,
     confirmAction,
     dismissAction,
+    actionDrafts,
+    setActionDraft,
     suggestions,
+    dinoGameActive,
+    closeDinoGame,
+    registerDinoSurface,
     openError,
     retryOpen,
+    retryReply,
     closeDock,
-    startFreshVisit,
+    newConversation,
     teamProjectId,
     switchTeamProject,
     isGreeting,
     isDeciding,
   } = useBuddy();
 
+  // The drawer's content read is project-scoped: open citations in the conversation's own
+  // project, not the globally selected one — the hire may have switched since it started.
+  const citationSession = sessions.find((session) => session.id === currentSessionId);
+  const citationProjectId = citationDrawerProjectId(
+    citationSession?.projectId,
+    teamProjectId,
+    selectedProjectId,
+  );
+
   // The switcher (and the composer, and everything else) waits: a turn in flight cannot be
-  // called back into a thread that a switch would clear. Same rule as the fresh-visit control.
+  // called back into a thread that a switch would clear. Same rule as the new-conversation
+  // control.
   // `isGreeting` closes the hole where the first token had already released `isOpening` while
   // the greeting was still streaming.
   const isTurnInFlight = isThinking || isStreaming || isOpening || isGreeting || isDeciding;
@@ -185,10 +276,65 @@ export function BuddyWidget() {
 
   useEffect(() => clearHandoffTimers, [clearHandoffTimers]);
 
+  /**
+   * Hands the conversation over to `/buddy`.
+   *
+   * Nothing has to ride along with it: the composer lives in `BuddyDraftProvider`, which sits above
+   * the router, so the page's box already holds the words this window holds — the hand-off is the
+   * same conversation on a wider surface, not a transfer. Carrying a copy through history state was
+   * a second mechanism for that, and it was what made this callback depend on the draft: every
+   * keystroke rebuilt `goToPage`, then `openFull`, then the dock.
+   */
   const goToPage = useCallback(() => {
-    // The draft rides along in history state; `useHandedOffDraft` applies it once on the page.
-    void navigate(BUDDY_PAGE, { state: { draft } });
-  }, [draft, navigate]);
+    // The conversation on screen is the one the page should open — the hand-off lands on the
+    // thread the hire was reading, not on whichever conversation the page happens to resolve
+    // as newest. A dock that has not opened a conversation yet has nothing to name and falls
+    // back to the plain route; the page resolves it the way it always did.
+    void navigate(currentSessionId ? `${BUDDY_PAGE}/${currentSessionId}` : BUDDY_PAGE);
+  }, [navigate, currentSessionId]);
+
+  /**
+   * The props the dock's memoised thread compares, each held in one identity.
+   *
+   * The thread — and every row in it — is memoised, which is what keeps a keystroke and every
+   * streamed token out of the conversation's re-render path (issue #236). Any of these built
+   * inline here would hand it a new prop on every render of the widget and put them all back.
+   */
+  const hasUserMessage = messages.some((message) => message.role === "USER");
+  // The greeting's one suggested next step, which only `/buddy` used to offer.
+  const lastMessageFooter = useMemo(
+    () =>
+      openerAction && !greeting.isRevealing && !hasUserMessage ? (
+        <Button
+          variant="primary"
+          size="sm"
+          className="mt-1.5"
+          icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+          onClick={() => void sendMessage(openerAction.question)}
+        >
+          {openerAction.label}
+        </Button>
+      ) : undefined,
+    [openerAction, greeting.isRevealing, hasUserMessage, sendMessage],
+  );
+  const retryOpenAction = useCallback(() => void retryOpen(), [retryOpen]);
+  const hideSuggestions = useCallback(() => setSuggestionsHidden(true), []);
+
+  /**
+   * The dock's header control, held in one identity for the same reason as the props above: the
+   * dock is memoised, and a switcher built inline here would be a fresh element on every render of
+   * the widget — a prop the memo would compare and always find changed.
+   */
+  const headerControl = useMemo(
+    () => (
+      <BuddyModeSwitcher
+        teamProjectId={teamProjectId}
+        onSwitch={(projectId) => void switchTeamProject(projectId)}
+        disabled={isTurnInFlight}
+      />
+    ),
+    [teamProjectId, switchTeamProject, isTurnInFlight],
+  );
 
   /**
    * Grows the open dock into the page — one gesture instead of a cut.
@@ -261,11 +407,20 @@ export function BuddyWidget() {
     };
   }, [handoff, closeDock]);
 
-  // Normally the widget takes itself off `/buddy` — the launcher would offer the page you are
-  // reading, and the dock would put a second composer over the first. During the hand-off it
+  // The dock is a surface the dino game may live in only while it is actually on screen:
+  // minimised, or hidden behind `/buddy`, a Space press must not open a game nobody can see.
+  const dockVisible = isOpen && !(isBuddyPagePath(pathname) && handoff === "idle");
+  useEffect(() => {
+    if (!dockVisible) return;
+    return registerDinoSurface();
+  }, [dockVisible, registerDinoSurface]);
+
+  // Normally the widget takes itself off the buddy page — the launcher would offer the page you
+  // are reading, and the dock would put a second composer over the first. During the hand-off it
   // has to stay: it *is* the transition, and unmounting it the instant the route changes is
-  // precisely the flash this sequencing exists to remove.
-  if (pathname === BUDDY_PAGE && handoff === "idle") return null;
+  // precisely the flash this sequencing exists to remove. The per-conversation addresses
+  // (`/buddy/:id`) are just as much "the page" — see `isBuddyPagePath`.
+  if (isBuddyPagePath(pathname) && handoff === "idle") return null;
 
   return (
     <>
@@ -283,47 +438,51 @@ export function BuddyWidget() {
             // `isOpening` too, the way `/buddy` passes it: a dock opened while the greeting is
             // still being written showed an empty window instead of the buddy typing.
             isThinking={isThinking || isOpening || greeting.isThinking}
-            // The greeting's one suggested next step, which only `/buddy` used to offer.
-            lastMessageFooter={
-              openerAction && !greeting.isRevealing && !messages.some((m) => m.role === "USER") ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="mt-1.5"
-                  icon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
-                  onClick={() => void sendMessage(openerAction.question)}
-                >
-                  {openerAction.label}
-                </Button>
-              ) : undefined
-            }
+            // Held in one identity above, with the reason written there — the thread's memo
+            // compares it.
+            lastMessageFooter={lastMessageFooter}
             isStreaming={isStreaming}
+            stopStreaming={stopStreaming}
+            queued={queued}
+            queuePaused={queuePaused}
+            removeQueued={removeQueued}
+            pullQueuedMessage={pullQueuedMessage}
+            resumeQueue={resumeQueue}
+            filters={filters}
+            setFilters={setFilters}
+            capabilitiesEnabled={capabilitiesEnabled}
+            setCapabilitiesEnabled={setCapabilitiesEnabled}
             activeTool={activeTool}
-            draft={draft}
-            setDraft={setDraft}
-            handleSubmit={handleSubmit}
             confirmAction={confirmAction}
             dismissAction={dismissAction}
+            actionDrafts={actionDrafts}
+            setActionDraft={setActionDraft}
             suggestions={suggestions}
-            startFreshVisit={startFreshVisit}
+            dinoGameActive={dinoGameActive}
+            onDinoGameExit={closeDinoGame}
+            newConversation={newConversation}
+            isOpening={isOpening}
             isGreeting={isGreeting}
             isDeciding={isDeciding}
             teamProjectId={teamProjectId}
             openError={openError}
-            onRetryOpen={() => void retryOpen()}
+            onRetryOpen={retryOpenAction}
+            retryReply={retryReply}
+            // Citation interaction for this surface: a `[N]` click opens the popover, and the
+            // footer's "Open source" hands the artifact to the drawer — both rendered below.
+            // No project to open a drawer in: pass no artifact opener, so the popover (and the
+            // footer's chips) fall back to the external source link instead of dead-ending.
+            onCitationClick={citationViewer.handleCitationClick}
+            onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
             onClose={toggleOpen}
             onOpenFull={openFull}
             suggestionsHidden={suggestionsHidden}
-            onHideSuggestions={() => setSuggestionsHidden(true)}
+            onHideSuggestions={hideSuggestions}
             // Hire conversation ↔ team conversations, in the header beside the title. The
-            // switcher carries the restore audit with it (see `BuddyModeSwitcher`).
-            headerControl={
-              <BuddyModeSwitcher
-                teamProjectId={teamProjectId}
-                onSwitch={(projectId) => void switchTeamProject(projectId)}
-                disabled={isTurnInFlight}
-              />
-            }
+            // switcher only *offers* the switch; the restore audit lives in the session
+            // (`useBuddyConversation` / `BuddyProvider`). Memoised above, like the props around
+            // it: the dock is a memoised component now.
+            headerControl={headerControl}
             isExpanding={handoff !== "idle"}
             isRevealing={handoff === "revealing"}
           />
@@ -368,6 +527,34 @@ export function BuddyWidget() {
           onDragRelease={handleDragRelease}
           onMoveCorner={handleMoveCorner}
         />
+      )}
+
+      {/* The citation popover and the artifact drawer, once a reply's sources are clicked. Kept
+          out of the dock's own tree so the fixed overlays are not clipped by its scroll
+          container, and rendered after it in the DOM so they sit above the window (both are
+          `z-50`). The widget is off `/buddy`, where the page renders its own pair — the two
+          never share a screen. */}
+      {citationViewer.selectedCitation && (
+        <CitationPopover
+          selected={citationViewer.selectedCitation}
+          onClose={citationViewer.closeCitation}
+          onOpenArtifact={citationProjectId ? citationViewer.handleOpenArtifact : undefined}
+        />
+      )}
+
+      {citationViewer.citationArtifact && citationProjectId && (
+        <RouteErrorBoundary fallback={<CitationDrawerFailure />}>
+          <Suspense fallback={<CitationDrawerLoading />}>
+            <ArtifactViewerDrawer
+              artifact={citationViewer.citationArtifact}
+              onClose={citationViewer.closeArtifact}
+              projectId={citationProjectId}
+              highlightLines={citationViewer.highlightLines}
+              canDelete={false}
+              onDelete={() => {}}
+            />
+          </Suspense>
+        </RouteErrorBoundary>
       )}
     </>
   );

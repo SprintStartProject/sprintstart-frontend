@@ -57,7 +57,7 @@ export interface OrgMetadataMember {
  * that is not a plain object (e.g. `"123"`). This lets callers own the empty state
  * without co-opting the "nothing here" of a failed parse.
  *
- * @param json The raw `artifact.metadata` string (may be omitted).
+ * @param json - The raw `artifact.metadata` string (may be omitted).
  * @returns The parsed org metadata, or `null` when the input is not usable.
  */
 export function parseOrgMetadata(
@@ -80,7 +80,8 @@ export function parseOrgMetadata(
   }
 
   const p = parsed as Record<string, unknown>;
-  if (typeof p["login"] !== "string" || !Array.isArray(p["members"])) {
+  const login = p["login"];
+  if (typeof login !== "string" || login.trim() === "" || !Array.isArray(p["members"])) {
     return null;
   }
 
@@ -102,5 +103,8 @@ export function parseOrgMetadata(
     if (!everyTeamUsable) return null;
   }
 
-  return parsed as OrgMetadataArtifactMetadata;
+  // Same normalization as the repo parser applies to repositoryFullName: a
+  // padded login must not silently miss the owner-half match, which folds
+  // case but compares against a trimmed `owner/repo` string.
+  return { ...(parsed as OrgMetadataArtifactMetadata), login: login.trim() };
 }

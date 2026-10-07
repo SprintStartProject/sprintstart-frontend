@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useMemo } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useReducedMotion } from "framer-motion";
@@ -9,6 +10,7 @@ import { SettingsSection } from "../features/settings/components/SettingsSection
 import { ProfileSection } from "../features/settings/components/ProfileSection";
 import { AppearanceSection } from "../features/settings/components/AppearanceSection";
 import { AccessTokensSection } from "../features/settings/components/AccessTokensSection";
+import { DinoUnlockPopover } from "../features/settings/components/DinoUnlockPopover";
 import { useDinoEasterEgg } from "../features/settings/hooks/useDinoEasterEgg";
 
 type SectionId = "profile" | "appearance" | "tokens";
@@ -62,6 +64,8 @@ const PAT_ALLOWED_GROUPS: ReadonlySet<PermissionGroup> = new Set([
  * personal configuration (profile, appearance, access tokens) in one
  * predictable place. The PAT section is only shown to PM/HR/ADMIN. A hidden
  * dino-game easter-egg (triple-click the cogwheel) lives in its own hook.
+ *
+ * Bound to `/settings`, open to every permission group; `/profile` redirects here.
  */
 export function SettingsPage() {
   const { profile } = useAuth();
@@ -115,26 +119,31 @@ export function SettingsPage() {
     <div className="h-full min-h-screen w-full">
       <header className="border-b border-app-border bg-app-bg">
         <div className="app-page-content py-6">
-          <div className="max-w-4xl">
+          <div className="mx-auto max-w-4xl">
             <PageHeader
               icon={Settings}
               title="Settings"
               subtitle="Manage your profile, appearance and access tokens in one place."
               onIconClick={dino.handleIconClick}
+              eggHint
+              iconPopover={<DinoUnlockPopover kind={dino.kind} />}
             />
           </div>
         </div>
       </header>
 
-      <main className="app-page-content py-6 md:py-8">
+      <MainContent className="app-page-content py-6 md:py-8">
         <div className="mx-auto max-w-4xl">
-          <nav aria-label="Settings sections" className="mb-8 flex gap-2 overflow-x-auto pb-1">
+          <nav
+            aria-label="Settings sections"
+            className="mb-8 flex gap-2 overflow-x-auto pb-1 max-lg:flex-wrap"
+          >
             {sections.map(({ id, label, icon: Icon }) => (
               <a
                 key={id}
                 href={`#${id}`}
                 onClick={(event) => scrollToSection(event, id)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-app-border bg-app-surface px-4 py-2 text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text max-sm:py-3"
               >
                 <Icon className="h-4 w-4" aria-hidden />
                 {label}
@@ -156,17 +165,7 @@ export function SettingsPage() {
             ))}
           </div>
         </div>
-      </main>
-
-      {dino.toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="animate-in fade-in slide-in-from-bottom-4 pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full bg-app-brand px-4 py-2 text-sm font-medium text-white shadow-lg"
-        >
-          {dino.toast}
-        </div>
-      )}
+      </MainContent>
     </div>
   );
 }

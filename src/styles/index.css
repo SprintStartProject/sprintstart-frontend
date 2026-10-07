@@ -20,16 +20,36 @@ body {
   overflow-x: clip;
 }
 
+/* Below `lg` the header is fixed (`SideBar`, `h-16` = 64px) and the buddy button floats at the
+   bottom (`BuddyLauncher`, `size-16` = 64px, plus its margin to the edge). A focused element that
+   the browser scrolls into view would otherwise land right underneath one of them (WCAG 2.4.11).
+   `scroll-padding` moves the edge the browser scrolls to inwards by that much. A page that owns
+   its own scroll container needs the same padding on it, e.g. `max-lg:scroll-pb-26`. */
+@media (width < 64rem) {
+  html {
+    scroll-padding-top: 4.5rem;
+    scroll-padding-bottom: 6.5rem;
+  }
+}
+
 :root {
   --app-page-gutter: 1.25rem;
   --app-page-block-gutter: 1.25rem;
   --app-page-max-width: 80rem;
+  /* Width of the desktop sidebar. The sidebar itself and the margin the page
+     content leaves for it both read this, so the two can never disagree. */
+  --app-sidebar-width: 286px;
 
-  /* Backgrounds */
-  --bg: #f9fafb;
+  /* Backgrounds
+     Light mode cannot lift a card by making it brighter than white, so the page
+     and the insets inside a card are tinted instead. The steps are sized to
+     roughly match the dark theme's (page -> card -> inset): with the old
+     near-white page (#f9fafb) a white card only showed by its border, and a
+     tile nested in a card did not show at all. */
+  --bg: #edf1f5;
   --bg-soft: #f3f4f6;
   --surface: #ffffff;
-  --surface-muted: #f8fafc;
+  --surface-muted: #f3f6f9;
   --surface-hover: #f1f5f9;
 
   /* Borders */
@@ -40,7 +60,7 @@ body {
   /* Text */
   --text: #111827;
   --text-muted: #4b5563;
-  --text-subtle: #6b7280;
+  --text-subtle: #5f6b7a;
   --text-disabled: #9ca3af;
   --text-inverse: #ffffff;
 
@@ -301,6 +321,11 @@ body {
 
 /* Tailwind theme tokens */
 @theme inline {
+  /* The smallest text the app uses, 11px at the default browser size, as `text-2xs`. For
+     uppercase labels and counters only; anything a person has to read is `text-xs` (12px) or
+     larger. In rem, so it grows with the browser's font size like every other step. */
+  --text-2xs: 0.6875rem;
+
   --color-app-bg: var(--bg);
   --color-app-bg-soft: var(--bg-soft);
 
@@ -419,9 +444,29 @@ body {
   --color-app-glow-alt: var(--glow-alt);
 }
 
-@media (max-width: 1024px) {
-  :root {
-    font-size: 16px;
+/* One keyboard focus indicator for the whole app (WCAG 2.4.7, 1.4.11). It is an `outline`, not a
+   `box-shadow`/`ring`, because outlines survive Windows contrast themes (forced colors) and are
+   drawn outside the element's box, so they cannot be clipped by the element's own `overflow`.
+   `:focus-visible` keeps it off mouse clicks. The 2px offset leaves a gap of page background
+   between the element and the outline, which is what keeps it readable on blue surfaces such as
+   primary buttons and the active sidebar link.
+   Components must not add their own focus ring or `outline-none`: a Tailwind utility beats this
+   `base` rule. Where the focus indicator is drawn by something else (a container showing
+   `focus-within`, an element that is only focused by script) use `outline-hidden`, never
+   `outline-none`, so forced-colors mode still gets an outline. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+/* Draws the focus outline inside the element's border box. Use it on a focusable element that sits
+   inside an `overflow-hidden` ancestor (cards, widgets, popover rows, toasts), where the default
+   outer outline would be cut off at the ancestor's edge. */
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline-offset: -2px;
   }
 }
 
@@ -432,10 +477,35 @@ body {
   }
 }
 
+/* Fluid from `lg` up rather than a flat 10rem. The page beside the sidebar is the window minus
+   286px, and two fixed 160px gutters took another 320px of it: at 1024px that left ~420px of
+   page, at 1280px ~660px, which is what squeezed the dashboard's quarter-row cards to ~150px and
+   pushed their content out of the frame. This grows with the window instead — 2rem at 1024px,
+   ~3.2rem at 1280px, ~4.1rem at 1440px, ~6.8rem at 1920px — and caps at the old 10rem on very
+   wide screens, where the calm margin was the point. */
 @media (min-width: 1024px) {
   :root {
-    --app-page-gutter: 10rem;
+    --app-page-gutter: clamp(2rem, 9vw - 4rem, 10rem);
     --app-page-block-gutter: 2.5rem;
+  }
+}
+
+/* The desktop sidebar and the page's margin beside it ease together when the sidebar folds to
+   icons, and follow the pointer exactly while its edge is dragged (`SidebarResizeHandle` marks
+   the drag on the root). */
+.app-sidebar-eases {
+  transition:
+    width 300ms ease-out,
+    margin-left 300ms ease-out;
+}
+
+html[data-sidebar-resizing] .app-sidebar-eases {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar-eases {
+    transition: none;
   }
 }
 
@@ -445,29 +515,38 @@ body {
   padding-right: var(--app-page-gutter);
 }
 
+/* A page that parks a tool rail in its right-hand gutter (the board). The rail is ~58px from the
+   window's edge; the fluid gutter is only 2rem at 1024px, so without this the rail sat on top of
+   the cards. At least 5rem on that side, the gutter itself once it is wider. Unlayered like
+   `.app-page-frame`, which a Tailwind padding utility could not override. */
+@media (min-width: 1024px) {
+  .app-page-frame.app-page-frame--rail {
+    padding-right: max(5rem, var(--app-page-gutter));
+  }
+}
+
 /* When a page opens a rail on its left, collapse the left gutter so the rail
    opens *into* the empty gutter space instead of pushing the content right and
    leaving a gap between the app sidebar and the page. Put it on the content
    column that sits beside the rail, not on the page root.
 
-   Used by ChatPage's history sidebar and by the buddy page's PM replies. It
-   started chat-specific; the second caller is what made it worth a name that
-   says what it does rather than where it was first needed. */
-.app-rail-open .app-page-frame {
-  padding-left: 1.5rem;
+   Used by the buddy page's conversation rail. It started on the retired chat's
+   history sidebar; a second caller is what made it worth a name that says what
+   it does rather than where it was first needed. */
+@media (min-width: 768px) {
+  .app-rail-open .app-page-frame {
+    padding-left: 1.5rem;
+  }
 }
 
+/* The admin page's frame is the page gutter now. It had a narrower one of its own below 1280px,
+   from when the page gutter was a flat 10rem from 1024px and left its tables no room; the
+   fluid gutter does that job for every page, and the separate rule only left admin at 16px on
+   a phone where everything else has 20px. Kept as a name so the page does not have to change. */
 .admin-page-frame {
   width: 100%;
-  padding-left: clamp(1rem, 4vw, 2rem);
-  padding-right: clamp(1rem, 4vw, 2rem);
-}
-
-@media (min-width: 1280px) {
-  .admin-page-frame {
-    padding-left: var(--app-page-gutter);
-    padding-right: var(--app-page-gutter);
-  }
+  padding-left: var(--app-page-gutter);
+  padding-right: var(--app-page-gutter);
 }
 
 .app-page-shell {
@@ -507,163 +586,6 @@ body {
   scrollbar-color: var(--border-strong) transparent;
 }
 
-/*
- * Markdown content inside chat bubbles.
- * Tailwind's preflight strips default margins and list styles, so rendered
- * markdown collapses into a wall of text without these rules.
- */
-.chat-md > *:first-child {
-  margin-top: 0;
-}
-
-.chat-md > *:last-child {
-  margin-bottom: 0;
-}
-
-.chat-md p {
-  margin: 0.5rem 0;
-}
-
-.chat-md ul,
-.chat-md ol {
-  margin: 0.5rem 0;
-  padding-left: 1.375rem;
-}
-
-.chat-md ul {
-  list-style: disc;
-}
-
-.chat-md ol {
-  list-style: decimal;
-}
-
-.chat-md li {
-  margin: 0.25rem 0;
-}
-
-.chat-md li::marker {
-  color: var(--text-subtle);
-}
-
-.chat-md ul ul,
-.chat-md ol ol,
-.chat-md ul ol,
-.chat-md ol ul {
-  margin: 0.25rem 0;
-}
-
-.chat-md h1,
-.chat-md h2,
-.chat-md h3,
-.chat-md h4 {
-  font-weight: 600;
-  line-height: 1.35;
-  margin: 1rem 0 0.375rem;
-}
-
-.chat-md h1 {
-  font-size: 1.15em;
-}
-
-.chat-md h2 {
-  font-size: 1.1em;
-}
-
-.chat-md h3,
-.chat-md h4 {
-  font-size: 1em;
-}
-
-.chat-md a {
-  color: var(--brand-text);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.chat-md a:hover {
-  color: var(--brand);
-}
-
-.chat-md blockquote {
-  border-left: 3px solid var(--brand-border);
-  margin: 0.5rem 0;
-  padding: 0.125rem 0 0.125rem 0.75rem;
-  color: var(--text-muted);
-}
-
-.chat-md hr {
-  border: 0;
-  border-top: 1px solid var(--border-muted);
-  margin: 0.875rem 0;
-}
-
-.chat-md strong {
-  font-weight: 600;
-}
-
-/* Inline citation references: [3] in the prose -> a small superscript badge. */
-.chat-md .citation-ref {
-  cursor: help;
-  font-size: 0.7em;
-  font-weight: 600;
-  line-height: 1;
-  vertical-align: super;
-  color: var(--brand-text);
-  background: var(--brand-soft);
-  border: 1px solid var(--brand-border);
-  border-radius: 5px;
-  padding: 0.05em 0.35em;
-  margin: 0 0.12em;
-  text-decoration: none;
-}
-
-/* Overrides for the user's blue bubble, where brand colors are unreadable. */
-.chat-md-user li::marker {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.chat-md-user a {
-  color: #ffffff;
-}
-
-.chat-md-user a:hover {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.chat-md-user blockquote {
-  border-left-color: rgba(255, 255, 255, 0.4);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.chat-md-user hr {
-  border-top-color: rgba(255, 255, 255, 0.3);
-}
-
-/* Blinking caret shown at the end of an assistant message while tokens are
-   still streaming in. aria-hidden so screen readers don't announce it. */
-.streaming-caret {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  background-color: currentColor;
-  animation: streaming-blink 1s steps(2, start) infinite;
-}
-
-@keyframes streaming-blink {
-  to {
-    visibility: hidden;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .streaming-caret {
-    animation: none;
-  }
-}
-
 html,
 body,
 #root {
@@ -695,6 +617,42 @@ body {
 
 .barrel-roll-active {
   animation: barrelRoll 2s ease-in-out;
+}
+
+/* ── Page-header icon easter-egg hint ──
+   Header icons that hide a game (Settings cogwheel, dashboard chart) get two
+   affordances: they grow slightly on hover, and on mount the icon that owns
+   a game plays ONE short glow pulse — a detail-level wink, not an obvious
+   call to action. The animation is one-shot: it runs once per mount and is
+   never re-triggered, so it reads as a flicker, not as a notification.
+   Users who prefer reduced motion get neither effect (the hover scale is
+   motion, so it goes too). */
+@keyframes header-icon-egg-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  50% {
+    filter: drop-shadow(0 0 6px var(--brand-border-strong));
+  }
+}
+
+.page-header-icon-button:hover .page-header-icon {
+  transform: scale(1.15);
+}
+
+.page-header-icon-button[data-egg-hint="true"] .page-header-icon {
+  animation: header-icon-egg-glow 0.5s ease-in-out 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-header-icon-button:hover .page-header-icon {
+    transform: none;
+  }
+
+  .page-header-icon-button[data-egg-hint="true"] .page-header-icon {
+    animation: none;
+  }
 }
 
 /* 
@@ -939,6 +897,50 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .app-widget-wiggle {
     animation: none;
+  }
+}
+
+/* The brief light on an onboarding step or question that a link from the buddy landed on.
+
+   The link opens the right phase and scrolls to the item, and on a list of look-alike cards
+   that is not quite enough to find it: this says "this one" twice and then gets out of the way.
+   Deliberately not a way of starting anything -- the hire presses the item's own button.
+
+   A ring rather than a background, so it reads over any card state (open, locked, done), and
+   delayed a beat so it plays after the smooth scroll has arrived rather than during it. */
+@keyframes app-link-highlight {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  25%,
+  65% {
+    box-shadow: 0 0 0 3px var(--color-app-brand);
+  }
+  45% {
+    box-shadow: 0 0 0 1px var(--color-app-brand-border);
+  }
+}
+
+/* `backwards`, not `both`: a last frame that outlived the animation beat the card's own shadow. */
+.app-link-highlight {
+  animation: app-link-highlight 1.6s ease-in-out 0.35s 1 backwards;
+}
+
+/* No pulse, but still marked for as long as the pulse would take: finding the item is the point,
+   not the motion. A step change rather than a fade, and gone afterwards like the pulse is. */
+@keyframes app-link-highlight-still {
+  0% {
+    box-shadow: 0 0 0 2px var(--color-app-brand);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-link-highlight {
+    animation: app-link-highlight-still 2s step-end 1 backwards;
   }
 }
 

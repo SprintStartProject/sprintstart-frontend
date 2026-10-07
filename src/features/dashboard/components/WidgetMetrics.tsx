@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { IconTile } from "../../../components/ui/IconTile";
 
 export type WidgetMetric = {
   label: string;
@@ -28,19 +29,10 @@ export function WidgetMetrics({
   metrics: WidgetMetric[];
 }) {
   return (
-    <ul className="flex flex-1 flex-col justify-center gap-3">
+    <ul className="flex flex-1 flex-col justify-center gap-2.5">
       {metrics.map((metric) => (
         <li key={metric.label} className="flex items-start gap-3">
-          <span
-            aria-hidden="true"
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-              metric.needsAttention
-                ? "bg-app-warning-bg text-app-warning-text"
-                : "bg-app-brand-soft text-app-brand-text"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-          </span>
+          <IconTile icon={Icon} size="md" tone={metric.needsAttention ? "warning" : "brand"} />
 
           <div className="min-w-0">
             <p className="text-xs font-medium text-app-text-muted">{metric.label}</p>
@@ -50,7 +42,7 @@ export function WidgetMetrics({
                 <span className="text-sm font-medium text-app-text-muted">{metric.suffix}</span>
               ) : null}
             </p>
-            <p className="mt-0.5 truncate text-xs text-app-text-muted">{metric.hint}</p>
+            <p className="truncate text-xs text-app-text-muted">{metric.hint}</p>
           </div>
         </li>
       ))}

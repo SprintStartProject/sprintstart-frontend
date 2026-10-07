@@ -2,7 +2,7 @@ import keycloak from "../config/keycloak";
 
 /**
  * One chunk of an AI generation's live progress — the frontend view of the backend's
- * `AiProgressEvent` (Seam 1 of the live-AI-visibility initiative).
+ * `AiProgressEvent`.
  *
  * `result` is opaque here: the surface re-reads its normal endpoint on `done` for the authoritative
  * artifact rather than reconstructing it from `result`. `item` carries the finalized element as a
@@ -38,7 +38,7 @@ export type AiStreamHandlers = {
  * events live, then re-reads its normal endpoint on `onDone` for the settled result. On any failure
  * the caller falls back to that same non-streaming read, so a dropped stream never costs the result.
  *
- * @param endpoint The `…/stream` endpoint (relative path), already carrying its query string.
+ * @param endpoint - The `…/stream` endpoint (relative path), already carrying its query string.
  */
 export async function streamAiProgress(
   endpoint: string,
@@ -58,7 +58,7 @@ export async function streamAiProgress(
   try {
     res = await fetch(endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${keycloak.token}` },
+      headers: keycloak.token ? { Authorization: `Bearer ${keycloak.token}` } : {},
     });
   } catch {
     handlers.onError("Could not reach the server.");

@@ -152,7 +152,7 @@ export function LaunchSequence({ displayName, onDone }: LaunchSequenceProps) {
         </span>
         {/* Wide tracking plus a long first name overflows a 360px phone
                     on one line, and the wordmark has no container to clip it. */}
-        <span className="mt-2 max-w-full text-[10px] font-semibold tracking-[0.18em] text-app-text-subtle uppercase sm:text-xs sm:tracking-[0.24em]">
+        <span className="mt-2 max-w-full text-2xs font-semibold tracking-[0.18em] text-app-text-subtle uppercase sm:text-xs sm:tracking-[0.24em]">
           {displayName ? `Welcome back, ${displayName}` : "Mission ready"}
         </span>
       </motion.div>

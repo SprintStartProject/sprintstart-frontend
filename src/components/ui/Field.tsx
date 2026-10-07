@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { useId, useMemo } from "react";
 import type { ReactNode } from "react";
 import { FieldContext, type FieldContextValue } from "./fieldContext";
@@ -16,8 +17,27 @@ export type FieldProps = {
    * or an empty string when the field is fine.
    */
   error?: ReactNode;
-  /** Appends the conventional asterisk and sets `required` semantics visually. */
+  /**
+   * Appends the conventional asterisk and carries the semantics through
+   * context, so the wrapped control also gets `aria-required` — the asterisk
+   * itself is `aria-hidden` and invisible to a screen reader.
+   *
+   * Presentation and ARIA, not constraint validation: this does **not** put the
+   * native `required` attribute on the wrapped control, so no `:required`
+   * styling and no browser "fill out this field" popup appear. The forms in
+   * this app validate themselves — guarded submit buttons, inline errors — and
+   * a label-level flag should not switch browser validation on behind their
+   * backs. Pass `required` to the control itself when the native attribute is
+   * wanted; the two stay separate on purpose.
+   */
   required?: boolean;
+  /**
+   * Appends a visible "(optional)" to the label, the counterpart for fields the
+   * form genuinely does not need. Rendered inside the `<label>` so it lands in
+   * the control's accessible name and announces with the field; ignored when
+   * `required` is also set, since the two are mutually exclusive in practice.
+   */
+  optional?: boolean;
   /**
    * Fixed id for the control, when something outside the field has to point at
    * it (`aria-controls`, a `ref`-free `focus()` by id, an existing E2E
@@ -60,6 +80,7 @@ export function Field({
   hint,
   error,
   required = false,
+  optional = false,
   controlId: providedControlId,
   disabled = false,
   className = "",
@@ -83,8 +104,9 @@ export function Field({
       describedBy: described || undefined,
       invalid: hasError,
       disabled,
+      required,
     };
-  }, [controlId, hintId, errorId, hasHint, hasError, disabled]);
+  }, [controlId, hintId, errorId, hasHint, hasError, disabled, required]);
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`.trim()}>
@@ -95,6 +117,12 @@ export function Field({
             <span className="ml-0.5 text-app-danger-text" aria-hidden="true">
               *
             </span>
+          )}
+          {optional && !required && (
+            <>
+              {" "}
+              <span className="ml-1 text-xs font-normal text-app-text-subtle">(optional)</span>
+            </>
           )}
         </label>
       )}
@@ -108,7 +136,12 @@ export function Field({
       )}
 
       {hasError && (
-        <p id={errorId} role="alert" className="text-xs font-medium text-app-danger-text">
+        <p
+          id={errorId}
+          role="alert"
+          className="flex items-start gap-1.5 text-xs font-medium text-app-danger-text"
+        >
+          <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           {error}
         </p>
       )}

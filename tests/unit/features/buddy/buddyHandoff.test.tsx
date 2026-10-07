@@ -41,7 +41,7 @@ function renderWidget() {
         <Routes>
           <Route path="/board" element={<p>the board</p>} />
           <Route
-            path="/buddy"
+            path="/buddy/:id?"
             element={
               <>
                 <StandInBuddyPage />

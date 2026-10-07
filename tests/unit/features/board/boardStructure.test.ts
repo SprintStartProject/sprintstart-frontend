@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
-  clearHireDependencies,
   currentStage,
   deriveCardStates,
   isCardDone,
   readBoardStructure,
   setDependency,
   pruneStructure,
+  restack,
   writeBoardStructure,
   type BoardStructure,
 } from "../../../../src/features/board/layout/boardStructure";
@@ -90,8 +90,8 @@ describe("isCardDone", () => {
     expect(isCardDone(card, structure({ a: { markedDone: true } }))).toBe(false);
   });
 
-  it("honours a hand-set done on a card that cannot report", () => {
-    expect(isCardDone(note("a"), structure({ a: { markedDone: true } }))).toBe(true);
+  it("ignores a hand-set done on a card that cannot report — there is no tick to undo it with", () => {
+    expect(isCardDone(note("a"), structure({ a: { markedDone: true } }))).toBe(false);
   });
 
   it("counts a fully ticked path step as done", () => {
@@ -100,14 +100,11 @@ describe("isCardDone", () => {
     expect(isCardDone(card, EMPTY)).toBe(true);
   });
 
-  it("honours a hand-set done on a path step with no tasks", () => {
-    // A degraded card (its step is gone) or a live step that simply has no tasks has nothing to
-    // report — unlike CHECKLIST, the hire cannot add tasks themselves, since they belong to the
-    // path. Falling back to the hand-set tick is the only way out other than dismissing the card.
+  it("does not call a path step with no tasks done, ticked or not", () => {
     const card = pathStep("a", []);
 
     expect(isCardDone(card, EMPTY)).toBe(false);
-    expect(isCardDone(card, structure({ a: { markedDone: true } }))).toBe(true);
+    expect(isCardDone(card, structure({ a: { markedDone: true } }))).toBe(false);
   });
 
   it("ignores a hand-set done on a path step that has tasks to report", () => {
@@ -118,7 +115,7 @@ describe("isCardDone", () => {
 });
 
 describe("deriveCardStates", () => {
-  it("blocks a card whose predecessor is unfinished, and names it", () => {
+  it("reads a stored comes-after as a place in a pile, not as a block", () => {
     const first = checklist("first", [{ text: "one", done: false }]);
     const second = checklist("second", [{ text: "two", done: false }]);
 
@@ -127,8 +124,9 @@ describe("deriveCardStates", () => {
       structure({ second: { dependsOn: after("first") } }),
     );
 
-    expect(states.get("second")?.status).toBe("BLOCKED");
-    expect(states.get("second")?.blockedBy.map((card) => card.id)).toEqual(["first"]);
+    expect(states.get("second")?.status).toBe("OPEN");
+    expect(states.get("second")?.blockedBy).toEqual([]);
+    expect(states.get("second")?.predecessorId).toBe("first");
   });
 
   it("unblocks a card once its predecessor is finished, keeping the sequence visible", () => {
@@ -158,26 +156,6 @@ describe("deriveCardStates", () => {
 
     expect(states.get("a")?.stage).toBe("NOW");
   });
-
-  it("lets a hand-set done unblock a card behind a taskless path step", () => {
-    // Without the fallback in `isSelfReporting`, a degraded/taskless PATH_STEP card is
-    // permanently OPEN (0 of 0 is never `total > 0`) and blocks whatever the hire put behind it,
-    // with no control anywhere to override it.
-    const first = pathStep("first", []);
-    const second = checklist("second", [{ text: "two", done: false }]);
-
-    const blocked = deriveCardStates(
-      [first, second],
-      structure({ second: { dependsOn: after("first") } }),
-    );
-    expect(blocked.get("second")?.status).toBe("BLOCKED");
-
-    const unblocked = deriveCardStates(
-      [first, second],
-      structure({ first: { markedDone: true }, second: { dependsOn: after("first") } }),
-    );
-    expect(unblocked.get("second")?.status).toBe("OPEN");
-  });
 });
 
 describe("currentStage", () => {
@@ -185,12 +163,11 @@ describe("currentStage", () => {
     const done = checklist("done", [{ text: "one", done: true }]);
     const later = checklist("later", [{ text: "two", done: false }]);
 
-    const states = deriveCardStates(
-      [done, later],
-      structure({ done: { stage: "NOW" }, later: { stage: "LATER" } }),
+    const states = deriveCardStates([done, later], structure({}), (card) =>
+      card.id === "later" ? "BEHIND" : "NOW",
     );
 
-    expect(currentStage(states)).toBe("LATER");
+    expect(currentStage(states)).toBe("BEHIND");
   });
 
   it("stays on a stage whose only open card is blocked", () => {
@@ -342,20 +319,63 @@ describe("who put a card behind another one", () => {
     ]);
   });
 
-  it("clears the hire's own edges and leaves the team's", () => {
-    const both = structure({
-      b: { dependsOn: [{ id: "a", source: "TEAM" }, ...after("c")] },
-    });
-
-    expect(clearHireDependencies(both, "b").cards.b?.dependsOn).toEqual([
-      { id: "a", source: "TEAM" },
-    ]);
-  });
-
   it("lets a buddy's link go, because a suggestion is not a rule", () => {
     const suggested = structure({ b: { dependsOn: [{ id: "a", source: "BUDDY" }] } });
 
-    expect(clearHireDependencies(suggested, "b").cards.b?.dependsOn).toEqual([]);
     expect(setDependency(suggested, "b", "a", false).cards.b?.dependsOn).toEqual([]);
+  });
+});
+
+describe("restack", () => {
+  const ids = ["a", "b", "c", "d"];
+  const under = (from: BoardStructure, id: string) => from.cards[id]?.dependsOn?.[0]?.id ?? null;
+
+  it("moves a whole pile onto another card, keeping its order", () => {
+    // a ← b is a pile; c ← d another. The a–b pile goes under c, and d now lies under b.
+    const two = structure({ b: { dependsOn: after("a") }, d: { dependsOn: after("c") } });
+    const next = restack(two, ids, "a", "c", ["a", "b"]);
+
+    expect(under(next, "a")).toBe("c");
+    expect(under(next, "b")).toBe("a");
+    expect(under(next, "d")).toBe("b");
+    expect(restack(two, ids, "a", "b", ["a", "b"])).toBe(two);
+  });
+
+  it("leaves a neighbour's edge with whoever put it there", () => {
+    // A team pile a ← b ← c; the hire takes b out. c closes the gap onto a, still the team's.
+    const team = structure({
+      b: { dependsOn: [{ id: "a", source: "TEAM" }] },
+      c: { dependsOn: [{ id: "b", source: "TEAM" }] },
+    });
+    const next = restack(team, ids, "b", null);
+
+    expect(next.cards.c?.dependsOn).toEqual([{ id: "a", source: "TEAM" }]);
+    expect(next.cards.b?.dependsOn).toEqual([]);
+    expect(restack(team, ids, "d", "a").cards.d?.dependsOn).toEqual([{ id: "a", source: "HIRE" }]);
+    expect(restack(team, ids, "d", "a").cards.b?.dependsOn).toEqual([{ id: "d", source: "TEAM" }]);
+  });
+
+  it("puts a card directly under another, and what lay under that one under it", () => {
+    let piled = restack(EMPTY, ids, "b", "a");
+    piled = restack(piled, ids, "c", "a");
+
+    expect(under(piled, "c")).toBe("a");
+    expect(under(piled, "b")).toBe("c");
+  });
+
+  it("closes the gap when a card is taken out of the middle of a pile", () => {
+    let piled = restack(EMPTY, ids, "b", "a");
+    piled = restack(piled, ids, "c", "b");
+    piled = restack(piled, ids, "b", null);
+
+    expect(under(piled, "b")).toBeNull();
+    expect(under(piled, "c")).toBe("a");
+  });
+
+  it("moves a card from one pile to another", () => {
+    let piled = restack(EMPTY, ids, "b", "a");
+    piled = restack(piled, ids, "b", "d");
+
+    expect(under(piled, "b")).toBe("d");
   });
 });

@@ -1,7 +1,78 @@
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { motion, useReducedMotion, type TargetAndTransition, type Variants } from "framer-motion";
+import { useRepeatClicks } from "../../features/easter-eggs/hooks/useRepeatClicks";
+import { SIDEBAR_TOGGLE_SHORTCUT, shortcutChord } from "../../features/shortcuts";
+import { ShortcutHint } from "../ui/ShortcutHint";
+import { hoverSpringToken, logoHopSpringToken } from "../../styles/tokens";
 
 const BADGE_SIZE = 44;
+
+/**
+ * A click this soon after the previous one counts towards the gravity egg only, instead of
+ * folding the sidebar again: five quick clicks should drop the badge, not flap the sidebar five
+ * times while it falls.
+ */
+const TOGGLE_REPEAT_GUARD_MS = 600;
+
+type SidebarLogoProps = {
+  className?: string;
+  /**
+   * Makes the badge toggle the sidebar, with a tooltip saying which way. `kind` picks the words:
+   * the desktop sidebar *folds* to icons ("Expand" / "Collapse"), the drawer below `lg` *opens*
+   * and *closes* — the same words as the menu button beside it in the header.
+   */
+  sidebarToggle?: { collapsed: boolean; onToggle: () => void; kind?: "fold" | "drawer" };
+};
 const MARK_SIZE = 28;
+
+/**
+ * How far the badge falls before it hits the floor. Chosen to clear the
+ * header row visually (parents are overflow-visible) so the drop reads as
+ * "fell past its shelf, bounced, hopped back" without portals or measured
+ * rects — a fixed translateY keeps the effect layout-independent.
+ */
+const DROP_DISTANCE = 140;
+
+/**
+ * The gravity choreography, one entry per phase. Each phase animates the
+ * whole badge; `onAnimationComplete` walks idle → falling → impact →
+ * bouncing → hopping → idle, so every beat lands exactly when the previous
+ * one finishes instead of relying on hand-tuned delays.
+ */
+const DROP_PHASES: Record<Exclude<DropPhase, "idle">, TargetAndTransition> = {
+  // Gravity accelerates: easeIn, with a slight forward tumble.
+  falling: { y: DROP_DISTANCE, rotate: 6, transition: { duration: 0.45, ease: "easeIn" } },
+  // Sideways squash on impact — the classic cartoon beat.
+  impact: {
+    scaleX: 1.14,
+    scaleY: 0.8,
+    rotate: 0,
+    transition: { duration: 0.09, ease: "easeOut" },
+  },
+  // Two diminishing bounces; each landing re-squashes a little less.
+  bouncing: {
+    y: [DROP_DISTANCE, 94, DROP_DISTANCE, 119, DROP_DISTANCE],
+    scaleX: [1.14, 1.02, 1.1, 1.03, 1.1],
+    scaleY: [0.8, 1, 0.87, 1, 0.93],
+    transition: {
+      duration: 0.62,
+      times: [0, 0.26, 0.5, 0.74, 1],
+      ease: ["easeOut", "easeIn", "easeOut", "easeIn"],
+    },
+  },
+  // Spring back to the shelf with a small overshoot, rotation settling.
+  hopping: {
+    y: 0,
+    scaleX: 1,
+    scaleY: 1,
+    rotate: 0,
+    transition: logoHopSpringToken,
+  },
+};
+
+/** The gravity sequence phases: idle at rest, then falling → impact → bouncing → hopping. */
+type DropPhase = "idle" | "falling" | "impact" | "bouncing" | "hopping";
 
 /**
  * Where the exhaust meets the body, in viewBox units. The flame scales from
@@ -26,8 +97,65 @@ const NOZZLE_ORIGIN = { transformOrigin: "7px 17px", transformBox: "view-box" } 
  * in the corner of the eye stops reading as charm and starts reading as a
  * fault.
  */
-export function SidebarLogo({ className = "" }: { className?: string }) {
+export function SidebarLogo({ className = "", sidebarToggle }: SidebarLogoProps) {
   const prefersReducedMotion = useReducedMotion();
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const lastClickAt = useRef(0);
+
+  // Where the toggle's tooltip sits, `null` while hidden. Beside the badge on the folded rail,
+  // like the entries' tooltips there; below it while open, where the name sits beside it. In a
+  // portal at a fixed position, so nothing in the sidebar clips it.
+  const [hintAt, setHintAt] = useState<{ x: number; y: number; side: "right" | "below" } | null>(
+    null,
+  );
+  // The badge moves whenever the sidebar folds or unfolds -- by a click here, Alt+S or the resize
+  // edge -- so a tooltip measured before would point at where it was. Cleared while rendering,
+  // so it never shows at the old spot for a frame; it comes back on the next hover.
+  const collapsed = sidebarToggle?.collapsed ?? false;
+  const [hintFor, setHintFor] = useState(collapsed);
+  if (hintFor !== collapsed) {
+    setHintFor(collapsed);
+    setHintAt(null);
+  }
+
+  // The gravity easter egg: five clicks drop the badge off its shelf.
+  // Reduced motion skips the animation entirely (pure motion has no honest
+  // static equivalent) — the counter still consumes, nothing plays.
+  const [dropPhase, setDropPhase] = useState<DropPhase>("idle");
+  const countEggClick = useRepeatClicks(5, () => {
+    if (!prefersReducedMotion && dropPhase === "idle") setDropPhase("falling");
+  });
+
+  const showHint = () => {
+    const rect = badgeRef.current?.getBoundingClientRect();
+    if (!sidebarToggle || !rect || dropPhase !== "idle") return;
+    setHintAt(
+      sidebarToggle.collapsed
+        ? { x: rect.right + 10, y: rect.top + rect.height / 2, side: "right" }
+        : { x: rect.left, y: rect.bottom + 8, side: "below" },
+    );
+  };
+
+  const handleLogoClick = () => {
+    const now = Date.now();
+    const isQuickRepeat = now - lastClickAt.current < TOGGLE_REPEAT_GUARD_MS;
+    lastClickAt.current = now;
+    // The badge moves with the sidebar, so a tooltip measured before the click would point at
+    // where it was; it comes back on the next hover.
+    setHintAt(null);
+    if (sidebarToggle && !isQuickRepeat) sidebarToggle.onToggle();
+    countEggClick();
+  };
+
+  /** Walks the choreography forward as each beat's animation completes. */
+  const advanceDrop = () => {
+    setDropPhase((current) => {
+      if (current === "falling") return "impact";
+      if (current === "impact") return "bouncing";
+      if (current === "bouncing") return "hopping";
+      return "idle";
+    });
+  };
 
   const badgeVariants: Variants = prefersReducedMotion
     ? { rest: {}, lift: {} }
@@ -35,7 +163,7 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
         rest: { scale: 1 },
         lift: {
           scale: 1.08,
-          transition: { type: "spring", stiffness: 400, damping: 16 },
+          transition: hoverSpringToken,
         },
       };
 
@@ -51,7 +179,7 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
         lift: {
           x: 1.5,
           y: -1.5,
-          transition: { type: "spring", stiffness: 420, damping: 14 },
+          transition: hoverSpringToken,
         },
       };
 
@@ -93,12 +221,35 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
 
   return (
     <motion.div
+      ref={badgeRef}
       initial="rest"
-      animate="rest"
-      whileHover="lift"
+      animate={dropPhase === "idle" ? "rest" : DROP_PHASES[dropPhase]}
+      // Hover lift is suppressed while the gravity sequence plays so the
+      // two transforms never fight over the same element.
+      whileHover={dropPhase === "idle" ? "lift" : undefined}
       variants={badgeVariants}
+      onAnimationComplete={advanceDrop}
+      onClick={handleLogoClick}
+      onPointerEnter={(event) => event.pointerType === "mouse" && showHint()}
+      onPointerLeave={() => setHintAt(null)}
+      data-drop-phase={dropPhase}
+      // The logo is deliberately decorative markup — the egg behind it is
+      // pure whimsy with no function, and making it tab-focusable on both
+      // in-app surfaces (the sidebar header and the mobile header) would
+      // worsen keyboard navigation for everyone to serve a secret. The
+      // login page's copy of the mark carries no egg at all.
+      //
+      // `data-drop-phase` exposes the choreography's state machine so tests
+      // (and devtools) can observe the egg without a running animation loop.
+      //
+      // The pointer cursor stays: unlike a plain decorative wrapper this one
+      // does answer clicks (that is the whole egg), and it is the only hint
+      // anybody gets that the badge is worth touching. It is not a home link
+      // on any surface, so it promises no navigation. In the desktop sidebar it
+      // also folds and unfolds it (`sidebarToggle`); from the keyboard the same
+      // is Enter on the sidebar's resize edge.
       style={{ width: BADGE_SIZE, height: BADGE_SIZE }}
-      className={`relative flex shrink-0 items-center justify-center rounded-[12px] bg-app-brand shadow-lg ${className}`}
+      className={`relative flex shrink-0 cursor-pointer items-center justify-center rounded-[12px] bg-app-brand shadow-lg select-none ${className}`}
     >
       <motion.svg
         variants={rocketVariants}
@@ -147,6 +298,33 @@ export function SidebarLogo({ className = "" }: { className?: string }) {
           <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
         </g>
       </motion.svg>
+
+      {hintAt &&
+        sidebarToggle &&
+        createPortal(
+          // Hidden from assistive technology: the badge is not reachable without a pointer, and
+          // the resize edge (Enter folds and unfolds) is their way to the same thing.
+          <span
+            aria-hidden="true"
+            style={{ left: hintAt.x, top: hintAt.y }}
+            className={`pointer-events-none fixed z-[70] flex items-center gap-2 rounded-lg border border-app-border bg-app-surface px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-app-text shadow-lg ${
+              hintAt.side === "right" ? "-translate-y-1/2" : ""
+            }`}
+          >
+            {sidebarToggle.kind === "drawer"
+              ? sidebarToggle.collapsed
+                ? "Open sidebar"
+                : "Close sidebar"
+              : sidebarToggle.collapsed
+                ? "Expand sidebar"
+                : "Collapse sidebar"}
+            <ShortcutHint
+              keys={shortcutChord(SIDEBAR_TOGGLE_SHORTCUT)}
+              className="border-app-border text-app-text-muted"
+            />
+          </span>,
+          document.body,
+        )}
     </motion.div>
   );
 }

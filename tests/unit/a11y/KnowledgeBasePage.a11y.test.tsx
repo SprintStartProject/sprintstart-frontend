@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { KnowledgeBasePage } from "../../../src/pages/KnowledgeBasePage";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 
 vi.mock("../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
@@ -31,38 +32,85 @@ vi.mock("../../../src/context/useAuth", () => ({
   }),
 }));
 
+const { mockArtifacts } = vi.hoisted(() => ({
+  mockArtifacts: [
+    {
+      id: "a1",
+      title: "Add feature",
+      artifactType: "PULL_REQUEST",
+      sourceSystem: "GITHUB",
+      sourceId: "42",
+      sourceUrl: null,
+      mime: null,
+      language: null,
+      ingestedAt: "2024-01-01",
+      lastChangedAt: null,
+      contentHash: null,
+      ingestionRunId: null,
+    },
+    {
+      id: "a2",
+      title: "manual.pdf",
+      artifactType: "FILE",
+      sourceSystem: "UPLOAD",
+      sourceId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      sourceUrl: null,
+      mime: null,
+      language: null,
+      ingestedAt: "2024-01-01",
+      lastChangedAt: null,
+      contentHash: null,
+      ingestionRunId: null,
+    },
+  ],
+}));
+
 vi.mock("../../../src/services/knowledgeService", () => ({
   knowledgeService: {
-    getUnifiedArtifacts: vi.fn().mockResolvedValue([
-      {
-        id: "a1",
-        title: "Add feature",
-        artifactType: "PULL_REQUEST",
-        sourceSystem: "GITHUB",
-        sourceId: "42",
-        sourceUrl: null,
-        mime: null,
-        language: null,
-        ingestedAt: "2024-01-01",
-        lastChangedAt: null,
-        contentHash: null,
-        ingestionRunId: null,
+    getArtifactPage: vi.fn().mockResolvedValue({
+      items: mockArtifacts,
+      page: {
+        number: 1,
+        size: 20,
+        totalElements: mockArtifacts.length,
+        totalPages: 1,
+        hasNext: false,
+        hasPrevious: false,
       },
-      {
-        id: "a2",
-        title: "manual.pdf",
-        artifactType: "FILE",
-        sourceSystem: "UPLOAD",
-        sourceId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-        sourceUrl: null,
-        mime: null,
-        language: null,
-        ingestedAt: "2024-01-01",
-        lastChangedAt: null,
-        contentHash: null,
-        ingestionRunId: null,
+      metadata: {
+        pageNumber: 1,
+        pageSize: 20,
+        totalElements: mockArtifacts.length,
+        totalPages: 1,
+        isFirst: true,
+        isLast: true,
+        hasNext: false,
+        hasPrevious: false,
       },
-    ]),
+    }),
+    getArtifactFacets: vi.fn().mockResolvedValue({
+      types: [
+        { value: "PULL_REQUEST", count: 1 },
+        { value: "FILE", count: 1 },
+      ],
+      sources: [
+        { value: "GITHUB", count: 1 },
+        { value: "UPLOAD", count: 1 },
+      ],
+      formats: [{ value: "PDF", count: 1 }],
+      repositories: [],
+    }),
+    // Chips on both cards, so axe checks them on the real page.
+    getArtifactAiStatus: vi.fn().mockResolvedValue({
+      aiAvailable: true,
+      items: [
+        { artifactId: "a1", status: "INDEXED", updatedAt: null, chunkCount: 3 },
+        { artifactId: "a2", status: "FAILED", updatedAt: null, chunkCount: null },
+      ],
+    }),
+    getArtifactById: vi.fn().mockImplementation((_pid: string, id: string) => {
+      return Promise.resolve(mockArtifacts.find((a) => a.id === id) ?? null);
+    }),
   },
 }));
 
@@ -70,7 +118,12 @@ describe("KnowledgeBasePage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <KnowledgeBasePage />
+        {/* Opening an artifact's citation hands the drawer a question the hire could ask
+            their buddy, so the drawer reaches for the app's one session — mount it the way
+            the app does. */}
+        <BuddyProvider>
+          <KnowledgeBasePage />
+        </BuddyProvider>
       </MemoryRouter>,
     );
 
@@ -89,7 +142,12 @@ describe("KnowledgeBasePage Accessibility", () => {
   it("should not have any a11y violations with the filter menu open", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <KnowledgeBasePage />
+        {/* Opening an artifact's citation hands the drawer a question the hire could ask
+            their buddy, so the drawer reaches for the app's one session — mount it the way
+            the app does. */}
+        <BuddyProvider>
+          <KnowledgeBasePage />
+        </BuddyProvider>
       </MemoryRouter>,
     );
 
@@ -99,6 +157,25 @@ describe("KnowledgeBasePage Accessibility", () => {
 
     fireEvent.click(screen.getByTestId("kb-filter-trigger"));
     expect(screen.getByTestId("kb-filter-menu")).toBeInTheDocument();
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("should not have any a11y violations with AI status chips on the cards", async () => {
+    const { baseElement } = render(
+      <MemoryRouter>
+        {/* Opening an artifact's citation hands the drawer a question the hire could ask
+            their buddy, so the drawer reaches for the app's one session — mount it the way
+            the app does. */}
+        <BuddyProvider>
+          <KnowledgeBasePage />
+        </BuddyProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("artifact-ai-status")).toHaveLength(2);
+    });
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });

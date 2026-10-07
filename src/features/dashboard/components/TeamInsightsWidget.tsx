@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, ShieldAlert } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { Spinner } from "../../../components/ui/Spinner";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { insightsService } from "../../../services/faqService";
 import { knowledgeGapService } from "../../../services/knowledgeGapService";
@@ -133,7 +134,7 @@ function GapRing({ summary }: { summary: GapSummary }) {
           ring is 74px across, and "COMPONENTS" set in caps with letter-spacing runs straight
           under the stroke.
         */}
-        <span className="text-[10px] leading-none font-medium text-app-text-muted">
+        <span className="text-xs leading-none font-medium text-app-text-muted">
           {summary.componentCount === 1 ? "component" : "components"}
         </span>
       </div>
@@ -197,26 +198,25 @@ function GapList({ gaps }: { gaps: readonly KnowledgeGap[] }) {
 
   return (
     <ul className="space-y-2">
-      {worstFirst.map((gap) => (
-        <li key={gap.id} className="flex items-start gap-2">
-          <span
-            aria-hidden="true"
-            className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${
-              SEVERITY_STYLES[gap.severity].bar
-            }`}
-          />
+      {worstFirst.map((gap) => {
+        const { icon: SeverityIcon, label, longLabel, text } = SEVERITY_STYLES[gap.severity];
 
-          <div className="min-w-0">
-            <p className="truncate text-sm text-app-text">{gap.component}</p>
-            <p className="truncate text-xs text-app-text-muted">
-              {/* The severity is already in the dot; the words say what would fix it. */}
-              {gap.missingTypes.length > 0
-                ? `missing ${gap.missingTypes.join(", ")}`
-                : SEVERITY_STYLES[gap.severity].longLabel.toLowerCase()}
-            </p>
-          </div>
-        </li>
-      ))}
+        return (
+          <li key={gap.id} className="flex items-start gap-2">
+            <SeverityIcon aria-hidden="true" className={`mt-0.5 h-4 w-4 shrink-0 ${text}`} />
+
+            <div className="min-w-0">
+              <p className="truncate text-sm text-app-text">{gap.component}</p>
+              <p className="truncate text-xs text-app-text-muted">
+                {/* The icon carries the step; the words start with it and then say what would fix it. */}
+                {gap.missingTypes.length > 0
+                  ? `${label} · missing ${gap.missingTypes.join(", ")}`
+                  : longLabel}
+              </p>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -225,7 +225,7 @@ function GapList({ gaps }: { gaps: readonly KnowledgeGap[] }) {
 function ColumnHeading({ label, total }: { label: string; total: string }) {
   return (
     <div className="mb-3 flex items-baseline justify-between gap-2">
-      <span className="text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+      <span className="text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
         {label}
       </span>
       <span className="text-xs text-app-text-muted tabular-nums">{total}</span>
@@ -294,7 +294,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
     <ClickableCard
       onClick={() => void navigate("/pm-dashboard")}
       aria-label="Open the PM Dashboard for the full team insights"
-      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 focus-ring-inset transition-all hover:-translate-y-0.5"
     >
       <div
         aria-hidden="true"
@@ -303,9 +303,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <ShieldAlert className="h-3.5 w-3.5" />
-          </span>
+          <IconTile icon={ShieldAlert} size="sm" tone="accent" />
           <span className="truncate text-sm font-semibold text-app-text">Team insights</span>
         </div>
 
@@ -321,11 +319,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
         </span>
       </div>
 
-      <div
-        className={`relative grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 ${
-          isWide ? "lg:grid-cols-2" : ""
-        }`}
-      >
+      <div className="relative grid flex-1 grid-cols-1 gap-5 @min-[24rem]:grid-cols-2 @min-[24rem]:gap-6">
         <section aria-label="Knowledge gaps">
           <ColumnHeading
             label="Knowledge gaps"
@@ -335,7 +329,12 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
           {/* At full width the ring and the component list sit side by side and close
               together: they are two views of the same analysis, and giving each an equal
               third of the card left the ring stranded in the middle of its own column. */}
-          <div className={`flex ${isWide ? "items-center gap-5" : "flex-col items-center gap-3"}`}>
+          {/* Only where the card is wide enough for both: in the two-column form of the wide
+              card each half is under 300px, and the list beside the ring got ~70px, which cut
+              every component name to a few letters. There it is the medium form. */}
+          <div
+            className={`flex flex-col items-center gap-3 ${isWide ? "@3xl:flex-row @3xl:gap-5" : ""}`}
+          >
             <div className="flex shrink-0 flex-col items-center gap-2">
               <GapRing summary={summary} />
 
@@ -363,7 +362,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
               </p>
             ) : (
               isWide && (
-                <div className="min-w-0 flex-1">
+                <div className="hidden min-w-0 flex-1 @3xl:block">
                   <p className="mb-2 text-xs font-medium text-app-text-muted">Needs documenting</p>
                   <GapList gaps={gaps} />
                 </div>
@@ -374,7 +373,7 @@ export function TeamInsightsWidget({ size }: { size: DashboardWidgetSize }) {
 
         <section
           aria-label="Recurring questions"
-          className="border-t border-app-border-muted pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6"
+          className="border-t border-app-border-muted pt-5 @min-[24rem]:border-t-0 @min-[24rem]:border-l @min-[24rem]:pt-0 @min-[24rem]:pl-6"
         >
           <ColumnHeading
             label="Recurring questions"

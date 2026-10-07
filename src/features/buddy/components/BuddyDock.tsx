@@ -1,11 +1,15 @@
-import { useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion, type MotionValue } from "framer-motion";
-import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
-import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { ArrowDown, Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
+import { SleepyBot } from "./SleepyBot";
 import { Button } from "../../../components/ui/Button";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
+import { useBuddyDraftActions } from "../buddyDraftContext";
+import type { BuddyMessageView } from "../types";
+import type { SelectedCitation } from "../citations/types";
+import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { BuddyComposer } from "./BuddyComposer";
 import { BuddyQuestionActions } from "./BuddyQuestionActions";
 import { BuddySuggestionChips } from "./BuddySuggestionChips";
@@ -40,14 +44,25 @@ type BuddyDockProps = Pick<
   | "messages"
   | "isThinking"
   | "isStreaming"
+  | "stopStreaming"
+  | "retryReply"
+  | "queued"
+  | "queuePaused"
+  | "removeQueued"
+  | "pullQueuedMessage"
+  | "resumeQueue"
+  | "filters"
+  | "setFilters"
+  | "capabilitiesEnabled"
+  | "setCapabilitiesEnabled"
   | "activeTool"
-  | "draft"
-  | "setDraft"
-  | "handleSubmit"
   | "confirmAction"
   | "dismissAction"
+  | "actionDrafts"
+  | "setActionDraft"
   | "suggestions"
-  | "startFreshVisit"
+  | "newConversation"
+  | "isOpening"
   | "isGreeting"
   | "isDeciding"
   | "teamProjectId"
@@ -76,6 +91,22 @@ type BuddyDockProps = Pick<
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
+  /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
+  dinoGameActive?: boolean;
+  /**
+   * Called when the hire clicks a `[N]` citation reference in a reply.
+   *
+   * Held in one identity by the widget, like the callbacks above — the thread's memo compares it.
+   */
+  onCitationClick?: (citation: SelectedCitation) => void;
+  /** Opens the artifact drawer from a reply's citations footer — see `BuddyThread`. */
+  onOpenArtifact?: (data: CitationArtifactOpen) => void;
+  /**
+   * Called when the player leaves the dino waiting-game. Named `onDinoGameExit` to match
+   * BuddyThread, which is what the dock forwards it to — one name across the dock → thread
+   * boundary so callers pass it once and forget.
+   */
+  onDinoGameExit?: () => void;
   /** Whether the hire has put the suggestion row away for this session. */
   suggestionsHidden?: boolean;
   /** Puts it away. Held by the widget so it survives closing and reopening the dock. */
@@ -120,18 +151,33 @@ type BuddyDockProps = Pick<
  * the full viewport, and the caller changes the route as it lands. Without that the dock
  * vanished and a page appeared, and nobody could tell it was the same conversation.
  */
-export function BuddyDock({
+function BuddyDockImpl({
   messages,
   isThinking,
   isStreaming,
+  stopStreaming,
+  retryReply,
+  queued,
+  queuePaused,
+  removeQueued,
+  pullQueuedMessage,
+  resumeQueue,
+  filters,
+  setFilters,
+  capabilitiesEnabled,
+  setCapabilitiesEnabled,
   activeTool,
-  draft,
-  setDraft,
-  handleSubmit,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   suggestions,
-  startFreshVisit,
+  dinoGameActive = false,
+  onDinoGameExit,
+  onCitationClick,
+  onOpenArtifact,
+  newConversation,
+  isOpening,
   isGreeting,
   isDeciding,
   teamProjectId,
@@ -151,7 +197,30 @@ export function BuddyDock({
 }: BuddyDockProps) {
   const prefersReducedMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
-  const { containerRef, onScroll } = useStickToBottom(messages);
+  const { containerRef, onScroll, isPinned, jumpToLatest } = useStickToBottom(messages);
+
+  // The chips fill the composer through the write-only half, so this window does not follow
+  // every character typed into the box — see `useBuddyDraftActions`.
+  const { setDraft } = useBuddyDraftActions();
+
+  /**
+   * The callbacks `BuddyThread` is handed, each held in one identity.
+   *
+   * The thread is memoised — that is what keeps a keystroke (or a token) from re-rendering the
+   * whole conversation — and a callback built inline here would hand it a new prop on every
+   * render of this window, which is exactly the dance the memo exists to avoid.
+   */
+  const renderReplyAction = useCallback(
+    (reply: string, message: BuddyMessageView) => (
+      <BuddyReplyActions reply={reply} message={message} />
+    ),
+    [],
+  );
+  const renderQuestionAction = useCallback(
+    (question: string) =>
+      teamProjectId === null ? <BuddyQuestionActions question={question} /> : undefined,
+    [teamProjectId],
+  );
 
   // Escape closes it, the way every other dismissible surface in the app behaves. Bound to the
   // document rather than the panel so it works while the hire is reading the page behind it.
@@ -246,34 +315,33 @@ export function BuddyDock({
           {/* Hire conversation ↔ team conversations. Rendered by the caller (the widget), like
                     every other session-driven piece here, so the dock needs no project context
                     of its own. `max-w-full min-w-0` keeps a long project name from pushing the
-                    fresh-visit button out of a 384 px window. */}
+                    new-conversation control out of a 384 px window. */}
           {headerControl && <div className="max-w-[11rem] min-w-0 shrink-0">{headerControl}</div>}
 
           {/* Same control, same words and the same promise as the one on `/buddy`: the window is
                     a view of that conversation, so anything it can do to the conversation it has to
                     be able to do here — a hire who had to open the full page to start over would
                     reasonably conclude the two were different buddies. Offered only once there is
-                    something to leave behind; on an untouched thread it would start the visit that
-                    is already on screen.
+                    something to leave behind; on an untouched conversation it would create a
+                    second empty one the hire did not ask for.
 
-                    Withdrawn while a turn is in flight. `startFreshVisit` clears the thread and
-                    greets, but it cannot call back the request already streaming into it: that
-                    stream's callbacks still hold the shared conversation, so its tool events
-                    would land under the new greeting — "Checking your progress…" beneath a fresh
-                    hello — and its completion would clear the greeting's own thinking state.
-                    Offering the control only between turns is the cheap half of that fix;
-                    aborting the stream is the other half and belongs in the session, alongside
-                    the same gap on `BuddyPage`. */}
-          {hasUserMessage && !isBusy && (
+                    The hire's surface only — team mode has one conversation per project and
+                    nothing to start.
+
+                    Withdrawn while a conversation is opening or greeting and while a decision is
+                    in flight: an open's read is on its way into the very thread this click would
+                    clear. Not withdrawn mid-answer: the move aborts the stream itself (see
+                    `stopRunningTurn`), so nothing keeps writing into the thread it clears. */}
+          {hasUserMessage && !isGreeting && !isDeciding && !isOpening && teamProjectId === null && (
             <Button
               variant="ghost"
               size="xs"
               iconOnly
-              onClick={() => void startFreshVisit()}
+              onClick={() => void newConversation()}
               aria-label="Start a new conversation"
               // No chord named here, deliberately. The window floats over every page, and
-              // `Alt+N` belongs to whichever one is underneath it — on `/chat` it starts a new
-              // *chat*, and on most pages nothing binds it at all. Advertising it from the dock
+              // `Alt+N` belongs to whichever one is underneath it — on the buddy page it is the
+              // page's own, and on most pages nothing binds it at all. Advertising it from the dock
               // would be promising a key that does somebody else's job.
               title="Start a new conversation — your buddy keeps what it has learned about you"
             >
@@ -310,32 +378,51 @@ export function BuddyDock({
           </Button>
         </header>
 
-        <div
-          ref={containerRef}
-          onScroll={onScroll}
-          data-testid="buddy-dock-transcript"
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
-        >
-          <BuddyThread
-            renderReplyAction={(reply, message) => (
-              <BuddyReplyActions reply={reply} message={message} />
-            )}
-            compact
-            messages={messages}
-            isThinking={isThinking}
-            activeTool={activeTool}
-            lastMessageFooter={lastMessageFooter}
-            confirmAction={confirmAction}
-            dismissAction={dismissAction}
-            // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
-            // team-mode conversation is not one — the offer must not even render there.
-            renderQuestionAction={(question) =>
-              teamProjectId === null ? <BuddyQuestionActions question={question} /> : undefined
-            }
-            openError={openError}
-            onRetryOpen={onRetryOpen}
-            onStartFreshVisit={() => void startFreshVisit()}
-          />
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div
+            ref={containerRef}
+            onScroll={onScroll}
+            data-testid="buddy-dock-transcript"
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
+          >
+            <BuddyThread
+              renderReplyAction={renderReplyAction}
+              compact
+              messages={messages}
+              isThinking={isThinking}
+              isStreaming={isStreaming}
+              activeTool={activeTool}
+              lastMessageFooter={lastMessageFooter}
+              confirmAction={confirmAction}
+              dismissAction={dismissAction}
+              actionDrafts={actionDrafts}
+              setActionDraft={setActionDraft}
+              // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+              // team-mode conversation is not one — the offer must not even render there.
+              renderQuestionAction={renderQuestionAction}
+              openError={openError}
+              onRetryOpen={onRetryOpen}
+              onRetryReply={retryReply}
+              dinoGameActive={dinoGameActive}
+              onDinoGameExit={onDinoGameExit}
+              onCitationClick={onCitationClick}
+              onOpenArtifact={onOpenArtifact}
+            />
+          </div>
+
+          {/* The way back to the newest message after scrolling up to re-read — the auto-scroll
+            deliberately does not drag a reader down (see `useStickToBottom`). */}
+          {!isPinned && (
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              data-testid="buddy-jump-to-latest"
+              className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text shadow-md transition-colors hover:bg-app-surface-hover"
+            >
+              <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+              Jump to latest
+            </button>
+          )}
         </div>
 
         <div className="shrink-0 border-t border-app-border bg-app-surface px-4 py-3">
@@ -377,14 +464,34 @@ export function BuddyDock({
                         in it starts the caret at position 0, so "Ask your buddy about this" used to
                         hand over a question the hire then typed in front of. */}
           <BuddyComposer
-            draft={draft}
-            setDraft={setDraft}
-            handleSubmit={handleSubmit}
             compact
             focusOnMount
+            busy={isBusy}
+            gameActive={dinoGameActive}
+            streaming={isThinking || isStreaming}
+            onStop={stopStreaming}
+            queue={{
+              items: queued,
+              paused: queuePaused,
+              onRemove: removeQueued,
+              onPull: pullQueuedMessage,
+              onSendQueued: resumeQueue,
+            }}
+            filters={filters}
+            onFiltersChange={setFilters}
+            capabilitiesEnabled={capabilitiesEnabled}
+            onCapabilitiesChange={setCapabilitiesEnabled}
           />
         </div>
       </motion.div>
     </motion.div>
   );
 }
+
+/**
+ * Memoised, like `BuddyThread`: every prop on this panel is either a plain value, a callback the
+ * widget holds in one identity, or a motion value — so a render of the widget that changes none of
+ * them (a resize while the dock is open, a drag across the screen) no longer re-walks the dock's
+ * whole layout. `headerControl` is held in one identity at the call site for the same reason.
+ */
+export const BuddyDock = memo(BuddyDockImpl);

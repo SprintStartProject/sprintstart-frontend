@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { KeyRound, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "../../../../components/ui/Button";
 import { Field } from "../../../../components/ui/Field";
+import { IconTile } from "../../../../components/ui/IconTile";
 import { Input } from "../../../../components/ui/Input";
 import { useToast } from "../../../../context/useToast";
 import { centralSpringToken } from "../../../../styles/tokens";
@@ -131,9 +132,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
       className="border-b border-app-border last:border-b-0"
     >
       <div className="flex flex-wrap items-center gap-3 px-4 py-4 sm:flex-nowrap sm:gap-4 sm:px-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-app-border bg-app-surface-muted">
-          <KeyRound className="h-4 w-4 text-app-text-muted" aria-hidden />
-        </div>
+        <IconTile icon={KeyRound} size="lg" tone="neutral" />
 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold break-words text-app-text">{displayName}</p>
@@ -149,7 +148,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               data-testid={`settings-atlassian-rename-open-${displayName}`}
               icon={<Pencil className="h-3.5 w-3.5" />}
               aria-label={`Rename credential ${displayName}`}
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-sm:h-11 sm:flex-none"
             >
               <span className="hidden sm:inline">Rename</span>
             </Button>
@@ -160,7 +159,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               data-testid={`settings-atlassian-rotate-open-${displayName}`}
               icon={<RefreshCw className="h-3.5 w-3.5" />}
               aria-label={`Rotate token ${displayName}`}
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-sm:h-11 sm:flex-none"
             >
               <span className="hidden sm:inline">Rotate</span>
             </Button>
@@ -171,7 +170,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               data-testid={`settings-atlassian-delete-open-${displayName}`}
               icon={<Trash2 className="h-3.5 w-3.5" />}
               aria-label={`Delete credential ${displayName}`}
-              className="flex-1 sm:flex-none"
+              className="flex-1 max-sm:h-11 sm:flex-none"
             >
               <span className="hidden sm:inline">Delete</span>
             </Button>
@@ -199,6 +198,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               <Field
                 label="New name"
                 controlId={`settings-atlassian-rename-${displayName}`}
+                required
                 disabled={isBusy}
                 className="min-w-0 flex-1"
               >
@@ -248,6 +248,7 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
               <Field
                 label="New API token"
                 controlId={`settings-atlassian-rotate-${displayName}`}
+                required
                 disabled={isBusy}
                 className="min-w-0 flex-1"
               >
@@ -289,9 +290,9 @@ export function AtlassianCredentialRow({ credential, onSaved }: AtlassianCredent
             transition={centralSpringToken}
             className="border-t border-app-border bg-app-danger-bg px-5 py-4"
           >
-            <p className="mb-3 text-sm text-app-danger-text">
+            <p className="mb-3 text-sm break-words text-app-danger-text">
               Delete <strong>{displayName}</strong>? This cannot be undone and may break connected
-              Jira instances and Confluence spaces.
+              Jira instances, Confluence spaces and Bitbucket repositories.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button

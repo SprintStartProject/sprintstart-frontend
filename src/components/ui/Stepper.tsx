@@ -165,7 +165,7 @@ export function Stepper({ steps, current, onStepSelect }: StepperProps) {
                   type="button"
                   onClick={() => onStepSelect?.(index)}
                   aria-label={`Go to ${label}`}
-                  className="-mx-1 flex items-center gap-1.5 rounded-full px-1 py-0.5 transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-brand focus-visible:outline-none"
+                  className="-mx-1 flex items-center gap-1.5 rounded-full px-1 py-0.5 transition-colors hover:bg-app-surface-hover"
                 >
                   {stepBody}
                 </button>

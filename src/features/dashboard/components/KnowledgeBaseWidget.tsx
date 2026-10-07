@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Spinner } from "../../../components/ui/Spinner";
+import { IconTile } from "../../../components/ui/IconTile";
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import { knowledgeService } from "../../../services/knowledgeService";
@@ -67,25 +68,27 @@ export function KnowledgeBaseWidget() {
   }, [projectId]);
 
   return (
-    <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
+    <div className="group @container relative flex h-full flex-col overflow-hidden rounded-2xl p-6">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"
       />
 
       <div className="relative mb-5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <BookOpen className="h-3.5 w-3.5" />
-          </span>
-          <span className="text-sm font-semibold text-app-text">Knowledge base</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <IconTile icon={BookOpen} size="sm" tone="accent" />
+          <span className="truncate text-sm font-semibold text-app-text">Knowledge base</span>
         </div>
 
         <Link
           to="/knowledge-base"
-          className="flex shrink-0 items-center gap-1 rounded-lg text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="flex shrink-0 items-center gap-1 rounded-lg text-xs font-medium text-app-text-muted transition-colors hover:text-app-brand-text"
+          // Named here because the words beside the arrow step aside on a narrow card.
+          aria-label="Browse the knowledge base"
         >
-          Browse
+          {/* Same container-width rule as `WidgetShell`: in a quarter-row card the label beside
+              the title ran the link to within a few pixels of the card's edge. */}
+          <span className="hidden @min-[17rem]:inline">Browse</span>
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
@@ -116,7 +119,7 @@ export function KnowledgeBaseWidget() {
                   {artifact.title ?? "Untitled"}
                 </span>
 
-                <span className="shrink-0 text-[11px] text-app-text-muted tabular-nums">
+                <span className="shrink-0 text-xs text-app-text-muted tabular-nums">
                   {formatRelative(artifact.ingestedAt)}
                 </span>
               </Link>

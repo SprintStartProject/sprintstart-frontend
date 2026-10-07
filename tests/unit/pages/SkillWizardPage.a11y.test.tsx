@@ -48,9 +48,7 @@ describe("SkillWizardPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <SkillWizardPage />
-        </main>
+        <SkillWizardPage />
       </MemoryRouter>,
     );
 

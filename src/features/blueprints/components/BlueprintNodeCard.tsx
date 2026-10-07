@@ -249,7 +249,7 @@ export function BlueprintNodeCard({
         */}
         <span
           aria-hidden={isFar}
-          className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-none text-app-text-muted transition-opacity duration-200 ${
+          className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-none text-app-text-muted transition-opacity duration-200 ${
             isFar ? "pointer-events-none opacity-0" : "opacity-100"
           }`}
         >

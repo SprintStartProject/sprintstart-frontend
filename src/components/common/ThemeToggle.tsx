@@ -26,7 +26,7 @@ export function ThemeToggle({ className = "", showLabel = true }: ThemeTogglePro
       onClick={toggleTheme}
       aria-label="Toggle light and dark mode"
       aria-pressed={isDarkMode}
-      className={`flex h-[40px] items-center justify-between rounded-[8px] px-[12px] text-[14px] leading-none font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${className}`}
+      className={`flex h-[40px] items-center justify-between rounded-[8px] px-[12px] text-sm leading-none font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text ${className}`}
     >
       <span className="flex items-center gap-[12px]">
         {isDarkMode ? (

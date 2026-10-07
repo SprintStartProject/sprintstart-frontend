@@ -57,7 +57,7 @@ export function SettingsToggleRow({
           aria-checked={checked}
           onClick={() => onCheckedChange(!checked)}
           className={[
-            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
+            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out after:absolute after:-inset-x-1 after:-inset-y-2.5 after:content-['']",
             checked ? "bg-app-brand" : "bg-app-border-strong",
           ].join(" ")}
         >

@@ -3,9 +3,10 @@ import { createPortal } from "react-dom";
 import { AnimatePresence } from "framer-motion";
 import { ChevronDown, ExternalLink, PencilLine, Plus, Save, Undo2, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { useToast } from "../../../context/useToast";
-import { DrawerCard } from "../../admin/components/DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { STEP_LABELS, STEP_ORDER } from "../steps";
 import { useOrientationDraft, type DraftStep } from "../hooks/useOrientationDraft";
 import type { AuthorOrientationInput, OrientationPacket, OrientationStep } from "../types";
@@ -24,7 +25,7 @@ type OrientationEditorProps = {
 };
 
 const inputClasses =
-  "w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus";
+  "w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-app-text";
 
 /**
  * The editor a PM or a hire uses to write a task's orientation by hand.
@@ -116,11 +117,7 @@ export function OrientationEditor({
             </a>
           ) : undefined
         }
-        leading={
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand-text">
-            <PencilLine className="h-5 w-5" aria-hidden="true" />
-          </span>
-        }
+        leading={<IconTile icon={PencilLine} size="xl" tone="brand" />}
         badge={<span className="text-sm text-app-text-muted">For &ldquo;{taskTitle}&rdquo;</span>}
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
@@ -244,7 +241,7 @@ function StepRow({
           type="button"
           aria-expanded={isOpen}
           onClick={onToggle}
-          className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-app-surface-hover"
         >
           <span
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold tabular-nums ${badgeTone}`}
@@ -252,7 +249,7 @@ function StepRow({
             {index}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
+            <span className="block text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
               {label}
             </span>
             <span
@@ -318,7 +315,7 @@ function StepRow({
                       onUpdateCitation(citation.key, { filename: event.target.value })
                     }
                     placeholder="Source (e.g. README.md)"
-                    className="w-1/3 rounded-lg border border-app-border bg-app-surface px-2 py-1.5 text-xs text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    className="w-1/3 rounded-lg border border-app-border bg-app-surface px-2 py-1.5 text-xs text-app-text"
                   />
                   <input
                     aria-label="Source link"
@@ -327,7 +324,7 @@ function StepRow({
                       onUpdateCitation(citation.key, { sourceUrl: event.target.value })
                     }
                     placeholder="https://… (optional)"
-                    className="flex-1 rounded-lg border border-app-border bg-app-surface px-2 py-1.5 text-xs text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    className="flex-1 rounded-lg border border-app-border bg-app-surface px-2 py-1.5 text-xs text-app-text"
                   />
                   <button
                     type="button"
@@ -342,7 +339,7 @@ function StepRow({
               <button
                 type="button"
                 onClick={onAddCitation}
-                className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                className="inline-flex items-center gap-1 text-xs font-medium text-app-brand-text hover:underline"
               >
                 <Plus className="h-3 w-3" />
                 Add a source

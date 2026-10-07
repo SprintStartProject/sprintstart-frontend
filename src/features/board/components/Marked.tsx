@@ -97,9 +97,7 @@ export function Marked({ text, marks = [], parse = false, cardId, className = ""
                 }
               : {})}
             className={`rounded-sm px-0.5 text-inherit ${HIGHLIGHT_CLASS[run.color]} ${
-              interactive
-                ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                : ""
+              interactive ? "cursor-pointer" : ""
             }`}
           >
             {run.text}

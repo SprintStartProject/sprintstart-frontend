@@ -61,27 +61,7 @@ describe("taking a card into the conversation", () => {
     expect(lastDraft()).toMatch(/where do I stand/i);
   });
 
-  it("a stalled path asks about the thing that is actually stuck", () => {
-    render(
-      <BoardGrid
-        board={board([
-          {
-            kind: "PATH_TO_FIRST_CONTRIBUTION",
-            moments: [],
-            acceptedCount: 0,
-            autonomyReachedAt: null,
-            stalledReason: "no response in 5 days",
-          },
-        ])}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /ask your buddy about this/i }));
-
-    expect(lastDraft()).toContain("no response in 5 days");
-  });
-
-  it("claiming a suggested task goes through the buddy, not around the confirm gate", () => {
+  it("a suggested task is grabbed behind its own confirm, with the buddy one press away", () => {
     render(
       <BoardGrid
         board={board([
@@ -100,10 +80,11 @@ describe("taking a card into the conversation", () => {
       />,
     );
 
-    // No claim button on the card: claiming changes what the hire's whole plan aims at.
-    expect(screen.queryByRole("button", { name: /^claim/i })).not.toBeInTheDocument();
+    // Grabbing changes what the hire's whole plan aims at, so the first press only asks.
+    fireEvent.click(screen.getByRole("button", { name: /grab this/i }));
+    expect(screen.getByRole("button", { name: /yes, grab it/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /i want to work on this/i }));
+    fireEvent.click(screen.getByRole("button", { name: /is this a good fit/i }));
     expect(lastDraft()).toContain("Fix the flaky login test");
   });
 
@@ -117,7 +98,6 @@ describe("taking a card into the conversation", () => {
             title: "Fix the flaky login test",
             summary: null,
             url: null,
-            chosen: true,
             closedAtSource: false,
           },
         ])}

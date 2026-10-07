@@ -68,5 +68,5 @@ describe("AdminPage Accessibility", () => {
       expect(screen.getByText("default")).toBeInTheDocument();
     });
     expect(await axe(baseElement)).toHaveNoViolations();
-  }, 10000);
+  });
 });

@@ -1,6 +1,5 @@
 import { notifyBoardStorageWritten } from "./boardStorage";
 import { isAreaAccent, type AreaAccent } from "./areaAccents";
-import { BOARD_STAGES, STAGE_LABELS } from "./boardStructure";
 
 /**
  * The named areas a hire has grouped their board's cards into, between visits.
@@ -79,7 +78,7 @@ export function readBoardGroups(boardId: string): BoardGroup[] {
   }
 }
 
-/** What the generator calls the area holding a team's card blueprints. */
+/** What the since-removed generator called the area holding a team's card blueprints. */
 const TEAM_AREA = "From your team";
 
 /**
@@ -105,15 +104,11 @@ function unsplitTeamArea(name: string): string {
 /**
  * The stage words that could be on the end of a generated area's name.
  *
- * Read from the stages *plus* the one the board no longer has. Deriving this from `BOARD_STAGES`
- * alone looked right and was wrong the moment `NEXT` was removed: the boards this function exists
- * for are exactly the ones generated while there were three stages, so dropping "Next" from the
- * list left them with the extra tab stop it was written to take away.
+ * Written out rather than read from `BOARD_STAGES`: the boards this function exists for were
+ * generated while there were three stages, and every stage dropped since (`NEXT`, then `LATER`)
+ * would otherwise leave them with the extra tab stop it was written to take away.
  */
-const SPLIT_TEAM_AREA_TITLES: readonly string[] = [
-  ...BOARD_STAGES.map((stage) => STAGE_LABELS[stage].title),
-  "Next",
-];
+const SPLIT_TEAM_AREA_TITLES: readonly string[] = ["Now", "Next", "Later"];
 
 /**
  * Areas sharing a name folded into one, keeping the first one's place and id.

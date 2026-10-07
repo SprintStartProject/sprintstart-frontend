@@ -5,7 +5,7 @@
  * with `Content-Type: text/event-stream`), buffers partial lines across chunk
  * boundaries, and yields each parsed `data:` JSON payload as a typed object.
  *
- * Used by `chatService`, `knowledgeService`, and `onboardingService` so the
+ * Used by `knowledgeService` and `onboardingService` so the
  * brittle line-splitting / JSON-parsing logic lives in exactly one place.
  *
  * Robustness: malformed `data:` lines are skipped (logged via `console.warn`)
@@ -16,7 +16,7 @@
 /**
  * Async generator that yields each SSE `data:` event parsed from the stream.
  *
- * @param stream The raw response body (or any `ReadableStream<Uint8Array>`).
+ * @param stream - The raw response body (or any `ReadableStream<Uint8Array>`).
  * @returns Yields one parsed JSON payload per `data:` line. The generator
  *   completes when the stream ends naturally. If the underlying `reader.read()`
  *   throws (e.g. an `AbortError` when the caller aborts the `fetch`), the error

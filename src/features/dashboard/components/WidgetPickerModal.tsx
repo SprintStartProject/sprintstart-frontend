@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Minus, Plus } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Modal } from "../../../components/ui/Modal";
+import { IconTile } from "../../../components/ui/IconTile";
 import { DASHBOARD_SIZE_LABELS } from "../layout/sizes";
 import type {
   DashboardWidgetDefinition,
@@ -226,18 +227,13 @@ function WidgetOption({
       // gets it past the `aria-label` above.
       aria-describedby={change === "absent" ? descriptionId : `${descriptionId} ${changeId}`}
       onClick={onToggle}
-      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
         isSelected
           ? "border-app-brand bg-app-brand-soft/40"
           : "border-app-border-muted bg-app-surface-muted hover:border-app-border"
       }`}
     >
-      <span
-        aria-hidden="true"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-brand-soft text-app-brand-text"
-      >
-        <Icon className="h-4 w-4" />
-      </span>
+      <IconTile icon={Icon} size="md" tone="brand" />
 
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-app-text">{widget.title}</span>
@@ -290,7 +286,7 @@ function ChangeChip({ id, change }: { id: string; change: PendingChange }) {
   return (
     <span
       id={id}
-      className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${className}`}
+      className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${className}`}
     >
       <ChipIcon className="h-3 w-3" aria-hidden="true" />
       {label}

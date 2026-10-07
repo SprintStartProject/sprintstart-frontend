@@ -23,7 +23,7 @@ type BoardStageBandProps = {
  * twenty-eight cards off the screen and left a number behind, so a hire looking at six cards had to
  * trust that the rest were somewhere. A band is a *fold*: everything the board holds is on the page,
  * named, counted, and one click from being read. The same six cards are in front of them and the
- * other twenty-eight are visibly filed under "Later" rather than gone.
+ * others are visibly filed under "Behind you" rather than gone.
  *
  * That is also the shape the customer asked for. A notebook does not hide the sections you are not
  * reading; it puts them in order and lets you open one. The section bar above does that for areas —
@@ -42,6 +42,10 @@ export function BoardStageBand({
   onToggle,
   children,
 }: BoardStageBandProps) {
+  // The board itself, not a band on it: what is current needs no heading saying so, and no fold to
+  // put it away. Only what is finished ("Behind you") is filed apart — see `pathStages.ts`.
+  if (stage === "NOW") return <div className="space-y-4">{children}</div>;
+
   const label = STAGE_LABELS[stage];
   const done = remaining === 0;
 
@@ -54,19 +58,27 @@ export function BoardStageBand({
           board is the reading this page is trying to reduce. */}
       {open && <span className="hidden text-xs text-app-text-muted sm:inline">{label.hint}</span>}
 
-      {done ? (
+      {/* Behind you is a shelf, not a list: what is filed there is from work already finished, so
+          "3 to do" would be counting notes as chores. It says how much is on the shelf. */}
+      {stage === "BEHIND" ? (
+        <Badge variant="neutral" size="sm">
+          <span className="tabular-nums">
+            {total} {total === 1 ? "card" : "cards"}
+          </span>
+        </Badge>
+      ) : done ? (
         <Badge variant="purple" size="sm" className="gap-1">
           <CircleCheckBig className="h-3 w-3" aria-hidden="true" />
           All done
         </Badge>
       ) : (
-        <Badge variant={stage === "NOW" ? "brand" : "neutral"} size="sm">
+        <Badge variant="neutral" size="sm">
           <span className="tabular-nums">{remaining} to do</span>
         </Badge>
       )}
 
       {/* Only when it differs from what is left: "12 cards · 12 to do" is the same fact twice. */}
-      {!done && total !== remaining && (
+      {stage !== "BEHIND" && !done && total !== remaining && (
         <span className="text-xs text-app-text-muted tabular-nums">{total} in all</span>
       )}
     </>
@@ -85,7 +97,7 @@ export function BoardStageBand({
             onToggle();
           }}
           aria-expanded={open}
-          className="flex w-full flex-wrap items-center gap-2 rounded-xl px-1 py-1 text-left transition-colors hover:bg-app-surface-muted focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="flex w-full flex-wrap items-center gap-2 rounded-xl px-1 py-1 text-left transition-colors hover:bg-app-surface-muted"
         >
           {open ? (
             <ChevronDown className="h-4 w-4 shrink-0 text-app-text-muted" aria-hidden="true" />

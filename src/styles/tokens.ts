@@ -5,12 +5,12 @@ import type { TargetAndTransition, Transition, Variants } from "framer-motion";
  *
  * Use these for ALL `motion` components so the whole app shares one
  * "velocity" — elements bounce and settle at the same speed/stiffness.
- * Documented in `docs/animation_tokens.md`; implemented here as the single
- * source of truth.
+ * Documented in `docs/FRONTEND_ARCHITECTURE.md` §8; implemented here as the
+ * single source of truth.
  *
  * Usage:
  * ```tsx
- * import { centralSpringToken } from "@/styles/tokens";
+ * import { centralSpringToken } from "../styles/tokens.ts";
  * <motion.div transition={centralSpringToken} ... />
  * ```
  */
@@ -210,6 +210,19 @@ export const celebrationSpringToken: Transition = {
   stiffness: 260,
   damping: 18,
   mass: 0.9,
+};
+
+/**
+ * Spring for the sidebar logo's hidden "drop" egg — the badge landing and
+ * hopping back into place. Far more under-damped than `celebrationSpringToken`
+ * on purpose: the visible bounce on landing *is* the joke, and a critically
+ * damped settle would read as a layout glitch rather than a toy. Only used by
+ * an opt-in egg that reduced-motion users never trigger; keep it off routine UI.
+ */
+export const logoHopSpringToken: Transition = {
+  type: "spring",
+  stiffness: 260,
+  damping: 11,
 };
 
 /** How long a rocket takes to cross the screen, in seconds. */

@@ -2,6 +2,7 @@
 // OnBoardingPage.tsx
 // ============================================================
 
+import { MainContent } from "../components/layout/MainContent";
 import {
   AlertCircle,
   AlertTriangle,
@@ -22,10 +23,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { PageShell } from "../components/layout/PageShell";
-import { AlertDialog } from "../components/ui/AlertDialog";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { SegmentedTabs } from "../components/ui/SegmentedTabs";
@@ -44,18 +44,21 @@ import { StepWorkspace } from "../features/onboarding/components/journey/StepWor
 import {
   useOnboardingJourney,
   type GenerationFailureReason,
+  type GenerationPhaseProgress,
   type UnavailableReason,
 } from "../features/onboarding/generation/OnboardingJourneyContext";
 import { ProgressRing } from "../features/onboarding/graph/JourneyNodeCards";
 import { usePathRevealMoment } from "../features/onboarding/hooks/usePathRevealMoment";
 import {
   blockingPhases,
+  isSkipPending,
   itemState,
   pathProgress,
   phaseItems,
   phaseProgress,
   phaseState,
   phasesUnlockedBy,
+  linkedCardId,
   sortedPhases,
   waitingOn,
   type PhaseItem,
@@ -69,6 +72,14 @@ import type {
 } from "../features/onboarding/types";
 import { useMoments } from "../features/moments";
 import { useProjectContext } from "../features/projects/useProjectContext";
+import { AskTheBuddy } from "../features/buddy/components/AskTheBuddy";
+import { onBuddyPathChanged } from "../features/buddy/aiBuddyBus";
+import { setOnboardingPlace } from "../features/onboarding/onboardingPlace";
+import {
+  askAboutEmptyPhase,
+  askAboutEmptyPhases,
+  askAboutPhase,
+} from "../features/onboarding/buddyDrafts";
 import { ApiError } from "../services/apiClient";
 import { onboardingGraphService } from "../services/onboardingGraphService";
 import { onboardingService } from "../services/onboardingService";
@@ -89,7 +100,10 @@ import {
 type LoadingState = "loading" | "empty" | "success" | "error";
 type ViewMode = "list" | "graph";
 
-const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
+/** How a step came to be opened: by its address, or by the member on the page. */
+type StartOptions = { byAddress?: boolean };
+
+const VIEW_ORDER: readonly ViewMode[] = ["graph", "list"];
 
 type NavigationState = {
   focusQuestionId?: string;
@@ -165,6 +179,24 @@ export function OnBoardingPage() {
   const focusItemId = routeStepId ?? navigationState?.focusQuestionId;
   // Set by the board's "where you are" strip when a phase on it is pressed.
   const openPhaseId = navigationState?.openPhaseId;
+  /**
+   * Where a link from the buddy points: `?step=<id>`, `?question=<id>` or `?phase=<id>`.
+   *
+   * The mentor is handed each item's link so it can write "you are on [#3](...)" and have that be
+   * clickable. In the URL rather than in router state because the model writes it into text the hire
+   * can copy, keep or open in a second tab, and state survives none of that.
+   *
+   * A link *lands* rather than starts: the phase opens, the page scrolls to the item and lights it up
+   * briefly. Unlike `/onboarding/:stepId`, nothing is unfolded or started -- following a link in a
+   * conversation is a way of finding something, and starting it is the hire's own click.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedStepId = searchParams.get("step");
+  // `&open=1` beside `?step=`: unfold the step as well as finding it -- still without starting it.
+  // What a card's "Back to" on the board sends, since the words it was kept from are inside the step.
+  const linkOpensStep = searchParams.get("open") === "1";
+  const linkedQuestionId = searchParams.get("question");
+  const linkedPhaseId = searchParams.get("phase");
 
   const [path, setPath] = useState<OnboardingPathEndpoint | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>("loading");
@@ -182,7 +214,7 @@ export function OnBoardingPage() {
       ? "list"
       : viewKey
         ? readJourneyView(viewKey).mode
-        : "list",
+        : "graph",
   );
   const [graphPhaseId, setGraphPhaseId] = useState<string | null>(
     // A phase arrived at by name opens *inside* itself on the graph, the same way it opens selected
@@ -220,9 +252,53 @@ export function OnBoardingPage() {
       SLIDING_PANEL_EXIT_MS,
     );
   }, []);
-  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [isDinoActiveInGeneration, setIsDinoActiveInGeneration] = useState(false);
+  /**
+   * The last running generation, kept so the generation screen can stay up while the dino game
+   * is still being played after the run has ended (see `isDinoActiveInGeneration`).
+   *
+   * `completed` outlives the `done` status on purpose: the page clears a finished generation as
+   * soon as the new path is fetched, so the status drops to `idle` while the game may still be
+   * open. Without the flag the screen would fall back to the frozen "working" snapshot and stop
+   * saying "Path ready".
+   */
+  const [lastGeneration, setLastGeneration] = useState<{
+    phases: GenerationPhaseProgress[];
+    startedAt: number;
+    completed: boolean;
+  }>(() =>
+    generation.status === "running"
+      ? { phases: generation.phases, startedAt: generation.startedAt, completed: false }
+      : { phases: [], startedAt: 0, completed: false },
+  );
+
+  // Follows the generation during render (React's "adjust state when a value changes" pattern)
+  // rather than in an effect, so the screen never paints one frame with a stale outcome.
+  const [seenGeneration, setSeenGeneration] = useState(generation);
+  if (seenGeneration !== generation) {
+    setSeenGeneration(generation);
+    if (generation.status === "running") {
+      setLastGeneration({
+        phases: generation.phases,
+        startedAt: generation.startedAt,
+        completed: false,
+      });
+    } else if (generation.status === "done") {
+      setLastGeneration((previous) => ({ ...previous, completed: true }));
+    } else if (generation.status === "error") {
+      // Failure wins over the game: the snapshot's phases are still "working", so keeping the
+      // generation screen up for the game would hide the failure behind a wait that is over.
+      // Dropping the flag unmounts the screen, which releases the game's shared slot with it.
+      setIsDinoActiveInGeneration(false);
+    }
+  }
   // Set when the page itself moves the member on, so the item they land on is scrolled to.
   const scrollToItemRef = useRef<string | null>(focusItemId ?? null);
+  // The item a buddy link landed on, for as long as its light plays. `key` changes per arrival, so
+  // following the same link again scrolls to it again. Cleared when the light has played or the
+  // member moves to another phase, so neither the scroll nor the light comes back on its own later.
+  const [linkHighlight, setLinkHighlight] = useState<{ id: string; key: string } | null>(null);
+  const clearLinkHighlight = useCallback(() => setLinkHighlight(null), []);
 
   usePathRevealMoment(loadingState === "success" ? path : null);
 
@@ -279,6 +355,16 @@ export function OnBoardingPage() {
     }
   }, [applyPath, toast]);
 
+  /**
+   * Re-reads the path after the buddy changed it.
+   *
+   * The buddy lives in a dock over this page, which is where a hire most likely is while talking
+   * about their path. Without this, confirming "mark this step as done" in the conversation left the
+   * list behind the dock still showing the step open. Told rather than polled; see
+   * `announceBuddyPathChanged`.
+   */
+  useEffect(() => onBuddyPathChanged(() => void refreshPath()), [refreshPath]);
+
   // A generation that finished -- here or while the user was elsewhere -- means there is a new path.
   // Read fresh rather than taken from the generation: the hire may have started working on it before
   // coming back here, and the stream's copy knows nothing of that.
@@ -333,15 +419,30 @@ export function OnBoardingPage() {
           ? { kind: "question" as const, id: focusQuestionId }
           : wantsChooser
             ? { kind: "choose" as const, id: "" }
-            : null,
-    [focusQuestionId, routeStepId, wantsChooser],
+            : linkedStepId
+              ? { kind: "link-step" as const, id: linkedStepId }
+              : linkedQuestionId
+                ? { kind: "link-question" as const, id: linkedQuestionId }
+                : linkedPhaseId
+                  ? { kind: "link-phase" as const, id: linkedPhaseId }
+                  : null,
+    [focusQuestionId, linkedPhaseId, linkedQuestionId, linkedStepId, routeStepId, wantsChooser],
   );
-  const arrivalKey = arrival ? `${arrival.kind}:${arrival.id}` : "";
+  // A link carries the navigation's key as well: the hire who scrolled away and clicks the same link
+  // in the conversation again should land again.
+  const arrivalKey = arrival
+    ? `${arrival.kind}:${arrival.id}${arrival.kind.startsWith("link") ? `:${location.key}` : ""}`
+    : "";
   const handledArrivalRef = useRef("");
 
   // Read by the arrival effect, which must not re-run every time one of these is recreated.
-  const startStepRef = useRef<(item: PhaseItem) => void>(() => undefined);
+  const startStepRef = useRef<(item: PhaseItem, options: StartOptions) => void>(() => undefined);
   const scrollToChooserRef = useRef<() => void>(() => undefined);
+  /**
+   * Takes a handled link out of the address, so a reload or the hire's own next click decides what
+   * they are looking at rather than the link lighting the same card up again.
+   */
+  const clearLinkRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     if (loadingState !== "success" || !path || !arrival) return;
@@ -362,19 +463,55 @@ export function OnBoardingPage() {
         return;
       }
 
+      // A link is followed in the list, so a step left open on the graph is let go of too --
+      // otherwise swiping stayed off and the graph reopened it on the way back.
+      if (arrival.kind.startsWith("link")) setGraphItemId(null);
+
+      if (arrival.kind === "link-phase") {
+        const linkedPhase = path.phases.find((phase) => phase.id === arrival.id);
+        if (linkedPhase) {
+          setSelectedPhaseId(arrival.id);
+          // An item open in the linked phase stays open: it may hold a typed answer.
+          setExpandedItemId((current) =>
+            phaseItems(linkedPhase).some((item) => item.id === current) ? current : null,
+          );
+        } else {
+          toast.error("That phase is not on your path", {
+            description: "It may have been replaced when your path was rebuilt.",
+          });
+        }
+        clearLinkRef.current();
+        return;
+      }
+
       const owningPhase = path.phases.find((phase) =>
         phaseItems(phase).some((item) => item.id === arrival.id),
       );
       if (!owningPhase) {
         toast.error(
-          arrival.kind === "step"
-            ? "That step is not on your path"
-            : "That question is not on your path",
+          arrival.kind === "question" || arrival.kind === "link-question"
+            ? "That question is not on your path"
+            : "That step is not on your path",
           { description: "It may have been replaced when your path was rebuilt." },
         );
         // Only the step has an address of its own to go back from; a question arrives in router
         // state, which is dropped by navigating to the same place without it.
         void navigate("/onboarding", { replace: true, state: null });
+        return;
+      }
+
+      if (arrival.kind === "link-step" || arrival.kind === "link-question") {
+        setSelectedPhaseId(owningPhase.id);
+        // "You're on #3" is most likely clicked while #3 is open -- collapsing it would throw away
+        // a typed answer or skip reason. A link that asks for the step open unfolds it instead.
+        if (arrival.kind === "link-step" && linkOpensStep) {
+          scrollToItemRef.current = arrival.id;
+          setExpandedItemId(arrival.id);
+        } else {
+          setExpandedItemId((current) => (current === arrival.id ? current : null));
+        }
+        setLinkHighlight({ id: arrival.id, key: arrivalKey });
+        clearLinkRef.current();
         return;
       }
 
@@ -385,9 +522,42 @@ export function OnBoardingPage() {
       // A step opened by its address is started like one opened by a click -- including the
       // second link of a visit, which the load-time version could not see.
       const item = phaseItems(owningPhase).find((candidate) => candidate.id === arrival.id);
-      if (item) startStepRef.current(item);
+      if (item) startStepRef.current(item, { byAddress: true });
     });
-  }, [arrival, arrivalKey, loadingState, navigate, path, toast]);
+  }, [arrival, arrivalKey, linkOpensStep, loadingState, navigate, path, toast]);
+
+  useEffect(() => {
+    clearLinkRef.current = () =>
+      setSearchParams(
+        (params) => {
+          params.delete("step");
+          params.delete("question");
+          params.delete("phase");
+          params.delete("open");
+          return params;
+        },
+        { replace: true },
+      );
+  }, [setSearchParams]);
+
+  // Scrolls to the card a link landed on, once per link. A link followed from the graph switches to
+  // the list, which `SlidingTabPanel` mounts only after the graph has slid out -- so a card that is
+  // not there yet is looked for again once it can be, the same wait `scrollToChooser` makes.
+  const scrolledLinkRef = useRef("");
+  useEffect(() => {
+    if (loadingState !== "success" || !linkHighlight) return;
+    if (scrolledLinkRef.current === linkHighlight.key) return;
+    const scroll = () => {
+      const card = document.getElementById(linkedCardId(linkHighlight.id));
+      if (!card) return false;
+      scrolledLinkRef.current = linkHighlight.key;
+      card.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      return true;
+    };
+    if (scroll()) return;
+    const timer = window.setTimeout(scroll, SLIDING_PANEL_EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [linkHighlight, loadingState, selectedPhaseId, viewMode]);
 
   // Scrolls to an item the page opened on the member's behalf -- a link, "up next", "continue".
   useEffect(() => {
@@ -432,6 +602,35 @@ export function OnBoardingPage() {
   const focusPhaseId =
     nextAction?.kind === "step" || nextAction?.kind === "question" ? nextAction.phase.id : null;
   const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? phases[0] ?? null;
+
+  // Where the hire is on this page, for whatever they keep on their board from here: the step they
+  // have open, or the phase they are looking at. See `onboardingPlace.ts`.
+  useEffect(() => {
+    const openItemId = viewMode === "graph" ? graphItemId : expandedItemId;
+    const shownPhase =
+      viewMode === "graph"
+        ? (phases.find((phase) => phase.id === openGraphPhaseId) ?? null)
+        : selectedPhase;
+    const openItem = openItemId
+      ? phases.flatMap(phaseItems).find((item) => item.id === openItemId)
+      : undefined;
+    // A question is not a place a note is kept *about*; its phase is.
+    const itemPhase =
+      openItem?.kind === "question"
+        ? phases.find((phase) => phase.id === openItem.question.phaseId)
+        : undefined;
+    const phase = itemPhase ?? shownPhase;
+
+    setOnboardingPlace(
+      openItem?.kind === "step"
+        ? { kind: "step", id: openItem.id, title: openItem.title }
+        : phase
+          ? { kind: "phase", id: phase.id, title: phase.title }
+          : null,
+    );
+  }, [expandedItemId, graphItemId, openGraphPhaseId, phases, selectedPhase, viewMode]);
+
+  useEffect(() => () => setOnboardingPlace(null), []);
   const overall = path ? pathProgress(path) : null;
   const generationIssues = path?.generationIssues ?? [];
   const generationIssueSummary = generationIssues
@@ -446,8 +645,12 @@ export function OnBoardingPage() {
     );
 
   /** A step the member opens for the first time is started; reopening one changes nothing. */
-  const beginStepIfWaiting = async (item: PhaseItem) => {
+  const beginStepIfWaiting = async (item: PhaseItem, { byAddress = false }: StartOptions = {}) => {
     if (item.kind !== "step" || item.step.status !== "WAITING" || item.step.locked) return;
+    // Arriving at `/onboarding/<id>` for a step with a skip request open is arriving to change or
+    // withdraw it, not to begin the step; its own "Start step" button still does that. Only the
+    // address: the list's button says "Start", and a click on it should do what it says.
+    if (byAddress && isSkipPending(item.step.skip)) return;
     try {
       await onboardingService.startStep(item.step.id);
       // The rocket marks a step *beginning*.
@@ -464,7 +667,7 @@ export function OnBoardingPage() {
   // Refreshed every render, so the arrival effect can call the latest of each without taking a
   // dependency on a function that is recreated on every render.
   useEffect(() => {
-    startStepRef.current = (item) => void beginStepIfWaiting(item);
+    startStepRef.current = (item, options) => void beginStepIfWaiting(item, options);
     scrollToChooserRef.current = scrollToChooser;
   });
 
@@ -521,6 +724,7 @@ export function OnBoardingPage() {
   const selectPhase = (phaseId: string) => {
     setSelectedPhaseId(phaseId);
     setExpandedItemId(null);
+    setLinkHighlight(null);
   };
 
   const choosePhase = (phaseId: string) => {
@@ -627,6 +831,7 @@ export function OnBoardingPage() {
         <QuestionWorkspace
           key={item.id}
           question={item.question}
+          phaseTitle={phase.title}
           onAnswered={(result) => handleAnswered(item.question, result)}
           continueLabel={next.label}
           onContinue={next.run}
@@ -649,7 +854,6 @@ export function OnBoardingPage() {
 
   const requestGeneration = () => {
     if (!selectedProjectId) return;
-    setConfirmRegenerate(false);
     startGeneration(selectedProjectId);
   };
 
@@ -669,8 +873,27 @@ export function OnBoardingPage() {
 
   // ── Render: generating ──────────────────────────────────────
 
-  if (generation.status === "running") {
-    return <GenerationScreen phases={generation.phases} startedAt={generation.startedAt} />;
+  // A failed generation never keeps this screen up, game or not: its failure (the retry below, or
+  // the toast beside an existing path) has to be what the member sees.
+  if (
+    generation.status === "running" ||
+    (isDinoActiveInGeneration && generation.status !== "error")
+  ) {
+    const isRunning = generation.status === "running";
+    const activePhases = isRunning ? generation.phases : lastGeneration.phases;
+    const startedAt = isRunning ? generation.startedAt : lastGeneration.startedAt;
+
+    return (
+      <GenerationScreen
+        phases={activePhases}
+        startedAt={startedAt}
+        isRunning={isRunning}
+        // Only a finished generation may claim "Path ready" -- and keeps claiming it after the
+        // page clears the `done` status, see `lastGeneration.completed`.
+        isCompleted={!isRunning && (generation.status === "done" || lastGeneration.completed)}
+        onGameActiveChange={setIsDinoActiveInGeneration}
+      />
+    );
   }
 
   // ── Render: loading ─────────────────────────────────────────
@@ -739,26 +962,47 @@ export function OnBoardingPage() {
             <GenerationIssueSummary issues={generationIssues} />
             {/* Retrying a phase that was skipped for lack of material changes nothing, so when that
                 is all there is, the button says so rather than inviting the same answer. */}
-            <p className="mt-5 text-xs text-app-text-subtle">
-              {retryCouldHelp(generationIssues)
-                ? "Trying again re-runs assembly for every phase."
-                : "Another run will produce the same result until the project has more material."}
-            </p>
+            {canManageSelected && (
+              <p className="mt-5 text-xs text-app-text-subtle">
+                {retryCouldHelp(generationIssues)
+                  ? "Trying again re-runs assembly for every phase."
+                  : "Another run will produce the same result until the project has more material."}
+              </p>
+            )}
           </div>
         ) : null}
-        <Button
-          className="mt-6"
-          variant={
-            generationIssues.length === 0 || retryCouldHelp(generationIssues)
-              ? "primary"
-              : "secondary"
-          }
-          onClick={requestGeneration}
-          icon={<RefreshCw className="h-4 w-4" />}
-          disabled={!selectedProjectId}
-        >
-          Try generation again
-        </Button>
+        {/* Building an existing path again replaces it, which is the project manager's call: the
+            backend refuses it to members, so they are pointed at the PM instead of a button that
+            can only fail. */}
+        {canManageSelected ? (
+          <Button
+            className="mt-6"
+            variant={
+              generationIssues.length === 0 || retryCouldHelp(generationIssues)
+                ? "primary"
+                : "secondary"
+            }
+            onClick={requestGeneration}
+            icon={<RefreshCw className="h-4 w-4" />}
+            disabled={!selectedProjectId}
+          >
+            Try generation again
+          </Button>
+        ) : (
+          <p className="mt-6 max-w-lg text-sm text-app-text-muted">
+            Your project manager can rebuild your path from your page in the team area.
+          </p>
+        )}
+        {/* Generating again is the wrong hope when the corpus is what was thin -- it comes back
+            empty a second time. The conversation is the one thing here that can produce
+            something, so it is offered beside the retry (or the pointer to the PM) rather than
+            instead of it. */}
+        {generationIssues.length > 0 ? (
+          <AskTheBuddy
+            question={askAboutEmptyPhases(generationIssues.map((issue) => issue.title))}
+            label="Work it out with your buddy instead"
+          />
+        ) : null}
       </CenteredState>
     );
   }
@@ -779,36 +1023,26 @@ export function OnBoardingPage() {
                 ? "You made it through every phase. Everything stays here to look back on."
                 : "Your path into the project. Phases that are open can be done in any order."
             }
+            // Rebuilding a path throws the member's progress away, so it is the PM's call: it lives
+            // on the member's page in the PM area, not here.
             actions={
-              <>
-                {generationIssues.length > 0 && (
-                  <span
-                    role="status"
-                    aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
-                  >
-                    <Badge variant="warning" size="sm" title={generationIssueSummary}>
-                      <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                      {generationIssues.length}
-                    </Badge>
-                  </span>
-                )}
-                <Button
-                  variant="secondary"
-                  onClick={() => setConfirmRegenerate(true)}
-                  icon={<RefreshCw className="h-4 w-4" />}
-                  aria-label="Regenerate path with AI"
-                  title="Regenerate path with AI"
-                  disabled={!selectedProjectId}
+              generationIssues.length > 0 && (
+                <span
+                  role="status"
+                  aria-label={`${generationIssues.length} onboarding ${generationIssues.length === 1 ? "phase" : "phases"} could not be generated`}
                 >
-                  Rebuild
-                </Button>
-              </>
+                  <Badge variant="warning" size="sm" title={generationIssueSummary}>
+                    <AlertTriangle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                    {generationIssues.length}
+                  </Badge>
+                </span>
+              )
             }
           />
         </div>
       </header>
 
-      <main className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
+      <MainContent className="app-page-frame space-y-5 py-6 pb-24 lg:py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <SegmentedTabs
             layoutId="onboarding-view-mode"
@@ -816,14 +1050,14 @@ export function OnBoardingPage() {
             value={viewMode}
             onChange={chooseViewMode}
             options={[
-              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
               { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
+              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
             ]}
           />
           {overall ? (
             <div className="flex items-center gap-3">
               <ProgressRing value={overall.percentage} size={44} stroke={4.5}>
-                <span className="text-[11px] font-bold text-app-text tabular-nums">
+                <span className="text-2xs font-bold text-app-text tabular-nums">
                   {overall.percentage}%
                 </span>
               </ProgressRing>
@@ -882,6 +1116,8 @@ export function OnBoardingPage() {
                     phase={selectedPhase}
                     nextItemId={nextItemId}
                     expandedItemId={expandedItemId}
+                    linkedItemId={linkHighlight?.id ?? null}
+                    onLinkHighlightEnd={clearLinkHighlight}
                     onToggle={toggleItem}
                     onPrimary={openItem}
                     renderExpanded={(item) => renderItemBody(item, "inline")}
@@ -917,22 +1153,7 @@ export function OnBoardingPage() {
             />
           )}
         </SlidingTabPanel>
-      </main>
-
-      <AlertDialog
-        isOpen={confirmRegenerate}
-        title="Rebuild your onboarding path?"
-        description="Your path is put together again from the project's current blueprint and knowledge base. Progress on the current path is replaced."
-        confirmLabel="Rebuild path"
-        variant="danger"
-        onClose={() => setConfirmRegenerate(false)}
-        onConfirm={() => {
-          requestGeneration();
-          toast.info("Rebuilding your onboarding path", {
-            description: "This runs in the background; you can keep using the app.",
-          });
-        }}
-      />
+      </MainContent>
     </div>
   );
 }
@@ -1023,6 +1244,7 @@ function PhaseHeaderCard({
   const progress = phaseProgress(phase);
   const waitsOn = blockingPhases(phase, phases);
   const unlocks = phasesUnlockedBy(phase, phases);
+  const isEmpty = phase.steps.length === 0 && phase.questions.length === 0;
 
   return (
     <div className="rounded-3xl border border-app-border bg-app-surface p-5">
@@ -1036,6 +1258,17 @@ function PhaseHeaderCard({
       {phase.description ? (
         <p className="mt-1 max-w-3xl text-sm text-app-text-muted">{phase.description}</p>
       ) : null}
+      {/* The phase-level way in. A hire who does not know why a phase is here is not helped by any
+          of the buttons below it -- and an empty phase is the case the buddy exists for: its title
+          still says what it was meant to cover, and the mentor can put the result on their path. */}
+      <AskTheBuddy
+        question={isEmpty ? askAboutEmptyPhase(phase.title) : askAboutPhase(phase)}
+        label={
+          isEmpty
+            ? "This phase is empty — talk it through with your buddy"
+            : "Ask your buddy about this phase"
+        }
+      />
       <div className="mt-3 flex items-center gap-3">
         <div className="h-1.5 w-40 overflow-hidden rounded-full bg-app-border-muted">
           <div

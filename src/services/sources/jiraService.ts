@@ -1,42 +1,10 @@
 import { apiClient } from "../apiClient.ts";
+import type { SyncScheduleConfig, SyncScheduleRequest } from "./syncSchedule.ts";
 
 // ---- Enums / shared ----
 
 /** Connection state the backend reports for a connected Jira instance. */
 export type JiraInstanceStatus = "UPDATING" | "UP_TO_DATE" | "OUT_OF_DATE" | "FAILED";
-
-export type JiraScheduleDayOfWeek =
-  "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
-
-/**
- * Typed schedule payload for a Jira instance. Structurally identical to
- * `GithubScheduleSpec` (same discriminator field `type`); mirrored here to keep
- * the Jira connector self-contained rather than cross-importing from the GitHub
- * service.
- */
-export type JiraScheduleSpec =
-  | {
-      type: "DAILY";
-      time: string;
-    }
-  | {
-      type: "WEEKLY";
-      time: string;
-      daysOfWeek: JiraScheduleDayOfWeek[];
-    }
-  | {
-      type: "MONTHLY";
-      time: string;
-      dayOfMonth: number;
-    }
-  | {
-      type: "INTERVAL";
-      everyMinutes: number;
-    }
-  | {
-      type: "CUSTOM";
-      cron: string;
-    };
 
 // ---- Instances ----
 
@@ -75,25 +43,14 @@ export type JiraInstanceDto = {
 
 // ---- Config ----
 
-export type ConfigureAllJiraInstancesRequest = {
-  schedule: JiraScheduleSpec;
-  autoUpdate: boolean;
+export type ConfigureJiraInstanceRequest = SyncScheduleRequest & {
+  instanceUrl: string;
 };
 
-export type ConfigureJiraInstanceRequest = {
+export type GetJiraInstanceConfigResponse = SyncScheduleConfig & {
   instanceUrl: string;
-  schedule: JiraScheduleSpec;
-  autoUpdate: boolean;
-};
-
-export type GetJiraInstanceConfigResponse = {
-  instanceUrl: string;
-  autoUpdate: boolean;
-  spec: JiraScheduleSpec | null;
   /** String representation of the schedule (cron or similar). */
   schedule: string;
-  /** ISO-8601 instant of the next scheduled sync, or null. */
-  nextSyncAt: string | null;
 };
 
 // ---- Instances ----
@@ -167,28 +124,7 @@ export async function updateJiraInstance(
   });
 }
 
-/**
- * Triggers an update of all connected Jira instances.
- *
- * @returns One accepted transaction id per instance.
- * @throws ApiError — 403 for an insufficient role.
- */
-export async function updateAllJiraInstances(): Promise<UpdateJiraInstanceResponse[]> {
-  return apiClient.fetch<UpdateJiraInstanceResponse[]>("/api/v1/jira/update-all", {
-    method: "POST",
-  });
-}
-
 // ---- Config ----
-
-/**
- * Loads the schedule and auto-update policy of every connected Jira instance.
- *
- * @throws ApiError — 403 for an insufficient role.
- */
-export async function getAllJiraConfigs(): Promise<GetJiraInstanceConfigResponse[]> {
-  return apiClient.fetch<GetJiraInstanceConfigResponse[]>("/api/v1/jira/config");
-}
 
 /**
  * Loads the schedule and auto-update policy of one connected Jira instance.
@@ -203,21 +139,6 @@ export async function getJiraConfig(instanceUrl: string): Promise<GetJiraInstanc
   const query = new URLSearchParams({ instanceUrl }).toString();
 
   return apiClient.fetch<GetJiraInstanceConfigResponse>(`/api/v1/jira/config/instance?${query}`);
-}
-
-/**
- * Applies one schedule and auto-update policy to all connected Jira instances.
- * The backend converts the typed schedule payload into the stored cron expression.
- *
- * @throws ApiError — 403 for an insufficient role.
- */
-export async function configureAllJiraInstances(
-  request: ConfigureAllJiraInstancesRequest,
-): Promise<void> {
-  await apiClient.fetch<void>("/api/v1/jira/config", {
-    method: "PUT",
-    body: JSON.stringify(request),
-  });
 }
 
 /**

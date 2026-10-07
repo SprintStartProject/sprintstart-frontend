@@ -92,10 +92,9 @@ function clampPage(page: number) {
 }
 
 function mapFailedArtifact(item: CanonicalFailedArtifact): FailedArtifact {
-  const sourceReference = item.sourceId ?? item.sourceUrl ?? "Unknown artifact";
-
   return {
-    artifactIdentifier: `${item.artifactType}: ${sourceReference}`,
+    artifactType: item.artifactType,
+    reference: item.sourceId ?? item.sourceUrl ?? null,
     reason: item.reason,
   };
 }
@@ -250,22 +249,6 @@ function buildArtifactQuery({
   return params.toString();
 }
 
-/**
- * Fetches the most recent ingestion runs.
- *
- * @param limit - Maximum number of ingestion runs to fetch. Must be between 1 and 100.
- * @returns A promise resolving to an array of IngestionRun objects.
- * @throws Error if the backend request fails.
- */
-export async function getIngestionRuns(limit = 50): Promise<IngestionRun[]> {
-  const safeLimit = clampLimit(limit);
-  const data = await apiClient.fetch<CanonicalIngestionRunResponse[]>(
-    `/api/v1/ingestion-runs?limit=${safeLimit}`,
-  );
-
-  return data.map(mapIngestionRun);
-}
-
 const DEFAULT_RUN_PAGE_SIZE = 20;
 const MAX_RUN_PAGE_SIZE = 100;
 
@@ -294,9 +277,9 @@ function buildRunPageQuery(filter: IngestionRunFilter): string {
 }
 
 /**
- * Fetches a filtered, paginated page of ingestion runs. Unlike
- * {@link getIngestionRuns}, each run carries its repository identity and the
- * server applies the {@link IngestionRunFilter} (repo, project, status, since).
+ * Fetches a filtered, paginated page of ingestion runs. Each run carries its
+ * repository identity and the server applies the {@link IngestionRunFilter}
+ * (repo, project, status, since).
  *
  * @throws Error if the backend request fails.
  */
@@ -348,6 +331,10 @@ export async function getIngestionSourceStatuses(
   return data.map(mapSourceInstanceStatus);
 }
 
+/**
+ * Loads one page of a project's ingested artifacts. `options` carries the 1-based page, the
+ * page size and an optional filter.
+ */
 export async function getProjectArtifacts(
   projectId: string,
   options: GetProjectArtifactsOptions = {},
@@ -357,6 +344,10 @@ export async function getProjectArtifacts(
   return apiClient.fetch<ArtifactPage>(`/api/v1/projects/${projectId}/artifacts?${query}`);
 }
 
+/**
+ * Loads every artifact of a project: the first page of 100, then all remaining pages in
+ * parallel. The number of requests grows with the project's artifact count.
+ */
 export async function getProjectArtifactSnapshot(
   projectId: string,
 ): Promise<{ artifacts: Artifact[]; totalElements: number }> {

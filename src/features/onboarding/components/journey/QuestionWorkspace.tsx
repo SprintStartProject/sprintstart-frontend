@@ -1,5 +1,5 @@
 import { ChevronRight, Loader2, RotateCcw, Trophy, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../../../components/ui/Button";
 import { useToast } from "../../../../context/useToast";
 import { onboardingService } from "../../../../services/onboardingService";
@@ -7,9 +7,24 @@ import { emptyDraft, isAnswered, toSubmission, type DraftAnswer } from "../../ch
 import type { OnboardingQuestionEndpoint, QuestionAttemptResult } from "../../types";
 import { CheckQuestionCard } from "../CheckQuestionCard";
 import { ConfettiBurst } from "../ConfettiBurst";
+import { AskTheBuddy } from "../../../buddy/components/AskTheBuddy";
+import { askAboutQuestion, askAboutWrongAnswer } from "../../buddyDrafts";
+import {
+  clearRevealed,
+  COPIED_SAMPLE_WARNING,
+  isCopyOfReveal,
+  isPasteFromReveal,
+  NOTHING_REVEALED,
+  readRevealed,
+  withAttempt,
+  writeRevealed,
+  type Revealed,
+} from "../../questionIntegrity";
 
 type Props = {
   question: OnboardingQuestionEndpoint;
+  /** The phase the question belongs to, named in what the buddy is asked about it. */
+  phaseTitle: string;
   /** After a graded attempt; `correct` and `onboardingCompleted` come from the backend. */
   onAnswered: (result: QuestionAttemptResult) => Promise<void> | void;
   continueLabel: string;
@@ -22,20 +37,51 @@ type Props = {
  * The same grading as before, without the dialog: a wrong answer is offered again right there, and a
  * correct one moves on the way a finished step does.
  */
-export function QuestionWorkspace({ question, onAnswered, continueLabel, onContinue }: Props) {
+export function QuestionWorkspace({
+  question,
+  phaseTitle,
+  onAnswered,
+  continueLabel,
+  onContinue,
+}: Props) {
   const toast = useToast();
   const [draft, setDraft] = useState<DraftAnswer>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<QuestionAttemptResult | null>(null);
   const alreadyPassed = question.status === "PASSED" && !result;
+  // Each attempt shows the options in a fresh order, so a retry is not answered by position.
+  const [attemptRound, setAttemptRound] = useState(0);
+  // What wrong attempts revealed -- sample answer, explanation, feedback: handing it back is not
+  // an answer.
+  const [revealed, setRevealed] = useState<Revealed>(() =>
+    question.type === "SHORT_TEXT" ? readRevealed(question.id) : NOTHING_REVEALED,
+  );
+  // A question passed elsewhere (another tab, a reload after passing) has nothing left to guard.
+  useEffect(() => {
+    if (question.status === "PASSED") clearRevealed(question.id);
+  }, [question.id, question.status]);
+  const [copyWarning, setCopyWarning] = useState<string | null>(null);
 
   const submit = async () => {
+    if (question.type === "SHORT_TEXT" && isCopyOfReveal(draft.textAnswer, revealed)) {
+      setCopyWarning(COPIED_SAMPLE_WARNING);
+      return;
+    }
     setSubmitting(true);
     try {
       const attempt = await onboardingService.submitQuestionAttempt(
         question.id,
         toSubmission(question, draft),
       );
+      if (question.type === "SHORT_TEXT") {
+        if (attempt.correct) {
+          clearRevealed(question.id);
+        } else {
+          const next = withAttempt(revealed, attempt, draft.textAnswer.trim());
+          writeRevealed(question.id, next);
+          setRevealed(next);
+        }
+      }
       setResult(attempt);
       await onAnswered(attempt);
     } catch (reason) {
@@ -91,13 +137,30 @@ export function QuestionWorkspace({ question, onAnswered, continueLabel, onConti
         >
           <XCircle className="h-5 w-5 shrink-0 text-app-danger-solid" aria-hidden="true" />
           <p className="text-sm font-semibold text-app-text">
-            Not correct yet
+            Not quite.
             <span className="block text-xs font-normal text-app-text-muted">
-              Look at the answer below and try again.
+              The correct answer is marked below.
             </span>
+            {/* Where another guess used to be the only thing on offer. The buddy is not given the
+                answer, so this is help with the material -- what a wrong answer calls for. */}
+            <AskTheBuddy
+              question={askAboutWrongAnswer(question, phaseTitle)}
+              label="Go through it with your buddy"
+            />
           </p>
         </div>
-      ) : null}
+      ) : (
+        // Before an attempt, and quiet: guessing costs nothing here, so this is an offer rather
+        // than a nudge. Louder on a question already answered wrong on an earlier visit.
+        <AskTheBuddy
+          question={askAboutQuestion(question, phaseTitle)}
+          label={
+            question.status === "RETRY"
+              ? "Go through this with your buddy"
+              : "Not sure? Ask your buddy to explain the material"
+          }
+        />
+      )}
 
       <CheckQuestionCard
         question={question}
@@ -112,7 +175,17 @@ export function QuestionWorkspace({ question, onAnswered, continueLabel, onConti
               : [...current.selectedOptionIds, optionId],
           }))
         }
-        onTextChange={(textAnswer) => setDraft((current) => ({ ...current, textAnswer }))}
+        onTextChange={(textAnswer) => {
+          setCopyWarning(null);
+          setDraft((current) => ({ ...current, textAnswer }));
+        }}
+        optionOrderSeed={`${question.id}:${attemptRound}`}
+        onTextPaste={(text) => {
+          if (!isPasteFromReveal(text, revealed)) return true;
+          setCopyWarning(COPIED_SAMPLE_WARNING);
+          return false;
+        }}
+        textWarning={copyWarning}
       />
 
       <div className="flex justify-end gap-2 border-t border-app-border pt-4">
@@ -131,6 +204,8 @@ export function QuestionWorkspace({ question, onAnswered, continueLabel, onConti
             onClick={() => {
               setDraft(emptyDraft);
               setResult(null);
+              setCopyWarning(null);
+              setAttemptRound((round) => round + 1);
             }}
           >
             Try again

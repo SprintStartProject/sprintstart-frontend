@@ -1,15 +1,26 @@
+import { SelectedBadge } from "../../../components/ui/SelectedBadge";
 import { useEffect, useState } from "react";
-import { Check, CornerDownRight, ListChecks, Pencil, Plus, Trash2, Users } from "lucide-react";
+import {
+  Check,
+  CornerDownRight,
+  ListChecks,
+  Pencil,
+  Plus,
+  Trash2,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
-import { DrawerCard } from "../../admin/components/DrawerCard";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { Field } from "../../../components/ui/Field";
 import { InfoHint } from "../../../components/ui/InfoHint";
 import { Input } from "../../../components/ui/Input";
 import { Spinner } from "../../../components/ui/Spinner";
 import { Textarea } from "../../../components/ui/Textarea";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useToast } from "../../../context/useToast";
 import { useArrivalAuthoring } from "../hooks/useArrivalAuthoring";
 import { howStepGetsDone } from "../howItsDone";
@@ -103,8 +114,9 @@ export function ArrivalStepAuthoring({
     return (
       <p
         role="alert"
-        className="rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
+        className="flex items-start gap-1.5 rounded-2xl border border-app-danger-border bg-app-danger-bg px-4 py-3 text-sm text-app-danger-text"
       >
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         The arrival lists could not be loaded. Refresh to try again.
       </p>
     );
@@ -163,10 +175,16 @@ export function ArrivalStepAuthoring({
             company: (company ?? []).map((step) => step.key.toLowerCase()),
             project: (project ?? []).map((step) => step.key.toLowerCase()),
           }}
-          onAddDerivable={async (derivation) => {
-            const ok = await addDerivable(derivation);
-            if (ok) showSuccessToast("Step added");
-            return ok;
+          onAddDerivables={async (derivations) => {
+            // One at a time, stopping at the first refusal: each write re-reads the lists, and a
+            // failed batch should leave the rest untried rather than half-guessed.
+            let added = 0;
+            for (const derivation of derivations) {
+              if (!(await addDerivable(derivation))) break;
+              added += 1;
+            }
+            if (added > 0) showSuccessToast(added === 1 ? "Step added" : `${added} steps added`);
+            return added === derivations.length;
           }}
           onCreate={async (request, who) => {
             const ok = await create(request, who);
@@ -346,11 +364,7 @@ function EditStepDrawer({
       onClose={onClose}
       showOverlay
       title="Edit step"
-      leading={
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-app-border bg-app-surface-muted text-app-text-muted">
-          <Pencil className="h-6 w-6" aria-hidden="true" />
-        </div>
-      }
+      leading={<IconTile icon={Pencil} size="2xl" tone="neutral" />}
       badge={
         <>
           {isOverride && (
@@ -421,6 +435,7 @@ function EditStepDrawer({
                 onClick={() => setAnswer("company")}
                 className={radioCardClassName(answer === "company")}
               >
+                {answer === "company" ? <SelectedBadge /> : null}
                 <span className="block text-sm font-semibold text-app-text">Everyone</span>
                 <span className="block text-xs text-app-text-muted">
                   Changes the wording for all projects.
@@ -433,6 +448,7 @@ function EditStepDrawer({
                 onClick={() => setAnswer("project")}
                 className={radioCardClassName(answer === "project")}
               >
+                {answer === "project" ? <SelectedBadge /> : null}
                 <span className="block text-sm font-semibold text-app-text">
                   Only {projectName ?? "this project"}
                 </span>

@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "../../components/icons/types.ts";
+import type { SourceSystem } from "./connectors/sourceSystems.ts";
 
-export type SourceSystem = "GITHUB" | "JIRA" | "UPLOAD" | "CONFLUENCE";
+export type { SourceSystem };
 
 export type BackendProjectSourceStatus =
   | "CONNECTED"
@@ -57,17 +59,15 @@ export type PageMetadata = {
   hasPrevious: boolean;
 };
 
-export type ArtifactPageMetadata = PageMetadata;
-
 export type ArtifactPage = {
   items: Artifact[];
-  page: ArtifactPageMetadata;
+  page: PageMetadata;
 };
 
 export type IngestionRun = {
   runId: string;
   sourceSystem: SourceSystem;
-  /** `"owner/name"` for GitHub runs; null for uploads and legacy runs. */
+  /** The run's source reference (`"owner/name"` for GitHub, the instance URL for Jira); null for uploads and legacy runs. */
   sourceId: string | null;
   owner: string | null;
   name: string | null;
@@ -87,24 +87,30 @@ export type IngestionRun = {
 };
 
 /**
- * Per-repo ingestion health from `/api/v1/ingestion-sources/status` — one row
- * per connected GitHub repository. This is the authoritative source for the
- * Data Ingestion source cards: it carries the repository identity, connection
- * status, enabled flag, the last run's counters, the total stored artifact
- * count and the per-artifact-type last-sync timestamps in a single call, so the
- * UI no longer has to reconstruct any of it from artifact metadata.
+ * Per-source ingestion health from `/api/v1/ingestion-sources/status` — one row
+ * per connected GitHub or Bitbucket repository, Jira instance, Confluence space,
+ * Notion workspace or upload source. This is the authoritative source for the Data Ingestion source cards:
+ * it carries the source identity, connection status, enabled flag, the last
+ * run's counters, the total stored artifact count and the per-artifact-type
+ * last-sync timestamps in a single call, so the UI does not have to reconstruct
+ * any of it from artifact metadata.
  */
 export type SourceInstanceIngestionStatus = {
   sourceSystem: SourceSystem;
   /**
-   * Stable, connector-neutral key: GitHub `"owner/name"`, Jira the instance URL.
+   * Key of the source within its system: GitHub `"owner/name"`, Bitbucket
+   * `"workspace/slug"`, Jira the instance URL, Confluence the base URL and space,
+   * Notion the workspace id (the connection id when Notion names none).
    */
   sourceId: string;
-  /** Display name: GitHub `"owner/name"`, Jira the instance's display name. */
+  /**
+   * Display name: GitHub `"owner/name"`, Bitbucket `"workspace/slug"`, otherwise the
+   * source's own display name.
+   */
   displayName: string;
   /**
-   * GitHub-only repository identity. Null for connector-neutral rows such as
-   * Jira, which are identified by {@link sourceId} (the instance URL) instead.
+   * Repository connection id (GitHub and Bitbucket). Null for connector-neutral rows
+   * such as Jira, which are identified by {@link sourceId} (the instance URL) instead.
    */
   repositoryId: string | null;
   owner: string | null;
@@ -160,7 +166,13 @@ export type IngestionRunFilter = {
 };
 
 export type FailedArtifact = {
-  artifactIdentifier: string;
+  /**
+   * Kept as a plain string: Confluence reports `PAGE`, which the ingestion
+   * {@link ArtifactType} union does not list.
+   */
+  artifactType: string;
+  /** Source id or URL of the failed item; null when a whole fetch failed. */
+  reference: string | null;
   reason: string;
 };
 
@@ -171,6 +183,20 @@ export type GithubRepositoryReference = {
 
 export type GithubRepositoryDetails = GithubRepositoryReference & {
   repositoryId: string | null;
+  fullName: string;
+  url: string;
+  enabled: boolean | null;
+};
+
+/**
+ * Bitbucket-specific identity for a source card. A repository is addressed as
+ * `workspace/slug`; `repositoryId` is the connection's UUID, used to update the
+ * repository and to link or unlink it from a project.
+ */
+export type BitbucketRepositoryDetails = {
+  repositoryId: string | null;
+  workspace: string;
+  slug: string;
   fullName: string;
   url: string;
   enabled: boolean | null;
@@ -201,7 +227,19 @@ export type ConfluenceSpaceSourceDetails = {
   credentialName?: string;
 };
 
-export type ActiveTab = "sources" | "artifacts" | "runs" | "connectors";
+/**
+ * Notion-specific identity for a source card. A connected workspace is addressed by
+ * its connection's UUID (`connectionId`), which updating, removing, the schedule and
+ * the run history key on. It is null when the viewer may not read the project's
+ * connections, and the card then only shows what the status row carries.
+ */
+export type NotionWorkspaceSourceDetails = {
+  connectionId: string | null;
+  /** The status row's `sourceId`, which a run carries as its own: the workspace id, else the connection id. */
+  sourceRef: string;
+  workspaceName: string;
+  credentialName: string | null;
+};
 
 /**
  * The section the overview-first Data Ingestion page is filtered to. `overview`
@@ -218,8 +256,6 @@ export type SectionKey = "overview" | "sources" | "runs";
 export const SECTION_ORDER: SectionKey[] = ["overview", "sources", "runs"];
 
 export type LoadingState = "idle" | "loading" | "success" | "error";
-
-export type ConnectState = "idle" | "loading" | "success" | "error";
 
 export type SourceStatus = "connected" | "running" | "warning" | "disabled";
 
@@ -255,57 +291,76 @@ export type SourceStatusPresentation = {
 export type SourceMeta = {
   name: string;
   type: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   description: string;
 };
 
-export type SourceDetailsSource = {
+/**
+ * What a source card knows about its own source, beyond what every source has in
+ * common. One variant per source system, so a card can only ever read the
+ * identity of the system it belongs to.
+ */
+export type SourceDetails =
+  | {
+      system: "GITHUB";
+      /** Null for a repository whose status row could not be resolved. */
+      repository: GithubRepositoryDetails | null;
+      /** Per-artifact-type last-sync timestamps (from the status row). */
+      syncTimes: { commits: string | null; issues: string | null; pullRequests: string | null };
+    }
+  | {
+      system: "BITBUCKET";
+      repository: BitbucketRepositoryDetails | null;
+      /** Bitbucket syncs pull requests only; commits and issues are never ingested. */
+      syncTimes: { pullRequests: string | null };
+    }
+  | {
+      system: "JIRA";
+      instance: JiraInstanceSourceDetails | null;
+      /** Jira refreshes issue data (comments and change history included) as one resource. */
+      syncTimes: { issues: string | null };
+    }
+  | {
+      system: "CONFLUENCE";
+      space: ConfluenceSpaceSourceDetails | null;
+    }
+  | {
+      system: "NOTION";
+      workspace: NotionWorkspaceSourceDetails | null;
+    }
+  | { system: "UPLOAD" };
+
+/** A source card on the Data Ingestion page, the dashboard and the PM views. */
+export type DataSource = {
   sourceId: string;
   sourceSystem: SourceSystem;
   name: string;
+  /** The source system's short label, e.g. "GitHub". */
   type: string;
+  icon: IconComponent;
   status: SourceStatus;
   backendStatus?: BackendProjectSourceStatus;
+  /** The single unified status shown in the list and details drawer. */
+  statusView: SourceStatusPresentation;
   artifacts: number;
   lastSync: string;
   errors: number;
-  latestIngestedCount?: number;
-  latestUpdatedCount?: number;
-  totalArtifactCount?: number;
-  runIds?: string[];
-  sharesSourceSystem?: boolean;
-  failedItems?: FailedArtifact[];
-  githubRepository?: GithubRepositoryDetails | null;
-  /** Jira instance identity; null/absent for non-Jira sources. */
-  jiraInstance?: JiraInstanceSourceDetails | null;
-  /** Confluence space identity; null/absent for non-Confluence sources. */
-  confluenceSpace?: ConfluenceSpaceSourceDetails | null;
   description?: string;
-  nextSync?: string;
-};
-
-export type DataSource = SourceDetailsSource & {
-  icon: LucideIcon;
-  statusLabel: string;
-  ingestionStatus: SourceStatus;
-  ingestionStatusLabel: string;
-  /** The single unified status shown in the list and details drawer. */
-  statusView: SourceStatusPresentation;
   lastRunAt: string | null;
   latestIngestedCount: number;
   latestUpdatedCount: number;
-  /** Artifacts removed by the latest run (from the per-repo status endpoint). */
+  /** Artifacts removed by the latest run (from the status row). */
   deletedCount: number;
   totalArtifactCount: number;
-  runIds: string[];
   sharesSourceSystem: boolean;
   failedItems: FailedArtifact[];
-  githubRepository: GithubRepositoryDetails | null;
-  confluenceSpace?: ConfluenceSpaceSourceDetails | null;
-  /** Per-artifact-type last-sync timestamps (GitHub, from endpoint #5). */
-  lastCommitsSyncAt: string | null;
-  lastIssuesSyncAt: string | null;
-  lastPullRequestsSyncAt: string | null;
+  details: SourceDetails;
 };
 
-export type SourceConnectMeta = SourceMeta;
+/**
+ * What the details panel changed about a source, so the page knows what to
+ * reload: `updated` started (or finished) a re-ingestion and also opens the
+ * polling window, `changed` is any other edit or a manual refresh, `unlinked`
+ * removed the source from the project.
+ */
+export type SourceChange = "updated" | "changed" | "unlinked";

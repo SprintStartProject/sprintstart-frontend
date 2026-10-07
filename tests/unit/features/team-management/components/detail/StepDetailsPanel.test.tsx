@@ -102,6 +102,27 @@ describe("StepDetailsPanel", () => {
     expect(onRequestDeleteTask).toHaveBeenCalledWith(expect.objectContaining({ id: "t1" }));
   });
 
+  it("moves a task up or down with buttons, not only by dragging", async () => {
+    const user = userEvent.setup();
+    const onReorderTasks = vi.fn();
+    render(<StepDetailsPanel {...defaultProps} onReorderTasks={onReorderTasks} />);
+
+    expect(screen.getByRole("button", { name: "Move Install Node up" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move Clone repo down" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Move Install Node down" }));
+    expect(onReorderTasks).toHaveBeenLastCalledWith("t1", "t2");
+
+    await user.click(screen.getByRole("button", { name: "Move Clone repo up" }));
+    expect(onReorderTasks).toHaveBeenLastCalledWith("t2", "t1");
+  });
+
+  it("offers no move buttons when the tasks cannot be reordered", () => {
+    render(<StepDetailsPanel {...defaultProps} />);
+
+    expect(screen.queryByRole("button", { name: /^Move .* (up|down)$/ })).toBeNull();
+  });
+
   it("shows the delete step button in the footer", () => {
     render(<StepDetailsPanel {...defaultProps} />);
 

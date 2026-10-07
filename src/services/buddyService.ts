@@ -4,16 +4,95 @@ import type { BuddyStreamHandlers, ProposalRisk } from "../features/buddy/types"
 import type { BuddyMessage } from "../features/buddy/types";
 
 /**
- * Retrieves the current visit's buddy messages, oldest first (the window since the mentor last
- * updated its memory — not the whole transcript).
+ * Names the conversation a call is about, on the query string — the shape the read and open
+ * endpoints take their target in.
  *
- * @param teamProjectId Pass to read the *team-mode* conversation with a managed project instead
- *   of the hire's own — the backend keeps the two as separate conversations.
+ * Hand-joined rather than `URLSearchParams.size`, and skipped parts are left out entirely:
+ * an absent parameter is what the backend reads as "the caller's own conversation".
  */
-export async function getMessages(teamProjectId?: string): Promise<BuddyMessage[]> {
-  const query = teamProjectId ? `?teamProjectId=${encodeURIComponent(teamProjectId)}` : "";
+function buddyQuery(parts: { sessionId?: string; teamProjectId?: string }): string {
+  const params: string[] = [];
 
-  return await apiClient.fetch<BuddyMessage[]>(`/api/v1/onboarding/me/buddy/messages${query}`);
+  if (parts.sessionId) params.push(`sessionId=${encodeURIComponent(parts.sessionId)}`);
+  if (parts.teamProjectId) params.push(`teamProjectId=${encodeURIComponent(parts.teamProjectId)}`);
+
+  return params.length > 0 ? `?${params.join("&")}` : "";
+}
+
+/**
+ * One conversation the hire owns: its id, its title (empty until the first message writes
+ * one) and when it was started. Newest first, as the backend orders them.
+ */
+export interface BuddySessionSummary {
+  id: string;
+  title: string;
+  projectId: string | null;
+  createdAt: string;
+}
+
+/**
+ * The hire's conversations, newest first.
+ *
+ * Read before every opening: the client picks the one to show — the most recent, or the one
+ * it was last in — and names it on every request that follows.
+ */
+export async function getSessions(): Promise<BuddySessionSummary[]> {
+  const response = await apiClient.fetch<{ sessions: BuddySessionSummary[] }>(
+    `/api/v1/onboarding/me/buddy/sessions`,
+  );
+
+  return response.sessions;
+}
+
+/**
+ * Starts a conversation for the hire and returns its id.
+ *
+ * No project is named, deliberately: the hire's conversation is not one project's, and the
+ * backend already scopes retrieval to every project they are on. A conversation created by
+ * "new conversation" therefore behaves exactly like the first one.
+ */
+export async function createSession(): Promise<string> {
+  const response = await apiClient.fetch<{ id: string }>(`/api/v1/onboarding/me/buddy/sessions`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+
+  return response.id;
+}
+
+/**
+ * Bins one of the hire's conversations.
+ *
+ * The conversation leaves the hire's list — the backend keeps it, messages and all, until its
+ * retention window ends and then deletes it for good. The list read no longer returns it, so
+ * taking the row out client-side is the same thing the next read would show.
+ *
+ * @param sessionId - The conversation to bin. One of the hire's own; the backend answers `404`
+ *   for anyone else's.
+ */
+export async function binSession(sessionId: string): Promise<void> {
+  await apiClient.fetch<void>(
+    `/api/v1/onboarding/me/buddy/sessions/${encodeURIComponent(sessionId)}`,
+    { method: "DELETE" },
+  );
+}
+
+/**
+ * Retrieves one conversation's messages, oldest first (the window since its last opening —
+ * not the whole transcript).
+ *
+ * @param sessionId - The conversation to read. Required for the hire's own conversations — the
+ *   backend answers `400` without one.
+ * @param teamProjectId - Pass to read the *team-mode* conversation with a managed project
+ *   instead; the backend keeps the two apart and team reads name no session.
+ */
+export async function getMessages(
+  sessionId: string | undefined,
+  teamProjectId?: string,
+): Promise<BuddyMessage[]> {
+  return await apiClient.fetch<BuddyMessage[]>(
+    `/api/v1/onboarding/me/buddy/messages${buddyQuery({ sessionId, teamProjectId })}`,
+  );
 }
 
 /** One suggested next step attached to a buddy greeting — one click sends `question`. */
@@ -66,17 +145,18 @@ export interface BuddyOpeningHandlers {
  * Opening twice without the hire saying anything is the same visit: the greeting already there is
  * replayed whole and no model is called.
  *
- * @param handlers How the streamed greeting is received.
- * @param teamProjectId Pass to open a *team-mode* visit with a managed project instead of the
+ * @param handlers - How the streamed greeting is received.
+ * @param sessionId - The conversation to open. Required for the hire's own conversations.
+ * @param teamProjectId - Pass to open a *team-mode* visit with a managed project instead of the
  *   hire's own conversation — the backend greets a manager about their team there.
  */
 export async function streamOpenBuddy(
   handlers: BuddyOpeningHandlers,
+  sessionId: string | undefined,
   teamProjectId?: string,
 ): Promise<void> {
-  const query = teamProjectId ? `?teamProjectId=${encodeURIComponent(teamProjectId)}` : "";
   const outcome = await readBuddyStream(
-    `/api/v1/onboarding/me/buddy/open/stream${query}`,
+    `/api/v1/onboarding/me/buddy/open/stream${buddyQuery({ sessionId, teamProjectId })}`,
     undefined,
     (chunk) => {
       switch (chunk.type) {
@@ -107,13 +187,24 @@ export async function streamOpenBuddy(
 }
 
 /**
- * Generic stream event returned by the backend when sending a buddy message. Mirrors
- * chatService's ChatEvent -- the backend's BuddyStreamEvent uses the identical shape
- * and wire field names as the chat module's AiStreamMessage.
+ * Generic stream event returned by the backend when sending a buddy message. Mirrors the
+ * backend's `BuddyStreamEvent`, which reuses the `sse_event` vocabulary the AI service has
+ * always spoken (`tool_use`/`token`/`citation`/…).
  */
 interface BuddyStreamChunk {
-  type: "tool_use" | "token" | "citation" | "action_proposal" | "opening_action" | "done" | "error";
+  type:
+    | "tool_use"
+    | "token"
+    | "citation"
+    | "action_proposal"
+    | "opening_action"
+    | "reasoning"
+    | "reset"
+    | "done"
+    | "error";
   content?: string;
+  /** Set on a `reasoning` chunk: a delta of the thought being written, appended as it comes. */
+  reasoning?: string;
   message?: string;
   name?: string;
   artifact_id?: string;
@@ -133,6 +224,21 @@ interface BuddyStreamChunk {
   github_login?: string;
   competency_key?: string;
   level?: string;
+  // Path-action confirm payloads: which node of the hire's own onboarding path the action names,
+  // the answer `answer_question` would send in their own words, and a new step's description.
+  step_id?: string;
+  question_id?: string;
+  phase_id?: string;
+  onboarding_task_id?: string;
+  answer?: string;
+  /** `answer_question` confirm payload: the options a multiple-choice answer stands for. */
+  option_ids?: string[];
+  description?: string;
+  /** `request_skip` confirm payload: the reason that goes to the PM. */
+  reason?: string;
+  /** `add_path_step` confirm payload: where the step goes in its phase's graph. */
+  waits_on_ids?: string[];
+  unlocks_ids?: string[];
   /**
    * `place_checklist` confirm payload: the list the buddy offered to keep.
    *
@@ -148,10 +254,16 @@ interface BuddyStreamChunk {
   /** `reword_checklist_item`: the line as it reads now, and as it would read. */
   line_before?: string;
   line_after?: string;
+  /** `place_link` / `edit_link`: where the link would point, and what it would be called. */
+  link_url?: string;
+  link_label?: string;
+  /** `dismiss_cards` / `reorder_cards`: the cards in order, and their board names (display only). */
+  card_ids?: string[];
+  card_names?: string[];
   // Team-mode proposal: the stored proposal to confirm or dismiss by id. Present instead of the
   // per-action payload fields — the client echoes nothing back but this id.
   proposal_id?: string;
-  // Team-mode proposal: what the manager is agreeing to, in words.
+  // What confirming would change, in words: every team-mode proposal, and the hire's board edits.
   preview?: string;
   // Team-mode proposal: STANDARD, DESTRUCTIVE or BULK — how loudly the card warns.
   risk?: string;
@@ -168,7 +280,9 @@ export interface BuddyActionResult {
  * changed nothing. The project is re-resolved server-side from the caller, so only the action name
  * and the proposal's own confirm payloads are sent: `question` for flag-to-PM, `taskId` for a
  * goal claim, `title` + `attesterId` for an attestation request, `githubLogin` for saving a
- * username, `competencyKey` + `level` for recording where a conversation placed the hire.
+ * username, `competencyKey` + `level` for recording where a conversation placed the hire, and the
+ * path-node ids (`stepId`, `questionId`, `phaseId`, plus `answer`, `description` and `reason`) for
+ * the actions that move the hire along their onboarding path.
  */
 export async function performAction(
   action: string,
@@ -180,12 +294,25 @@ export async function performAction(
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    stepId?: string;
+    questionId?: string;
+    phaseId?: string;
+    onboardingTaskId?: string;
+    answer?: string;
+    optionIds?: string[];
+    description?: string;
+    reason?: string;
+    waitsOnIds?: string[];
+    unlocksIds?: string[];
     checklistTitle?: string;
     checklistItems?: string[];
     cardId?: string;
     noteText?: string;
     lineBefore?: string;
     lineAfter?: string;
+    linkUrl?: string;
+    linkLabel?: string;
+    cardIds?: string[];
   } = {},
 ): Promise<BuddyActionResult> {
   return await apiClient.fetch<BuddyActionResult>(`/api/v1/onboarding/me/buddy/actions`, {
@@ -199,12 +326,25 @@ export async function performAction(
       githubLogin: extras.githubLogin,
       competencyKey: extras.competencyKey,
       level: extras.level,
+      stepId: extras.stepId,
+      questionId: extras.questionId,
+      phaseId: extras.phaseId,
+      onboardingTaskId: extras.onboardingTaskId,
+      answer: extras.answer,
+      optionIds: extras.optionIds,
+      description: extras.description,
+      reason: extras.reason,
+      waitsOnIds: extras.waitsOnIds,
+      unlocksIds: extras.unlocksIds,
       checklistTitle: extras.checklistTitle,
       checklistItems: extras.checklistItems,
       cardId: extras.cardId,
       noteText: extras.noteText,
       lineBefore: extras.lineBefore,
       lineAfter: extras.lineAfter,
+      linkUrl: extras.linkUrl,
+      linkLabel: extras.linkLabel,
+      cardIds: extras.cardIds,
     }),
   });
 }
@@ -281,6 +421,7 @@ async function readBuddyStream(
   body: unknown,
   onChunk: (chunk: BuddyStreamChunk) => "stop" | void,
   onError?: (message: string) => void,
+  signal?: AbortSignal,
 ): Promise<BuddyStreamOutcome> {
   // Ensure the token is up to date (refresh if it expires in < 30s)
   try {
@@ -299,14 +440,18 @@ async function readBuddyStream(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${keycloak.token}`,
+        ...(keycloak.token ? { Authorization: `Bearer ${keycloak.token}` } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
     });
-  } catch {
-    // Reported rather than thrown, so "we never reached the server" arrives at the caller's
-    // error surface as a sentence instead of as a rejection it has to translate. The only thing
-    // the hire needs from this is whether trying again is worth it.
+  } catch (error) {
+    // An abort is the hire's Stop, not a failure: it is reported to nobody, and the caller
+    // reads it from the signal it passed in. Everything else is reported rather than thrown,
+    // so "we never reached the server" arrives at the caller's error surface as a sentence
+    // instead of as a rejection it has to translate. The only thing the hire needs from this
+    // is whether trying again is worth it.
+    if (isAbortError(error)) return "aborted";
     onError?.("Could not reach the server.");
     return "aborted";
   }
@@ -362,6 +507,8 @@ async function readBuddyStream(
       }
     }
   } catch (error) {
+    // An abort mid-read is the hire's Stop — the same silent path as above.
+    if (isAbortError(error)) return "aborted";
     // A connection dropped mid-stream. Without this it rejected out of the function, past every
     // `onError` the caller wired up, and whatever had streamed so far simply stopped.
     console.error("Buddy stream failed mid-response", error);
@@ -373,24 +520,76 @@ async function readBuddyStream(
 }
 
 /**
+ * A stop the hire asked for, told apart from a failure.
+ *
+ * Both `fetch` and the reader reject with this on abort — `name` rather than `instanceof`,
+ * because a DOMException is not an `Error` subclass in every engine that runs this.
+ */
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
+/**
+ * Per-message switches that ride along with the content — see `streamMessage`.
+ */
+export type BuddyMessageOptions = {
+  /**
+   * Whether the mentor may act on this message (tools, action proposals, board writes). Sent
+   * per message rather than held on the session: it is a mood, not a setting — a hire who turned
+   * it off to look something up and then asks the mentor to *do* something should not have to
+   * remember which state they left the switch in.
+   */
+  capabilitiesEnabled?: boolean;
+  /**
+   * Narrows what this message may draw on. Field names as the backend serializes them
+   * (`BuddySessionFilters`' `@SerialName`s) — this module is the one place that speaks the wire
+   * vocabulary; callers hand over the composer's camelCase shape, already mapped.
+   */
+  filters?: { source_systems?: string[]; time_from?: string; time_to?: string };
+};
+
+/**
  * Sends a message to the user's persistent buddy and streams the grounded reply.
  *
- * @param content The message to send.
- * @param handlers Helper operations handling the output of the buddy's response.
- * @param teamProjectId Pass to speak in *team mode* about a managed project instead of the hire's
+ * @param content - The message to send.
+ * @param handlers - Helper operations handling the output of the buddy's response.
+ * @param sessionId - The conversation to speak into. Required for the hire's own conversations.
+ * @param teamProjectId - Pass to speak in *team mode* about a managed project instead of the hire's
  *   own conversation. Sent in the body, not the query string — the backend's contract puts the
- *   team target on the POST body and leaves the hire's own conversation the body-less default.
+ *   team target on the POST body and leaves the hire's own conversation to `sessionId`.
+ * @param currentPage The app path the sender is on (`/team-management`), so the buddy's app
+ *   guide can answer "where is this here?". Omitted when unknown, like `teamProjectId`.
+ * @param signal Stops the turn — the composer's Stop button. An abort resolves the read
+ *   silently (no `onError`, no `onDone`), so the caller reads `signal.aborted` to close the
+ *   turn out as cut short rather than failed.
+ * @param options Per-message switches (capabilities, filters); see `BuddyMessageOptions`.
  */
 export async function streamMessage(
   content: string,
   handlers: BuddyStreamHandlers,
+  sessionId: string | undefined,
   teamProjectId?: string,
+  currentPage?: string,
+  signal?: AbortSignal,
+  options?: BuddyMessageOptions,
 ): Promise<void> {
   const outcome = await readBuddyStream(
     `/api/v1/onboarding/me/buddy/messages`,
-    // Omitted, never null: the backend treats an absent field as the hire's own conversation,
-    // and carrying `teamProjectId: null` would send a field the contract does not have.
-    teamProjectId ? { content, teamProjectId } : { content },
+    // Omitted, never null: a team target replaces the conversation, and carrying
+    // `teamProjectId: null` would send a field the contract does not have.
+    {
+      content,
+      ...(teamProjectId ? { teamProjectId } : { sessionId }),
+      ...(currentPage ? { currentPage } : {}),
+      ...(options?.capabilitiesEnabled === undefined
+        ? {}
+        : { capabilitiesEnabled: options.capabilitiesEnabled }),
+      ...(options?.filters ? { filters: options.filters } : {}),
+    },
     (event) => {
       switch (event.type) {
         case "tool_use":
@@ -403,6 +602,16 @@ export async function streamMessage(
           if (event.content !== undefined) {
             handlers.onToken(event.content);
           }
+          break;
+
+        case "reasoning":
+          if (event.reasoning !== undefined) {
+            handlers.onReasoning?.(event.reasoning);
+          }
+          break;
+
+        case "reset":
+          handlers.onReset?.();
           break;
 
         case "citation":
@@ -446,12 +655,27 @@ export async function streamMessage(
               githubLogin: event.github_login,
               competencyKey: event.competency_key,
               level: event.level,
+              stepId: event.step_id,
+              questionId: event.question_id,
+              phaseId: event.phase_id,
+              onboardingTaskId: event.onboarding_task_id,
+              answer: event.answer,
+              optionIds: event.option_ids,
+              description: event.description,
+              reason: event.reason,
+              waitsOnIds: event.waits_on_ids,
+              unlocksIds: event.unlocks_ids,
               checklistTitle: event.checklist_title,
               checklistItems: event.checklist_items,
               cardId: event.card_id,
               noteText: event.note_text,
               lineBefore: event.line_before,
               lineAfter: event.line_after,
+              linkUrl: event.link_url,
+              linkLabel: event.link_label,
+              cardIds: event.card_ids,
+              cardNames: event.card_names,
+              preview: event.preview,
             });
           }
           break;
@@ -466,6 +690,7 @@ export async function streamMessage(
       }
     },
     handlers.onError,
+    signal,
   );
 
   // Fallback: ensure onDone is called when the stream ends without a terminal event.

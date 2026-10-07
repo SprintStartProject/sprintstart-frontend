@@ -1,8 +1,8 @@
 import { Plus } from "lucide-react";
 import { Button } from "../../../../../components/ui/Button";
-import { StagedSourceList } from "../../StagedSourceList";
-import type { SourceOwnerOption } from "../../../sourceOwners";
-import type { DraftSource } from "../../../projectSourcesDraft";
+import { StagedSourceList } from "../../../../data-ingestion/add-source/StagedSourceList";
+import type { SourceOwnerOption } from "../../../../data-ingestion/add-source/sourceOwners";
+import type { DraftSource } from "../../../../data-ingestion/add-source/projectSourcesDraft";
 
 type WizardSourcesStepProps = {
   sources: DraftSource[];
@@ -43,7 +43,7 @@ export function WizardSourcesStep({
         onRemove={onRemove}
         ownerOptions={ownerOptions}
         onOwnerChange={onOwnerChange}
-        emptyMessage="No sources yet. Add a GitHub repo, Jira project, Confluence space, or files to start."
+        emptyMessage="No sources yet. Add a GitHub repo, Jira project, Confluence space, Notion workspace, or files to start."
       />
 
       <Button

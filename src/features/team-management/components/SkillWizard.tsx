@@ -25,6 +25,13 @@ const SKILL_LEVELS: { value: SkillLevel; label: string }[] = [
   { value: "EXPERT", label: "Expert" },
 ];
 
+/**
+ * The skill self-assessment dialog on `/skill-wizard`: one level per active skill that is linked
+ * to one of the user's project roles.
+ *
+ * Submitting is only possible once every such skill is rated. When `onSubmit` throws, the dialog
+ * stays open with the ratings kept, so the user can try again.
+ */
 export function SkillWizard({
   open,
   user,
@@ -124,7 +131,7 @@ export function SkillWizard({
                           [skill.id]: level.value,
                         }))
                       }
-                      className={`rounded-xl border px-3 py-2 text-xs font-medium transition-all focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+                      className={`rounded-xl border px-3 py-2 text-xs font-medium transition-all ${
                         selectedLevels[skill.id] === level.value
                           ? "border-app-brand-border-strong bg-app-brand-soft text-app-brand-text shadow-lg"
                           : "border-app-border bg-app-surface text-app-text-muted hover:border-app-brand-border hover:bg-app-surface-hover hover:text-app-brand"

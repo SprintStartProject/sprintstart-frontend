@@ -16,7 +16,7 @@ export function ShortcutHint({ keys, className = "" }: { keys: string; className
   return (
     <kbd
       aria-hidden="true"
-      className={`ml-1 hidden rounded border px-1 py-0.5 font-sans text-[10px] leading-none opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 sm:inline-block ${className}`}
+      className={`ml-1 hidden rounded border px-1 py-0.5 font-sans text-xs leading-none opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 sm:inline-block ${className}`}
     >
       {keys}
     </kbd>

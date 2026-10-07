@@ -3,23 +3,35 @@ import { Check, ChevronDown, ChevronUp, PenLine, Pencil, X } from "lucide-react"
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
-import { Textarea } from "../../../components/ui/Textarea";
 import { BoardCardFrame } from "./BoardCardFrame";
 import { CardOriginLink } from "./CardOriginLink";
 import { AskTheBuddy } from "../../buddy/components/AskTheBuddy";
 import { questionAboutNote } from "../generation/cardQuestion";
 import { Marked } from "./Marked";
+import { NoteMarkdown } from "./NoteMarkdown";
+import { StepLink } from "./StepLink";
+import { StepLinkTextarea } from "./StepLinkTextarea";
+import { splitStepLinks } from "../layout/stepLinks";
+import { looksLikeMarkdown, plainHeading } from "../layout/noteMarkdown";
 import { useCardMarks } from "../marks/useCardMarks";
 import type { CardMark } from "../marks/cardMarks";
 import type { CardOrigin } from "../layout/cardOrigins";
-import type { AuthoredCardRequest, BoardCard, NoteContent } from "../types";
+import type { AuthoredCardRequest, BoardCard, BoardUndoNotice, NoteContent } from "../types";
 
 type NoteCardProps = {
   content: NoteContent;
-  card: Pick<BoardCard, "id" | "owner" | "placedAt">;
+  card: Pick<BoardCard, "id" | "owner" | "placedAt" | "previous" | "lastChange">;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  /** Puts the card back to what it said before its latest edit. See `BoardCardFrame`. */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring?: boolean;
+  /** True while a write of this card is still on its way — see `CardEditHistory`'s `paused`. */
+  saving?: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice?: BoardUndoNotice | null;
   /** Where this note was made from, when it was made from something. See `layout/cardOrigins.ts`. */
   origin?: CardOrigin | null;
 };
@@ -57,7 +69,18 @@ function splitNote(text: string): { heading: string; body: string } {
  * body as separate fields and joins them back into one text on save: the split is how the note is
  * shown *and* how it is written, but never how it is stored — there is no title on the wire.
  */
-export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin }: NoteCardProps) {
+export function NoteCard({
+  content,
+  card,
+  onDismiss,
+  dismissing,
+  onEdit,
+  onRestorePrevious,
+  restoring,
+  saving,
+  undoNotice,
+  origin,
+}: NoteCardProps) {
   const { heading, body } = splitNote(content.text);
   // Colour only: which words are marked is written into the note's own text. See `marks/`.
   const marks = useCardMarks().marksFor(card.id);
@@ -105,13 +128,17 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
           // The first line is the note's own words, so it can be marked like any other part of it.
           // `controlLabel` below keeps the card's controls saying "the note card" rather than
           // trying to put a highlighted sentence inside an accessible name.
-          <Marked text={heading} marks={marks} parse cardId={card.id} />
+          <Marked text={plainHeading(heading)} marks={marks} parse cardId={card.id} />
         )
       }
       controlLabel="note"
       card={card}
       onDismiss={onDismiss}
       dismissing={dismissing}
+      onRestorePrevious={onRestorePrevious}
+      restoring={restoring}
+      paused={editing || Boolean(saving)}
+      undoNotice={undoNotice}
       action={
         onEdit && !editing ? (
           <Button
@@ -128,7 +155,7 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
     >
       {editing ? (
         <div className="space-y-3">
-          <Field label="Title (optional)" controlId={`note-title-${card.id}`}>
+          <Field label="Title" optional controlId={`note-title-${card.id}`}>
             <Input
               value={titleDraft}
               onChange={(event) => setTitleDraft(event.target.value)}
@@ -140,10 +167,10 @@ export function NoteCard({ content, card, onDismiss, dismissing, onEdit, origin 
             <label className="sr-only" htmlFor={`note-${card.id}`}>
               Note text
             </label>
-            <Textarea
+            <StepLinkTextarea
               id={`note-${card.id}`}
               value={bodyDraft}
-              onChange={(event) => setBodyDraft(event.target.value)}
+              onValueChange={setBodyDraft}
               minRows={4}
             />
           </div>
@@ -232,23 +259,34 @@ function NoteBody({ body, marks, cardId }: { body: string; marks: CardMark[]; ca
   const [expanded, setExpanded] = useState(false);
 
   const long = body.length > COLLAPSE_AFTER_CHARS || body.split("\n").length > COLLAPSE_AFTER_LINES;
-  if (!long)
-    return (
+  // What the buddy writes is Markdown, and is drawn as such; see `NoteMarkdown`.
+  const markdown = looksLikeMarkdown(body);
+  const draw = (text: string) =>
+    markdown ? (
+      <NoteMarkdown text={text} marks={marks} cardId={cardId} />
+    ) : (
       <p className="text-sm whitespace-pre-wrap text-app-text">
-        <Marked text={body} marks={marks} parse cardId={cardId} />
+        {/* `[[Step]]` links first, then each run between them marked as usual. */}
+        {splitStepLinks(text).map((run, index) =>
+          run.link ? (
+            <StepLink key={index} title={run.text} />
+          ) : (
+            <Marked key={index} text={run.text} marks={marks} parse cardId={cardId} />
+          ),
+        )}
       </p>
     );
 
+  if (!long) return draw(body);
+
   return (
     <div>
-      <p className="text-sm whitespace-pre-wrap text-app-text">
-        {/* The fold cuts the *raw* text, delimiters and all, so a highlight that straddles the cut
-            would lose its closing `==` and stop being one. `preview` keeps whole lines and whole
-            words, so the only way to split a mark is to have written one across a line break —
-            and `Marked` renders an unclosed pair as ordinary text rather than lighting up the
-            rest of the card. */}
-        <Marked text={expanded ? body : preview(body)} marks={marks} parse cardId={cardId} />
-      </p>
+      {/* The fold cuts the *raw* text, delimiters and all, so a highlight that straddles the cut
+          would lose its closing `==` and stop being one. `preview` keeps whole lines and whole
+          words, so the only way to split a mark is to have written one across a line break — and
+          `Marked` renders an unclosed pair as ordinary text rather than lighting up the rest of
+          the card. */}
+      {draw(expanded ? body : preview(body))}
 
       <Button
         variant="ghost"

@@ -2,7 +2,7 @@
  * Lets the rest of the app know when a rocket is crossing the screen, and where.
  *
  * The rockets and their audience live in different features — the flights are
- * moments, the bot that gapes at them is the chatbot's — and neither should
+ * moments, the bot that gapes at them is the buddy's — and neither should
  * know the other exists. This module is the whole contract between them: a
  * flight registers the element it is moving, watchers subscribe and read the
  * element's position off the DOM for as long as it is up.

@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   suggestSkillsForRole: vi.fn(),
   acceptSkillSuggestion: vi.fn(),
   createProjectRole: vi.fn(),
+  updateRoleSkills: vi.fn(),
+  assignProjectRoleToUser: vi.fn(),
+  unassignProjectRoleFromUser: vi.fn(),
 }));
 
 vi.mock("../../../../../src/context/useAuth", () => ({
@@ -38,6 +41,9 @@ vi.mock("../../../../../src/services/teamManagementService", async (importOrigin
     suggestSkillsForRole: mocks.suggestSkillsForRole,
     acceptSkillSuggestion: mocks.acceptSkillSuggestion,
     createProjectRole: mocks.createProjectRole,
+    updateRoleSkills: mocks.updateRoleSkills,
+    assignProjectRoleToUser: mocks.assignProjectRoleToUser,
+    unassignProjectRoleFromUser: mocks.unassignProjectRoleFromUser,
   };
 });
 
@@ -58,6 +64,22 @@ const acceptedSkill = {
   category: "TECHNICAL",
   universal: false,
 };
+const multiRoleSkill = {
+  id: "skill-3",
+  name: "SQL",
+  roleIds: [role.id, "role-2"],
+  status: "ACTIVE" as const,
+  category: "TECHNICAL",
+  universal: false,
+};
+const retiredSkill = {
+  id: "skill-4",
+  name: "jQuery",
+  roleIds: [role.id],
+  status: "RETIRED" as const,
+  category: "TECHNICAL",
+  universal: false,
+};
 const suggestion = {
   skillId: "skill-2",
   name: "React",
@@ -69,6 +91,26 @@ const suggestion = {
 };
 
 const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: ToastProvider });
+
+const backend = { id: "role-2", name: "Backend", description: "Owns the services" };
+
+function member(userId: string, firstname: string, lastname: string, roles: (typeof role)[]) {
+  return {
+    userId,
+    firstname,
+    lastname,
+    projects: [],
+    roles,
+    skills: [],
+    progressPercentage: 0.5,
+    currentPhase: { id: "phase-1", title: "Setup" },
+    currentStep: null,
+    hasFeedback: false,
+  } as unknown as Parameters<typeof RoleManagementTab>[0]["users"][number];
+}
+
+const ada = member("u1", "Ada", "Lovelace", [role]);
+const grace = member("u2", "Grace", "Hopper", []);
 
 async function openRole(user: ReturnType<typeof userEvent.setup>) {
   await user.click(
@@ -110,7 +152,8 @@ describe("RoleManagementTab", () => {
     expect(await screen.findByTestId("skill-suggestion-panel")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Accept React" })).toBeChecked();
     expect(screen.getByText("The role builds the project UI")).toBeInTheDocument();
-    expect(screen.getAllByText("TypeScript")).toHaveLength(2);
+    // The role's row lists its skills too, beside the open panel and the suggestion review.
+    expect(screen.getAllByText("TypeScript")).toHaveLength(3);
     expect(mocks.suggestSkillsForRole).toHaveBeenCalledWith(role.id, {
       projectId: "project-1",
       industry: "Fintech",
@@ -224,6 +267,8 @@ describe("RoleManagementTab", () => {
     const onDataChanged = vi.fn().mockResolvedValue(undefined);
     render(<RoleManagementTab roles={[]} users={[]} onDataChanged={onDataChanged} />);
 
+    // Creating sits behind the toolbar's "New role", which opens the form at the top of the list.
+    await user.click(screen.getByRole("button", { name: "New role" }));
     await user.type(screen.getByLabelText("Name"), "Frontend");
     await user.type(screen.getByLabelText("Description"), "Builds the UI");
     await user.click(screen.getByRole("button", { name: "Create role" }));
@@ -249,6 +294,8 @@ describe("RoleManagementTab", () => {
     const onDataChanged = vi.fn().mockResolvedValue(undefined);
     render(<RoleManagementTab roles={[]} users={[]} onDataChanged={onDataChanged} />);
 
+    // Creating sits behind the toolbar's "New role", which opens the form at the top of the list.
+    await user.click(screen.getByRole("button", { name: "New role" }));
     await user.type(screen.getByLabelText("Name"), "Frontend");
     await user.type(screen.getByLabelText("Description"), "Builds the UI");
     await user.click(screen.getByRole("button", { name: "Create role" }));
@@ -264,5 +311,169 @@ describe("RoleManagementTab", () => {
     expect(mocks.suggestSkillsForRole).not.toHaveBeenCalled();
     expect(screen.queryByTestId("skill-suggestion-panel")).not.toBeInTheDocument();
     expect(screen.queryByText("Suggestions could not be loaded")).not.toBeInTheDocument();
+  });
+
+  it("adds the skills picked in the form as soon as the role exists", async () => {
+    const user = userEvent.setup();
+    const onDataChanged = vi.fn().mockResolvedValue(undefined);
+    render(<RoleManagementTab roles={[]} users={[]} onDataChanged={onDataChanged} />);
+
+    await user.click(screen.getByRole("button", { name: "New role" }));
+    await user.type(screen.getByLabelText("Name"), "Frontend");
+    // One from the catalog, picked from what the typing offers, and one new by Enter.
+    await user.type(screen.getByLabelText("Skills"), "Type");
+    await user.click(await screen.findByRole("button", { name: "TypeScript" }));
+    await user.type(screen.getByLabelText("Skills"), "GraphQL{Enter}");
+    // No AI round on top this time.
+    await user.click(screen.getByLabelText(/Also suggest skills with AI/));
+    await user.click(screen.getByRole("button", { name: "Create role" }));
+
+    await waitFor(() =>
+      expect(mocks.acceptSkillSuggestion).toHaveBeenCalledWith(role.id, { skillId: "skill-1" }),
+    );
+    expect(mocks.acceptSkillSuggestion).toHaveBeenCalledWith(role.id, { name: "GraphQL" });
+    await screen.findByText("Role created with 2 skills");
+    expect(mocks.suggestSkillsForRole).not.toHaveBeenCalled();
+  });
+
+  describe("the roles list", () => {
+    it("searches roles by name, skill or member", async () => {
+      const user = userEvent.setup();
+      render(<RoleManagementTab roles={[role, backend]} users={[ada]} onDataChanged={vi.fn()} />);
+
+      await user.type(screen.getByLabelText("Search roles"), "ada");
+
+      expect(
+        screen.getByRole("button", { name: `Manage skills and members of ${role.name}` }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: `Manage skills and members of ${backend.name}` }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    });
+
+    it("marks a role nobody holds and narrows the list to such roles", async () => {
+      const user = userEvent.setup();
+      render(<RoleManagementTab roles={[role, backend]} users={[ada]} onDataChanged={vi.fn()} />);
+
+      expect(screen.getByText("No members yet")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /No members/ }));
+
+      expect(
+        screen.queryByRole("button", { name: `Manage skills and members of ${role.name}` }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: `Manage skills and members of ${backend.name}` }),
+      ).toBeInTheDocument();
+    });
+
+    it("names the members without a role above the list", () => {
+      render(<RoleManagementTab roles={[role]} users={[ada, grace]} onDataChanged={vi.fn()} />);
+
+      expect(screen.getByText("1 without a role:")).toBeInTheDocument();
+      expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
+    });
+
+    it("narrows the open role's members to those without a role", async () => {
+      const user = userEvent.setup();
+      render(<RoleManagementTab roles={[role]} users={[ada, grace]} onDataChanged={vi.fn()} />);
+
+      await openRole(user);
+      expect(screen.getByRole("checkbox", { name: /Ada Lovelace/ })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /^Without a role/ }));
+
+      expect(screen.queryByRole("checkbox", { name: /Ada Lovelace/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: /Grace Hopper/ })).toBeInTheDocument();
+    });
+
+    it("says who loses the role before deleting it", async () => {
+      const user = userEvent.setup();
+      render(<RoleManagementTab roles={[role]} users={[ada]} onDataChanged={vi.fn()} />);
+
+      await user.click(screen.getByRole("button", { name: `Delete ${role.name}` }));
+
+      expect(
+        await screen.findByText(/1 member loses this role: Ada Lovelace\./),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("removes a skill that holds other roles via a PUT of the remaining role skills", async () => {
+    mocks.getSkills.mockResolvedValue([multiRoleSkill]);
+    mocks.getSkillsByRoleId.mockResolvedValue([multiRoleSkill]);
+    mocks.updateRoleSkills.mockResolvedValue([]);
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role]} users={[]} onDataChanged={vi.fn()} />);
+
+    await openRole(user);
+    await user.click(
+      screen.getByRole("button", { name: `Remove ${multiRoleSkill.name} from role` }),
+    );
+
+    await waitFor(() => expect(mocks.updateRoleSkills).toHaveBeenCalledWith(role.id, []));
+    expect(await screen.findByText("Skill removed from role")).toBeInTheDocument();
+  });
+
+  it("disables removing a skill that would be left without any role", async () => {
+    mocks.getSkills.mockResolvedValue([existingSkill]);
+    mocks.getSkillsByRoleId.mockResolvedValue([existingSkill]);
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role]} users={[]} onDataChanged={vi.fn()} />);
+
+    await openRole(user);
+    const removeButton = screen.getByRole("button", {
+      name: `Remove ${existingSkill.name} from role`,
+    });
+
+    expect(removeButton).toBeDisabled();
+    expect(removeButton).toHaveAttribute(
+      "title",
+      "Only role of this skill. An admin can retire it in Access Management.",
+    );
+
+    await user.click(removeButton);
+    expect(mocks.updateRoleSkills).not.toHaveBeenCalled();
+  });
+
+  it("shows a retired skill as a plain badge, with no retire or reactivate controls", async () => {
+    mocks.getSkills.mockResolvedValue([retiredSkill]);
+    mocks.getSkillsByRoleId.mockResolvedValue([retiredSkill]);
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role]} users={[]} onDataChanged={vi.fn()} />);
+
+    await openRole(user);
+
+    expect(await screen.findByText("Retired")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `Reactivate ${retiredSkill.name}` }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `Retire ${retiredSkill.name}` }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: `Remove ${retiredSkill.name} from role` }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the members that saved and names the one that didn't when part of a save fails", async () => {
+    mocks.unassignProjectRoleFromUser.mockResolvedValue(undefined);
+    mocks.assignProjectRoleToUser.mockRejectedValue(new Error("Forbidden"));
+    const onDataChanged = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<RoleManagementTab roles={[role]} users={[ada, grace]} onDataChanged={onDataChanged} />);
+
+    await openRole(user);
+    // Ada leaves the role (works), Grace joins it (fails).
+    await user.click(screen.getByRole("checkbox", { name: /Ada Lovelace/ }));
+    await user.click(screen.getByRole("checkbox", { name: /Grace Hopper/ }));
+    await user.click(screen.getByRole("button", { name: "Save 2 changes" }));
+
+    expect(await screen.findByText("Couldn't update Grace Hopper")).toBeInTheDocument();
+    expect(screen.getByText(/The other changes were saved/)).toBeInTheDocument();
+    // What went through is read back, and only the failed change is still pending.
+    expect(onDataChanged).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Save 1 change" })).toBeInTheDocument();
+    expect(mocks.unassignProjectRoleFromUser).toHaveBeenCalledTimes(1);
   });
 });

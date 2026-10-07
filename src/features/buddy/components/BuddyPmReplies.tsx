@@ -1,10 +1,11 @@
-import { BookCheck, Clock, MessageSquareOff, X } from "lucide-react";
+import { AlarmClock, BookCheck, Clock, MessageSquareOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { formatDateTime, formatWaiting, hasWaitedADay } from "../../knowledge-request/format";
 import type { PmReplies } from "../hooks/usePmReplies";
 
 /**
- * What the hire has sent to a person, beside the conversation rather than inside it.
+ * What the hire has sent to a person, in the drawer the page header's button opens — beside the
+ * conversation rather than inside it.
  *
  * `FlagToPmButton` tells a hire "the answer will show up here once they reply", and until this
  * existed the app did not keep that promise — the loop closed only if the hire happened to ask
@@ -13,10 +14,11 @@ import type { PmReplies } from "../hooks/usePmReplies";
  * blocked on, and a prompt reply that produces no visible signal reads exactly like being
  * ignored.
  *
- * **It sits in a rail, not at the top of the thread.** As messages it pushed the live
+ * **It lives in a drawer, not at the top of the thread.** As messages it pushed the live
  * conversation down every time — the record grows and never shrinks, so the thing the hire came
- * for started further from the top each visit. A rail is where a chat keeps this sort of
- * standing context; the buddy's own thread stays the buddy's own thread.
+ * for started further from the top each visit. The button that opens it carries the count of
+ * answers not looked at yet, so the signal survives even while the drawer stays shut; the
+ * buddy's own thread stays the buddy's own thread.
  *
  * It is still read from the server on every mount rather than being part of the transcript, and
  * that is the point: a visit opens fresh, so a message inside it would scroll away with
@@ -28,35 +30,21 @@ import type { PmReplies } from "../hooks/usePmReplies";
  *
  * Scoped to the hire, not to the selected project: these are their own questions, and hiding the
  * ones asked on another project would mean an answer silently never arriving.
+ *
+ * It carries no close control of its own: the drawer's header has the one cross, and a second
+ * one mid-panel would read as closing this section alone.
  */
-export function BuddyPmReplies({
-  answered,
-  waiting,
-  dismissed,
-  onClose,
-}: PmReplies & { onClose: () => void }) {
+export function BuddyPmReplies({ answered, waiting, dismissed }: PmReplies) {
   // Nothing to say is the common case — a hire who has never escalated should see no trace of a
   // feature they have not used. The page reads the same emptiness from `hasAny` and does not
-  // offer the rail at all, so this guard is the backstop rather than the mechanism.
+  // offer the button at all, so this guard is the backstop rather than the mechanism.
   if (answered.length === 0 && waiting.length === 0 && dismissed.length === 0) return null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-4 pb-3">
-        <h2 className="truncate text-sm font-bold tracking-wide text-app-text-muted uppercase">
-          Sent to your PM
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close the PM replies"
-          className="shrink-0 rounded p-1 text-app-text-muted transition-colors hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </button>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-5">
+      {/* No heading of its own: the drawer's title says "Sent to your PM", and a second one
+          under it would be the same words twice. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-4 pb-5">
         {answered.length > 0 && (
           <Group
             icon={BookCheck}
@@ -64,8 +52,8 @@ export function BuddyPmReplies({
           >
             {answered.map((request) => (
               <li key={request.id} className="rounded-xl bg-app-surface-muted/60 p-3">
-                <p className="text-sm font-medium text-app-text">{request.question}</p>
-                <p className="mt-1.5 text-sm whitespace-pre-wrap text-app-text-muted">
+                <p className="text-sm font-medium break-words text-app-text">{request.question}</p>
+                <p className="mt-1.5 text-sm break-words whitespace-pre-wrap text-app-text-muted">
                   {request.answer?.answer}
                 </p>
                 <p className="mt-2 text-xs text-app-text-disabled">
@@ -83,7 +71,7 @@ export function BuddyPmReplies({
             {waiting.map((request) => (
               <li
                 key={request.id}
-                className="rounded-xl bg-app-surface-muted/60 px-3 py-2.5 text-sm text-app-text-muted"
+                className="rounded-xl bg-app-surface-muted/60 px-3 py-2.5 text-sm break-words text-app-text-muted"
               >
                 {request.question}
                 {/* The wait is the information, and a long one is worth flagging — said in
@@ -95,8 +83,13 @@ export function BuddyPmReplies({
                       : "text-app-text-disabled"
                   }`}
                 >
-                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  {hasWaitedADay(request.createdAt) ? (
+                    <AlarmClock className="h-3 w-3" aria-hidden="true" />
+                  ) : (
+                    <Clock className="h-3 w-3" aria-hidden="true" />
+                  )}
                   Waiting {formatWaiting(request.createdAt)}
+                  {hasWaitedADay(request.createdAt) ? " · long" : null}
                 </span>
               </li>
             ))}
@@ -111,7 +104,7 @@ export function BuddyPmReplies({
             {dismissed.map((request) => (
               <li
                 key={request.id}
-                className="rounded-xl bg-app-surface-muted/40 px-3 py-2.5 text-sm text-app-text-muted"
+                className="rounded-xl bg-app-surface-muted/40 px-3 py-2.5 text-sm break-words text-app-text-muted"
               >
                 {request.question}
                 <span className="mt-1 block text-xs text-app-text-disabled">

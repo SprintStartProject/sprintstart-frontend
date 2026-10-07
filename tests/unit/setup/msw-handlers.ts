@@ -93,6 +93,23 @@ export const handlers = [
     ]),
   ),
 
+  // Nobody has arranged their dashboard yet: the default layout. Tests that care about a stored
+  // layout override this handler.
+  http.get("/api/v1/users/me/dashboard/layout", ({ request }) =>
+    HttpResponse.json({
+      version: Number(new URL(request.url).searchParams.get("version")),
+      items: [],
+      updatedAt: null,
+    }),
+  ),
+
+  http.put("/api/v1/users/me/dashboard/layout", async ({ request }) => {
+    const body = (await request.json()) as { version: number; items: unknown[] };
+    return HttpResponse.json({ ...body, updatedAt: new Date().toISOString() });
+  }),
+
+  http.delete("/api/v1/users/me/dashboard/layout", () => new HttpResponse(null, { status: 204 })),
+
   http.get("/api/v1/users/me/projects", () =>
     HttpResponse.json([{ id: "project-1", name: "SprintStart Project" }]),
   ),
@@ -119,6 +136,11 @@ export const handlers = [
   http.get("/api/v1/github/pat", () => HttpResponse.json([])),
   http.get("/api/v1/atlassian/credentials", () => HttpResponse.json([])),
 
+  // AI status for the visible page: the AI answered and knows none of them. Tests about the
+  // chip override this.
+  http.get("/api/v1/projects/:projectId/artifacts/ai-status", () =>
+    HttpResponse.json({ aiAvailable: true, items: [] }),
+  ),
   http.get("/api/v1/projects/:projectId/artifacts", () =>
     HttpResponse.json({
       items: [],
@@ -132,51 +154,6 @@ export const handlers = [
       },
     }),
   ),
-  http.get("/api/v1/chats", () =>
-    HttpResponse.json({
-      chats: [
-        {
-          id: "chat1",
-          userId: "user1",
-          title: "Chat 1",
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    }),
-  ),
-
-  http.get("/api/v1/chats/me", () =>
-    HttpResponse.json({
-      chats: [
-        {
-          id: "chat1",
-          userId: "user1",
-          title: "Chat 1",
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    }),
-  ),
-
-  http.post("/api/v1/chats", async ({ request }) => {
-    const body = (await request.json().catch(() => ({}))) as { userId?: string };
-    return HttpResponse.json({
-      id: "new-chat-id",
-      userId: body.userId ?? "user1",
-      title: "",
-      createdAt: new Date().toISOString(),
-    });
-  }),
-
-  http.post("/api/v1/chats/me", () => {
-    return HttpResponse.json({
-      id: "new-chat-id",
-      userId: "user1",
-      title: "",
-      createdAt: new Date().toISOString(),
-    });
-  }),
-
   http.patch("/api/v1/admin/users/:userId/enabled", async ({ request, params }) => {
     const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({
@@ -185,60 +162,6 @@ export const handlers = [
       ...body,
     });
   }),
-
-  http.get("/api/v1/chats/:chatId", ({ params }) =>
-    HttpResponse.json({
-      messages: [
-        {
-          id: "msg1",
-          content: "Hello",
-          role: "USER",
-          chat: null,
-          chatId: params.chatId,
-        },
-      ],
-    }),
-  ),
-
-  http.get("/api/v1/chats/me/:chatId", ({ params }) =>
-    HttpResponse.json({
-      messages: [
-        {
-          id: "msg1",
-          content: "Hello",
-          role: "USER",
-          chat: null,
-          chatId: params.chatId,
-        },
-      ],
-    }),
-  ),
-
-  http.post(
-    "/api/v1/chats/prompt",
-    () =>
-      new HttpResponse(
-        sseStream(
-          JSON.stringify({ type: "token", content: "Hello " }),
-          JSON.stringify({ type: "token", content: "world" }),
-          JSON.stringify({ type: "done" }),
-        ),
-        { headers: { "Content-Type": "text/event-stream" } },
-      ),
-  ),
-
-  http.post(
-    "/api/v1/chats/me/prompt",
-    () =>
-      new HttpResponse(
-        sseStream(
-          JSON.stringify({ type: "token", content: "Hello " }),
-          JSON.stringify({ type: "token", content: "world" }),
-          JSON.stringify({ type: "done" }),
-        ),
-        { headers: { "Content-Type": "text/event-stream" } },
-      ),
-  ),
 
   http.get("/api/v1/onboarding/me/path", () =>
     HttpResponse.json({
@@ -567,6 +490,9 @@ export const handlers = [
   }),
 
   http.post("/api/v1/users/:userId/project-roles", () => new HttpResponse(null, { status: 200 })),
+  // A member's onboarding path, read by the PM member side panel. No path by default; tests that
+  // care about the "phase 2 of 4" line override it.
+  http.get("/api/v1/onboarding/users/:userId/path", () => new HttpResponse(null, { status: 404 })),
 
   http.get("/api/v1/confluence/projects/:projectId/connections", () => HttpResponse.json([])),
   http.post("/api/v1/confluence/projects/:projectId/connections", () =>
@@ -650,5 +576,86 @@ export const handlers = [
   ),
   http.get("/api/v1/connectors/confluence/sources", () =>
     HttpResponse.json({ connectorId: "confluence", sources: [] }),
+  ),
+  // Bitbucket: nothing discovered and every connect accepted. Tests that care override these.
+  http.get("/api/v1/bitbucket/discover/workspace/:workspace", () =>
+    HttpResponse.json({ repositories: [] }),
+  ),
+  http.post("/api/v1/bitbucket", () =>
+    HttpResponse.json({ transactionId: "bb-tx-default" }, { status: 202 }),
+  ),
+  http.post("/api/v1/bitbucket/connections/:repositoryId/projects/:projectId", ({ params }) =>
+    HttpResponse.json({ repositoryId: params.repositoryId, projectIds: [params.projectId] }),
+  ),
+  http.delete("/api/v1/bitbucket/connections/:repositoryId/projects/:projectId", ({ params }) =>
+    HttpResponse.json({ repositoryId: params.repositoryId, projectIds: [] }),
+  ),
+  http.post("/api/v1/bitbucket/connections/:repositoryId/update", () =>
+    HttpResponse.json({ transactionId: "bb-update-default" }, { status: 202 }),
+  ),
+  http.get("/api/v1/notion/credentials", () => HttpResponse.json([])),
+  http.get("/api/v1/notion/pages", () => HttpResponse.json([])),
+  http.get("/api/v1/notion/projects/:projectId/connections", () => HttpResponse.json([])),
+  http.post("/api/v1/notion/projects/:projectId/connections", ({ params }) =>
+    HttpResponse.json(
+      {
+        id: "notion-conn-default",
+        projectId: params.projectId,
+        workspaceId: "workspace-default",
+        workspaceName: "Example Workspace",
+        workspaceUrl: "https://www.notion.so/example",
+        credentialName: "default",
+        sourceEnabled: true,
+        autoUpdate: false,
+        schedule: "every 60 minutes",
+        scheduleSpec: { type: "INTERVAL", everyMinutes: 60 },
+        nextSyncAt: null,
+        lastSyncedAt: null,
+        createdAt: "2026-10-05T09:00:00.000Z",
+        updatedAt: "2026-10-05T09:00:00.000Z",
+        version: 1,
+      },
+      { status: 201 },
+    ),
+  ),
+  http.post("/api/v1/notion/projects/:projectId/connections/:connectionId/update", ({ params }) =>
+    HttpResponse.json({
+      runId: "run-default",
+      connectionId: params.connectionId,
+      outcome: "COMPLETED",
+      failure: null,
+      successfulPages: 0,
+      failedPages: 0,
+      removedPages: 0,
+    }),
+  ),
+  http.get("/api/v1/connectors/notion/sources", () =>
+    HttpResponse.json({ connectorId: "notion", sources: [] }),
+  ),
+  // Every surface that opens the buddy dock asks for its suggestion chips. A default empty list
+  // keeps that request handled for the many tests that open the dock without being about the
+  // chips; `useBuddySuggestions`' own suite mocks the service directly and never sees this.
+  http.get("/api/v1/onboarding/me/buddy/suggestions", () => HttpResponse.json([])),
+  // Every surface that opens the buddy reads its conversation list first — the newest is
+  // opened, and an empty list would create one. One default conversation keeps the many tests
+  // that are not about conversations on the path they were written for: read it, and greet it
+  // while it is still empty. Tests about the list override the id or start from none.
+  http.get("/api/v1/onboarding/me/buddy/sessions", () =>
+    HttpResponse.json({
+      sessions: [
+        {
+          id: "session-1",
+          title: "",
+          userId: "1",
+          projectId: null,
+          createdAt: "2026-09-30T09:00:00.000Z",
+        },
+      ],
+    }),
+  ),
+  // "New conversation" tests assert on their own id where it matters; this is the default the
+  // rest gets, so the call resolves like the real backend's.
+  http.post("/api/v1/onboarding/me/buddy/sessions", () =>
+    HttpResponse.json({ id: "session-new" }, { status: 201 }),
   ),
 ];

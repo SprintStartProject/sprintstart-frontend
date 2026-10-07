@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Clock, FileWarning } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import { IconTile } from "../../../components/ui/IconTile";
 import { DetailsSideDrawer } from "../../../components/layout/DetailsSideDrawer";
 import { formatDateTime, formatRelativeDate } from "../format";
 import { SEVERITY_ORDER, SEVERITY_STYLES } from "../severity";
@@ -38,7 +39,7 @@ function documentsMissing(gaps: readonly KnowledgeGap[]): number {
 /** Small uppercase caption over a chip group. */
 function ChipLabel({ children }: { children: string }) {
   return (
-    <p className="mb-1.5 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+    <p className="mb-1.5 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
       {children}
     </p>
   );
@@ -170,11 +171,7 @@ export function MyKnowledgeGapsDrawer({
       showOverlay
       zIndexClassName="z-50"
       widthClassName="w-full sm:w-[min(94vw,34rem)] lg:w-[min(72vw,46rem)]"
-      leading={
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-app-brand-soft text-app-brand">
-          <FileWarning className="h-6 w-6" />
-        </div>
-      }
+      leading={<IconTile icon={FileWarning} size="2xl" tone="brand" />}
       badge={
         <span>
           {gaps.length === 1 ? "1 component" : `${gaps.length} components`} &middot;{" "}

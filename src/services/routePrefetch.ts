@@ -1,8 +1,16 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./queryKeys";
 import { knowledgeRequestService } from "./knowledgeRequestService";
+import { insightsService } from "./faqService";
+import { knowledgeGapService } from "./knowledgeGapService";
+import { onboardingMetricsService } from "./onboardingMetricsService";
+import { getTeamOverview } from "./teamManagementService";
 import { loadBoard } from "../features/board/hooks/useBoard";
-import { loadKnowledgeBaseArtifacts } from "../features/knowledge-base/hooks/useKnowledgeBase";
+import {
+  loadKnowledgeBasePage,
+  loadKnowledgeBaseFacets,
+} from "../features/knowledge-base/hooks/useKnowledgeBase";
+import { DEFAULT_PAGE_SIZE } from "../features/knowledge-base/hooks/useKnowledgeBaseUrlState";
 import { loadStarterWorkReviewQueue } from "../features/starter-work/hooks/useStarterWorkReview";
 
 /**
@@ -26,8 +34,8 @@ function prefetchRouteModule(path: string): void {
     case "/board":
       void import("../pages/BoardPage");
       return;
-    case "/chat":
-      void import("../pages/ChatPage");
+    case "/buddy":
+      void import("../pages/BuddyPage");
       return;
     case "/knowledge-base":
       void import("../pages/KnowledgeBasePage");
@@ -38,17 +46,20 @@ function prefetchRouteModule(path: string): void {
     case "/blueprints":
       void import("../pages/BlueprintPathsPage");
       return;
+    // Every PM section ships in the workspace's one chunk.
     case "/pm-dashboard":
-      void import("../pages/PmDashboardPage");
+    case "/team-management":
+    case "/insights/faq":
+    case "/insights/knowledge-gaps":
+    case "/insights/onboarding":
+    case "/insights/knowledge-requests":
+      void import("../features/pm-area/PmWorkspace");
       return;
     case "/data-ingestion":
       void import("../pages/DataIngestionPage");
       return;
     case "/hire-setup":
       void import("../pages/HireSetupPage");
-      return;
-    case "/insights/knowledge-requests":
-      void import("../features/knowledge-request/components/KnowledgeRequestInboxPage");
       return;
     case "/admin":
       void import("../pages/AdminPage");
@@ -57,6 +68,13 @@ function prefetchRouteModule(path: string): void {
       return;
   }
 }
+/**
+ * Warms the page module of `path` and, for routes with one dominant read, its main query.
+ *
+ * Project-scoped reads are skipped while `projectId` is `null`, since their query keys need
+ * the project. Fire and forget: nothing is awaited, and a failed prefetch only means the page
+ * loads its data itself.
+ */
 export function prefetchRoute(
   queryClient: QueryClient,
   path: string,
@@ -67,9 +85,15 @@ export function prefetchRoute(
   switch (path) {
     case "/knowledge-base":
       if (!projectId) return;
+      // The same first-page params the hook builds from an empty URL, so the
+      // key matches — a hard-coded size would silently miss if the default moved.
       void queryClient.prefetchQuery({
-        queryKey: queryKeys.knowledgeBase.byProject(projectId),
-        queryFn: () => loadKnowledgeBaseArtifacts(projectId),
+        queryKey: queryKeys.knowledgeBase.list(projectId, { page: 1, size: DEFAULT_PAGE_SIZE }),
+        queryFn: () => loadKnowledgeBasePage(projectId, { page: 1, size: DEFAULT_PAGE_SIZE }),
+      });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.knowledgeBase.facets(projectId, {}),
+        queryFn: () => loadKnowledgeBaseFacets(projectId, {}),
       });
       return;
 
@@ -85,6 +109,39 @@ export function prefetchRoute(
       void queryClient.prefetchQuery({
         queryKey: queryKeys.starterWork.review(),
         queryFn: loadStarterWorkReviewQueue,
+      });
+      return;
+
+    case "/pm-dashboard":
+    case "/team-management":
+      // Both lead with the project's roster; same key and call as `useTeamRoster`.
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.teamOverview.filtered(projectId),
+        queryFn: () => getTeamOverview(undefined, undefined, projectId ? [projectId] : undefined),
+      });
+      return;
+
+    case "/insights/faq":
+      if (!projectId) return;
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.faq.groups(projectId),
+        queryFn: () => insightsService.fetchFAQGroups(projectId),
+      });
+      return;
+
+    case "/insights/knowledge-gaps":
+      if (!projectId) return;
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.knowledgeGaps.overview(projectId),
+        queryFn: () => knowledgeGapService.fetchKnowledgeGaps(projectId),
+      });
+      return;
+
+    case "/insights/onboarding":
+      if (!projectId) return;
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.onboardingMetrics.project(projectId),
+        queryFn: () => onboardingMetricsService.fetchProjectMetrics(projectId),
       });
       return;
 

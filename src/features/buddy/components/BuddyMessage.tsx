@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertCircle, UserRound } from "lucide-react";
-import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { AlertCircle, MessageSquareOff, UserRound } from "lucide-react";
+import { Button } from "../../../components/ui/Button";
+import { SleepyBot } from "./SleepyBot";
+import { BotGlyph } from "./BotGlyph";
+import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
+import { dinoCompletionProps } from "../../easter-eggs/lib/dinoOutcome.ts";
+import type { DinoTurnOutcome } from "../../easter-eggs/lib/dinoOutcome.ts";
+import { centralSpringToken } from "../../../styles/tokens.ts";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { useAuth } from "../../../context/useAuth";
 
@@ -49,8 +55,29 @@ type BuddyMessageProps = {
    * this is the whole message.
    */
   error?: string;
+  /**
+   * True when this reply was cut short — the stream ended before the answer finished, and the
+   * backend kept the words that had arrived.
+   *
+   * A quiet line under the bubble: the partial answer
+   * is still an answer, and this says why it ends where it does. Only ever read from history —
+   * a live failure carries `error` instead, and the two never render together.
+   */
+  incomplete?: boolean;
+  /**
+   * True for a live turn the hire stopped themselves. The same quiet line as `incomplete`, worded
+   * for what happened — and the whole message when the Stop came before the first word, which it
+   * usually does (see `BuddyMessageView.stopped`).
+   */
+  stopped?: boolean;
   /** Rendered under the bubble, inside the speaker's column: the escalation offer, mostly. */
   footer?: ReactNode;
+  /**
+   * Re-asks the question this failed turn was answering — rendered inside the error box, so
+   * the line that says the reply failed is also where trying again lives. Only given when
+   * there is a question to re-ask (see `BuddyThread`).
+   */
+  onRetry?: () => void;
   /** True for the turn currently receiving tokens — that bot is working, so it stays awake. */
   isStreaming?: boolean;
 };
@@ -82,7 +109,10 @@ export function BuddyMessage({
   compact = false,
   meta,
   error,
+  incomplete = false,
+  stopped = false,
   footer,
+  onRetry,
   isStreaming = false,
 }: BuddyMessageProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -99,6 +129,10 @@ export function BuddyMessage({
   return (
     <motion.div
       {...entrance}
+      // The one buddy answer's root, so the selection toolbar can tell a reply-to-the-answer
+      // apart from ordinary prose (see `selectionCapture`). The buddy speaks as the assistant;
+      // the hire and their PM are the other side of the conversation.
+      data-message-role={speaker === "BUDDY" ? "ASSISTANT" : "USER"}
       className={`flex w-full min-w-0 gap-2.5 ${isYou ? "flex-row-reverse" : "flex-row"}`}
     >
       {!(compact && isYou) && (
@@ -117,7 +151,7 @@ export function BuddyMessage({
         // because the buddy's turn is the one that streams: a box re-measured on every token
         // widens word by word and snaps back whenever a re-parse changes the rendered markdown,
         // which is unreadable while it is being written. Everyone else's turns arrive whole and
-        // still hug. Same rule, and the same reason, as `MessageRow` in the chat.
+        // still hug.
         className={`flex min-w-0 flex-col gap-1 ${isYou ? "items-end" : "items-start"} ${
           compact && !isYou ? "flex-1" : "max-w-[min(85%,46rem)]"
         } ${speaker === "BUDDY" ? "w-full" : ""}`}
@@ -138,16 +172,33 @@ export function BuddyMessage({
 
         {error && (
           <div
-            className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm leading-relaxed text-app-danger-text ${
+            className={`flex max-w-full min-w-0 items-center gap-2 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm leading-relaxed text-app-danger-text ${
               children === undefined ? "" : "mt-1"
             }`}
           >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{error}</span>
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1">{error}</span>
+            {onRetry && (
+              <Button variant="secondary" size="sm" onClick={onRetry}>
+                Try again
+              </Button>
+            )}
           </div>
         )}
 
-        {meta && <p className="px-1 text-[11px] text-app-text-disabled">{meta}</p>}
+        {(incomplete || stopped) && !error && (
+          <div
+            data-testid={stopped ? "buddy-message-stopped" : "buddy-message-incomplete"}
+            className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-sm leading-relaxed text-app-text-muted ${
+              children === undefined ? "" : "mt-1"
+            }`}
+          >
+            <MessageSquareOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{stopped ? "You stopped this reply." : "This reply was cut short."}</span>
+          </div>
+        )}
+
+        {meta && <p className="px-1 text-xs text-app-text-disabled">{meta}</p>}
         {footer}
       </div>
     </motion.div>
@@ -218,11 +269,77 @@ function SpeakerAvatar({ speaker, isStreaming }: { speaker: BuddySpeaker; isStre
 export function BuddyTypingMessage({
   label,
   showName = false,
+  gameActive = false,
+  replyReady = false,
+  turnOutcome = null,
+  onGameExit,
 }: {
   label?: string;
   showName?: boolean;
+  /** True when the dino waiting-game is open instead of the dots. */
+  gameActive?: boolean;
+  /**
+   * True when the turn has finished while the game is open: forwarded to the
+   * game as its completion badge and used to stop showing the dots — a reply
+   * that has arrived is not being typed anymore.
+   */
+  replyReady?: boolean;
+  /**
+   * How the finished turn ended — a failed reply must not be announced as "Reply ready".
+   * Only read once `replyReady` is true.
+   */
+  turnOutcome?: DinoTurnOutcome;
+  /** Called when the player leaves the dino game (Escape / exit button). */
+  onGameExit?: () => void;
 }) {
   const prefersReducedMotion = useReducedMotion();
+
+  // The unlocked dino waiting-game replaces the dots while the buddy works —
+  // the same deal the AI chat's ThinkingIndicator offers. The dots stay
+  // underneath as the status row while the buddy is still working, and the
+  // label keeps explaining what the buddy is doing behind the game. Once the
+  // turn has finished (replyReady) the dots stop: nobody is typing anymore,
+  // and the game's own completion badge takes over as the status line.
+  if (gameActive && onGameExit) {
+    return (
+      <motion.div
+        {...(prefersReducedMotion
+          ? {}
+          : {
+              initial: { opacity: 0, y: 8 },
+              animate: { opacity: 1, y: 0 },
+              transition: centralSpringToken,
+            })}
+        className="flex w-full min-w-0 gap-2.5"
+      >
+        {/* The game is deliberately outside any live region: its score changes many times a
+            second and would flood a screen reader. This one concise status says what the buddy
+            is doing; the game announces its own completion and game-over lines. */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {replyReady ? "" : (label ?? "Buddy is thinking…")}
+        </p>
+
+        <div className="flex size-8 shrink-0 items-center justify-center">
+          <BotGlyph size={30} state="cheering" className="text-app-brand-text" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <DinoGameLazy onExit={onGameExit} {...dinoCompletionProps(replyReady, turnOutcome)} />
+
+          {!replyReady && (
+            <div className="mt-2 flex w-max max-w-full items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-2.5 shadow-sm">
+              <span className="flex gap-1" aria-hidden="true">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand motion-reduce:animate-none" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms] motion-reduce:animate-none" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms] motion-reduce:animate-none" />
+              </span>
+              {label && <span className="text-sm text-app-text-muted italic">{label}</span>}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -245,9 +362,9 @@ export function BuddyTypingMessage({
 
         <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface px-4 py-3 shadow-sm">
           <span className="flex gap-1" aria-hidden="true">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand motion-reduce:animate-none" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:150ms] motion-reduce:animate-none" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-app-brand [animation-delay:300ms] motion-reduce:animate-none" />
           </span>
           {/* What it is *doing*, when the backend says so. "Checking your progress…" answers
                         "why is this taking a moment"; three dots do not. */}

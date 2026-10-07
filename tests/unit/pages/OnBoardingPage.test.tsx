@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Link, MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -6,6 +6,8 @@ import { OnBoardingPage } from "../../../src/pages/OnBoardingPage";
 import { http, HttpResponse } from "msw";
 import { server } from "../../unit/setup/vitest.setup";
 import { onboardingService } from "../../../src/services/onboardingService";
+import { announceBuddyPathChanged } from "../../../src/features/buddy/aiBuddyBus";
+import { hireJourneyViewKey } from "../../../src/features/onboarding/journeyViewMemory";
 import {
   OnboardingJourneyContext,
   type OnboardingJourneyValue,
@@ -18,6 +20,7 @@ const { projectContextState } = vi.hoisted(() => ({
     selectedProjectId: "proj1",
     isLoading: false,
     isSwitcherEnabled: true,
+    canManageSelected: false,
   },
 }));
 
@@ -26,6 +29,18 @@ const { projectContextState } = vi.hoisted(() => ({
 vi.mock("../../../src/context/useAuth", () => ({
   useAuth: () => ({ profile: { id: signedInUserId.value } }),
 }));
+
+// One stable object, as the real hook's is: the page keeps `toast` in effect dependencies.
+const toastMocks = vi.hoisted(() => ({
+  show: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  warning: vi.fn(),
+  error: vi.fn(),
+  dismiss: vi.fn(),
+  dismissAll: vi.fn(),
+}));
+vi.mock("../../../src/context/useToast", () => ({ useToast: () => toastMocks }));
 
 // The celebratory layer is decorative and lives behind its own provider; the
 // page only needs a no-op `celebrate` to render.
@@ -73,6 +88,7 @@ vi.mock("../../../src/features/projects/useProjectContext", async () => {
           : null,
         isLoading: projectContextState.isLoading,
         isSwitcherEnabled: projectContextState.isSwitcherEnabled,
+        canManageSelected: projectContextState.canManageSelected,
       }),
   };
 });
@@ -154,14 +170,25 @@ function phaseFixture(id: string, position: number, title: string) {
   };
 }
 
+/** Remembers the list for the signed-in hire, as if they had left the page on it. */
+function startOnList() {
+  localStorage.setItem(
+    hireJourneyViewKey(signedInUserId.value),
+    JSON.stringify({ mode: "list", graphPhaseId: null }),
+  );
+}
+
 describe("OnBoardingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // The page remembers list or graph; every test starts from a page never seen before.
+    // The page remembers list or graph. The graph is the default; most tests here are about the
+    // list, so they start from a hire who left the page on it.
     localStorage.clear();
+    startOnList();
     projectContextState.selectedProjectId = "proj1";
     projectContextState.isLoading = false;
     projectContextState.isSwitcherEnabled = true;
+    projectContextState.canManageSelected = false;
   });
 
   it("renders loading state initially", () => {
@@ -294,6 +321,8 @@ describe("OnBoardingPage", () => {
 
     expect(screen.getAllByText("Phase 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Step 1").length).toBeGreaterThan(0);
+    // Rebuilding throws the member's progress away: that is the PM's call, from the PM area.
+    expect(screen.queryByRole("button", { name: /rebuild|regenerate/i })).not.toBeInTheDocument();
   });
 
   it("computes progress correctly", async () => {
@@ -421,7 +450,8 @@ describe("OnBoardingPage", () => {
     expect(screen.getByTitle("Role-specific tasks — Could not be reached")).toBeInTheDocument();
   });
 
-  it("offers regeneration when every generated phase is hidden", async () => {
+  it("offers the project's manager regeneration when every generated phase is hidden", async () => {
+    projectContextState.canManageSelected = true;
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
         HttpResponse.json({
@@ -482,7 +512,33 @@ describe("OnBoardingPage", () => {
     expect(screen.getByTitle("Architecture — Took too long")).toBeInTheDocument();
   });
 
+  it("points a member at their PM instead of rebuilding a path whose phases are all hidden", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [],
+          generationIssues: [{ phaseId: "phase1", title: "Role-specific tasks", status: "EMPTY" }],
+        }),
+      ),
+    );
+
+    render(
+      <MemoryRouter>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("No onboarding phases were generated")).toBeInTheDocument();
+    // Replacing an existing path is the PM's call; the backend refuses it to members.
+    expect(screen.queryByRole("button", { name: "Try generation again" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Your project manager can rebuild your path/)).toBeInTheDocument();
+  });
+
   it("warns that every phase timed out and offers regeneration", async () => {
+    projectContextState.canManageSelected = true;
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
         HttpResponse.json({
@@ -508,6 +564,22 @@ describe("OnBoardingPage", () => {
     expect(
       screen.getByText(/the journey is simply empty until one of them lands/),
     ).toBeInTheDocument();
+  });
+
+  it("opens on the graph for a hire with nothing remembered, and lists it first", async () => {
+    localStorage.clear();
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
+    ).toBeInTheDocument();
+    const slider = screen.getByRole("button", { name: "Graph" }).parentElement!;
+    expect(
+      within(slider)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Graph", "List"]);
   });
 
   it("switches to the graph with the view slider and back to the list", async () => {
@@ -706,6 +778,53 @@ describe("OnBoardingPage", () => {
     expect(await screen.findByRole("button", { name: "Mark as complete" })).toBeInTheDocument();
   });
 
+  /**
+   * The buddy links a step with a pending skip here so the hire can change or withdraw the reason.
+   * Opening it for that is not beginning it.
+   */
+  it("opens a step waiting on a skip decision by its address without starting it", async () => {
+    const waiting = {
+      ...phaseFixture("phase1", 1, "Phase 1").steps[0],
+      status: "WAITING",
+      skip: {
+        id: "skip1",
+        stepId: "step-phase1",
+        reason: "I did this on my last team.",
+        accepted: null,
+        reviewComment: null,
+        reviewedAt: null,
+      },
+    };
+    server.use(
+      http.get("/api/v1/onboarding/me/steps/:stepId", () => HttpResponse.json(waiting)),
+      http.get("/api/v1/onboarding/me/steps/:stepId/tasks", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/steps/:stepId/resources", () => HttpResponse.json([])),
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          phases: [{ ...phaseFixture("phase1", 1, "Phase 1"), steps: [waiting] }],
+        }),
+      ),
+    );
+    const startStep = vi.spyOn(onboardingService, "startStep");
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding/step-phase1"]}>
+        <OnboardingJourneyContext.Provider value={journeyValue()}>
+          <Routes>
+            <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
+          </Routes>
+        </OnboardingJourneyContext.Provider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Skip requested")).toBeInTheDocument();
+    await expectUnfolded("step-phase1");
+    expect(startStep).not.toHaveBeenCalled();
+  });
+
   it("names what a locked item is waiting on", async () => {
     server.use(
       http.get("/api/v1/onboarding/me/path", () =>
@@ -756,7 +875,7 @@ describe("OnBoardingPage", () => {
       ),
     );
     localStorage.setItem(
-      "sprintstart.onboarding.view.user1",
+      hireJourneyViewKey("user1"),
       JSON.stringify({ mode: "graph", graphPhaseId: "phase2" }),
     );
 
@@ -784,26 +903,28 @@ describe("OnBoardingPage", () => {
         }),
       ),
     );
+    localStorage.clear();
     localStorage.setItem(
-      "sprintstart.onboarding.view.user1",
-      JSON.stringify({ mode: "graph", graphPhaseId: "phase2" }),
+      hireJourneyViewKey("user1"),
+      JSON.stringify({ mode: "list", graphPhaseId: null }),
     );
     signedInUserId.value = "user2";
 
     renderPage();
 
-    // The list, which is what an account with nothing remembered gets -- not the graph the other
-    // account left behind.
-    expect(await screen.findByRole("button", { name: /Phase 1 step/ })).toBeInTheDocument();
-    expect(screen.queryByRole("application")).not.toBeInTheDocument();
+    // The graph's journey map, which is what an account with nothing remembered gets -- not the
+    // list the other account left behind.
+    expect(
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Phase 1 step/ })).not.toBeInTheDocument();
 
     // And what this account does is written under its own key, leaving the other one alone.
-    await waitFor(() =>
-      expect(localStorage.getItem("sprintstart.onboarding.view.user2")).not.toBeNull(),
-    );
-    expect(
-      JSON.parse(localStorage.getItem("sprintstart.onboarding.view.user1") ?? "{}"),
-    ).toMatchObject({ mode: "graph", graphPhaseId: "phase2" });
+    await waitFor(() => expect(localStorage.getItem(hireJourneyViewKey("user2"))).not.toBeNull());
+    expect(JSON.parse(localStorage.getItem(hireJourneyViewKey("user1")) ?? "{}")).toMatchObject({
+      mode: "list",
+    });
+    signedInUserId.value = "user1";
   });
 
   /**
@@ -860,5 +981,202 @@ describe("OnBoardingPage", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/onboarding$/));
+  });
+});
+
+/**
+ * Following a link the buddy wrote.
+ *
+ * The mentor is handed each item's link so that "you are on #3" can be clickable: `?step=<id>`,
+ * `?question=<id>` or `?phase=<id>`, which also means the link survives being copied, kept or
+ * opened in a second tab. A step or question link *lands* on the card — its phase opens, the page
+ * scrolls to it, and it lights up — and starts nothing: that stays the hire's own click.
+ */
+describe("OnBoardingPage: changes the buddy made", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    startOnList();
+    projectContextState.selectedProjectId = "proj1";
+  });
+
+  it("re-reads the path when the buddy announces a change", async () => {
+    const fetchPath = vi.spyOn(onboardingService, "fetchPath");
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () =>
+        HttpResponse.json({
+          id: "path1",
+          userId: "user1",
+          createdAt: new Date().toISOString(),
+          generationIssues: [],
+          phases: [phaseFixture("phase-1", 0, "Overview")],
+        }),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+    await screen.findByRole("heading", { name: "Overview", level: 2 });
+    const before = fetchPath.mock.calls.length;
+
+    act(() => announceBuddyPathChanged());
+
+    await waitFor(() => expect(fetchPath.mock.calls.length).toBeGreaterThan(before));
+  });
+});
+
+describe("OnBoardingPage: links from the buddy", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    projectContextState.selectedProjectId = "proj1";
+  });
+
+  function pathWithQuestion(status: "OPEN" | "LOCKED" | "PASSED") {
+    const phase = phaseFixture("phase-2", 1, "Meetings");
+    return {
+      id: "path1",
+      userId: "user1",
+      createdAt: new Date().toISOString(),
+      generationIssues: [],
+      phases: [
+        phaseFixture("phase-1", 0, "Overview"),
+        {
+          ...phase,
+          questions: [
+            {
+              id: "q-linked",
+              phaseId: phase.id,
+              position: 1,
+              type: "SHORT_TEXT",
+              question: "Who runs the retro?",
+              options: [],
+              status,
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  it("lands on a linked question and lights it up, without opening it", async () => {
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/onboarding?question=q-linked"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    // Its phase, because a card the hire cannot see the context of is a link that only half arrived.
+    expect(await screen.findByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
+    const card = container.querySelector("#onboarding-item-q-linked");
+    expect(card).toHaveClass("app-link-highlight");
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    // Answering is the hire's click on the card, not something following a link does for them.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("lands on a linked step in a later phase and lights only that card", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/onboarding?step=step-phase-2"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
+    expect(container.querySelector("#onboarding-item-step-phase-2")).toHaveClass(
+      "app-link-highlight",
+    );
+    expect(container.querySelector("#onboarding-item-q-linked")).not.toHaveClass(
+      "app-link-highlight",
+    );
+  });
+
+  /**
+   * The line between a buddy link and `/onboarding/:stepId`: the address opens and starts a step,
+   * a link in the conversation only shows the hire where it is.
+   */
+  it("neither unfolds nor starts a step a link lands on", async () => {
+    const path = pathWithQuestion("OPEN");
+    path.phases[1].steps[0].status = "WAITING";
+    server.use(http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(path)));
+    const startStep = vi.spyOn(onboardingService, "startStep");
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/onboarding?step=step-phase-2"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(container.querySelector("#onboarding-item-step-phase-2")).toHaveClass(
+        "app-link-highlight",
+      ),
+    );
+    expect(startStep).not.toHaveBeenCalled();
+    expect(
+      within(container.querySelector("#onboarding-item-step-phase-2")!).queryByRole("button", {
+        expanded: true,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  /** Steps first, then questions -- the numbering `BuddyPathTools` gives the mentor. */
+  it("numbers the rows the way the buddy numbers them", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/onboarding?phase=phase-2"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("heading", { name: "Meetings", level: 2 });
+    expect(container.querySelector("#onboarding-item-step-phase-2")).toHaveTextContent("#1");
+    expect(container.querySelector("#onboarding-item-q-linked")).toHaveTextContent("#2");
+  });
+
+  it("names a question, not a step, when a question link points at nothing", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding?question=q-gone"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(toastMocks.error).toHaveBeenCalledWith(
+        "That question is not on your path",
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("lands on the phase a link names", async () => {
+    server.use(
+      http.get("/api/v1/onboarding/me/path", () => HttpResponse.json(pathWithQuestion("OPEN"))),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/onboarding?phase=phase-2"]}>
+        <OnBoardingPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Meetings", level: 2 })).toBeInTheDocument();
   });
 });

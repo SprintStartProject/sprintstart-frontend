@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ClickableCard } from "../../../components/common/ClickableCard";
 import { SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { IconTile } from "../../../components/ui/IconTile";
 import { useDelayedFlag } from "../../../hooks/useDelayedFlag";
 
 /**
@@ -31,6 +32,15 @@ export type WidgetShellProps = {
    * {@link WidgetShellProps.onActivate} that makes it one.
    */
   actionLabel?: string;
+  /**
+   * The words shown beside the arrow, when they should be shorter than
+   * {@link WidgetShellProps.actionLabel}.
+   *
+   * The label is the card's accessible name, so it has to say everything — including what a
+   * `notice` beside it shows visually ("5 newly assigned"). Printed in the header as well, that
+   * whole sentence crowded the title down to a few letters. Defaults to the label.
+   */
+  actionText?: string;
   /**
    * Where clicking the card leads — the page that can act on what it shows.
    *
@@ -76,6 +86,7 @@ export function WidgetShell({
   icon: Icon,
   title,
   actionLabel,
+  actionText,
   to,
   onActivate,
   notice,
@@ -100,11 +111,11 @@ export function WidgetShell({
         className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-app-brand/10 blur-2xl"
       />
 
-      <div className="relative mb-5 flex items-center justify-between gap-2">
+      {/* `mb-4`: a three-figure card measured 6px taller than its cell with `mb-5`, which put
+          its last line in the card's bottom padding. */}
+      <div className="relative mb-4 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-app-progress-fill to-app-progress-fill-end text-white shadow-sm">
-            <Icon className="h-3.5 w-3.5" />
-          </span>
+          <IconTile icon={Icon} size="sm" tone="accent" />
           <span className="truncate text-sm font-semibold text-app-text">{title}</span>
         </div>
 
@@ -122,7 +133,7 @@ export function WidgetShell({
               aria-hidden="true"
               className="flex shrink-0 items-center gap-1 text-xs font-medium text-app-text-muted transition-all group-hover:translate-x-0.5 group-hover:text-app-brand-text"
             >
-              <span className="hidden @min-[20rem]:inline">{actionLabel}</span>
+              <span className="hidden @min-[20rem]:inline">{actionText ?? actionLabel}</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </span>
           )}
@@ -156,7 +167,7 @@ export function WidgetShell({
     <ClickableCard
       onClick={activate}
       aria-label={actionLabel}
-      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="group @container relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl p-6 focus-ring-inset transition-all hover:-translate-y-0.5"
     >
       {contents}
     </ClickableCard>

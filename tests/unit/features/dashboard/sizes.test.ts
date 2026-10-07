@@ -9,19 +9,24 @@ function heightOf(rowSpan: number, trackPx = 32, gapPx = 20): number {
   return rowSpan * trackPx + (rowSpan - 1) * gapPx;
 }
 
-/** The span a cell has before any breakpoint applies — i.e. on a phone. */
+/** The span a cell has on a two-column board, the smallest that uses the fixed track. */
 function rowSpanOf(className: string): number {
-  const match = /(?:^|\s)row-span-(\d+)/.exec(className);
-  if (!match) throw new Error(`no base row span in "${className}"`);
+  const match = /@min-\[36rem\]\/dashboard:row-span-(\d+)/.exec(className);
+  if (!match) throw new Error(`no row span in "${className}"`);
 
   return Number(match[1]);
 }
 
-/** The span from `sm` up, which is the same as the base one unless the cell overrides it. */
-function smRowSpanOf(className: string): number {
-  const match = /sm:row-span-(\d+)/.exec(className);
+/**
+ * The span on a board of two columns or more, which is the same as the base one unless the cell
+ * overrides it. `columns` picks the container variant: the two-column one, or the four-column
+ * one where a cell sets it and the two-column one otherwise.
+ */
+function smRowSpanOf(className: string, columns: 2 | 4 = 4): number {
+  const four = /@min-\[60rem\]\/dashboard:row-span-(\d+)/.exec(className);
+  if (columns === 4 && four) return Number(four[1]);
 
-  return match ? Number(match[1]) : rowSpanOf(className);
+  return rowSpanOf(className);
 }
 
 /**
@@ -34,7 +39,7 @@ function smRowSpanOf(className: string): number {
  */
 describe("dashboard grid sizes", () => {
   it("lays the board on a 2rem track", () => {
-    expect(DASHBOARD_GRID_CLASS).toContain("auto-rows-[2rem]");
+    expect(DASHBOARD_GRID_CLASS).toContain("@min-[36rem]/dashboard:auto-rows-[2rem]");
     expect(DASHBOARD_GRID_CLASS).toContain("gap-5");
   });
 
@@ -59,16 +64,42 @@ describe("dashboard grid sizes", () => {
   });
 
   /**
-   * The shallow bands are shallow *because* they are wide. Below `sm` the board is one column,
-   * so a band is no longer a strip across four columns — it is a phone-width box, and 136px or
-   * 84px of it cut the card's content off. Every cell is the full height there.
+   * The short band is one line of pills across four columns. Across two, the same pills wrap
+   * onto more lines than 84px holds, so that board gives it the ordinary band instead.
    */
-  it("gives every wide form the full height on a phone", () => {
-    const full = 2 * 136 + 20;
+  it("keeps the ordinary band for a single-line wide card on a two-column board", () => {
+    expect(heightOf(smRowSpanOf(dashboardCellClass("wide", false, true), 2))).toBe(136);
+  });
 
-    expect(heightOf(rowSpanOf(dashboardCellClass("wide", false)))).toBe(full);
-    expect(heightOf(rowSpanOf(dashboardCellClass("wide", true)))).toBe(full);
-    expect(heightOf(rowSpanOf(dashboardCellClass("wide", false, true)))).toBe(full);
+  it("switches columns on the board's own width, not the window's", () => {
+    expect(DASHBOARD_GRID_CLASS).toContain("@min-[36rem]/dashboard:grid-cols-2");
+    expect(DASHBOARD_GRID_CLASS).toContain("@min-[60rem]/dashboard:grid-cols-4");
+    expect(DASHBOARD_GRID_CLASS).not.toMatch(/(^|\s)(sm|md|lg):/);
+  });
+
+  /**
+   * The shallow bands are shallow *because* they are wide. On a single-column board a band is no
+   * longer a strip across four columns — it is a phone-width box, and 136px or 84px of it cut
+   * the card's content off. There every cell is at least the full height, and may grow: with no
+   * neighbours in its row, a fixed height only ever cost the bottom of the card.
+   */
+  it("gives every cell at least the full height, and room to grow, on a phone", () => {
+    const cells = [
+      dashboardCellClass("small", false),
+      dashboardCellClass("medium", false),
+      dashboardCellClass("wide", false),
+      dashboardCellClass("wide", true),
+      dashboardCellClass("wide", false, true),
+    ];
+
+    for (const cell of cells) {
+      // 18.25rem is the 292px full cell.
+      expect(cell).toMatch(/(^|\s)min-h-\[18\.25rem\](\s|$)/);
+      expect(cell).toContain("@min-[36rem]/dashboard:min-h-0");
+      // No base (phone) row span: the track there is `auto`, so the card sets the height.
+      expect(cell).not.toMatch(/(^|\s)row-span-\d/);
+    }
+    expect(DASHBOARD_GRID_CLASS).not.toMatch(/(^|\s)auto-rows-/);
   });
 
   it("prefers the roomier height when a widget claims both", () => {

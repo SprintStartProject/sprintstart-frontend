@@ -1,20 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
-  ArrowLeft,
+  AtSign,
   Clock,
   FolderKanban,
   Gauge,
   Hourglass,
-  Inbox,
-  LayoutGrid,
+  GitPullRequest,
   RefreshCw,
   Rocket,
   Search,
-  Users,
+  UserX,
 } from "lucide-react";
-import { PageHeader } from "../../../components/layout/PageHeader";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { FilterSelect, type FilterSelectOption } from "../../../components/ui/FilterSelect";
@@ -26,15 +23,19 @@ import { useToast } from "../../../context/useToast";
 import { onboardingMetricsService } from "../../../services/onboardingMetricsService";
 import { queryKeys } from "../../../services/queryKeys";
 import { SkeletonBlock, SkeletonGroup, SkeletonLine } from "../../../components/ui/Skeleton";
+import { PmSectionHeader, PmStat } from "../../pm-area/components/PmCard";
+import { useMemberPeek } from "../../pm-area/useMemberPeek";
 import { useProjectContext } from "../../projects/useProjectContext";
 import { HireTimelineCard } from "./HireTimelineCard";
-import { StatTile } from "./StatTile";
 import { formatDuration } from "../format";
 import { isAwaitingFirstResponse } from "../hireStatus";
 import type { HireTimeline } from "../types";
 
-/** Narrows the per-hire list to those a PM might act on, for a busy project. */
-type HireFilter = "all" | "attention";
+/**
+ * Narrows the per-hire list: to those a PM might act on, for a busy project, or to those whose
+ * work cannot be counted because they have no GitHub login.
+ */
+type HireFilter = "all" | "attention" | "unattributed";
 
 /** How many hire timelines to show per page before the list paginates. */
 const HIRES_PER_PAGE = 8;
@@ -70,7 +71,74 @@ function hasActivity(hires: HireTimeline[]): boolean {
   );
 }
 
-/** Matches the `grid grid-cols-2 gap-3 lg:grid-cols-4` layout of {@link StatTile}. */
+/** How many names the notice spells out before it folds the rest into "+n". */
+const NOTICE_NAMES = 3;
+
+/**
+ * Hires whose work the numbers leave out, said where the numbers are — once, in place, rather
+ * than as a toast on every visit. Each name opens that member's panel (their profile is one
+ * press further), and "Show them" narrows the timelines below to exactly these hires.
+ */
+function UnattributedNotice({
+  count,
+  hires,
+  showingThem,
+  onShowThem,
+  onOpenMember,
+}: {
+  count: number;
+  hires: HireTimeline[];
+  showingThem: boolean;
+  onShowThem: () => void;
+  onOpenMember: (userId: string) => void;
+}) {
+  const named = hires.slice(0, NOTICE_NAMES);
+  const folded = hires.length - named.length;
+
+  return (
+    <section
+      aria-label="Hires without a GitHub login"
+      className="flex flex-col gap-3 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 sm:flex-row sm:items-center"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-app-surface text-app-warning-text">
+        <UserX aria-hidden="true" className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-app-text">
+          {count} {count === 1 ? "hire" : "hires"} can&apos;t be attributed
+        </p>
+        <p className="text-xs text-app-text-muted">
+          They have no GitHub login, so their work is left out of these numbers.
+          {named.length > 0 && (
+            <>
+              {" "}
+              {named.map((hire, index) => (
+                <span key={hire.userId}>
+                  {index > 0 && ", "}
+                  <button
+                    type="button"
+                    onClick={() => onOpenMember(hire.userId)}
+                    className="font-medium text-app-text underline decoration-app-border underline-offset-2 hover:decoration-app-text"
+                  >
+                    {hire.displayName}
+                  </button>
+                </span>
+              ))}
+              {folded > 0 && ` and ${folded} more`}
+            </>
+          )}
+        </p>
+      </div>
+      {!showingThem && (
+        <Button variant="secondary" size="sm" onClick={onShowThem} className="shrink-0">
+          Show them
+        </Button>
+      )}
+    </section>
+  );
+}
+
+/** Matches one `PmStat` in the `grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5` overview row. */
 function StatTileSkeleton() {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-app-border bg-app-surface p-4 sm:p-[18px]">
@@ -109,9 +177,9 @@ function HireTimelineCardSkeleton() {
 
 function OnboardingMetricsSkeleton() {
   return (
-    <SkeletonGroup label="Loading onboarding metrics" className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
+    <SkeletonGroup label="Loading contribution metrics" className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
           <StatTileSkeleton key={index} />
         ))}
       </div>
@@ -125,8 +193,12 @@ function OnboardingMetricsSkeleton() {
 }
 
 /**
- * The PM readout for the numbers the onboarding redesign is judged on:
- * time-to-first-accepted-work, response latency, and who is stalled. The
+ * The PM readout for how a project's people get their work in:
+ * time-to-first-accepted-work, response latency, and whose work is stalled.
+ *
+ * Not onboarding progress. Onboarding is the path a PM's blueprint prescribes, and how far a hire
+ * is along it is on the team pages; this is the contribution side beside it. The route and the
+ * file names still say "onboarding" from before that split. The
  * aggregates lead, and the per-hire timelines follow, stalled first.
  *
  * Deliberately a measurement readout, not another dashboard: no completion
@@ -135,14 +207,13 @@ function OnboardingMetricsSkeleton() {
  * global project switcher scopes it; PM/HR/ADMIN only. Empty states separate "no hires yet"
  * from "no data yet".
  *
- * Reached from the PM Dashboard "Insights" group; the frame matches its sibling insights
- * pages (`FaqPage`, `KnowledgeGapsPage`): a centered column, a Back button, a header Refresh
- * that refetches (the metrics are derived on request, so there is no pipeline to trigger),
- * and toast feedback.
+ * One of the PM area's sections, on the shared PM page shell: a header Refresh that refetches
+ * (the metrics are derived on request, so there is no pipeline to trigger), toast feedback, and
+ * each hire's name opening the member side panel.
  */
 export function OnboardingMetricsPage() {
   const { projects, selectedProjectId, isLoading: projectsLoading } = useProjectContext();
-  const navigate = useNavigate();
+  const { openMember } = useMemberPeek();
   const toast = useToast();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -152,11 +223,6 @@ export function OnboardingMetricsPage() {
   // Set when a manual refresh is in flight, so the completion effect can tell the
   // user what the refetch turned up without also firing on the first load.
   const pendingRefreshRef = useRef(false);
-  // One load-error toast per failed load, reset once a load succeeds again.
-  const errorToastRef = useRef(false);
-  // The project we last warned about missing GitHub logins for, so the warning
-  // fires once per selection rather than on every refetch.
-  const warnedProjectRef = useRef<string | null>(null);
 
   const {
     data: metrics,
@@ -187,12 +253,12 @@ export function OnboardingMetricsPage() {
     pendingRefreshRef.current = false;
     setRefreshing(false);
     if (error || refetchError) {
-      toast.error("Couldn't refresh onboarding metrics", { description: "Try again shortly." });
+      toast.error("Couldn't refresh contribution metrics", { description: "Try again shortly." });
       return;
     }
     if (!metrics || metrics.memberCount === 0) return;
     if (!hasActivity(metrics.hires)) {
-      toast.info("No onboarding activity yet", {
+      toast.info("No contribution activity yet", {
         description:
           "Nothing has happened on this project yet — that's different from nobody being here.",
       });
@@ -201,35 +267,12 @@ export function OnboardingMetricsPage() {
     }
   }, [isFetching, error, refetchError, metrics, toast]);
 
-  // A load failure that wasn't a manual refresh still deserves a toast, once.
-  useEffect(() => {
-    if (isFetching) return;
-    if (!error) {
-      errorToastRef.current = false;
-      return;
-    }
-    if (!errorToastRef.current && !pendingRefreshRef.current) {
-      errorToastRef.current = true;
-      toast.error("Couldn't load onboarding metrics", {
-        description: "The onboarding metrics couldn't be loaded. Try again shortly.",
-      });
-    }
-  }, [isFetching, error, toast]);
+  // No toast for a failed load: the section already says so in place, and a toast on top
+  // reported the same thing twice — loudly, on every visit to a project with nothing in it.
 
-  // Warn once per project when some hires have no GitHub login, since their work
-  // can't be attributed and the numbers below quietly exclude it.
-  useEffect(() => {
-    if (isFetching || error || !metrics) return;
-    if (metrics.unattributableMemberCount > 0 && warnedProjectRef.current !== metrics.projectId) {
-      warnedProjectRef.current = metrics.projectId;
-      toast.warning(
-        `${metrics.unattributableMemberCount} hire${
-          metrics.unattributableMemberCount === 1 ? "" : "s"
-        } can't be attributed`,
-        { description: "They have no GitHub login, so their work is left out of these numbers." },
-      );
-    }
-  }, [isFetching, error, metrics, toast]);
+  // Hires without a GitHub login are said on the view itself (see the notice above the
+  // timelines), not in a toast: the toast came back on every swipe through the workspace, and
+  // a toast cannot lead anywhere.
 
   // Stalled hires lead the per-hire list — they are what a PM should act on today.
   const orderedHires = useMemo(() => {
@@ -240,12 +283,14 @@ export function OnboardingMetricsPage() {
   const hireFilterOptions: FilterSelectOption<HireFilter>[] = [
     { value: "all", label: "All hires" },
     { value: "attention", label: "Needs attention only" },
+    { value: "unattributed", label: "No GitHub login" },
   ];
 
   const filteredHires = useMemo(() => {
     const query = search.trim().toLowerCase();
     return orderedHires.filter((hire) => {
       if (hireFilter === "attention" && !needsAttention(hire)) return false;
+      if (hireFilter === "unattributed" && hire.githubLogin) return false;
       if (!query) return true;
       return (
         hire.displayName.toLowerCase().includes(query) ||
@@ -263,6 +308,15 @@ export function OnboardingMetricsPage() {
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setPage(1);
+  };
+
+  /** Narrows the timelines to the hires without a GitHub name and scrolls down to them. */
+  const showUnattributed = () => {
+    handleSearchChange("");
+    handleFilterChange("unattributed");
+    document
+      .getElementById("metrics-hires-heading")
+      ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   };
 
   const totalPages = Math.max(1, Math.ceil(filteredHires.length / HIRES_PER_PAGE));
@@ -287,30 +341,13 @@ export function OnboardingMetricsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-app-bg">
-      <section aria-label="Page header" className="border-b border-app-border bg-app-bg/90">
-        <div className="app-page-content py-8">
-          <Button
-            variant="ghost"
-            onClick={() => void navigate("/pm-dashboard")}
-            icon={<ArrowLeft className="h-4 w-4" />}
-            className="mb-4"
-          >
-            Back to PM-Dashboard
-          </Button>
-
-          <div className="flex items-start justify-between gap-4">
-            <PageHeader
-              icon={Gauge}
-              title="Onboarding metrics"
-              subtitle="Track each new hire's path from joining to their first accepted contribution, and where they get held up."
-            />
-            {refreshButton}
-          </div>
-        </div>
-      </section>
-
-      <main className="app-page-content space-y-6 py-8">
+    <section aria-label="Contribution metrics">
+      <PmSectionHeader
+        title="Contribution metrics"
+        description="How each hire gets from joining to their first accepted contribution, and where their work waits on someone."
+        actions={refreshButton}
+      />
+      <div className="space-y-8">
         {!projectsLoading && projects.length === 0 ? (
           <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No projects">
             There are no projects to report on yet.
@@ -318,15 +355,12 @@ export function OnboardingMetricsPage() {
         ) : showLoadingSkeleton ? (
           <OnboardingMetricsSkeleton />
         ) : loading ? null : error ? (
-          <EmptyState
-            icon={<AlertCircle className="h-8 w-8 text-app-danger-solid" />}
-            title="Couldn't load metrics"
-          >
-            The onboarding metrics couldn&apos;t be loaded. Try again shortly.
+          <EmptyState icon={<AlertCircle className="h-8 w-8" />} title="Not available right now">
+            The contribution metrics couldn&apos;t be loaded. Try again in a moment.
           </EmptyState>
         ) : !metrics || metrics.memberCount === 0 ? (
           <EmptyState icon={<FolderKanban className="h-8 w-8" />} title="No hires yet">
-            Once people join this project, their onboarding shows up here.
+            Once people join this project, their contributions show up here.
           </EmptyState>
         ) : !hasActivity(metrics.hires) ? (
           <EmptyState icon={<Gauge className="h-8 w-8" />} title="No data yet">
@@ -336,95 +370,124 @@ export function OnboardingMetricsPage() {
         ) : (
           <>
             {/* Aggregates. Medians throughout so one outlier can't move the number. */}
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <LayoutGrid className="h-4 w-4 text-app-brand" aria-hidden="true" />
-                <h2 className="text-lg font-semibold tracking-tight text-app-text">Overview</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <StatTile
-                  icon={<Rocket size={18} />}
-                  accent="brand"
+            <section aria-labelledby="metrics-overview-heading" className="space-y-3">
+              <h2
+                id="metrics-overview-heading"
+                className="text-xs font-semibold tracking-wider text-app-text-muted uppercase"
+              >
+                Overview
+              </h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <PmStat
+                  tone="cyan"
+                  icon={Rocket}
                   label="Median time to first accepted work"
                   value={formatDuration(metrics.medianHoursToFirstAcceptedContribution)}
                   hint={`${metrics.hiresWithAcceptedContribution} of ${metrics.memberCount} have had work accepted`}
                 />
-                <StatTile
-                  icon={<Clock size={18} />}
-                  accent="brand"
+                <PmStat
+                  tone="cyan"
+                  icon={Clock}
                   label="Median first-review wait"
                   value={formatDuration(metrics.medianHoursToFirstResponse)}
                   hint="Opened → first response"
                 />
-                <StatTile
-                  icon={<Hourglass size={18} />}
-                  accent="warning"
+                <PmStat
+                  tone="cyan"
+                  icon={Hourglass}
                   label="90th-percentile review wait"
                   value={formatDuration(metrics.p90HoursToFirstResponse)}
                   hint="The slow tail, where the barrier bites"
+                  attention={metrics.p90HoursToFirstResponse !== null}
                 />
-                <StatTile
-                  icon={<Inbox size={18} />}
-                  accent={metrics.waitingOnResponseCount > 0 ? "warning" : "neutral"}
+                <PmStat
+                  tone="cyan"
+                  icon={GitPullRequest}
                   label="Waiting on a review"
                   value={metrics.waitingOnResponseCount}
+                  attention={metrics.waitingOnResponseCount > 0}
+                  hint="Contributions nobody has answered"
+                />
+                {/* How many hires the numbers can see at all: without a GitHub name their pull
+                    requests cannot be matched to them. Leads to exactly those hires. */}
+                <PmStat
+                  tone="cyan"
+                  icon={AtSign}
+                  label="GitHub name added"
+                  value={`${metrics.memberCount - metrics.unattributableMemberCount} / ${metrics.memberCount}`}
+                  attention={metrics.unattributableMemberCount > 0}
                   hint={
                     metrics.unattributableMemberCount > 0
-                      ? `${metrics.unattributableMemberCount} unattributable (no GitHub login)`
-                      : undefined
+                      ? `${metrics.unattributableMemberCount} still missing — not counted`
+                      : "Everyone can be counted"
                   }
+                  onClick={metrics.unattributableMemberCount > 0 ? showUnattributed : undefined}
                 />
               </div>
             </section>
 
+            {metrics.unattributableMemberCount > 0 && (
+              <UnattributedNotice
+                count={metrics.unattributableMemberCount}
+                hires={metrics.hires.filter((hire) => !hire.githubLogin)}
+                showingThem={hireFilter === "unattributed"}
+                onShowThem={showUnattributed}
+                onOpenMember={openMember}
+              />
+            )}
+
             {/* Per-hire timelines, stalled first. */}
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-app-brand" aria-hidden="true" />
-                <h2 className="text-lg font-semibold tracking-tight text-app-text">
+            <section aria-labelledby="metrics-hires-heading" className="space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <h2
+                  id="metrics-hires-heading"
+                  className="text-xs font-semibold tracking-wider text-app-text-muted uppercase"
+                >
                   Per-hire timelines
                 </h2>
-              </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  size="sm"
-                  icon={<Search className="h-4 w-4" />}
-                  aria-label="Search hires by name"
-                  placeholder="Search hires…"
-                  value={search}
-                  onChange={(event) => handleSearchChange(event.target.value)}
-                  className="min-w-0 flex-1"
-                />
-                <FilterSelect
-                  label="Filter hires"
-                  value={hireFilter}
-                  options={hireFilterOptions}
-                  onChange={handleFilterChange}
-                  className="w-56 shrink-0"
-                />
+                <div className="flex items-center gap-2 sm:ml-auto">
+                  <Input
+                    size="sm"
+                    icon={<Search className="h-4 w-4" />}
+                    aria-label="Search hires by name"
+                    placeholder="Search hires…"
+                    value={search}
+                    onChange={(event) => handleSearchChange(event.target.value)}
+                    className="min-w-0 flex-1 sm:w-56"
+                  />
+                  <FilterSelect
+                    label="Filter hires"
+                    value={hireFilter}
+                    options={hireFilterOptions}
+                    onChange={handleFilterChange}
+                    className="w-52 shrink-0"
+                  />
+                </div>
               </div>
               {filteredHires.length === 0 ? (
                 <EmptyState size="sm">
                   {search.trim()
                     ? "No hires match your search."
-                    : "No hires need attention right now."}
+                    : hireFilter === "unattributed"
+                      ? "Every hire has a GitHub login."
+                      : "No hires need attention right now."}
                 </EmptyState>
               ) : (
-                <>
+                <div className="space-y-3">
                   {pagedHires.map((hire) => (
-                    <HireTimelineCard key={hire.userId} hire={hire} />
+                    <HireTimelineCard key={hire.userId} hire={hire} onOpenMember={openMember} />
                   ))}
                   <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={setPage}
                   />
-                </>
+                </div>
               )}
             </section>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </section>
   );
 }

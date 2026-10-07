@@ -1,10 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SelectionActions } from "../../../../src/features/board/selection/SelectionActions";
 import { boardService } from "../../../../src/services/boardService";
-import { ChatContext, type ChatContextValue } from "../../../../src/context/ChatContext";
+import { queryKeys } from "../../../../src/services/queryKeys";
 import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
 import { FocusModeContext } from "../../../../src/context/FocusModeContext";
 
@@ -21,11 +22,6 @@ vi.mock("../../../../src/features/projects/useProjectContext", () => ({
 
 const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("../../../../src/context/useToast", () => ({ useToast: () => toast }));
-
-const mockQuoteSelection = vi.fn();
-const mockChatContext = {
-  quoteSelection: mockQuoteSelection,
-} as unknown as ChatContextValue;
 
 vi.mock("../../../../src/features/buddy/aiBuddyBus", () => ({ openAiBuddy: vi.fn() }));
 
@@ -58,18 +54,25 @@ describe("SelectionActions", () => {
     document.dispatchEvent(new Event("selectionchange"));
   }
 
-  function renderToolbar({ focused = false }: { focused?: boolean } = {}) {
-    return render(
+  function renderToolbar({
+    focused = false,
+    client,
+  }: { focused?: boolean; client?: QueryClient } = {}) {
+    const tree = (
       <MemoryRouter>
         <FocusModeContext.Provider
           value={{ isFocused: focused, setFocused: () => {}, toggleFocused: () => {} }}
         >
-          <ChatContext.Provider value={mockChatContext}>
-            <SelectionActions />
-          </ChatContext.Provider>
+          <SelectionActions />
         </FocusModeContext.Provider>
-      </MemoryRouter>,
+      </MemoryRouter>
     );
+
+    // A client of its own only where a test reads the cache back; every other render keeps the
+    // one the harness hands it.
+    return client
+      ? render(<QueryClientProvider client={client}>{tree}</QueryClientProvider>)
+      : render(tree);
   }
 
   it("offers nothing until something is selected", () => {
@@ -95,6 +98,42 @@ describe("SelectionActions", () => {
     await waitFor(() => expect(addCard).toHaveBeenCalledOnce());
     expect(addCard.mock.calls[0][0]).toBe("p1");
     expect(addCard.mock.calls[0][1]).toMatchObject({ kind: "NOTE" });
+  });
+
+  it("marks the board stale once the selection is really on it", async () => {
+    vi.spyOn(boardService, "addCard").mockResolvedValue({ id: "c1" } as never);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(queryKeys.board.byProject("p1"), {
+      boardId: "b1",
+      projectId: "p1",
+      cards: [],
+    });
+    renderToolbar({ client });
+    highlight("Run the migration first.");
+
+    await userEvent.click(await screen.findByRole("button", { name: /add to board/i }));
+
+    await waitFor(() =>
+      expect(client.getQueryState(queryKeys.board.byProject("p1"))?.isInvalidated).toBe(true),
+    );
+  });
+
+  /** The other half of the stale-marking rule: a write that never landed must not cost the board. */
+  it("leaves the board alone when the write failed", async () => {
+    vi.spyOn(boardService, "addCard").mockRejectedValue(new Error("nope"));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(queryKeys.board.byProject("p1"), {
+      boardId: "b1",
+      projectId: "p1",
+      cards: [],
+    });
+    renderToolbar({ client });
+    highlight("Run the migration first.");
+
+    await userEvent.click(await screen.findByRole("button", { name: /add to board/i }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(client.getQueryState(queryKeys.board.byProject("p1"))?.isInvalidated).toBe(false);
   });
 
   /**
@@ -136,7 +175,7 @@ describe("SelectionActions", () => {
   it("offers Reply button when selecting text in an AI assistant message", async () => {
     renderToolbar();
     const container = document.createElement("div");
-    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    container.setAttribute("data-message-role", "ASSISTANT");
     const p = document.createElement("p");
     p.textContent = "AI generated response.";
     container.appendChild(p);
@@ -153,10 +192,15 @@ describe("SelectionActions", () => {
     expect(screen.getByRole("button", { name: /add to board/i })).toBeInTheDocument();
   });
 
-  it("calls quoteSelection and clears selection when Reply is clicked", async () => {
+  /**
+   * Reply hands the answer over as a quote in the buddy's composer — the dock's box when it is
+   * open, the page's otherwise — rather than to a chat context. Seeded, not sent: the hire can
+   * still wrap their actual question around it.
+   */
+  it("seeds the buddy composer and clears selection when Reply is clicked", async () => {
     renderToolbar();
     const container = document.createElement("div");
-    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    container.setAttribute("data-message-role", "ASSISTANT");
     const p = document.createElement("p");
     p.textContent = "AI generated response.";
     container.appendChild(p);
@@ -172,7 +216,10 @@ describe("SelectionActions", () => {
     const replyButton = await screen.findByRole("button", { name: /reply/i });
     await userEvent.click(replyButton);
 
-    expect(mockQuoteSelection).toHaveBeenCalledWith("AI generated response.");
+    expect(vi.mocked(openAiBuddy)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(openAiBuddy).mock.calls[0][0]).toEqual({
+      draft: "> AI generated response.\n\n",
+    });
     expect(window.getSelection()?.rangeCount).toBe(0);
   });
 
@@ -180,7 +227,7 @@ describe("SelectionActions", () => {
     selectedProjectId = "";
     renderToolbar();
     const container = document.createElement("div");
-    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    container.setAttribute("data-message-role", "ASSISTANT");
     const p = document.createElement("p");
     p.textContent = "AI generated response.";
     container.appendChild(p);

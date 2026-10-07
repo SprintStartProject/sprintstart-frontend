@@ -2,9 +2,13 @@ import { useCallback, useRef, useState } from "react";
 import { LayoutGrid } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { EmptyState } from "../../../components/ui/EmptyState";
-import { useIsSmUp } from "../../../hooks/useIsSmUp";
+import { useElementWidth } from "../../../hooks/useElementWidth";
 import { getDashboardWidget } from "../layout/catalog";
-import { DASHBOARD_GRID_CLASS } from "../layout/sizes";
+import {
+  DASHBOARD_CONTAINER_CLASS,
+  DASHBOARD_GRID_CLASS,
+  DASHBOARD_TWO_COLUMN_MIN_PX,
+} from "../layout/sizes";
 import type { DashboardWidgetId } from "../layout/types";
 import type { DashboardLayoutController } from "../layout/useDashboardLayout";
 import { DashboardWidgetFrame } from "./DashboardWidgetFrame";
@@ -60,9 +64,11 @@ export function DashboardGrid({
   const lastSwapAt = useRef(0);
   const [draggingId, setDraggingId] = useState<DashboardWidgetId | null>(null);
 
-  // Read once here rather than per card: every cell needs the same answer, and one
-  // `matchMedia` subscription for the board beats one per widget.
-  const isNarrow = !useIsSmUp();
+  // Read once here rather than per card: every cell needs the same answer. The board's own
+  // width, not the window's -- the same thing the grid's container queries switch on, so the
+  // form a card renders and the column it gets can never disagree.
+  const [measureRef, boardWidth] = useElementWidth<HTMLDivElement>();
+  const isSingleColumn = boardWidth < DASHBOARD_TWO_COLUMN_MIN_PX;
 
   const registerElement = useCallback((id: DashboardWidgetId, element: HTMLDivElement | null) => {
     if (element) {
@@ -111,31 +117,33 @@ export function DashboardGrid({
   }
 
   return (
-    <div className={DASHBOARD_GRID_CLASS}>
-      {controller.layout.map((item, index) => {
-        const definition = getDashboardWidget(item.id);
-        if (!definition) return null;
+    <div ref={measureRef} className={DASHBOARD_CONTAINER_CLASS}>
+      <div className={DASHBOARD_GRID_CLASS}>
+        {controller.layout.map((item, index) => {
+          const definition = getDashboardWidget(item.id);
+          if (!definition) return null;
 
-        return (
-          <DashboardWidgetFrame
-            key={item.id}
-            definition={definition}
-            size={item.size}
-            index={index}
-            total={controller.layout.length}
-            isEditing={isEditing}
-            isDragging={draggingId === item.id}
-            isNarrow={isNarrow}
-            onRemove={controller.removeWidget}
-            onResize={controller.resizeWidget}
-            onMoveBy={controller.moveWidgetBy}
-            onDragStart={handleDragStart}
-            onDrag={handleDrag}
-            onDragEnd={() => setDraggingId(null)}
-            registerElement={registerElement}
-          />
-        );
-      })}
+          return (
+            <DashboardWidgetFrame
+              key={item.id}
+              definition={definition}
+              size={item.size}
+              index={index}
+              total={controller.layout.length}
+              isEditing={isEditing}
+              isDragging={draggingId === item.id}
+              isSingleColumn={isSingleColumn}
+              onRemove={controller.removeWidget}
+              onResize={controller.resizeWidget}
+              onMoveBy={controller.moveWidgetBy}
+              onDragStart={handleDragStart}
+              onDrag={handleDrag}
+              onDragEnd={() => setDraggingId(null)}
+              registerElement={registerElement}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }

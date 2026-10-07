@@ -1,6 +1,8 @@
 import {
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Circle,
   MessageSquareText,
   Plus,
@@ -9,7 +11,7 @@ import {
   ThumbsUp,
   Trash2,
 } from "lucide-react";
-import { useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { Badge } from "../../../../components/ui/Badge";
 import { Button } from "../../../../components/ui/Button";
 import { Input } from "../../../../components/ui/Input";
@@ -76,6 +78,14 @@ type StepDetailsPanelProps = {
   markingFeedbackId?: string | null;
 };
 
+/**
+ * One step of a member's onboarding path in the profile's side panel: its tasks (add, reorder,
+ * delete), the member's feedback on it, and the review of an open skip request.
+ *
+ * Holds no data of its own. `TeamMemberDetailPage` owns the step, the drafts and every request;
+ * the panel renders them and reports what the manager did. Optional callbacks switch their
+ * controls off when they are not given.
+ */
 export function StepDetailsPanel({
   step,
   tasks,
@@ -110,6 +120,19 @@ export function StepDetailsPanel({
 }: StepDetailsPanelProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+  // Which task was just moved with its buttons, so that task can take focus back once the list has
+  // been reordered (the move re-parents the node, which would otherwise drop keyboard focus).
+  const [moveFocus, setMoveFocus] = useState<{
+    taskId: string;
+    direction: TaskMoveDirection;
+  } | null>(null);
+  const moveTask = (index: number, direction: TaskMoveDirection) => {
+    const task = tasks[index];
+    const neighbour = tasks[direction === "up" ? index - 1 : index + 1];
+    if (!onReorderTasks || !task || !neighbour) return;
+    setMoveFocus({ taskId: task.id, direction });
+    onReorderTasks(task.id, neighbour.id);
+  };
   const skipStatus = getSkipStatus(step);
   const skipAwaitsReview = !!step.skip?.id && isSkipPending(step.skip) && step.status !== "SKIPPED";
   return (
@@ -125,7 +148,7 @@ export function StepDetailsPanel({
           >
             {step.status.replace("_", " ")}
           </span>
-          <StepOriginBadge step={step} />
+          <StepOriginBadge step={step} viewer="reviewer" />
         </div>
       }
       panelBackgroundClassName="bg-app-surface"
@@ -236,6 +259,11 @@ export function StepDetailsPanel({
                 onCancelDeleteTask={onCancelDeleteTask}
                 onConfirmDeleteTask={onConfirmDeleteTask}
                 draggable={Boolean(onReorderTasks)}
+                canMoveUp={index > 0}
+                canMoveDown={index < tasks.length - 1}
+                showMoveButtons={Boolean(onReorderTasks) && tasks.length > 1}
+                moveFocus={moveFocus}
+                onMove={(direction) => moveTask(index, direction)}
                 onDragStart={(taskId) => setDraggedTaskId(taskId)}
                 onDragOver={(taskId) => setDragOverTaskId(taskId)}
                 onDragLeave={() => setDragOverTaskId(null)}
@@ -394,6 +422,8 @@ export function StepDetailsPanel({
   );
 }
 
+type TaskMoveDirection = "up" | "down";
+
 function TaskItem({
   task,
   index,
@@ -414,6 +444,11 @@ function TaskItem({
   onCancelDeleteTask,
   onConfirmDeleteTask,
   draggable,
+  canMoveUp,
+  canMoveDown,
+  showMoveButtons,
+  moveFocus,
+  onMove,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -438,6 +473,11 @@ function TaskItem({
   onCancelDeleteTask: () => void;
   onConfirmDeleteTask: (task: OnboardingTaskEndpoint) => void;
   draggable: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  showMoveButtons: boolean;
+  moveFocus: { taskId: string; direction: TaskMoveDirection } | null;
+  onMove: (direction: TaskMoveDirection) => void;
   onDragStart: (taskId: string) => void;
   onDragOver: (taskId: string) => void;
   onDragLeave: () => void;
@@ -445,6 +485,18 @@ function TaskItem({
 }) {
   const isDragging = draggedTaskId === task.id;
   const isDragTarget = dragOverTaskId === task.id && draggedTaskId !== task.id;
+  const moveUpRef = useRef<HTMLButtonElement>(null);
+  const moveDownRef = useRef<HTMLButtonElement>(null);
+
+  // After this task was moved, put focus back on the button that moved it. At the end of the list
+  // that button is now disabled, so the other one takes it: the keyboard user can keep going or
+  // go back without having to find the task again.
+  useEffect(() => {
+    if (moveFocus?.taskId !== task.id) return;
+    const preferred = moveFocus.direction === "up" ? moveUpRef.current : moveDownRef.current;
+    const other = moveFocus.direction === "up" ? moveDownRef.current : moveUpRef.current;
+    (preferred && !preferred.disabled ? preferred : other)?.focus();
+  }, [moveFocus, task.id]);
 
   return (
     <div className="group/task-insert space-y-1">
@@ -539,16 +591,46 @@ function TaskItem({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onRequestDeleteTask(task)}
-          disabled={stepActionId !== null}
-          className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`Delete ${task.title}`}
-          title="Delete task"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="flex shrink-0 items-start gap-0.5">
+          {showMoveButtons && (
+            <>
+              <button
+                ref={moveUpRef}
+                type="button"
+                onClick={() => onMove("up")}
+                disabled={!canMoveUp}
+                className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={`Move ${task.title} up`}
+                title="Move up"
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+
+              <button
+                ref={moveDownRef}
+                type="button"
+                onClick={() => onMove("down")}
+                disabled={!canMoveDown}
+                className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={`Move ${task.title} down`}
+                title="Move down"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onRequestDeleteTask(task)}
+            disabled={stepActionId !== null}
+            className="rounded-lg p-1.5 text-app-text-muted transition-colors hover:bg-app-danger-bg hover:text-app-danger-text disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={`Delete ${task.title}`}
+            title="Delete task"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {taskToDelete?.id === task.id && (
@@ -663,7 +745,7 @@ function TaskInsertButton({ label, onClick }: { label: string; onClick: () => vo
       aria-label={label}
       title="Add task here"
     >
-      <Plus className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover/step-insert:opacity-100 group-hover/task-insert:opacity-100" />
+      <Plus className="h-3.5 w-3.5 opacity-0 transition-opacity group-focus-within/step-insert:opacity-100 group-focus-within/task-insert:opacity-100 group-hover/step-insert:opacity-100 group-hover/task-insert:opacity-100" />
     </button>
   );
 }

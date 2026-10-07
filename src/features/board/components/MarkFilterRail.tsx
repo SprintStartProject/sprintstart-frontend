@@ -7,7 +7,10 @@ type MarkFilterRailProps = {
   /** The section being shown; null is "everything". */
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  /** Stacks them under a divider, for the rail in the page's margin. */
+  /**
+   * Stacks them, for the rail standing up the page's margin from `lg` up; below that the rail lies
+   * across the page and they sit side by side. The divider before them is drawn either way.
+   */
   vertical?: boolean;
   className?: string;
 };
@@ -27,10 +30,11 @@ type MarkFilterRailProps = {
  * is the button's label for a pointer and for a screen reader: the one place a name is genuinely
  * useful, and the one place it costs no room.
  *
- * **Twice on the page, and that is the point.** The rail lives in the page's right margin from `lg`
- * up, and below that width there is no margin — so this also renders in the row above the board,
- * exactly as the provenance filter does. Moving out of the section bar took the colours off every
- * narrow screen for a while, which is a filter that exists on a laptop and not on a phone.
+ * **On every screen, through the one rail.** The rail stands up the page's right margin from `lg`
+ * and lies across the top of the page below it, so there is one copy of this at every width.
+ * Moving out of the section bar once took the colours off every narrow screen for a while, which
+ * is a filter that exists on a laptop and not on a phone; the rail reaching every width is what
+ * keeps that from happening again.
  *
  * Draws nothing until something is highlighted. Four dots over a board with no marks would be a
  * control for something that has not happened yet.
@@ -46,9 +50,13 @@ export function MarkFilterRail({
 
   return (
     <>
-      {/* Only in the rail, where it separates two groups of switches. In the row above the board
-          this sits beside the other controls with the row's own gap between them. */}
-      {vertical && <span className="my-0.5 h-px w-6 bg-app-border" aria-hidden="true" />}
+      {/* Separates it from the rail's other groups, whichever way the rail is standing: a short
+          line across while it stands up the margin, a short upright one while it lies across the
+          page below `lg`. */}
+      <span
+        className={vertical ? "my-0.5 h-px w-6 bg-app-border" : "mx-0.5 h-6 w-px bg-app-border"}
+        aria-hidden="true"
+      />
 
       <div
         className={`flex items-center gap-1 ${vertical ? "flex-col" : ""} ${className}`}
@@ -67,7 +75,7 @@ export function MarkFilterRail({
               aria-pressed={active}
               aria-label={label}
               title={label}
-              className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
+              className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-app-surface-hover ${
                 active ? "bg-app-surface-hover" : ""
               }`}
             >

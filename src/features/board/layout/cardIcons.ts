@@ -4,11 +4,11 @@ import {
   CheckSquare,
   Footprints,
   GitPullRequest,
+  LayoutList,
   Link2,
   Network,
   PenLine,
   PlaneLanding,
-  Route,
   Sparkles,
   Target,
   type LucideIcon,
@@ -29,12 +29,12 @@ import type { BoardCardKind } from "../types";
  * a confident wrong one reads as a different card.
  */
 const ICONS: Record<BoardCardKind, LucideIcon> = {
-  PATH_TO_FIRST_CONTRIBUTION: Route,
   CURRENT_TASK: Target,
   DIAGRAM: Network,
   ARRIVAL_STEPS: PlaneLanding,
   OPEN_PULL_REQUESTS: GitPullRequest,
   SUGGESTED_TASKS: Sparkles,
+  TASK_POOL: LayoutList,
   COMPETENCY_PROGRESS: Award,
   MEMORY_RECAP: Brain,
   PATH_STEP: Footprints,

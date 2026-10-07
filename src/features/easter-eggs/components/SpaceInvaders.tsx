@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { centralSpringToken } from "../../../styles/tokens";
+import { isTypingTarget } from "../lib/keyTargets.ts";
 
 type SpaceInvadersProps = {
   /**
@@ -267,9 +268,10 @@ function spawnPlayerExplosion(w: World, x: number, y: number): void {
 /**
  * SpaceInvaders
  *
- * A canvas Space Invaders clone, hidden as an easter egg on the 404 page
- * and reachable from the dashboard via the Ctrl+Shift+3 chord (see
- * {@link SpaceInvadersModal}).
+ * A canvas Space Invaders clone, hidden as an easter egg behind the 404
+ * page's rocket teaser and opened through the shared egg shell
+ * (see {@link EggModalShell}, registry id `space-invaders`). The game owns
+ * its own keyboard — Escape and the exit button call `onExit`.
  *
  * Architecture mirrors {@link DinoGame}: all mutable game state lives in a
  * single `useRef<World>` so the `requestAnimationFrame` loop never restarts
@@ -328,11 +330,10 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
   // --- Keyboard input (Escape, Space, Arrows / A-D) ---
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onExit();
-        return;
-      }
+      // Shortcuts (Ctrl/Cmd+A, Alt+D, …) and typing belong to the browser and
+      // the focused field, not the game — same guards as DinoGame.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
 
       if (e.code === "Space") {
         e.preventDefault();
@@ -366,9 +367,21 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
       }
     };
 
+    // Escape in the capture phase, as in DinoGame: one press must close only
+    // the game, before any surrounding surface that also closes on Escape
+    // sees it. Honoured from anywhere, including a text field.
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onExit();
+    };
+
+    window.addEventListener("keydown", onEscape, true);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     return () => {
+      window.removeEventListener("keydown", onEscape, true);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
@@ -686,10 +699,10 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
       {/* Top bar: high score + score + exit */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-semibold text-app-text-muted tabular-nums backdrop-blur-sm">
+          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-2xs font-semibold text-app-text-muted tabular-nums backdrop-blur-sm">
             HI {String(highScore).padStart(5, "0")}
           </span>
-          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-bold text-app-text tabular-nums backdrop-blur-sm">
+          <span className="rounded-md bg-app-surface/80 px-2 py-0.5 text-2xs font-bold text-app-text tabular-nums backdrop-blur-sm">
             {String(score).padStart(5, "0")}
           </span>
         </div>
@@ -698,7 +711,7 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
           type="button"
           onClick={onExit}
           data-testid="invaders-exit"
-          className="pointer-events-auto rounded-md bg-app-surface/80 px-2 py-0.5 text-[11px] font-medium text-app-text-muted backdrop-blur-sm transition-colors hover:text-app-text"
+          className="pointer-events-auto rounded-md bg-app-surface/80 px-2 py-0.5 text-xs font-medium text-app-text-muted backdrop-blur-sm transition-colors hover:text-app-text"
         >
           Esc ✕
         </button>
@@ -707,7 +720,7 @@ export function SpaceInvaders({ onExit }: SpaceInvadersProps) {
       {/* Controls hint */}
       {!isOver && (
         <div className="pointer-events-none absolute inset-x-0 top-9 flex justify-center">
-          <span className="rounded bg-app-surface/70 px-2 py-0.5 text-[10px] text-app-text-disabled backdrop-blur-sm">
+          <span className="rounded bg-app-surface/70 px-2 py-0.5 text-xs text-app-text-disabled backdrop-blur-sm">
             ← → move · Space shoot
           </span>
         </div>

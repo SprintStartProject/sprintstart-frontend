@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"
+    />
+    <!--
+      `interactive-widget=resizes-content` is honoured by Chromium (Android) and ignored by
+      iOS Safari, which overlays the keyboard on top of the page instead. The dvh-based
+      shells keep the composer in view on both; the hint is for the one that resizes.
+    -->
     <title>SprintStart</title>
 
     <!--
@@ -44,9 +52,9 @@
       /* Fallback for the split second before the inline script below resolves
          the stored theme, and for the case where it cannot run at all. */
       :root {
-        --boot-bg: #f9fafb; /* --bg, light */
+        --boot-bg: #edf1f5; /* --bg, light */
         --boot-text: #111827; /* --text, light */
-        --boot-caption: #6b7280; /* --text-subtle, light */
+        --boot-caption: #5f6b7a; /* --text-subtle, light */
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -56,9 +64,9 @@
         }
       }
       html.light {
-        --boot-bg: #f9fafb;
+        --boot-bg: #edf1f5;
         --boot-text: #111827;
-        --boot-caption: #6b7280;
+        --boot-caption: #5f6b7a;
       }
       html.dark {
         --boot-bg: #030712;

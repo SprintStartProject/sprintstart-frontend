@@ -14,8 +14,15 @@ import {
   formatInstanceDomain,
   formatNumber,
 } from "../data.ts";
+import {
+  bitbucketRepositoryOf,
+  confluenceSpaceOf,
+  githubRepositoryOf,
+  jiraInstanceOf,
+} from "../sourceDetails.ts";
 import type { DataSource } from "../types.ts";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
+import { IconTile } from "../../../components/ui/IconTile";
 import { SourceStatusChip } from "./SourceStatusChip.tsx";
 import { SourceTypeBadge } from "./SourceTypeBadge.tsx";
 
@@ -47,8 +54,8 @@ export function SourceList({
             <h3 className="text-lg font-semibold text-app-text">Connect your first source</h3>
 
             <p className="mt-2 max-w-md text-sm text-app-text-muted">
-              Discover repositories from a GitHub organization or user and connect them to start
-              ingesting artifacts into the knowledge base.
+              Connect a GitHub repository, Jira instance, Confluence space or uploaded files to
+              start ingesting artifacts into the knowledge base.
             </p>
 
             {onAddSource && (
@@ -81,16 +88,16 @@ export function SourceList({
             onClick={() => onSelectSource(source.sourceId)}
             // Mobile: onboarding-style card (scale + brand-soft fill on select).
             // From `sm` up: the original card (subtle lift, 2x2 stat grid below).
-            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border p-5 text-left transition-all duration-200 focus:ring-2 focus:ring-app-brand focus:ring-offset-2 focus:ring-offset-app-bg focus:outline-none motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 sm:p-6 ${
+            className={`group flex h-full w-full cursor-pointer flex-col rounded-2xl border p-5 text-left transition-all duration-200 motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 sm:p-6 ${
               isSelected
                 ? "border-app-brand bg-app-brand-soft sm:bg-app-surface sm:shadow-sm"
                 : "border-app-border bg-app-surface hover:scale-[1.01] hover:border-app-brand-border-strong hover:shadow-lg sm:hover:-translate-y-0.5 sm:hover:scale-100"
             }`}
           >
             <div className="flex gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-app-bg-soft text-app-text-muted sm:h-14 sm:w-14">
+              <IconTile size="xl" tone="neutral" className="sm:h-14 sm:w-14 sm:rounded-2xl">
                 <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
-              </div>
+              </IconTile>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
@@ -99,21 +106,27 @@ export function SourceList({
                       {source.name}
                     </h3>
 
-                    {source.githubRepository?.owner && (
+                    {githubRepositoryOf(source)?.owner && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {source.githubRepository.owner}
+                        {githubRepositoryOf(source)?.owner}
                       </p>
                     )}
 
-                    {source.jiraInstance?.instanceUrl && (
+                    {bitbucketRepositoryOf(source)?.workspace && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {formatInstanceDomain(source.jiraInstance.instanceUrl)}
+                        {bitbucketRepositoryOf(source)?.workspace}
                       </p>
                     )}
 
-                    {source.confluenceSpace?.baseUrl && (
+                    {jiraInstanceOf(source)?.instanceUrl && (
                       <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
-                        {formatInstanceDomain(source.confluenceSpace.baseUrl)}
+                        {formatInstanceDomain(jiraInstanceOf(source)?.instanceUrl ?? "")}
+                      </p>
+                    )}
+
+                    {confluenceSpaceOf(source)?.baseUrl && (
+                      <p className="mt-0.5 truncate text-xs text-app-text-subtle sm:overflow-visible sm:break-words sm:whitespace-normal">
+                        {formatInstanceDomain(confluenceSpaceOf(source)?.baseUrl ?? "")}
                       </p>
                     )}
                   </div>
@@ -244,12 +257,11 @@ function FailedItemsNote({ count }: { count: number }) {
   return (
     <div className="mt-5 rounded-2xl border border-app-warning-border bg-app-warning-bg p-4">
       <p className="text-sm font-semibold text-app-warning-text">
-        {count} failed item{count === 1 ? "" : "s"} in latest status
+        {count} {count === 1 ? "item" : "items"} failed in the latest sync
       </p>
 
       <p className="mt-1 text-sm text-app-text-muted">
-        Open the source details or check the backend response for failed artifact identifiers and
-        reasons.
+        Open the source to see which items failed and why.
       </p>
     </div>
   );

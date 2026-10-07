@@ -6,6 +6,7 @@ import { GLOW_INTENSITY_MAX, GLOW_INTENSITY_MIN } from "../../../context/ThemeCo
 import { useTheme } from "../../../context/useTheme";
 import type { Theme } from "../../../context/ThemeContext";
 import { useMoments } from "../../moments";
+import { SelectedBadge } from "../../../components/ui/SelectedBadge";
 import { SettingsToggleRow } from "./SettingsToggleRow";
 
 const OPTIONS: ReadonlyArray<{ value: Theme; label: string; icon: typeof Sun }> = [
@@ -43,7 +44,7 @@ function AppearanceGroup({
  * intensity, Card Tilt) and optional extras (the rocket pet).
  *
  * Bound to the global {@link ThemeContext}; selecting an option persists it
- * via the provider. Each option shows an icon and a text label (AGENTS.md §7 —
+ * via the provider. Each option shows an icon and a text label (FRONTEND_CODING_STANDARDS.md §5 —
  * meaning never conveyed by colour alone).
  *
  * The classic-mode notice is the only way out of `style-classic` in the whole app. The mode
@@ -96,7 +97,7 @@ export function AppearanceSection() {
                 data-testid={`theme-option-${value}`}
                 onClick={() => setTheme(value)}
                 className={[
-                  "flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none",
+                  "relative flex flex-1 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-colors",
                   isActive
                     ? "border-app-brand bg-app-brand-soft text-app-text"
                     : "border-app-border bg-app-bg text-app-text-muted hover:bg-app-surface-hover hover:text-app-text",
@@ -104,6 +105,7 @@ export function AppearanceSection() {
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 {label}
+                {isActive ? <SelectedBadge /> : null}
               </button>
             );
           })}
@@ -176,7 +178,7 @@ export function AppearanceSection() {
                 onChange={(event) => setGlowIntensity(event.target.valueAsNumber)}
                 // Native control tinted with the brand colour — deliberately no
                 // custom track CSS until a second slider justifies extracting one.
-                className="mt-2 w-full cursor-pointer rounded-full accent-app-brand focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                className="mt-2 w-full cursor-pointer rounded-full accent-app-brand"
               />
               <p className="mt-1 text-xs text-app-text-muted">
                 Size and brightness of the glow that follows your mouse.

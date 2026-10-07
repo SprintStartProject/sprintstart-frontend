@@ -3,6 +3,7 @@ import { useQueryFetch } from "../../../hooks/useQueryFetch";
 import { getTeamOverview } from "../../../services/teamManagementService";
 import { queryKeys } from "../../../services/queryKeys";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { memberStage } from "../../pm-area/memberStatus";
 import type { TeamOverviewUser } from "../../team-management/types";
 import type { DashboardWidgetSize } from "../layout/types";
 import { WidgetBar } from "./WidgetBar";
@@ -54,11 +55,10 @@ function summarize(members: readonly TeamOverviewUser[]): TeamSummary {
 
   return {
     memberCount: members.length,
-    notStarted: members.filter((member) => member.progressPercentage <= 0).length,
-    inProgress: members.filter(
-      (member) => member.progressPercentage > 0 && member.progressPercentage < 100,
-    ).length,
-    finished: members.filter((member) => member.progressPercentage >= 100).length,
+    // `progressPercentage` is a fraction; `memberStage` is the one place that reads it.
+    notStarted: members.filter((member) => memberStage(member) === "not-started").length,
+    inProgress: members.filter((member) => memberStage(member) === "underway").length,
+    finished: members.filter((member) => memberStage(member) === "done").length,
     waiting,
   };
 }
@@ -129,12 +129,12 @@ export function TeamOverviewWidget({ size }: { size: DashboardWidgetSize }) {
       {size === "small" ? (
         <WidgetMetrics icon={Users} metrics={metricsFor(summary)} />
       ) : (
-        <div className="grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="grid flex-1 grid-cols-1 gap-5 @min-[24rem]:grid-cols-2">
           <WidgetMetrics icon={Users} metrics={metricsFor(summary).slice(0, 2)} />
 
           <div className="flex flex-col justify-center gap-4">
             <div>
-              <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+              <p className="mb-2 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
                 Onboarding
               </p>
               <WidgetBar
@@ -147,7 +147,7 @@ export function TeamOverviewWidget({ size }: { size: DashboardWidgetSize }) {
             </div>
 
             <div>
-              <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+              <p className="mb-2 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
                 Waiting on you
               </p>
 

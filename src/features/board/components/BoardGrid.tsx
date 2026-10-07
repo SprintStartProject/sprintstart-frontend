@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
-import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, Lock, X } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown, GripVertical, Layers, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Collapsible } from "../../../components/ui/Collapsible";
@@ -23,13 +23,15 @@ import { CurrentTaskCard } from "./CurrentTaskCard";
 import { DiagramCard } from "./DiagramCard";
 import { LinkCard } from "./LinkCard";
 import { originOf, type CardOrigin, type CardOrigins } from "../layout/cardOrigins";
+import { useBoardPath } from "../hooks/boardPath";
+import { leadsOntoPath } from "../layout/pathStages";
 import { MemoryRecapCard } from "./MemoryRecapCard";
 import { NoteCard } from "./NoteCard";
 import { ArrivalStepsCard } from "./ArrivalStepsCard";
 import { OpenPullRequestsCard } from "./OpenPullRequestsCard";
 import { PathStepCard } from "./PathStepCard";
-import { PathToFirstContributionCard } from "./PathToFirstContributionCard";
 import { SuggestedTasksCard } from "./SuggestedTasksCard";
+import { TaskPoolCard } from "./TaskPoolCard";
 import { BoardCardContext } from "./boardCardControls";
 import { BoardStageBand } from "./BoardStageBand";
 import { cardAccent } from "../layout/cardAccents";
@@ -37,13 +39,10 @@ import { AREA_ACCENTS, areaAccent, type AreaAccent } from "../layout/areaAccents
 import { groupOf, type BoardGroup } from "../layout/boardGroups";
 import { moveTo } from "../layout/boardOrder";
 import { cardIcon } from "../layout/cardIcons";
-import { buddyLockSaid, lockedAfter, teamLockSaid } from "../../graph-diagram/lockWords";
-import { unblockedByFinishing } from "../layout/nextUp";
 import { cardName } from "../layout/cardNames";
 import type { CardStack } from "../layout/cardStacks";
 import {
   BOARD_STAGES,
-  isSelfReporting,
   STAGE_LABELS,
   type BoardStage,
   type CardState,
@@ -57,7 +56,7 @@ import {
   type CardSize,
   type CardSizes,
 } from "../layout/cardSizes";
-import type { AuthoredCardRequest, Board, BoardCard } from "../types";
+import type { AuthoredCardRequest, Board, BoardCard, BoardUndoNotice } from "../types";
 
 /** Two columns from Tailwind's `lg` up; one below it. The only width this grid branches on. */
 const TWO_COLUMN_QUERY = "(min-width: 1024px)";
@@ -71,6 +70,52 @@ const TWO_COLUMN_QUERY = "(min-width: 1024px)";
  * dashboard, which learned it the same way.
  */
 const MOVE_COOLDOWN_MS = 160;
+
+/**
+ * How long a dragged card has to rest over the middle of another before letting go piles it there.
+ *
+ * Long enough that passing over a card on the way somewhere else never does it, short enough that
+ * somebody who means it does not feel the board hesitating. The edge of a card still moves cards
+ * aside the way it always did — after {@link REORDER_DWELL_MS}, so the middle is reachable at all.
+ */
+const PILE_DWELL_MS = 350;
+
+/**
+ * How long a dragged card rests over the edge of another before the two trade places.
+ *
+ * Reordering used to be instant, which made the middle of a card unreachable: the card moved aside
+ * the moment its edge was touched. A beat is enough to tell "passing through" from "this is the
+ * place" — as long as the beat only counts while the pointer is still (see {@link STILL_PX}).
+ */
+const REORDER_DWELL_MS = 150;
+
+/**
+ * How far the pointer may drift over a card's edge and still count as resting.
+ *
+ * Reordering waits for the pointer to *stop*, not merely to stay over the edge. Timing the zone
+ * alone meant the edge band — which every drag towards a card's middle crosses first — moved the
+ * card aside on the way in whenever the crossing took longer than a beat, and the pile it was
+ * headed for slid out from under it. A hand held still jitters a few pixels; anything more is the
+ * hire still on their way.
+ */
+const STILL_PX = 8;
+
+/** Whether a point is in the middle of an element — the half of it, either way, around its centre. */
+function inMiddle(element: HTMLElement, x: number, y: number, reach = 1 / 4): boolean {
+  const rect = element.getBoundingClientRect();
+  const dx = Math.abs(x - (rect.left + rect.width / 2));
+  const dy = Math.abs(y - (rect.top + rect.height / 2));
+
+  return dx <= rect.width * reach && dy <= rect.height * reach;
+}
+
+/**
+ * How far the middle reaches once the pointer is in it — further than the way in.
+ *
+ * Without the extra room a hand resting near the middle's border flickered between middle and edge,
+ * and every flicker started the wait over, so the pile never lit.
+ */
+const MIDDLE_HOLD_REACH = 0.4;
 
 /**
  * The tilt that says "this can be moved".
@@ -91,6 +136,10 @@ const WIGGLE = { rotate: [-0.55, 0.55, -0.55] };
  * Ticking an item, following a link or pressing a control does what it says, and never also opens
  * the pile.
  */
+/** Pressing inside one of these is acting on the board, not looking away from an open pile. */
+const KEEPS_PILES_OPEN =
+  "[role='toolbar'], [role='dialog'], [role='menu'], [role='listbox'], [role='status'], [role='alert'], [data-keeps-piles-open]";
+
 const INTERACTIVE_WITHIN_CARD =
   "a, button, input, select, textarea, label, [role='button'], [role='checkbox'], [role='link']";
 
@@ -335,11 +384,31 @@ function toViewport(point: { x: number; y: number }): { x: number; y: number } {
   return { x: point.x - window.scrollX, y: point.y - window.scrollY };
 }
 
+/** What piling onto the lit card does to the dragged card's area, if anything. */
+type PileAreaMove = "into" | "out" | null;
+
 type BoardGridProps = {
   board: Board;
   onDismiss?: (cardId: string) => void;
   dismissingId?: string | null;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  /**
+   * Puts a card back to what it said before its most recent edit.
+   *
+   * The record of that edit lives on the card itself, not in a toast — a change the hire never saw
+   * is exactly what an undo exists to prevent, so the affordance cannot be something that expires
+   * with a timeout.
+   */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** The cards with an undo in flight, so their own strips can say they are working. */
+  restoringIds?: ReadonlySet<string>;
+  /** The cards being written to right now — an edit, or a tick, still on its way. */
+  savingIds?: ReadonlySet<string>;
+  /**
+   * What just happened to an undo, keyed to the card it happened on: a stale press's refusal, or
+   * the fact that a restore landed.
+   */
+  undoNotices?: ReadonlyMap<string, BoardUndoNotice>;
   /** Applies a whole new order. Absent when the board is not arrangeable. */
   onReorder?: (cardIds: string[]) => void;
   /**
@@ -372,14 +441,8 @@ type BoardGridProps = {
    * about sequence, not claim every card is open and due now.
    */
   states?: Map<string, CardState>;
-  onAssignStage?: (cardId: string, stage: BoardStage) => void;
-  /** Puts every card of an area in one stage — sequencing twelve cards in one gesture. */
-  onAssignGroupStage?: (groupId: string, cardIds: string[], stage: BoardStage) => void;
-  onToggleDone?: (cardId: string, done: boolean) => void;
-  /** Makes a card wait on one other card, or on nothing. */
-  onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
-  /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
-  onShowChain?: (cardId: string) => void;
+  /** Puts a card directly under another one in a pile, or (with null) takes it out of its pile. */
+  onStackOnto?: (cardId: string, targetId: string | null, carry?: readonly string[]) => void;
   /**
    * The stacks on this board, keyed by every member's id.
    *
@@ -448,21 +511,34 @@ type SharedProps = {
  * renders something visible rather than nothing: a card that silently disappears because the client
  * is a version behind is indistinguishable from the mentor never having placed it.
  */
+type BoardCardViewProps = SharedProps & {
+  onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring: boolean;
+  /** True while this card is being written to — an edit, or a tick, still on its way. */
+  saving: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice: BoardUndoNotice | null;
+};
+
 function BoardCardView({
   card,
   onEdit,
+  onRestorePrevious,
+  restoring,
+  saving,
+  undoNotice,
   origin,
   onCardAdded,
   ...shared
-}: SharedProps & { onEdit?: (cardId: string, request: AuthoredCardRequest) => void }) {
+}: BoardCardViewProps) {
   // Only the authored kinds take an origin — all three of them now, since a checklist minted from
   // a task is as found as a note taken from a paragraph. It is unpacked here rather than spread
   // with the rest: a live card was never found anywhere, and handing it a prop it ignores invites
   // somebody to wire one up later and wonder why nothing shows.
   const props = { card, ...shared };
   switch (card.content.kind) {
-    case "PATH_TO_FIRST_CONTRIBUTION":
-      return <PathToFirstContributionCard content={card.content} {...props} />;
     case "ARRIVAL_STEPS":
       return <ArrivalStepsCard content={card.content} {...props} />;
     case "OPEN_PULL_REQUESTS":
@@ -471,6 +547,8 @@ function BoardCardView({
       return <CurrentTaskCard content={card.content} onCardAdded={onCardAdded} {...props} />;
     case "SUGGESTED_TASKS":
       return <SuggestedTasksCard content={card.content} onCardAdded={onCardAdded} {...props} />;
+    case "TASK_POOL":
+      return <TaskPoolCard content={card.content} {...props} />;
     case "COMPETENCY_PROGRESS":
       return <CompetencyProgressCard content={card.content} {...props} />;
     case "MEMORY_RECAP":
@@ -480,11 +558,43 @@ function BoardCardView({
     case "PATH_STEP":
       return <PathStepCard content={card.content} {...props} />;
     case "NOTE":
-      return <NoteCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
+      return (
+        <NoteCard
+          content={card.content}
+          onEdit={onEdit}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          saving={saving}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     case "LINK":
-      return <LinkCard content={card.content} origin={origin} {...props} />;
+      return (
+        <LinkCard
+          content={card.content}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          saving={saving}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     case "CHECKLIST":
-      return <ChecklistCard content={card.content} onEdit={onEdit} origin={origin} {...props} />;
+      return (
+        <ChecklistCard
+          content={card.content}
+          onEdit={onEdit}
+          onRestorePrevious={onRestorePrevious}
+          restoring={restoring}
+          saving={saving}
+          undoNotice={undoNotice}
+          origin={origin}
+          {...props}
+        />
+      );
     default:
       return (
         <section className="rounded-2xl border border-dashed border-app-border p-4">
@@ -495,6 +605,10 @@ function BoardCardView({
       );
   }
 }
+
+/** Stand-ins for a board rendered without undo state — one with no writes to report. */
+const NO_IDS: ReadonlySet<string> = new Set();
+const NO_NOTICES: ReadonlyMap<string, BoardUndoNotice> = new Map();
 
 /**
  * The board's layout: cards in board order, packed into columns, rearrangeable by dragging.
@@ -526,6 +640,10 @@ export function BoardGrid({
   onDismiss,
   dismissingId = null,
   onEdit,
+  onRestorePrevious,
+  restoringIds = NO_IDS,
+  savingIds = NO_IDS,
+  undoNotices = NO_NOTICES,
   onReorder,
   boardOrder,
   isArranging = false,
@@ -540,11 +658,7 @@ export function BoardGrid({
   onDissolveGroup,
   onRecolourGroup,
   states,
-  onAssignStage,
-  onAssignGroupStage,
-  onToggleDone,
-  onSetPredecessor,
-  onShowChain,
+  onStackOnto,
   stacks,
   expandedStackIds,
   onToggleStack,
@@ -574,6 +688,37 @@ export function BoardGrid({
   const groupElements = useRef(new Map<string, HTMLElement>());
   const lastMoveAt = useRef(0);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  /**
+   * A card's way back, unless it leads into the path somewhere the path no longer has.
+   *
+   * A step rebuilt away, or a path that is gone altogether, would turn "Back to …" into a trip to a
+   * page that says the step is not there. Only decided once the path has been read: before that,
+   * "no path" means "not known yet", and hiding every way back for a second would be the board
+   * flickering.
+   */
+  const { phases: pathPhasesNow, settled: pathSettled } = useBoardPath();
+  const reachableOrigin = (cardId: string) => {
+    const origin = originOf(cardOrigins, cardId);
+    if (!origin || !pathSettled) return origin;
+
+    return leadsOntoPath(origin.url, pathPhasesNow) ? origin : null;
+  };
+  /** The card a dragged one would be piled under if let go now — see `handleDrag`. */
+  const [pileTargetId, setPileTargetId] = useState<string | null>(null);
+  const pileTargetRef = useRef<string | null>(null);
+  /** Whether piling onto the lit card moves the dragged one into or out of an area — on the label. */
+  const [pileAreaMove, setPileAreaMove] = useState<PileAreaMove>(null);
+  /**
+   * Lights the pile target once the dragged card has rested long enough, even when the pointer holds
+   * perfectly still: drag events only arrive while it moves, so counting on them alone left a hire
+   * who stopped and waited with nothing happening.
+   */
+  const pileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The card and the part of it the dragged card is resting on, and where the rest began. */
+  const restingRef = useRef<{ id: string; zone: "middle" | "edge"; x: number; y: number } | null>(
+    null,
+  );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   /**
    * A card the pile was opened *for*, to be brought into view once it is on the board.
@@ -586,25 +731,6 @@ export function BoardGrid({
 
   /** The cards on screen, in the order they are drawn. */
   const shownIds = useMemo(() => board.cards.map((card) => card.id), [board.cards]);
-
-  /**
-   * What finishing each card would free, counted once for the whole board.
-   *
-   * A question about *other* cards, like "blocked" is — so it is answered in one pass here rather
-   * than by every card asking the same question about the same forty.
-   */
-  const unblocksById = useMemo(
-    () =>
-      states
-        ? new Map(
-            board.cards.map((card) => [
-              card.id,
-              unblockedByFinishing(board.cards, states, card.id),
-            ]),
-          )
-        : null,
-    [board.cards, states],
-  );
 
   /**
    * The whole board's order, filtered cards included.
@@ -621,6 +747,30 @@ export function BoardGrid({
    */
   const ids = useMemo(() => boardOrder ?? shownIds, [boardOrder, shownIds]);
 
+  /**
+   * {@link moveTo}, but a closed pile travels whole.
+   *
+   * A closed pile is drawn as its top card, so moving that card is — to the hire — moving the pile.
+   * Moving only the one card would scatter the others through the order behind it, and the pile
+   * would open later with its cards strewn across the board.
+   */
+  const reorder = useCallback(
+    (cardId: string, targetId: string): string[] => {
+      const pile = stacks?.get(cardId);
+      if (!pile || expandedStackIds?.has(pile.rootId)) return moveTo(ids, cardId, targetId);
+
+      const members = new Set(pile.memberIds);
+      if (members.has(targetId)) return ids;
+
+      const moved = moveTo(ids, cardId, targetId).filter((id) => id === cardId || !members.has(id));
+      const at = moved.indexOf(cardId);
+      const block = pile.memberIds.filter((id) => ids.includes(id));
+
+      return [...moved.slice(0, at), ...block, ...moved.slice(at + 1)];
+    },
+    [expandedStackIds, ids, stacks],
+  );
+
   const move = onReorder
     ? (cardId: string, direction: "up" | "down") => {
         // Stepped through what is *shown*: the neighbour a hire means by "up" is the card above
@@ -631,7 +781,7 @@ export function BoardGrid({
 
         // Anchored on that neighbour rather than swapped by index, so the step means the same
         // thing whether or not there are hidden cards between the two.
-        onReorder(moveTo(ids, cardId, shownIds[to]));
+        onReorder(reorder(cardId, shownIds[to]));
       }
     : undefined;
 
@@ -665,6 +815,10 @@ export function BoardGrid({
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target instanceof Element ? event.target : null;
+      // Floating controls acting on what is in the pile — the highlighter's toolbar, the colour
+      // popover, a menu or dialog — are not looking elsewhere. Pressing "Highlight" on a sentence in
+      // an open pile used to fold the pile away under the sentence being marked.
+      if (target?.closest(KEEPS_PILES_OPEN)) return;
       const openedFrame = target?.closest("[data-stack-root]");
       const insideRoot = openedFrame?.getAttribute("data-stack-root") ?? null;
 
@@ -691,11 +845,58 @@ export function BoardGrid({
    * a pointer that is still moving — and it is the pointer's own position that counts, not the
    * card's, because that is where the hire is looking when they let go.
    */
+  const clearPileTarget = useCallback(() => {
+    if (pileTimer.current) clearTimeout(pileTimer.current);
+    pileTimer.current = null;
+    if (pileTargetRef.current) {
+      pileTargetRef.current = null;
+      setPileTargetId(null);
+    }
+  }, []);
+
+  const lightPileTarget = useCallback(
+    (draggedId: string, candidateId: string) => {
+      if (pileTargetRef.current === candidateId) return;
+      pileTargetRef.current = candidateId;
+      setPileTargetId(candidateId);
+      const from = groupOf(groups, draggedId)?.id ?? null;
+      const to = groupOf(groups, candidateId)?.id ?? null;
+      setPileAreaMove(from === to ? null : to ? "into" : "out");
+    },
+    [groups],
+  );
+
+  useEffect(() => clearPileTarget, [clearPileTarget]);
+
   const handleCardDrop = useCallback(
     (cardId: string, point: { x: number; y: number }) => {
-      if (!onAssignGroup) return;
+      const target = pileTargetRef.current;
+      clearPileTarget();
+      restingRef.current = null;
+
+      // Let go over the middle of another card: the two become a pile. See `handleDrag`. A closed
+      // pile is drawn as one card and moves as one: all of it goes onto the target. From an open
+      // pile only the card that was picked up goes.
+      if (target && target !== cardId && onStackOnto) {
+        const pile = stacks?.get(cardId);
+        if (pile && !expandedStackIds?.has(pile.rootId)) {
+          onStackOnto(pile.memberIds[0], target, pile.memberIds);
+        } else {
+          onStackOnto(cardId, target);
+        }
+        return;
+      }
 
       const { x, y } = toViewport(point);
+
+      // Dragged out of an open pile and let go anywhere outside it: it leaves the pile.
+      const pile = stacks?.get(cardId);
+      if (pile && onStackOnto && expandedStackIds?.has(pile.rootId)) {
+        const frame = document.querySelector(`[data-stack-root="${CSS.escape(pile.rootId)}"]`);
+        if (frame instanceof HTMLElement && !contains(frame, x, y)) onStackOnto(cardId, null);
+      }
+
+      if (!onAssignGroup) return;
 
       for (const [groupId, element] of groupElements.current) {
         if (contains(element, x, y)) {
@@ -707,28 +908,87 @@ export function BoardGrid({
 
       if (groupOf(groups, cardId)) onAssignGroup(cardId, null);
     },
-    [groups, onAssignGroup],
+    [clearPileTarget, expandedStackIds, groups, onAssignGroup, onStackOnto, stacks],
   );
 
+  /**
+   * What a dragged card is over, every frame, and what letting go there would do.
+   *
+   * Two things a drag can mean, told apart by *where* on the other card it rests:
+   *
+   * - **Its edge** — the two trade places, as dragging always did, after a beat
+   *   ({@link REORDER_DWELL_MS}).
+   * - **Its middle** — after a longer rest ({@link PILE_DWELL_MS}) the card underneath lights up,
+   *   and letting go puts the dragged card into a pile under it. Nothing moves aside while it is
+   *   lit, so the target stays where the pointer is.
+   *
+   * In plan mode and outside it alike: tidying two cards into one pile is something a person
+   * reading the board notices they want, and the grip is there in both.
+   */
   const handleDrag = useCallback(
-    (id: string) => {
-      const dragged = elements.current.get(id);
-      if (!dragged || !onReorder) return;
-
-      const now = performance.now();
-      if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
-
-      const { x, y } = centerOf(dragged);
+    (id: string, point: { x: number; y: number }) => {
+      // The pointer, not the dragged card's centre. The card is held by its grip in a corner, so
+      // its centre sits half a card away from where the hire is looking — and how far depends on
+      // the card's size, which is why aiming at a card's middle piled onto some cards and not
+      // others. Letting go already goes by the pointer; this now agrees with it.
+      const { x, y } = toViewport(point);
 
       for (const [candidateId, element] of elements.current) {
-        if (candidateId !== id && contains(element, x, y)) {
-          onReorder(moveTo(ids, id, candidateId));
-          lastMoveAt.current = now;
-          return;
-        }
+        if (candidateId === id || !contains(element, x, y)) continue;
+
+        const resting = restingRef.current;
+        const holding = resting?.id === candidateId && resting.zone === "middle";
+        const zone =
+          onStackOnto && inMiddle(element, x, y, holding ? MIDDLE_HOLD_REACH : undefined)
+            ? "middle"
+            : "edge";
+        // The middle only has to be *stayed in*: it is small and deliberate, and asking a hand to
+        // hold still inside it as well made piling feel broken. The edge has to be rested on, or
+        // every drag towards a middle would shuffle the cards on its way in.
+        const sameSpot =
+          resting?.id === candidateId &&
+          resting.zone === zone &&
+          (zone === "middle" || Math.hypot(x - resting.x, y - resting.y) <= STILL_PX);
+        // Still resting where it was: whatever is pending stays pending, whatever is lit stays lit.
+        if (sameSpot) return;
+
+        // Anything else starts the wait over from here.
+        const keepLit = zone === "middle" && pileTargetRef.current === candidateId;
+        if (pileTimer.current) clearTimeout(pileTimer.current);
+        pileTimer.current = null;
+        if (!keepLit) clearPileTarget();
+
+        const spot = { id: candidateId, zone, x, y } as const;
+        restingRef.current = spot;
+        if (keepLit) return;
+
+        pileTimer.current = setTimeout(
+          () => {
+            pileTimer.current = null;
+            if (restingRef.current !== spot) return;
+
+            if (zone === "middle") {
+              lightPileTarget(id, candidateId);
+              return;
+            }
+            if (!onReorder) return;
+            const now = performance.now();
+            if (now - lastMoveAt.current < MOVE_COOLDOWN_MS) return;
+
+            onReorder(reorder(id, candidateId));
+            lastMoveAt.current = now;
+            restingRef.current = null;
+          },
+          zone === "middle" ? PILE_DWELL_MS : REORDER_DWELL_MS,
+        );
+        return;
       }
+
+      // Over nothing: whatever was about to happen is off.
+      restingRef.current = null;
+      clearPileTarget();
     },
-    [ids, onReorder],
+    [clearPileTarget, lightPileTarget, onReorder, onStackOnto, reorder],
   );
 
   /**
@@ -848,19 +1108,6 @@ export function BoardGrid({
   );
 
   /**
-   * The areas that carry stages of their own: a named set of cards that is not all due at once.
-   *
-   * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
-   * this exists for — one set somebody wrote in one sitting, deliberately spread across the
-   * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
-   * "Now" around cards marked Later, and splitting it across the bands would take a thing with a
-   * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
-   * the same fold, one level in.
-   *
-   * They lead, above the bands. An area is a decision somebody made about what belongs together,
-   * and the bands are the board's own answer to when; the named thing goes first.
-   */
-  /**
    * The areas with nothing drawn in them.
    *
    * They have no box in the grid — the grid is built by walking the cards — which used to be fine,
@@ -876,6 +1123,19 @@ export function BoardGrid({
     [board.cards, groups],
   );
 
+  /**
+   * The areas that carry stages of their own: a named set of cards that is not all due at once.
+   *
+   * These are not filed into a band, they are banded *inside*. A team's blueprints are the case
+   * this exists for — one set somebody wrote in one sitting, deliberately spread across the
+   * stages. Filing it under "Now" because its earliest card is due now would put a heading saying
+   * "Now" around cards already behind the hire, and splitting it across the bands would take a thing with a
+   * name and scatter it. So it keeps its name, keeps its cards, and folds by stage within itself —
+   * the same fold, one level in.
+   *
+   * They lead, above the bands. An area is a decision somebody made about what belongs together,
+   * and the bands are the board's own answer to when; the named thing goes first.
+   */
   const spanningGroups = useMemo<Block[]>(() => {
     if (!banding) return [];
 
@@ -1021,6 +1281,8 @@ export function BoardGrid({
         total={ids.length}
         isArranging={isArranging}
         isDragging={draggingId === card.id}
+        isPileTarget={pileTargetId === card.id}
+        pileAreaMove={pileAreaMove}
         isWiggling={isArranging && !reduceMotion && hoveredId !== card.id && draggingId !== card.id}
         collapsed={collapsedIds?.has(card.id) ?? false}
         pinned={pinnedIds?.has(card.id) ?? false}
@@ -1028,24 +1290,24 @@ export function BoardGrid({
         onTogglePinned={onTogglePinned}
         allCards={board.cards}
         state={states?.get(card.id)}
-        onAssignStage={isArranging ? onAssignStage : undefined}
-        onToggleDone={onToggleDone}
-        onSetPredecessor={isArranging ? onSetPredecessor : undefined}
-        // Unlike the pickers, this is not an arranging tool: the question it answers — why is this
-        // card closed — is asked hardest by somebody who is trying to work, not to rearrange.
-        onShowChain={onShowChain}
-        unblocks={unblocksById?.get(card.id)}
+        // Piling is rearranging, so it is offered where the rest of rearranging is: in plan mode.
+        onStackOnto={isArranging ? onStackOnto : undefined}
         onDrop={handleCardDrop}
         onMove={move}
         onDismiss={onDismiss}
         dismissing={dismissingId === card.id}
         onEdit={onEdit}
+        onRestorePrevious={onRestorePrevious}
+        restoring={restoringIds.has(card.id)}
+        saving={savingIds.has(card.id)}
+        undoNotice={undoNotices.get(card.id) ?? null}
         registerElement={registerElement}
         onDragStart={() => {
           lastMoveAt.current = 0;
+          restingRef.current = null;
           setDraggingId(card.id);
         }}
-        onDrag={() => handleDrag(card.id)}
+        onDrag={(point) => handleDrag(card.id, point)}
         onDragEnd={() => setDraggingId(null)}
         onHoverChange={(hovered) =>
           setHoveredId((current) => (hovered ? card.id : current === card.id ? null : current))
@@ -1056,20 +1318,13 @@ export function BoardGrid({
           stack && onToggleStack ? (memberId) => revealMember(stack.rootId, memberId) : undefined
         }
         size={sizeOf(cardSizes, card.id)}
-        origin={originOf(cardOrigins, card.id)}
+        origin={reachableOrigin(card.id)}
         onCardAdded={onCardAdded}
         onResize={onResizeCard ? (next) => onResizeCard(card.id, next) : undefined}
       />
     );
   };
 
-  /**
-   * One block: a card, or an area with its cards stacked inside it.
-   *
-   * `wide` is only true for a block that broke the run — an area holding a diagram. It packs that
-   * area's members into columns of their own, because the reason it took the full width was that
-   * something in it needed the room, not that the area did.
-   */
   /** One item inside a column or an area: a card, or a sequence somebody has spread out. */
   const renderItem = (item: Item) => {
     if (item.kind === "card") return renderCard(item.card);
@@ -1109,6 +1364,13 @@ export function BoardGrid({
     </div>
   );
 
+  /**
+   * One block: a card, or an area with its cards inside it.
+   *
+   * An area whose cards span several stages (see `spanningGroups`) is folded by stage inside
+   * itself. Any other area lays its items out in a grid of its own, `span` columns wide, so cards
+   * in an area can sit next to each other.
+   */
   const renderBlock = (block: Block, blockIndex: number, span: number) => {
     if (block.kind !== "group") return renderItem(block);
 
@@ -1116,7 +1378,6 @@ export function BoardGrid({
       return (
         <BoardGroupSection
           group={block.group}
-          isArranging={isArranging}
           canMove={onReorder !== undefined}
           onMoveStep={(direction) => moveBlock(blockIndex, direction)}
           onDragMove={(element) => handleGroupDrag(blockIndex, element)}
@@ -1141,7 +1402,6 @@ export function BoardGrid({
     return (
       <BoardGroupSection
         group={block.group}
-        isArranging={isArranging}
         canMove={onReorder !== undefined}
         onMoveStep={(direction) => moveBlock(blockIndex, direction)}
         onDragMove={(element) => handleGroupDrag(blockIndex, element)}
@@ -1150,16 +1410,6 @@ export function BoardGrid({
         onDissolve={onDissolveGroup}
         onRecolour={onRecolourGroup}
         stage={states?.get(block.cards[0]?.id ?? "")?.stage}
-        onAssignStage={
-          onAssignGroupStage
-            ? (stage) =>
-                onAssignGroupStage(
-                  block.group.id,
-                  block.cards.map((card) => card.id),
-                  stage,
-                )
-            : undefined
-        }
         registerElement={registerGroupElement}
       >
         {inner}
@@ -1366,21 +1616,19 @@ type BoardCardCellProps = {
   total: number;
   isArranging: boolean;
   isDragging: boolean;
+  /** A dragged card is resting on this one, and letting go would pile it here. */
+  isPileTarget?: boolean;
+  /** Whether piling onto this card moves the dragged one into this card's area, or out of its own. */
+  pileAreaMove?: PileAreaMove;
   isWiggling: boolean;
   collapsed: boolean;
   pinned: boolean;
   onToggleCollapsed?: (cardId: string) => void;
   onTogglePinned?: (cardId: string) => void;
-  /** Every card on the board, so this one can offer them as things to wait on. */
+  /** Every card on the board, so this one can offer them as cards to lie under. */
   allCards: BoardCard[];
   state?: CardState;
-  onAssignStage?: (cardId: string, stage: BoardStage) => void;
-  onToggleDone?: (cardId: string, done: boolean) => void;
-  onSetPredecessor?: (cardId: string, blockerId: string | null) => void;
-  /** Opens the picture of a card's run. Absent on a board with no structure to draw. */
-  onShowChain?: (cardId: string) => void;
-  /** How many cards this one alone is holding up, already counted by the grid. */
-  unblocks?: number;
+  onStackOnto?: (cardId: string, targetId: string | null) => void;
   /**
    * Set only on the top card of a *closed* pile — the one standing in for the others.
    *
@@ -1403,9 +1651,17 @@ type BoardCardCellProps = {
   onDismiss?: (cardId: string) => void;
   dismissing: boolean;
   onEdit?: (cardId: string, request: AuthoredCardRequest) => void;
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring: boolean;
+  /** True while this card is being written to — an edit, or a tick, still on its way. */
+  saving: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice: BoardUndoNotice | null;
   registerElement: (id: string, element: HTMLDivElement | null) => void;
   onDragStart: () => void;
-  onDrag: () => void;
+  /** Every frame of a drag, with where the pointer is (page coordinates). */
+  onDrag: (point: { x: number; y: number }) => void;
   onDragEnd: () => void;
   onHoverChange: (hovered: boolean) => void;
 };
@@ -1433,6 +1689,8 @@ function BoardCardCell({
   total,
   isArranging,
   isDragging,
+  isPileTarget = false,
+  pileAreaMove = null,
   isWiggling,
   collapsed,
   pinned,
@@ -1440,11 +1698,7 @@ function BoardCardCell({
   onTogglePinned,
   allCards,
   state,
-  onAssignStage,
-  onToggleDone,
-  onSetPredecessor,
-  onShowChain,
-  unblocks,
+  onStackOnto,
   stack,
   origin,
   onCardAdded,
@@ -1457,6 +1711,10 @@ function BoardCardCell({
   onDismiss,
   dismissing,
   onEdit,
+  onRestorePrevious,
+  restoring,
+  saving,
+  undoNotice,
   registerElement,
   onDragStart,
   onDrag,
@@ -1468,32 +1726,9 @@ function BoardCardCell({
   const label =
     card.content.kind === "NOTE" ? "note" : card.content.kind.toLowerCase().replace(/_/g, " ");
 
-  /**
-   * The card this one waits on, for the picker to show.
-   *
-   * `blockedBy` only lists predecessors that are *not yet done*, which is right for the badge and
-   * wrong for the control: a hire who finished the predecessor should still see which card they
-   * put in front of this one, or the picker would silently forget the sequence they arranged.
-   */
+  /** The card this one lies directly under, if it is in a pile — see `restack`. */
   const predecessorId = state?.predecessorId ?? null;
-  const predecessorName = predecessorId
-    ? (allCards.find((other) => other.id === predecessorId) ?? null)
-    : null;
 
-  /**
-   * Opens the pile when the card itself is clicked.
-   *
-   * The chip in the header is still the real control — it is what a keyboard reaches, what a screen
-   * reader announces, and what carries `aria-expanded`. This is the pointer shortcut beside it:
-   * the card *looks* like a pile, so clicking the pile should open it, and hunting for a chip to do
-   * something the whole card is depicting is the kind of small friction nobody reports and
-   * everybody feels.
-   *
-   * Three things it stays out of the way of: anything that already does something when clicked
-   * (see {@link INTERACTIVE_WITHIN_CARD}), the click that ends a drag while the board is being
-   * arranged, and the click that ends a text selection — releasing after selecting a line is not a
-   * request to rearrange the page under it.
-   */
   /**
    * Folds a card, or opens a folded one, on a double click anywhere on it.
    *
@@ -1527,6 +1762,9 @@ function BoardCardCell({
     onToggleCollapsed(card.id);
   }
 
+  /** Where a resize drag started, and from which size. Null when nothing is being dragged. */
+  const resizeStart = useRef<{ x: number; y: number; size: CardSize } | null>(null);
+
   /**
    * The cards behind this one, nearest first — the ones the fanned sheets name.
    *
@@ -1534,9 +1772,6 @@ function BoardCardCell({
    * run. Two at most, because there are two sheets: a third strip would be a card the eye has to
    * work to read on a pile that is already asking for a click.
    */
-  /** Where a resize drag started, and from which size. Null when nothing is being dragged. */
-  const resizeStart = useRef<{ x: number; y: number; size: CardSize } | null>(null);
-
   const behind = useMemo(() => {
     if (!stack) return [];
 
@@ -1562,6 +1797,20 @@ function BoardCardCell({
       });
   }, [stack]);
 
+  /**
+   * Opens the pile when the card itself is clicked.
+   *
+   * The chip in the header is still the real control — it is what a keyboard reaches, what a screen
+   * reader announces, and what carries `aria-expanded`. This is the pointer shortcut beside it:
+   * the card *looks* like a pile, so clicking the pile should open it, and hunting for a chip to do
+   * something the whole card is depicting is the kind of small friction nobody reports and
+   * everybody feels.
+   *
+   * Three things it stays out of the way of: anything that already does something when clicked
+   * (see {@link INTERACTIVE_WITHIN_CARD}), the click that ends a drag while the board is being
+   * arranged, and the click that ends a text selection — releasing after selecting a line is not a
+   * request to rearrange the page under it.
+   */
   function handleStackClick(event: ReactMouseEvent<HTMLDivElement>) {
     if (!stack || isArranging || !onToggleStack) return;
     // The second click of a double click, which would otherwise open the pile and shut it again.
@@ -1578,68 +1827,26 @@ function BoardCardCell({
       pinned,
       accent: cardAccent(card.content.kind),
       state,
-      // Only for the kinds nothing can observe. A checklist reports its own progress, and a
-      // hand-set "done" beside three outstanding items is the board contradicting itself.
-      onToggleDone:
-        onToggleDone && !isSelfReporting(card)
-          ? () => onToggleDone(card.id, state?.status !== "DONE")
-          : undefined,
-      stagePicker: onAssignStage ? (
+      // The pile this card lies in. Only while the board is being planned — see where it is passed.
+      pilePicker: onStackOnto ? (
         <Select
           size="sm"
-          value={state?.stage ?? "NOW"}
-          aria-label={`When the ${label} card is due`}
-          className="max-w-32"
-          onChange={(event) => onAssignStage(card.id, event.target.value as BoardStage)}
-        >
-          {BOARD_STAGES.map((stage) => (
-            <option key={stage} value={stage}>
-              {STAGE_LABELS[stage].title}
-            </option>
-          ))}
-        </Select>
-      ) : undefined,
-      dependencyPicker: !onSetPredecessor ? undefined : state?.predecessorSource === "TEAM" ? (
-        // A rule the team wrote, shown rather than offered. The alternative was a select that
-        // silently refused what it let somebody choose — an affordance that lies is worse than a
-        // sentence that explains, and the sentence also answers the question the select could not:
-        // why this card is behind that one when the hire never put it there.
-        <span
-          className="flex max-w-40 items-center gap-1 text-xs text-app-text-muted"
-          title={teamLockSaid(predecessorName ? cardName(predecessorName) : null)}
-        >
-          <Lock className="h-3 w-3 shrink-0" aria-hidden="true" />
-          <span className="min-w-0 truncate">
-            {lockedAfter(predecessorName ? cardName(predecessorName) : "another card")}
-          </span>
-        </span>
-      ) : (
-        <Select
-          size="sm"
-          value={state?.blockedBy[0]?.id ?? predecessorId ?? ""}
-          aria-label={`What the ${label} card waits on`}
+          value={predecessorId ?? ""}
+          aria-label={`Put the ${label} card in a pile`}
+          title="Put this card under another one, so the two lie in one pile. It moves into the other card’s area, or out of its own when the other card has none."
           className="max-w-40"
-          // A buddy's link is the hire's to change — it is a suggestion, not a rule — but it should
-          // not look like something they set themselves and forgot.
-          title={
-            state?.predecessorSource === "BUDDY" && predecessorName
-              ? buddyLockSaid(cardName(predecessorName))
-              : undefined
-          }
-          onChange={(event) => onSetPredecessor(card.id, event.target.value || null)}
+          onChange={(event) => onStackOnto(card.id, event.target.value || null)}
         >
-          <option value="">Waits on nothing</option>
+          <option value="">Not in a pile</option>
           {allCards
             .filter((other) => other.id !== card.id)
             .map((other) => (
               <option key={other.id} value={other.id}>
-                {lockedAfter(cardName(other))}
+                Under “{cardName(other)}”
               </option>
             ))}
         </Select>
-      ),
-      onShowChain: onShowChain ? () => onShowChain(card.id) : undefined,
-      unblocks,
+      ) : undefined,
       stack:
         stack && onToggleStack
           ? {
@@ -1679,7 +1886,7 @@ function BoardCardCell({
             }}
             title="Drag sideways to make this card narrower or wider, or use the arrow keys"
             aria-label={`Resize the ${label} card — drag sideways, or use the arrow keys`}
-            className="absolute right-1 bottom-1 z-20 hidden h-5 w-5 cursor-ew-resize items-center justify-center rounded text-app-text-subtle opacity-0 transition-opacity duration-150 group-hover/stack:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none lg:flex"
+            className="absolute right-1 bottom-1 z-20 hidden h-6 w-6 cursor-ew-resize items-center justify-center rounded text-app-text-subtle opacity-0 transition-opacity duration-150 group-hover/stack:opacity-100 focus-visible:opacity-100 lg:flex"
           >
             <span
               aria-hidden="true"
@@ -1718,17 +1925,12 @@ function BoardCardCell({
       dragControls,
       index,
       label,
-      onAssignStage,
       onMove,
-      onSetPredecessor,
-      onShowChain,
-      unblocks,
+      onStackOnto,
       onToggleStack,
-      predecessorName,
       isArranging,
       onResize,
       onToggleCollapsed,
-      onToggleDone,
       onTogglePinned,
       size,
       pinned,
@@ -1781,7 +1983,7 @@ function BoardCardCell({
         dragElastic={0}
         dragMomentum={false}
         onDragStart={onDragStart}
-        onDrag={onDrag}
+        onDrag={(_event, info) => onDrag(info.point)}
         onDragEnd={(_event, info) => {
           onDrop(card.id, info.point);
           onDragEnd();
@@ -1792,11 +1994,22 @@ function BoardCardCell({
         onPointerLeave={() => onHoverChange(false)}
         className={`relative ${stack ? "cursor-pointer" : ""} ${
           isDragging ? "z-40 cursor-grabbing" : ""
-        }`}
+        } ${isPileTarget ? "rounded-2xl ring-2 ring-app-brand ring-offset-2 ring-offset-app-bg" : ""}`}
         // The floor for a tall card lives on the grid block that measures it, not here — see
         // `GridBlock`. Two floors would be one too many, and this one is inside the measurement.
         style={isArranging ? { touchAction: "none" } : undefined}
       >
+        {/* Says what letting go will do, on the card it will do it to. */}
+        {isPileTarget && (
+          <span className="pointer-events-none absolute -top-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-app-brand px-2 py-0.5 text-xs font-medium whitespace-nowrap text-white shadow-sm">
+            {pileAreaMove === "into"
+              ? "Drop to pile here, in this area"
+              : pileAreaMove === "out"
+                ? "Drop to pile here, out of its area"
+                : "Drop to pile here"}
+          </span>
+        )}
+
         {/* Deepest first, so the nearer sheet paints over it and the two strips stack rather than
           overlap. Only what is still to do is drawn: three of five ticked off leaves one card
           behind this one, and drawing two would be the board overstating what is left.
@@ -1849,6 +2062,10 @@ function BoardCardCell({
               onDismiss={onDismiss}
               dismissing={dismissing}
               onEdit={onEdit}
+              onRestorePrevious={onRestorePrevious}
+              restoring={restoring}
+              saving={saving}
+              undoNotice={undoNotice}
               origin={origin}
               onCardAdded={onCardAdded}
             />
@@ -1861,7 +2078,6 @@ function BoardCardCell({
 
 type BoardGroupSectionProps = {
   group: BoardGroup;
-  isArranging: boolean;
   canMove: boolean;
   onMoveStep: (direction: "up" | "down") => void;
   onDragMove: (element: HTMLElement) => void;
@@ -1872,8 +2088,6 @@ type BoardGroupSectionProps = {
   onRecolour?: (groupId: string, accent: AreaAccent) => void;
   /** The earliest stage among the area's cards, shown as the area's own. */
   stage?: BoardStage;
-  /** Puts every card of this area in one stage. Absent when the board has no process layer. */
-  onAssignStage?: (stage: BoardStage) => void;
   registerElement: (groupId: string, element: HTMLElement | null) => void;
   children: ReactNode;
 };
@@ -1892,7 +2106,6 @@ type BoardGroupSectionProps = {
  */
 function BoardGroupSection({
   group,
-  isArranging,
   canMove,
   onMoveStep,
   onDragMove,
@@ -1901,7 +2114,6 @@ function BoardGroupSection({
   onDissolve,
   onRecolour,
   stage,
-  onAssignStage,
   registerElement,
   children,
 }: BoardGroupSectionProps) {
@@ -2031,7 +2243,7 @@ function BoardGroupSection({
                   type="button"
                   onClick={() => setDraft(group.name)}
                   title="Rename this area"
-                  className="max-w-full truncate rounded-sm hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                  className="max-w-full truncate rounded-sm hover:underline"
                 >
                   {group.name}
                 </button>
@@ -2045,30 +2257,14 @@ function BoardGroupSection({
             {group.cardIds.length}
           </span>
 
-          {/* An area is where sequencing is worth doing: a PM who has grouped twelve setup cards
-              wants them all due now, and setting that twelve times is how a good idea becomes a
-              chore nobody repeats. Outside arrange mode the stage is a fact, so it reads as a
-              badge rather than as a control offering to change something. */}
-          {stage &&
-            (onAssignStage && isArranging ? (
-              <Select
-                size="sm"
-                value={stage}
-                aria-label={`When the ${group.name} area is due`}
-                className="max-w-32"
-                onChange={(event) => onAssignStage(event.target.value as BoardStage)}
-              >
-                {BOARD_STAGES.map((option) => (
-                  <option key={option} value={option}>
-                    {STAGE_LABELS[option].title}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              <Badge variant={stage === "NOW" ? "brand" : "neutral"} size="sm">
-                {STAGE_LABELS[stage].title}
-              </Badge>
-            ))}
+          {/* Said only of an area whose cards are all from finished phases: "Now" on every other
+              area would be the board labelling itself. The stage comes from the path, so it is a
+              fact here and never a control. */}
+          {stage === "BEHIND" && (
+            <Badge variant="neutral" size="sm">
+              {STAGE_LABELS[stage].title}
+            </Badge>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
@@ -2085,14 +2281,19 @@ function BoardGroupSection({
                   aria-pressed={(group.accent ?? "blue") === option}
                   title={`Paint the ${group.name} area ${areaAccent(option).label.toLowerCase()}`}
                   aria-label={`Paint the ${group.name} area ${areaAccent(option).label.toLowerCase()}`}
-                  className={`h-3.5 w-3.5 rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none ${
-                    areaAccent(option).swatch
-                  } ${
-                    (group.accent ?? "blue") === option
-                      ? "ring-2 ring-app-text/40 ring-offset-1 ring-offset-app-surface"
-                      : "hover:scale-125"
-                  }`}
-                />
+                  className="group/accent flex h-6 w-6 items-center justify-center rounded-full"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-3.5 w-3.5 rounded-full transition-transform ${
+                      areaAccent(option).swatch
+                    } ${
+                      (group.accent ?? "blue") === option
+                        ? "ring-2 ring-app-text/40 ring-offset-1 ring-offset-app-surface"
+                        : "group-hover/accent:scale-125"
+                    }`}
+                  />
+                </button>
               ))}
             </span>
           )}

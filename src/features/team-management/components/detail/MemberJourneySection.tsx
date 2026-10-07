@@ -8,7 +8,16 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { Button } from "../../../../components/ui/Button";
 import { SegmentedTabs } from "../../../../components/ui/SegmentedTabs";
 import { SlidingTabPanel } from "../../../../components/ui/SlidingTabPanel";
@@ -16,7 +25,6 @@ import { useSwipeableTabs } from "../../../../hooks/useHorizontalWheelNavigation
 import { useToast } from "../../../../context/useToast";
 import { onboardingGraphService } from "../../../../services/onboardingGraphService";
 import { useAuth } from "../../../../context/useAuth";
-import { isSkipPending } from "../../../onboarding/journey";
 import { computeRanks } from "../../../onboarding/graph/layout";
 import {
   memberJourneyViewKey,
@@ -37,7 +45,6 @@ import {
   formatMinutes,
   itemState,
   orderedPhaseItems,
-  pathProgress,
   skipRequestOf,
   phaseItems,
   phaseProgress,
@@ -55,11 +62,21 @@ import { SkipReview, type SkipReviewAction } from "./SkipReview";
 import { StepQuickEdit } from "./StepQuickEdit";
 
 type ViewMode = "list" | "graph";
-const VIEW_ORDER: readonly ViewMode[] = ["list", "graph"];
+const VIEW_ORDER: readonly ViewMode[] = ["graph", "list"];
 
 type StepTaskCount = { total: number; done: number };
 
+/** What the rest of the profile can ask of the path section. */
+export type MemberJourneyHandle = {
+  /**
+   * Scrolls the path into view, showing `phaseId` in whichever view is open: selected in the
+   * list, opened in the graph. Without a phase it only scrolls.
+   */
+  showPhase: (phaseId?: string) => void;
+};
+
 type Props = {
+  ref?: Ref<MemberJourneyHandle>;
   userId: string;
   memberName: string;
   path: OnboardingPathEndpoint | null;
@@ -100,6 +117,7 @@ function actualMinutesOf(item: PhaseItem): number | null {
  * blueprint is untouched.
  */
 export function MemberJourneySection({
+  ref,
   userId,
   memberName,
   path,
@@ -157,6 +175,24 @@ export function MemberJourneySection({
     onChange: setViewMode,
     enabled: phases.length > 0,
   });
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      showPhase: (phaseId) => {
+        if (phaseId) {
+          setSelectedPhaseId(phaseId);
+          setSelectedItemId(null);
+          if (viewMode === "graph") setGraphPhaseId(phaseId);
+        }
+        document
+          .getElementById("member-journey-title")
+          ?.closest("section")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    }),
+    [viewMode],
+  );
 
   const phase =
     phases.find((candidate) => candidate.id === selectedPhaseId) ??
@@ -336,14 +372,6 @@ export function MemberJourneySection({
     [onPathChanged, userId],
   );
 
-  const overall = path ? pathProgress(path) : null;
-  const allSteps = phases.flatMap((candidate) => candidate.steps);
-  const skipped = allSteps.filter((step) => step.status === "SKIPPED").length;
-  // `accepted` is null while the PM has not answered yet.
-  const pendingSkips = allSteps.filter(
-    (step) => isSkipPending(step.skip) && step.status !== "SKIPPED",
-  ).length;
-
   const questionTools = (target: OnboardingPhaseEndpoint) => (
     <>
       <Button
@@ -364,8 +392,10 @@ export function MemberJourneySection({
     <section
       ref={swipeRef}
       aria-labelledby="member-journey-title"
-      className="space-y-5 rounded-3xl border border-app-border bg-app-surface/60 p-4 shadow-sm sm:p-6"
+      className="scroll-mt-6 space-y-5 rounded-3xl border border-app-border bg-app-surface/60 p-4 shadow-sm sm:p-6"
     >
+      {/* The path's figures (items, phases, skips) are the profile's summary card's job now
+          (`MemberSummary`), right above this section; repeating them here was the clutter. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 id="member-journey-title" className="text-xl font-semibold text-app-text">
@@ -376,18 +406,6 @@ export function MemberJourneySection({
             graph.
           </p>
         </div>
-        {overall ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Metric label="Items done" value={`${overall.completed}/${overall.total}`} />
-            <Metric label="Phases" value={`${overall.phasesDone}/${phases.length}`} />
-            <Metric label="Steps finished" value={String(overall.stepsDone)} />
-            <Metric
-              label={pendingSkips > 0 ? "Skip requests" : "Skipped"}
-              value={String(pendingSkips > 0 ? pendingSkips : skipped)}
-              warning={pendingSkips > 0}
-            />
-          </div>
-        ) : null}
       </div>
 
       {!path || phases.length === 0 || !phase ? (
@@ -406,8 +424,8 @@ export function MemberJourneySection({
               setSelectedItemId(null);
             }}
             options={[
-              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
               { value: "graph", label: "Graph", icon: <GitBranch className="h-4 w-4" /> },
+              { value: "list", label: "List", icon: <ListChecks className="h-4 w-4" /> },
             ]}
           />
 
@@ -571,31 +589,6 @@ export function MemberJourneySection({
   );
 }
 
-function Metric({
-  label,
-  value,
-  warning = false,
-}: {
-  label: string;
-  value: string;
-  warning?: boolean;
-}) {
-  return (
-    <div
-      className={`min-w-24 rounded-2xl border px-3 py-2 ${
-        warning ? "border-app-warning-border bg-app-warning-bg" : "border-app-border bg-app-surface"
-      }`}
-    >
-      <p className="text-[11px] text-app-text-muted">{label}</p>
-      <p
-        className={`mt-0.5 text-sm font-semibold tabular-nums ${warning ? "text-app-warning-text" : "text-app-text"}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function PhaseHeader({
   phase,
   phases,
@@ -660,7 +653,7 @@ function StepFacts({ item, taskCount }: { item: PhaseItem; taskCount?: StepTaskC
   const delta = actual && item.step.estimatedMinutes ? actual - item.step.estimatedMinutes : null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <StepOriginBadge step={item.step} />
+      <StepOriginBadge step={item.step} viewer="reviewer" />
       {taskCount ? (
         <span className="rounded-full bg-app-surface-muted px-2 py-0.5 text-app-text-muted">
           {taskCount.done}/{taskCount.total} tasks
@@ -745,8 +738,8 @@ function MemberItemList({
           aria-label={`Stage ${stageIndex + 1}`}
           className="relative pl-5 before:absolute before:top-7 before:bottom-2 before:left-[7px] before:w-px before:bg-app-border"
         >
-          <h4 className="relative mb-1.5 -ml-5 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
-            <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-app-border bg-app-surface text-[9px] tabular-nums">
+          <h4 className="relative mb-1.5 -ml-5 flex items-center gap-2 text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
+            <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-app-border bg-app-surface text-2xs tabular-nums">
               {stageIndex + 1}
             </span>
             {stageIndex === 0 ? "First" : "Then"}
@@ -822,15 +815,11 @@ function MemberItemRow({
           <ItemGlyph item={item} state={state} />
         </span>
         <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={onOpen}
-            className="w-full rounded-lg text-left focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-          >
+          <button type="button" onClick={onOpen} className="w-full rounded-lg text-left">
             <span className="flex flex-wrap items-center gap-2">
               {isNext ? (
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase ${
+                  className={`rounded-full px-2 py-0.5 text-2xs font-bold tracking-wide text-white uppercase ${
                     isQuestion ? "bg-app-question-solid" : "bg-app-brand"
                   }`}
                 >
@@ -898,14 +887,14 @@ function MemberItemRow({
       <div className="group/insert relative flex h-5 items-center justify-center">
         <span
           aria-hidden="true"
-          className="absolute inset-x-10 top-1/2 border-t border-dashed border-app-border opacity-0 transition-opacity group-hover/insert:opacity-100"
+          className="absolute inset-x-10 top-1/2 border-t border-dashed border-app-border opacity-0 transition-opacity group-focus-within/insert:opacity-100 group-hover/insert:opacity-100"
         />
         <button
           type="button"
           onClick={onAddAfter}
           aria-label={`Add a step after ${item.title}`}
           title={`Add a step after ${item.title}`}
-          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-1.5 py-0.5 text-[11px] font-semibold text-app-brand-text shadow-sm transition-all hover:bg-app-brand-soft hover:px-2.5 focus-visible:px-2.5"
+          className="relative z-10 inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-surface px-1.5 py-0.5 text-xs font-semibold text-app-brand-text shadow-sm transition-all hover:bg-app-brand-soft hover:px-2.5 focus-visible:px-2.5"
         >
           <Plus className="h-3 w-3" aria-hidden="true" />
           <span className="hidden group-focus-within/insert:inline group-hover/insert:inline">

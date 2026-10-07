@@ -1,12 +1,12 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { canAccessRoute, getDefaultRoute, type AppRoute } from "../auth/accessPolicy";
-import { AssistantShell } from "../components/layout/AssistantShell";
 import { PageShellSkeleton } from "../components/layout/PageShell";
 import { PageTransition } from "../components/layout/PageTransition";
 import { AuthGuard } from "./AuthGuard";
+import { RouteErrorBoundary } from "./RouteErrorBoundary";
 // Not lazy, unlike every other route below: `AuthGuard`'s Keycloak redirect chain (logout,
 // the silent SSO check on boot) can land here through several full page reloads in a row,
 // each needing this chunk again. `PageShellSkeleton` -- the shared `Suspense` fallback -- has
@@ -14,9 +14,6 @@ import { AuthGuard } from "./AuthGuard";
 // right before this replaces it. Bundling it eagerly removes the wait Suspense would show.
 import { LoginPage } from "../pages/LoginPage";
 
-const ChatPage = lazy(() =>
-  import("../pages/ChatPage").then((module) => ({ default: module.ChatPage })),
-);
 const DashboardPage = lazy(() =>
   import("../pages/DashboardPage.tsx").then((module) => ({ default: module.DashboardPage })),
 );
@@ -46,19 +43,9 @@ const BlueprintPathDetailPage = lazy(() =>
 const SkillWizardPage = lazy(() =>
   import("../pages/SkillWizardPage").then((module) => ({ default: module.SkillWizardPage })),
 );
-const TeamManagementPage = lazy(() =>
-  import("../pages/TeamManagementPage.tsx").then((module) => ({
-    default: module.TeamManagementPage,
-  })),
-);
-const TeamMemberDetailPage = lazy(() =>
-  import("../pages/TeamMemberDetailPage.tsx").then((module) => ({
-    default: module.TeamMemberDetailPage,
-  })),
-);
-const PmDashboardPage = lazy(() =>
-  import("../pages/PmDashboardPage.tsx").then((module) => ({
-    default: module.PmDashboardPage,
+const PmWorkspace = lazy(() =>
+  import("../features/pm-area/PmWorkspace.tsx").then((module) => ({
+    default: module.PmWorkspace,
   })),
 );
 const AdminPage = lazy(() =>
@@ -66,36 +53,6 @@ const AdminPage = lazy(() =>
 );
 const SettingsPage = lazy(() =>
   import("../pages/SettingsPage.tsx").then((module) => ({ default: module.SettingsPage })),
-);
-const FaqPage = lazy(() =>
-  import("../features/faq/components/FaqPage.tsx").then((module) => ({
-    default: module.FaqPage,
-  })),
-);
-const FaqDetailPage = lazy(() =>
-  import("../features/faq/components/FaqDetailPage.tsx").then((module) => ({
-    default: module.FaqDetailPage,
-  })),
-);
-const KnowledgeGapsPage = lazy(() =>
-  import("../features/knowledge-gaps/components/KnowledgeGapsPage.tsx").then((module) => ({
-    default: module.KnowledgeGapsPage,
-  })),
-);
-const KnowledgeGapsDetailPage = lazy(() =>
-  import("../features/knowledge-gaps/components/KnowledgeGapsDetailPage.tsx").then((module) => ({
-    default: module.KnowledgeGapsDetailPage,
-  })),
-);
-const KnowledgeRequestInboxPage = lazy(() =>
-  import("../features/knowledge-request/components/KnowledgeRequestInboxPage.tsx").then(
-    (module) => ({ default: module.KnowledgeRequestInboxPage }),
-  ),
-);
-const OnboardingMetricsPage = lazy(() =>
-  import("../features/onboarding-metrics/components/OnboardingMetricsPage.tsx").then((module) => ({
-    default: module.OnboardingMetricsPage,
-  })),
 );
 const BuddyPage = lazy(() =>
   import("../pages/BuddyPage").then((module) => ({ default: module.BuddyPage })),
@@ -133,116 +90,141 @@ function ManagerAreaGuard({ route, children }: { route: AppRoute; children: Reac
   return <>{children}</>;
 }
 
+/**
+ * `/chat/:id` → the conversation it names.
+ *
+ * The retired chat's ids live on as the ids of the conversations the backfill migrated: it
+ * copied `chat.id` onto the buddy session it created, so an old "Keep this chat" card's link
+ * still names a conversation that exists, and this opens it. Where no such conversation is
+ * there to open — an environment the backfill never reached, a binned conversation —
+ * `BuddyPage`'s own reconciler falls back to the bare page, because a stale link is not a
+ * failed read.
+ */
+function ChatRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/buddy/${id}` : "/buddy"} replace />;
+}
+
+/**
+ * Every route of the app, inside one `AuthGuard`, one `RouteErrorBoundary` and one shared
+ * `Suspense` fallback. The boundary is reset by pathname: a page that failed to load or render
+ * keeps the shell (the sidebar included) and can be left by navigating — the next route gets a
+ * clean attempt. A state reset, not a remount: the tree below stays mounted, as the grouped
+ * transition keys (`PageTransition`) intend for buddy conversations and the PM workspace.
+ *
+ * Pages are lazy-loaded except `LoginPage` (see the comment on its import). One layout
+ * route groups pages that share a header: `PmWorkspace` for the PM area. Routes a user
+ * without access must not reach by URL are wrapped in `ManagerAreaGuard`; the others rely
+ * on the sidebar not offering them. Which groups may open which route is defined in
+ * `src/auth/accessPolicy.ts`.
+ */
 export function AppRouter() {
+  const { pathname } = useLocation();
+
   return (
     <AuthGuard>
       <PageTransition>
-        <Suspense fallback={<PageShellSkeleton />}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/skill-wizard" element={<SkillWizardPage />} />
-            <Route path="/" element={<DashboardPage />} />
-            {/* One layout route for both halves of the assistant, so the shared header survives
-              the crossing and the panel underneath can slide instead of cut. Their URLs are
-              unchanged — `/buddy` is still `/buddy`; only who draws the header moved. */}
-            <Route element={<AssistantShell />}>
-              <Route path="/chat" element={<ChatPage />} />
-              <Route path="/chat/:id" element={<ChatPage />} />
+        <RouteErrorBoundary resetKey={pathname}>
+          <Suspense fallback={<PageShellSkeleton />}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/skill-wizard" element={<SkillWizardPage />} />
+              <Route path="/" element={<DashboardPage />} />
+              {/* The one conversation surface, and the address the dock's expand hands over —
+              `/buddy/:id` is one conversation, named by id and read by the page itself. */}
               <Route path="/buddy" element={<BuddyPage />} />
-            </Route>
-            <Route path="/onboarding" element={<OnBoardingPage />} />
-            {/* Guarded for the same reason as `/hire-setup` below: the policy calls authoring
+              <Route path="/buddy/:id" element={<BuddyPage />} />
+              {/* The retired chat. Both of its addresses land on the buddy rather than a 404, and
+              `/chat/:id` keeps its id — the backfill that ran before the chat tables were
+              dropped copied each chat's id onto the session it created (see `ChatRedirect`),
+              so an old "Keep this chat" card still names a conversation that can open. A link
+              whose id has no conversation behind it falls back to the bare page, never a 404. */}
+              <Route path="/chat" element={<Navigate to="/buddy" replace />} />
+              <Route path="/chat/:id" element={<ChatRedirect />} />
+              <Route path="/onboarding" element={<OnBoardingPage />} />
+              {/* Guarded for the same reason as `/hire-setup` below: the policy calls authoring
               PM/HR/ADMIN-only and the sidebar merely hides it, which leaves the URL. Both
               addresses share one policy entry -- `routePrefixes` maps `/blueprints/` onto it. */}
-            <Route
-              path="/blueprints"
-              element={
-                <ManagerAreaGuard route="/blueprints">
-                  <BlueprintPathsPage />
-                </ManagerAreaGuard>
-              }
-            />
-            <Route
-              path="/blueprints/:pathId"
-              element={
-                <ManagerAreaGuard route="/blueprints">
-                  <BlueprintPathDetailPage />
-                </ManagerAreaGuard>
-              }
-            />
-            <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
-            {/* The old address of a step page: opens the path with that step unfolded. */}
-            <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
-            <Route
-              path="/data-ingestion"
-              element={
-                <ManagerAreaGuard route="/data-ingestion">
-                  <DataIngestionPage />
-                </ManagerAreaGuard>
-              }
-            />
-            <Route path="/team-management" element={<TeamManagementPage />} />
-            <Route path="/team/:userId" element={<TeamMemberDetailPage />} />
-            <Route
-              path="/pm-dashboard"
-              element={
-                <ManagerAreaGuard route="/pm-dashboard">
-                  <PmDashboardPage />
-                </ManagerAreaGuard>
-              }
-            />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/insights/faq" element={<FaqPage />} />
-            <Route path="/insights/faq/:groupId" element={<FaqDetailPage />} />
-            <Route path="/insights/knowledge-gaps" element={<KnowledgeGapsPage />} />
-            <Route path="/insights/knowledge-gaps/:gapId" element={<KnowledgeGapsDetailPage />} />
-            <Route
-              path="/insights/knowledge-requests"
-              element={
-                <ManagerAreaGuard route="/insights/knowledge-requests">
-                  <KnowledgeRequestInboxPage />
-                </ManagerAreaGuard>
-              }
-            />
-            <Route
-              path="/insights/onboarding"
-              element={
-                <ManagerAreaGuard route="/insights/onboarding">
-                  <OnboardingMetricsPage />
-                </ManagerAreaGuard>
-              }
-            />
-            {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
-              in place of it: both ways in stay open. The buddy itself now sits with the chat,
-              under `AssistantShell`. */}
-            <Route path="/board" element={<BoardPage />} />
-            {/* Guarded, because the access policy says it is PM/HR/ADMIN-only and the sidebar
+              <Route
+                path="/blueprints"
+                element={
+                  <ManagerAreaGuard route="/blueprints">
+                    <BlueprintPathsPage />
+                  </ManagerAreaGuard>
+                }
+              />
+              <Route
+                path="/blueprints/:pathId"
+                element={
+                  <ManagerAreaGuard route="/blueprints">
+                    <BlueprintPathDetailPage />
+                  </ManagerAreaGuard>
+                }
+              />
+              <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
+              {/* The old address of a step page: opens the path with that step unfolded. */}
+              <Route path="/onboarding/:stepId" element={<OnBoardingPage />} />
+              <Route
+                path="/data-ingestion"
+                element={
+                  <ManagerAreaGuard route="/data-ingestion">
+                    <DataIngestionPage />
+                  </ManagerAreaGuard>
+                }
+              />
+              {/* The whole PM area is one layout route, like the assistant above: one header and
+              one tab bar that stay mounted while the sections slide underneath. The children
+              carry no elements -- `PmWorkspace` picks the section from the URL -- they are here
+              so every old address still matches. Guarded once for all of them: the access
+              policy gives every one of these routes the same groups and the same
+              manage-the-selected-project rule. */}
+              <Route
+                element={
+                  <ManagerAreaGuard route="/pm-dashboard">
+                    <PmWorkspace />
+                  </ManagerAreaGuard>
+                }
+              >
+                <Route path="/pm-dashboard" />
+                <Route path="/team-management" />
+                <Route path="/team/:userId" />
+                <Route path="/insights/knowledge-requests" />
+                <Route path="/insights/onboarding" />
+                <Route path="/insights/faq/:groupId?" />
+                <Route path="/insights/knowledge-gaps/:gapId?" />
+              </Route>
+              <Route path="/admin" element={<AdminPage />} />
+              {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
+              in place of it: both ways in stay open. The buddy itself is its own page, `/buddy`. */}
+              <Route path="/board" element={<BoardPage />} />
+              {/* Guarded, because the access policy says it is PM/HR/ADMIN-only and the sidebar
               merely hides it -- which leaves the URL. The page already gates its *actions* by
               role, but a hire who typed the path still got the page and a column of failed
               requests, and the policy claimed otherwise. */}
-            <Route
-              path="/hire-setup"
-              element={
-                <ManagerAreaGuard route="/hire-setup">
-                  <HireSetupPage />
-                </ManagerAreaGuard>
-              }
-            />
-            {/* The former standalone pages, now tabs of `/hire-setup`. Kept as redirects so old
+              <Route
+                path="/hire-setup"
+                element={
+                  <ManagerAreaGuard route="/hire-setup">
+                    <HireSetupPage />
+                  </ManagerAreaGuard>
+                }
+              />
+              {/* The former standalone pages, now tabs of `/hire-setup`. Kept as redirects so old
               links and bookmarks still land somewhere useful. */}
-            <Route
-              path="/arrival-steps"
-              element={<Navigate to="/hire-setup?tab=arrival" replace />}
-            />
-            <Route
-              path="/starter-work"
-              element={<Navigate to="/hire-setup?tab=starter" replace />}
-            />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/profile" element={<Navigate to="/settings" replace />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Suspense>
+              <Route
+                path="/arrival-steps"
+                element={<Navigate to="/hire-setup?tab=arrival" replace />}
+              />
+              <Route
+                path="/starter-work"
+                element={<Navigate to="/hire-setup?tab=starter" replace />}
+              />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/profile" element={<Navigate to="/settings" replace />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
+        </RouteErrorBoundary>
       </PageTransition>
     </AuthGuard>
   );

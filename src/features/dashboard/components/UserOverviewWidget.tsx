@@ -105,19 +105,19 @@ export function UserOverviewWidget({ size }: { size: DashboardWidgetSize }) {
       {size === "small" ? (
         <WidgetMetrics icon={ShieldCheck} metrics={metrics} />
       ) : (
-        <div className="grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="grid flex-1 grid-cols-1 gap-5 @min-[24rem]:grid-cols-2">
           <WidgetMetrics icon={ShieldCheck} metrics={metrics.slice(0, 2)} />
 
           <div className="flex flex-col justify-center gap-4">
             <div>
-              <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+              <p className="mb-2 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
                 Permission groups
               </p>
               <WidgetBar segments={permissionSegments} />
             </div>
 
             <div>
-              <p className="mb-2 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+              <p className="mb-2 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
                 Not in a project
               </p>
 

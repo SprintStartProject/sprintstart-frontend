@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { X } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
@@ -110,7 +110,7 @@ export function TokenAddForm({ onClose, onSaved, embedded = false }: TokenAddFor
       )}
 
       <div className="space-y-3">
-        <Field label="Token name" controlId="settings-add-token-name" disabled={isSaving}>
+        <Field label="Token name" controlId="settings-add-token-name" required disabled={isSaving}>
           <Input
             ref={nameInputRef}
             data-testid="settings-add-token-name"
@@ -125,6 +125,7 @@ export function TokenAddForm({ onClose, onSaved, embedded = false }: TokenAddFor
         <Field
           label="Token (ghp_...)"
           controlId="settings-add-token-value"
+          required
           hint="The token value is stored encrypted and cannot be retrieved after saving."
           disabled={isSaving}
         >
@@ -140,7 +141,8 @@ export function TokenAddForm({ onClose, onSaved, embedded = false }: TokenAddFor
         </Field>
 
         {error && (
-          <p role="alert" className="text-sm text-app-danger-text">
+          <p role="alert" className="flex items-start gap-1.5 text-sm text-app-danger-text">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             {error}
           </p>
         )}

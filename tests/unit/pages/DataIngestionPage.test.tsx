@@ -47,32 +47,109 @@ function createRunPage(items: unknown[] = [], overrides = {}) {
   };
 }
 
+/** The "latest runs" request behind the source cards: the project's newest runs, no filter. */
+type RunsFilter = { size?: number; status?: string };
+const isLatestRunsRequest = (filter: RunsFilter) =>
+  filter.size === 50 && filter.status === undefined;
+
+function githubConfig(overrides = {}) {
+  return {
+    id: "cfg-1",
+    repositoryOwner: "octocat",
+    repositoryName: "hello-world",
+    autoUpdate: true,
+    spec: { type: "INTERVAL", everyMinutes: 60 },
+    schedule: "every 60m",
+    nextSyncAt: null,
+    ...overrides,
+  };
+}
+
+function jiraConfig(overrides = {}) {
+  return {
+    instanceUrl: "https://team.atlassian.net",
+    autoUpdate: true,
+    spec: { type: "INTERVAL", everyMinutes: 60 },
+    schedule: "every 60m",
+    nextSyncAt: null,
+    ...overrides,
+  };
+}
+
+function githubStatusRow(name: string, repositoryId: string, overrides = {}) {
+  return {
+    sourceSystem: "GITHUB",
+    sourceId: `octocat/${name}`,
+    displayName: `octocat/${name}`,
+    repositoryId,
+    owner: "octocat",
+    name,
+    sourceUrl: `https://github.com/octocat/${name}`,
+    connectionStatus: "CONNECTED",
+    enabled: true,
+    lastRunTime: "2026-07-01T00:00:00Z",
+    ingestedCount: 5,
+    updatedCount: 0,
+    deletedCount: 0,
+    failedCount: 0,
+    failedItems: [],
+    artifactCount: 10,
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: null,
+    ...overrides,
+  };
+}
+
+function githubRun(runId: string, repositoryId: string, name: string, overrides = {}) {
+  return {
+    runId,
+    sourceSystem: "GITHUB",
+    sourceId: `octocat/${name}`,
+    owner: "octocat",
+    name,
+    repositoryId,
+    startedAt: "2026-07-05T10:00:00Z",
+    finishedAt: null,
+    ingestedCount: 0,
+    updatedCount: 0,
+    deletedCount: 0,
+    failedCount: 0,
+    status: "RUNNING",
+    failedItems: [],
+    failureReason: null,
+    aiSyncStatus: "NOT_APPLICABLE",
+    aiSyncFailureReason: null,
+    ...overrides,
+  };
+}
+
 const {
   mockGetIngestionRunsPage,
   mockGetIngestionStatus,
   mockConnectGithubRepository,
   mockDiscoverRepositories,
   mockGetGithubPatNames,
-  mockUpdateAllGithubRepositories,
   mockUpdateGithubRepository,
   mockGetAccessibleProject,
   mockGetIngestionSourceStatuses,
-  mockGetUnifiedArtifacts,
   mockListConnectors,
-  mockConfigureAllGithubRepositories,
+  mockGetGithubRepositoryConfig,
+  mockConfigureGithubRepository,
+  mockRemoveRepositoryFromProject,
 } = vi.hoisted(() => ({
   mockGetIngestionRunsPage: vi.fn(),
   mockGetIngestionStatus: vi.fn(),
   mockConnectGithubRepository: vi.fn(),
   mockDiscoverRepositories: vi.fn(),
   mockGetGithubPatNames: vi.fn(),
-  mockUpdateAllGithubRepositories: vi.fn(),
   mockUpdateGithubRepository: vi.fn(),
   mockGetAccessibleProject: vi.fn(),
   mockGetIngestionSourceStatuses: vi.fn(),
-  mockGetUnifiedArtifacts: vi.fn(),
   mockListConnectors: vi.fn(),
-  mockConfigureAllGithubRepositories: vi.fn(),
+  mockGetGithubRepositoryConfig: vi.fn(),
+  mockConfigureGithubRepository: vi.fn(),
+  mockRemoveRepositoryFromProject: vi.fn(),
 }));
 
 vi.mock("../../../src/services/ingestionService", () => ({
@@ -93,23 +170,29 @@ vi.mock("../../../src/services/sources/githubService", () => ({
   connectGithubRepository: mockConnectGithubRepository,
   discoverRepositories: mockDiscoverRepositories,
   getGithubPatNames: mockGetGithubPatNames,
-  updateAllGithubRepositories: mockUpdateAllGithubRepositories,
   updateGithubRepository: mockUpdateGithubRepository,
-  configureAllGithubRepositories: mockConfigureAllGithubRepositories,
+  getGithubRepositoryConfig: mockGetGithubRepositoryConfig,
+  configureGithubRepository: mockConfigureGithubRepository,
+  removeRepositoryFromProject: mockRemoveRepositoryFromProject,
 }));
 
-const { mockGetJiraInstances, mockUpdateJiraInstance, mockConfigureAllJiraInstances } = vi.hoisted(
-  () => ({
-    mockGetJiraInstances: vi.fn(),
-    mockUpdateJiraInstance: vi.fn(),
-    mockConfigureAllJiraInstances: vi.fn(),
-  }),
-);
+const {
+  mockGetJiraInstances,
+  mockUpdateJiraInstance,
+  mockGetJiraConfig,
+  mockConfigureJiraInstance,
+} = vi.hoisted(() => ({
+  mockGetJiraInstances: vi.fn(),
+  mockUpdateJiraInstance: vi.fn(),
+  mockGetJiraConfig: vi.fn(),
+  mockConfigureJiraInstance: vi.fn(),
+}));
 
 vi.mock("../../../src/services/sources/jiraService", () => ({
   getJiraInstances: mockGetJiraInstances,
   updateJiraInstance: mockUpdateJiraInstance,
-  configureAllJiraInstances: mockConfigureAllJiraInstances,
+  getJiraConfig: mockGetJiraConfig,
+  configureJiraInstance: mockConfigureJiraInstance,
 }));
 
 vi.mock("../../../src/services/connectorService", async (importOriginal) => {
@@ -124,7 +207,7 @@ vi.mock("../../../src/services/knowledgeService", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/services/knowledgeService")>();
   return {
     ...actual,
-    knowledgeService: { ...actual.knowledgeService, getUnifiedArtifacts: mockGetUnifiedArtifacts },
+    knowledgeService: { ...actual.knowledgeService },
   };
 });
 
@@ -140,7 +223,6 @@ describe("DataIngestionPage", () => {
       hasMore: false,
       resolvedOwnerType: "user",
     });
-    mockUpdateAllGithubRepositories.mockResolvedValue({ transactionId: "tx2" });
     mockUpdateGithubRepository.mockResolvedValue({ transactionId: "tx3" });
     mockGetAccessibleProject.mockResolvedValue({
       id: "proj1",
@@ -153,9 +235,14 @@ describe("DataIngestionPage", () => {
     mockGetIngestionSourceStatuses.mockResolvedValue([]);
     mockGetJiraInstances.mockResolvedValue([]);
     mockUpdateJiraInstance.mockResolvedValue({ transactionId: "jira-tx" });
-    mockConfigureAllGithubRepositories.mockResolvedValue(undefined);
-    mockConfigureAllJiraInstances.mockResolvedValue(undefined);
-    mockGetUnifiedArtifacts.mockResolvedValue([]);
+    mockGetGithubRepositoryConfig.mockResolvedValue(githubConfig());
+    mockConfigureGithubRepository.mockResolvedValue(undefined);
+    mockRemoveRepositoryFromProject.mockResolvedValue({
+      repositoryId: "repo-uuid",
+      projectIds: [],
+    });
+    mockGetJiraConfig.mockResolvedValue(jiraConfig());
+    mockConfigureJiraInstance.mockResolvedValue(undefined);
     mockListConnectors.mockResolvedValue([]);
     selectProject();
   });
@@ -358,6 +445,81 @@ describe("DataIngestionPage", () => {
     expect(within(connectedSourcesKpi).getByText("1")).toBeInTheDocument();
   });
 
+  const bitbucketStatusRow = (overrides: Record<string, unknown> = {}) => ({
+    sourceSystem: "BITBUCKET",
+    sourceId: "acme/widgets",
+    displayName: "acme/widgets",
+    repositoryId: "bb-repo-uuid",
+    owner: "acme",
+    name: "widgets",
+    sourceUrl: "https://bitbucket.org/acme/widgets",
+    connectionStatus: "CONNECTED",
+    enabled: true,
+    lastRunTime: "2026-09-28T10:00:00Z",
+    ingestedCount: 9,
+    updatedCount: 1,
+    deletedCount: 0,
+    failedCount: 0,
+    failedItems: [],
+    artifactCount: 77,
+    lastCommitsSyncAt: null,
+    lastIssuesSyncAt: null,
+    lastPullRequestsSyncAt: "2026-09-28T10:00:00Z",
+    ...overrides,
+  });
+
+  it("builds a Bitbucket source card from the connector-neutral status row", async () => {
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+    });
+    mockGetIngestionSourceStatuses.mockResolvedValue([bitbucketStatusRow()]);
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    expect((await screen.findAllByText("acme/widgets")).length).toBeGreaterThan(0);
+    // The workspace is the card's subtitle and the row's artifact total drives the count.
+    expect(screen.getAllByText("acme").length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByText("77").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("does not double a Bitbucket repository that is also exposed as a project source", async () => {
+    // `project.sources` carries Bitbucket entries too. The card is built from the
+    // status row alone, so the project source must not add a fallback card.
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [
+        { id: "acme/widgets", name: "acme/widgets", type: "BITBUCKET", status: "CONNECTED" },
+      ],
+      users: [],
+    });
+    mockGetIngestionSourceStatuses.mockResolvedValue([bitbucketStatusRow()]);
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    const connectedSourcesKpi = await screen.findByRole("button", {
+      name: /connected sources/i,
+    });
+    expect(within(connectedSourcesKpi).getByText("1")).toBeInTheDocument();
+  });
+
   it("filters the run history to a Jira instance via sourceRef", async () => {
     // A GitHub repo (repositoryId) and a Jira instance (URL) together offer
     // two options in the source filter, so the dropdown appears.
@@ -446,6 +608,54 @@ describe("DataIngestionPage", () => {
     });
   });
 
+  it("filters the run history to a Bitbucket repository via repositoryId", async () => {
+    mockGetIngestionSourceStatuses.mockResolvedValue([
+      {
+        sourceSystem: "GITHUB",
+        sourceId: "octocat/hello-world",
+        displayName: "octocat/hello-world",
+        repositoryId: "repo-uuid",
+        owner: "octocat",
+        name: "hello-world",
+        sourceUrl: "https://github.com/octocat/hello-world",
+        connectionStatus: "CONNECTED",
+        enabled: true,
+        lastRunTime: "2026-07-01T00:00:00Z",
+        ingestedCount: 1,
+        updatedCount: 0,
+        deletedCount: 0,
+        failedCount: 0,
+        failedItems: [],
+        artifactCount: 10,
+        lastCommitsSyncAt: null,
+        lastIssuesSyncAt: null,
+        lastPullRequestsSyncAt: null,
+      },
+      bitbucketStatusRow(),
+    ]);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Filter runs by source" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("combobox", { name: "Filter runs by source" }));
+    await user.click(await screen.findByRole("option", { name: "acme/widgets" }));
+
+    // A Bitbucket repository is scoped by its connection id, not by sourceRef.
+    await waitFor(() => {
+      expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ repositoryId: "bb-repo-uuid", sourceRef: undefined, page: 1 }),
+      );
+    });
+  });
+
   /*
     The knowledge-gap detail page's "Update data source" button links here from a gap, and a gap
     knows itself by component — `owner/repo` — not by the project-source id these cards select
@@ -486,6 +696,63 @@ describe("DataIngestionPage", () => {
     // repository's full name.
     const panel = await screen.findByRole("dialog");
     expect(within(panel).getByText("Ingestion")).toBeInTheDocument();
+  });
+
+  it("starts an update from the drawer and reloads the project's sources", async () => {
+    mockGetIngestionSourceStatuses.mockResolvedValue([githubStatusRow("hello-world", "repo-uuid")]);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/data-ingestion?sourceId=octocat/hello-world"]}>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    const panel = await screen.findByRole("dialog");
+    const callsBefore = mockGetIngestionSourceStatuses.mock.calls.length;
+    await user.click(within(panel).getByRole("button", { name: /Update repo/ }));
+
+    await waitFor(() => {
+      expect(mockUpdateGithubRepository).toHaveBeenCalledWith(
+        expect.objectContaining({ owner: "octocat", name: "hello-world" }),
+      );
+    });
+    await waitFor(() => {
+      expect(mockGetIngestionSourceStatuses.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+  });
+
+  it("closes the drawer once the source was removed from the project", async () => {
+    mockGetIngestionSourceStatuses.mockResolvedValue([githubStatusRow("hello-world", "repo-uuid")]);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/data-ingestion?sourceId=octocat/hello-world"]}>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    const panel = await screen.findByRole("dialog");
+    // After the removal the project has no sources left.
+    mockGetIngestionSourceStatuses.mockResolvedValue([]);
+    mockGetAccessibleProject.mockResolvedValue({
+      id: "proj1",
+      name: "Project Alpha",
+      description: "",
+      manager: null,
+      sources: [],
+      users: [],
+    });
+
+    await user.click(within(panel).getByRole("button", { name: /Remove from project/ }));
+    await user.click(await screen.findByRole("button", { name: /^Remove$/ }));
+
+    await waitFor(() => {
+      expect(mockRemoveRepositoryFromProject).toHaveBeenCalledWith("repo-uuid", "proj1");
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
   });
 
   it("opens nothing for a component that is not connected", async () => {
@@ -777,6 +1044,59 @@ describe("DataIngestionPage", () => {
     expect(screen.queryByText("Connector disabled")).not.toBeInTheDocument();
   });
 
+  it("shows the loading state, not the old error, while the connectors modal retries a failed load", async () => {
+    mockListConnectors.mockRejectedValueOnce(new Error("Forbidden"));
+    let rejectRetry: (error: Error) => void = () => {};
+    mockListConnectors.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectRetry = reject;
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <DataIngestionPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("octocat/hello-world");
+    await waitFor(() => expect(mockListConnectors).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: /manage connectors/i }));
+
+    const modal = within(await screen.findByRole("dialog", { name: "Connectors" }));
+    expect(await modal.findByText("Loading connectors")).toBeInTheDocument();
+    expect(modal.queryByText("Forbidden")).not.toBeInTheDocument();
+    expect(modal.queryByText("No connectors registered")).not.toBeInTheDocument();
+
+    rejectRetry(new Error("Still forbidden"));
+
+    expect(await modal.findByText("Still forbidden")).toBeInTheDocument();
+    expect(modal.queryByText("Loading connectors")).not.toBeInTheDocument();
+  });
+
+  it("shows one banner per failed load even when the failures read the same", async () => {
+    mockGetIngestionRunsPage.mockRejectedValue(new Error("Network down"));
+    mockGetIngestionSourceStatuses.mockRejectedValue(new Error("Network down"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => expect(screen.getAllByText("Network down")).toHaveLength(2));
+      // Banners keyed by their message would collide here.
+      expect(consoleError.mock.calls.some((call) => String(call[0]).includes("same key"))).toBe(
+        false,
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("scopes the run history to the selected project", async () => {
     render(
       <MemoryRouter>
@@ -868,15 +1188,24 @@ describe("DataIngestionPage", () => {
     // be discarded, otherwise freshly created runs disappear again until the
     // user reloads the browser.
     let resolveStale: ((value: unknown) => void) | undefined;
-    mockGetIngestionRunsPage
-      .mockResolvedValueOnce(createRunPage([run("old-run")]))
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveStale = resolve;
-          }),
-      )
-      .mockResolvedValueOnce(createRunPage([run("new-run")]));
+    const tableResponses = [
+      () => Promise.resolve(createRunPage([run("old-run")])),
+      () =>
+        new Promise((resolve) => {
+          resolveStale = resolve;
+        }),
+      () => Promise.resolve(createRunPage([run("new-run")])),
+    ];
+    mockGetIngestionRunsPage.mockImplementation((filter: RunsFilter) => {
+      // The cards' own latest-runs request is not part of the scripted table responses.
+      if (isLatestRunsRequest(filter)) return Promise.resolve(createRunPage());
+
+      return (
+        tableResponses.shift() ??
+        tableResponses[0] ??
+        (() => Promise.resolve(createRunPage()))
+      )();
+    });
 
     const user = userEvent.setup();
     render(
@@ -985,16 +1314,18 @@ describe("DataIngestionPage", () => {
       screen.queryByRole("tablist", { name: /sync settings connector/i }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("switch", { name: /toggle global jira auto update/i }));
-    await user.click(screen.getByRole("button", { name: /apply globally/i }));
+    await user.click(
+      await screen.findByRole("switch", { name: /toggle jira auto update for this project/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /apply to project/i }));
 
     await waitFor(() => {
-      expect(mockConfigureAllJiraInstances).toHaveBeenCalledWith({
+      expect(mockConfigureJiraInstance).toHaveBeenCalledWith({
+        instanceUrl: "https://team.atlassian.net",
         autoUpdate: false,
         schedule: { type: "INTERVAL", everyMinutes: 60 },
       });
     });
-    expect(mockConfigureAllGithubRepositories).not.toHaveBeenCalled();
   });
 
   it("applies the global sync schedule to every Confluence connection", async () => {
@@ -1033,6 +1364,28 @@ describe("DataIngestionPage", () => {
           },
         ]),
       ),
+      http.get("/api/v1/confluence/projects/:projectId/connections/:connectionId", () =>
+        HttpResponse.json({
+          id: "conn-1",
+          projectId: "proj1",
+          baseUrl: "https://acme.atlassian.net",
+          spaceId: "123456",
+          spaceKey: "ENG",
+          spaceName: "Engineering",
+          credentialName: "default",
+          pageAllowlist: [],
+          pageDenylist: [],
+          credentialsConfigured: true,
+          createdAt: "2026-07-01T00:00:00Z",
+          updatedAt: "2026-07-01T00:00:00Z",
+          version: 1,
+          sourceEnabled: true,
+          autoUpdate: true,
+          spec: { type: "INTERVAL", everyMinutes: 60 },
+          schedule: "every 60m",
+          nextSyncAt: null,
+        }),
+      ),
       http.put(
         "/api/v1/confluence/projects/:projectId/connections/:connectionId/schedule",
         async ({ request, params }) => {
@@ -1054,8 +1407,12 @@ describe("DataIngestionPage", () => {
 
     expect(await screen.findByText("Confluence Sync Settings")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("switch", { name: /toggle global confluence auto update/i }));
-    await user.click(screen.getByRole("button", { name: /apply globally/i }));
+    await user.click(
+      await screen.findByRole("switch", {
+        name: /toggle confluence auto update for this project/i,
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /apply to project/i }));
 
     await waitFor(() => {
       expect(scheduleRequests).toEqual([
@@ -1064,6 +1421,717 @@ describe("DataIngestionPage", () => {
           body: { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } },
         },
       ]);
+    });
+  });
+
+  describe("source cards", () => {
+    const statusRows = () => [githubStatusRow("hello-world", "repo-uuid")];
+
+    beforeEach(() => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [{ id: "src1", name: "octocat/hello-world", type: "GITHUB", status: "CONNECTED" }],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue(statusRows());
+    });
+
+    const sourcesSection = () => within(screen.getByRole("region", { name: "Sources" }));
+
+    it("keeps a card's status when the run table is filtered", async () => {
+      // The newest run of the repository is still running; the table filter below
+      // asks for failed runs only, which returns none.
+      mockGetIngestionRunsPage.mockImplementation((filter: RunsFilter) =>
+        Promise.resolve(
+          isLatestRunsRequest(filter) || filter.status === undefined
+            ? createRunPage([githubRun("run-live", "repo-uuid", "hello-world")])
+            : createRunPage(),
+        ),
+      );
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(sourcesSection().getAllByText("Syncing").length).toBeGreaterThan(0);
+      });
+
+      await user.click(screen.getByRole("combobox", { name: "Filter runs by status" }));
+      await user.click(await screen.findByRole("option", { name: "Failed" }));
+
+      await waitFor(() => {
+        expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+          expect.objectContaining({ status: "FAILED" }),
+        );
+      });
+      expect(screen.queryByText("run-live")).not.toBeInTheDocument();
+      expect(sourcesSection().getAllByText("Syncing").length).toBeGreaterThan(0);
+    });
+
+    it("refreshes the card while a run is in flight until it has finished", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      try {
+        // First answer: the repository is syncing. Every later answer: it has finished.
+        mockGetIngestionSourceStatuses
+          .mockResolvedValueOnce([
+            githubStatusRow("hello-world", "repo-uuid", { connectionStatus: "UPDATING" }),
+          ])
+          .mockResolvedValue(statusRows());
+        mockGetIngestionRunsPage
+          .mockResolvedValueOnce(createRunPage([githubRun("run-live", "repo-uuid", "hello-world")]))
+          .mockResolvedValueOnce(createRunPage([githubRun("run-live", "repo-uuid", "hello-world")]))
+          .mockResolvedValue(
+            createRunPage([
+              githubRun("run-live", "repo-uuid", "hello-world", {
+                status: "COMPLETED",
+                finishedAt: "2026-07-05T10:05:00Z",
+                aiSyncStatus: "SUCCEEDED",
+              }),
+            ]),
+          );
+
+        render(
+          <MemoryRouter>
+            <DataIngestionPage />
+          </MemoryRouter>,
+        );
+
+        await waitFor(() => {
+          expect(sourcesSection().getAllByText("Syncing").length).toBeGreaterThan(0);
+        });
+        // The reload is armed by the runs that are in flight, and the cards do not wait for
+        // them, so let the run table load before the clock moves.
+        expect(await screen.findByText("run-live")).toBeInTheDocument();
+
+        // One poll tick reloads the statuses and the latest runs, not only the table.
+        await vi.advanceTimersByTimeAsync(3100);
+
+        await waitFor(() => {
+          expect(sourcesSection().queryByText("Syncing")).not.toBeInTheDocument();
+        });
+        expect(sourcesSection().getAllByText("Synced").length).toBeGreaterThan(0);
+        expect(mockGetIngestionSourceStatuses.mock.calls.length).toBeGreaterThan(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("project-wide sync settings", () => {
+    const twoRepositories = () => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [
+          { id: "src1", name: "octocat/one", type: "GITHUB", status: "CONNECTED" },
+          { id: "src2", name: "octocat/two", type: "GITHUB", status: "CONNECTED" },
+        ],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([
+        githubStatusRow("one", "repo-one"),
+        githubStatusRow("two", "repo-two"),
+      ]);
+    };
+
+    const openSyncSettings = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole("button", { name: /manage sync settings/i }));
+      expect(await screen.findByText("GitHub Sync Settings")).toBeInTheDocument();
+    };
+
+    it("applies the schedule to each repository of the project, not platform-wide", async () => {
+      twoRepositories();
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await openSyncSettings(user);
+      await user.click(
+        await screen.findByRole("switch", { name: /toggle github auto update for this project/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /apply to project/i }));
+
+      await waitFor(() => {
+        expect(mockConfigureGithubRepository).toHaveBeenCalledTimes(2);
+      });
+      const request = { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } };
+      expect(mockConfigureGithubRepository).toHaveBeenCalledWith(
+        expect.objectContaining({ owner: "octocat", name: "one" }),
+        request,
+      );
+      expect(mockConfigureGithubRepository).toHaveBeenCalledWith(
+        expect.objectContaining({ owner: "octocat", name: "two" }),
+        request,
+      );
+    });
+
+    it("pre-fills the schedule the repositories already share", async () => {
+      twoRepositories();
+      mockGetGithubRepositoryConfig.mockResolvedValue(
+        githubConfig({ autoUpdate: true, spec: { type: "INTERVAL", everyMinutes: 15 } }),
+      );
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await openSyncSettings(user);
+
+      expect(await screen.findByRole("combobox", { name: "Every" })).toHaveValue("15");
+      expect(screen.queryByText(/different schedules/i)).not.toBeInTheDocument();
+    });
+
+    it("shows the default and a hint when the repositories have different schedules", async () => {
+      twoRepositories();
+      mockGetGithubRepositoryConfig
+        .mockResolvedValueOnce(githubConfig({ spec: { type: "INTERVAL", everyMinutes: 15 } }))
+        .mockResolvedValueOnce(githubConfig({ spec: { type: "INTERVAL", everyMinutes: 30 } }));
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await openSyncSettings(user);
+
+      expect(await screen.findByText(/different schedules/i)).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Every" })).toHaveValue("60");
+    });
+
+    it("still applies the schedule to the other repositories when one save fails", async () => {
+      twoRepositories();
+      mockConfigureGithubRepository
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce(undefined);
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await openSyncSettings(user);
+      await user.click(
+        await screen.findByRole("switch", { name: /toggle github auto update for this project/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /apply to project/i }));
+
+      await waitFor(() => {
+        expect(mockConfigureGithubRepository).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("Bitbucket source actions", () => {
+    beforeEach(() => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([bitbucketStatusRow()]);
+    });
+
+    async function openBitbucketDrawer() {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/data-ingestion?sourceId=bb-repo-uuid"]}>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      const panel = await screen.findByRole("dialog");
+      expect(within(panel).getByText("Workspace")).toBeInTheDocument();
+
+      return { user, panel };
+    }
+
+    it("updates the repository through its connection id", async () => {
+      const updated: string[] = [];
+      server.use(
+        http.post("/api/v1/bitbucket/connections/:repositoryId/update", ({ params }) => {
+          updated.push(String(params.repositoryId));
+          return HttpResponse.json({ transactionId: "tx-1" }, { status: 202 });
+        }),
+      );
+
+      const { user, panel } = await openBitbucketDrawer();
+      await user.click(within(panel).getByRole("button", { name: /update repo/i }));
+
+      await waitFor(() => expect(updated).toEqual(["bb-repo-uuid"]));
+    });
+
+    it("disables the repository through the connector endpoint by workspace/slug", async () => {
+      const patches: unknown[] = [];
+      server.use(
+        http.patch(
+          "/api/v1/connectors/:connectorId/sources/status",
+          async ({ params, request }) => {
+            patches.push({ connectorId: params.connectorId, body: await request.json() });
+            return HttpResponse.json({});
+          },
+        ),
+      );
+
+      const { user, panel } = await openBitbucketDrawer();
+      await user.click(
+        within(panel).getByRole("switch", { name: /toggle ingestion for acme\/widgets/i }),
+      );
+
+      await waitFor(() => {
+        expect(patches).toEqual([
+          {
+            connectorId: "bitbucket",
+            body: { sources: [{ sourceId: "acme/widgets", enabled: false }] },
+          },
+        ]);
+      });
+    });
+
+    it("removes the repository from the selected project", async () => {
+      const removed: unknown[] = [];
+      server.use(
+        http.delete(
+          "/api/v1/bitbucket/connections/:repositoryId/projects/:projectId",
+          ({ params }) => {
+            removed.push({ repositoryId: params.repositoryId, projectId: params.projectId });
+            return HttpResponse.json({ repositoryId: params.repositoryId, projectIds: [] });
+          },
+        ),
+      );
+
+      const { user, panel } = await openBitbucketDrawer();
+      await user.click(within(panel).getByRole("button", { name: /remove from project/i }));
+      await user.click(await screen.findByRole("button", { name: /^remove$/i }));
+
+      await waitFor(() => {
+        expect(removed).toEqual([{ repositoryId: "bb-repo-uuid", projectId: "proj1" }]);
+      });
+    });
+
+    it("loads and saves the repository's own sync schedule by workspace and slug", async () => {
+      const saved: unknown[] = [];
+      server.use(
+        http.get("/api/v1/bitbucket/config/:workspace/:slug", () =>
+          HttpResponse.json({
+            id: "cfg-1",
+            workspace: "acme",
+            slug: "widgets",
+            autoUpdate: true,
+            spec: { type: "INTERVAL", everyMinutes: 30 },
+            schedule: "every 30m",
+            nextSyncAt: null,
+          }),
+        ),
+        http.put("/api/v1/bitbucket/config/:workspace/:slug", async ({ params, request }) => {
+          saved.push({ params, body: await request.json() });
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+
+      const { user, panel } = await openBitbucketDrawer();
+      const minutes = await within(panel).findByLabelText("Every");
+      await waitFor(() => expect(minutes).toHaveValue("30"));
+
+      await user.selectOptions(minutes, "15");
+      await user.click(within(panel).getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(saved).toEqual([
+          {
+            params: { workspace: "acme", slug: "widgets" },
+            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 15 } },
+          },
+        ]);
+      });
+    });
+
+    it("applies the project-wide schedule to each Bitbucket repository, not platform-wide", async () => {
+      const saved: unknown[] = [];
+      server.use(
+        http.get("/api/v1/bitbucket/config/:workspace/:slug", () =>
+          HttpResponse.json({
+            id: "cfg-1",
+            workspace: "acme",
+            slug: "widgets",
+            autoUpdate: true,
+            spec: { type: "INTERVAL", everyMinutes: 60 },
+            schedule: "every 60m",
+            nextSyncAt: null,
+          }),
+        ),
+        http.put("/api/v1/bitbucket/config/:workspace/:slug", async ({ params, request }) => {
+          saved.push({ params, body: await request.json() });
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await user.click(await screen.findByRole("button", { name: /manage sync settings/i }));
+
+      expect(await screen.findByText("Bitbucket Sync Settings")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("tablist", { name: /sync settings connector/i }),
+      ).not.toBeInTheDocument();
+
+      await user.click(
+        await screen.findByRole("switch", {
+          name: /toggle bitbucket auto update for this project/i,
+        }),
+      );
+      // The scheduler skips a repository with auto update off, and the modal says so.
+      expect(
+        screen.getByText(/Due checks skip Bitbucket repositories in this project/i),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /apply to project/i }));
+
+      await waitFor(() => {
+        expect(saved).toEqual([
+          {
+            params: { workspace: "acme", slug: "widgets" },
+            body: { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } },
+          },
+        ]);
+      });
+      expect(mockConfigureGithubRepository).not.toHaveBeenCalled();
+    });
+  });
+  describe("Notion workspaces", () => {
+    const notionStatusRow = (overrides: Record<string, unknown> = {}) => ({
+      sourceSystem: "NOTION",
+      sourceId: "ws-1",
+      displayName: "Acme Workspace",
+      repositoryId: null,
+      owner: null,
+      name: null,
+      sourceUrl: "https://www.notion.so/acme",
+      connectionStatus: "CONNECTED",
+      enabled: true,
+      lastRunTime: "2026-09-28T10:00:00Z",
+      ingestedCount: 5,
+      updatedCount: 0,
+      deletedCount: 0,
+      failedCount: 0,
+      failedItems: [],
+      artifactCount: 31,
+      lastCommitsSyncAt: null,
+      lastIssuesSyncAt: null,
+      lastPullRequestsSyncAt: null,
+      ...overrides,
+    });
+
+    const notionConnection = {
+      id: "notion-conn-1",
+      projectId: "proj1",
+      workspaceId: "ws-1",
+      workspaceName: "Acme Workspace",
+      workspaceUrl: "https://www.notion.so/acme",
+      credentialName: "wiki",
+      sourceEnabled: true,
+      autoUpdate: true,
+      schedule: "every 60 minutes",
+      scheduleSpec: { type: "INTERVAL", everyMinutes: 60 },
+      nextSyncAt: null,
+      lastSyncedAt: "2026-09-28T10:00:00Z",
+      createdAt: "2026-09-01T10:00:00Z",
+      updatedAt: "2026-09-28T10:00:00Z",
+      version: 1,
+    };
+
+    beforeEach(() => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([notionStatusRow()]);
+      server.use(
+        http.get("/api/v1/notion/projects/proj1/connections", () =>
+          HttpResponse.json([notionConnection]),
+        ),
+      );
+    });
+
+    async function openNotionDrawer() {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={["/data-ingestion?sourceId=notion-conn-1"]}>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      const panel = await screen.findByRole("dialog");
+      expect(within(panel).getByText("Credential")).toBeInTheDocument();
+
+      return { user, panel };
+    }
+
+    it("builds a card from the status row and selects it by the connection id", async () => {
+      await openNotionDrawer();
+
+      expect((await screen.findAllByText("Acme Workspace")).length).toBeGreaterThan(0);
+      expect(screen.getByText("wiki")).toBeInTheDocument();
+    });
+
+    it("still shows the card when the project's connections cannot be read", async () => {
+      server.use(
+        http.get("/api/v1/notion/projects/proj1/connections", () =>
+          HttpResponse.json({ message: "forbidden" }, { status: 403 }),
+        ),
+      );
+
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      expect((await screen.findAllByText("Acme Workspace")).length).toBeGreaterThan(0);
+    });
+
+    it("syncs the workspace through its connection id", async () => {
+      const synced: string[] = [];
+      server.use(
+        http.post(
+          "/api/v1/notion/projects/proj1/connections/:connectionId/update",
+          ({ params }) => {
+            synced.push(String(params.connectionId));
+            return HttpResponse.json({
+              runId: "run-1",
+              connectionId: params.connectionId,
+              outcome: "COMPLETED",
+              failure: null,
+              successfulPages: 7,
+              failedPages: 0,
+              removedPages: 0,
+            });
+          },
+        ),
+      );
+
+      const { user, panel } = await openNotionDrawer();
+      await user.click(within(panel).getByRole("button", { name: /update workspace/i }));
+
+      await waitFor(() => expect(synced).toEqual(["notion-conn-1"]));
+    });
+
+    it("disables the workspace through the connector endpoint, scoped to the project", async () => {
+      const patches: unknown[] = [];
+      server.use(
+        http.patch(
+          "/api/v1/connectors/:connectorId/sources/status",
+          async ({ params, request }) => {
+            patches.push({
+              connectorId: params.connectorId,
+              projectId: new URL(request.url).searchParams.get("projectId"),
+              body: await request.json(),
+            });
+            return HttpResponse.json({});
+          },
+        ),
+      );
+
+      const { user, panel } = await openNotionDrawer();
+      await user.click(
+        within(panel).getByRole("switch", { name: /toggle ingestion for acme workspace/i }),
+      );
+
+      await waitFor(() => {
+        expect(patches).toEqual([
+          {
+            connectorId: "notion",
+            projectId: "proj1",
+            body: { sources: [{ sourceId: "notion-conn-1", enabled: false }] },
+          },
+        ]);
+      });
+    });
+
+    it("removes the workspace connection from the project", async () => {
+      const removed: string[] = [];
+      server.use(
+        http.delete("/api/v1/notion/projects/proj1/connections/:connectionId", ({ params }) => {
+          removed.push(String(params.connectionId));
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+
+      const { user, panel } = await openNotionDrawer();
+      await user.click(within(panel).getByRole("button", { name: /remove from project/i }));
+      await user.click(await screen.findByRole("button", { name: /^remove$/i }));
+
+      await waitFor(() => expect(removed).toEqual(["notion-conn-1"]));
+    });
+
+    it("loads the schedule from the project's connection list and saves it per connection", async () => {
+      const saved: unknown[] = [];
+      server.use(
+        http.put(
+          "/api/v1/notion/projects/proj1/connections/:connectionId/schedule",
+          async ({ params, request }) => {
+            saved.push({ connectionId: params.connectionId, body: await request.json() });
+            return HttpResponse.json(notionConnection);
+          },
+        ),
+      );
+
+      const { user, panel } = await openNotionDrawer();
+      const minutes = await within(panel).findByLabelText("Every");
+      await waitFor(() => expect(minutes).toHaveValue("60"));
+
+      await user.selectOptions(minutes, "15");
+      await user.click(within(panel).getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(saved).toEqual([
+          {
+            connectionId: "notion-conn-1",
+            body: { autoUpdate: true, schedule: { type: "INTERVAL", everyMinutes: 15 } },
+          },
+        ]);
+      });
+    });
+
+    it("applies the project-wide schedule to each Notion workspace of the project", async () => {
+      const saved: unknown[] = [];
+      server.use(
+        http.put(
+          "/api/v1/notion/projects/proj1/connections/:connectionId/schedule",
+          async ({ params, request }) => {
+            saved.push({ connectionId: params.connectionId, body: await request.json() });
+            return HttpResponse.json(notionConnection);
+          },
+        ),
+      );
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await user.click(await screen.findByRole("button", { name: /manage sync settings/i }));
+
+      expect(await screen.findByText("Notion Sync Settings")).toBeInTheDocument();
+
+      await user.click(
+        await screen.findByRole("switch", {
+          name: /toggle notion auto update for this project/i,
+        }),
+      );
+      expect(
+        screen.getByText(/Due checks skip Notion workspaces in this project/i),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /apply to project/i }));
+
+      await waitFor(() => {
+        expect(saved).toEqual([
+          {
+            connectionId: "notion-conn-1",
+            body: { autoUpdate: false, schedule: { type: "INTERVAL", everyMinutes: 60 } },
+          },
+        ]);
+      });
+    });
+
+    it("filters the run history to a Notion workspace via its connection id", async () => {
+      mockGetAccessibleProject.mockResolvedValue({
+        id: "proj1",
+        name: "Project Alpha",
+        description: "",
+        manager: null,
+        sources: [
+          {
+            id: "repo-uuid",
+            name: "octocat/hello-world",
+            type: "GITHUB",
+            status: "CONNECTED",
+          },
+        ],
+        users: [],
+      });
+      mockGetIngestionSourceStatuses.mockResolvedValue([
+        {
+          sourceSystem: "GITHUB",
+          sourceId: "octocat/hello-world",
+          displayName: "octocat/hello-world",
+          repositoryId: "repo-uuid",
+          owner: "octocat",
+          name: "hello-world",
+          sourceUrl: "https://github.com/octocat/hello-world",
+          connectionStatus: "CONNECTED",
+          enabled: true,
+          lastRunTime: "2026-07-01T00:00:00Z",
+          ingestedCount: 1,
+          updatedCount: 0,
+          deletedCount: 0,
+          failedCount: 0,
+          failedItems: [],
+          artifactCount: 10,
+          lastCommitsSyncAt: null,
+          lastIssuesSyncAt: null,
+          lastPullRequestsSyncAt: null,
+        },
+        notionStatusRow(),
+      ]);
+
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <DataIngestionPage />
+        </MemoryRouter>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("combobox", { name: "Filter runs by source" })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("combobox", { name: "Filter runs by source" }));
+      await user.click(await screen.findByRole("option", { name: "Acme Workspace" }));
+
+      // A workspace is scoped by its connection id, not by the workspace id the status row carries.
+      await waitFor(() => {
+        expect(mockGetIngestionRunsPage).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            repositoryId: "notion-conn-1",
+            sourceRef: undefined,
+            page: 1,
+          }),
+        );
+      });
     });
   });
 

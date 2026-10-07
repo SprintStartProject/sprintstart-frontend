@@ -1,13 +1,18 @@
 /**
- * Verbatim copy of the app's `SidebarLogo`
- * (src/components/layout/SidebarLogo.tsx) for the Keycloak login theme.
+ * The app's `SidebarLogo` (src/components/layout/SidebarLogo.tsx) for the
+ * Keycloak login theme: same rocket, badge, hover lift and flame, copied
+ * rather than re-exported.
  *
  * No app-specific dependency to strip here (unlike AuroraBackground.tsx /
  * SpotlightCard.tsx in this same folder) — it only needs `framer-motion`,
- * which is already pulled into this bundle by SpotlightCard. Kept as an exact
- * copy rather than a re-export so the login theme doesn't reach into
- * `src/components/layout/` (a different part of the app's own bundle graph)
- * — copy stays in sync by hand if the original changes.
+ * which is already pulled into this bundle by SpotlightCard. Kept as a copy
+ * rather than a re-export so the login theme doesn't reach into
+ * `src/components/layout/` (a different part of the app's own bundle graph).
+ *
+ * This copy deliberately stops at the mark. The app version's gravity egg
+ * (five clicks drop the badge off its shelf) belongs to the signed-in app
+ * only — a login form is no place to hide a game. Changes to the *mark*
+ * still have to be carried over by hand; that is the price of the copy.
  */
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 

@@ -1,9 +1,8 @@
 # Frontend Architecture
 
-This document is the authoritative architecture reference for `sprintstart-frontend`.
-It replaces the frontend section of the (root-level) `ARCHITECTURE.md` so that this
-repository is self-sufficient: a developer cloning only `sprintstart-frontend/` gets
-the full architecture picture without needing root files.
+This document describes how `sprintstart-frontend` is built: structure, routing,
+state, services, design-system mechanics, build and deployment. Rules for writing
+code live in the coding standards; this file only describes.
 
 > **Related docs**
 >
@@ -25,6 +24,7 @@ and uses **Keycloak** for identity and access management.
 - **Feature-first architecture** — domain code lives in `src/features/<name>/`; only
   genuinely shared code lives in top-level folders.
 - **React Router v7** with declarative `<Route element={...}>` + an `AuthGuard` wrapper.
+- **TanStack Query 5** as the shared cache for all backend data (see §5.2).
 - **Tailwind CSS v4** with a single shared semantic palette (light/dark themes).
 - **Framer Motion 12** with centralized spring transition tokens.
 - **Keycloakify 11** for a custom Keycloak login theme.
@@ -37,12 +37,14 @@ and uses **Keycloak** for identity and access management.
 | ------------------------- | ----------------------------------------------------------------------------------------------- |
 | UI framework              | **React 19**                                                                                    |
 | Routing                   | **React Router v7** (`react-router-dom` ^7)                                                     |
+| Server state              | **TanStack Query 5** (`@tanstack/react-query`)                                                  |
 | Language                  | **TypeScript** (strict, `verbatimModuleSyntax`)                                                 |
 | Build tooling             | **Vite 8**                                                                                      |
 | Styling                   | **Tailwind CSS v4** (semantic design tokens, light/dark themes)                                 |
 | Animation                 | **Framer Motion 12** (centralized spring tokens)                                                |
 | Authentication            | **Keycloak** via `keycloak-js`, with a custom login theme built on **Keycloakify 11**           |
 | Markdown / math rendering | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-katex`, `react-syntax-highlighter`       |
+| Graphs and diagrams       | `@xyflow/react` (node canvases), `dagre` (layered layout), `d3-force` (competency graph layout) |
 | Icons                     | `lucide-react`                                                                                  |
 | Avatars                   | `boring-avatars`                                                                                |
 | Unit testing              | **Vitest 4** + **Testing Library** (`jsdom`, `msw`, `vitest-axe`)                               |
@@ -58,31 +60,61 @@ goes in the top-level folders.
 
 ```
 src/
-├── features/            # Self-contained domain slices (components/, hooks/, types.ts)
-│   ├── admin/               # User, project & token management
+├── features/            # Self-contained domain slices (most hold components/, hooks/, types.ts)
+│   ├── access/              # Stored connector credentials (admin access management)
+│   ├── admin/               # User, project & token management, create-project wizard
+│   ├── ai-activity/         # Live AI progress log for generations (useAiStream)
+│   ├── arrival/             # Arrival step authoring (Hire Setup)
+│   ├── attestation/         # Requests to confirm a hire's work
+│   ├── blueprints/          # Onboarding path blueprints: graph editor, versions
+│   ├── board/               # The hire's board: cards, areas, stages, marks, server sync
+│   ├── buddy/               # AI buddy: conversation, drafts, proposals for the board and the onboarding path
 │   ├── chatbot/             # Streaming AI assistant
+│   ├── competency-graph/    # Force layout for the competency graph
 │   ├── connectors/          # Connector + source allow/deny management
+│   ├── dashboard/           # Personal dashboard grid and widgets
 │   ├── data-ingestion/      # Sources, ingestion runs, artifacts
+│   ├── easter-eggs/         # Hidden mini-games, the dino waiting game, whole-window effects
 │   ├── faq/                 # AI FAQ clusters (insights)
+│   ├── graph-diagram/       # Shared xyflow diagram canvas with dagre layout
 │   ├── knowledge-base/      # Artifact browsing + streamed summaries
 │   ├── knowledge-gaps/      # AI-detected documentation gaps (insights)
-│   ├── onboarding/          # AI onboarding paths, checks, skip workflow
+│   ├── knowledge-request/   # Escalated questions inbox and answers (insights)
+│   ├── moments/             # Celebration animations (launch, path reveal, completion)
+│   ├── onboarding/          # AI onboarding paths, journey canvas, generation, checks
+│   ├── onboarding-metrics/  # Onboarding progress and attention per hire (insights)
+│   ├── orientation/         # Task orientation editor and panel
+│   ├── pm-area/             # PM workspace layout (PmWorkspace), team roster, attention queue, project analysis
 │   ├── profile/             # User profile view/edit
-│   ├── projects/            # Project selection
-│   ├── settings/            # User settings (chat preferences, etc.)
+│   ├── projects/            # Project selection (ProjectProvider)
+│   ├── settings/            # User settings, personal credentials
+│   ├── shortcuts/           # Global keyboard shortcuts
+│   ├── starter-work/        # Starter task pool and review (Hire Setup)
+│   ├── task-pool/           # Grabbing a task from the pool
 │   └── team-management/     # Team overview, member detail, Skill Wizard
 ├── pages/               # Route-level views (one per user-facing flow)
-├── router/              # AppRouter.tsx + AuthGuard.tsx
-├── auth/                # accessPolicy.ts (AppRoute union + canAccessRoute)
-├── context/             # Global providers (Auth, Theme, Chat, ChatPreferences)
-├── services/            # Backend communication (one module per domain; SSE streaming)
-├── components/          # Shared UI: common/, layout/, ui/ primitives
-├── config/              # Integration config (keycloak.ts)
-├── hooks/               # Shared hooks
+├── router/              # AppRouter.tsx (incl. ManagerAreaGuard) + AuthGuard.tsx
+├── auth/                # accessPolicy.ts (AppRoute union + canAccessRoute), redirectUtils.ts
+├── context/             # Global providers (Auth, Theme, Chat, Toast, FocusMode)
+├── services/            # Backend communication (one module per domain), query client, query keys
+├── components/          # Shared UI: common/, icons/ (logos lucide lacks), layout/, ui/ primitives
+├── config/              # keycloak.ts (Keycloak client), contributionWording.ts (wording shared with the backend)
+├── hooks/               # Shared hooks (incl. the TanStack Query based fetch hooks)
 ├── styles/              # Global CSS (index.css) + animation tokens (tokens.ts)
-├── mocks/               # Dev mock data
-└── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated — do not hand-edit)
+├── mocks/               # Two fixtures used as fallback by teamManagementService
+├── keycloak-theme/      # Keycloakify overrides (kc.gen.tsx is generated, do not hand-edit)
+├── main.tsx             # Entry point: boots the login theme or the app (see below)
+├── main-app.tsx         # React root of the app: StrictMode, BrowserRouter, App
+├── App.tsx              # App-level providers (§5.1) around AppRouter
+├── bootSplash.ts        # Dismisses the boot splash that index.html paints before React
+└── vite-env.d.ts        # Vite client types (import.meta.env, asset imports)
 ```
+
+`main.tsx` decides at runtime what this bundle is: when Keycloak injected a
+`window.kcContext`, it loads the login theme (`keycloak-theme/main`); with
+`VITE_KC_DEV=true` it loads the theme's dev preview (`keycloak-theme/main.dev`);
+otherwise it loads the app (`main-app`). The login theme and the app are built from
+the same `index.html`.
 
 > **Note:** there is **no `src/types/` folder**. Global types live alongside their
 > consumers (e.g. `src/services/types.ts` for backend DTOs, `src/auth/accessPolicy.ts`
@@ -90,6 +122,12 @@ src/
 
 **Rule:** new feature work → a `features/<name>/` slice. Promote to `components/` or
 `context/` only when the code is truly shared across features.
+
+**Known exception:** the connector registry (`features/data-ingestion/connectors/`) is
+imported by knowledge-base, chatbot, connectors, dashboard and admin, so a connector
+is a platform concept even though it lives inside the data-ingestion slice. Those
+features import only from the registry and `sourceSystems.ts`, never from
+data-ingestion components.
 
 ---
 
@@ -106,19 +144,40 @@ codebase.
 user-facing route is declared as a `<Route element={<Page />} />` entry. Auth is
 handled by the wrapper, not per-route loaders.
 
+All pages except `LoginPage` are loaded lazily with `React.lazy` behind one shared
+`Suspense` fallback (`PageShellSkeleton`). `LoginPage` is bundled eagerly because the
+Keycloak redirect chain can land on it through several full page reloads in a row.
+
+Two layout routes group pages that share a header: `AssistantShell` for `/chat` and
+`/buddy`, and `PmWorkspace` for the PM area (`/pm-dashboard`, `/team-management`,
+`/team/:userId` and the `/insights/*` pages).
+
+Routes that a user without access must not reach by URL are wrapped in
+`ManagerAreaGuard`: the PM area, `/data-ingestion`, `/blueprints` and `/hire-setup`.
+It waits for the project context to load and redirects to `getDefaultRoute` when
+`canAccessRoute` fails.
+
 ### 4.2 AuthGuard (`src/router/AuthGuard.tsx`)
 
-`AuthGuard` is the single entry point for access control. It:
+`AuthGuard` handles authentication and the app-wide redirects. Role-based URL
+blocking is done by `ManagerAreaGuard` (§4.1). `AuthGuard`:
 
-1. Reads `status` (`loading` | `authenticated` | `unauthenticated`) and `profile`
-   from `useAuth()`.
-2. Redirects unauthenticated users to `/login` (preserving the original target via
-   `location.state.from`).
-3. Redirects authenticated users on `/login` back to where they came from.
+1. Reads `status` (`loading` | `signingOut` | `unauthenticated` | `authenticated`)
+   and `profile` from `useAuth()`.
+2. Redirects unauthenticated users to `/login`. The original target is stored in
+   `sessionStorage` (`src/auth/redirectUtils.ts`) and also passed as `?redirect=`
+   and `location.state.from`, because the Keycloak round trip loses the router state.
+3. Redirects authenticated users on `/login` to the stored target, or to
+   `getDefaultRoute(profile)` when there is none. When Keycloak returns to `/` or
+   strips the hash fragment, it restores the stored target as well.
 4. Redirects authenticated users who need a skill assessment to `/skill-wizard`
    (the only route exempt from the skill-assessment gate).
-5. Renders a full-screen spinner while auth state or skill-assessment check is in
-   flight.
+5. Blocks `/onboarding` and `/onboarding/:stepId` for users who have completed
+   onboarding.
+6. Renders a page skeleton while auth state or the skill-assessment check is in
+   flight. It renders nothing while `status` is `signingOut` (a logout return or a
+   failed silent SSO check), and nothing while `loading` on `/login`, because the
+   skeleton's header does not match the login card.
 
 ### 4.3 Access policy (`src/auth/accessPolicy.ts`)
 
@@ -129,8 +188,10 @@ Route-level authorization is centralized in `src/auth/accessPolicy.ts`:
   `'/insights/knowledge-gaps'`).
 - **`routePermissions`** — `Record<AppRoute, readonly PermissionGroup[]>` mapping
   each route to the groups allowed to access it.
-- **`canAccessRoute(profile, route)`** — returns `true` if the user's
-  `permissionGroup` is in the route's allow-list.
+- **`canAccessRoute(profile, route, managesSelectedProject)`**: returns `true` if the
+  user's `permissionGroup` is in the route's allow-list. For PMs on the routes in
+  `MANAGER_ASSIGNMENT_ROUTES` it also requires that they manage the selected project
+  (`canManageSelected` from `useProjectContext()`).
 - **`getDefaultRoute(profile)`** — the route to redirect to after login.
 - **`getMatchingProtectedRoute(pathname)`** — matches a real URL (including
   dynamic segments like `/team/:userId`) back to an `AppRoute` for permission
@@ -148,38 +209,138 @@ Route-level authorization is centralized in `src/auth/accessPolicy.ts`:
 > **New protected routes must be added to `AppRoute` + `routePermissions`**, or they
 > won't type-check and won't be access-controlled.
 
+> **The buddy has a hand-written map of these pages** (`AppGuide.kt` in the backend,
+> served by the `get_app_guide` tool). A new, renamed or removed page, tab or tab URL
+> parameter, or a changed sidebar/tab/button label it quotes, means updating that file
+> in the same change. `appGuideRoutes.test.ts` fails when `accessPolicy.ts` gains a
+> route the guide neither describes nor excludes on purpose
+> (`src/features/buddy/appGuideRoutes.ts`).
+
 ### 4.4 Actual route list
 
-Declared in `AppRouter.tsx` (17 routes):
+Declared in `AppRouter.tsx`:
 
 ```
-/login                          /team-management
-/skill-wizard                   /team/:userId
-/                               /pm-dashboard
-/chat                           /admin
-/chat/:id                       /insights/faq
-/onboarding                     /insights/faq/:groupId
-/onboarding/:stepId             /insights/knowledge-gaps
-/knowledge-base                 /insights/knowledge-gaps/:gapId
-/data-ingestion                 /profile
+/login                          /pm-dashboard
+/skill-wizard                   /team-management
+/                               /team/:userId
+/chat                           /insights/faq/:groupId?
+/chat/:id                       /insights/knowledge-gaps/:gapId?
+/buddy                          /insights/knowledge-requests
+/onboarding                     /insights/onboarding
+/onboarding/:stepId             /admin
+/board                          /hire-setup
+/knowledge-base                 /arrival-steps   (redirects to /hire-setup)
+/blueprints                     /starter-work    (redirects to /hire-setup)
+/blueprints/:pathId             /settings
+/data-ingestion                 /profile         (redirects to /settings)
+                                *                (NotFoundPage)
 ```
 
 ---
 
 ## 5. State management
 
-There is **no global store** (no Redux, Zustand, etc.). Cross-cutting state is
-handled by React Context providers in `src/context/`:
+There is **no global store** (no Redux, Zustand, etc.). Backend data lives in the
+TanStack Query cache (§5.2). Cross-cutting client state is handled by React Context
+providers.
 
-| Provider / hook                                  | File                                                                                | Responsibility                                                                               |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `AuthProvider` + `useAuth`                       | `AuthProvider.tsx`, `AuthContext.ts`, `useAuth.ts`                                  | Initializes Keycloak, fetches the user profile (with retries), exposes `status` + `profile`. |
-| `ThemeProvider` + `useTheme`                     | `ThemeProvider.tsx`, `ThemeContext.ts`, `useTheme.ts`                               | Light/dark/system theme via `.dark` class on `document.documentElement`; persists choice.    |
-| `ChatProvider`                                   | `ChatProvider.tsx`, `ChatContext.ts`                                                | Active conversation state for the chatbot feature.                                           |
-| `ChatPreferencesProvider` + `useChatPreferences` | `ChatPreferencesProvider.tsx`, `ChatPreferencesContext.ts`, `useChatPreferences.ts` | Per-user chat UI preferences.                                                                |
+### 5.1 Context providers
+
+Global providers in `src/context/`:
+
+| Provider / hook                      | File                                                              | Responsibility                                                                               |
+| ------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `AuthProvider` + `useAuth`           | `AuthProvider.tsx`, `AuthContext.ts`, `useAuth.ts`                | Initializes Keycloak, fetches the user profile (with retries), exposes `status` + `profile`. |
+| `ThemeProvider` + `useTheme`         | `ThemeProvider.tsx`, `ThemeContext.ts`, `useTheme.ts`             | Light/dark/system theme via `.dark` class on `document.documentElement`; persists choice.    |
+| `ToastProvider` + `useToast`         | `ToastProvider.tsx`, `ToastContext.ts`, `useToast.ts`             | App-wide toasts that survive route changes.                                                  |
+| `ChatProvider`                       | `ChatProvider.tsx`, `ChatContext.ts`                              | Active conversation state for the chatbot feature.                                           |
+| `FocusModeProvider` + `useFocusMode` | `FocusModeProvider.tsx`, `FocusModeContext.ts`, `useFocusMode.ts` | Lets a page put the app shell into focus mode.                                               |
+
+Feature providers mounted at app level (`App.tsx`):
+
+| Provider                    | Location                          | Responsibility                                                                          |
+| --------------------------- | --------------------------------- | --------------------------------------------------------------------------------------- |
+| `ProjectProvider`           | `features/projects/`              | Loads the user's projects, holds the globally selected project and `canManageSelected`. |
+| `MyKnowledgeGapsProvider`   | `features/knowledge-gaps/`        | Knowledge gaps the user owns in the selected project.                                   |
+| `MomentsProvider`           | `features/moments/`               | Celebration animations, e.g. the launch sequence after login.                           |
+| `CardMarksProvider`         | `features/board/marks/`           | Highlights on board cards, shared with the selection toolbar.                           |
+| `OnboardingJourneyProvider` | `features/onboarding/generation/` | Onboarding path generation that keeps running across route changes.                     |
+| `BuddyProvider`             | `features/buddy/`                 | The hire's one buddy conversation, shared by the dock and the `/buddy` page.            |
+| `BuddyDraftProvider`        | `features/buddy/`                 | Composer drafts shared by the dock and the `/buddy` page.                               |
+
+The buddy is the one provider with two surfaces and one session: `BuddyProvider` sits
+above the routes — inside the router, since `main-app.tsx` mounts `<BrowserRouter>`
+around `App.tsx` — so the dock (`BuddyWidget`; mounted once the user is signed in, gone
+in focus mode, hidden on `/buddy`) and the page render the same conversation — a message sent in
+either appears in the other, and the dock hands the session to the page by growing into
+it rather than by transferring anything. The composer's draft is a provider of its own
+(`BuddyDraftProvider`) below the session, so it survives closing the dock, and a
+keystroke re-renders the composer instead of the conversation. Team mode is bound to
+the global project selection: a user who manages a project can switch the session onto
+it, and when the binding breaks — management lost, or the selection moved — the session
+falls back to the hire thread and says so with a toast.
 
 Feature-local state stays inside the feature (e.g. `onboarding` step state lives in
 `features/onboarding/`).
+
+### 5.2 Server state (TanStack Query)
+
+All backend reads go through one shared `QueryClient` (`src/services/queryClient.ts`,
+`staleTime` 30 s, `retry` 1, cleared on logout). Query keys come from the central
+factory in `src/services/queryKeys.ts`. Project-scoped keys always contain the
+`projectId`, user-scoped keys the user id.
+
+| Situation                                   | Hook                       |
+| ------------------------------------------- | -------------------------- |
+| Normal page or widget read                  | `useQueryFetch`            |
+| Panel that refreshes itself (polling)       | `useLiveFetch`             |
+| Small read in the app shell (badge, count)  | `useRateLimitedRead`       |
+| Writes, optimistic updates, custom `select` | `useQuery` / `useMutation` |
+
+`useFetch` is superseded by `useQueryFetch` and has no callers left; only its
+`UseFetchResult` type is still imported by `useQueryFetch`. The sidebar warms the page module
+and its main query on `pointerdown` (`src/services/routePrefetch.ts`). The reasoning
+behind this setup is recorded in ADR-017 in the Wiki.
+
+### 5.3 Knowledge Base view state
+
+The `/knowledge-base` page keeps its whole view state in the query string, and
+`useKnowledgeBaseUrlState` is its only writer: tab, search, sources, repositories,
+format, languages, the date window, page, size and sort survive a refresh, a link is
+shareable, and Back undoes the last click instead of walking through every keystroke.
+`?artifact=<id>` is part of that state rather than a one-time hand-off — it names the
+document open in the viewer drawer, opening one writes it, closing one removes it
+(`replace` throughout, so reading four documents does not leave four entries in the back
+button), and a switch between two settled projects drops it together with the other
+project-scoped params, because an id from project A means nothing in project B. The board's
+cards rely on it: an origin recorded from a highlighted paragraph is this URL plus a
+`#:~:text=` fragment, so without the parameter the way back would land on the list instead
+of the document.
+
+Deleting uploads is gated to `PM` and `ADMIN`, mirroring the backend's
+`@PreAuthorize("hasRole('PM') or hasRole('ADMIN')")`: the page offers the selection mode
+only while the Uploads source is picked, and the viewer drawer shows its Delete control
+only for an allowed role and a connector whose artifacts are deletable.
+
+AI summaries stream over SSE through `knowledgeService.streamArtifactSummary`; a `503`
+means the artifact is still being indexed, and the drawer retries with exponential
+backoff (2 s up to 30 s) until it is ready. A second, batched request per visible page
+(`useArtifactAiStatus`) draws the AI status chips on the list, polling every 10 s while
+anything is still `PROCESSING`. Uploads enter through the Upload connector's add-source
+form (`FileUploadZone`, shared from `knowledge-base/`) and appear here as the Uploads
+source; this page lists them, it does not upload them.
+
+### 5.4 Settings view state
+
+`/settings` is open to every permission group (`/profile` redirects here), and it is
+one scrollable page with three sections: User Profile, Appearance and Access Tokens.
+The Access Tokens section exists only for `PM`, `HR` and `ADMIN` users, and it renders
+the same `AccessManagementView` as the admin Access Management page, so the two cannot
+drift apart. The section nav entries stay real anchor links; a click scrolls to the
+section (respecting `prefers-reduced-motion`), writes the hash with `replaceState`, and
+moves focus onto the section with `preventScroll`, so the focus change does not undo the
+scroll.
 
 ---
 
@@ -205,167 +366,128 @@ The codebase uses the **native `fetch` API** (not axios). All HTTP calls go thro
 - Yields each `data:` JSON payload as a typed object.
 - Skips malformed `data:` lines (logs via `console.warn`) rather than aborting.
 
-Used by `chatService`, `knowledgeService`, and `onboardingService` so the
-line-splitting / JSON-parsing logic lives in exactly one place.
+Used by `chatService`, `knowledgeService`, and `onboardingService`. `buddyService`
+and `aiStreamService` do not use it yet and still split and parse their streams in
+their own read loops.
 
 ### 6.3 Service modules (`src/services/`)
 
-One module per domain. Each exports typed functions and surfaces backend failures
-(no empty `catch`, no silent swallow):
+One module per domain (rules for writing them in
+[FRONTEND_CODING_STANDARDS.md §7](./FRONTEND_CODING_STANDARDS.md#7-services--api-layer)):
 
-| Module                     | Domain                                                         |
-| -------------------------- | -------------------------------------------------------------- |
-| `adminUserService.ts`      | Admin user management                                          |
-| `apiClient.ts`             | Shared fetch wrapper                                           |
-| `chatService.ts`           | Chatbot (SSE streaming)                                        |
-| `connectorService.ts`      | Connectors + source allow/deny lists                           |
-| `faqService.ts`            | Insights FAQ clusters                                          |
-| `ingestionService.ts`      | Data ingestion runs + artifacts                                |
-| `knowledgeGapService.ts`   | Insights knowledge gaps                                        |
-| `knowledgeService.ts`      | Knowledge base + streamed summaries                            |
-| `onboardingService.ts`     | Onboarding paths, steps, tasks, feedback                       |
-| `projectService.ts`        | Project selection                                              |
-| `sse.ts`                   | Shared SSE stream parser                                       |
-| `teamManagementService.ts` | Team overview, member detail, skills                           |
-| `userService.ts`           | Current user profile                                           |
-| `types.ts`                 | Backend DTO types (the closest thing to a global types folder) |
-| `sources/`                 | Per-source services (e.g. `githubService`)                     |
+| Module                         | Domain                                                                |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `adminUserService.ts`          | Admin user management                                                 |
+| `aiStreamService.ts`           | Live AI progress events (SSE over `fetch`)                            |
+| `apiClient.ts`, `apiError.ts`  | Shared fetch wrapper and `ApiError`                                   |
+| `arrivalService.ts`            | Arrival steps                                                         |
+| `attestationService.ts`        | Attestation requests                                                  |
+| `blueprintService.ts`          | Onboarding path blueprints                                            |
+| `boardService.ts`              | Board cards and board arrangement sync                                |
+| `buddyService.ts`              | AI buddy (SSE streaming)                                              |
+| `chatService.ts`               | Chatbot (SSE streaming)                                               |
+| `connectorService.ts`          | Connectors + source allow/deny lists                                  |
+| `dashboardLayoutService.ts`    | Dashboard widget layout                                               |
+| `faqService.ts`                | Insights FAQ clusters                                                 |
+| `ingestionService.ts`          | Data ingestion runs + artifacts                                       |
+| `knowledgeGapService.ts`       | Insights knowledge gaps                                               |
+| `knowledgeRequestService.ts`   | Escalated knowledge requests                                          |
+| `knowledgeService.ts`          | Knowledge base + streamed summaries                                   |
+| `myStarterWorkService.ts`      | The current hire's starter work                                       |
+| `onboardingFeedbackService.ts` | Onboarding feedback                                                   |
+| `onboardingGraphService.ts`    | Onboarding journey graph                                              |
+| `onboardingMetricsService.ts`  | Onboarding metrics (insights)                                         |
+| `onboardingService.ts`         | Onboarding paths, steps, tasks, feedback                              |
+| `orientationService.ts`        | Task orientation                                                      |
+| `projectAnalysisService.ts`    | Project analysis runs (PM-area insights)                              |
+| `projectService.ts`            | Projects, managed projects, project selection                         |
+| `queryClient.ts`               | Shared TanStack Query client (§5.2)                                   |
+| `queryKeys.ts`                 | Central query key factory (§5.2)                                      |
+| `routePrefetch.ts`             | Sidebar prefetch of page modules and queries (§5.2)                   |
+| `sse.ts`                       | Shared SSE stream parser                                              |
+| `starterWorkService.ts`        | Starter work pool and review                                          |
+| `teamManagementService.ts`     | Team overview, member detail, skills                                  |
+| `userService.ts`               | Current user profile                                                  |
+| `types.ts`                     | Backend DTO types (the closest thing to a global types folder)        |
+| `sources/`                     | Per-source services (GitHub, Bitbucket, Jira, Confluence & Atlassian) |
 
-### 6.4 Vite dev proxy (`vite.config.ts`)
+### 6.4 Reverse proxy
 
-| Path    | Target                             |
-| ------- | ---------------------------------- |
-| `/api`  | `http://127.0.0.1:8080` (backend)  |
-| `/v1`   | `http://127.0.0.1:8080` (backend)  |
-| `/auth` | `http://127.0.0.1:8081` (Keycloak) |
+Nothing addresses the backend or Keycloak by absolute URL: both are reached through
+the frontend's own origin and resolved by a reverse proxy, which differs per
+deployment target:
+
+| Route   | Vite dev (`vite.config.ts`) | Docker (`nginx.conf`)       | Kubernetes (`sprintstart-k8s`) |
+| ------- | --------------------------- | --------------------------- | ------------------------------ |
+| `/api`  | `127.0.0.1:8080`            | `host.docker.internal:8080` | `sprintstart-backend:8080`     |
+| `/v1`   | `127.0.0.1:8080`            | not proxied                 | `sprintstart-backend:8080`     |
+| `/auth` | `127.0.0.1:8081`            | `host.docker.internal:8081` | `sprintstart-keycloak:8080`    |
+
+The Kubernetes column is the nginx config in `base/sprintstart-frontend/configmap.yaml`
+of the `sprintstart-k8s` repository, which is what the cluster runs. `/v1` is
+currently unused by the SPA, so its absence in Docker costs nothing today. The
+manifests under `k8s/frontend/` in this repository are an older standalone set that
+the cluster does not use. They have no `/auth` route, so `config/keycloak.ts`
+(which builds the Keycloak URL as `window.location.origin + /auth`) would not work
+with them as they are.
 
 ---
 
 ## 7. Design system
 
-### 7.1 One shared palette
+This section describes how the design system is built. The rules for using it
+(tokens only, UI primitives, radius/shadow/heading scales, color-blind safety,
+contrast, focus) are in
+[FRONTEND_CODING_STANDARDS.md §4 and §5](./FRONTEND_CODING_STANDARDS.md#4-styling-tailwind-css-v4).
 
-A set of **semantic design tokens** (CSS variables → Tailwind `app-*` classes)
-defined in [`src/styles/index.css`](../src/styles/index.css). **Always use tokens;
-never hardcode colors** (no `#2563eb`, no raw Tailwind colors like `text-blue-500`).
+### 7.1 Semantic tokens
 
-Semantic roles:
+All colors are semantic design tokens, defined as CSS custom properties in
+[`src/styles/index.css`](../src/styles/index.css). An `@theme inline` block maps them
+to Tailwind utilities with the `app-` prefix. The families:
 
 - **Surfaces**: `bg-app-bg`, `bg-app-surface`, `bg-app-surface-muted`
 - **Text**: `text-app-text`, `text-app-text-muted`, `text-app-text-subtle`
 - **Borders**: `border-app-border`, …
 - **Brand**: `bg-app-brand`, `text-app-brand`, …
-- **Status**: `success` / `warning` / `danger` / `neutral`
+- **Status**: `success` / `warning` / `danger` / `neutral`, each with `-bg`,
+  `-border` and `-text` variants, plus `-solid` for all but `neutral`
   (e.g. `bg-app-success-bg text-app-success-text`)
 
 ### 7.2 Light / dark theme
 
-Controlled via the `.dark` class on `document.documentElement`, managed by
-`ThemeProvider`. The entry CSS uses `@import "tailwindcss"`, `@custom-variant dark`,
-and `@theme inline` to map CSS custom properties into Tailwind tokens. Every color
-works in both themes automatically when you use tokens.
-
-### 7.3 Color-blind accessibility (required)
-
-Never rely on color **alone** to convey meaning. Always back it with an
-**icon, text label, or shape** (e.g. status = chip text + icon, not just red/green)
-— this is why finished/skipped/locked steps use distinct icons _and_ labels. Keep
-color pairs distinguishable for common color-vision deficiencies.
-
-### 7.4 Contrast & focus
-
-- Meet **WCAG 2.1 AA** for text and interactive elements.
-- Keep visible focus via the `--app-focus` token (`focus-visible:ring-app-focus`) —
-  don't remove outlines.
-
-### 7.5 Stay consistent beyond color
-
-Use the shared Tailwind scale for spacing, radius, and sizing instead of arbitrary
-one-off pixel values, so padding/margins/gaps match the rest of the app.
+`ThemeProvider` sets the `.dark` class on `document.documentElement` and persists the
+choice (light, dark or system). `index.css` defines the light values under `:root`
+and overrides them under `.dark`, so anything styled with tokens follows the theme
+without `dark:` prefixes. `@custom-variant dark` is there for the rare case that
+needs one.
 
 ---
 
 ## 8. Animation system (Framer Motion 12)
 
-The codebase consumes `framer-motion` (^12) directly with inline `motion.` props.
+The codebase uses `framer-motion` (^12) directly through `motion.*` components and
+`<AnimatePresence>`. The rules for using it are in
+[FRONTEND_CODING_STANDARDS.md §6](./FRONTEND_CODING_STANDARDS.md#6-animation-framer-motion-12).
 
-### 8.1 Centralized spring tokens
+Every shared motion value lives in [`src/styles/tokens.ts`](../src/styles/tokens.ts),
+each with a TSDoc comment saying when to use it. Read the file rather than a copy of
+it here; it falls into four groups:
 
-Canonical implementation: [`src/styles/tokens.ts`](../src/styles/tokens.ts).
+- **Spring transitions**: `centralSpringToken` (the default for layout and list
+  motion), `hoverSpringToken` (hover and tap micro-interactions), plus a few
+  specialised springs such as `sidePanelSlideToken` or `celebrationSpringToken`.
+- **Button motion**: `buttonHoverMotion` and `buttonHoverMotionDisabled`, which
+  `ui/Button` applies itself. Despite the name they only scale on press, not on
+  hover.
+- **Dialog variants**: `modalBackdropVariants` and `getModalDialogVariants`, used by
+  `ui/Modal`.
+- **Timing constants**: e.g. `SIDE_PANEL_SLIDE_MS`, `SKELETON_APPEAR_DELAY_MS`.
 
-```typescript
-import type { Transition } from "framer-motion";
-
-/** Default spring for layout transitions, list enter/exit, and general motion.
- *  Snappy but not stiff — settles quickly without overshooting violently. */
-export const centralSpringToken: Transition = {
-  type: "spring",
-  stiffness: 300,
-  damping: 25,
-  mass: 0.8,
-};
-
-/** Lighter spring for hover/tap micro-interactions — faster, slightly bouncier. */
-export const hoverSpringToken: Transition = {
-  type: "spring",
-  stiffness: 400,
-  damping: 15,
-};
-```
-
-**Rule:** use these presets for ALL `motion` transitions — do not inline ad-hoc
-spring configs.
-
-Usage:
-
-```tsx
-import { centralSpringToken } from "@/styles/tokens";
-<motion.div transition={centralSpringToken} ... />
-```
-
-### 8.2 Layout transitions & list deletions
-
-When items (like steps or resources) are added or removed dynamically, standard
-CSS transitions cause adjacent elements to snap instantly to their new locations.
-Use **layout animations** to interpolate this reflow smoothly.
-
-```tsx
-import { motion, AnimatePresence } from "framer-motion";
-import { centralSpringToken } from "@/styles/tokens";
-
-export function TaskList({ tasks, onDelete }) {
-  return (
-    <div className="grid gap-4">
-      <AnimatePresence mode="popLayout">
-        {tasks.map((task) => (
-          <motion.div
-            layout
-            key={task.id}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={centralSpringToken}
-          >
-            <TaskCard task={task} onDelete={onDelete} />
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}
-```
-
-### 8.3 Defensive layout rules
-
-1. **`mode="popLayout"`** — always specify on `<AnimatePresence>` when wrapping
-   elements that affect document reflow. This pops the exiting element out of the
-   layout flow, allowing surrounding elements to animate into their new positions
-   immediately rather than waiting for the exit animation to complete.
-2. **`layout` attribute** — the direct child of `<AnimatePresence>` must have
-   `layout` set. This tells Framer Motion to watch the element's bounding box and
-   animate size or position changes.
-3. **Key declarations** — the animated child must have a unique, stable `key`. Avoid
-   index offsets; use database UUIDs.
+The variant factories take a `prefersReducedMotion` flag, and `ui/Button` drops its
+press feedback when the user prefers reduced motion. In tests, `framer-motion` is
+replaced by a passthrough mock (see
+[testing_strategy.md §5](./testing_strategy.md#5-global-setup-testsunitsetupvitestsetupts)).
 
 ---
 
@@ -373,20 +495,7 @@ export function TaskList({ tasks, onDelete }) {
 
 ### 9.1 Commands
 
-| Purpose                                                       | Command                                              |
-| ------------------------------------------------------------- | ---------------------------------------------------- |
-| Install deps (runs `keycloakify sync-extensions` postinstall) | `npm install`                                        |
-| Dev server (`:5173`)                                          | `npm run dev`                                        |
-| Production build (`tsc -b` + `vite build`)                    | `npm run build`                                      |
-| Lint                                                          | `npm run lint`                                       |
-| All unit tests (CI-friendly, non-watch)                       | `npm run test`                                       |
-| Unit tests only (excludes a11y)                               | `npm run unit`                                       |
-| A11y tests only                                               | `npm run a11y`                                       |
-| **Definition of Done (one command)**                          | `npm run try` (install + build + lint + unit + a11y) |
-| Storybook (`:6006`)                                           | `npm run storybook`                                  |
-| Build Keycloak theme                                          | `npm run build-keycloak-theme`                       |
-| Dev Keycloak theme                                            | `npm run dev-keycloak-theme`                         |
-| Full stack via Docker (`:3000`)                               | `docker compose up --build`                          |
+All npm scripts are listed in the [README](../README.md#commands--scripts).
 
 ### 9.2 Vite config
 
@@ -397,15 +506,18 @@ export function TaskList({ tasks, onDelete }) {
 - `keycloakify({ accountThemeImplementation: "none" })` — Keycloakify Vite plugin.
 - Dev proxy (see §6.4).
 - Vitest config: `environment: 'jsdom'`, `globals: true`,
-  `setupFiles: './tests/unit/setup/vitest.setup.ts'`.
+  `setupFiles: './tests/unit/setup/vitest.setup.ts'`, a 30 s test timeout, and an
+  alias that routes `@testing-library/react` through `tests/unit/setup/rtl.tsx` (see
+  [testing_strategy.md §4](./testing_strategy.md#4-vitest-configuration)).
 
 ### 9.3 TypeScript config
 
 - `tsconfig.app.json` — `verbatimModuleSyntax: true`, `allowImportingTsExtensions: true`
-  (so `.ts`/`.tsx` extensions on relative imports are allowed and encouraged),
+  (so `.ts`/`.tsx` extensions on relative imports are allowed),
   `target: es2023`, `jsx: react-jsx`, strict linting flags.
 - `tsconfig.node.json` — for Vite config files.
-- `tsconfig.test.json` — for test files (relaxes some lint rules).
+- `tsconfig.test.json` — for test files: extends `tsconfig.app.json`, adds the
+  `vitest/globals` and `jsdom` types, and includes `tests/`.
 
 ---
 
@@ -421,20 +533,50 @@ export function TaskList({ tasks, onDelete }) {
 
 ### 10.2 Kubernetes
 
-`k8s/` (inside this repo, not a separate `sprintstart-k8s` repo) holds per-component
-Kubernetes manifests.
+The cluster deployment is defined in the separate `sprintstart-k8s` repository
+(Kustomize base and dev/prod overlays, deployed through Argo CD with image updater).
+`k8s/frontend/` in this repository holds an older standalone set of manifests that
+the cluster does not use.
 
-### 10.3 Keycloak theme
+### 10.3 Keycloak login theme
 
-`npm run build-keycloak-theme` produces a Keycloak theme JAR/ZIP under
-`dist_keycloak/` (gitignored) deployable to a Keycloak instance.
+`src/keycloak-theme/` is a Keycloakify login theme. Most of it is regenerated by
+`keycloakify sync-extensions` on every `npm install` and is gitignored (see
+`src/keycloak-theme/.gitignore`); the files committed to git are ours. `kc.gen.tsx`
+is committed as well but generated, so do not hand-edit it.
 
----
+**It does not inherit the app's design system for free.** The theme boots its own,
+separate React root: no `ThemeProvider`, no `AuthProvider`, nothing from
+`main-app.tsx`'s tree. Exactly one thing crosses that boundary automatically:
 
-## 11. Reference
+- **CSS custom properties.** `login/styleLevelCustomization.tsx` imports
+  `src/styles/index.css` directly, so the `--color-app-*` tokens and the
+  `.app-aurora` / `.app-bg-grid` / etc. keyframes are available as-is in `login.css`.
 
-- [FRONTEND_CODING_STANDARDS.md](./FRONTEND_CODING_STANDARDS.md) — TS / React / Tailwind / a11y conventions.
-- [FRONTEND_DOCUMENTATION_GUIDELINES.md](./FRONTEND_DOCUMENTATION_GUIDELINES.md) — TSDoc/JSDoc rules.
-- [testing_strategy.md](./testing_strategy.md) — Vitest + MSW + vitest-axe setup.
-- [../AGENTS.md](../AGENTS.md) — short-context orientation guide for AI agents.
-- [../README.md](../README.md) — setup, prerequisites, env vars, developer notes.
+Everything else is **not shared** and exists twice, as hand-maintained copies:
+
+- `SpotlightCard`, `AuroraBackground` and the animated `SidebarLogo` mark have
+  trimmed-down copies under `src/keycloak-theme/login/components/`. They read
+  `localStorage` directly for settings like `isAuroraEnabled` and `isTiltEnabled`,
+  since there is no `ThemeContext` there.
+- `ui/Button` and `ui/Input` have no component copy. The login form is Keycloak's own
+  markup, so their look (radius, focus ring, hover and press feedback) is rebuilt in
+  CSS on Keycloak's classes in `login/login.css`.
+
+When a shared primitive or token changes, the copy has to be ported by hand (rule in
+[FRONTEND_CODING_STANDARDS.md §4](./FRONTEND_CODING_STANDARDS.md#4-styling-tailwind-css-v4)).
+
+**Deploying a theme change is a second step, in a second repo.** Editing
+`src/keycloak-theme/` only changes source here. To make it visible anywhere:
+
+1. `npm run build-keycloak-theme` (needs a local Maven and JDK, because
+   `keycloakify build` shells out to `mvn` to package the theme JAR).
+2. Copy `dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar` into
+   `sprintstart-backend/infra/keycloak/themes/` (a different repo; the JAR is
+   committed there as a binary).
+3. Rebuild the Keycloak image there (`docker compose up --build keycloak` locally,
+   `publish-keycloak.yml` in CI).
+
+Nothing syncs the two repos automatically. Skip this and the running Keycloak keeps
+serving whatever theme JAR was last committed, while the source here moves on
+without it.

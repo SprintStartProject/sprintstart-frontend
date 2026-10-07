@@ -4,24 +4,19 @@ import {
   ChevronsUpDown,
   Bot,
   CircleCheckBig,
-  CircleDashed,
   Layers,
-  Lock,
-  KeyRound,
   Pin,
   PinOff,
-  Waypoints,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { unblocksSaid } from "../../graph-diagram/lockWords";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Collapsible } from "../../../components/ui/Collapsible";
 import { SpotlightCard } from "../../../components/ui/SpotlightCard";
-import { cardName } from "../layout/cardNames";
+import { CardEditHistory } from "./CardEditHistory";
 import { useBoardCardControls } from "./boardCardControls";
-import type { BoardCard } from "../types";
+import type { BoardCard, BoardCardLastChange, BoardCardPrevious, BoardUndoNotice } from "../types";
 
 type BoardCardFrameProps = {
   /**
@@ -44,7 +39,17 @@ type BoardCardFrameProps = {
    * It is here so a card can be found by shape before it is read; the colour comes from the bloom.
    */
   icon: LucideIcon;
-  card: Pick<BoardCard, "id" | "owner" | "placedAt">;
+  card: Pick<BoardCard, "id" | "owner" | "placedAt"> & {
+    /**
+     * The version the latest edit replaced, when there is one to go back to — authored cards only.
+     *
+     * Optional so the live-card components keep handing over exactly what they always did: a live
+     * card holds no stored content and can never carry a previous version.
+     */
+    previous?: BoardCardPrevious | null;
+    /** The card's latest change, for the strip's wording. Same story as `previous`. */
+    lastChange?: BoardCardLastChange | null;
+  };
   /** Optional one-line note under the title, e.g. what the card is counting. */
   subtitle?: string;
   /**
@@ -57,6 +62,20 @@ type BoardCardFrameProps = {
   controlLabel?: string;
   onDismiss?: (cardId: string) => void;
   dismissing?: boolean;
+  /**
+   * Puts this card back to what it said before its most recent edit. Absent on a board that cannot
+   * write.
+   */
+  onRestorePrevious?: (cardId: string, replacedAt: string) => void;
+  /** True while this card's own undo is in flight. */
+  restoring?: boolean;
+  /**
+   * True while the card is being changed by hand — its editor is open, or a write of its own is
+   * still on its way. The strip's undo stands down then; see `CardEditHistory`.
+   */
+  paused?: boolean;
+  /** What just happened to this card's undo, when anything did. */
+  undoNotice?: BoardUndoNotice | null;
   /** A kind-specific control in the header, e.g. "edit this note". */
   action?: ReactNode;
   children: ReactNode;
@@ -70,6 +89,11 @@ type BoardCardFrameProps = {
  * they know they wrote it. Claiming the buddy added something it didn't would be attribution the
  * hire cannot check, and attribution they cannot check is attribution they cannot trust — which
  * would undermine the label everywhere it *is* true.
+ *
+ * A card that was edited carries the record of that edit too — what it replaced, who replaced it
+ * and when, with the way back — rendered by {@link CardEditHistory}. Like the `placedAt` line it is
+ * data on the card rather than a toast: the edit the hire never saw is the one an undo exists for,
+ * and a record that expires while they are away is one they cannot check.
  *
  * The remove control says "Remove", not "Hide": the buddy will not put it back, and a word that
  * suggested otherwise would misdescribe a decision as a gesture. Folding is the opposite and says
@@ -91,14 +115,8 @@ type BoardCardFrameProps = {
  * card down to an ellipsis: reserved space is reserved whether or not anything is drawn in it. Now
  * the cluster is lifted out of the header's flow, so the title has the whole row until somebody
  * comes near, and `focus-within` brings the cluster back for a keyboard user. While the board is
- * being arranged it sits in the flow again — there it holds the stage and dependency pickers and
+ * being arranged it sits in the flow again — there it holds the "Pile" picker on every card and
  * *is* what somebody came for.
- *
- * **A blocked card stays visible and goes quiet.** It is dimmed and says what it is waiting on,
- * rather than being hidden or disabled: a hire who cannot yet do something is entitled to know it
- * exists and why it is not their turn, and a card that vanished until its moment would read as the
- * board losing things. Nothing about it is actually locked — the block is a statement about order,
- * not a permission, and somebody who has a reason to get on with it still can.
  *
  * The body stops taking clicks while the board is being arranged, so a card that is a drag target
  * does not also tick a checkbox on the way past. That is driven by `data-arranging` on the grid
@@ -114,6 +132,10 @@ export function BoardCardFrame({
   controlLabel,
   onDismiss,
   dismissing = false,
+  onRestorePrevious,
+  restoring = false,
+  paused = false,
+  undoNotice = null,
   action,
   children,
 }: BoardCardFrameProps) {
@@ -125,11 +147,7 @@ export function BoardCardFrame({
     onTogglePinned,
     dragHandle,
     state,
-    onToggleDone,
-    stagePicker,
-    dependencyPicker,
-    onShowChain,
-    unblocks,
+    pilePicker,
     stack,
     resizeHandle,
   } = useBoardCardControls();
@@ -142,8 +160,6 @@ export function BoardCardFrame({
   const open = !collapsed || peeking;
 
   const placedByBuddy = card.placedAt !== null;
-  const blocked = state?.status === "BLOCKED";
-  const freed = unblocksSaid(unblocks ?? 0);
   const done = state?.status === "DONE";
   // Falls back to the generic word rather than to the title when the title is not text: a
   // rendered node cannot go inside "Remove the … card", and "Remove the [object Object] card" is
@@ -159,12 +175,7 @@ export function BoardCardFrame({
       roundedClassName="rounded-2xl"
       // A visible "this can be moved" state while the board is being arranged, matching the ring
       // the dashboard puts on its widgets in edit mode.
-      className={`[[data-arranging]_&]:ring-2 [[data-arranging]_&]:ring-app-border-muted ${
-        // Turned down rather than turned off. Full opacity would put a card nobody can act on at
-        // the same volume as the one they should be reading; hiding it would lose the fact that it
-        // is coming. Restored on approach, so reading a blocked card costs nothing.
-        blocked ? "opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100" : ""
-      }`}
+      className="[[data-arranging]_&]:ring-2 [[data-arranging]_&]:ring-app-border-muted"
     >
       <section
         // How anything outside the board finds out that a selection landed inside a card — the
@@ -218,7 +229,12 @@ export function BoardCardFrame({
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <h2 className="line-clamp-2 text-sm font-semibold text-app-text">{title}</h2>
+                <h2
+                  className="line-clamp-2 text-sm font-semibold text-app-text"
+                  title={typeof title === "string" ? title : undefined}
+                >
+                  {title}
+                </h2>
 
                 {pinned && (
                   <Badge variant="neutral" size="sm" className="gap-1">
@@ -237,22 +253,6 @@ export function BoardCardFrame({
                   </Badge>
                 )}
 
-                {blocked && (
-                  <Badge variant="neutral" size="sm" className="gap-1">
-                    <Lock className="h-3 w-3" aria-hidden="true" />
-                    Waiting
-                  </Badge>
-                )}
-
-                {/* Only where it is actionable: on a card that is waiting, "frees three" is a
-                    promise about work nobody can start, and on a finished one it is history. */}
-                {!blocked && !done && freed && (
-                  <Badge variant="brand" size="sm" className="gap-1" title={freed}>
-                    <KeyRound className="h-3 w-3" aria-hidden="true" />
-                    {freed}
-                  </Badge>
-                )}
-
                 {/* A badge that is also the way in. `aria-expanded` says what it does, and the
                     count is the reassurance that opening it holds no surprises — a pile whose
                     depth you cannot see is a pile you do not trust to be small. Deliberately not
@@ -263,13 +263,11 @@ export function BoardCardFrame({
                     type="button"
                     onClick={stack.onToggle}
                     aria-expanded={false}
-                    aria-label={`Show all ${stack.total} cards in this sequence`}
-                    className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:bg-app-brand hover:text-white focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                    aria-label={`Show all ${stack.total} cards in this pile`}
+                    className="inline-flex items-center gap-1 rounded-full border border-app-brand-border bg-app-brand-soft px-2 py-0.5 text-xs font-medium text-app-brand-text transition-colors hover:bg-app-brand hover:text-white"
                   >
                     <Layers className="h-3 w-3" aria-hidden="true" />
-                    <span className="tabular-nums">
-                      Step {stack.position} of {stack.total}
-                    </span>
+                    <span className="tabular-nums">{stack.total} cards</span>
                   </button>
                 )}
 
@@ -296,31 +294,6 @@ export function BoardCardFrame({
                 )}
               </div>
               {subtitle && <p className="mt-1 text-xs text-app-text-muted">{subtitle}</p>}
-
-              {/* Named, not counted. "Waiting on 2 cards" tells the hire they are stuck; naming
-                  them tells them what to go and do about it. */}
-              {blocked && state && (
-                <p className="mt-1 text-xs text-app-text-muted">
-                  Don{"\u2019"}t start yet — first finish{" "}
-                  <span className="font-medium text-app-text">
-                    {state.blockedBy.map((blocker) => cardName(blocker)).join(", ")}
-                  </span>
-                  .{" "}
-                  {/* Naming the next card answers one hop. Two hops back the sentence is true and
-                      useless, because the card it names is itself waiting — so the way to the whole
-                      run sits on the sentence that raises the question. */}
-                  {onShowChain && (
-                    <button
-                      type="button"
-                      onClick={onShowChain}
-                      className="inline-flex items-center gap-1 rounded font-medium text-app-brand-text underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                    >
-                      <Waypoints className="h-3 w-3" aria-hidden="true" />
-                      See the whole run
-                    </button>
-                  )}
-                </p>
-              )}
             </div>
           </div>
 
@@ -339,40 +312,14 @@ export function BoardCardFrame({
             // The states it used to keep visible are not lost with it: "Pinned" and "Done" are
             // badges next to the title, and they are the ones that say so.
             //
-            // Not floated while the board is being arranged: there the cluster carries the stage
-            // and the "waits on" pickers, it *is* what somebody came for, and a panel of selects
-            // hovering over the title would be the mode fighting itself.
+            // Not floated while the board is being arranged: there the cluster carries the "Pile"
+            // picker on every card at once, and a panel of selects hovering over each title would be
+            // the mode fighting itself.
             className={`absolute top-0 right-0 z-10 flex items-center gap-1 rounded-xl bg-app-surface/90 px-1 opacity-0 shadow-sm backdrop-blur transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 [[data-arranging]_&]:pointer-events-auto [[data-arranging]_&]:static [[data-arranging]_&]:bg-transparent [[data-arranging]_&]:opacity-100 [[data-arranging]_&]:shadow-none [[data-arranging]_&]:backdrop-blur-none ${
               dismissing ? "" : "pointer-events-none"
             }`}
           >
-            {stagePicker}
-            {dependencyPicker}
-
-            {onToggleDone && (
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                onClick={onToggleDone}
-                aria-pressed={done}
-                aria-label={
-                  done ? `Mark the ${label} card as not done` : `Mark the ${label} card as done`
-                }
-                title={
-                  done
-                    ? "Not finished after all"
-                    : "Tick this off — it stops blocking whatever waits on it"
-                }
-                className={done ? "text-app-purple-text" : undefined}
-              >
-                {done ? (
-                  <CircleCheckBig className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <CircleDashed className="h-4 w-4" aria-hidden="true" />
-                )}
-              </Button>
-            )}
+            {pilePicker}
 
             {onTogglePinned && (
               <Button
@@ -428,6 +375,22 @@ export function BoardCardFrame({
             </span>
           </div>
         </header>
+
+        {/* The card's own record of its latest edit, when there is one to go back to. Outside the
+            `Collapsible` on purpose: the fact a card was edited is like the blocked line — true
+            whether or not the card is folded, and the way back should not need unfolding first. */}
+        {card.previous && onRestorePrevious && (
+          <CardEditHistory
+            cardId={card.id}
+            previous={card.previous}
+            lastChange={card.lastChange}
+            controlLabel={label}
+            onRestore={onRestorePrevious}
+            restoring={restoring}
+            paused={paused}
+            notice={undoNotice}
+          />
+        )}
 
         <Collapsible open={open}>
           <div className="relative [[data-arranging]_&]:pointer-events-none [[data-arranging]_&]:select-none">

@@ -123,4 +123,135 @@ describe("SegmentedTabs", () => {
     expect(buttons[1]).toHaveAttribute("aria-pressed", "false");
     expect(buttons[2]).toHaveAttribute("aria-pressed", "false");
   });
+
+  it("wraps below lg only when the caller asks for it", () => {
+    const { container, rerender } = render(
+      <SegmentedTabs
+        value="all"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-wrapbelow"
+        ariaLabel="Filter items"
+        wrapBelow="lg"
+      />,
+    );
+
+    expect(container.firstElementChild?.classList.contains("max-lg:flex-wrap")).toBe(true);
+
+    rerender(
+      <SegmentedTabs
+        value="all"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-wrapbelow"
+        ariaLabel="Filter items"
+      />,
+    );
+
+    expect(container.firstElementChild?.classList.contains("max-lg:flex-wrap")).toBe(false);
+  });
+
+  it("grows the phone padding on the reading size, and leaves the compact one its density", () => {
+    const { unmount } = render(
+      <SegmentedTabs
+        value="all"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-growth-compact"
+        ariaLabel="Filter items compact"
+        size="sm"
+      />,
+    );
+
+    // The compact size has no caller yet. When one needs the grown target the class comes back
+    // with it; until then the row keeps the density it was built for.
+    expect(screen.getByTestId("tab-all").className).not.toContain("max-sm:py-3");
+    unmount();
+
+    render(
+      <SegmentedTabs
+        value="all"
+        options={options}
+        onChange={vi.fn()}
+        layoutId="test-tabs-growth"
+        ariaLabel="Filter items"
+      />,
+    );
+
+    expect(screen.getByTestId("tab-all").className).toContain("max-sm:py-3");
+  });
+
+  describe("views inside an option", () => {
+    const nested: SegmentedTabOption<string>[] = [
+      { value: "overview", label: "Overview" },
+      {
+        value: "team",
+        label: "Team",
+        count: 9,
+        subOptions: [
+          { value: "members", label: "Members", count: 7 },
+          { value: "roles", label: "Roles", count: 3 },
+        ],
+        subValue: "roles",
+        subAriaLabel: "Team views",
+      },
+    ];
+
+    it("grows them out of the selected option, and hides its own count meanwhile", () => {
+      render(
+        <SegmentedTabs
+          value="team"
+          options={nested}
+          onChange={vi.fn()}
+          layoutId="nested"
+          ariaLabel="Sections"
+        />,
+      );
+
+      const views = screen.getByRole("group", { name: "Team views" });
+      expect(views).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Roles/ })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: /Members/ })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+      expect(screen.getByRole("button", { name: /^Team/ })).not.toHaveTextContent("9");
+    });
+
+    it("keeps them folded away while another option is selected", () => {
+      render(
+        <SegmentedTabs
+          value="overview"
+          options={nested}
+          onChange={vi.fn()}
+          layoutId="nested"
+          ariaLabel="Sections"
+        />,
+      );
+
+      expect(screen.queryByRole("group", { name: "Team views" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Team/ })).toHaveTextContent("9");
+    });
+
+    it("reports a chosen view through its own callback", async () => {
+      const onChange = vi.fn();
+      const onSubChange = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <SegmentedTabs
+          value="team"
+          options={nested.map((option) =>
+            option.subOptions ? { ...option, onSubChange } : option,
+          )}
+          onChange={onChange}
+          layoutId="nested"
+          ariaLabel="Sections"
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /Members/ }));
+      expect(onSubChange).toHaveBeenCalledWith("members");
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
 });

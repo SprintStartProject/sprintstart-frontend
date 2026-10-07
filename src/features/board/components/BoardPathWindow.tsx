@@ -1,223 +1,147 @@
-import { useEffect, useId, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, CircleDot, Layers, Lock, X } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
+import { ArrowRight, CheckCircle2, Milestone, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "../../../components/ui/Button.tsx";
-import { Collapsible } from "../../../components/ui/Collapsible.tsx";
-import { readPathWindowOpen, writePathWindowOpen } from "../layout/pathWindowFold.ts";
-import { BlueprintGraphCanvas } from "../../blueprints/components/BlueprintGraphCanvas.tsx";
-import {
-  BlueprintNodeCard,
-  type NodeAccent,
-} from "../../blueprints/components/BlueprintNodeCard.tsx";
-import {
-  pathWindow,
-  type PathWindowNode,
-  type PathWindowState,
-} from "../../onboarding/pathWindow.ts";
-import { onboardingService } from "../../../services/onboardingService.ts";
+import { phaseProgress, sortedPhases } from "../../onboarding/journey.ts";
+import { resolveNextAction } from "../../onboarding/nextAction.ts";
+import { onboardingPlaceUrl } from "../../onboarding/onboardingPlace.ts";
+import type { OnboardingPathEndpoint } from "../../onboarding/types.ts";
 
-/** What each state is called and wears. Never colour alone — every one carries a word and a glyph. */
-const STATES: Record<
-  PathWindowState,
-  {
-    label: string;
-    accent: NodeAccent;
-    variant: "success" | "brand" | "neutral";
-    icon: typeof Layers;
-  }
-> = {
-  done: { label: "Done", accent: "success", variant: "success", icon: CheckCircle2 },
-  current: { label: "You are here", accent: "brand", variant: "brand", icon: CircleDot },
-  ahead: { label: "Next", accent: "neutral", variant: "neutral", icon: CircleDot },
-  locked: { label: "Locked", accent: "warning", variant: "neutral", icon: Lock },
+type BoardPathWindowProps = {
+  /** The hire's path, or null while it loads and when there is none. */
+  path: OnboardingPathEndpoint | null;
+  /** Takes the card off this board altogether. The way back is the board's own rail. */
+  onRemove: () => void;
+  /**
+   * Drawn at the foot of the card, under "Next": the phase check (`BoardPhaseCheck`). Inside the
+   * card rather than beside it, so the rail's "show where you are" shows and hides both together —
+   * the check closes the phase this card is about.
+   */
+  children?: ReactNode;
 };
 
 /**
- * Where the hire stands in their path, as the two or three phases around them.
+ * Where the hire is in their path, as one card: the phase they are in, how far through it, and the
+ * next thing in it. Pressing the card opens that phase on the Onboarding page; pressing the next
+ * step opens the step.
  *
- * The board says a great many true things about somebody's work and never this one. The path has a
- * page of its own and that page shows all of it — right for "what is coming", useless for "what
- * now", because the phase they are standing in is one of sixteen boxes on it.
+ * **The phase they are in, not the lowest open one.** This used to be a strip of the graph around
+ * the first unfinished phase by position — and phases are not a queue: a hire who took another way
+ * through stood in phase 7 while the board pointed at phase 2. It now asks `resolveNextAction`, the
+ * same answer the Onboarding page gives to "continue": the phase being worked in, most recently
+ * touched first.
  *
- * **A window, not a map.** See {@link pathWindow}: what had to happen, where they are, what that
- * opens. Drawn with the same canvas the PM authored the blueprint in, read-only, which is the
- * point — the run a hire is looking at *is* the shape somebody drew for them, and seeing it in the
- * same hand is what connects the two.
+ * **A card, not a map.** The whole path has a page of its own; on the board the question is "where
+ * am I and what is next", and that is one line of each.
  *
- * **Silent when there is nothing to say.** A hire with no path yet is an ordinary state, not an
- * error: the strip renders nothing rather than an empty box or a message about a 404.
- *
- * **It folds, and the sentence stays.** A graph worth reading is a graph with room, and this one
- * takes a good share of a board somebody is otherwise working down. Folded, the line above it is
- * still there — and that line already answers "where am I"; the picture is the elaboration. The
- * fold is remembered per board, see {@link readPathWindowOpen}.
+ * Silent when there is no path, which is an ordinary state rather than an error.
  */
-export function BoardPathWindow({
-  boardId,
-  onRemove,
-}: {
-  boardId: string;
-  /** Takes the strip off this board altogether. The way back is the board's own rail. */
-  onRemove: () => void;
-}) {
-  const navigate = useNavigate();
-  const [where, setWhere] = useState<ReturnType<typeof pathWindow> | null>(null);
-  const [isOpen, setIsOpen] = useState(true);
-  const panelId = useId();
+export function BoardPathWindow({ path, onRemove, children }: BoardPathWindowProps) {
+  if (!path || path.phases.length === 0) return null;
 
-  // Read during render rather than in an effect, the way the board reads its other folds: the
-  // state has to be right on the render that first shows the strip, and reading a key back out of
-  // storage is an idempotent read with nothing to synchronise. Re-read per board, because a hire
-  // on two projects folded each one separately.
-  const [readFor, setReadFor] = useState<string | null>(null);
-  if (boardId !== readFor) {
-    setReadFor(boardId);
-    setIsOpen(readPathWindowOpen(boardId));
+  const phases = sortedPhases(path);
+  const next = resolveNextAction(path);
+
+  const removeButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      iconOnly
+      aria-label="Take this off your board"
+      title="Take this off your board"
+      onClick={onRemove}
+      className="relative z-10 shrink-0"
+    >
+      <X className="h-4 w-4" />
+    </Button>
+  );
+
+  if (next.kind === "done" || next.kind === "choose") {
+    return (
+      <section
+        aria-label="Where you are in your path"
+        className="relative flex items-center gap-3 rounded-2xl border border-app-border bg-app-surface px-4 py-3 shadow-sm transition-colors hover:border-app-brand-border"
+      >
+        {next.kind === "done" ? (
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-app-success-text" aria-hidden="true" />
+        ) : (
+          <Milestone className="h-5 w-5 shrink-0 text-app-brand-text" aria-hidden="true" />
+        )}
+        <Link
+          to="/onboarding"
+          className="min-w-0 flex-1 text-sm font-medium text-app-text after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-hidden focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-app-focus focus-visible:after:outline-solid"
+        >
+          {next.kind === "done"
+            ? "Your path is done — every phase finished."
+            : "Pick the phase you want to do next"}
+        </Link>
+        {removeButton}
+      </section>
+    );
   }
 
-  useEffect(() => {
-    let cancelled = false;
-
-    void onboardingService
-      .fetchPath()
-      .then((path) => {
-        if (!cancelled) setWhere(pathWindow(path));
-      })
-      // No path, or no reaching it: the board has plenty else to show, and a strip that cannot
-      // say where somebody is should not say anything at all.
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!where || where.nodes.length === 0) return null;
-
-  const current = where.nodes.find((node) => node.id === where.currentId);
-
-  function fold(open: boolean) {
-    setIsOpen(open);
-    writePathWindowOpen(boardId, open);
-  }
+  const phase = next.phase;
+  const progress = phaseProgress(phase);
+  const number = phases.findIndex((candidate) => candidate.id === phase.id) + 1;
+  const nextTitle =
+    next.kind === "step" ? next.step.title : next.question.title || "A knowledge check";
+  const nextUrl =
+    next.kind === "step"
+      ? onboardingPlaceUrl({ kind: "step", id: next.step.id })
+      : `/onboarding?question=${encodeURIComponent(next.question.id)}`;
 
   return (
-    <section aria-label="Where you are in your path">
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-1 text-xs text-app-text-muted">
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-expanded={isOpen}
-            // Only while the panel is mounted: folded, there is nothing for it to point at.
-            aria-controls={isOpen ? panelId : undefined}
-            aria-label={
-              isOpen ? "Hide where you are in your path" : "Show where you are in your path"
-            }
-            title={isOpen ? "Hide the path" : "Show the path"}
-            onClick={() => fold(!isOpen)}
-          >
-            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-          {current ? (
-            <>
-              You are in <span className="font-medium text-app-text">{current.title}</span>
-              {current.progress.total > 0 ? (
-                <>
-                  {" "}
-                  — {current.progress.done} of {current.progress.total} steps done
-                </>
-              ) : null}
-              .
-            </>
-          ) : (
-            "Where you are in your path."
-          )}
-        </p>
-        <span className="flex shrink-0 items-center gap-1">
+    <section
+      aria-label="Where you are in your path"
+      // The whole card is the way into the phase (the link's `after:` overlay); the next step and
+      // the close button sit above that overlay, so each still does its own thing.
+      className="relative space-y-2 rounded-2xl border border-app-border bg-app-surface px-4 py-3 shadow-sm transition-colors hover:border-app-brand-border"
+    >
+      <div className="flex items-start gap-3">
+        <Milestone className="mt-0.5 h-5 w-5 shrink-0 text-app-brand-text" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-app-text-muted">
+            You are in phase {number} of {phases.length}
+          </p>
           <Link
-            to="/onboarding"
-            className="text-xs font-medium text-app-brand-text underline-offset-2 hover:underline"
+            to={onboardingPlaceUrl({ kind: "phase", id: phase.id })}
+            className="block truncate text-sm font-semibold text-app-text after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-hidden focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-app-focus focus-visible:after:outline-solid"
           >
-            See the whole path
+            {phase.title}
           </Link>
-          {/*
-            Beside the way *in*, because they are the two things somebody might want from a strip
-            they are done reading: the whole thing, or none of it.
-          */}
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label="Take this off your board"
-            title="Take this off your board"
-            onClick={onRemove}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        </div>
+        <span className="shrink-0 text-xs text-app-text-muted tabular-nums">
+          {progress.completed} of {progress.total} done
         </span>
+        {removeButton}
       </div>
 
-      {/*
-        No box around it. A border and and a panel would make this a section of the page competing
-        with the eleven cards below; what it is is a few nodes drawn on the board's own surface,
-        and the nodes are the thing with edges on them.
-      */}
-      {/*
-        Tall enough for the graph to be a graph. A chain of three phases is three rows on a canvas
-        that lays prerequisites out downwards, and in the twelve-rem strip this used to be, the fit
-        landed under a third — three cards nobody could read the titles of, which is a worse answer
-        to "where am I" than the sentence above it alone. That is also why it folds: this much room
-        has to be worth taking, and some days it is not.
-      */}
-      <Collapsible open={isOpen}>
-        <div id={panelId} className="h-[26rem]">
-          <BlueprintGraphCanvas<PathWindowNode>
-            nodes={where.nodes}
-            title=""
-            description=""
-            editable={false}
-            height="fill"
-            ariaLabel="Where you are in your path"
-            emptyTitle="Nothing to show yet"
-            // A phase on the strip is the phase on the path page, so pressing one goes there and
-            // lands on it. A picture of where somebody stands that cannot be stepped into makes them
-            // find the same phase again by hand on the page it links to.
-            onNodeClick={(node) =>
-              void navigate("/onboarding", { state: { openPhaseId: node.id } })
-            }
-            onPositionChange={() => Promise.resolve()}
-            onAddBlocker={() => Promise.resolve()}
-            onRemoveBlocker={() => Promise.resolve()}
-            // A finished phase's arrow is satisfied and says so; the one into where the hire actually
-            // is, is the live one; everything past that is still shut. The strip is about standing
-            // somewhere in a path, and an arrow that does not say which side of "here" it is on has
-            // left out the only thing being asked.
-            edgeTone={(node, blockerId) => {
-              const blocker = where.nodes.find((candidate) => candidate.id === blockerId);
-              if (blocker?.state !== "done") return "waiting";
-              return node.state === "locked" ? "waiting" : "active";
-            }}
-            renderNode={(node, cardProps) => {
-              const state = STATES[node.state];
-              return (
-                <BlueprintNodeCard
-                  {...cardProps}
-                  title={node.title}
-                  kind={{ label: "Phase", icon: Layers }}
-                  accent={state.accent}
-                  status={{ label: state.label, variant: state.variant, icon: state.icon }}
-                  highlighted={node.id === where.currentId}
-                  // The ring around the glyph rather than a count on the line: how far through a
-                  // phase somebody is, is the one number this strip exists to show.
-                  progress={node.progress}
-                />
-              );
-            }}
-          />
-        </div>
-      </Collapsible>
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-app-surface-muted"
+        role="progressbar"
+        aria-label={`${phase.title}: ${progress.percentage}% done`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress.percentage}
+      >
+        <div
+          className="h-full rounded-full bg-app-brand transition-[width] duration-300"
+          style={{ width: `${progress.percentage}%` }}
+        />
+      </div>
+
+      <p className="flex flex-wrap items-baseline gap-x-1.5 text-sm text-app-text-muted">
+        <span>Next:</span>
+        <Link
+          to={nextUrl}
+          className="relative z-10 inline-flex items-center gap-1 font-medium text-app-brand-text hover:underline"
+        >
+          {nextTitle}
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      </p>
+
+      {children}
     </section>
   );
 }

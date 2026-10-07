@@ -46,7 +46,7 @@ export function ItemAside({
     >
       <div className="flex items-start justify-between gap-3 border-b border-app-border px-4 py-3">
         <div className="min-w-0">
-          <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-app-text-subtle uppercase">
+          <p className="inline-flex items-center gap-1.5 text-2xs font-semibold tracking-wide text-app-text-subtle uppercase">
             <ItemKindIcon item={item} className="h-3.5 w-3.5" />
             {itemKindLabel(item)}
             {item.kind === "step" && item.step.estimatedMinutes

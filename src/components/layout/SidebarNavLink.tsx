@@ -1,10 +1,12 @@
 import { motion, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
 import { useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { NavLink } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SidebarIcon } from "./SidebarNavIcons";
 import { slidingIndicatorSpringToken } from "../../styles/tokens";
 import { prefetchRoute } from "../../services/routePrefetch";
+import { ShortcutHint } from "../ui/ShortcutHint";
 import { useProjectContext } from "../../features/projects/useProjectContext";
 
 /**
@@ -178,12 +180,24 @@ type SidebarNavLinkProps = {
    */
   busy?: boolean;
   busyLabel?: string;
+  /**
+   * The chord that jumps here, shown on hover/focus. Comes from the shortcuts registry
+   * (`navigationShortcut`) rather than being typed at each call site, so the hint on the
+   * entry and the keypress that answers it cannot drift apart.
+   */
+  shortcut?: string;
   onNavigate?: () => void;
+  /**
+   * The desktop sidebar folded to icons: the label is kept for assistive technology only and
+   * shown as a tooltip beside the icon on hover and keyboard focus, and a count shrinks to a
+   * bubble on the icon's corner.
+   */
+  collapsed?: boolean;
 };
 
 const BASE_LINK_CLASS = [
-  "group relative flex h-[40px] items-center rounded-[10px] px-[12px] text-[14px] font-medium leading-none",
-  "transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-focus",
+  "group relative flex h-[40px] items-center rounded-[10px] px-[12px] text-sm font-medium leading-none",
+  "transition-colors duration-200",
 ].join(" ");
 
 function getLinkStateClass(isHighlighted: boolean): string {
@@ -214,7 +228,9 @@ export function SidebarNavLink({
   countLabel,
   busy = false,
   busyLabel,
+  shortcut,
   onNavigate,
+  collapsed = false,
 }: SidebarNavLinkProps) {
   const prefersReducedMotion = useReducedMotion();
   const indicatorTransition = prefersReducedMotion ? { duration: 0 } : slidingIndicatorSpringToken;
@@ -239,6 +255,16 @@ export function SidebarNavLink({
   // Keyboard users get no pointer, so focus stands in for it and asks for the
   // full lift outright.
   const [isFocused, setIsFocused] = useState(false);
+
+  // Where the collapsed entry's tooltip sits, measured when it is asked for (pointer over the
+  // entry, or keyboard focus on it) -- `null` while hidden. Drawn in a portal at a fixed position:
+  // the nav clips anything that reaches past its edge, which is exactly where a tooltip goes.
+  const [tooltipAt, setTooltipAt] = useState<{ x: number; y: number } | null>(null);
+  const showTooltip = () => {
+    const rect = elementRef.current?.getBoundingClientRect();
+    if (collapsed && rect) setTooltipAt({ x: rect.right + 10, y: rect.top + rect.height / 2 });
+  };
+  const hideTooltip = () => setTooltipAt(null);
 
   // The row's centre, measured once per render instead of on every pointer
   // move. `getBoundingClientRect` forces layout, and doing that for every
@@ -338,12 +364,28 @@ export function SidebarNavLink({
         transformOrigin: "left center",
         willChange: "transform",
       }}
-      onFocusCapture={() => setIsFocused(true)}
-      onBlurCapture={() => setIsFocused(false)}
+      onFocusCapture={() => {
+        setIsFocused(true);
+        showTooltip();
+      }}
+      onBlurCapture={() => {
+        setIsFocused(false);
+        hideTooltip();
+      }}
+      onPointerEnter={showTooltip}
+      onPointerLeave={hideTooltip}
+      onKeyDown={(event) => {
+        // The usual way out of a tooltip that is in the way.
+        if (event.key === "Escape") hideTooltip();
+      }}
     >
       <NavLink
         to={to}
         end={end}
+        // The chord lives in the title rather than in the link's text: the chip is
+        // `aria-hidden` (a second rendering of the same thing), and this is the copy a
+        // screen reader does get.
+        title={shortcut ? `${label} (${shortcut})` : undefined}
         onClick={onNavigate}
         // Pointerdown rather than hover: a sweep across the sidebar passes over several
         // entries in one motion, and prefetching all of them would spend requests on
@@ -496,7 +538,7 @@ export function SidebarNavLink({
                         }
                       : { duration: 0.2 }
                   }
-                  className={`flex shrink-0 transition-colors ${
+                  className={`relative flex shrink-0 transition-colors ${
                     needsAttention
                       ? "text-app-warning-solid"
                       : isHighlighted
@@ -521,11 +563,31 @@ export function SidebarNavLink({
                                         would read out "Escalation Inbox, open
                                         escalations, 3 open escalations". */}
                   {needsAttention && count === 0 && (
-                    <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                    <>
+                      {/* The shape that stays when the movement does not: the icon wobbles for the
+                          people who can see it move, and this badge is there for everybody else,
+                          reduced motion included (WCAG 1.4.1). A count takes its place when there is
+                          one. */}
+                      <span
+                        aria-hidden="true"
+                        className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-app-warning-solid text-xs leading-none font-bold text-white ring-2 ring-app-surface"
+                      >
+                        !
+                      </span>
+                      <span className="sr-only">{attentionLabel ?? "Needs attention"}</span>
+                    </>
                   )}
                 </motion.span>
 
-                <span>{label}</span>
+                {/* Folded to icons, the label is still the entry's accessible name -- and the
+                    tooltip's text, for everyone else. */}
+                <span className={collapsed ? "sr-only" : undefined}>{label}</span>
+
+                {/* Not on the folded rail: there is no room beside the icon, and the chord stays
+                    in the link's `title` and in the shortcuts modal. */}
+                {shortcut && !collapsed && (
+                  <ShortcutHint keys={shortcut} className="border-app-border text-app-text-muted" />
+                )}
 
                 {/* One trailing slot, not two. The count takes it when there is
                                     one: a number and the active dot side by side read as
@@ -533,7 +595,12 @@ export function SidebarNavLink({
                                     you are already on has less to tell you than the one
                                     with work waiting behind it. */}
                 {busy ? (
-                  <span className="ml-auto flex items-center" role="status">
+                  <span
+                    className={
+                      collapsed ? "absolute -top-1 -right-1 flex" : "ml-auto flex items-center"
+                    }
+                    role="status"
+                  >
                     <span
                       aria-hidden="true"
                       className={`h-[14px] w-[14px] rounded-full border-2 border-t-transparent motion-safe:animate-spin ${
@@ -543,7 +610,17 @@ export function SidebarNavLink({
                     <span className="sr-only">{busyLabel ?? "In progress"}</span>
                   </span>
                 ) : count > 0 ? (
-                  <span className="ml-auto flex items-center">
+                  // Folded to icons, the count sits on the icon's corner. Its words (what a screen
+                  // reader hears) are its tooltip, since a bare number does not say of what.
+                  <span
+                    className={
+                      collapsed
+                        ? "absolute -top-2 -right-2.5 flex items-center"
+                        : "ml-auto flex items-center"
+                    }
+                    // Open, the link's own `title` (name and chord) must not be shadowed by it.
+                    title={collapsed ? countLabel?.(count) : undefined}
+                  >
                     {/* The same amber as the icon beside it, and the same
                                             amber on the active row as off it. This is the
                                             second half of one signal, not a badge of its
@@ -553,13 +630,13 @@ export function SidebarNavLink({
                                             kind of thing carrying a number. */}
                     <span
                       aria-hidden="true"
-                      className="min-w-[20px] rounded-full bg-app-warning-bg px-1.5 py-0.5 text-center text-[11px] font-semibold text-app-warning-text"
+                      className="min-w-[20px] rounded-full bg-app-warning-bg px-1.5 py-0.5 text-center text-xs font-semibold text-app-warning-text"
                     >
                       {count}
                     </span>
                     <span className="sr-only">{countLabel?.(count) ?? `${count} waiting`}</span>
                   </span>
-                ) : isHighlighted ? (
+                ) : isHighlighted && !collapsed ? (
                   <span className="ml-auto h-[6px] w-[6px] rounded-full bg-white" />
                 ) : null}
               </span>
@@ -567,6 +644,34 @@ export function SidebarNavLink({
           );
         }}
       </NavLink>
+
+      {collapsed &&
+        tooltipAt &&
+        createPortal(
+          // Hidden from assistive technology: the entry's own name and status already say all
+          // of this; the tooltip is the same words for someone who can only see an icon.
+          <span
+            aria-hidden="true"
+            style={{ left: tooltipAt.x, top: tooltipAt.y }}
+            className="pointer-events-none fixed z-[70] -translate-y-1/2 rounded-lg border border-app-border bg-app-surface px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-app-text shadow-lg"
+          >
+            {label}
+            {busy ? (
+              <span className="block text-xs font-normal text-app-text-muted">
+                {busyLabel ?? "In progress"}
+              </span>
+            ) : count > 0 ? (
+              <span className="block text-xs font-normal text-app-text-muted">
+                {countLabel?.(count) ?? `${count} waiting`}
+              </span>
+            ) : needsAttention ? (
+              <span className="block text-xs font-normal text-app-text-muted">
+                {attentionLabel ?? "Needs attention"}
+              </span>
+            ) : null}
+          </span>,
+          document.body,
+        )}
     </motion.div>
   );
 }

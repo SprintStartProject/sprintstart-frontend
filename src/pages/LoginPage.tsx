@@ -1,3 +1,4 @@
+import { MainContent } from "../components/layout/MainContent";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { Rocket, LogIn } from "lucide-react";
@@ -7,8 +8,12 @@ import { SpotlightCard } from "../components/ui/SpotlightCard";
 import { resolveRedirectTarget, retrieveRedirectTarget } from "../auth/redirectUtils";
 
 /**
- * The authentication entry point.
- * Redirects users to the SSO identity provider and initiates the role selection upon first login.
+ * The sign-in card. Signing in itself happens at Keycloak; this page only sends the user there.
+ *
+ * Bound to `/login`, which is outside the access policy. `AuthGuard` sends unauthenticated
+ * users here and authenticated users away again. The button passes the page the user wanted
+ * (from `?redirect=`, the router state or `sessionStorage`) to `login`, so Keycloak returns
+ * there afterwards. The page is bundled eagerly, see the comment on its import in `AppRouter`.
  */
 export function LoginPage() {
   const { login, status } = useAuth();
@@ -28,7 +33,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-4 text-app-text sm:p-6">
+    <MainContent className="relative flex min-h-screen items-center justify-center p-4 text-app-text sm:p-6">
       <div className="absolute top-4 right-4 sm:top-8 sm:right-8">
         <ThemeToggle
           showLabel={false}
@@ -81,6 +86,6 @@ export function LoginPage() {
           </p>
         </div>
       </SpotlightCard>
-    </div>
+    </MainContent>
   );
 }

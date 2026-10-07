@@ -1,9 +1,15 @@
+import { memo, useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
 import type { BuddyMessageView, ProposedAction } from "../types";
+import type { BuddySessionFilters } from "../types";
+import type { ActionDrafts } from "../actionDrafts";
+import type { SelectedCitation } from "../citations/types";
+import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { BuddyComposer } from "./BuddyComposer";
+import type { BuddyComposerQueue } from "./BuddyComposer";
 import { BuddyThread } from "./BuddyThread";
 import { BuddyReplyActions } from "./BuddyReplyActions";
-import { MessagesSquare } from "lucide-react";
+import { ArrowDown, MessagesSquare } from "lucide-react";
 import { SaveToBoard } from "../../board/save/SaveToBoard";
 import { transcriptNote } from "../../board/generation/chatToCard";
 import { useStickToBottom } from "../hooks/useStickToBottom";
@@ -14,17 +20,16 @@ type BuddyConversationProps = {
   isThinking: boolean;
   /** The tool the buddy is running right now, if any — becomes "Checking your progress…". */
   activeTool: string | null;
-  draft: string;
-  setDraft: (value: string) => void;
-  handleSubmit: (event: React.FormEvent) => void;
   /** Confirms a buddy-proposed action (the only path that mutates). */
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
-  dismissAction: (messageId: string, actionId: string) => void;
+  dismissAction: (messageId: string, action: ProposedAction) => void;
+  /** The session's wording for offers that carry an editable message — see `actionDrafts`. */
+  actionDrafts: ActionDrafts;
+  /** Records one, so it outlives whichever surface is on screen. */
+  setActionDraft: (key: string, text: string) => void;
   /** Composer placeholder — "Type your answer…" while the buddy is intaking. */
   placeholder?: string;
-  /** Rendered above the first message: what came back from the hire's PM. */
-  before?: ReactNode;
   /** Rendered under the buddy's most recent reply — the greeting's suggested next step. */
   lastMessageFooter?: ReactNode;
   /** Rendered under each of the hire's own questions, handed that question's text. */
@@ -35,10 +40,12 @@ type BuddyConversationProps = {
   openError?: string | null;
   /** Tries the read again, from the banner that reports the failure. */
   onRetryOpen?: () => void;
-  /** Clears the previous conversation from the visit divider — see `BuddyThread`. */
-  onStartFreshVisit?: () => void;
-  /** The chord named in that control's tooltip, where the caller has actually bound one. */
-  freshVisitShortcut?: string;
+  /**
+   * Re-asks the question a failed turn was answering — the "Try again" under its error line.
+   * Held in one identity by the page, like the render callbacks above — the thread's memo
+   * compares it.
+   */
+  onRetryReply?: (messageId: string) => void;
   /**
    * Leaves room at the top of the thread for a control floating over it.
    *
@@ -50,6 +57,50 @@ type BuddyConversationProps = {
   hasFloatingControl?: boolean;
   /** Puts the caret in the composer on mount — the page opens in order to be typed in. */
   focusComposerOnMount?: boolean;
+  /**
+   * Whether the buddy's reply is actively streaming in.
+   *
+   * Read by the composer's focus dance only: together with `isThinking` this is
+   * "the buddy is still writing", and the caret returns to the box when that
+   * ends. Kept separate from `isThinking` because they are genuinely different
+   * states — the thinking dots stop at the first token while the answer keeps
+   * arriving — and folding streaming into `isThinking` would change what the
+   * thread draws.
+   */
+  isStreaming?: boolean;
+  /**
+   * Whether a message turn is in flight — the buddy is thinking about what the hire asked, or
+   * writing the answer. Distinct from `isThinking` above, which the page hands in already
+   * combined with opening and greeting work (it drives the typing dots). This one is the
+   * composer's: like the retired chat surface's `isBusy`, it arms Stop and turns Send into the
+   * queue's entry point from the moment a send starts, not from the first token.
+   */
+  turnActive?: boolean;
+  /** Stops the in-flight reply — the composer's Stop button (see `BuddyComposer`). */
+  onStop?: () => void;
+  /** The queue's data and actions for the composer — see `BuddyComposerQueue`. */
+  queue?: BuddyComposerQueue;
+  /** Retrieval filters for the composer; the session owns the state. */
+  filters?: BuddySessionFilters;
+  onFiltersChange?: (next: BuddySessionFilters) => void;
+  /** Whether the mentor may act on messages sent from here; paired with the setter below. */
+  capabilitiesEnabled?: boolean;
+  onCapabilitiesChange?: (next: boolean) => void;
+  /** Bump to put the caret in the composer — see `BuddyComposer`'s `focusToken`. */
+  composerFocusToken?: number;
+  /** Whether the dino waiting-game is open while the buddy thinks (see `BuddyThread`). */
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
+  /**
+   * Called when the hire clicks a `[N]` citation reference in a reply.
+   *
+   * Held in one identity by the page, like the render callbacks above — the thread's memo
+   * compares it.
+   */
+  onCitationClick?: (citation: SelectedCitation) => void;
+  /** Opens the artifact drawer from a reply's citations footer — see `BuddyThread`. */
+  onOpenArtifact?: (data: CitationArtifactOpen) => void;
 };
 
 /**
@@ -72,43 +123,77 @@ type BuddyConversationProps = {
  * It scrolls down, never sideways — `overflow-x-hidden` plus the `min-w-0` chain running down
  * to `BuddyMarkdown`, where wide blocks get their own scrollers.
  */
-export function BuddyConversation({
+function BuddyConversationImpl({
   messages,
   isThinking,
   activeTool,
-  draft,
-  setDraft,
-  handleSubmit,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   placeholder,
-  before,
   lastMessageFooter,
   renderQuestionAction,
   aboveComposer,
   openError,
   onRetryOpen,
-  onStartFreshVisit,
-  freshVisitShortcut,
+  onRetryReply,
   hasFloatingControl = false,
   focusComposerOnMount = false,
+  isStreaming = false,
+  turnActive = false,
+  onStop,
+  queue,
+  filters,
+  onFiltersChange,
+  capabilitiesEnabled,
+  onCapabilitiesChange,
+  composerFocusToken,
+  dinoGameActive = false,
+  onDinoGameExit,
+  onCitationClick,
+  onOpenArtifact,
 }: BuddyConversationProps) {
-  const { containerRef, onScroll } = useStickToBottom(messages);
+  const { containerRef, onScroll, isPinned, jumpToLatest } = useStickToBottom(messages);
+
+  /**
+   * Every question this conversation has seen, oldest first — the composer's arrow-key walk.
+   * Derived from the rendered messages rather than stored anywhere, so it survives a reload
+   * and always matches what is on screen.
+   */
+  const promptHistory = useMemo(
+    () => messages.filter((message) => message.role === "USER").map((message) => message.content),
+    [messages],
+  );
+
+  /**
+   * The row under every reply, held in one identity for the life of this component.
+   *
+   * `BuddyThread` is memoised — that is what keeps a keystroke out of the thread — and a
+   * callback created inline would hand it a new prop on every render, defeating exactly that.
+   */
+  const renderReplyAction = useCallback(
+    (reply: string, message: BuddyMessageView) => (
+      <BuddyReplyActions reply={reply} message={message} />
+    ),
+    [],
+  );
 
   return (
     <>
-      <div
-        ref={containerRef}
-        onScroll={onScroll}
-        data-testid="buddy-transcript"
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
-      >
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div
-          className={`app-page-frame flex min-w-0 flex-col gap-4 pb-6 ${
-            hasFloatingControl ? RAIL_TOGGLE_CLEARANCE : "pt-8"
-          }`}
+          ref={containerRef}
+          onScroll={onScroll}
+          data-testid="buddy-transcript"
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
         >
-          {/* The conversation as a whole, kept as one folded note.
+          <div
+            className={`app-page-frame flex min-w-0 flex-col gap-4 pb-6 ${
+              hasFloatingControl ? RAIL_TOGGLE_CLEARANCE : "pt-8"
+            }`}
+          >
+            {/* The conversation as a whole, kept as one folded note.
               Above the thread rather than at the end of it, because the end of a conversation moves
               every time the buddy answers — an action that walks down the page as you talk is one
               you have to find again each time you want it.
@@ -116,47 +201,66 @@ export function BuddyConversation({
               Only once the buddy has actually said something. A window holding the hire's question
               and nothing else is not a conversation worth freezing, and the buddy is often still
               typing the first answer when the page opens. */}
-          {messages.some((message) => message.role === "ASSISTANT" && message.content !== "") && (
-            <div className="flex justify-end">
-              <SaveToBoard
-                request={() =>
-                  transcriptNote(
-                    messages
-                      .filter((message) => message.content !== "")
-                      .map((message) => ({
-                        speaker: message.role === "USER" ? "You" : "Buddy",
-                        content: message.content,
-                      })),
-                    "You",
-                  )
-                }
-                label="Keep this conversation"
-                savedLabel="On your board"
-                description="The whole thread, as one note you can fold open."
-                icon={<MessagesSquare className="h-4 w-4" aria-hidden="true" />}
-              />
-            </div>
-          )}
-
-          <BuddyThread
-            renderReplyAction={(reply, message) => (
-              <BuddyReplyActions reply={reply} message={message} />
+            {messages.some((message) => message.role === "ASSISTANT" && message.content !== "") && (
+              <div className="flex justify-end">
+                <SaveToBoard
+                  request={() =>
+                    transcriptNote(
+                      messages
+                        .filter((message) => message.content !== "")
+                        .map((message) => ({
+                          speaker: message.role === "USER" ? "You" : "Buddy",
+                          content: message.content,
+                        })),
+                      "You",
+                    )
+                  }
+                  label="Keep this conversation"
+                  savedLabel="On your board"
+                  description="The whole thread, as one note you can fold open."
+                  icon={<MessagesSquare className="h-4 w-4" aria-hidden="true" />}
+                />
+              </div>
             )}
-            messages={messages}
-            isThinking={isThinking}
-            activeTool={activeTool}
-            confirmAction={confirmAction}
-            dismissAction={dismissAction}
-            showNames
-            before={before}
-            lastMessageFooter={lastMessageFooter}
-            renderQuestionAction={renderQuestionAction}
-            openError={openError}
-            onRetryOpen={onRetryOpen}
-            onStartFreshVisit={onStartFreshVisit}
-            freshVisitShortcut={freshVisitShortcut}
-          />
+
+            <BuddyThread
+              renderReplyAction={renderReplyAction}
+              messages={messages}
+              isThinking={isThinking}
+              isStreaming={isStreaming}
+              activeTool={activeTool}
+              confirmAction={confirmAction}
+              dismissAction={dismissAction}
+              actionDrafts={actionDrafts}
+              setActionDraft={setActionDraft}
+              showNames
+              lastMessageFooter={lastMessageFooter}
+              renderQuestionAction={renderQuestionAction}
+              openError={openError}
+              onRetryOpen={onRetryOpen}
+              onRetryReply={onRetryReply}
+              dinoGameActive={dinoGameActive}
+              onDinoGameExit={onDinoGameExit}
+              onCitationClick={onCitationClick}
+              onOpenArtifact={onOpenArtifact}
+            />
+          </div>
         </div>
+
+        {/* Only while the transcript is unpinned: the way back to the newest message after
+          scrolling up to re-read something — the auto-scroll deliberately does not drag a
+          reader down (see `useStickToBottom`). */}
+        {!isPinned && (
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            data-testid="buddy-jump-to-latest"
+            className="absolute bottom-4 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text shadow-md transition-colors hover:bg-app-surface-hover"
+          >
+            <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+            Jump to latest
+          </button>
+        )}
       </div>
 
       {/* Translucent rather than solid, so the thread does not stop dead at a hard line — the
@@ -166,14 +270,34 @@ export function BuddyConversation({
           {aboveComposer && <div className="mb-3 min-w-0">{aboveComposer}</div>}
 
           <BuddyComposer
-            draft={draft}
-            setDraft={setDraft}
-            handleSubmit={handleSubmit}
             placeholder={placeholder}
             focusOnMount={focusComposerOnMount}
+            busy={isThinking || isStreaming}
+            gameActive={dinoGameActive}
+            streaming={isStreaming || turnActive}
+            onStop={onStop}
+            queue={queue}
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            capabilitiesEnabled={capabilitiesEnabled}
+            onCapabilitiesChange={onCapabilitiesChange}
+            focusToken={composerFocusToken}
+            promptHistory={promptHistory}
           />
         </div>
       </div>
     </>
   );
 }
+
+/**
+ * Memoised, and its props are the contract: everything in that list is a plain value, an element
+ * or callback the page holds in one identity (see the `useMemo`/`useCallback`s above its render),
+ * or a motion value. A fresh inline element added to it later — a `footer={`…`}` built in the
+ * page's render — is silently the one prop that always changed, and the memo stops paying.
+ *
+ * The thread *inside* this carries the per-message boundary; this one is about the page's own
+ * re-renders (the rail opening, a toast landing, a conversation switch) not walking the whole
+ * conversation.
+ */
+export const BuddyConversation = memo(BuddyConversationImpl);

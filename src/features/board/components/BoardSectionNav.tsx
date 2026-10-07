@@ -86,8 +86,8 @@ export function BoardSectionTabs({
             </Badge>
           )}
 
-          {selected.stage && (
-            <Badge variant={selected.stage === "NOW" ? "brand" : "neutral"} size="sm">
+          {selected.stage === "BEHIND" && (
+            <Badge variant="neutral" size="sm">
               {STAGE_LABELS[selected.stage].title}
             </Badge>
           )}

@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "./Button";
+import { getPageItems } from "./paginationItems";
 
 interface PaginationProps {
   currentPage: number;
@@ -9,31 +10,14 @@ interface PaginationProps {
 }
 
 /**
- * Page navigation with ellipsis collapsing. Shows max 5 page buttons.
- * Collapses entirely when totalPages <= 1.
+ * Page navigation that collapses long ranges: up to 7 pages show every number, beyond that only the
+ * first and last page and the current page with its neighbours stay, separated by ellipses.
+ * Renders nothing when totalPages <= 1.
  */
 export function Pagination({ currentPage, totalPages, onPageChange, className }: PaginationProps) {
   if (totalPages <= 1) return null;
 
-  const maxVisiblePages = 5;
-
-  const getPageNumbers = () => {
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = startPage + maxVisiblePages - 1;
-
-    if (endPage > totalPages) {
-      endPage = totalPages;
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-
-    const pages = [];
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-    return pages;
-  };
-
-  const pages = getPageNumbers();
+  const items = getPageItems(currentPage, totalPages);
 
   return (
     <nav
@@ -47,6 +31,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
         aria-label="Previous page"
+        className="max-sm:h-11 max-sm:w-11"
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
@@ -59,36 +44,22 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
       </span>
 
       <div className="hidden items-center space-x-1 sm:flex">
-        {pages[0] > 1 && (
-          <>
-            <Button variant="ghost" size="sm" onClick={() => onPageChange(1)}>
-              1
+        {items.map((item) =>
+          typeof item === "number" ? (
+            <Button
+              key={item}
+              variant={currentPage === item ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => onPageChange(item)}
+              aria-current={currentPage === item ? "page" : undefined}
+            >
+              {item}
             </Button>
-            {pages[0] > 2 && <span className="px-2 text-app-text-muted">...</span>}
-          </>
-        )}
-
-        {pages.map((page) => (
-          <Button
-            key={page}
-            variant={currentPage === page ? "primary" : "ghost"}
-            size="sm"
-            onClick={() => onPageChange(page)}
-            aria-current={currentPage === page ? "page" : undefined}
-          >
-            {page}
-          </Button>
-        ))}
-
-        {pages[pages.length - 1] < totalPages && (
-          <>
-            {pages[pages.length - 1] < totalPages - 1 && (
-              <span className="px-2 text-app-text-muted">...</span>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => onPageChange(totalPages)}>
-              {totalPages}
-            </Button>
-          </>
+          ) : (
+            <span key={item} className="px-2 text-app-text-muted" aria-hidden="true">
+              ...
+            </span>
+          ),
         )}
       </div>
 
@@ -99,6 +70,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
         aria-label="Next page"
+        className="max-sm:h-11 max-sm:w-11"
       >
         <ChevronRight className="h-4 w-4" />
       </Button>

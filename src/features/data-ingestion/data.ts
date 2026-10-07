@@ -1,14 +1,4 @@
-import {
-  AlertTriangle,
-  BookOpen,
-  CheckCircle2,
-  CircleSlash,
-  FileText,
-  GitBranch,
-  History,
-  Loader2,
-  Ticket,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleSlash, History, Loader2 } from "lucide-react";
 import type {
   AiSyncStatus,
   BackendProjectSourceStatus,
@@ -19,382 +9,128 @@ import type {
   SourceMeta,
   SourceStatus,
   SourceStatusPresentation,
-  SourceSystem,
 } from "./types.ts";
-import type { JiraInstanceDto } from "../../services/sources/jiraService.ts";
-import type { ConfluenceConnectionDto } from "../../services/sources/confluenceService.ts";
+import { CONNECTORS, getConnector } from "./connectors/registry.ts";
+import { SOURCE_SYSTEMS, type SourceSystem } from "./connectors/sourceSystems.ts";
+import type { ConnectorDefinition } from "./connectors/types.ts";
 
-export const SOURCE_SYSTEMS: SourceSystem[] = ["GITHUB", "JIRA", "UPLOAD", "CONFLUENCE"];
+/**
+ * Name, short label, icon and description of every source system, derived from
+ * the connector registry so there is one place that says what a connector is.
+ */
+export const SOURCE_META = Object.fromEntries(
+  SOURCE_SYSTEMS.map((system): [SourceSystem, SourceMeta] => {
+    const { meta } = CONNECTORS[system];
 
-export const SOURCE_META: Record<SourceSystem, SourceMeta> = {
-  GITHUB: {
-    name: "GitHub Repository",
-    type: "GitHub",
-    icon: GitBranch,
-    description: "Indexes repositories, README files, pull requests, issues and source files.",
-  },
-  JIRA: {
-    name: "Jira Project Board",
-    type: "Jira",
-    icon: Ticket,
-    description: "Indexes Jira issues, tasks, epics, comments and project-related metadata.",
-  },
-  UPLOAD: {
-    name: "Uploaded Documentation",
-    type: "Upload",
-    icon: FileText,
-    description: "Indexes manually uploaded documentation, markdown files and project knowledge.",
-  },
-  CONFLUENCE: {
-    name: "Confluence Space",
-    type: "Confluence",
-    icon: BookOpen,
-    description: "Indexes pages, hierarchical documents and spaces from Confluence Cloud.",
-  },
+    return [
+      system,
+      { name: meta.name, type: meta.label, icon: meta.icon, description: meta.description },
+    ];
+  }),
+) as Record<SourceSystem, SourceMeta>;
+
+type CreateDataSourceInput<C> = {
+  definition: ConnectorDefinition<C>;
+  /**
+   * The authoritative status row (`/api/v1/ingestion-sources/status`) of the
+   * source. Null for a source the backend reports no row for; its numbers then
+   * come from `latestRun`.
+   */
+  status: SourceInstanceIngestionStatus | null;
+  /** The connector's own record of the source (project source, Jira instance, Confluence connection). */
+  connection?: C | null;
+  /** The newest run of this source (or, for a source without a row, of its source system). */
+  latestRun?: IngestionRun | null;
+  /**
+   * Whether the source system's connector is globally enabled. `undefined` means
+   * unknown and is treated as enabled.
+   */
+  connectorEnabled?: boolean;
+  /** True when the project has several sources of this system, so a system-wide run says little about this one. */
+  sharesSourceSystem?: boolean;
 };
 
-export const INGESTION_RUN_LIMIT = 50;
-export const DETAILS_RUN_LIMIT = 10;
-
 /**
- * Turns one per-repo ingestion status row (`/api/v1/ingestion-sources/status`)
- * into a {@link DataSource}. This is the shared mapping used wherever sources
- * are shown per repository rather than per source system — the Data Ingestion
- * page overlays the project source's own id and display name on top of it.
- */
-export function createSourceFromInstance(instance: SourceInstanceIngestionStatus): DataSource {
-  const meta = SOURCE_META[instance.sourceSystem];
-  const backendStatus: BackendProjectSourceStatus =
-    instance.enabled === false ? "DISABLED" : instance.connectionStatus;
-  const hasErrors = instance.failedCount > 0;
-  const hasNeverSynced = instance.lastRunTime === null;
-
-  return {
-    // GitHub rows carry a repositoryId; fall back to the connector-neutral
-    // sourceId so the card always has a stable selection key.
-    sourceId: instance.repositoryId ?? instance.sourceId,
-    sourceSystem: instance.sourceSystem,
-    name: instance.displayName,
-    type: meta.type,
-    icon: meta.icon,
-    status: getSourceStatusFromBackend(backendStatus),
-    backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel: getSourceStatusLabel(hasNeverSynced, hasErrors, null),
-    statusView: deriveSourceStatus({
-      backendStatus,
-      hasErrors,
-      hasNeverSynced,
-    }),
-    artifacts: instance.artifactCount,
-    lastSync: formatDateTime(instance.lastRunTime),
-    nextSync: "Not available",
-    errors: instance.failedCount,
-    description: meta.description,
-    lastRunAt: instance.lastRunTime,
-    latestIngestedCount: instance.ingestedCount,
-    latestUpdatedCount: instance.updatedCount,
-    deletedCount: instance.deletedCount,
-    totalArtifactCount: instance.artifactCount,
-    runIds: [],
-    sharesSourceSystem: false,
-    failedItems: instance.failedItems,
-    githubRepository: {
-      owner: instance.owner ?? "",
-      name: instance.name ?? "",
-      repositoryId: instance.repositoryId,
-      fullName: instance.sourceId,
-      url: instance.sourceUrl,
-      enabled: instance.enabled,
-    },
-    lastCommitsSyncAt: instance.lastCommitsSyncAt,
-    lastIssuesSyncAt: instance.lastIssuesSyncAt,
-    lastPullRequestsSyncAt: instance.lastPullRequestsSyncAt,
-  };
-}
-
-/**
- * Turns one Jira ingestion status row (`/api/v1/ingestion-sources/status`, the
- * connector-neutral rows where `sourceSystem === "JIRA"`) into a
- * {@link DataSource}, the Jira counterpart to {@link createSourceFromInstance}.
+ * Builds the {@link DataSource} card of any connector. Everything the connectors
+ * share (status, counters, sync time) is derived here once; what differs (the
+ * card's key and name, the status without a row, the source-system details)
+ * comes from the connector's definition.
  *
- * The status row is now authoritative for health, counters, total artifact count
- * and last-sync time — exactly like GitHub — so no run stitch is needed. The
- * status endpoint carries no credential metadata, though, so the matching
- * {@link JiraInstanceDto} (looked up by instance URL) is merged in for the
- * credential shown in the details panel. `githubRepository` is always null;
- * identity lives in `jiraInstance`, keyed by the instance URL (`sourceId`).
+ * With a status row the row is authoritative for health, counters and the stored
+ * artifact total. Without one, the counters are those of `latestRun`, the total
+ * is unknown (0) unless the connector's `runFallback` reads it off the run, and
+ * the backend status falls back to the connection record.
  */
-export function createJiraSourceFromInstance(
-  status: SourceInstanceIngestionStatus,
-  instance?: JiraInstanceDto | null,
-  connectorEnabled?: boolean,
-): DataSource {
-  const meta = SOURCE_META.JIRA;
-  const backendStatus: BackendProjectSourceStatus =
-    status.enabled === false ? "DISABLED" : status.connectionStatus;
-  const hasErrors = status.failedCount > 0;
-  const hasNeverSynced = status.lastRunTime === null;
+export function createDataSource<C>({
+  definition,
+  status,
+  connection = null,
+  latestRun = null,
+  connectorEnabled,
+  sharesSourceSystem = false,
+}: CreateDataSourceInput<C>): DataSource {
+  const { meta } = definition;
+  const { sourceId, name } = definition.identity(status, connection);
+
+  const backendStatus: BackendProjectSourceStatus = status
+    ? status.enabled === false
+      ? "DISABLED"
+      : status.connectionStatus
+    : definition.fallbackBackendStatus(connection);
+
+  const failedItems = status ? status.failedItems : (latestRun?.failedItems ?? []);
+  const errors = status ? status.failedCount : (latestRun?.failedCount ?? failedItems.length);
+  const lastRunAt = status ? status.lastRunTime : (latestRun?.startedAt ?? null);
+  const latestIngestedCount = status ? status.ingestedCount : (latestRun?.ingestedCount ?? 0);
+  const runFallback = !status && latestRun ? definition.runFallback : undefined;
+  const runArtifactCount = runFallback && latestRun ? runFallback.artifactCount(latestRun) : null;
+  const artifacts = status ? status.artifactCount : (runArtifactCount ?? latestIngestedCount);
+  const totalArtifactCount = status ? status.artifactCount : (runArtifactCount ?? 0);
+  const lastSyncAt = runFallback && latestRun ? runFallback.syncedAt(latestRun) : lastRunAt;
 
   return {
-    sourceId: status.sourceId,
-    sourceSystem: "JIRA",
-    name: status.displayName,
-    type: meta.type,
+    sourceId,
+    sourceSystem: meta.system,
+    name,
+    type: meta.label,
     icon: meta.icon,
     status: getSourceStatusFromBackend(backendStatus),
     backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel:
-      !hasNeverSynced && !hasErrors
-        ? "Synced"
-        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
     statusView: deriveSourceStatus({
       backendStatus,
-      hasErrors,
-      hasNeverSynced,
+      runStatus: latestRun?.status ?? null,
+      aiSyncStatus: latestRun?.aiSyncStatus ?? null,
+      hasErrors: errors > 0,
+      hasNeverSynced: lastRunAt === null,
       connectorEnabled,
     }),
-    artifacts: status.artifactCount,
-    lastSync: formatDateTime(status.lastRunTime),
-    nextSync: "Not available",
-    errors: status.failedCount,
+    artifacts,
+    lastSync: formatDateTime(lastSyncAt),
+    errors,
     description: meta.description,
-    lastRunAt: status.lastRunTime,
-    latestIngestedCount: status.ingestedCount,
-    latestUpdatedCount: status.updatedCount,
-    deletedCount: status.deletedCount,
-    totalArtifactCount: status.artifactCount,
-    runIds: [],
-    sharesSourceSystem: false,
-    failedItems: status.failedItems,
-    githubRepository: null,
-    jiraInstance: {
-      instanceUrl: status.sourceId,
-      // Prefer the instance DTO's display name/credential; the status row still
-      // provides a display name, but only the DTO knows the credential pair.
-      displayName: instance?.displayName ?? status.displayName,
-      credentialName: instance?.updateCredentialName ?? "",
-      credentialUserEmail: instance?.updateCredentialUserEmail ?? "",
-    },
-    lastCommitsSyncAt: null,
-    // Jira's per-type sync timestamp; the backend maps it to the last update.
-    lastIssuesSyncAt: status.lastIssuesSyncAt,
-    lastPullRequestsSyncAt: null,
+    lastRunAt,
+    latestIngestedCount,
+    latestUpdatedCount: status ? status.updatedCount : (latestRun?.updatedCount ?? 0),
+    deletedCount: status ? status.deletedCount : (latestRun?.deletedCount ?? 0),
+    totalArtifactCount,
+    sharesSourceSystem,
+    failedItems,
+    details: definition.toDetails(status, connection),
   };
 }
 
 /**
- * Maps an UPLOAD status row from `/api/v1/ingestion-sources/status` into the
- * full {@link DataSource} model rendered on the ingestion page.
+ * Maps a bare status row with the connector of its source system, for views that
+ * have no connection records or runs (dashboard, PM header, analysis).
  */
-export function createUploadSourceFromInstance(status: SourceInstanceIngestionStatus): DataSource {
-  const meta = SOURCE_META.UPLOAD;
-  const backendStatus: BackendProjectSourceStatus =
-    status.enabled === false ? "DISABLED" : status.connectionStatus;
-  const hasErrors = status.failedCount > 0;
-  const hasNeverSynced = status.lastRunTime === null;
-
-  return {
-    sourceId: status.sourceId,
-    sourceSystem: "UPLOAD",
-    name: status.displayName,
-    type: meta.type,
-    icon: meta.icon,
-    status: getSourceStatusFromBackend(backendStatus),
-    backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel:
-      !hasNeverSynced && !hasErrors
-        ? "Synced"
-        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
-    statusView: deriveSourceStatus({
-      backendStatus,
-      hasErrors,
-      hasNeverSynced,
-      connectorEnabled: true,
-    }),
-    artifacts: status.artifactCount,
-    lastSync: formatDateTime(status.lastRunTime),
-    nextSync: "Not available",
-    errors: status.failedCount,
-    description: meta.description,
-    lastRunAt: status.lastRunTime,
-    latestIngestedCount: status.ingestedCount,
-    latestUpdatedCount: status.updatedCount,
-    deletedCount: status.deletedCount,
-    totalArtifactCount: status.artifactCount,
-    runIds: [],
-    sharesSourceSystem: false,
-    failedItems: status.failedItems,
-    githubRepository: null,
-    jiraInstance: null,
-    confluenceSpace: null,
-    lastCommitsSyncAt: null,
-    lastIssuesSyncAt: null,
-    lastPullRequestsSyncAt: null,
-  };
+export function createDataSourceFromStatus(status: SourceInstanceIngestionStatus): DataSource {
+  return createDataSource({ definition: getConnector(status.sourceSystem), status });
 }
 
 /**
- * Maps a CONFLUENCE status row from `/api/v1/ingestion-sources/status` into the
- * full {@link DataSource} model rendered on the ingestion page.
+ * A source's status from the status the backend reports for a project source. A missing or
+ * unknown value reads as `warning`, not as connected.
  */
-export function createConfluenceSourceFromInstance(
-  status: SourceInstanceIngestionStatus,
-  connection?: ConfluenceConnectionDto | null,
-  connectorEnabled?: boolean,
-): DataSource {
-  const meta = SOURCE_META.CONFLUENCE;
-  const backendStatus: BackendProjectSourceStatus =
-    status.enabled === false ? "DISABLED" : status.connectionStatus;
-  const hasErrors = status.failedCount > 0;
-  const hasNeverSynced = status.lastRunTime === null;
-
-  return {
-    sourceId: connection?.id ?? status.sourceId,
-    sourceSystem: "CONFLUENCE",
-    name: status.displayName,
-    type: meta.type,
-    icon: meta.icon,
-    status: getSourceStatusFromBackend(backendStatus),
-    backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, null),
-    ingestionStatusLabel:
-      !hasNeverSynced && !hasErrors
-        ? "Synced"
-        : getSourceStatusLabel(hasNeverSynced, hasErrors, null),
-    statusView: deriveSourceStatus({
-      backendStatus,
-      hasErrors,
-      hasNeverSynced,
-      connectorEnabled,
-    }),
-    artifacts: status.artifactCount,
-    lastSync: formatDateTime(status.lastRunTime),
-    nextSync: connection?.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
-    errors: status.failedCount,
-    description: meta.description,
-    lastRunAt: status.lastRunTime,
-    latestIngestedCount: status.ingestedCount,
-    latestUpdatedCount: status.updatedCount,
-    deletedCount: status.deletedCount,
-    totalArtifactCount: status.artifactCount,
-    runIds: [],
-    sharesSourceSystem: false,
-    failedItems: status.failedItems,
-    githubRepository: null,
-    jiraInstance: null,
-    // Same shape as the connection-built card below: the details drawer only
-    // renders the space name and credential rows when they are present, and a
-    // card must not lose them just because a status row exists for it.
-    confluenceSpace: connection
-      ? {
-          connectionId: connection.id,
-          baseUrl: connection.baseUrl,
-          spaceId: connection.spaceId,
-          spaceKey: connection.spaceKey,
-          spaceName: connection.spaceName,
-          credentialName: connection.credentialName,
-        }
-      : null,
-    lastCommitsSyncAt: null,
-    lastIssuesSyncAt: null,
-    lastPullRequestsSyncAt: null,
-  };
-}
-
-/**
- * Creates a DataSource directly from a {@link ConfluenceConnectionDto},
- * matching against recent ingestion runs for counters and sync status.
- */
-export function createConfluenceSourceFromConnection(
-  connection: ConfluenceConnectionDto,
-  runs: IngestionRun[] = [],
-  connectorEnabled?: boolean,
-): DataSource {
-  const meta = SOURCE_META.CONFLUENCE;
-  const compositeRef = `${connection.baseUrl}|${connection.spaceId}`.toLowerCase();
-  const latestRun = runs.find(
-    (r) =>
-      r.sourceSystem === "CONFLUENCE" &&
-      (r.sourceId?.toLowerCase() === compositeRef ||
-        r.sourceId?.toLowerCase() === connection.spaceId.toLowerCase() ||
-        r.sourceId?.toLowerCase() === connection.id.toLowerCase() ||
-        r.sourceId?.toLowerCase() === connection.spaceKey.toLowerCase() ||
-        r.repositoryId === connection.id),
-  );
-
-  const hasNeverSynced = !latestRun;
-  const hasErrors = (latestRun?.failedCount ?? 0) > 0;
-  const backendStatus: BackendProjectSourceStatus =
-    connection.sourceEnabled === false ? "DISABLED" : "CONNECTED";
-
-  return {
-    sourceId: connection.id,
-    sourceSystem: "CONFLUENCE",
-    name: connection.spaceName ?? connection.spaceKey ?? connection.spaceId,
-    type: meta.type,
-    icon: meta.icon,
-    status: getSourceStatusFromBackend(backendStatus),
-    backendStatus,
-    statusLabel: getBackendSourceStatusLabel(backendStatus),
-    ingestionStatus: getSourceStatus(hasNeverSynced, hasErrors, latestRun?.status ?? null),
-    ingestionStatusLabel:
-      !hasNeverSynced && !hasErrors
-        ? "Synced"
-        : getSourceStatusLabel(hasNeverSynced, hasErrors, latestRun?.status ?? null),
-    statusView: deriveSourceStatus({
-      backendStatus,
-      hasErrors,
-      hasNeverSynced,
-      connectorEnabled,
-    }),
-    artifacts: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
-    lastSync: formatDateTime(latestRun?.finishedAt ?? latestRun?.startedAt),
-    nextSync: connection.nextSyncAt ? formatDateTime(connection.nextSyncAt) : "Not scheduled",
-    errors: latestRun?.failedCount ?? 0,
-    description: meta.description,
-    lastRunAt: latestRun?.startedAt ?? null,
-    latestIngestedCount: latestRun?.ingestedCount ?? 0,
-    latestUpdatedCount: latestRun?.updatedCount ?? 0,
-    deletedCount: latestRun?.deletedCount ?? 0,
-    totalArtifactCount: (latestRun?.ingestedCount ?? 0) + (latestRun?.updatedCount ?? 0),
-    runIds: latestRun ? [latestRun.runId] : [],
-    sharesSourceSystem: false,
-    failedItems: latestRun?.failedItems ?? [],
-    githubRepository: null,
-    jiraInstance: null,
-    confluenceSpace: {
-      connectionId: connection.id,
-      baseUrl: connection.baseUrl,
-      spaceId: connection.spaceId,
-      spaceKey: connection.spaceKey,
-      spaceName: connection.spaceName,
-      credentialName: connection.credentialName,
-    },
-    lastCommitsSyncAt: null,
-    lastIssuesSyncAt: null,
-    lastPullRequestsSyncAt: null,
-  };
-}
-
-export function getSourceStatus(
-  hasNeverSynced: boolean,
-  hasErrors: boolean,
-  runStatus?: IngestionRunStatus | null,
-): SourceStatus {
-  if (hasNeverSynced) return "warning";
-  if (isRunInProgress(runStatus)) return "running";
-  if (runStatus === "FAILED" || runStatus === "PARTIAL") return "warning";
-  if (hasErrors) return "warning";
-  return "connected";
-}
-
 export function getSourceStatusFromBackend(
   backendStatus?: BackendProjectSourceStatus,
 ): SourceStatus {
@@ -590,20 +326,10 @@ export function deriveSyncStatus(source: DataSource): SourceStatusPresentation {
       };
 }
 
-export function getSourceStatusLabel(
-  hasNeverSynced: boolean,
-  hasErrors: boolean,
-  runStatus?: IngestionRunStatus | null,
-) {
-  if (hasNeverSynced) return "Not synced";
-  if (isRunInProgress(runStatus)) return "Running";
-  if (runStatus === "FAILED") return "Failed";
-  if (runStatus === "PARTIAL") return "Partial";
-  if (hasErrors) return "Warning";
-  if (runStatus === "COMPLETED") return "Synced";
-  return "Connected";
-}
-
+/**
+ * The words for a backend source status. A missing or unknown value reads as "Connected", unlike
+ * {@link getSourceStatusFromBackend}, which treats it as a warning.
+ */
 export function getBackendSourceStatusLabel(backendStatus?: BackendProjectSourceStatus) {
   switch (backendStatus) {
     case "CONNECTED":
@@ -645,6 +371,7 @@ export function getRunStatusTone(status: IngestionRunStatus) {
   return "warning";
 }
 
+/** Whether a run is still going. `CONNECTED` counts as running, as in {@link getRunStatusLabel}. */
 export function isRunInProgress(status?: IngestionRunStatus | null) {
   return status === "CONNECTED" || status === "RUNNING";
 }
@@ -674,7 +401,7 @@ export function getAiSyncStatusTone(status: AiSyncStatus) {
 }
 
 export function getSourceLabel(sourceSystem: SourceSystem) {
-  return SOURCE_META[sourceSystem].type;
+  return CONNECTORS[sourceSystem].meta.label;
 }
 
 /**
@@ -698,31 +425,16 @@ export function formatInstanceDomain(instanceUrl: string): string {
  * reference — most visibly for Jira, whose `sourceId` is the instance URL.
  *
  * Keyed by the same value the run carries in `sourceId`: GitHub `"owner/name"`
- * (the repository's full name) and Jira the instance URL. Runs whose source is
- * no longer connected won't be in the map and fall back to the raw reference.
+ * (the repository's full name), Jira the instance URL and Confluence the connection
+ * id or space. Runs whose source is no longer connected won't be in the map and fall back to the raw reference.
  */
 export function buildRunSourceLabels(sources: DataSource[]): Map<string, string> {
   const labels = new Map<string, string>();
 
   sources.forEach((source) => {
-    if (source.jiraInstance?.instanceUrl) {
-      labels.set(source.jiraInstance.instanceUrl, source.name);
-    }
-
-    if (source.githubRepository?.fullName) {
-      labels.set(source.githubRepository.fullName, source.name);
-    }
-
-    if (source.confluenceSpace) {
-      const { connectionId, baseUrl, spaceId, spaceKey } = source.confluenceSpace;
-      if (connectionId) labels.set(connectionId, source.name);
-      if (baseUrl && spaceId) {
-        labels.set(`${baseUrl}|${spaceId}`, source.name);
-        labels.set(`${baseUrl}|${spaceId}`.toLowerCase(), source.name);
-      }
-      if (spaceKey) labels.set(spaceKey, source.name);
-      if (spaceId) labels.set(spaceId, source.name);
-    }
+    getConnector(source.sourceSystem)
+      .runReferences(source.details)
+      .forEach((reference) => labels.set(reference, source.name));
   });
 
   return labels;

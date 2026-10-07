@@ -50,6 +50,13 @@ export type AccessConnector<TPayload = unknown> = {
   icon: LucideIcon;
   /** What one stored entry is called here — "token" for GitHub, "credential" for Jira. */
   noun: { one: string; many: string };
+  /**
+   * Optional short text appended to the entry count in the group header, always
+   * visible. Keep it to a few words so the header stays two lines. For sources whose
+   * credential is shared by several connectors, so users can tell what a stored
+   * entry is used for.
+   */
+  description?: string;
   addLabel: string;
   emptyTitle: string;
   emptyDescription: string;

@@ -1,28 +1,64 @@
-import { Fragment } from "react";
+import { memo, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertCircle, RotateCcw } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import type { BuddyMessageView, ProposedAction } from "../types";
+import type { ActionDrafts } from "../actionDrafts";
+import type { Citation, SelectedCitation } from "../citations/types";
+import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { toolLabel } from "../toolLabel";
 import { BuddyActionProposals } from "./BuddyActionProposals";
 import { BuddyMarkdown } from "./BuddyMarkdown";
+import { BuddyReasoningPanel } from "./BuddyReasoningPanel";
+import { MessageCitations } from "../citations/MessageCitations";
 import { BuddyMessage, BuddyTypingMessage } from "./BuddyMessage";
+
+/** The drafts a row without any proposal gets: one shared object, so its memo is never broken. */
+const EMPTY_ACTION_DRAFTS: ActionDrafts = {};
+
+/** The citations a row without any gets: one shared array, so its memo is never broken. */
+const EMPTY_CITATIONS: Citation[] = [];
+
+/**
+ * What a finished turn's completion announcement says — see `BuddyThread`.
+ *
+ * The game announces its own outcome while it is open ("Stopped" / "Reply failed" / "Reply
+ * ready" — see `BuddyTypingMessage`), so this stays silent then: two voices saying it would
+ * be noise.
+ */
+function completionAnnouncement(
+  lastTurn: BuddyMessageView | undefined,
+  dinoGameActive: boolean,
+): string {
+  if (dinoGameActive) return "";
+  if (lastTurn?.error) return "Reply failed";
+  if (lastTurn?.stopped === true) return "Reply stopped";
+  return "Response complete";
+}
 
 type BuddyThreadProps = {
   messages: BuddyMessageView[];
   isThinking: boolean;
+  /**
+   * True while the reply is still receiving tokens. Together with `isThinking`
+   * this is what keeps the waiting game's "reply ready" badge honest: the game
+   * only claims the reply is there once the turn has actually finished.
+   */
+  isStreaming?: boolean;
   /** The tool the buddy is running right now, if any — becomes "Checking your progress…". */
   activeTool: string | null;
   /** Confirms a buddy-proposed action (the only path that mutates). */
   confirmAction: (messageId: string, action: ProposedAction) => void;
   /** Declines a proposed action; nothing changes. */
-  dismissAction: (messageId: string, actionId: string) => void;
+  dismissAction: (messageId: string, action: ProposedAction) => void;
+  /** The session's wording for offers that carry an editable message — see `actionDrafts`. */
+  actionDrafts: ActionDrafts;
+  /** Records one, so it outlives whichever surface is on screen. */
+  setActionDraft: (key: string, text: string) => void;
   /** Names above the bubbles — on for the page, off in the dock. */
   showNames?: boolean;
   /** The dock's narrow layout — see `BuddyMessage`'s `compact`. */
   compact?: boolean;
-  /** Rendered above the first message: what came back from the hire's PM. */
-  before?: ReactNode;
   /**
    * Rendered under the buddy's most recent reply — the greeting's suggested next step.
    */
@@ -34,6 +70,9 @@ type BuddyThreadProps = {
    * verdict on the reply — but a hire does not flag an answer, they flag the question they
    * still need answered, and they may well want to send one they asked ten minutes ago. Under
    * every question, they can. Both surfaces pass it, so the corner window can escalate too.
+   *
+   * Must be referentially stable, like `renderReplyAction`: the rows below are memoised, and a
+   * fresh function per render of the caller would re-render every turn with it.
    */
   renderQuestionAction?: (question: string) => ReactNode;
   /**
@@ -42,8 +81,24 @@ type BuddyThreadProps = {
    * Where keeping something from the conversation belongs. The thread does not know what is worth
    * keeping or how — it hands over the text and lets the caller decide, which is what stops this
    * component from growing a dependency on the board.
+   *
+   * Must be referentially stable: a fresh function per render of the caller would hand every
+   * memoised row a new prop and re-parse every reply's markdown with it.
    */
   renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
+  /**
+   * Called when the hire clicks a `[N]` citation reference in a reply.
+   *
+   * Must be referentially stable, like `renderReplyAction`: the rows below are memoised, and a
+   * fresh function per render of the caller would re-render every turn with it.
+   */
+  onCitationClick?: (citation: SelectedCitation) => void;
+  /**
+   * Opens the artifact drawer from a reply's citations footer — see `MessageCitations`.
+   *
+   * Same stability contract as `onCitationClick`, for the same reason.
+   */
+  onOpenArtifact?: (data: CitationArtifactOpen) => void;
   /**
    * Why the conversation could not be brought on screen at all, if it could not.
    *
@@ -55,25 +110,162 @@ type BuddyThreadProps = {
   /** Tries the read again. The banner is only worth showing when there is something to press. */
   onRetryOpen?: () => void;
   /**
-   * Clears the conversation above the visit divider and opens a clean one.
+   * Re-asks the question a failed turn was answering — the "Try again" under its error line.
+   * Rendered only for a turn whose question is still in the thread: a greeting has no question
+   * to re-ask, so no button is offered for it.
    *
-   * Offered from the divider itself rather than from a button in the page header, because the
-   * divider is the one place on screen that already means "everything above here is the last
-   * conversation" — a control that tidies exactly that belongs on the line that says so, and
-   * nowhere else. Which is also why it is only ever drawn when there *is* a divider: a visit
-   * with nothing above it is already the fresh one.
+   * Must be referentially stable, like the callbacks above: the rows below are memoised.
    */
-  onStartFreshVisit?: () => void;
+  onRetryReply?: (messageId: string) => void;
   /**
-   * The keyboard chord for that control, named in its tooltip — when there is one.
-   *
-   * Passed in rather than read from `useNewConversationShortcut`, because whether the chord
-   * does anything depends on who is rendering this thread. `/buddy` binds it and says so; the
-   * dock floats over pages that bind it to their *own* new conversation, or to nothing at all,
-   * and a tooltip promising a key that starts somebody else's chat is worse than no tooltip.
+   * Whether the dino waiting-game is open while the buddy thinks (unlocked
+   * users only; Space opens it — see useSpaceOpensDino). Both surfaces pass
+   * it so dock and page offer the same deal.
    */
-  freshVisitShortcut?: string;
+  dinoGameActive?: boolean;
+  /** Called when the player leaves the dino waiting-game. */
+  onDinoGameExit?: () => void;
 };
+
+type BuddyThreadRowProps = {
+  message: BuddyMessageView;
+  /** Whether this row is the turn currently receiving tokens. */
+  isStreaming: boolean;
+  showNames: boolean;
+  compact: boolean;
+  confirmAction: (messageId: string, action: ProposedAction) => void;
+  dismissAction: (messageId: string, action: ProposedAction) => void;
+  /** The session's wording for the row's own offers, if any — see `BuddyThreadProps`. */
+  actionDrafts: ActionDrafts;
+  /** Records one, so it outlives whichever surface is on screen. */
+  setActionDraft: (key: string, text: string) => void;
+  renderQuestionAction?: (question: string) => ReactNode;
+  renderReplyAction?: (reply: string, message: BuddyMessageView) => ReactNode;
+  /** See `BuddyThreadProps.onCitationClick`. */
+  onCitationClick?: (citation: SelectedCitation) => void;
+  /** See `BuddyThreadProps.onOpenArtifact`. */
+  onOpenArtifact?: (data: CitationArtifactOpen) => void;
+  /** See `BuddyThreadProps.onRetryReply`. */
+  onRetryReply?: (messageId: string) => void;
+  /** Whether this row's "Try again" would have a question to re-ask — see `BuddyThread`. */
+  retryable: boolean;
+  /** The greeting's suggested next step — present on the row it hangs under, nowhere else. */
+  lastMessageFooter?: ReactNode;
+};
+
+/**
+ * One turn: the bubble.
+ *
+ * Extracted from the thread's map and memoised (the retired chat's `MessageRow` did the same):
+ * with the thread memoised, a keystroke never reaches it — and when a token arrives, only the row
+ * it belongs to re-renders, while every other row's props stay referentially equal and it bails
+ * out instead of re-running `ReactMarkdown` over its reply. In a fifty-message thread that is the
+ * difference between one markdown parse and fifty per keystroke (issue #236).
+ *
+ * Which makes referential stability a *contract* on the props: the render callbacks must come
+ * from `useCallback` in the caller, and `lastMessageFooter` from one `useMemo`.
+ *
+ * `lastMessageFooter` is resolved by the thread rather than here — "is this the last reply, and
+ * has the buddy stopped writing" is a question about the whole list, and answering it in the row
+ * would make each row depend on its neighbours.
+ */
+function BuddyThreadRowImpl({
+  message,
+  isStreaming,
+  showNames,
+  compact,
+  confirmAction,
+  dismissAction,
+  actionDrafts,
+  setActionDraft,
+  renderQuestionAction,
+  renderReplyAction,
+  onCitationClick,
+  onOpenArtifact,
+  onRetryReply,
+  retryable,
+  lastMessageFooter,
+}: BuddyThreadRowProps) {
+  const isUser = message.role === "USER";
+  const hasText = message.content.trim().length > 0;
+  const hasReasoning = (message.reasoning ?? "").length > 0;
+  const hasActions = (message.actions?.length ?? 0) > 0;
+  const citations = message.citations ?? EMPTY_CITATIONS;
+
+  // Until the first token (or an action proposal) arrives the streaming placeholder has
+  // nothing to show, and the typing bubble below already stands in for it — so skip it,
+  // otherwise an empty second bubble appears while the buddy is working. A turn that
+  // failed before writing a word is the exception: its reason *is* the message, and
+  // dropping it here is what made a failed reply look like no reply. Same for a turn whose
+  // only arrival so far is reasoning — its panel is worth showing on its own — and for a turn
+  // the hire stopped: a Stop usually lands before the first word, and the line saying so is
+  // then the only answer the question gets.
+  if (!isUser && !hasText && !hasActions && !message.error && !hasReasoning && !message.stopped) {
+    return null;
+  }
+
+  return (
+    <BuddyMessage
+      speaker={isUser ? "YOU" : "BUDDY"}
+      showName={showNames}
+      compact={compact}
+      isStreaming={isStreaming}
+      error={message.error}
+      onRetry={retryable && onRetryReply ? () => onRetryReply(message.id) : undefined}
+      // A cut-short reply is the backend's story (history read); the hire's own turns never
+      // carry it, so it is gated the same way the rest of the buddy-only chrome is.
+      incomplete={!isUser && message.isIncomplete === true}
+      stopped={!isUser && message.stopped === true}
+      footer={
+        <>
+          {isUser && renderQuestionAction?.(message.content)}
+          {!isUser && hasText && renderReplyAction?.(message.content, message)}
+          {!isUser && hasActions && (
+            <BuddyActionProposals
+              messageId={message.id}
+              actions={message.actions ?? []}
+              actionDrafts={actionDrafts}
+              setActionDraft={setActionDraft}
+              onConfirm={confirmAction}
+              onDismiss={dismissAction}
+            />
+          )}
+          {lastMessageFooter}
+        </>
+      }
+    >
+      {hasText || hasReasoning ? (
+        isUser ? (
+          message.content
+        ) : (
+          <>
+            {hasReasoning && (
+              <BuddyReasoningPanel
+                reasoning={message.reasoning ?? ""}
+                isStreaming={isStreaming}
+                // How much answer text has arrived, in characters — the panel folds itself once
+                // an answer starts and re-opens when thinking resumes (see the panel's rules).
+                answerLength={message.content.length}
+              />
+            )}
+            {hasText && (
+              <BuddyMarkdown
+                content={message.content}
+                citations={citations}
+                onCitationClick={onCitationClick}
+              />
+            )}
+            {hasText && citations.length > 0 && (
+              <MessageCitations citations={citations} onOpenArtifact={onOpenArtifact} />
+            )}
+          </>
+        )
+      ) : undefined}
+    </BuddyMessage>
+  );
+}
+
+const BuddyThreadRow = memo(BuddyThreadRowImpl);
 
 /**
  * The conversation itself: every message, in order, with whoever is talking beside it.
@@ -86,40 +278,79 @@ type BuddyThreadProps = {
  * because a flex item's default `min-width: auto` refuses to shrink below its content — without
  * it a wide code block widens the bubble, the column and the panel, and the per-block scrollers
  * never engage.
+ *
+ * Both this and every row in it are memoised: re-rendering a long thread is what used to make
+ * each keystroke re-run `ReactMarkdown` over every reply and every bubble's animation hooks
+ * (issue #236). A keystroke no longer reaches this component at all, and a token reaches one row
+ * — see `BuddyThreadRow` for the contract that keeps that true.
  */
-export function BuddyThread({
+function BuddyThreadImpl({
   messages,
   isThinking,
+  isStreaming = false,
   activeTool,
   confirmAction,
   dismissAction,
+  actionDrafts,
+  setActionDraft,
   showNames = false,
   compact = false,
-  before,
   lastMessageFooter,
   renderQuestionAction,
   renderReplyAction,
+  onCitationClick,
+  onOpenArtifact,
   openError,
   onRetryOpen,
-  onStartFreshVisit,
-  freshVisitShortcut,
+  onRetryReply,
+  dinoGameActive = false,
+  onDinoGameExit,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
-  // one is the turn receiving tokens.
-  const streamingId = messages[messages.length - 1]?.id;
+  // one is the turn receiving tokens — while a turn is running at all. Being last is not on its
+  // own "live": holding the newest row awake forever is a bot that never sleeps, so the row is
+  // only flagged while tokens are actually arriving — see `SleepyBot`'s `canSleep`.
+  const lastTurn = messages[messages.length - 1];
+  const streamingId = lastTurn?.id;
 
-  // Which message the escalation offer hangs under: the buddy's most recent reply. Not every
-  // reply — an offer to give up repeated under all of them reads as the buddy expecting to fail.
+  // Which turn the footer hangs under: the buddy's most recent reply. Not every reply — the same
+  // suggestion repeated under all of them reads as the buddy repeating itself. (This started as
+  // the escalation offer, which now lives under the hire's own questions — see
+  // `renderQuestionAction` on the props above.)
+  //
+  // A reply carrying only a proposal counts as a reply: the *empty* message the send loop appends
+  // up front is the one to skip, and skipping it means "nothing written yet, and nothing offered".
   const lastAssistantId = [...messages]
     .reverse()
-    .find((message) => message.role === "ASSISTANT" && message.content.trim().length > 0)?.id;
+    .find(
+      (message) =>
+        message.role === "ASSISTANT" &&
+        (message.content.trim().length > 0 || (message.actions?.length ?? 0) > 0),
+    )?.id;
+
+  // The first question in the thread: a failed turn before it (the greeting) has nothing to
+  // re-ask, so its row offers no "Try again".
+  const firstUserIndex = messages.findIndex((message) => message.role === "USER");
+
+  /**
+   * The turn's completion, announced politely once per turn: "Response complete" after a good
+   * turn, "Reply failed" / "Reply stopped" otherwise. Held in render state rather than derived
+   * inline so the next turn can clear it — a live region only announces a change — and derived
+   * during render (the documented adjust-state pattern) from the busy flags, which are the
+   * whole signal.
+   */
+  const busy = isThinking || isStreaming;
+  const [announcedBusy, setAnnouncedBusy] = useState(busy);
+  const [completion, setCompletion] = useState("");
+  if (announcedBusy !== busy) {
+    setAnnouncedBusy(busy);
+    setCompletion(busy ? "" : completionAnnouncement(lastTurn, dinoGameActive));
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      {before}
-
       {/* Above the thread rather than in it: what failed is the whole conversation, so there is
-                nothing below for it to belong to -- and on a first visit there is nothing below at
+                nothing below for it to belong to -- and on a first open there is nothing below at
                 all. `alert`, because it arrives without the hire doing anything. */}
       {openError && (
         <div
@@ -136,93 +367,71 @@ export function BuddyThread({
         </div>
       )}
 
-      {messages.map((message) => {
-        const isUser = message.role === "USER";
-        const hasText = message.content.trim().length > 0;
-        const hasActions = (message.actions?.length ?? 0) > 0;
+      {/* The completion line, for screen readers: the thread's own status voice, kept out of
+          the visual layout but always mounted so the text *change* is what speaks. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {completion}
+      </p>
 
-        // Until the first token (or an action proposal) arrives the streaming placeholder has
-        // nothing to show, and the typing bubble below already stands in for it — so skip it,
-        // otherwise an empty second bubble appears while the buddy is working. A turn that
-        // failed before writing a word is the exception: its reason *is* the message, and
-        // dropping it here is what made a failed reply look like no reply.
-        if (!isUser && !hasText && !hasActions && !message.error) return null;
+      {messages.map((message, index) => (
+        <BuddyThreadRow
+          key={message.id}
+          message={message}
+          isStreaming={
+            // `Boolean`, not the bare comparison: `streamingId` is the latest message even after
+            // a turn has finished, and this flag means "receiving tokens right now".
+            Boolean(isStreaming && message.id === streamingId)
+          }
+          showNames={showNames}
+          compact={compact}
+          confirmAction={confirmAction}
+          dismissAction={dismissAction}
+          // Handed only to the rows that actually carry a proposal: the drafts object changes
+          // identity on every keystroke in a flag's field, and each row is memoised (#236), so
+          // the shared empty object keeps that keystroke from re-rendering the whole transcript.
+          actionDrafts={(message.actions?.length ?? 0) > 0 ? actionDrafts : EMPTY_ACTION_DRAFTS}
+          setActionDraft={setActionDraft}
+          renderQuestionAction={renderQuestionAction}
+          renderReplyAction={renderReplyAction}
+          onCitationClick={onCitationClick}
+          onOpenArtifact={onOpenArtifact}
+          // The re-ask belongs to rows that have a question behind them: the failed turn's own
+          // row does, a greeting's does not.
+          onRetryReply={onRetryReply}
+          retryable={Boolean(message.error) && firstUserIndex !== -1 && index > firstUserIndex}
+          // Resolved here rather than inside the row: only the buddy's latest reply gets it, and
+          // only once the thinking bubble is gone — so the offer lands under a finished answer
+          // rather than under a promise.
+          // The opener suggestion hangs under the newest reply — unless that reply brought a next
+          // step of its own: a proposal card and a suggestion under one bubble are two competing
+          // offers. (`streamOpenBuddy` has no `action_proposal` case and never writes `actions`,
+          // so a greeting cannot carry a proposal today; this is the line that keeps it that way,
+          // not a fix for a bug you can reach.)
+          lastMessageFooter={
+            !isThinking && message.id === lastAssistantId && !message.actions?.length
+              ? lastMessageFooter
+              : undefined
+          }
+        />
+      ))}
 
-        return (
-          <Fragment key={message.id}>
-            {/* Everything above belongs to the last conversation; the buddy has just opened a
-                            new one under it, grounded in what it remembers rather than in the text
-                            above. Saying so is what stops the greeting reading as a non-sequitur
-                            replying to a question from an hour ago. */}
-            {message.startsVisit && (
-              <div className="flex items-center gap-3 py-1">
-                <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-
-                <span className="flex items-center gap-1">
-                  <span className="text-xs font-medium text-app-text-muted">New conversation</span>
-
-                  {onStartFreshVisit && (
-                    <button
-                      type="button"
-                      onClick={onStartFreshVisit}
-                      data-testid="buddy-clear-previous"
-                      aria-label="Clear the earlier conversation"
-                      title={
-                        freshVisitShortcut
-                          ? `Clear the earlier conversation (${freshVisitShortcut})`
-                          : "Clear the earlier conversation"
-                      }
-                      className="rounded-full p-1 text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-                  )}
-                </span>
-
-                <span className="h-px flex-1 bg-app-border" aria-hidden="true" />
-              </div>
-            )}
-
-            <BuddyMessage
-              speaker={isUser ? "YOU" : "BUDDY"}
-              showName={showNames}
-              compact={compact}
-              isStreaming={message.id === streamingId}
-              error={message.error}
-              footer={
-                <>
-                  {isUser && renderQuestionAction?.(message.content)}
-                  {!isUser && hasText && renderReplyAction?.(message.content, message)}
-                  {!isUser && hasActions && (
-                    <BuddyActionProposals
-                      messageId={message.id}
-                      actions={message.actions ?? []}
-                      onConfirm={confirmAction}
-                      onDismiss={dismissAction}
-                    />
-                  )}
-                  {!isThinking && message.id === lastAssistantId && lastMessageFooter}
-                </>
-              }
-            >
-              {hasText ? (
-                isUser ? (
-                  message.content
-                ) : (
-                  <BuddyMarkdown content={message.content} />
-                )
-              ) : undefined}
-            </BuddyMessage>
-          </Fragment>
-        );
-      })}
-
-      {isThinking && (
+      {(isThinking || dinoGameActive) && (
         <BuddyTypingMessage
           label={activeTool ? toolLabel(activeTool) : undefined}
           showName={showNames}
+          gameActive={dinoGameActive}
+          replyReady={dinoGameActive && !isThinking && !isStreaming}
+          // How the finished turn ended. A failed reply carries its error on the last turn and
+          // a stopped one carries `stopped` — announcing either as "Reply ready" would be a
+          // lie. The game's row outlives the turn whenever the game is open, which is exactly
+          // how a stopped turn used to reach it and get called ready; `dinoOutcome` renders it
+          // as "Stopped" instead.
+          turnOutcome={lastTurn?.error ? "failed" : lastTurn?.stopped === true ? "stopped" : "done"}
+          onGameExit={onDinoGameExit}
         />
       )}
     </div>
   );
 }
+
+export const BuddyThread = memo(BuddyThreadImpl);

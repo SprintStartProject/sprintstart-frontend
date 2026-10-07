@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { DashboardPage } from "../../../src/pages/DashboardPage";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 import { PermissionGroup, type UserProfile } from "../../../src/services/types";
 import type { ProjectContextValue } from "../../../src/features/projects/ProjectContext";
 import type { MyOnboardingStatus } from "../../../src/features/onboarding/hooks/useMyOnboardingStatus";
@@ -121,7 +122,13 @@ function signInAsManagingPm() {
 function renderPage() {
   render(
     <MemoryRouter>
-      <DashboardPage />
+      {/* The dashboard's quick-ask widget seeds the buddy's draft box, and the recent-conversations
+          widget reads the hire's list — both reach for the app's one buddy session, so the page
+          renders the way the app mounts it. The provider is inert until a surface asks for the
+          conversation, so nothing here touches the network by being wrapped. */}
+      <BuddyProvider>
+        <DashboardPage />
+      </BuddyProvider>
     </MemoryRouter>,
   );
 }
@@ -296,7 +303,9 @@ describe("DashboardPage", () => {
     it("takes a widget off the board and keeps it off across a remount", async () => {
       const { unmount } = render(
         <MemoryRouter>
-          <DashboardPage />
+          <BuddyProvider>
+            <DashboardPage />
+          </BuddyProvider>
         </MemoryRouter>,
       );
 
@@ -486,6 +495,28 @@ describe("DashboardPage", () => {
         within(picker).queryByRole("button", { name: "User accounts" }),
       ).not.toBeInTheDocument();
       expect(within(picker).queryByRole("button", { name: "Projects" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("easter egg", () => {
+    it("renders the header icon with eggHint enabled", () => {
+      renderPage();
+
+      const iconButton = screen.getByRole("button", { name: "Dashboard icon" });
+      expect(iconButton).toHaveAttribute("data-egg-hint", "true");
+    });
+
+    it("opens the 2048 game modal after three clicks on the header icon", async () => {
+      renderPage();
+
+      const iconButton = screen.getByRole("button", { name: "Dashboard icon" });
+      expect(screen.queryByRole("dialog", { name: "2048" })).not.toBeInTheDocument();
+
+      await userEvent.click(iconButton);
+      await userEvent.click(iconButton);
+      await userEvent.click(iconButton);
+
+      expect(screen.getByRole("dialog", { name: "2048" })).toBeInTheDocument();
     });
   });
 });

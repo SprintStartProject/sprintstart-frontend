@@ -65,6 +65,7 @@ export function AutoResizeTextarea({
     // Re-run on window resize too, since line-wrapping can change.
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
+    // `resize` is a new function every render; `value` is what changes the height.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
@@ -94,7 +95,7 @@ export function AutoResizeTextarea({
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
       rows={minRows}
-      className={`w-full resize-none overflow-hidden rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-none focus:border-app-brand ${className}`.trim()}
+      className={`w-full resize-none overflow-hidden rounded-xl border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text outline-hidden focus:border-app-brand ${className}`.trim()}
     />
   );
 }

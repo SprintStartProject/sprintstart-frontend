@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { CheckSquare, Link2, PenLine, Plus, X } from "lucide-react";
+import { CheckSquare, Link2, PenLine, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Field } from "../../../components/ui/Field";
 import { Input } from "../../../components/ui/Input";
-import { Textarea } from "../../../components/ui/Textarea";
+import { StepLinkTextarea } from "./StepLinkTextarea";
 import type { AuthoredCardKind, AuthoredCardRequest } from "../types";
 
 type AddCardFormProps = {
@@ -24,9 +24,7 @@ type AddCardTriggersProps = {
   onPick: (kind: AuthoredCardKind) => void;
   /** Which one is open, so the row can show where the form below it came from. */
   active: AuthoredCardKind | null;
-  /** Drops the words and keeps the glyphs, for the narrow rail in the page's own margin. */
-  compact?: boolean;
-  /** Stacks them, for the rail: three glyphs down the margin rather than across it. */
+  /** Stacks them, for the rail standing up the margin from `lg`; side by side below that. */
   vertical?: boolean;
   className?: string;
 };
@@ -34,16 +32,14 @@ type AddCardTriggersProps = {
 /**
  * The three offers: a note, a link, a list.
  *
- * Split out from the form because they now appear in two places at once. On a wide screen they sit
- * in the page's right margin, which is dead space on every board and the natural home for something
- * always available and rarely urgent; below that width there is no margin to speak of, so they stay
- * in the row above the board where they have always been. Both drive the same choice, and the form
- * opens in the same place either way — over the board, where there is room to type.
+ * Split out from the form because they live in the board's tool rail: up the page's right margin
+ * from `lg` — dead space on every board, and the natural home for something always available and
+ * rarely urgent — and across the top of the page below that. Glyphs only, named by `aria-label`;
+ * the form opens over the board either way, where there is room to type.
  */
 export function AddCardTriggers({
   onPick,
   active,
-  compact,
   vertical,
   className = "",
 }: AddCardTriggersProps) {
@@ -54,13 +50,12 @@ export function AddCardTriggers({
           key={kind}
           variant={active === kind ? "secondary" : "ghost"}
           size="sm"
-          iconOnly={compact}
+          iconOnly
           onClick={() => onPick(kind)}
-          aria-label={compact ? `Add a ${label.toLowerCase()}` : undefined}
-          title={compact ? `Add a ${label.toLowerCase()}` : undefined}
-          icon={compact ? undefined : <Plus className="h-3.5 w-3.5" aria-hidden="true" />}
+          aria-label={`Add a ${label.toLowerCase()}`}
+          title={`Add a ${label.toLowerCase()}`}
         >
-          {compact ? <Icon className="h-4 w-4" aria-hidden="true" /> : label}
+          <Icon className="h-4 w-4" aria-hidden="true" />
         </Button>
       ))}
     </div>
@@ -117,7 +112,7 @@ export function AddCardForm({ kind, onAdd, onClose }: AddCardFormProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-3">
           {kind === "NOTE" && (
-            <Field label="Title (optional)" controlId={`${fieldId}-title`}>
+            <Field label="Title" optional controlId={`${fieldId}-title`}>
               <Input
                 value={noteTitle}
                 onChange={(event) => setNoteTitle(event.target.value)}
@@ -128,11 +123,7 @@ export function AddCardForm({ kind, onAdd, onClose }: AddCardFormProps) {
 
           <Field label={promptFor(kind)} controlId={fieldId}>
             {kind === "NOTE" ? (
-              <Textarea
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                minRows={3}
-              />
+              <StepLinkTextarea value={text} onValueChange={setText} minRows={3} />
             ) : (
               <Input
                 value={text}
@@ -155,7 +146,7 @@ export function AddCardForm({ kind, onAdd, onClose }: AddCardFormProps) {
       </div>
 
       {kind === "LINK" && (
-        <Field label="What to call it (optional)" controlId={`${fieldId}-label`}>
+        <Field label="What to call it" optional controlId={`${fieldId}-label`}>
           <Input value={label} onChange={(event) => setLabel(event.target.value)} />
         </Field>
       )}

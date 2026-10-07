@@ -1,3 +1,5 @@
+const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
 /**
  * The link on an arrival step, if it is safe to hand a hire a clickable anchor for it.
  *
@@ -16,8 +18,6 @@
  * `java\nscript:` through, because the URL parser strips control characters and the regex does
  * not.
  */
-const ALLOWED_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
-
 export function safeStepHref(raw: string | null | undefined): string | null {
   if (!raw) return null;
 

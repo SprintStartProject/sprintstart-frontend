@@ -4,6 +4,7 @@ import { useContext, useEffect, useId, useRef, type ReactNode } from "react";
 import { SWIPE_IGNORE_ATTRIBUTE } from "../../hooks/useHorizontalWheelNavigation";
 import { PanelPresenceContext } from "./panelPresenceContext";
 import { sidePanelSlideToken } from "../../styles/tokens";
+import { useScrollLock } from "./useScrollLock";
 
 type SidePanelProps = {
   isOpen: boolean;
@@ -27,6 +28,7 @@ type SidePanelProps = {
   footerClassName?: string;
   closeAriaLabel?: string;
   closeOnEscape?: boolean;
+  lockScroll?: boolean;
 };
 
 const focusableSelector = [
@@ -72,6 +74,7 @@ export function SidePanel({
   footerClassName = "border-t border-app-border bg-app-bg px-6 py-5",
   closeAriaLabel = "Close details",
   closeOnEscape = true,
+  lockScroll = true,
 }: SidePanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
@@ -83,12 +86,16 @@ export function SidePanel({
   const presence = useContext(PanelPresenceContext);
   const isOpen = presence ? presence.isOpen : isOpenProp;
 
+  // Freezes the background page (body and any scroll containers) while the
+  // panel is open so only the panel insides scroll under the pointer.
+  useScrollLock(isOpen && lockScroll);
+
   const prefersReducedMotion = useReducedMotion();
   const panelTransition = prefersReducedMotion ? { duration: 0 } : sidePanelSlideToken;
 
   useEffect(() => {
     if (!isOpen) {
-      previouslyFocusedElement.current?.focus();
+      previouslyFocusedElement.current?.focus({ preventScroll: true });
       return;
     }
 
@@ -100,7 +107,7 @@ export function SidePanel({
       if (!panel) return;
 
       const [firstFocusable] = getFocusableElements(panel);
-      (firstFocusable ?? panel).focus();
+      (firstFocusable ?? panel).focus({ preventScroll: true });
     });
 
     return () => {
@@ -111,7 +118,15 @@ export function SidePanel({
   useEffect(() => {
     if (!isOpen) return;
 
+    /**
+     * Escape closes the drawer only when nothing inside it has already claimed
+     * the key. Inner consumers (e.g. the dino mini-game, which exits on Escape)
+     * call `preventDefault()`; without this check one keypress would close both
+     * the inner widget and the whole drawer.
+     */
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && event.defaultPrevented) return;
+
       if (event.key === "Escape" && closeOnEscape) {
         onClose();
         return;
@@ -161,7 +176,7 @@ export function SidePanel({
           aria-hidden={!isOpen}
           inert={!isOpen}
           onClick={onClose}
-          className={`fixed inset-x-0 top-0 h-screen ${zIndexClassName} ${overlayClassName} transition-opacity duration-300 ease-out ${
+          className={`fixed inset-x-0 top-0 h-dvh ${zIndexClassName} ${overlayClassName} transition-opacity duration-300 ease-out ${
             isOpen ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         />
@@ -177,7 +192,11 @@ export function SidePanel({
       <motion.div
         ref={panelRef}
         role="dialog"
-        aria-modal="true"
+        // Only while it is actually open. A closed panel is kept mounted so its backdrop can
+        // fade, and calling it `aria-modal` then would tell the shortcuts layer that an
+        // overlay owns the keyboard — on the Board, where one lives for the whole visit,
+        // every chord would go silent.
+        aria-modal={isOpen ? "true" : undefined}
         // A sideways flick inside a panel is a flick inside a panel. Without this it reached the
         // page underneath, where it switches tabs -- behind an overlay the person is reading.
         {...{ [SWIPE_IGNORE_ATTRIBUTE]: "" }}
@@ -186,7 +205,7 @@ export function SidePanel({
         initial={{ x: "100%", opacity: 0 }}
         animate={{ x: isOpen ? 0 : "100%", opacity: isOpen ? 1 : 0 }}
         transition={panelTransition}
-        className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-screen ${widthClassName} flex-col overflow-hidden border-l border-app-border ${panelBackgroundClassName} shadow-2xl sm:rounded-l-[28px] ${panelClassName}`}
+        className={`fixed inset-y-0 right-0 ${zIndexClassName} flex h-dvh ${widthClassName} flex-col overflow-hidden border-l border-app-border ${panelBackgroundClassName} shadow-2xl sm:rounded-l-[28px] ${panelClassName}`}
         aria-hidden={!isOpen}
         inert={!isOpen}
         tabIndex={-1}
@@ -228,7 +247,7 @@ export function SidePanel({
                 )}
               </div>
 
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                 {actions}
 
                 <button
@@ -244,7 +263,7 @@ export function SidePanel({
           </div>
         )}
 
-        <div className="flex-1 [scrollbar-gutter:auto] overflow-y-auto">
+        <div className="flex-1 [scrollbar-gutter:auto] overflow-y-auto overscroll-contain">
           <div className={contentClassName}>{children}</div>
         </div>
 

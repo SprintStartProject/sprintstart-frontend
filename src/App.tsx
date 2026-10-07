@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./services/queryClient";
 import { AppRouter } from "./router/AppRouter";
 import { SideBar } from "./components/layout/SideBar";
 import { AuthProvider } from "./context/AuthProvider";
-import { ChatProvider } from "./context/ChatProvider";
 import { ThemeProvider } from "./context/ThemeProvider";
 import { ToastProvider } from "./context/ToastProvider";
 import { FocusModeProvider } from "./context/FocusModeProvider";
@@ -18,15 +18,31 @@ import { SelectionActions } from "./features/board/selection/SelectionActions";
 import { CardMarksProvider } from "./features/board/marks/CardMarksProvider";
 import { useAuth } from "./context/useAuth";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
+import { MAIN_CONTENT_ID, requestMainContentFocus } from "./components/layout/mainFocus";
+import { EggEffectsLayer } from "./features/easter-eggs/components/EggEffectsLayer";
 import { MyKnowledgeGapsProvider } from "./features/knowledge-gaps/MyKnowledgeGapsProvider";
 import { KnowledgeGapOwnerAnnouncement } from "./features/knowledge-gaps/components/KnowledgeGapOwnerAnnouncement";
 import { useScrollRestoration } from "./hooks/useScrollRestoration";
+import { useBuddyPathSync } from "./features/buddy/hooks/useBuddyPathSync";
+import { GlobalShortcuts } from "./features/shortcuts";
 
 function AppContent() {
   const { status } = useAuth();
   const { showRocketPet } = useMoments();
   const { isFocused } = useFocusMode();
   useScrollRestoration();
+  useBuddyPathSync();
+
+  // Hands keyboard focus to the new page after a route change, so the next Tab starts in the page
+  // and not on the sidebar link that was just pressed. Not on the first load: the browser starts
+  // at the top of the document, which is where the skip link is.
+  const { pathname } = useLocation();
+  const previousPathname = useRef(pathname);
+  useEffect(() => {
+    if (previousPathname.current === pathname) return;
+    previousPathname.current = pathname;
+    requestMainContentFocus();
+  }, [pathname]);
 
   // Signed in at all — the shell is drawn for anyone past the login screen, onboarding included.
   // `signingOut` stays out on purpose: it is the boot script's "this load is a logout return"
@@ -54,6 +70,7 @@ function AppContent() {
   // happened to be out does not open with it already there, waiting for a mouse that never went
   // near it to leave. Reset during render rather than in an effect: it is a correction to state
   // that is already wrong for this render, not a synchronisation with anything outside React.
+  // (The pattern and its three rules are named once in `CODING_STANDARDS.md` § 3.)
   const [peekMode, setPeekMode] = useState(isFocused);
   if (peekMode !== isFocused) {
     setPeekMode(isFocused);
@@ -65,16 +82,39 @@ function AppContent() {
     // `/buddy` page. Two instances is what made them disagree about what had been said.
     <BuddyProvider>
       <div className="flex min-h-screen w-full bg-app-bg text-app-text">
+        {/* First stop for a keyboard: lets it jump over the whole sidebar to the page (WCAG 2.4.1).
+            Parked above the viewport until focused. Only with the sidebar, so only when signed in. Focuses the
+            target in script instead of following the hash, which would add #main-content to
+            every URL. */}
+        {signedIn && (
+          <a
+            href={`#${MAIN_CONTENT_ID}`}
+            onClick={(event) => {
+              event.preventDefault();
+              const main = document.getElementById(MAIN_CONTENT_ID);
+              main?.focus();
+              main?.scrollIntoView({ block: "start" });
+            }}
+            className="fixed top-3 left-3 z-[210] -translate-y-24 rounded-xl bg-app-brand px-4 py-2 text-sm font-semibold text-white shadow-app-brand-lift focus:translate-y-0"
+          >
+            Skip to main content
+          </a>
+        )}
+
         <AuroraBackground />
         {signedIn && (
           // `contents` while the shell is whole: the wrapper has no box at all, so the sidebar is
           // the same direct flex child of the page it has always been. It only becomes a box in
           // focus mode, and only from `lg` up — below that there is no hovering to reveal anything
           // with, and the sidebar's own mobile header is the way back.
+          //
+          // The box carries the sidebar's width itself. Everything inside it is `fixed`, so without
+          // one it is zero wide, and `-translate-x-full` of nothing moves nothing: the sidebar
+          // stayed where it was, on top of a page that had already taken its margin back.
           <div
             className={
               isFocused
-                ? `contents lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:transition-transform lg:duration-300 lg:ease-out ${peeking ? "lg:translate-x-0" : "lg:-translate-x-full"}`
+                ? `contents lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-[var(--app-sidebar-desktop-width,var(--app-sidebar-width))] lg:transition-transform lg:duration-300 lg:ease-out ${peeking ? "lg:translate-x-0" : "lg:-translate-x-full"}`
                 : "contents"
             }
             onMouseLeave={() => {
@@ -107,9 +147,21 @@ function AppContent() {
         {/* `data-moment-stage`: the area the page-scoped moments (the
           onboarding launch and landing) cover, instead of the whole
           screen — see momentStage.ts in the moments feature. */}
-        <main data-moment-stage className="relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0">
+        <div
+          data-moment-stage
+          className={`app-sidebar-eases relative min-h-screen min-w-0 flex-1 pt-[64px] lg:pt-0 ${
+            // The sidebar is `fixed` from `lg` up (see SideBar), so it is out of
+            // flow and the page has to leave its width free itself. In focus mode
+            // it slides away over the content, so the margin goes with it. Its
+            // width can be changed and folded, so it is read from the variable
+            // the sidebar keeps, falling back to the default before it has run.
+            signedIn && !isFocused
+              ? "lg:ml-[var(--app-sidebar-desktop-width,var(--app-sidebar-width))]"
+              : ""
+          }`}
+        >
           <AppRouter />
-        </main>
+        </div>
 
         {/* The buddy in the corner of every page, and the dock it opens. Mounted here
           rather than per-route so one conversation survives navigation — that is what
@@ -118,6 +170,12 @@ function AppContent() {
           nobody on the login screen has a session for. It takes itself off `/buddy`,
           where the page already is the buddy. */}
         {showBuddyDock && <BuddyWidget />}
+
+        {/* The keyboard, app-wide: the destination chords and `?` open a listener here rather
+          than per page, because a shortcut that only works on the page you are already on is
+          not a shortcut. Signed-in only — the login screen has nothing to jump between, and
+          the help lists destinations a signed-out visitor has no access to. */}
+        {signedIn && <GlobalShortcuts />}
 
         {/* Offers to keep whatever the hire has highlighted, from any page. Mounted here for the
           same reason the buddy is: what is worth keeping is almost never found on the board.
@@ -139,6 +197,12 @@ function AppContent() {
           sits on top of the login screen, and off unless turned on in
           Settings (see AppearanceSection). */}
         {signedIn && showRocketPet && <RocketPet />}
+
+        {/* Whole-window egg effects (barrel roll, matrix rain), rendered
+          once for the whole app. Any chat surface fires them through the
+          bus (playEggEffect); this is where they actually draw. Not gated
+          on signedIn: a fired effect must always have its renderer. */}
+        <EggEffectsLayer />
       </div>
     </BuddyProvider>
   );
@@ -157,30 +221,28 @@ function App() {
         <ToastProvider>
           <AuthProvider>
             <ProjectProvider>
-              <ChatProvider>
-                {/* Inside ProjectProvider: what a user owns is asked per selected project, and
+              {/* Inside ProjectProvider: what a user owns is asked per selected project, and
                     above the router so the owner announcement can appear on any page. */}
-                <MyKnowledgeGapsProvider>
-                  {/* Inside AuthProvider: the launch sequence is triggered
+              <MyKnowledgeGapsProvider>
+                {/* Inside AuthProvider: the launch sequence is triggered
                                 by the user becoming authenticated. */}
-                  <MomentsProvider>
-                    {/* Inside the router's providers and outside the router itself: the shell has to
+                <MomentsProvider>
+                  {/* Inside the router's providers and outside the router itself: the shell has to
                         read the flag a page sets, and both live under this. */}
-                    <FocusModeProvider>
-                      {/* Inside ProjectProvider, which it reads the project id from, and outside the
+                  <FocusModeProvider>
+                    {/* Inside ProjectProvider, which it reads the project id from, and outside the
                           router, because the toolbar that makes a highlight is mounted out here too —
                           the board page under it lends its cards in. */}
-                      <CardMarksProvider>
-                        {/* Inside the project and toast providers it reads from; above the routes,
+                    <CardMarksProvider>
+                      {/* Inside the project and toast providers it reads from; above the routes,
                             so a path being built keeps building while the user changes routes. */}
-                        <OnboardingJourneyProvider>
-                          <AppContent />
-                        </OnboardingJourneyProvider>
-                      </CardMarksProvider>
-                    </FocusModeProvider>
-                  </MomentsProvider>
-                </MyKnowledgeGapsProvider>
-              </ChatProvider>
+                      <OnboardingJourneyProvider>
+                        <AppContent />
+                      </OnboardingJourneyProvider>
+                    </CardMarksProvider>
+                  </FocusModeProvider>
+                </MomentsProvider>
+              </MyKnowledgeGapsProvider>
             </ProjectProvider>
           </AuthProvider>
         </ToastProvider>

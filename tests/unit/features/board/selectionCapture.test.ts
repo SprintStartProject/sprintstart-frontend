@@ -5,7 +5,7 @@ import {
   selectionQuoteText,
   type CapturedSelection,
 } from "../../../../src/features/board/selection/selectionCapture";
-import { insertQuoteIntoDraft } from "../../../../src/features/chatbot/utils/quoteFormat";
+import { insertQuoteIntoDraft } from "../../../../src/features/buddy/utils/quoteFormat";
 
 /**
  * The decisions behind "add this to my board", tested on strings and a real DOM rather than
@@ -56,13 +56,13 @@ describe("selectionCapture", () => {
 
     it("identifies when selection is inside an AI assistant message", () => {
       document.body.innerHTML =
-        "<div data-chat-message-role='ASSISTANT'><p id='t'>AI response content</p></div>";
+        "<div data-message-role='ASSISTANT'><p id='t'>AI response content</p></div>";
       expect(capture("#t").isAiMessage).toBe(true);
     });
 
     it("identifies when selection is inside a user message", () => {
       document.body.innerHTML =
-        "<div data-chat-message-role='USER'><p id='t'>User prompt question</p></div>";
+        "<div data-message-role='USER'><p id='t'>User prompt question</p></div>";
       expect(capture("#t").isAiMessage).toBe(false);
     });
 
@@ -97,9 +97,9 @@ describe("selectionCapture", () => {
     }
 
     const twoBubbles =
-      "<div data-chat-message-role='ASSISTANT'><p id='a1'>The answer.</p></div>" +
-      "<div data-chat-message-role='USER'><p id='u1'>A follow-up question?</p></div>" +
-      "<div data-chat-message-role='ASSISTANT'><p id='a2'>Another answer.</p></div>";
+      "<div data-message-role='ASSISTANT'><p id='a1'>The answer.</p></div>" +
+      "<div data-message-role='USER'><p id='u1'>A follow-up question?</p></div>" +
+      "<div data-message-role='ASSISTANT'><p id='a2'>Another answer.</p></div>";
 
     it("says no when the drag runs from an answer into the next message", () => {
       document.body.innerHTML = twoBubbles;
@@ -126,7 +126,7 @@ describe("selectionCapture", () => {
 
     it("still says yes when the selection spans paragraphs inside one answer", () => {
       document.body.innerHTML =
-        "<div data-chat-message-role='ASSISTANT'><p id='a1'>First part.</p><p id='a2'>Second part.</p></div>";
+        "<div data-message-role='ASSISTANT'><p id='a1'>First part.</p><p id='a2'>Second part.</p></div>";
 
       expect(captureSelection(dragAcross("#a1", "#a2", 6, true))!.isAiMessage).toBe(true);
     });

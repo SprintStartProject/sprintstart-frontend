@@ -1,12 +1,3 @@
-// ============================================================
-// PhaseCheckAdminModal.tsx
-// ============================================================
-// PM/HR/Admin view of one phase's knowledge questions, with two
-// tabs: each question's attempts by this member, and an editor
-// for the questions themselves. Onboarding paths are per-user,
-// so editing here only affects this member's phase.
-// ============================================================
-
 import { useState, useEffect } from "react";
 import { Modal } from "../../../../components/ui/Modal";
 import { useToast } from "../../../../context/useToast";
@@ -148,6 +139,13 @@ function toPayload(drafts: QuestionDraft[]): UpsertQuestion[] {
   }));
 }
 
+/**
+ * PM/HR/ADMIN view of one phase's knowledge check for one member, in two tabs: the member's
+ * attempts per question, and an editor for the questions themselves.
+ *
+ * Onboarding paths are per user, so editing here only changes this member's phase. Saving with
+ * every question removed deletes the phase's whole check, which takes a second click.
+ */
 export function PhaseCheckAdminModal({
   userId,
   phaseId,
@@ -486,7 +484,7 @@ function QuestionsEditor({
             onChange={(event) => onUpdate(draft.key, { question: event.target.value })}
             placeholder="Question"
             aria-label={`Question ${index + 1} text`}
-            className="mt-3 w-full rounded-xl border border-app-border bg-app-bg px-4 py-2.5 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand focus:outline-none"
+            className="mt-3 w-full rounded-xl border border-app-border bg-app-bg px-4 py-2.5 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand"
           />
 
           {draft.type === "MULTIPLE_CHOICE" ? (
@@ -520,7 +518,7 @@ function QuestionsEditor({
                         ),
                       })
                     }
-                    className="w-full rounded-xl border border-app-border bg-app-bg px-4 py-2 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand focus:outline-none"
+                    className="w-full rounded-xl border border-app-border bg-app-bg px-4 py-2 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand"
                   />
                   <button
                     type="button"
@@ -559,7 +557,7 @@ function QuestionsEditor({
               onChange={(event) => onUpdate(draft.key, { correctAnswer: event.target.value })}
               placeholder="Sample answer (graded semantically by the AI)"
               aria-label={`Question ${index + 1} sample answer`}
-              className="mt-3 w-full rounded-xl border border-app-border bg-app-bg px-4 py-2.5 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand focus:outline-none"
+              className="mt-3 w-full rounded-xl border border-app-border bg-app-bg px-4 py-2.5 text-sm text-app-text placeholder:text-app-text-subtle focus:border-app-brand"
             />
           )}
 
@@ -569,7 +567,7 @@ function QuestionsEditor({
             onChange={(event) => onUpdate(draft.key, { explanation: event.target.value })}
             placeholder="Explanation shown after answering (optional)"
             aria-label={`Question ${index + 1} explanation`}
-            className="mt-2 w-full rounded-xl border border-app-border bg-app-bg px-4 py-2 text-xs text-app-text placeholder:text-app-text-subtle focus:border-app-brand focus:outline-none"
+            className="mt-2 w-full rounded-xl border border-app-border bg-app-bg px-4 py-2 text-xs text-app-text placeholder:text-app-text-subtle focus:border-app-brand"
           />
         </div>
       ))}

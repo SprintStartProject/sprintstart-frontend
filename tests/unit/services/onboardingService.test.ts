@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { onboardingService } from "../../../src/services/onboardingService";
 import { http, HttpResponse } from "msw";
-import { server } from "../../unit/setup/vitest.setup";
+import { mockKeycloakInstance, server } from "../../unit/setup/vitest.setup";
 import type {
   OnboardingStepDetail,
   OnboardingTaskEndpoint,
@@ -10,6 +10,9 @@ import type {
 describe("onboardingService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockKeycloakInstance.authenticated = true;
+    mockKeycloakInstance.token = "test-token";
+    mockKeycloakInstance.updateToken.mockResolvedValue(true);
   });
 
   it("fetchPath returns path endpoint", async () => {
@@ -254,5 +257,36 @@ describe("onboardingService", () => {
 
     expect(review.attempts).toHaveLength(1);
     expect(review.attempts[0].correct).toBe(true);
+  });
+
+  it("sends no Authorization header when no token is held", async () => {
+    mockKeycloakInstance.authenticated = false;
+    Object.assign(mockKeycloakInstance, { token: undefined });
+    let capturedAuthHeader: string | null = "unset";
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+        controller.close();
+      },
+    });
+    server.use(
+      http.post("/api/v1/projects/proj-sel/onboarding/me/path/personalize", ({ request }) => {
+        capturedAuthHeader = request.headers.get("Authorization");
+        return new HttpResponse(stream, {
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }),
+    );
+
+    await onboardingService.personalizePath("proj-sel", {
+      onStage: vi.fn(),
+      onPath: vi.fn(),
+      onDone: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    // The literal "Bearer undefined" used to reach the backend here.
+    expect(capturedAuthHeader).toBeNull();
   });
 });

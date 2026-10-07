@@ -6,36 +6,35 @@
  * idea: six different focus treatments, four heights, and 34 of them with no
  * `placeholder:` color at all. The most common focus ring was
  * `ring-app-brand-glow`, a 10%-opacity blue that is very nearly invisible —
- * which is why the shared style rings with `--app-focus` instead, the same
- * token `Button` uses and the one `FRONTEND_CODING_STANDARDS.md` §5 asks for.
+ * which is why focus is now drawn by the global `:focus-visible` outline
+ * (`--app-focus`, see `index.css`), the same one `Button` gets.
  */
 
 /** Matches `ButtonSize`, so a control and a button in one row line up exactly. */
 export type FieldSize = "sm" | "md" | "lg";
 
 /**
- * Focus is on `:focus`, not `:focus-visible`. A button only needs to show focus
- * for keyboard users, but a text field must show it when clicked too — the
- * caret alone is too small a cue to locate at a glance.
+ * The outline comes from the global `:focus-visible` rule, which browsers also
+ * apply to a text field that is clicked, so the field shows focus for mouse and
+ * keyboard alike. Only the border color is set here.
  */
 const baseFieldClasses =
-  "w-full border bg-app-surface text-app-text outline-none transition-colors " +
+  "w-full border bg-app-surface text-app-text transition-colors " +
   "placeholder:text-app-text-disabled " +
-  "focus:ring-2 focus:ring-app-focus " +
   "disabled:cursor-not-allowed disabled:opacity-60";
 
 const normalBorderClasses = "border-app-border focus:border-app-brand-border-strong";
 
 /**
  * An invalid control is outlined in red *and* keeps its error text below it, so
- * the state is never carried by color alone (AGENTS.md §7 / standards §5).
+ * the state is never carried by color alone (FRONTEND_CODING_STANDARDS.md §5).
  */
 const invalidBorderClasses = "border-app-danger-border focus:border-app-danger-solid";
 
 const sizeClasses: Record<FieldSize, string> = {
-  sm: "h-9 rounded-lg px-3 text-sm",
-  md: "h-11 rounded-xl px-3 text-sm",
-  lg: "h-12 rounded-xl px-4 text-sm",
+  sm: "h-9 rounded-lg px-3 text-base sm:text-sm pointer-coarse:text-base",
+  md: "h-11 rounded-xl px-3 text-base sm:text-sm pointer-coarse:text-base",
+  lg: "h-12 rounded-xl px-4 text-base sm:text-sm pointer-coarse:text-base",
 };
 
 /** Left padding that clears a leading icon, per size. */

@@ -3,13 +3,34 @@ import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { GitBranch } from "lucide-react";
+import { BitbucketIcon } from "../../../src/components/icons/BitbucketIcon";
 import { SourceDetailsPanel } from "../../../src/features/data-ingestion/components/SourceDetailsPanel";
 import type { DataSource } from "../../../src/features/data-ingestion/types";
 import { deriveSourceStatus } from "../../../src/features/data-ingestion/data";
 
 vi.mock("../../../src/services/ingestionService", () => ({
-  getIngestionRuns: vi.fn().mockResolvedValue([]),
   getIngestionStatus: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../../../src/services/sources/bitbucketService", () => ({
+  getBitbucketRepositoryConfig: vi.fn().mockResolvedValue({
+    autoUpdate: true,
+    spec: { type: "INTERVAL", everyMinutes: 30 },
+    nextSyncAt: null,
+  }),
+}));
+
+vi.mock("../../../src/services/sources/notionService", () => ({
+  notionService: {
+    listConnections: vi.fn().mockResolvedValue([
+      {
+        id: "notion-conn-1",
+        autoUpdate: true,
+        scheduleSpec: { type: "INTERVAL", everyMinutes: 30 },
+        nextSyncAt: null,
+      },
+    ]),
+  },
 }));
 
 const source: DataSource = {
@@ -18,9 +39,6 @@ const source: DataSource = {
   name: "GitHub Repository",
   type: "GitHub",
   status: "connected",
-  statusLabel: "Connected",
-  ingestionStatus: "connected",
-  ingestionStatusLabel: "Synced",
   statusView: deriveSourceStatus({ hasErrors: false, hasNeverSynced: false }),
   artifacts: 42,
   lastSync: "2026-07-01",
@@ -29,15 +47,15 @@ const source: DataSource = {
   latestUpdatedCount: 5,
   totalArtifactCount: 42,
   deletedCount: 0,
-  runIds: [],
   sharesSourceSystem: false,
-  lastCommitsSyncAt: null,
-  lastIssuesSyncAt: null,
-  lastPullRequestsSyncAt: null,
   lastRunAt: "2026-07-01T00:00:00.000Z",
   icon: GitBranch,
   failedItems: [],
-  githubRepository: null,
+  details: {
+    system: "GITHUB",
+    repository: null,
+    syncTimes: { commits: null, issues: null, pullRequests: null },
+  },
   description: "Indexes repositories.",
 };
 
@@ -45,13 +63,102 @@ describe("SourceDetailsPanel Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <SourceDetailsPanel source={source} onClose={vi.fn()} />
+        <SourceDetailsPanel
+          source={source}
+          projectId="p1"
+          canManage
+          canUnlink
+          onChanged={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
       </MemoryRouter>,
     );
 
     await waitFor(() => {
       expect(screen.getByText("GitHub Repository")).toBeInTheDocument();
     });
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no a11y violations for a Notion workspace with all actions", async () => {
+    const notionSource: DataSource = {
+      ...source,
+      sourceId: "notion-conn-1",
+      sourceSystem: "NOTION",
+      name: "Acme Workspace",
+      type: "Notion",
+      details: {
+        system: "NOTION",
+        workspace: {
+          connectionId: "notion-conn-1",
+          sourceRef: "ws-1",
+          workspaceName: "Acme Workspace",
+          credentialName: "wiki",
+        },
+      },
+    };
+
+    const { baseElement } = render(
+      <MemoryRouter>
+        <SourceDetailsPanel
+          source={notionSource}
+          projectId="p1"
+          canManage
+          canUnlink
+          onChanged={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Acme Workspace").length).toBeGreaterThan(0);
+    });
+    await screen.findByLabelText("Every");
+
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it("has no a11y violations for a Bitbucket repository with all actions", async () => {
+    const bitbucketSource: DataSource = {
+      ...source,
+      sourceId: "bb-repo-1",
+      sourceSystem: "BITBUCKET",
+      name: "acme/widgets",
+      type: "Bitbucket",
+      icon: BitbucketIcon,
+      details: {
+        system: "BITBUCKET",
+        repository: {
+          repositoryId: "bb-repo-1",
+          workspace: "acme",
+          slug: "widgets",
+          fullName: "acme/widgets",
+          url: "https://bitbucket.org/acme/widgets",
+          enabled: true,
+        },
+        syncTimes: { pullRequests: "2026-07-01T00:00:00.000Z" },
+      },
+    };
+
+    const { baseElement } = render(
+      <MemoryRouter>
+        <SourceDetailsPanel
+          source={bitbucketSource}
+          projectId="p1"
+          canManage
+          canUnlink
+          onChanged={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("acme/widgets").length).toBeGreaterThan(0);
+    });
+    await screen.findByLabelText("Every");
 
     expect(await axe(baseElement)).toHaveNoViolations();
   });

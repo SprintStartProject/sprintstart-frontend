@@ -77,8 +77,8 @@ function MissingTypes({
 
   const chip =
     tone === "present"
-      ? "rounded border border-app-success-border bg-app-success-bg px-1.5 py-0.5 text-[10px] text-app-success-text"
-      : "rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-[10px] text-app-text-muted";
+      ? "rounded border border-app-success-border bg-app-success-bg px-1.5 py-0.5 text-xs text-app-success-text"
+      : "rounded border border-app-border bg-app-surface-muted px-1.5 py-0.5 text-xs text-app-text-muted";
 
   return (
     <div className="flex flex-wrap gap-1">
@@ -96,7 +96,7 @@ function MissingTypes({
 /** Small uppercase caption over a chip group. */
 function ChipLabel({ children }: { children: string }) {
   return (
-    <p className="mb-1.5 text-[10px] font-semibold tracking-widest text-app-brand-text uppercase">
+    <p className="mb-1.5 text-2xs font-semibold tracking-wider text-app-brand-text uppercase">
       {children}
     </p>
   );
@@ -138,8 +138,8 @@ function GapFeature({
   const coOwners = gap.owners.filter((owner) => owner.id !== currentUserId);
 
   return (
-    <div className="flex flex-1 flex-col justify-center gap-3 sm:flex-row sm:items-center sm:gap-8">
-      <div className="min-w-0 sm:flex-1">
+    <div className="flex flex-1 flex-col justify-center gap-3 @min-[28rem]:flex-row @min-[28rem]:items-center @min-[28rem]:gap-8">
+      <div className="min-w-0 @min-[28rem]:flex-1">
         <SeverityPill gap={gap} />
 
         <p
@@ -167,7 +167,7 @@ function GapFeature({
         )}
       </div>
 
-      <div className="min-w-0 sm:flex-1 sm:border-l sm:border-app-border-muted sm:pl-8">
+      <div className="min-w-0 @min-[28rem]:flex-1 @min-[28rem]:border-l @min-[28rem]:border-app-border-muted @min-[28rem]:pl-8">
         <ChipLabel>Missing</ChipLabel>
         <MissingTypes types={gap.missingTypes} limit={gap.missingTypes.length} />
 
@@ -185,7 +185,7 @@ function GapFeature({
         never shown. Without it the right half of the widget sat empty.
       */}
       {split && (
-        <div className="min-w-0 sm:flex-1 sm:border-l sm:border-app-border-muted sm:pl-8">
+        <div className="min-w-0 @min-[28rem]:flex-1 @min-[28rem]:border-l @min-[28rem]:border-app-border-muted @min-[28rem]:pl-8">
           <ChipLabel>Source</ChipLabel>
 
           <dl className="space-y-1">
@@ -256,7 +256,7 @@ function GapCard({ gap, rich = false }: { gap: KnowledgeGap; rich?: boolean }) {
         the cards get a whole row to themselves and have the height to spare.
       */}
       {rich && (
-        <p className="mt-2 flex items-center gap-1 text-[10px] text-app-text-muted">
+        <p className="mt-2 flex items-center gap-1 text-xs text-app-text-muted">
           <Clock aria-hidden="true" className="h-3 w-3 shrink-0" />
           {formatRelativeDate(gap.lastIngested)}
         </p>
@@ -371,7 +371,7 @@ function NewOwnershipPill() {
   return (
     <span
       aria-hidden="true"
-      className="flex shrink-0 items-center gap-1.5 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 text-[10px] font-semibold tracking-wide text-app-warning-text uppercase"
+      className="flex shrink-0 items-center gap-1.5 rounded-full border border-app-warning-border bg-app-warning-bg px-2 py-0.5 text-2xs font-semibold tracking-wide text-app-warning-text uppercase"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-app-warning-solid" />
       New
@@ -532,6 +532,8 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
                 ? `Open your knowledge gaps, ${unseenComponents.length} newly assigned`
                 : "Open your knowledge gaps"
         }
+        // The count lives in the "New" pill beside it; repeating it here squeezed the title.
+        actionText={canOpenDrawer ? "Open your knowledge gaps" : "Mark as read"}
         onActivate={isPressable ? openDetails : undefined}
         notice={hasUnseen ? <NewOwnershipPill /> : undefined}
         isLoading={loading}
@@ -588,13 +590,13 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
             )}
           </div>
         ) : (
-          <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:gap-8">
+          <div className="flex flex-1 flex-col gap-4 @min-[28rem]:flex-row @min-[28rem]:gap-6 @3xl:gap-8">
             {/*
             The spread first, because at full width it is the thing the list cannot say: four
             low-severity gaps and one high one are the same number of rows and completely
             different afternoons.
           */}
-            <div className="flex shrink-0 flex-col justify-center sm:w-52">
+            <div className="flex shrink-0 flex-col justify-center @min-[28rem]:w-40 @3xl:w-52">
               <p className="text-4xl leading-none font-bold text-app-text tabular-nums">
                 {gaps.length}
               </p>
@@ -620,7 +622,7 @@ export function MyKnowledgeGapsWidget({ size }: { size: DashboardWidgetSize }) {
             five. The widget's own title already says what this is, and anything past the four
             cells is reported by the last cell rather than below the grid.
           */}
-            <div className="flex min-w-0 flex-1 flex-col border-t border-app-border-muted pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-8">
+            <div className="flex min-w-0 flex-1 flex-col border-t border-app-border-muted pt-4 @min-[28rem]:border-t-0 @min-[28rem]:border-l @min-[28rem]:pt-0 @min-[28rem]:pl-6 @3xl:pl-8">
               <ul className={`grid min-h-0 flex-1 gap-3 ${wideGridClass}`}>
                 {celledGaps.map((gap) => (
                   <GapCard key={gap.id} gap={gap} rich={wideRichCards} />

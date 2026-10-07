@@ -4,9 +4,7 @@ import { FILTER_OPTIONS, type BoardFilter } from "../layout/boardFilters";
 type BoardFilterTriggersProps = {
   value: BoardFilter;
   onChange: (filter: BoardFilter) => void;
-  /** Drops the words and keeps the glyphs, for the narrow rail in the page's own margin. */
-  compact?: boolean;
-  /** Stacks them, for the rail: three glyphs down the margin rather than across it. */
+  /** Stacks them, for the rail standing up the margin from `lg`; side by side below that. */
   vertical?: boolean;
   className?: string;
 };
@@ -14,10 +12,10 @@ type BoardFilterTriggersProps = {
 /**
  * Which cards to show, as two switches rather than a dropdown.
  *
- * Split out the way {@link AddCardTriggers} was, and for the same reason: from `lg` up it lives in
- * the page's right margin beside the other switches, and below that width there is no margin, so it
- * stays in the row above the board where the filter has always been. One state, two places it can
- * be reached from — never two implementations.
+ * Lives in the board's tool rail beside the other switches — up the right margin from `lg`, across
+ * the top of the page below it. Glyphs only, named by their `aria-label` and tooltip: the rail is
+ * the only place this renders, and the worded form it used to have for a row above the board went
+ * with that row.
  *
  * Toggle buttons with `aria-pressed` rather than a radio group, which is what `SegmentedTabs` does
  * a few lines away and for the same reason: a real radio group promises arrow-key navigation, and
@@ -27,14 +25,13 @@ type BoardFilterTriggersProps = {
  * afterwards, because a board with neither of these on is already showing every card — see
  * {@link FILTER_OPTIONS}.
  *
- * In the rail the words are gone, which a cut like "Yours" cannot carry on a glyph alone. It does
+ * Without words, which a cut like "Yours" cannot carry on a glyph alone. It does
  * not have to: `BoardViewStatus` names the cut in words directly above the board whenever one is
  * on, so what the pressed button did is written out where the result of it is.
  */
 export function BoardFilterTriggers({
   value,
   onChange,
-  compact,
   vertical,
   className = "",
 }: BoardFilterTriggersProps) {
@@ -49,13 +46,13 @@ export function BoardFilterTriggers({
           key={option}
           variant={value === option ? "secondary" : "ghost"}
           size="sm"
-          iconOnly={compact}
+          iconOnly
           onClick={() => onChange(value === option ? "all" : option)}
           aria-pressed={value === option}
-          aria-label={compact ? label : undefined}
+          aria-label={label}
           title={label}
         >
-          {compact ? <Icon className="h-4 w-4" aria-hidden="true" /> : label}
+          <Icon className="h-4 w-4" aria-hidden="true" />
         </Button>
       ))}
     </div>

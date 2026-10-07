@@ -62,9 +62,9 @@ const VARIANT_CONFIG: Record<
 const CARD_CLASSES =
   "pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-2xl border px-4 py-3 shadow-lg shadow-black/5 backdrop-blur-sm";
 const ACTION_CLASSES =
-  "mt-1.5 inline-flex w-fit items-center gap-1 rounded-lg text-sm font-semibold underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none";
+  "focus-ring-inset mt-1.5 inline-flex w-fit items-center gap-1 rounded-lg text-sm font-semibold underline-offset-2 hover:underline focus-visible:underline";
 const CLOSE_CLASSES =
-  "-mt-0.5 -mr-1 shrink-0 rounded-lg p-1 opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none";
+  "focus-ring-inset -mt-0.5 -mr-1 shrink-0 rounded-lg p-1 opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100";
 const VIEWPORT_CLASSES =
   "pointer-events-none fixed inset-x-4 top-[72px] z-[200] flex flex-col items-end gap-3 sm:inset-x-auto sm:top-4 sm:right-4 sm:w-full sm:max-w-sm";
 

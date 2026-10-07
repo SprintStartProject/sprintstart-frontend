@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { BuddyDock } from "../../../../src/features/buddy/components/BuddyDock";
+import {
+  BuddyDraftActionsContext,
+  BuddyDraftContext,
+} from "../../../../src/features/buddy/buddyDraftContext";
 import type { BuddyMessageView } from "../../../../src/features/buddy/types";
 import type { BuddySuggestion } from "../../../../src/services/buddyService";
 
@@ -30,47 +34,71 @@ function renderDock(
   {
     suggestions = [],
     setDraft = vi.fn(),
-    startFreshVisit = vi.fn(async () => {}),
+    newConversation = vi.fn(async () => {}),
+    isOpening = false,
     isThinking = false,
     isStreaming = false,
+    isGreeting = false,
+    isDeciding = false,
   }: {
     suggestions?: BuddySuggestion[];
     setDraft?: () => void;
-    startFreshVisit?: () => Promise<void>;
+    newConversation?: () => Promise<void>;
+    isOpening?: boolean;
     isThinking?: boolean;
     isStreaming?: boolean;
+    isGreeting?: boolean;
+    isDeciding?: boolean;
   } = {},
 ) {
   return render(
-    <BuddyDock
-      messages={messages}
-      isThinking={isThinking}
-      isStreaming={isStreaming}
-      activeTool={null}
-      draft=""
-      setDraft={setDraft}
-      handleSubmit={vi.fn()}
-      confirmAction={vi.fn()}
-      dismissAction={vi.fn()}
-      suggestions={suggestions}
-      startFreshVisit={startFreshVisit}
-      isGreeting={false}
-      isDeciding={false}
-      teamProjectId={null}
-      onClose={vi.fn()}
-    />,
+    // The words come from the shared composer now (`BuddyDraftProvider`): the chips fill the box
+    // through the write-only half, and the box inside reads the value. The dock's own props no
+    // longer carry either.
+    <BuddyDraftActionsContext.Provider value={{ setDraft }}>
+      <BuddyDraftContext.Provider value={{ draft: "", setDraft, handleSubmit: vi.fn() }}>
+        <BuddyDock
+          messages={messages}
+          isThinking={isThinking}
+          isStreaming={isStreaming}
+          stopStreaming={vi.fn()}
+          queued={[]}
+          queuePaused={false}
+          removeQueued={vi.fn()}
+          pullQueuedMessage={vi.fn(() => null)}
+          resumeQueue={vi.fn()}
+          filters={{ sourceSystems: [], from: "", to: "" }}
+          setFilters={vi.fn()}
+          capabilitiesEnabled
+          setCapabilitiesEnabled={vi.fn()}
+          activeTool={null}
+          confirmAction={vi.fn()}
+          dismissAction={vi.fn()}
+          actionDrafts={{}}
+          setActionDraft={vi.fn()}
+          suggestions={suggestions}
+          newConversation={newConversation}
+          isOpening={isOpening}
+          isGreeting={isGreeting}
+          isDeciding={isDeciding}
+          teamProjectId={null}
+          retryReply={vi.fn()}
+          onClose={vi.fn()}
+        />
+      </BuddyDraftContext.Provider>
+    </BuddyDraftActionsContext.Provider>,
   );
 }
 
-const assistant = (content: string): BuddyMessageView => ({
-  id: "a1",
+const assistant = (content: string, id = "a1"): BuddyMessageView => ({
+  id,
   role: "ASSISTANT",
   content,
   createdAt: "2026-08-03T00:00:00Z",
 });
 
-const user = (content: string): BuddyMessageView => ({
-  id: "u1",
+const user = (content: string, id = "u1"): BuddyMessageView => ({
+  id,
   role: "USER",
   content,
   createdAt: "2026-08-03T00:00:00Z",
@@ -265,36 +293,62 @@ describe("BuddyDock new conversation", () => {
     expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });
 
-  it("starts the fresh visit once, on the session the dock was handed", async () => {
-    const startFreshVisit = vi.fn(async () => {});
-    renderDock([assistant("Hello."), user("How do we deploy?")], { startFreshVisit });
+  it("starts a new conversation once, on the session the dock was handed", async () => {
+    const newConversation = vi.fn(async () => {});
+    renderDock([assistant("Hello."), user("How do we deploy?")], { newConversation });
 
     await userEvent.click(screen.getByRole("button", { name: "Start a new conversation" }));
 
-    expect(startFreshVisit).toHaveBeenCalledTimes(1);
+    expect(newConversation).toHaveBeenCalledTimes(1);
   });
 
-  // startFreshVisit clears the thread and greets, but cannot call back the request already
-  // streaming into it: that stream's callbacks still hold the shared conversation, so its tool
-  // events would land under the brand-new greeting.
-  it("withdraws while the buddy is still thinking", () => {
+  // newConversation aborts the running answer before it clears the thread (see
+  // `stopRunningTurn`), so the control stays on offer mid-answer.
+  it("stays on offer while the buddy is still thinking", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
       isThinking: true,
+    });
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
+  });
+
+  it("stays on offer while a reply is still arriving", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isStreaming: true,
+    });
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
+  });
+
+  // What the move cannot cut short: a greeting still being written, and a decision's outcome.
+  it("withdraws while the greeting is still being written", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isGreeting: true,
     });
 
     expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
   });
 
-  it("withdraws while a reply is still arriving", () => {
+  it("withdraws while a proposal decision is in flight", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
-      isStreaming: true,
+      isDeciding: true,
+    });
+
+    expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
+  });
+
+  // An open is going into the very thread this click would clear: withdrawn while one is in
+  // flight.
+  it("withdraws while a conversation is opening", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isOpening: true,
     });
 
     expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
   });
 
   it("comes back once the turn is over", () => {
-    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.")]);
+    renderDock([assistant("Hello."), user("How do we deploy?"), assistant("Against dev.", "a2")]);
 
     expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
   });

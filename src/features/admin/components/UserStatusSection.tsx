@@ -1,6 +1,6 @@
 import { ShieldCheck } from "lucide-react";
-import { AccountEnabledToggle } from "./AccountEnabledToggle";
-import { DrawerCard } from "./DrawerCard";
+import { AccountEnabledToggle } from "../../../components/ui/AccountEnabledToggle";
+import { DrawerCard } from "../../../components/ui/DrawerCard";
 import { StatusChip } from "./StatusChip";
 
 type UserStatusSectionProps = {
@@ -31,7 +31,7 @@ export function UserStatusSection({
     <DrawerCard label="Status" icon={ShieldCheck} index={index}>
       <div className="flex flex-wrap gap-x-8 gap-y-4">
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-semibold tracking-[0.14em] text-app-text-muted uppercase">
+          <span className="text-2xs font-semibold tracking-[0.14em] text-app-text-muted uppercase">
             Account access
           </span>
           <div className="flex flex-wrap items-center gap-3">
@@ -53,7 +53,7 @@ export function UserStatusSection({
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-semibold tracking-[0.14em] text-app-text-muted uppercase">
+          <span className="text-2xs font-semibold tracking-[0.14em] text-app-text-muted uppercase">
             Onboarding
           </span>
           <StatusChip

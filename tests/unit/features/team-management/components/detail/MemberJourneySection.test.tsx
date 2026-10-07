@@ -1,12 +1,17 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { createRef } from "react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { onboardingGraphService } from "../../../../../../src/services/onboardingGraphService";
-import { MemberJourneySection } from "../../../../../../src/features/team-management/components/detail/MemberJourneySection";
+import {
+  MemberJourneySection,
+  type MemberJourneyHandle,
+} from "../../../../../../src/features/team-management/components/detail/MemberJourneySection";
 import type {
   OnboardingPathEndpoint,
   OnboardingStepEndpoint,
 } from "../../../../../../src/features/onboarding/types";
+import { memberJourneyViewKey } from "../../../../../../src/features/onboarding/journeyViewMemory";
 
 // The remembered List/Graph view is keyed on the manager looking as well as on the member, so
 // the section asks who is signed in.
@@ -104,6 +109,26 @@ describe("MemberJourneySection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // The graph is the default; most tests here are about the list, so the manager left it there.
+    localStorage.setItem(
+      memberJourneyViewKey("pm-1", "user1"),
+      JSON.stringify({ mode: "list", graphPhaseId: null }),
+    );
+  });
+
+  it("opens on the graph when nothing is remembered, and lists it first", async () => {
+    localStorage.clear();
+    renderSection();
+
+    expect(
+      await screen.findByRole("application", { name: /Journey map of all onboarding phases/ }),
+    ).toBeInTheDocument();
+    const slider = screen.getByRole("button", { name: "Graph" }).parentElement!;
+    expect(
+      within(slider)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Graph", "List"]);
   });
 
   it("opens on the phase the member is in, with items in graph order", () => {
@@ -180,6 +205,48 @@ describe("MemberJourneySection", () => {
     await waitFor(() => expect(onboardingGraphService.createConnectedStep).toHaveBeenCalled());
     const [, request] = vi.mocked(onboardingGraphService.createConnectedStep).mock.calls.at(-1)!;
     expect(request).toMatchObject({ waitsOn: ["verify"], unlocks: [] });
+  });
+
+  /** The PM reads this, so "you" in the badge would be about the PM. */
+  it("names the hire, not the reader, on a step the hire added", () => {
+    const withHireStep: OnboardingPathEndpoint = {
+      ...path,
+      phases: [
+        {
+          ...path.phases[0],
+          steps: [
+            ...path.phases[0].steps,
+            step({ id: "own", position: 3, title: "My own step", origin: "HIRE" }),
+          ],
+        },
+        path.phases[1],
+      ],
+    };
+    renderSection({ path: withHireStep });
+
+    expect(screen.getByText("Added by the hire")).toBeInTheDocument();
+    expect(screen.queryByText("You added this")).not.toBeInTheDocument();
+  });
+
+  it("shows a phase asked for from the summary above, and scrolls down to it", () => {
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    const ref = createRef<MemberJourneyHandle>();
+    try {
+      renderSection({ ref });
+
+      act(() => {
+        ref.current?.showPhase("phase2");
+      });
+
+      expect(
+        within(screen.getByRole("navigation", { name: "Onboarding phases" })).getByRole("button", {
+          name: /^Architecture/,
+        }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    } finally {
+      scrollIntoView.mockRestore();
+    }
   });
 
   it("says so when the member has no path yet", () => {

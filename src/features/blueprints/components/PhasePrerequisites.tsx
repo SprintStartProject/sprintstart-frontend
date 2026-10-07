@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { TriangleAlert, X } from "lucide-react";
 import { Badge } from "../../../components/ui/Badge.tsx";
 import { DropdownSelect } from "../../../components/ui/DropdownSelect.tsx";
 import { canConnect } from "../../graph-diagram/graphLayout.ts";
@@ -85,7 +85,8 @@ export function PhasePrerequisites({
   return (
     <div className="space-y-4">
       {saveError ? (
-        <p role="alert" className="text-sm text-app-danger-text">
+        <p role="alert" className="flex items-start gap-1.5 text-sm text-app-danger-text">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {saveError}
         </p>
       ) : null}
@@ -109,7 +110,7 @@ export function PhasePrerequisites({
                       aria-label={`Stop waiting for ${blocker.title}`}
                       disabled={isSaving}
                       onClick={() => void run(() => onRemove(phase, blocker.id))}
-                      className="rounded-full transition-colors hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="rounded-full transition-colors hover:text-app-danger-text"
                     >
                       <X className="h-3 w-3" aria-hidden="true" />
                     </button>
@@ -157,7 +158,7 @@ export function PhasePrerequisites({
                       aria-label={`Stop ${dependent.title} waiting for ${phase.title}`}
                       disabled={isSaving}
                       onClick={() => void run(() => onRemove(dependent, phase.id))}
-                      className="rounded-full transition-colors hover:text-app-danger-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+                      className="rounded-full transition-colors hover:text-app-danger-text"
                     >
                       <X className="h-3 w-3" aria-hidden="true" />
                     </button>

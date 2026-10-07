@@ -114,6 +114,66 @@ describe("knowledgeService", () => {
         knowledgeService.deleteUpload("proj-1", "up-1", "remover-1"),
       ).rejects.toMatchObject({ name: "ApiError", status: 403 });
     });
+
+    it("rejects with the backend's reason when the one id comes back failed", async () => {
+      server.use(
+        http.delete("/api/v1/uploads", () =>
+          HttpResponse.json({
+            deletedIds: [],
+            failed: [{ artifactId: "up-1", error: "Artifact could not be deleted." }],
+          }),
+        ),
+      );
+
+      await expect(knowledgeService.deleteUpload("proj-1", "up-1", "remover-1")).rejects.toThrow(
+        "Artifact could not be deleted.",
+      );
+    });
+  });
+
+  describe("deleteUploads", () => {
+    it("sends every id in one request and returns the per-item outcome", async () => {
+      const fetchSpy = vi.spyOn(apiClient, "fetch").mockResolvedValue({
+        deletedIds: ["up-1"],
+        failed: [{ artifactId: "up-2", error: "Artifact with id up-2 not found." }],
+      });
+
+      const result = await knowledgeService.deleteUploads("proj-1", ["up-1", "up-2"], "r-1");
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const part = (fetchSpy.mock.calls[0][1]?.body as FormData).get("request") as Blob;
+      const payload: unknown = JSON.parse(await part.text());
+      expect(payload).toEqual({
+        artifactIds: ["up-1", "up-2"],
+        removerId: "r-1",
+        projectId: "proj-1",
+      });
+      expect(result).toEqual({
+        deletedIds: ["up-1"],
+        failed: [{ artifactId: "up-2", error: "Artifact with id up-2 not found." }],
+      });
+    });
+
+    it("reads an old backend's empty 204 as every id deleted", async () => {
+      server.use(http.delete("/api/v1/uploads", () => new HttpResponse(null, { status: 204 })));
+
+      await expect(
+        knowledgeService.deleteUploads("proj-1", ["up-1", "up-2"], "r-1"),
+      ).resolves.toEqual({ deletedIds: ["up-1", "up-2"], failed: [] });
+    });
+
+    it("never counts an id the answer does not mention as deleted", async () => {
+      server.use(
+        http.delete("/api/v1/uploads", () =>
+          HttpResponse.json({ deletedIds: ["up-1"], failed: [] }),
+        ),
+      );
+
+      const result = await knowledgeService.deleteUploads("proj-1", ["up-1", "up-2"], "r-1");
+
+      expect(result.deletedIds).toEqual(["up-1"]);
+      expect(result.failed.map((item) => item.artifactId)).toEqual(["up-2"]);
+    });
   });
 
   describe("streamArtifactSummary", () => {
@@ -232,25 +292,31 @@ describe("knowledgeService", () => {
     });
   });
 
-  describe("getUnifiedArtifacts", () => {
+  describe("getArtifactPage", () => {
     const projectId = "proj-uuid";
 
-    it("fetches a single page of artifacts", async () => {
+    it("serializes filter criteria and pagination into query params and returns page response", async () => {
       server.use(
         http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
           const url = new URL(request.url);
-          expect(url.searchParams.get("page")).toBe("1");
-          expect(url.searchParams.get("size")).toBe("100");
+          expect(url.searchParams.get("page")).toBe("2");
+          expect(url.searchParams.get("size")).toBe("20");
+          expect(url.searchParams.get("search")).toBe("guide");
+          expect(url.searchParams.getAll("types")).toEqual(["FILE", "ISSUE"]);
+          expect(url.searchParams.getAll("sources")).toEqual(["GITHUB"]);
+          expect(url.searchParams.getAll("repositories")).toEqual(["owner/repo"]);
+          expect(url.searchParams.get("format")).toBe("PDF");
+
           return HttpResponse.json({
             items: [
               {
                 id: "art-1",
-                title: "doc1.md",
+                title: "guide.pdf",
                 artifactType: "FILE",
                 sourceSystem: "GITHUB",
                 sourceId: "src-1",
                 sourceUrl: null,
-                mime: "text/markdown",
+                mime: "application/pdf",
                 language: null,
                 ingestedAt: "2026-01-01T00:00:00Z",
                 lastChangedAt: null,
@@ -259,86 +325,269 @@ describe("knowledgeService", () => {
               },
             ],
             page: {
-              totalPages: 1,
+              number: 2,
+              size: 20,
+              totalElements: 25,
+              totalPages: 2,
+              hasNext: false,
+              hasPrevious: true,
             },
           });
         }),
       );
 
-      const artifacts = await knowledgeService.getUnifiedArtifacts(projectId);
-      expect(artifacts).toHaveLength(1);
-      expect(artifacts[0].title).toBe("doc1.md");
-    });
+      const page = await knowledgeService.getArtifactPage(projectId, {
+        page: 2,
+        size: 20,
+        search: "guide",
+        types: ["FILE", "ISSUE"],
+        sources: ["GITHUB"],
+        repositories: ["owner/repo"],
+        format: "PDF",
+      });
 
-    it("fetches across multiple pages until all pages are retrieved", async () => {
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0].title).toBe("guide.pdf");
+      expect(page.page.totalElements).toBe(25);
+    });
+  });
+
+  describe("getArtifactFacets", () => {
+    const projectId = "proj-uuid";
+
+    it("queries facets endpoint and returns aggregated facet breakdown", async () => {
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts/facets`, ({ request }) => {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("search")).toBe("guide");
+          return HttpResponse.json({
+            types: [{ value: "FILE", count: 10 }],
+            sources: [{ value: "GITHUB", count: 10 }],
+            formats: [{ value: "PDF", count: 3 }],
+            repositories: [{ value: "owner/repo", count: 7 }],
+          });
+        }),
+      );
+
+      const facets = await knowledgeService.getArtifactFacets(projectId, {
+        search: "guide",
+      });
+
+      expect(facets.types).toEqual([{ value: "FILE", count: 10 }]);
+      expect(facets.formats).toEqual([{ value: "PDF", count: 3 }]);
+    });
+  });
+
+  describe("list order and filter parity", () => {
+    const projectId = "proj-uuid";
+    const emptyPage = {
+      items: [],
+      page: {
+        number: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false,
+      },
+    };
+    const emptyFacets = { types: [], sources: [], formats: [], repositories: [] };
+
+    it("sends the sort order with the list request", async () => {
+      let seen: URLSearchParams | null = null;
       server.use(
         http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
-          const url = new URL(request.url);
-          const page = url.searchParams.get("page");
-          if (page === "1") {
-            return HttpResponse.json({
-              items: [
-                {
-                  id: "art-1",
-                  title: "page1.md",
-                  artifactType: "FILE",
-                  sourceSystem: "GITHUB",
-                  sourceId: "src-1",
-                  sourceUrl: null,
-                  mime: "text/markdown",
-                  language: null,
-                  ingestedAt: "2026-01-01T00:00:00Z",
-                  lastChangedAt: null,
-                  contentHash: null,
-                  ingestionRunId: null,
-                },
-              ],
-              page: {
-                totalPages: 2,
-              },
-            });
-          }
+          seen = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyPage);
+        }),
+      );
+
+      await knowledgeService.getArtifactPage(projectId, { page: 0, size: 20, sort: "TITLE_ASC" });
+
+      expect(seen!.get("sort")).toBe("TITLE_ASC");
+    });
+
+    it("leaves sort out when none is given, so the default request is unchanged", async () => {
+      let seen: URLSearchParams | null = null;
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          seen = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyPage);
+        }),
+      );
+
+      await knowledgeService.getArtifactPage(projectId, { page: 1, size: 20 });
+
+      expect(seen!.has("sort")).toBe(false);
+    });
+
+    it("never sends page, size or sort to the facets endpoint", async () => {
+      let seen: URLSearchParams | null = null;
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts/facets`, ({ request }) => {
+          seen = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyFacets);
+        }),
+      );
+
+      await knowledgeService.getArtifactFacets(projectId, {
+        page: 3,
+        size: 50,
+        sort: "CHANGED_DESC",
+        search: "guide",
+        sources: ["GITHUB"],
+      });
+
+      expect(seen!.has("page")).toBe(false);
+      expect(seen!.has("size")).toBe(false);
+      expect(seen!.has("sort")).toBe(false);
+      expect(seen!.get("search")).toBe("guide");
+      expect(seen!.getAll("sources")).toEqual(["GITHUB"]);
+    });
+
+    it("sends the date range to the list and the facets alike, unlike sort", async () => {
+      let listParams: URLSearchParams | null = null;
+      let facetParams: URLSearchParams | null = null;
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          listParams = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyPage);
+        }),
+        http.get(`/api/v1/projects/${projectId}/artifacts/facets`, ({ request }) => {
+          facetParams = new URL(request.url).searchParams;
+          return HttpResponse.json(emptyFacets);
+        }),
+      );
+      const params = {
+        from: "2026-09-01",
+        to: "2026-09-24",
+        sort: "TITLE_ASC" as const,
+      };
+
+      await knowledgeService.getArtifactPage(projectId, params);
+      await knowledgeService.getArtifactFacets(projectId, params);
+
+      for (const seen of [listParams!, facetParams!]) {
+        expect(seen.get("from")).toBe("2026-09-01");
+        expect(seen.get("to")).toBe("2026-09-24");
+      }
+      expect(listParams!.get("sort")).toBe("TITLE_ASC");
+      expect(facetParams!.has("sort")).toBe(false);
+    });
+
+    it("repeats languages on the list and the facets, spelled as given", async () => {
+      const seen: URLSearchParams[] = [];
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts`, ({ request }) => {
+          seen.push(new URL(request.url).searchParams);
+          return HttpResponse.json(emptyPage);
+        }),
+        http.get(`/api/v1/projects/${projectId}/artifacts/facets`, ({ request }) => {
+          seen.push(new URL(request.url).searchParams);
+          return HttpResponse.json({ ...emptyFacets, languages: [] });
+        }),
+      );
+      const params = { languages: ["Kotlin", "C#"] };
+
+      await knowledgeService.getArtifactPage(projectId, params);
+      const facets = await knowledgeService.getArtifactFacets(projectId, params);
+
+      expect(seen).toHaveLength(2);
+      for (const query of seen) expect(query.getAll("languages")).toEqual(["Kotlin", "C#"]);
+      expect(facets.languages).toEqual([]);
+    });
+  });
+
+  describe("getArtifactById", () => {
+    const projectId = "proj-uuid";
+    const artifactId = "art-uuid";
+
+    it("fetches single artifact by id", async () => {
+      server.use(
+        http.get(`/api/v1/projects/${projectId}/artifacts/${artifactId}`, () => {
           return HttpResponse.json({
-            items: [
-              {
-                id: "art-2",
-                title: "page2.md",
-                artifactType: "FILE",
-                sourceSystem: "GITHUB",
-                sourceId: "src-2",
-                sourceUrl: null,
-                mime: "text/markdown",
-                language: null,
-                ingestedAt: "2026-01-01T00:00:00Z",
-                lastChangedAt: null,
-                contentHash: null,
-                ingestionRunId: null,
-              },
-            ],
-            page: {
-              totalPages: 2,
-            },
+            id: artifactId,
+            title: "detail.md",
+            artifactType: "FILE",
+            sourceSystem: "GITHUB",
+            sourceId: "src-detail",
+            sourceUrl: null,
+            mime: "text/markdown",
+            language: null,
+            ingestedAt: "2026-01-01T00:00:00Z",
+            lastChangedAt: null,
+            contentHash: null,
+            ingestionRunId: null,
           });
         }),
       );
 
-      const artifacts = await knowledgeService.getUnifiedArtifacts(projectId);
-      expect(artifacts).toHaveLength(2);
-      expect(artifacts[0].title).toBe("page1.md");
-      expect(artifacts[1].title).toBe("page2.md");
+      const artifact = await knowledgeService.getArtifactById(projectId, artifactId);
+      expect(artifact.id).toBe(artifactId);
+      expect(artifact.title).toBe("detail.md");
     });
+  });
+});
 
-    it("propagates ApiError when the request fails with 500", async () => {
-      server.use(
-        http.get(`/api/v1/projects/${projectId}/artifacts`, () =>
-          HttpResponse.json({ message: "Internal server error" }, { status: 500 }),
-        ),
-      );
+describe("knowledgeService.getArtifactAiStatus", () => {
+  it("sends every visible id as a repeated ids param in one request", async () => {
+    const seen: string[][] = [];
+    server.use(
+      http.get("/api/v1/projects/:projectId/artifacts/ai-status", ({ request }) => {
+        seen.push(new URL(request.url).searchParams.getAll("ids"));
+        return HttpResponse.json({
+          aiAvailable: true,
+          items: [{ artifactId: "a1", status: "INDEXED", updatedAt: null, chunkCount: 4 }],
+        });
+      }),
+    );
 
-      await expect(knowledgeService.getUnifiedArtifacts(projectId)).rejects.toMatchObject({
-        name: "ApiError",
-        status: 500,
-      });
+    const result = await knowledgeService.getArtifactAiStatus("p1", ["a1", "a2"]);
+
+    expect(seen).toEqual([["a1", "a2"]]);
+    expect(result).toEqual({
+      aiAvailable: true,
+      items: [{ artifactId: "a1", status: "INDEXED", updatedAt: null, chunkCount: 4 }],
     });
+  });
+
+  it("answers an empty page locally, without a request", async () => {
+    let calls = 0;
+    server.use(
+      http.get("/api/v1/projects/:projectId/artifacts/ai-status", () => {
+        calls += 1;
+        return HttpResponse.json({ aiAvailable: true, items: [] });
+      }),
+    );
+
+    await expect(knowledgeService.getArtifactAiStatus("p1", [])).resolves.toEqual({
+      aiAvailable: true,
+      items: [],
+    });
+    expect(calls).toBe(0);
+  });
+
+  it("reads a response without aiAvailable as unavailable, so nothing is guessed", async () => {
+    server.use(
+      http.get("/api/v1/projects/:projectId/artifacts/ai-status", () =>
+        HttpResponse.json({
+          items: [{ artifactId: "a1", status: "UNKNOWN", updatedAt: null, chunkCount: null }],
+        }),
+      ),
+    );
+
+    const result = await knowledgeService.getArtifactAiStatus("p1", ["a1"]);
+
+    expect(result.aiAvailable).toBe(false);
+  });
+
+  it("rejects when the request fails", async () => {
+    server.use(
+      http.get("/api/v1/projects/:projectId/artifacts/ai-status", () =>
+        HttpResponse.json({ message: "Too many ids" }, { status: 400 }),
+      ),
+    );
+
+    await expect(knowledgeService.getArtifactAiStatus("p1", ["a1"])).rejects.toThrow();
   });
 });

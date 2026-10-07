@@ -17,8 +17,17 @@ type DetailsSideDrawerProps = {
   contentClassName?: string;
   headerClassName?: string;
   closeAriaLabel?: string;
+  lockScroll?: boolean;
 };
 
+/**
+ * `SidePanel` preset for the details of an item opened from a list: a source, a run, a user,
+ * a project.
+ *
+ * Differs from the `SidePanel` defaults in that it is wider on desktop, has no dimming overlay
+ * (the list next to it stays visible and usable) and sits at `z-40`, below dialogs. Every prop
+ * is passed through, so a caller can still override each of these.
+ */
 export function DetailsSideDrawer({
   isOpen,
   onClose,
@@ -35,6 +44,7 @@ export function DetailsSideDrawer({
   contentClassName = "mx-3 px-3 pb-8 pt-4 sm:mx-5 sm:px-4 sm:pb-10 sm:pt-5 lg:px-5 lg:pt-6",
   headerClassName = "mx-3 px-3 pb-4 pt-4 sm:mx-5 sm:px-4 sm:pb-5 sm:pt-5 lg:px-5 lg:pt-6",
   closeAriaLabel = "Close details",
+  lockScroll = true,
 }: DetailsSideDrawerProps) {
   return (
     <SidePanel
@@ -52,6 +62,7 @@ export function DetailsSideDrawer({
       contentClassName={contentClassName}
       headerClassName={headerClassName}
       closeAriaLabel={closeAriaLabel}
+      lockScroll={lockScroll}
     >
       {children}
     </SidePanel>

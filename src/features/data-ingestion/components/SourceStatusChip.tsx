@@ -20,7 +20,7 @@ type SourceStatusChipProps = {
 
 /**
  * Renders the single unified source status as one chip: icon + label, never
- * color alone (color-blind accessibility, AGENTS.md §7). The `syncing` state
+ * color alone (color-blind accessibility, FRONTEND_CODING_STANDARDS.md §5). The `syncing` state
  * spins its icon. This is the only status badge a source shows — it replaces the
  * previous split of a backend badge next to a separate ingestion badge.
  */

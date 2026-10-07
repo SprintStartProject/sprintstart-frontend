@@ -4,7 +4,9 @@ import { Button, type ButtonSize } from "../../../components/ui/Button";
 import { useToast } from "../../../context/useToast";
 import { boardService } from "../../../services/boardService";
 import { useProjectContext } from "../../projects/useProjectContext";
+import { useInvalidateBoard } from "../hooks/useInvalidateBoard";
 import { rememberOrigin, type CardOrigin } from "../layout/cardOrigins";
+import { onboardingOrigin } from "../layout/onboardingOrigin";
 import type { AuthoredCardRequest } from "../types";
 
 type SaveToBoardProps = {
@@ -76,6 +78,7 @@ export function SaveToBoard({
 }: SaveToBoardProps) {
   const { selectedProjectId } = useProjectContext();
   const toast = useToast();
+  const invalidateBoard = useInvalidateBoard(selectedProjectId);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -90,7 +93,12 @@ export function SaveToBoard({
     try {
       const created = await boardService.addCard(selectedProjectId, card);
 
-      const where = origin?.();
+      // This button is often pressed far away from the board — see `useInvalidateBoard`.
+      invalidateBoard();
+
+      // A save that brings no origin of its own — the buddy dock's — is tied to the step open
+      // behind it, when there is one. See `onboardingOrigin`.
+      const where = origin?.() ?? onboardingOrigin(window.location.pathname);
       // Never allowed to fail the save: the card is what was asked for, the trail back is extra.
       if (where) rememberOrigin(selectedProjectId, created.id, where);
 

@@ -7,11 +7,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Search, SlidersHorizontal } from "lucide-react";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import { Checkbox } from "./Checkbox";
 import { Collapsible } from "./Collapsible";
+import { Input } from "./Input";
 import { buttonHoverMotion, buttonHoverMotionDisabled } from "../../styles/tokens";
 import { MENU_Z_INDEX, menuTransition, usePopoverMenu } from "./usePopoverMenu";
 
@@ -34,13 +35,29 @@ export type MultiSelectFilterSection<TValue extends string> = {
   id: string;
   label: string;
   options: MultiSelectFilterOption<TValue>[];
+  /**
+   * Adds a filter box above the options once the section holds more than
+   * {@link SECTION_SEARCH_THRESHOLD} of them. A repository list from a large
+   * organisation is otherwise a scroll hunt; a four-option list does not need one.
+   */
+  searchable?: boolean;
+  /**
+   * Shows only the first `visibleLimit` options until the reader presses
+   * "Show all". Ticked options are always shown, wherever they sit in the list,
+   * so a selection can never be hidden behind the fold. Ignored while the
+   * section's filter box holds text: then every match is shown.
+   */
+  visibleLimit?: number;
 };
+
+/** Sections with at most this many options never show a filter box, even when `searchable`. */
+export const SECTION_SEARCH_THRESHOLD = 8;
 
 /** Trigger height, on the same scale as `ui/Field` and `ui/Button`. */
 export type MultiSelectFilterSize = "sm" | "md";
 
 const triggerSizeClasses: Record<MultiSelectFilterSize, string> = {
-  sm: "h-9 px-2.5",
+  sm: "h-9 max-sm:h-11 px-2.5",
   md: "h-11 px-3.5",
 };
 
@@ -66,6 +83,11 @@ type MultiSelectFilterProps<TValue extends string> = {
    * an inner dropdown/collapsible button.
    */
   collapsible?: boolean;
+  /**
+   * Muted line at the foot of the menu. For what the counts mean, which a
+   * reader otherwise has to guess ("is 12 the total, or what I would get?").
+   */
+  footnote?: string;
   className?: string;
   /** Prefix for the control's `data-testid`s. */
   testId?: string;
@@ -93,7 +115,7 @@ type MultiSelectFilterProps<TValue extends string> = {
  * `FilterSelect`: the menu is portaled into `<body>` so no ancestor's stacking
  * context or `overflow: hidden` can swallow it.
  *
- * @param summary The trigger's text. Callers word it from the selection because
+ * @param summary - The trigger's text. Callers word it from the selection because
  *   only they know what the options mean ("3 sources" reads better than a list
  *   once the list is long).
  */
@@ -107,6 +129,7 @@ export function MultiSelectFilter<TValue extends string>({
   size = "sm",
   disabled = false,
   collapsible = true,
+  footnote,
   className = "",
   testId = "multiselect-filter",
 }: MultiSelectFilterProps<TValue>) {
@@ -118,6 +141,21 @@ export function MultiSelectFilter<TValue extends string>({
   const [collapsedSections, setCollapsedSections] = useState<ReadonlySet<string>>(
     new Set<string>(),
   );
+
+  // Per-section filter text and "Show all" state, keyed by section id. Both
+  // outlive a close/reopen on purpose: the filter box shows its text, so a
+  // narrowed list is never a mystery.
+  const [sectionQueries, setSectionQueries] = useState<Readonly<Record<string, string>>>({});
+  const [expandedSections, setExpandedSections] = useState<ReadonlySet<string>>(new Set<string>());
+
+  const setSectionExpanded = (sectionId: string, expanded: boolean) => {
+    setExpandedSections((current) => {
+      const next = new Set(current);
+      if (expanded) next.add(sectionId);
+      else next.delete(sectionId);
+      return next;
+    });
+  };
 
   const toggleSection = (sectionId: string) => {
     setCollapsedSections((current) => {
@@ -199,7 +237,7 @@ export function MultiSelectFilter<TValue extends string>({
         onClick={() => (isOpen ? close() : open())}
         {...(disabled ? buttonHoverMotionDisabled : buttonHoverMotion)}
         data-testid={`${testId}-trigger`}
-        className={`inline-flex w-full cursor-pointer items-center gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 text-sm text-app-text backdrop-blur-md transition-colors outline-none hover:border-app-brand-border-strong hover:bg-app-surface-hover focus-visible:ring-2 focus-visible:ring-app-focus disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70 ${triggerSizeClasses[size]}`}
+        className={`inline-flex w-full cursor-pointer items-center gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 text-sm text-app-text backdrop-blur-md transition-colors hover:border-app-brand-border-strong hover:bg-app-surface-hover disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-app-border/70 disabled:hover:bg-app-surface/70 ${triggerSizeClasses[size]}`}
       >
         <SlidersHorizontal aria-hidden="true" className="h-4 w-4 shrink-0 text-app-text-muted" />
 
@@ -247,7 +285,7 @@ export function MultiSelectFilter<TValue extends string>({
                 maxWidth: position.maxWidth,
                 zIndex: MENU_Z_INDEX,
               }}
-              className="fixed overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl outline-none"
+              className="fixed overflow-y-auto rounded-2xl border border-app-border/70 bg-app-surface/85 p-1.5 shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] outline-hidden backdrop-blur-xl"
               data-testid={`${testId}-menu`}
             >
               {sections.length === 0 && (
@@ -258,7 +296,7 @@ export function MultiSelectFilter<TValue extends string>({
                 const renderOption = (option: MultiSelectFilterOption<TValue>) => (
                   <label
                     key={option.value}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-app-text transition-colors hover:bg-app-surface-hover has-[:focus-visible]:bg-app-brand-soft max-sm:py-3"
                   >
                     <Checkbox
                       checked={selected.has(option.value)}
@@ -278,6 +316,78 @@ export function MultiSelectFilter<TValue extends string>({
                   </label>
                 );
 
+                const renderSectionBody = () => {
+                  const query = sectionQueries[section.id] ?? "";
+                  const showSearch =
+                    section.searchable === true &&
+                    section.options.length > SECTION_SEARCH_THRESHOLD;
+                  const needle = showSearch ? query.trim().toLowerCase() : "";
+                  const matching = needle
+                    ? section.options.filter((option) =>
+                        option.label.toLowerCase().includes(needle),
+                      )
+                    : section.options;
+                  const limit = section.visibleLimit;
+                  const isOverLimit =
+                    limit !== undefined && needle === "" && matching.length > limit;
+                  const isExpanded = expandedSections.has(section.id);
+                  const visible =
+                    isOverLimit && !isExpanded
+                      ? matching.filter(
+                          (option, index) => index < limit || selected.has(option.value),
+                        )
+                      : matching;
+                  const sectionTestId = `${testId}-section-${section.id}`;
+
+                  return (
+                    <>
+                      {showSearch && (
+                        <div className="px-1 pb-1">
+                          <Input
+                            type="search"
+                            size="sm"
+                            value={query}
+                            onChange={(event) =>
+                              setSectionQueries((current) => ({
+                                ...current,
+                                [section.id]: event.target.value,
+                              }))
+                            }
+                            placeholder={`Filter ${section.label.toLowerCase()}…`}
+                            aria-label={`Filter ${section.label.toLowerCase()}`}
+                            icon={<Search className="h-3.5 w-3.5" />}
+                            data-testid={`${sectionTestId}-search`}
+                          />
+                        </div>
+                      )}
+
+                      {visible.map(renderOption)}
+
+                      {needle !== "" && visible.length === 0 && (
+                        <p
+                          className="px-2.5 py-1.5 text-sm text-app-text-muted"
+                          data-testid={`${sectionTestId}-no-matches`}
+                        >
+                          No matches
+                        </p>
+                      )}
+
+                      {isOverLimit && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          fullWidth
+                          aria-expanded={isExpanded}
+                          onClick={() => setSectionExpanded(section.id, !isExpanded)}
+                          data-testid={`${sectionTestId}-show-all`}
+                        >
+                          {isExpanded ? "Show fewer" : `Show all (${matching.length})`}
+                        </Button>
+                      )}
+                    </>
+                  );
+                };
+
                 if (!collapsible) {
                   return (
                     <div key={section.id} className="py-0.5">
@@ -287,7 +397,7 @@ export function MultiSelectFilter<TValue extends string>({
                         </div>
                       )}
                       <div role="group" aria-label={section.label}>
-                        {section.options.map(renderOption)}
+                        {renderSectionBody()}
                       </div>
                       {sectionIndex < sections.length - 1 && (
                         <div className="my-1 border-t border-app-border/40" />
@@ -326,12 +436,21 @@ export function MultiSelectFilter<TValue extends string>({
 
                     <Collapsible open={!isCollapsed}>
                       <div id={panelId} role="group" aria-labelledby={headerId}>
-                        {section.options.map(renderOption)}
+                        {renderSectionBody()}
                       </div>
                     </Collapsible>
                   </div>
                 );
               })}
+
+              {footnote && (
+                <p
+                  className="mt-1 border-t border-app-border/40 px-2.5 pt-2 pb-1 text-xs text-app-text-muted"
+                  data-testid={`${testId}-footnote`}
+                >
+                  {footnote}
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>,

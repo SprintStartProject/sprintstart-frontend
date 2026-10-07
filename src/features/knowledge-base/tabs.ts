@@ -1,19 +1,25 @@
-import type { Artifact, ArtifactType, SourceSystem } from "./types";
+import { CONNECTORS, KNOWLEDGE_BASE_SOURCE_ORDER } from "../data-ingestion/connectors/registry.ts";
+import type { Artifact, ArtifactSort, ArtifactType, SourceSystem, UploadFormat } from "./types";
 
 /**
- * Human-readable display names for the artifact sources (connectors).
+ * Upload file formats the knowledge base classifies an upload into. Declared
+ * beside the artifact types they filter on, and re-exported from `./types` so
+ * the facet's labels and its values stay next to each other.
  */
-export const SOURCE_LABELS: Record<SourceSystem, string> = {
-  GITHUB: "GitHub",
-  JIRA: "Jira",
-  CONFLUENCE: "Confluence",
-  UPLOAD: "Uploads",
-};
+export type { UploadFormat } from "./types";
 
 /**
- * Standard left-to-right order for the source facet.
+ * Human-readable display names for the artifact sources (connectors), from the
+ * connector registry.
  */
-export const DEFAULT_SOURCE_ORDER: SourceSystem[] = ["GITHUB", "JIRA", "CONFLUENCE", "UPLOAD"];
+export const SOURCE_LABELS = Object.fromEntries(
+  KNOWLEDGE_BASE_SOURCE_ORDER.map((system) => [system, CONNECTORS[system].knowledgeBase.label]),
+) as Record<SourceSystem, string>;
+
+/**
+ * Standard left-to-right order for the source facet, from the connector registry.
+ */
+export const DEFAULT_SOURCE_ORDER: SourceSystem[] = [...KNOWLEDGE_BASE_SOURCE_ORDER];
 
 /**
  * Human-readable display names for artifact types.
@@ -73,15 +79,6 @@ export const KNOWLEDGE_TABS: readonly KnowledgeTabDef[] = [
 
 export const KNOWLEDGE_TAB_ORDER: readonly KnowledgeTab[] = KNOWLEDGE_TABS.map((tab) => tab.id);
 
-/**
- * File formats a reader can narrow *uploaded* artifacts to.
- *
- * Not a source type and not an artifact type: an upload's format only exists
- * for uploads, so this facet is offered only while `UPLOAD` is part of the
- * source selection (see `useKnowledgeBase`).
- */
-export type UploadFormat = "PDF" | "MARKDOWN" | "IMAGE" | "OTHER";
-
 /** Human-readable display names for the file-format facet. */
 export const FORMAT_LABELS: Record<UploadFormat, string> = {
   PDF: "PDFs",
@@ -92,6 +89,19 @@ export const FORMAT_LABELS: Record<UploadFormat, string> = {
 
 /** Standard order for the file-format facet. */
 export const DEFAULT_FORMAT_ORDER: UploadFormat[] = ["PDF", "MARKDOWN", "IMAGE", "OTHER"];
+
+/** The list order used when the URL names none — and the one the backend applies unasked. */
+export const DEFAULT_ARTIFACT_SORT: ArtifactSort = "ADDED_DESC";
+
+/** Display names for the sort control, phrased as what the reader sees first. */
+export const SORT_LABELS: Record<ArtifactSort, string> = {
+  ADDED_DESC: "Newest added",
+  CHANGED_DESC: "Recently changed",
+  TITLE_ASC: "Title A–Z",
+};
+
+/** Order of the options in the sort control. */
+export const ARTIFACT_SORT_ORDER: ArtifactSort[] = ["ADDED_DESC", "CHANGED_DESC", "TITLE_ASC"];
 
 /** Whether an artifact came from a direct upload rather than a connector. */
 export function isUpload(artifact: Artifact): boolean {
@@ -121,6 +131,12 @@ function isPdfArtifact(artifact: Artifact): boolean {
   );
 }
 
+/**
+ * `language` is the backend's display name from the file extension at ingestion
+ * (`"Markdown"`), sent since the language facet; compared lowercased so it
+ * classifies a Markdown upload even when its title carries no extension. Other
+ * languages (`"Kotlin"`, `"Plain Text"`) are no Markdown signal and fall to Other.
+ */
 function isMarkdownArtifact(artifact: Artifact): boolean {
   const title = artifact.title?.toLowerCase() ?? "";
   const sourceId = artifact.sourceId.toLowerCase();

@@ -1,3 +1,11 @@
+/* Keyboard focus, mirroring the global `:focus-visible` rule in `src/styles/index.css`. That rule
+   sits in `@layer base`, so it loses against any unlayered Keycloak/PatternFly rule; `:root` raises
+   the specificity here so the outline cannot be overridden. */
+:root :focus-visible {
+  outline: 2px solid var(--color-app-focus);
+  outline-offset: 2px;
+}
+
 #kc-header-wrapper {
   display: flex;
   gap: 0.75rem;
@@ -81,13 +89,10 @@ div.kcFormGroupClass {
     box-shadow 0.15s ease;
 }
 
-/* Same focus treatment as the app's shared Input (fieldStyles.ts):
-   brand-colored border + a visible `--app-focus` ring, never just
-   `outline: none` with nothing to replace it (AGENTS.md §9). */
+/* Same focus treatment as the app's shared Input (fieldStyles.ts): brand-colored border,
+   plus the focus outline at the top of this file (FRONTEND_CODING_STANDARDS.md §5). */
 .pf-c-form-control:focus {
-  outline: none;
   border-color: var(--color-app-brand-border-strong);
-  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .pf-c-input-group {
@@ -105,11 +110,6 @@ div.kcFormGroupClass {
 
 .password-visibility-btn:hover {
   background-color: var(--color-app-surface-hover);
-}
-
-.password-visibility-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .visibility-icon {
@@ -137,27 +137,21 @@ div.kcFormGroupClass {
   transition:
     background-color 0.15s ease,
     box-shadow 0.15s ease,
-    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform 0.15s ease-out;
 }
 
-/* Same "grows slightly on hover, settles back on press" feel as `ui/Button`'s
-   `buttonHoverMotion` (whileHover: scale 1.03, whileTap: scale 0.97) — a CSS
-   transform instead of framer-motion, since this is a plain form `<input>`
-   shared by every generated Keycloak page, not a `motion.button`. The
-   back-out easing approximates the spring's slight overshoot. */
+/* Same feedback as a `primary` `ui/Button`: hover changes colour and adds the brand lift
+   shadow, it does not grow; press shrinks to 0.97, like `buttonHoverMotion`'s `whileTap`.
+   A CSS transform instead of framer-motion, since this is a plain form `<input>` shared by
+   every generated Keycloak page, not a `motion.button`. The easing does not overshoot, like
+   the damped spring of the token. */
 .kcButtonClass.pf-c-button:hover {
   background: var(--color-app-brand-hover);
   box-shadow: var(--shadow-app-brand-lift);
-  transform: scale(1.03);
 }
 
 .kcButtonClass.pf-c-button:active {
   transform: scale(0.97);
-}
-
-.kcButtonClass.pf-c-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--color-app-focus);
 }
 
 .kcButtonClass.pf-c-button:disabled {
@@ -168,10 +162,9 @@ div.kcFormGroupClass {
 }
 
 /* Respect the OS-level motion preference, same as the app's `buttonHoverMotion`
-   consumers (`ui/Button` checks `useReducedMotion`) — a growing button on
-   hover is exactly the kind of motion that setting asks to remove. */
+   consumers (`ui/Button` checks `useReducedMotion`): the press shrink is the only
+   transform left, so that is what the setting turns off. */
 @media (prefers-reduced-motion: reduce) {
-  .kcButtonClass.pf-c-button:hover,
   .kcButtonClass.pf-c-button:active {
     transform: none;
   }
@@ -203,6 +196,15 @@ input[type="checkbox"] {
 
 #kc-info-wrapper > span:nth-child(1) {
   color: var(--color-app-text-muted);
+}
+
+/* A link inside a sentence (the register link under the form, the "click here" of an info page)
+   is underlined, so it is not told apart from the words around it by colour alone (WCAG 1.4.1).
+   The "Forgot password?" link stands on its own and stays plain. */
+#kc-registration a,
+#kc-content-wrapper p a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 span.subtitle > span:nth-child(2) {

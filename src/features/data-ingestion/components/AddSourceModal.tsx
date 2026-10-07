@@ -1,5 +1,5 @@
-import { ArrowLeft, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Plus, TriangleAlert } from "lucide-react";
+import { useMemo, useState } from "react";
 import { AlertDialog } from "../../../components/ui/AlertDialog.tsx";
 import { Button } from "../../../components/ui/Button.tsx";
 import { Modal } from "../../../components/ui/Modal.tsx";
@@ -7,34 +7,21 @@ import { useToast } from "../../../context/useToast.ts";
 import { useQueryFetch } from "../../../hooks/useQueryFetch.ts";
 import { getTeamOverview } from "../../../services/teamManagementService.ts";
 import { queryKeys } from "../../../services/queryKeys.ts";
+import { AddSourceFlow } from "../add-source/AddSourceFlow.tsx";
+import { COMPANION_GAP, COMPANION_WIDTH } from "../add-source/CredentialSlot.tsx";
 import {
-  addDraftSource,
+  addDraftSources,
   connectDraftSources,
   connectOutcomeDescription,
-  createConfluenceDraft,
-  createDraftSourceFromDiscovery,
-  createJiraDraft,
-  createUploadDraft,
   hasFailedSources,
-  isValidConfluenceSpaceId,
   removeDraftSource,
   setDraftSourceOwner,
   type DraftSource,
-} from "../../admin/projectSourcesDraft.ts";
-import { sortOwnerOptions } from "../../admin/sourceOwners.ts";
-import { StagedSourceList } from "../../admin/components/StagedSourceList.tsx";
-import {
-  AddSourceFlow,
-  COMPANION_GAP,
-  COMPANION_WIDTH,
-  type AddSourceStep,
-} from "../../admin/components/wizard/sources/AddSourceFlow.tsx";
-import { useGithubTokens } from "../../settings/hooks/useGithubTokens.ts";
-import { useAtlassianCredentials } from "../../settings/hooks/useAtlassianCredentials.ts";
-import { SOURCE_META, SOURCE_SYSTEMS } from "../data.ts";
-import type { SourceSystem } from "../types.ts";
-import type { DiscoverySelection } from "./GithubRepositoryDiscovery.tsx";
-import type { AtlassianCredentialDto } from "../../../services/sources/atlassianService.ts";
+} from "../add-source/projectSourcesDraft.ts";
+import { sortOwnerOptions } from "../add-source/sourceOwners.ts";
+import { StagedSourceList } from "../add-source/StagedSourceList.tsx";
+import { useSourceDraftForm } from "../add-source/useSourceDraftForm.ts";
+import { getConnector } from "../connectors/registry.ts";
 
 type AddSourceModalProps = {
   projectId: string | null;
@@ -62,14 +49,14 @@ type AddSourceModalProps = {
  * "Add sources" modal for the Data Ingestion page.
  *
  * Like the create-project wizard's Sources step, this stages a *list* of sources
- * across all three connectors (GitHub repositories, Jira instances, uploaded
- * files) and connects them together — instead of the old flow, which picked one
- * type, connected it live and closed, so only a single source type could be
- * added per opening.
+ * across the connectors (GitHub repositories, Jira instances, Confluence spaces,
+ * Notion workspaces, uploaded files) and connects them together — instead of the
+ * old flow, which picked one type, connected it live and closed, so only a single
+ * source type could be added per opening.
  *
  * It reuses the wizard's {@link AddSourceFlow} sub-flow verbatim, so the type
- * grid, the per-connector detail forms and the inline "add GitHub token / add
- * Jira credential" companions are identical in both places. The modal opens
+ * grid, the per-connector add-source forms and the inline "add GitHub token / add
+ * Atlassian credential" companions are identical in both places. The modal opens
  * straight on that type grid; each detail screen can either stage the source
  * ("Add to list") or connect it — plus anything already staged — right away
  * ("Connect now"). Connecting runs {@link connectDraftSources} against the
@@ -92,21 +79,10 @@ export function AddSourceModal({
   // -> detail) and the terminal connecting screen. The modal opens straight on
   // the type grid — the staged list is where you land after "Add to list".
   const [sources, setSources] = useState<DraftSource[]>([]);
-  const [isAddingSource, setIsAddingSource] = useState(true);
-  const [addStep, setAddStep] = useState<AddSourceStep>("type");
-  const [addType, setAddType] = useState<SourceSystem>("GITHUB");
-  // Remounts the GitHub picker on each add so a new "Add source" starts clean.
-  const [addFlowKey, setAddFlowKey] = useState(0);
+  const addForm = useSourceDraftForm({ initiallyOpen: true });
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmingClose, setConfirmingClose] = useState(false);
-  // True while the desktop "add credential" companion is open, so the modal
-  // slides left to make room for it beside itself.
-  const [companionOpen, setCompanionOpen] = useState(false);
-
-  // GitHub detail state.
-  const [githubSelection, setGithubSelection] = useState<DiscoverySelection[]>([]);
-  const [githubTokenName, setGithubTokenName] = useState(tokenNames[0] ?? "");
 
   // Naming an owner is part of connecting a source, so it follows `canIngest` on top of the
   // role the page has already checked.
@@ -133,211 +109,13 @@ export function AddSourceModal({
     [teamUsers],
   );
 
-  // The token list is owned here so an inline "add token" can refresh it and
-  // auto-select the new token; it falls back to the prop until it has loaded so
-  // discovery works on the first open without waiting for the refetch.
-  const {
-    tokenNames: loadedTokenNames,
-    tokensLoaded,
-    loadTokenNames,
-    addTokenNameLocally,
-  } = useGithubTokens();
-  const effectiveTokenNames = tokensLoaded ? loadedTokenNames : tokenNames;
-
-  // Jira detail state.
-  const [jiraDisplayName, setJiraDisplayName] = useState("");
-  const [jiraUrl, setJiraUrl] = useState("");
-  const [jiraCredentialName, setJiraCredentialName] = useState("");
-
-  // Confluence detail state.
-  const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
-  const [confluenceSpaceId, setConfluenceSpaceId] = useState("");
-  const [confluenceCredentialName, setConfluenceCredentialName] = useState("");
-
-  // Upload detail state — files staged in memory until the list is connected.
-  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-
-  const isJiraDetail = isAddingSource && addStep === "detail" && addType === "JIRA";
-  const isConfluenceDetail = isAddingSource && addStep === "detail" && addType === "CONFLUENCE";
-  // Jira and Confluence share the same Atlassian credential store, so one
-  // instance of the hook backs both detail screens' pickers.
-  const {
-    credentials: jiraCredentials,
-    loaded: jiraCredentialsLoaded,
-    error: jiraCredentialsError,
-    isRefreshing: jiraCredentialsLoading,
-    reload: reloadJiraCredentials,
-    addCredentialLocally,
-  } = useAtlassianCredentials(isJiraDetail || isConfluenceDetail);
-
-  // Adopt the first token as soon as the list arrives (and heal a stale
-  // selection) so discovery is usable on the first open.
-  useEffect(() => {
-    if (effectiveTokenNames.length === 0) return;
-
-    void Promise.resolve().then(() => {
-      setGithubTokenName((current) =>
-        current && effectiveTokenNames.includes(current) ? current : effectiveTokenNames[0],
-      );
-    });
-  }, [effectiveTokenNames]);
-
-  // Adopt the first stored Atlassian credential once the list arrives, keeping
-  // a still-valid choice — shared by the Jira and Confluence pickers.
-  useEffect(() => {
-    if (!jiraCredentialsLoaded || jiraCredentialsLoading) return;
-
-    void Promise.resolve().then(() => {
-      setJiraCredentialName((current) => {
-        if (jiraCredentials.length === 0) return "";
-        return current && jiraCredentials.some((credential) => credential.displayName === current)
-          ? current
-          : jiraCredentials[0].displayName;
-      });
-      setConfluenceCredentialName((current) => {
-        if (jiraCredentials.length === 0) return "";
-        return current && jiraCredentials.some((credential) => credential.displayName === current)
-          ? current
-          : jiraCredentials[0].displayName;
-      });
-    });
-  }, [jiraCredentials, jiraCredentialsLoaded, jiraCredentialsLoading]);
-
-  const resetSourceDraftFields = () => {
-    setGithubSelection([]);
-    setJiraDisplayName("");
-    setJiraUrl("");
-    setJiraCredentialName("");
-    setUploadFiles([]);
-    setConfluenceBaseUrl("");
-    setConfluenceSpaceId("");
-    setConfluenceCredentialName("");
-  };
-
-  // --- Add-source sub-flow ---
-
-  const openAddSource = () => {
-    resetSourceDraftFields();
-    setAddType("GITHUB");
-    setAddStep("type");
-    setAddFlowKey((key) => key + 1);
-    setIsAddingSource(true);
-  };
-
-  const closeAddSource = () => {
-    setIsAddingSource(false);
-    resetSourceDraftFields();
-  };
-
-  const handleSelectAddType = (type: SourceSystem) => {
-    setAddType(type);
-    setAddStep("detail");
-  };
-
-  const backToTypeGrid = () => {
-    setAddStep("type");
-    resetSourceDraftFields();
-  };
-
-  // Inline credential creation: adopt the new token/credential locally and
-  // select it right away, so a successful add is reflected even if the reload
-  // fails or is aborted; the reload then reconciles with the server.
-  const handleTokenSaved = async (tokenName: string) => {
-    addTokenNameLocally(tokenName);
-    setGithubTokenName(tokenName);
-    await loadTokenNames();
-  };
-
-  const handleCredentialSaved = async (credential: AtlassianCredentialDto) => {
-    addCredentialLocally(credential);
-    setJiraCredentialName(credential.displayName);
-    await reloadJiraCredentials();
-  };
-
-  const handleConfluenceCredentialSaved = async (credential: AtlassianCredentialDto) => {
-    addCredentialLocally(credential);
-    setConfluenceCredentialName(credential.displayName);
-    await reloadJiraCredentials();
-  };
-
-  const selectedJiraCredential = jiraCredentials.find(
-    (credential) => credential.displayName === jiraCredentialName,
-  );
-
-  const selectedConfluenceCredential = jiraCredentials.find(
-    (credential) => credential.displayName === confluenceCredentialName,
-  );
-
-  const canAddSource =
-    addType === "GITHUB"
-      ? githubSelection.length > 0
-      : addType === "JIRA"
-        ? Boolean(jiraDisplayName.trim() && jiraUrl.trim() && selectedJiraCredential)
-        : addType === "UPLOAD"
-          ? uploadFiles.length > 0
-          : addType === "CONFLUENCE"
-            ? Boolean(
-                confluenceBaseUrl.trim() &&
-                isValidConfluenceSpaceId(confluenceSpaceId) &&
-                selectedConfluenceCredential,
-              )
-            : false;
-
-  /**
-   * The draft(s) captured on the current detail screen — several at once for the
-   * GitHub multi-select, one for Jira/Upload/Confluence. Empty when the detail isn't
-   * complete enough to stage.
-   */
-  const buildDetailDrafts = (): DraftSource[] => {
-    if (!canAddSource) return [];
-
-    if (addType === "GITHUB") {
-      return githubSelection.map((selection) =>
-        createDraftSourceFromDiscovery(selection, githubTokenName),
-      );
-    }
-
-    if (addType === "JIRA" && selectedJiraCredential) {
-      return [
-        createJiraDraft({
-          displayName: jiraDisplayName.trim(),
-          url: jiraUrl.trim(),
-          userEmail: selectedJiraCredential.userEmail,
-          tokenName: selectedJiraCredential.displayName,
-        }),
-      ];
-    }
-
-    if (addType === "UPLOAD") {
-      const displayName = uploadFiles.length === 1 ? uploadFiles[0].name : "Uploaded documents";
-      return [createUploadDraft(displayName, uploadFiles)];
-    }
-
-    if (addType === "CONFLUENCE" && selectedConfluenceCredential) {
-      return [
-        createConfluenceDraft({
-          baseUrl: confluenceBaseUrl.trim(),
-          spaceId: confluenceSpaceId.trim(),
-          credentialName: selectedConfluenceCredential.displayName,
-        }),
-      ];
-    }
-
-    return [];
-  };
-
-  /** Appends drafts to a list, skipping any that are already staged. */
-  const mergeDrafts = (base: DraftSource[], added: DraftSource[]): DraftSource[] =>
-    added.reduce((accumulated, draft) => addDraftSource(accumulated, draft), base);
-
-  // "Add to list": stage the current detail and return to the staged list to
-  // keep building or connect later.
+  // "Add to list": stage the current form's drafts and return to the staged list
+  // to keep building or connect later.
   const commitAddSource = () => {
-    const drafts = buildDetailDrafts();
-    if (drafts.length === 0) return;
+    if (!addForm.canAdd) return;
 
-    setSources((current) => mergeDrafts(current, drafts));
-    closeAddSource();
+    const drafts = addForm.commit();
+    setSources((current) => addDraftSources(current, drafts));
   };
 
   // --- Connect + retry ---
@@ -353,7 +131,7 @@ export function AddSourceModal({
     // Show the list being connected (including a just-captured "Connect now"
     // draft) before the first per-row status lands.
     setSources(list);
-    setIsAddingSource(false);
+    addForm.close();
     setIsConnecting(true);
     setIsSubmitting(true);
 
@@ -382,10 +160,9 @@ export function AddSourceModal({
   // "Connect now": stage the current detail and connect the whole list right
   // away, skipping the intermediate list screen.
   const handleConnectNow = () => {
-    const drafts = buildDetailDrafts();
-    if (drafts.length === 0) return;
+    if (!addForm.canAdd) return;
 
-    void runConnect(mergeDrafts(sources, drafts));
+    void runConnect(addDraftSources(sources, addForm.drafts));
   };
 
   const handleConnectAll = () => {
@@ -442,16 +219,16 @@ export function AddSourceModal({
 
   const modalTitle = isConnecting
     ? "Connecting sources"
-    : isAddingSource
-      ? addStep === "type"
+    : addForm.isOpen
+      ? addForm.step === "type"
         ? "Add a source"
-        : `Add ${SOURCE_META[addType].type}`
+        : `Add ${getConnector(addForm.type).meta.label}`
       : "Add data sources";
 
   const modalDescription =
-    isConnecting || isAddingSource
+    isConnecting || addForm.isOpen
       ? undefined
-      : "Stage GitHub repositories, Jira instances and files, then connect them together.";
+      : "Stage GitHub repositories, Jira instances, Confluence spaces, Notion workspaces and files, then connect them together.";
 
   const connectLabel =
     sources.length > 0
@@ -462,12 +239,12 @@ export function AddSourceModal({
     <Button variant="primary" onClick={requestClose} loading={isSubmitting} disabled={isSubmitting}>
       Done
     </Button>
-  ) : isAddingSource ? (
-    addStep === "type" ? (
+  ) : addForm.isOpen ? (
+    addForm.step === "type" ? (
       sources.length > 0 ? (
         <Button
           variant="secondary"
-          onClick={() => setIsAddingSource(false)}
+          onClick={addForm.close}
           icon={<ArrowLeft className="h-4 w-4" />}
           className="sm:mr-auto"
         >
@@ -486,7 +263,7 @@ export function AddSourceModal({
         <Button
           variant="secondary"
           onClick={handleConnectNow}
-          disabled={!canAddSource || !canIngest || !projectId}
+          disabled={!addForm.canAdd || !canIngest || !projectId}
           loading={isSubmitting}
         >
           Connect now
@@ -495,7 +272,7 @@ export function AddSourceModal({
         <Button
           variant="primary"
           onClick={commitAddSource}
-          disabled={!canAddSource}
+          disabled={!addForm.canAdd}
           icon={<Plus className="h-4 w-4" />}
         >
           Add to list
@@ -531,7 +308,7 @@ export function AddSourceModal({
         }
         size="xl"
         isDismissDisabled={isSubmitting}
-        contentInsetRight={companionOpen ? COMPANION_WIDTH + COMPANION_GAP + 16 : 0}
+        contentInsetRight={addForm.companionOpen ? COMPANION_WIDTH + COMPANION_GAP + 16 : 0}
         onClose={requestClose}
         closeLabel="Close add source"
         bodyClassName="px-5 py-5 sm:px-7 sm:py-6"
@@ -550,64 +327,21 @@ export function AddSourceModal({
               onRetry={(sourceId) => void retrySource(sourceId)}
             />
           </div>
-        ) : isAddingSource ? (
+        ) : addForm.isOpen ? (
           <div className="space-y-5">
             {!canIngest && <IngestBlockedNotice reason={ingestBlockedReason} />}
 
             <AddSourceFlow
-              key={addFlowKey}
-              step={addStep}
-              selectedType={addType}
-              availableTypes={SOURCE_SYSTEMS}
-              onSelectType={handleSelectAddType}
-              onBack={backToTypeGrid}
+              key={addForm.flowKey}
+              step={addForm.step}
+              selectedType={addForm.type}
+              onSelectType={addForm.selectType}
+              onBack={addForm.backToTypes}
               isBusy={isSubmitting}
-              onCompanionOpenChange={setCompanionOpen}
-              github={{
-                tokenNames: effectiveTokenNames,
-                tokenName: githubTokenName,
-                onTokenNameChange: setGithubTokenName,
-                onSelectionChange: setGithubSelection,
-                onTokenSaved: handleTokenSaved,
-                projectId,
-                projectName,
-              }}
-              jira={{
-                displayName: jiraDisplayName,
-                url: jiraUrl,
-                credentialName: jiraCredentialName,
-                credentials: jiraCredentials,
-                credentialsLoaded: jiraCredentialsLoaded,
-                credentialsLoading: jiraCredentialsLoading,
-                credentialsError: jiraCredentialsError,
-                defaultUserEmail: null,
-                onDisplayNameChange: setJiraDisplayName,
-                onUrlChange: setJiraUrl,
-                onCredentialNameChange: setJiraCredentialName,
-                onSubmit: commitAddSource,
-                onCredentialSaved: handleCredentialSaved,
-              }}
-              upload={{
-                files: uploadFiles,
-                onAddFiles: (files) => setUploadFiles((current) => [...current, ...files]),
-                onRemoveFile: (index) =>
-                  setUploadFiles((current) => current.filter((_, position) => position !== index)),
-              }}
-              confluence={{
-                baseUrl: confluenceBaseUrl,
-                spaceId: confluenceSpaceId,
-                credentialName: confluenceCredentialName,
-                credentials: jiraCredentials,
-                credentialsLoaded: jiraCredentialsLoaded,
-                credentialsLoading: jiraCredentialsLoading,
-                credentialsError: jiraCredentialsError,
-                defaultUserEmail: null,
-                onBaseUrlChange: setConfluenceBaseUrl,
-                onSpaceIdChange: setConfluenceSpaceId,
-                onCredentialNameChange: setConfluenceCredentialName,
-                onSubmit: commitAddSource,
-                onCredentialSaved: handleConfluenceCredentialSaved,
-              }}
+              context={{ projectId, projectName, tokenNames }}
+              onDraftsChange={addForm.reportDrafts}
+              onSubmit={commitAddSource}
+              onCompanionOpenChange={addForm.setCompanionOpen}
             />
           </div>
         ) : (
@@ -632,12 +366,12 @@ export function AddSourceModal({
                       setSources((current) => setDraftSourceOwner(current, sourceId, ownerUserId))
                   : undefined
               }
-              emptyMessage="No sources yet. Add a GitHub repo, Jira instance, or files to start."
+              emptyMessage="No sources yet. Add a GitHub repo, Jira instance, Confluence space, Notion workspace, or files to start."
             />
 
             <Button
               variant="secondary"
-              onClick={openAddSource}
+              onClick={addForm.open}
               icon={<Plus className="h-4 w-4" />}
               className="w-full"
             >
@@ -667,8 +401,9 @@ export function AddSourceModal({
 /** Warning banner shown when the user may not connect sources to the project. */
 function IngestBlockedNotice({ reason }: { reason?: string }) {
   return (
-    <div className="rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
-      {reason ?? "You can only connect sources to projects you manage."}
+    <div className="flex items-start gap-2 rounded-2xl border border-app-warning-border bg-app-warning-bg px-4 py-3 text-sm text-app-warning-text">
+      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>{reason ?? "You can only connect sources to projects you manage."}</span>
     </div>
   );
 }

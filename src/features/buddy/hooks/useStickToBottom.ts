@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** How close to the bottom still counts as "reading the newest message", in px. */
 const STICK_THRESHOLD_PX = 120;
@@ -26,19 +26,38 @@ const STICK_THRESHOLD_PX = 120;
  * act of joining the end of the conversation: staying put would hide both what they just wrote
  * and the reply to it, which reads as the buddy having ignored them.
  *
- * @param messages The transcript. Its identity changes whenever it grows.
+ * @param messages - The transcript. Its identity changes whenever it grows.
  */
 export function useStickToBottom(messages: readonly { role: string }[]) {
   const containerRef = useRef<HTMLDivElement>(null);
   // Starts pinned: a conversation opens at its newest message.
   const isPinned = useRef(true);
+  // The ref answers "should this scroll follow?"; this mirror is what the jump button renders
+  // from — a ref cannot re-render the button that appears when the pin releases. Written from
+  // the scroll handler (and the jump itself), never during render.
+  const [pinned, setPinned] = useState(true);
   const previousQuestionCount = useRef(0);
 
   const onScroll = useCallback(() => {
     const element = containerRef.current;
     if (!element) return;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    isPinned.current = distanceFromBottom <= STICK_THRESHOLD_PX;
+    const nextPinned = distanceFromBottom <= STICK_THRESHOLD_PX;
+    isPinned.current = nextPinned;
+    setPinned(nextPinned);
+  }, []);
+
+  /**
+   * Returns to the newest message and takes the pin back — what the floating "Jump to latest"
+   * button calls. The auto-scroll above deliberately never drags a reader who scrolled up;
+   * this is the reader's own way down.
+   */
+  const jumpToLatest = useCallback(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    isPinned.current = true;
+    setPinned(true);
+    element.scrollTop = element.scrollHeight;
   }, []);
 
   useEffect(() => {
@@ -59,5 +78,5 @@ export function useStickToBottom(messages: readonly { role: string }[]) {
     element.scrollTop = element.scrollHeight;
   }, [messages]);
 
-  return { containerRef, onScroll };
+  return { containerRef, onScroll, isPinned: pinned, jumpToLatest };
 }

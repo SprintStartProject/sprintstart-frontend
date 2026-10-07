@@ -1,4 +1,5 @@
-import type { Citation } from "../chatbot/types";
+import type { Citation } from "./citations/types";
+import type { SourceSystem } from "../data-ingestion/connectors/sourceSystems";
 
 /**
  * An action the buddy has *proposed* — the hire must confirm it before anything changes. Carried on
@@ -30,6 +31,28 @@ export type ActionPatch = {
 export const BUDDY_ACTION_OPEN_ORIENTATION = "open_orientation";
 
 /**
+ * The backend's `flag_to_pm` action. Its `question` is the message that goes to the PM, so the
+ * confirm shows it: this one leaves the product and arrives in somebody's inbox in the hire's name.
+ */
+export const BUDDY_ACTION_FLAG_TO_PM = "flag_to_pm";
+
+/**
+ * The actions that change the hire's onboarding path.
+ *
+ * Listed once, here, because two surfaces need the same answer: confirming one of these has to tell
+ * whatever is showing a path that it is now stale (see `announceBuddyPathChanged`). Answering a
+ * question counts even when the answer was wrong — the attempt is recorded and the question's status
+ * moves either way.
+ */
+export const BUDDY_PATH_ACTIONS: readonly string[] = [
+  "complete_step",
+  "complete_task",
+  "answer_question",
+  "add_path_step",
+  "request_skip",
+];
+
+/**
  * The backend's `place_checklist` action: the mentor offering to keep a list it just wrote.
  *
  * Named here because two surfaces have to recognise it — the proposal draws the lines it would
@@ -54,6 +77,35 @@ export const BUDDY_ACTION_TICK_CHECKLIST = "tick_checklist_items";
 export const BUDDY_ACTION_REWORD_CHECKLIST = "reword_checklist_item";
 
 /**
+ * The backend's `place_note` action: an explanation the mentor offered to keep as a note.
+ *
+ * Named like the checklist actions above because the same reader needs it: the confirm path has
+ * to recognise which actions write to the board (see `BUDDY_BOARD_ACTIONS` in `useBuddyConversation`).
+ */
+export const BUDDY_ACTION_PLACE_NOTE = "place_note";
+
+/**
+ * The backend's `claim_goal` action: the hire starting to work toward a task.
+ *
+ * Confirming this writes twice — the goal claim itself, and the CURRENT_TASK card pinned onto
+ * the board ("It's on your board too") — which is why the board-syncing set includes it despite
+ * its not being one of the board tools.
+ */
+export const BUDDY_ACTION_CLAIM_GOAL = "claim_goal";
+
+/**
+ * The backend's board edits (`BuddyBoardEditActions`): the buddy reaching past adding, into what
+ * the hire already has. Each one proposes; the confirm is what writes, and the card afterwards
+ * says the buddy made the change.
+ */
+export const BUDDY_ACTION_PLACE_LINK = "place_link";
+export const BUDDY_ACTION_EDIT_NOTE = "edit_note";
+export const BUDDY_ACTION_EDIT_LINK = "edit_link";
+export const BUDDY_ACTION_EDIT_CHECKLIST = "edit_checklist";
+export const BUDDY_ACTION_DISMISS_CARDS = "dismiss_cards";
+export const BUDDY_ACTION_REORDER_CARDS = "reorder_cards";
+
+/**
  * An action proposed in hire mode: the buddy offers to do something *for this hire*, and the
  * confirm echoes the offer's own payload back verbatim. What gets written is what was shown on
  * the button — never something the client derived.
@@ -61,11 +113,15 @@ export const BUDDY_ACTION_REWORD_CHECKLIST = "reword_checklist_item";
 export type HireActionProposal = {
   /** Local id for keying and targeting the confirm — the backend doesn't assign one. */
   id: string;
-  /** The action's tool name, sent back verbatim to confirm it (e.g. "claim_task_zero"). */
+  /** The action's tool name, sent back verbatim to confirm it (e.g. "claim_goal"). */
   action: string;
-  /** The button text ("Start Task 0"). */
+  /** The button text ("Work toward this task"). */
   label: string;
-  /** Carried through only for flag-to-PM: the question the buddy composed. */
+  /**
+   * Carried through only for flag-to-PM: the question the buddy composed. Shown in an editable
+   * field *above* the confirm — this one is a message, so the hire may reword it, and what reaches
+   * the PM is whatever that field held. See `BuddyActionProposals`.
+   */
   question?: string;
   /**
    * The goal-claim confirm payload (`claim_goal`), echoed back verbatim so the action runs
@@ -100,6 +156,37 @@ export type HireActionProposal = {
   competencyKey?: string;
   level?: string;
   /**
+   * The path-action confirm payloads: which node of the hire's own onboarding path the action is
+   * aimed at, the answer `answer_question` would send, and a new step's description.
+   *
+   * Echoed back verbatim for the same reason as `githubLogin`: the hire reads the step, or their own
+   * answer, on the button before agreeing to it, so what gets written has to be what they were
+   * shown — never something the client derived afterwards.
+   */
+  stepId?: string;
+  questionId?: string;
+  phaseId?: string;
+  onboardingTaskId?: string;
+  answer?: string;
+  /**
+   * The options a multiple-choice `answer` stands for, as the backend resolved them when it
+   * proposed. Echoed back so the confirm can check the button still means what it says — the
+   * backend refuses it if the question changed in between.
+   */
+  optionIds?: string[];
+  description?: string;
+  /**
+   * The reason `request_skip` sends to the PM. Shown in full under the button, because it goes out
+   * in the hire's name and a label has no room for it.
+   */
+  reason?: string;
+  /**
+   * Where `add_path_step` puts the new step in its phase's graph — what it waits on, and what will
+   * wait on it. Echoed back verbatim and re-checked against the hire's own path on confirm.
+   */
+  waitsOnIds?: string[];
+  unlocksIds?: string[];
+  /**
    * The `place_checklist` confirm payload: the list the buddy wrote and offered to keep.
    *
    * Echoed back like every payload above, and here the rule has its sharpest form: these lines are
@@ -127,6 +214,21 @@ export type HireActionProposal = {
    */
   lineBefore?: string;
   lineAfter?: string;
+  /** `place_link` / `edit_link`: where the link would point, and what it would be called. */
+  linkUrl?: string;
+  linkLabel?: string;
+  /** `dismiss_cards` / `reorder_cards`: the cards, in order — echoed back on confirm. */
+  cardIds?: string[];
+  /**
+   * The same cards as the board names them, resolved server-side from `cardIds`. Display only and
+   * never sent back: the confirm acts on the ids, and these are what the hire reads before agreeing.
+   */
+  cardNames?: string[];
+  /**
+   * The board edits: what confirming would change, as one sentence the backend composed — including
+   * every line an `edit_checklist` would remove, which the new list alone would not show.
+   */
+  preview?: string;
   status: ProposedActionStatus;
   /** Whether a resolved action actually changed something (false = a handled "couldn't"). */
   ok?: boolean;
@@ -193,26 +295,48 @@ export type BuddyMessage = {
    * When the message was sent.
    */
   createdAt: string;
+
+  /**
+   * The backend's id for a persisted message.
+   *
+   * Absent on a turn this client streamed, which it ids locally (see `BuddyMessageView`); a
+   * conversation read back from history carries the backend's own ids.
+   */
+  id?: string;
+
+  /**
+   * The sources a persisted reply was grounded in, read back with the conversation's history.
+   *
+   * Live turns collect the same list off the stream (see `useBuddyConversation`); this field is
+   * what makes them survive a reload.
+   */
+  citations?: Citation[];
+
+  /**
+   * True when a persisted reply was cut short: the stream ended before the answer finished and
+   * the backend kept the words that had already arrived.
+   *
+   * Only ever set by the backend — a live turn does not know it will be cut short, and its
+   * failure path carries its own `error` instead (see `BuddyMessageView`).
+   */
+  isIncomplete?: boolean;
 };
 
 /**
- * A buddy message as tracked in hook state: adds a locally-synthesized id (the backend
- * doesn't assign one) and in-memory citations for the current session's streamed replies.
+ * A buddy message as tracked in hook state: the same fields the read returned, with the id made
+ * required — a locally-synthesized one stands in for a turn that has not been read back yet.
  */
 export type BuddyMessageView = BuddyMessage & {
   id: string;
   citations?: Citation[];
+  /**
+   * The mentor's visible thought process for this turn, as the backend streamed it — one string,
+   * grown in place, one paragraph per thought. Absent for turns that ran none (and for messages
+   * read back from before the reasoning phase existed).
+   */
+  reasoning?: string;
   /** Actions the buddy proposed in this turn, each awaiting the hire's confirmation. */
   actions?: ProposedAction[];
-  /**
-   * True for a greeting that opened a new visit *under* a conversation already on screen.
-   *
-   * Only ever set for a greeting this surface streamed itself, because that is the only one it
-   * can know about: a greeting read back from the server arrives as an ordinary message at the
-   * top of the window, where a "this is where the new one starts" rule would be pointing at
-   * nothing. It drives the divider in `BuddyThread`.
-   */
-  startsVisit?: boolean;
   /**
    * True for the buddy's opening greeting, whether it was streamed here or read back as the only
    * message of an unanswered visit.
@@ -231,17 +355,58 @@ export type BuddyMessageView = BuddyMessage & {
    * from the buddy having ignored them -- on the surface the whole feature is built around.
    */
   error?: string;
+  /**
+   * True for a live turn the hire stopped with the composer's Stop button.
+   *
+   * Its own flag rather than `isIncomplete`, which is the backend's account of a reply it kept
+   * half of: the backend writes the whole agent loop before it emits a word, so a Stop almost
+   * always lands before the first token — there is nothing to keep, and the turn would render as
+   * nothing at all. This is what keeps it on screen, with a line saying the hire stopped it.
+   */
+  stopped?: boolean;
+};
+
+/**
+ * What narrows a message's retrieval: which source systems it may draw on, and the indexed-date
+ * window. Held in the session (one set, both surfaces) and sent per message.
+ *
+ * The composer's own shape (camelCase); `streamMessage` maps it onto the wire vocabulary the
+ * backend's `BuddySessionFilters` actually names.
+ */
+export type BuddySessionFilters = {
+  sourceSystems: SourceSystem[];
+  /** ISO dates (`YYYY-MM-DD`) or empty; both empty means "all time". */
+  from: string;
+  to: string;
+};
+
+/**
+ * One message the hire submitted while the buddy was still answering, waiting its turn.
+ *
+ * `id` so the strip can edit or drop a specific row; the text as submitted, because a message
+ * that has not been sent yet has to be visible somewhere the hire can still change their mind.
+ */
+export type QueuedBuddyMessage = {
+  id: string;
+  text: string;
 };
 
 /**
  * The stream callbacks a buddy visit needs.
  *
  * Deliberately its own type rather than a widening of the chat's `StreamHandlers`: the buddy's
- * stream has no reasoning phase and proposes actions, which chat never does. Loosening the shared
- * type to fit both would make handlers optional for chat, where they are required.
+ * stream proposes actions the chat never does, and the two age apart. Loosening the shared type
+ * to fit both would make handlers optional for chat, where they are required.
  */
 export type BuddyStreamHandlers = {
   onToken: (token: string) => void;
+  /** Optional: a delta of the thought being written, before and between the answer's words. */
+  onReasoning?: (reasoning: string) => void;
+  /**
+   * Optional: the words streamed so far are void — the backend is asking again (a reply that
+   * turned out to be a tool call written as text). The surface clears the reply's content.
+   */
+  onReset?: () => void;
   onCitation: (citation: Citation) => void;
   onDone: () => void;
   /** Optional: a caller with no error surface of its own lets the failure pass silently. */
@@ -249,7 +414,7 @@ export type BuddyStreamHandlers = {
   /** Optional: only some turns run a tool, and the surface may not show which. */
   onToolUse?: (tool: string) => void;
   /**
-   * The buddy has *proposed* an action the hire must confirm (e.g. "Start Task 0"). Nothing has
+   * The buddy has *proposed* an action the hire must confirm (e.g. "Work toward this task"). Nothing has
    * changed yet — the surface renders a confirm affordance and only mutates when the hire clicks.
    */
   onActionProposal?: (proposal: {
@@ -262,12 +427,27 @@ export type BuddyStreamHandlers = {
     githubLogin?: string;
     competencyKey?: string;
     level?: string;
+    stepId?: string;
+    questionId?: string;
+    phaseId?: string;
+    onboardingTaskId?: string;
+    answer?: string;
+    optionIds?: string[];
+    description?: string;
+    reason?: string;
+    waitsOnIds?: string[];
+    unlocksIds?: string[];
     checklistTitle?: string;
     checklistItems?: string[];
     cardId?: string;
     noteText?: string;
     lineBefore?: string;
     lineAfter?: string;
+    linkUrl?: string;
+    linkLabel?: string;
+    cardIds?: string[];
+    cardNames?: string[];
+    preview?: string;
   }) => void;
   /**
    * The buddy has proposed a *team-mode* change, stored server-side. Confirm goes by

@@ -126,6 +126,8 @@ export function sizeOf(sizes: CardSizes | undefined, cardId: string): CardSize {
   return sizes?.[cardId] ?? DEFAULT_SIZE;
 }
 
+const WIDTHS: readonly CardWidth[] = ["narrow", "normal", "wide"];
+
 /**
  * The size a card becomes when it is pulled sideways.
  *
@@ -133,8 +135,6 @@ export function sizeOf(sizes: CardSizes | undefined, cardId: string): CardSize {
  * direction of travel. A distance would mean inventing a pixel-to-size mapping that is wrong at
  * the other column count, and would make the gesture something to aim rather than something to do.
  */
-const WIDTHS: readonly CardWidth[] = ["narrow", "normal", "wide"];
-
 export function sizeFromDrag(start: CardSize, dx: number, threshold = 48): CardSize {
   // One step per threshold, so a long drag to the right goes narrow → normal → wide rather than
   // jumping to the end: the widths are a ramp, and a gesture over a ramp has to be able to stop in

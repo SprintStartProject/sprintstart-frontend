@@ -7,6 +7,7 @@ import {
   Footprints,
   Lightbulb,
   Link2,
+  TriangleAlert,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
@@ -239,7 +240,11 @@ export function PathStepCard({ content, card, onDismiss, dismissing }: PathStepC
                       </span>
                     )}
                     {failedTaskId === task.id && (
-                      <span role="alert" className="mt-0.5 block text-xs text-app-danger-text">
+                      <span
+                        role="alert"
+                        className="mt-0.5 flex items-start gap-1.5 text-xs text-app-danger-text"
+                      >
+                        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         That didn&apos;t save. Try again in a moment.
                       </span>
                     )}

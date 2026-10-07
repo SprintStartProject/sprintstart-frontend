@@ -543,7 +543,7 @@ function StepRow({
           type="button"
           onClick={onEdit}
           aria-label={`Edit "${step.title}"`}
-          className="absolute inset-0 z-0 rounded-2xl focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+          className="absolute inset-0 z-0 rounded-2xl"
         />
       )}
 

@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useDialogFocus } from "../ui/useDialogFocus";
 
 /** The width the app branches on for a rail: below it there is no room for a column. */
 export const RAIL_DESKTOP_QUERY = "(min-width: 768px)";
@@ -26,6 +28,9 @@ export const RAIL_DESKTOP_QUERY = "(min-width: 768px)";
  * not only by finding its cross. The backdrop is a `button` rather than a `div` with a click
  * handler, so it is a real control with a name — the same shape, and the same layering
  * (`z-50` under a `z-[60]` panel), as `SideBar`'s.
+ *
+ * Below `md`, while it is open, it is also a modal layer for the keyboard: focus moves in, Tab
+ * stays inside, Escape shuts it, and focus goes back to whatever reopens it.
  */
 export function ConversationRail({
   isOpen,
@@ -53,6 +58,25 @@ export function ConversationRail({
   dismissLabel?: string;
   children: ReactNode;
 }) {
+  const isDrawer = !useMediaQuery(RAIL_DESKTOP_QUERY);
+  const isDrawerOpen = isOpen && isDrawer && onDismiss !== undefined;
+  const railRef = useDialogFocus<HTMLElement>(isDrawerOpen, onDismiss);
+
+  // The control that opened the drawer is not there while it is open (`RailToggle` only exists
+  // for a closed rail), so `useDialogFocus` has nothing to give focus back to. Once the drawer is
+  // shut and the control is back, hand it focus -- unless focus has already gone somewhere.
+  useEffect(() => {
+    if (!isDrawerOpen || !id) return;
+    return () => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      const opener = Array.from(document.querySelectorAll<HTMLElement>("[aria-controls]")).find(
+        (element) => element.getAttribute("aria-controls") === id,
+      );
+      opener?.focus();
+    };
+  }, [isDrawerOpen, id]);
+
   return (
     <>
       {isOpen && onDismiss && (
@@ -65,12 +89,14 @@ export function ConversationRail({
       )}
 
       <aside
+        ref={railRef}
+        tabIndex={-1}
         id={id}
         aria-label={label}
         aria-hidden={!isOpen}
         inert={!isOpen}
         className={[
-          "fixed inset-y-0 left-0 z-[60] flex w-72 max-w-[85vw] flex-col",
+          "fixed inset-y-0 left-0 z-[60] flex w-72 max-w-[85vw] flex-col outline-hidden",
           "border-r border-app-border bg-app-bg-soft shadow-2xl",
           "transition-transform duration-300",
           // From `md` the insets and the shadow stop applying and the width does the work.
@@ -90,12 +116,16 @@ export function ConversationRail({
  * The top padding a conversation has to carry while a control floats over it.
  *
  * Two of them do, one per corner and both to the same measurements: {@link RailToggle} on the
- * left, and the buddy page's `BuddyFreshVisitButton` on the right. Either sits at `top-3` and is
+ * left, and the buddy page's `BuddyNewConversationButton` on the right. Either sits at `top-3` and is
  * about 40px tall, so on a phone — where the conversation runs to both page edges — the first
- * message would start underneath it. From `md` up the page gutter is wide enough that a control
- * sits beside the column rather than over it, and the page's own `pt-8` stands. One number
- * covers both because the geometry is identical; a control of a different height would need its
- * own, not a bigger shared one.
+ * message would start underneath it. From `md` up the page gutter grows and content *inside*
+ * the column sits beside the control rather than under it, and the page's own `pt-8` stands. A
+ * control that sits *at* the gutter edge is the exception — below ~1660px the gutter (a fluid
+ * `clamp(2rem, 9vw - 4rem, 10rem)`) is narrower than the counted toggle's reach, so the buddy's
+ * mode row keeps this phone value up to `min-[1660px]` (`pt-14 min-[1660px]:pt-4` in
+ * `BuddyPage`). One number covers
+ * the two message surfaces because their geometry is identical; a control of a different height
+ * would need its own, not a bigger shared one.
  *
  * One exported string rather than a rule per page. The chat and the buddy had drifted to two
  * different answers for it: the buddy reserved the room at every width, so on a desktop with the
@@ -138,12 +168,12 @@ export function RailToggle({
       aria-expanded={false}
       title={label}
       onClick={onClick}
-      className="absolute top-3 left-2 z-30 flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors hover:bg-app-surface-hover hover:text-app-text focus-visible:ring-2 focus-visible:ring-app-focus focus-visible:outline-none"
+      className="absolute top-3 left-2 z-30 flex shrink-0 items-center gap-1.5 rounded-xl border border-app-border bg-app-surface p-2 text-app-text-muted shadow-sm transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:bg-app-surface-hover hover:text-app-text"
     >
       {icon}
 
       {typeof count === "number" && count > 0 && (
-        <span className="rounded-full bg-app-brand-soft px-1.5 text-[11px] font-semibold text-app-brand-text tabular-nums">
+        <span className="rounded-full bg-app-brand-soft px-1.5 text-2xs font-semibold text-app-brand-text tabular-nums">
           {count}
         </span>
       )}

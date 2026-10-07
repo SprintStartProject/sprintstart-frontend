@@ -9,7 +9,20 @@ import { AuthContext, type AuthContextType } from "../../../src/context/AuthCont
 
 vi.mock("../../../src/services/buddyService", () => ({
   getMessages: vi.fn().mockResolvedValue([]),
-  // An empty visit is the one case that still greets — see `ensureOpened`.
+  // One empty conversation, so the page settles in its loaded state — without these the
+  // opening resolve hits an undefined export and the a11y run only ever sees the error
+  // banner a missing mock leaves behind.
+  getSessions: vi.fn().mockResolvedValue([
+    {
+      id: "session-1",
+      title: "",
+      userId: "user-1",
+      projectId: null,
+      createdAt: "2026-09-30T09:00:00.000Z",
+    },
+  ]),
+  createSession: vi.fn().mockResolvedValue("session-2"),
+  // An empty conversation is the one case that still greets — see `ensureOpened`.
   streamOpenBuddy: vi.fn((handlers: { onDone: () => void }) => {
     handlers.onDone();
     return Promise.resolve();
@@ -74,18 +87,20 @@ describe("BuddyPage Accessibility", () => {
 
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <AuthWrapper>
-            <BuddyProvider>
-              <BuddyPage />
-            </BuddyProvider>
-          </AuthWrapper>
-        </main>
+        <AuthWrapper>
+          <BuddyProvider>
+            <BuddyPage />
+          </BuddyProvider>
+        </AuthWrapper>
       </MemoryRouter>,
     );
 
+    // The page draws its own `<main>` since the shell retired, so the harness must not wrap it
+    // in a second one — two nested main landmarks are exactly what this suite exists to catch.
+    // The wait is on the chips above the composer: without a project the page is the same
+    // conversation (the gate is gone), and the chips prove the interactive state settled.
     await waitFor(() => {
-      expect(screen.getByText(/not on a project yet/)).toBeInTheDocument();
+      expect(screen.getByText("What should I work on?")).toBeInTheDocument();
     });
 
     expect(await axe(baseElement)).toHaveNoViolations();
@@ -94,13 +109,11 @@ describe("BuddyPage Accessibility", () => {
   it("has no violations in mentor mode", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <main>
-          <AuthWrapper>
-            <BuddyProvider>
-              <BuddyPage />
-            </BuddyProvider>
-          </AuthWrapper>
-        </main>
+        <AuthWrapper>
+          <BuddyProvider>
+            <BuddyPage />
+          </BuddyProvider>
+        </AuthWrapper>
       </MemoryRouter>,
     );
 

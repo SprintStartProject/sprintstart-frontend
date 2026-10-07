@@ -1,11 +1,12 @@
 import { createPortal } from "react-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { MouseEvent } from "react";
-import { ExternalLink, MoreVertical, Trash2 } from "lucide-react";
+import { ExternalLink, MoreVertical, Trash2, Users } from "lucide-react";
 import { getDisplayName } from "../data";
 import { UserAvatar } from "../../../components/common/UserAvatar";
 import { Button } from "../../../components/ui/Button";
-import type { AdminUser } from "../types";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import type { AdminUser, ProjectOverview } from "../types";
 import { PermissionGroupBadge } from "./Badges";
 import { ProjectList } from "./ProjectList";
 import { SelectionCheckbox } from "./SelectionCheckbox";
@@ -13,6 +14,8 @@ import { TableHeader } from "./TableHeader";
 
 type UsersTabProps = {
   paginatedUsers: AdminUser[];
+  /** Used to mark the projects a user manages in the project column. */
+  projects?: ProjectOverview[];
   selectedUserIds: Set<string>;
   allVisibleUsersSelected: boolean;
   openUserMenuId: string | null;
@@ -50,8 +53,16 @@ function getMenuPosition(button: HTMLButtonElement): MenuPosition {
   return { top, left };
 }
 
+/**
+ * The user table of the admin page: one page of the filtered users, with row selection for bulk
+ * delete and a context menu per row.
+ *
+ * Holds no data of its own. Filtering, paging, selection and the open menu live in `AdminPage`;
+ * the menu is rendered in a portal so the table's overflow cannot clip it.
+ */
 export function UsersTab({
   paginatedUsers,
+  projects = [],
   selectedUserIds,
   allVisibleUsersSelected,
   openUserMenuId,
@@ -63,6 +74,20 @@ export function UsersTab({
   onRequestUserDeleteFromMenu,
 }: UsersTabProps) {
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
+
+  const managedProjectIdsByUser = useMemo(() => {
+    const byUser = new Map<string, Set<string>>();
+
+    for (const project of projects) {
+      if (!project.manager) continue;
+
+      const managed = byUser.get(project.manager.id) ?? new Set<string>();
+      managed.add(project.id);
+      byUser.set(project.manager.id, managed);
+    }
+
+    return byUser;
+  }, [projects]);
 
   const handleToggleUserContextMenu = (event: MouseEvent<HTMLButtonElement>, userId: string) => {
     const shouldOpen = openUserMenuId !== userId;
@@ -88,7 +113,7 @@ export function UsersTab({
               type="button"
               role="menuitem"
               onClick={(event) => onOpenUserDetailsFromMenu(event, openMenuUser)}
-              className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-medium text-app-text-muted transition-colors hover:bg-app-surface-hover hover:text-app-text"
+              className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-medium text-app-text-muted focus-ring-inset transition-colors hover:bg-app-surface-hover hover:text-app-text"
             >
               <ExternalLink className="h-4 w-4" />
               Open details
@@ -97,7 +122,7 @@ export function UsersTab({
               type="button"
               role="menuitem"
               onClick={(event) => onRequestUserDeleteFromMenu(event, openMenuUser)}
-              className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-medium text-app-danger-text transition-colors hover:bg-app-danger-bg"
+              className="flex min-h-11 w-full items-center gap-2 px-4 text-left text-sm font-medium text-app-danger-text focus-ring-inset transition-colors hover:bg-app-danger-bg"
             >
               <Trash2 className="h-4 w-4" />
               Delete
@@ -109,12 +134,9 @@ export function UsersTab({
 
   if (paginatedUsers.length === 0) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-app-border bg-app-surface p-6">
-        <p className="text-base font-medium text-app-text">No users found</p>
-        <p className="mt-1 text-sm text-app-text-muted">
-          Try another search term or change the filters.
-        </p>
-      </div>
+      <EmptyState icon={<Users className="h-8 w-8" aria-hidden="true" />} title="No users found">
+        Try another search term or change the filters.
+      </EmptyState>
     );
   }
 
@@ -154,7 +176,7 @@ export function UsersTab({
             <button
               type="button"
               onClick={() => onOpenUserDetails(user)}
-              className="absolute inset-0 z-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-app-brand-glow focus-visible:ring-inset"
+              className="absolute inset-0 z-0 focus-ring-inset"
               aria-label={`Open details for ${getDisplayName(user)}`}
             />
 
@@ -181,11 +203,16 @@ export function UsersTab({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-app-text">
+                    <span
+                      className="truncate text-sm font-semibold text-app-text"
+                      title={getDisplayName(user)}
+                    >
                       {getDisplayName(user)}
                     </span>
                   </div>
-                  <div className="truncate text-xs text-app-text-muted">{user.email}</div>
+                  <div className="truncate text-xs text-app-text-muted" title={user.email}>
+                    {user.email}
+                  </div>
                 </div>
               </div>
             </div>
@@ -196,7 +223,10 @@ export function UsersTab({
               </div>
 
               <div className="relative z-10 min-w-0">
-                <ProjectList projects={user.projects} />
+                <ProjectList
+                  projects={user.projects}
+                  managedProjectIds={managedProjectIdsByUser.get(user.id)}
+                />
               </div>
             </div>
 

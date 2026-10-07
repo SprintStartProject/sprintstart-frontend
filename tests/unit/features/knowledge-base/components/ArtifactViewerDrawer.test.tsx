@@ -1,7 +1,9 @@
-import { act, render as rtlRender, screen } from "@testing-library/react";
+import { useState } from "react";
+import { act, fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ToastProvider } from "../../../../../src/context/ToastProvider";
+import { useSpaceOpensDino } from "../../../../../src/features/easter-eggs/hooks/useDinoWaitingGame";
 import { ArtifactViewerDrawer } from "../../../../../src/features/knowledge-base/components/ArtifactViewerDrawer";
 import { preprocessMarkdown } from "../../../../../src/features/knowledge-base/markdown";
 import { ApiError } from "../../../../../src/services/apiClient";
@@ -50,15 +52,17 @@ vi.mock("../../../../../src/components/ui/SidePanel", () => ({
     actions,
     badge,
     children,
+    lockScroll,
   }: {
     isOpen: boolean;
     title: React.ReactNode;
     actions: React.ReactNode;
     badge?: React.ReactNode;
     children: React.ReactNode;
+    lockScroll?: boolean;
   }) =>
     isOpen ? (
-      <div data-testid="side-panel">
+      <div data-testid="side-panel" data-lock-scroll={lockScroll !== false}>
         <div data-testid="panel-header">{title}</div>
         {badge && <div data-testid="panel-badge">{badge}</div>}
         <div data-testid="panel-actions">{actions}</div>
@@ -126,6 +130,41 @@ function streamingSuccess(summary: string, citations: ArtifactSummaryCitation[] 
   };
 }
 
+/**
+ * A second waiting-game host beside the drawer. The game slot is one module-level
+ * variable shared by every surface, so this probe proves what the drawer's game does
+ * to the rest of the app: while it runs the slot is taken, and the moment the drawer
+ * closes the slot must be free again.
+ */
+function DinoProbe() {
+  const [active, , open] = useSpaceOpensDino(true, true);
+  return (
+    <button type="button" data-testid="dino-probe" onClick={open}>
+      {active ? "playing" : "idle"}
+    </button>
+  );
+}
+
+/** The drawer with the probe beside it; closing clears the selection the way the page does. */
+function DrawerWithProbeHarness() {
+  const [artifact, setArtifact] = useState<Artifact | null>(createArtifact());
+  return (
+    <>
+      <button type="button" data-testid="close-drawer" onClick={() => setArtifact(null)}>
+        close drawer
+      </button>
+      <ArtifactViewerDrawer
+        artifact={artifact}
+        onClose={() => setArtifact(null)}
+        projectId="proj-1"
+        canDelete={false}
+        onDelete={vi.fn()}
+      />
+      <DinoProbe />
+    </>
+  );
+}
+
 describe("ArtifactViewerDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -171,6 +210,124 @@ describe("ArtifactViewerDrawer", () => {
       );
 
       expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("external source link", () => {
+    it("shows the source link alongside the repository badge for a GitHub artifact with repo metadata and sourceUrl", () => {
+      const sourceUrl = "https://github.com/sprintstart/sprintstart-backend/blob/main/README.md";
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "GITHUB",
+          sourceUrl,
+          metadata: JSON.stringify({
+            repositoryId: "r1",
+            repositoryFullName: "sprintstart/sprintstart-backend",
+          }),
+        }),
+      );
+
+      expect(screen.getByTestId("artifact-drawer-repo-badge")).toHaveTextContent(
+        "sprintstart/sprintstart-backend",
+      );
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveTextContent("Open in GitHub");
+      expect(link).toHaveAttribute("href", sourceUrl);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      expect(link).toHaveAttribute("title", sourceUrl);
+    });
+
+    it("shows the source link in place of the repository badge for a Jira artifact", () => {
+      const sourceUrl = "https://team.atlassian.net/browse/PROJ-123";
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "JIRA",
+          sourceUrl,
+        }),
+      );
+
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveTextContent("Open in Jira");
+      expect(link).toHaveAttribute("href", sourceUrl);
+    });
+
+    it("shows the source link for a Confluence artifact", () => {
+      const sourceUrl = "https://team.atlassian.net/wiki/spaces/DEV/pages/456";
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "CONFLUENCE",
+          sourceUrl,
+        }),
+      );
+
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveTextContent("Open in Confluence");
+      expect(link).toHaveAttribute("href", sourceUrl);
+    });
+
+    it("shows no source link for an uploaded artifact even if sourceUrl is present", () => {
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "UPLOAD",
+          sourceUrl: "https://example.com/uploads/doc.pdf",
+        }),
+      );
+
+      expect(screen.queryByTestId("artifact-drawer-source-link")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("artifact-drawer-repo-badge")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("panel-badge")).not.toBeInTheDocument();
+    });
+
+    it("opens an artifact of a source system the frontend does not know with a neutral source link", async () => {
+      const sourceUrl = "https://linear.app/acme/issue/ACME-123";
+      renderDrawer(
+        createArtifact({
+          // A connector the backend may ship before the frontend registers it.
+          sourceSystem: "LINEAR" as Artifact["sourceSystem"],
+          sourceUrl,
+        }),
+        { canDelete: true },
+      );
+
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toHaveTextContent("Open source");
+      expect(link).toHaveAttribute("href", sourceUrl);
+      await screen.findByTestId("raw-content");
+      expect(screen.queryByTestId("delete-artifact-btn")).not.toBeInTheDocument();
+    });
+
+    it("opens a Notion page with an Open in Notion link", async () => {
+      const sourceUrl = "https://www.notion.so/acme/Page-123";
+      renderDrawer(createArtifact({ sourceSystem: "NOTION", sourceUrl }));
+
+      const link = screen.getByTestId("artifact-drawer-source-link");
+      expect(link).toHaveTextContent("Open in Notion");
+      expect(link).toHaveAttribute("href", sourceUrl);
+      await screen.findByTestId("raw-content");
+    });
+
+    it("shows no source link when sourceUrl is null or whitespace", () => {
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "GITHUB",
+          sourceUrl: null,
+        }),
+      );
+      expect(screen.queryByTestId("artifact-drawer-source-link")).not.toBeInTheDocument();
+
+      renderDrawer(
+        createArtifact({
+          sourceSystem: "GITHUB",
+          sourceUrl: "   ",
+        }),
+      );
+      expect(screen.queryByTestId("artifact-drawer-source-link")).not.toBeInTheDocument();
     });
   });
 
@@ -353,6 +510,28 @@ describe("ArtifactViewerDrawer", () => {
       const rawContent = await screen.findByTestId("raw-content");
       expect(rawContent.querySelector(".prose")).toBeInTheDocument();
       expect(await screen.findByText("PR Description")).toBeInTheDocument();
+    });
+
+    it("renders a Bitbucket pull request as markdown from its /pull-requests/ link alone", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.getArtifactContent).mockResolvedValueOnce({
+        content: "## Bitbucket PR\n- Reworked the widgets",
+        mimeType: "text/plain",
+        isObjectUrl: false,
+      });
+
+      renderDrawer(
+        createArtifact({
+          title: "Rework widgets",
+          artifactType: "FILE",
+          sourceSystem: "BITBUCKET",
+          sourceUrl: "https://bitbucket.org/acme/widgets/pull-requests/12",
+        }),
+      );
+
+      const rawContent = await screen.findByTestId("raw-content");
+      expect(rawContent.querySelector(".prose")).toBeInTheDocument();
+      expect(await screen.findByText("Bitbucket PR")).toBeInTheDocument();
     });
 
     it("renders Jira / GitHub issues as markdown even if artifactType is FILE", async () => {
@@ -853,6 +1032,64 @@ describe("ArtifactViewerDrawer", () => {
       );
     });
   });
+  describe("Bitbucket workspace artifacts", () => {
+    const workspaceMetadata = JSON.stringify({
+      workspace: "acme",
+      uuid: "{1234}",
+      name: "Acme Corp",
+      isPrivate: true,
+      createdOn: "2020-01-15T00:00:00.000Z",
+      url: "https://bitbucket.org/acme/",
+      members: [
+        { accountId: "1", nickname: "ada", displayName: "Ada Lovelace" },
+        { accountId: "2", nickname: "grace", displayName: null },
+      ],
+    });
+
+    it("renders the workspace profile from metadata and never fetches content", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "Acme Corp",
+          sourceSystem: "BITBUCKET",
+          metadata: workspaceMetadata,
+        }),
+      );
+
+      expect(await screen.findByTestId("bitbucket-workspace-view")).toBeInTheDocument();
+      expect(screen.queryByTestId("org-metadata-view")).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "acme" })).toHaveAttribute(
+        "href",
+        "https://bitbucket.org/acme/",
+      );
+      expect(screen.getByRole("link", { name: /repositories/i })).toHaveAttribute(
+        "href",
+        "https://bitbucket.org/acme/workspace/repositories",
+      );
+      expect(screen.getByText("Private")).toBeInTheDocument();
+      expect(screen.getByText("15 Jan 2020")).toBeInTheDocument();
+      // A member without a display name falls back to the nickname.
+      expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+      expect(screen.getByText("grace")).toBeInTheDocument();
+      expect(knowledgeService.getArtifactContent).not.toHaveBeenCalled();
+    });
+
+    it("shows a quiet empty state when the workspace metadata is unusable", async () => {
+      renderDrawer(
+        createArtifact({
+          artifactType: "ORG_METADATA",
+          title: "Acme Corp",
+          sourceSystem: "BITBUCKET",
+          metadata: JSON.stringify({ name: "Acme Corp" }),
+        }),
+      );
+
+      expect(await screen.findByText("Workspace profile unavailable.")).toBeInTheDocument();
+      expect(screen.queryByText("Organization profile unavailable.")).not.toBeInTheDocument();
+    });
+  });
+
   it("refuses an empty artifact instead of asking the AI", async () => {
     const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
 
@@ -998,5 +1235,174 @@ describe("ArtifactViewerDrawer", () => {
     expect(selected.removeAllRanges).toHaveBeenCalledTimes(1);
 
     vi.restoreAllMocks();
+  });
+
+  it("enables background scroll locking by default on the rendered SidePanel", () => {
+    renderDrawer();
+    const panel = screen.getByTestId("side-panel");
+    expect(panel).toHaveAttribute("data-lock-scroll", "true");
+  });
+
+  describe("dino waiting game on the summary", () => {
+    beforeEach(() => {
+      window.localStorage.setItem("dinoUnlocked", "true");
+    });
+
+    afterEach(() => {
+      window.localStorage.clear();
+    });
+
+    it("offers a tappable hint while the summary streams, and the tap opens the game", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+
+      // The wait runs minutes; the invitation is a real button so a touch user
+      // can act on it (Space stays the keyboard path).
+      const hint = await screen.findByTestId("dino-play-hint");
+      await userEvent.click(hint);
+
+      // The first mount in the file pays the game chunk's dynamic import; on a
+      // cold CI worker the default 1 s is thin.
+      expect(
+        await screen.findByTestId("dino-game", undefined, { timeout: 5000 }),
+      ).toBeInTheDocument();
+      // One wait, one opener: the hint steps aside once the game is up.
+      expect(screen.queryByTestId("dino-play-hint")).not.toBeInTheDocument();
+    });
+
+    it("says 'Summary ready' when the stream finishes while the game is open", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      let handlers: SummaryStreamHandlers | null = null;
+      vi.mocked(knowledgeService.streamArtifactSummary).mockImplementation((_p, _a, h) => {
+        handlers = h;
+        return new Promise<void>(() => {});
+      });
+
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+
+      fireEvent.keyDown(window, { code: "Space" });
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+      expect(screen.queryByTestId("dino-game-reply-ready")).not.toBeInTheDocument();
+
+      act(() => {
+        handlers?.onToken("The summary, finished.");
+        handlers?.onDone();
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent(/summary ready/i),
+      );
+      expect(screen.getByTestId("dino-game-reply-ready")).toHaveAttribute("data-tone", "success");
+    });
+
+    it("says 'Summary failed' when the stream errors while the game is open", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      let rejectStream: ((error: unknown) => void) | null = null;
+      vi.mocked(knowledgeService.streamArtifactSummary).mockImplementation(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectStream = reject;
+          }),
+      );
+
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+
+      fireEvent.keyDown(window, { code: "Space" });
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+
+      act(() => {
+        rejectStream?.(new Error("stream broke"));
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("dino-game-reply-ready")).toHaveTextContent(/summary failed/i),
+      );
+      expect(screen.getByTestId("dino-game-reply-ready")).toHaveAttribute("data-tone", "danger");
+    });
+
+    it("keeps the hint and the Space trigger away while the dino is locked", async () => {
+      window.localStorage.clear();
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+      await screen.findByText("Generating summary...");
+
+      expect(screen.queryByTestId("dino-play-hint")).not.toBeInTheDocument();
+      fireEvent.keyDown(window, { code: "Space" });
+      expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+    });
+
+    it("hands the shared slot back when the drawer closes mid-run", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      rtlRender(<DrawerWithProbeHarness />, { wrapper: ToastProvider });
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+      await userEvent.click(await screen.findByTestId("dino-play-hint"));
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+
+      // The running game holds the one shared slot: the other host stays shut.
+      await userEvent.click(screen.getByTestId("dino-probe"));
+      expect(screen.getByTestId("dino-probe")).toHaveTextContent("idle");
+
+      // Closing the drawer closes its game with it — and frees the slot.
+      await userEvent.click(screen.getByTestId("close-drawer"));
+      await userEvent.click(screen.getByTestId("dino-probe"));
+      expect(screen.getByTestId("dino-probe")).toHaveTextContent("playing");
+    });
+
+    it("leaves with the summary view — Back to File frees the slot and a later summarise does not resurrect the game", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      rtlRender(<DrawerWithProbeHarness />, { wrapper: ToastProvider });
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+      await userEvent.click(await screen.findByTestId("dino-play-hint"));
+      expect(await screen.findByTestId("dino-game")).toBeInTheDocument();
+
+      // Back to File unmounts the game's box; the game must leave with it.
+      await userEvent.click(screen.getByTestId("back-to-file-btn"));
+      expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+
+      // The one shared slot is free again — the other host can claim it.
+      await userEvent.click(screen.getByTestId("dino-probe"));
+      expect(screen.getByTestId("dino-probe")).toHaveTextContent("playing");
+
+      // And a later summarise must not pop the abandoned game back.
+      await userEvent.click(screen.getByTestId("summarise-btn"));
+      expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+      expect(await screen.findByTestId("dino-play-hint")).toBeInTheDocument();
+    });
+
+    it("keeps Space a scroll key on the raw view while the summary streams", async () => {
+      const { knowledgeService } = await import("../../../../../src/services/knowledgeService");
+      vi.mocked(knowledgeService.streamArtifactSummary).mockReturnValue(new Promise(() => {}));
+
+      // Deliberately no second host here: an armed host of its own would swallow
+      // the press first, and this test is about the drawer's trigger alone.
+      renderDrawer();
+      await userEvent.click(await screen.findByTestId("summarise-btn"));
+      await userEvent.click(screen.getByTestId("back-to-file-btn"));
+
+      // The wait still runs in the background, but its trigger must not swallow
+      // a scroll press on a view where no game can be seen. Focus goes back to
+      // the page first, the way it is after scrolling the file.
+      (document.activeElement as HTMLElement | null)?.blur();
+      const notPrevented = fireEvent.keyDown(window, { code: "Space" });
+      expect(notPrevented).toBe(true);
+
+      // And no game was armed by the press: returning to the summary shows the
+      // hint, not a game the user never opened.
+      await userEvent.click(screen.getByTestId("summarise-btn"));
+      expect(screen.queryByTestId("dino-game")).not.toBeInTheDocument();
+      expect(await screen.findByTestId("dino-play-hint")).toBeInTheDocument();
+    });
   });
 });
