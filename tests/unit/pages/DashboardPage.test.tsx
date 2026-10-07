@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { DashboardPage } from "../../../src/pages/DashboardPage";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 import { PermissionGroup, type UserProfile } from "../../../src/services/types";
 import type { ProjectContextValue } from "../../../src/features/projects/ProjectContext";
 import type { MyOnboardingStatus } from "../../../src/features/onboarding/hooks/useMyOnboardingStatus";
@@ -121,7 +122,13 @@ function signInAsManagingPm() {
 function renderPage() {
   render(
     <MemoryRouter>
-      <DashboardPage />
+      {/* The dashboard's quick-ask widget seeds the buddy's draft box, and the recent-conversations
+          widget reads the hire's list — both reach for the app's one buddy session, so the page
+          renders the way the app mounts it. The provider is inert until a surface asks for the
+          conversation, so nothing here touches the network by being wrapped. */}
+      <BuddyProvider>
+        <DashboardPage />
+      </BuddyProvider>
     </MemoryRouter>,
   );
 }
@@ -296,7 +303,9 @@ describe("DashboardPage", () => {
     it("takes a widget off the board and keeps it off across a remount", async () => {
       const { unmount } = render(
         <MemoryRouter>
-          <DashboardPage />
+          <BuddyProvider>
+            <DashboardPage />
+          </BuddyProvider>
         </MemoryRouter>,
       );
 

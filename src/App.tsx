@@ -5,7 +5,6 @@ import { queryClient } from "./services/queryClient";
 import { AppRouter } from "./router/AppRouter";
 import { SideBar } from "./components/layout/SideBar";
 import { AuthProvider } from "./context/AuthProvider";
-import { ChatProvider } from "./context/ChatProvider";
 import { ThemeProvider } from "./context/ThemeProvider";
 import { ToastProvider } from "./context/ToastProvider";
 import { FocusModeProvider } from "./context/FocusModeProvider";
@@ -222,30 +221,28 @@ function App() {
         <ToastProvider>
           <AuthProvider>
             <ProjectProvider>
-              <ChatProvider>
-                {/* Inside ProjectProvider: what a user owns is asked per selected project, and
+              {/* Inside ProjectProvider: what a user owns is asked per selected project, and
                     above the router so the owner announcement can appear on any page. */}
-                <MyKnowledgeGapsProvider>
-                  {/* Inside AuthProvider: the launch sequence is triggered
+              <MyKnowledgeGapsProvider>
+                {/* Inside AuthProvider: the launch sequence is triggered
                                 by the user becoming authenticated. */}
-                  <MomentsProvider>
-                    {/* Inside the router's providers and outside the router itself: the shell has to
+                <MomentsProvider>
+                  {/* Inside the router's providers and outside the router itself: the shell has to
                         read the flag a page sets, and both live under this. */}
-                    <FocusModeProvider>
-                      {/* Inside ProjectProvider, which it reads the project id from, and outside the
+                  <FocusModeProvider>
+                    {/* Inside ProjectProvider, which it reads the project id from, and outside the
                           router, because the toolbar that makes a highlight is mounted out here too —
                           the board page under it lends its cards in. */}
-                      <CardMarksProvider>
-                        {/* Inside the project and toast providers it reads from; above the routes,
+                    <CardMarksProvider>
+                      {/* Inside the project and toast providers it reads from; above the routes,
                             so a path being built keeps building while the user changes routes. */}
-                        <OnboardingJourneyProvider>
-                          <AppContent />
-                        </OnboardingJourneyProvider>
-                      </CardMarksProvider>
-                    </FocusModeProvider>
-                  </MomentsProvider>
-                </MyKnowledgeGapsProvider>
-              </ChatProvider>
+                      <OnboardingJourneyProvider>
+                        <AppContent />
+                      </OnboardingJourneyProvider>
+                    </CardMarksProvider>
+                  </FocusModeProvider>
+                </MomentsProvider>
+              </MyKnowledgeGapsProvider>
             </ProjectProvider>
           </AuthProvider>
         </ToastProvider>

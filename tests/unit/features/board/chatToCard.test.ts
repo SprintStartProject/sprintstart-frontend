@@ -2,13 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   buddyReplyNote,
-  chatLink,
-  chatMessageNote,
+  messageNote,
   plainFromMarkdown,
   transcriptNote,
 } from "../../../../src/features/board/generation/chatToCard";
 
-function noteText(request: ReturnType<typeof chatMessageNote>): string {
+function noteText(request: ReturnType<typeof messageNote>): string {
   if (request.kind !== "NOTE") throw new Error("expected a note");
   return request.text;
 }
@@ -41,7 +40,7 @@ describe("keeping something out of a conversation", () => {
   describe("one answer", () => {
     it("leads with the answer's own first line and says where it came from", () => {
       const [heading, body, attribution] = noteText(
-        chatMessageNote("Deploys are on Thursdays.\n\nAsk in #release first."),
+        messageNote("Deploys are on Thursdays.\n\nAsk in #release first.", "the assistant"),
       ).split("\n\n");
 
       expect(heading).toBe("Deploys are on Thursdays.");
@@ -50,29 +49,15 @@ describe("keeping something out of a conversation", () => {
     });
 
     it("does not repeat a one-line answer under itself", () => {
-      const parts = noteText(chatMessageNote("Deploys are on Thursdays.")).split("\n\n");
+      const parts = noteText(messageNote("Deploys are on Thursdays.", "the assistant")).split(
+        "\n\n",
+      );
 
       expect(parts).toEqual(["Deploys are on Thursdays.", "From the assistant"]);
     });
 
     it("names the buddy when it was the buddy", () => {
       expect(noteText(buddyReplyNote("Start with the runbook."))).toContain("From your buddy");
-    });
-  });
-
-  describe("a whole chat", () => {
-    it("keeps a link to the conversation rather than a copy of it", () => {
-      expect(chatLink({ id: "abc", title: "Deploy questions" })).toEqual({
-        kind: "LINK",
-        url: "/chat/abc",
-        label: "Deploy questions",
-      });
-    });
-
-    it("still keeps a chat whose title has not been written yet", () => {
-      const card = chatLink({ id: "abc", title: "   " });
-
-      expect(card).toEqual({ kind: "LINK", url: "/chat/abc", label: "Chat" });
     });
   });
 

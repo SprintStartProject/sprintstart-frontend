@@ -17,7 +17,6 @@ import type { AppRoute } from "../../auth/accessPolicy";
 export const APP_GUIDE_ROUTES: readonly AppRoute[] = [
   "/",
   "/board",
-  "/chat",
   "/buddy",
   "/knowledge-base",
   "/onboarding",
@@ -39,4 +38,5 @@ export const APP_GUIDE_EXCLUDED_ROUTES: Partial<Record<AppRoute, string>> = {
   "/arrival-steps": "Redirects to /hire-setup?tab=arrival.",
   "/starter-work": "Redirects to /hire-setup?tab=starter.",
   "/profile": "Redirects to /settings.",
+  "/chat": "The retired chat — both of its addresses redirect to /buddy.",
 };

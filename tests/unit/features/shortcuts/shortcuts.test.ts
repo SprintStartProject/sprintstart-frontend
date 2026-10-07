@@ -31,7 +31,6 @@ describe("the registered chords", () => {
   it("prints each chord the way a person reads it", () => {
     expect(navigationShortcut("/")).toBe("Alt + H");
     expect(navigationShortcut("/board")).toBe("Alt + B");
-    expect(navigationShortcut("/chat")).toBe("Alt + C");
     expect(navigationShortcut("/buddy")).toBe("Alt + U");
     expect(navigationShortcut("/knowledge-base")).toBe("Alt + K");
     expect(navigationShortcut("/pm-dashboard")).toBe("Alt + P");

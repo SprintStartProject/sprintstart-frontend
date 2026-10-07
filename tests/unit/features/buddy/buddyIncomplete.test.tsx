@@ -93,3 +93,66 @@ describe("a reply that was cut short", () => {
     expect(screen.queryByTestId("buddy-message-incomplete")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * A turn the hire stopped with the composer's Stop button. Usually it has no words at all — the
+ * backend writes the whole agent loop before it emits one — and an empty assistant turn renders
+ * as nothing, so without its own line the question sat there unanswered and unexplained.
+ */
+describe("a reply the hire stopped", () => {
+  const question: BuddyMessageView = {
+    id: "m1",
+    role: "USER",
+    content: "How do I set this up?",
+    createdAt: "2026-10-01T09:00:00.000Z",
+  };
+
+  it("says so even when it was stopped before its first word", () => {
+    renderConversation([
+      question,
+      {
+        id: "m2",
+        role: "ASSISTANT",
+        content: "",
+        createdAt: "2026-10-01T09:00:01.000Z",
+        stopped: true,
+      },
+    ]);
+
+    expect(screen.getByTestId("buddy-message-stopped")).toHaveTextContent(
+      "You stopped this reply.",
+    );
+  });
+
+  it("keeps what arrived above the line", () => {
+    renderConversation([
+      question,
+      {
+        id: "m2",
+        role: "ASSISTANT",
+        content: "First, install the",
+        createdAt: "2026-10-01T09:00:01.000Z",
+        stopped: true,
+      },
+    ]);
+
+    expect(screen.getByText("First, install the")).toBeInTheDocument();
+    expect(screen.getByTestId("buddy-message-stopped")).toBeInTheDocument();
+    // One line, worded for what happened — not the backend's "cut short" beside it.
+    expect(screen.queryByTestId("buddy-message-incomplete")).not.toBeInTheDocument();
+  });
+
+  it("still renders nothing for an empty turn that is merely waiting", () => {
+    renderConversation([
+      question,
+      {
+        id: "m2",
+        role: "ASSISTANT",
+        content: "",
+        createdAt: "2026-10-01T09:00:01.000Z",
+      },
+    ]);
+
+    expect(screen.queryByTestId("buddy-message-stopped")).not.toBeInTheDocument();
+  });
+});

@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import { useProjectContext } from "../../projects/useProjectContext";
-import { Select } from "../../../components/ui/Select";
+import { FilterSelect } from "../../../components/ui/FilterSelect";
 
 /**
- * Hire conversation ↔ team conversations, as one native select.
+ * Hire conversation ↔ team conversations, as one app-styled dropdown (`FilterSelect`, the one
+ * every toolbar and header picker in the app uses).
  *
  * The options are the projects this user *manages* — not the ones they can merely switch to.
  * `isManaged` comes from the global project context and mirrors the backend's project manager
@@ -45,25 +46,20 @@ export function BuddyModeSwitcher({
 
   if (managedProjects.length === 0) return null;
 
+  const options = [
+    { value: "", label: "Your onboarding" },
+    ...managedProjects.map((project) => ({ value: project.id, label: project.name })),
+  ];
+
   return (
-    <Select
-      data-testid="buddy-mode-switcher"
+    <FilterSelect
+      testId="buddy-mode-switcher"
       className={className}
-      aria-label="Which conversation is your buddy in"
+      label="Which conversation is your buddy in"
       value={teamProjectId ?? ""}
       disabled={disabled}
-      size="sm"
-      onChange={(event) => {
-        const value = event.target.value;
-        onSwitch(value === "" ? null : value);
-      }}
-    >
-      <option value="">Your onboarding</option>
-      {managedProjects.map((project) => (
-        <option key={project.id} value={project.id}>
-          {project.name}
-        </option>
-      ))}
-    </Select>
+      options={options}
+      onChange={(value) => onSwitch(value === "" ? null : value)}
+    />
   );
 }

@@ -80,7 +80,7 @@ describe("KeyboardShortcutsModal", () => {
   it("lists every destination a hire may reach, and none of the others", () => {
     renderModal();
 
-    for (const label of ["Dashboard", "Board", "Chat", "Buddy", "Knowledge Base", "Settings"]) {
+    for (const label of ["Dashboard", "Board", "Buddy", "Knowledge Base", "Settings"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
 
@@ -117,7 +117,9 @@ describe("KeyboardShortcutsModal", () => {
   it("says where a chord only works somewhere specific", () => {
     renderModal();
 
-    expect(within(rowFor("Jump to the message box")).getByText(/in Chat/)).toBeInTheDocument();
+    expect(
+      within(rowFor("Jump to the message box")).getByText(/on the Buddy page/),
+    ).toBeInTheDocument();
   });
 
   it("documents the chords the surfaces answer, not only the global ones", () => {

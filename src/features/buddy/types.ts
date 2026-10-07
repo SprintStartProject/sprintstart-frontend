@@ -1,4 +1,5 @@
 import type { Citation } from "./citations/types";
+import type { SourceSystem } from "../data-ingestion/connectors/sourceSystems";
 
 /**
  * An action the buddy has *proposed* — the hire must confirm it before anything changes. Carried on
@@ -328,6 +329,12 @@ export type BuddyMessage = {
 export type BuddyMessageView = BuddyMessage & {
   id: string;
   citations?: Citation[];
+  /**
+   * The mentor's visible thought process for this turn, as the backend streamed it — one string,
+   * grown in place, one paragraph per thought. Absent for turns that ran none (and for messages
+   * read back from before the reasoning phase existed).
+   */
+  reasoning?: string;
   /** Actions the buddy proposed in this turn, each awaiting the hire's confirmation. */
   actions?: ProposedAction[];
   /**
@@ -348,17 +355,58 @@ export type BuddyMessageView = BuddyMessage & {
    * from the buddy having ignored them -- on the surface the whole feature is built around.
    */
   error?: string;
+  /**
+   * True for a live turn the hire stopped with the composer's Stop button.
+   *
+   * Its own flag rather than `isIncomplete`, which is the backend's account of a reply it kept
+   * half of: the backend writes the whole agent loop before it emits a word, so a Stop almost
+   * always lands before the first token — there is nothing to keep, and the turn would render as
+   * nothing at all. This is what keeps it on screen, with a line saying the hire stopped it.
+   */
+  stopped?: boolean;
+};
+
+/**
+ * What narrows a message's retrieval: which source systems it may draw on, and the indexed-date
+ * window. Held in the session (one set, both surfaces) and sent per message.
+ *
+ * The composer's own shape (camelCase); `streamMessage` maps it onto the wire vocabulary the
+ * backend's `BuddySessionFilters` actually names.
+ */
+export type BuddySessionFilters = {
+  sourceSystems: SourceSystem[];
+  /** ISO dates (`YYYY-MM-DD`) or empty; both empty means "all time". */
+  from: string;
+  to: string;
+};
+
+/**
+ * One message the hire submitted while the buddy was still answering, waiting its turn.
+ *
+ * `id` so the strip can edit or drop a specific row; the text as submitted, because a message
+ * that has not been sent yet has to be visible somewhere the hire can still change their mind.
+ */
+export type QueuedBuddyMessage = {
+  id: string;
+  text: string;
 };
 
 /**
  * The stream callbacks a buddy visit needs.
  *
  * Deliberately its own type rather than a widening of the chat's `StreamHandlers`: the buddy's
- * stream has no reasoning phase and proposes actions, which chat never does. Loosening the shared
- * type to fit both would make handlers optional for chat, where they are required.
+ * stream proposes actions the chat never does, and the two age apart. Loosening the shared type
+ * to fit both would make handlers optional for chat, where they are required.
  */
 export type BuddyStreamHandlers = {
   onToken: (token: string) => void;
+  /** Optional: a delta of the thought being written, before and between the answer's words. */
+  onReasoning?: (reasoning: string) => void;
+  /**
+   * Optional: the words streamed so far are void — the backend is asking again (a reply that
+   * turned out to be a tool call written as text). The surface clears the reply's content.
+   */
+  onReset?: () => void;
   onCitation: (citation: Citation) => void;
   onDone: () => void;
   /** Optional: a caller with no error surface of its own lets the failure pass silently. */

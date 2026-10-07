@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { DashboardPage } from "../../../src/pages/DashboardPage";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 import { PermissionGroup } from "../../../src/services/types";
 import type { ProjectContextValue } from "../../../src/features/projects/ProjectContext";
 import { createProjectContextValue, createSelectableProject } from "../setup/projectContext";
@@ -82,7 +83,11 @@ describe("DashboardPage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <DashboardPage />
+        {/* The widgets reach for the app's one buddy session (draft seeding, the
+            conversations card), so the page renders the way the app mounts it. */}
+        <BuddyProvider>
+          <DashboardPage />
+        </BuddyProvider>
       </MemoryRouter>,
     );
     expect(await axe(baseElement)).toHaveNoViolations();
@@ -93,7 +98,11 @@ describe("DashboardPage Accessibility", () => {
   it("should not have any a11y violations while the dashboard is being edited", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <DashboardPage />
+        {/* The widgets reach for the app's one buddy session (draft seeding, the
+            conversations card), so the page renders the way the app mounts it. */}
+        <BuddyProvider>
+          <DashboardPage />
+        </BuddyProvider>
       </MemoryRouter>,
     );
 
@@ -118,7 +127,11 @@ describe("DashboardPage Accessibility", () => {
 
     const { baseElement } = render(
       <MemoryRouter>
-        <DashboardPage />
+        {/* The widgets reach for the app's one buddy session (draft seeding, the
+            conversations card), so the page renders the way the app mounts it. */}
+        <BuddyProvider>
+          <DashboardPage />
+        </BuddyProvider>
       </MemoryRouter>,
     );
 

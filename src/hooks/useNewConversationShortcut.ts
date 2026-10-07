@@ -10,7 +10,7 @@ import {
  * Deliberately not `Ctrl+N`, which is what was asked for first: every desktop browser owns
  * that one and opens a window with it, and a page cannot refuse. `Alt` keeps the mnemonic and
  * is free. (The chord itself, with that reasoning, lives in the shortcuts registry where the
- * listener matches it; this export stays the chat button's way of naming it.)
+ * listener matches it; this export stays the new-conversation button's way of naming it.)
  */
 export const NEW_CONVERSATION_CHORD = shortcutChord(NEW_CONVERSATION_SHORTCUT);
 
@@ -29,10 +29,7 @@ export const NEW_CONVERSATION_CHORD = shortcutChord(NEW_CONVERSATION_SHORTCUT);
  * for `ñ` — worth naming, and the trade this app is happy with on a Windows-first team.
  *
  * @param enabled - Leave false where there is nothing to start — an untouched buddy visit is
- *   already the new conversation, and re-opening it would only replay the greeting. Both halves
- *   of the assistant also gate it on being the one on screen: the shell keeps the page being
- *   left mounted for the length of the slide, and this listener is on `window`, so during that
- *   window one keypress would otherwise be answered twice.
+ *   already the new conversation, and re-opening it would only replay the greeting.
  */
 export function useNewConversationShortcut(onTrigger: () => void, enabled = true): void {
   useShortcutListener(NEW_CONVERSATION_SHORTCUT, onTrigger, enabled);

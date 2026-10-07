@@ -1,9 +1,8 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useProjectContext } from "../features/projects/useProjectContext";
 import { canAccessRoute, getDefaultRoute, type AppRoute } from "../auth/accessPolicy";
-import { AssistantShell } from "../components/layout/AssistantShell";
 import { PageShellSkeleton } from "../components/layout/PageShell";
 import { PageTransition } from "../components/layout/PageTransition";
 import { AuthGuard } from "./AuthGuard";
@@ -14,9 +13,6 @@ import { AuthGuard } from "./AuthGuard";
 // right before this replaces it. Bundling it eagerly removes the wait Suspense would show.
 import { LoginPage } from "../pages/LoginPage";
 
-const ChatPage = lazy(() =>
-  import("../pages/ChatPage").then((module) => ({ default: module.ChatPage })),
-);
 const DashboardPage = lazy(() =>
   import("../pages/DashboardPage.tsx").then((module) => ({ default: module.DashboardPage })),
 );
@@ -94,13 +90,28 @@ function ManagerAreaGuard({ route, children }: { route: AppRoute; children: Reac
 }
 
 /**
+ * `/chat/:id` → the conversation it names.
+ *
+ * The retired chat's ids live on as the ids of the conversations the backfill migrated: it
+ * copied `chat.id` onto the buddy session it created, so an old "Keep this chat" card's link
+ * still names a conversation that exists, and this opens it. Where no such conversation is
+ * there to open — an environment the backfill never reached, a binned conversation —
+ * `BuddyPage`'s own reconciler falls back to the bare page, because a stale link is not a
+ * failed read.
+ */
+function ChatRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/buddy/${id}` : "/buddy"} replace />;
+}
+
+/**
  * Every route of the app, inside one `AuthGuard` and one shared `Suspense` fallback.
  *
- * Pages are lazy-loaded except `LoginPage` (see the comment on its import). Two layout
- * routes group pages that share a header: `AssistantShell` for `/chat` and `/buddy`, and
- * `PmWorkspace` for the PM area. Routes a user without access must not reach by URL are
- * wrapped in `ManagerAreaGuard`; the others rely on the sidebar not offering them. Which
- * groups may open which route is defined in `src/auth/accessPolicy.ts`.
+ * Pages are lazy-loaded except `LoginPage` (see the comment on its import). One layout
+ * route groups pages that share a header: `PmWorkspace` for the PM area. Routes a user
+ * without access must not reach by URL are wrapped in `ManagerAreaGuard`; the others rely
+ * on the sidebar not offering them. Which groups may open which route is defined in
+ * `src/auth/accessPolicy.ts`.
  */
 export function AppRouter() {
   return (
@@ -111,14 +122,17 @@ export function AppRouter() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/skill-wizard" element={<SkillWizardPage />} />
             <Route path="/" element={<DashboardPage />} />
-            {/* One layout route for both halves of the assistant, so the shared header survives
-              the crossing and the panel underneath can slide instead of cut. Their URLs are
-              unchanged — `/buddy` is still `/buddy`; only who draws the header moved. */}
-            <Route element={<AssistantShell />}>
-              <Route path="/chat" element={<ChatPage />} />
-              <Route path="/chat/:id" element={<ChatPage />} />
-              <Route path="/buddy" element={<BuddyPage />} />
-            </Route>
+            {/* The one conversation surface, and the address the dock's expand hands over —
+              `/buddy/:id` is one conversation, named by id and read by the page itself. */}
+            <Route path="/buddy" element={<BuddyPage />} />
+            <Route path="/buddy/:id" element={<BuddyPage />} />
+            {/* The retired chat. Both of its addresses land on the buddy rather than a 404, and
+              `/chat/:id` keeps its id — the backfill that ran before the chat tables were
+              dropped copied each chat's id onto the session it created (see `ChatRedirect`),
+              so an old "Keep this chat" card still names a conversation that can open. A link
+              whose id has no conversation behind it falls back to the bare page, never a 404. */}
+            <Route path="/chat" element={<Navigate to="/buddy" replace />} />
+            <Route path="/chat/:id" element={<ChatRedirect />} />
             <Route path="/onboarding" element={<OnBoardingPage />} />
             {/* Guarded for the same reason as `/hire-setup` below: the policy calls authoring
               PM/HR/ADMIN-only and the sidebar merely hides it, which leaves the URL. Both
@@ -173,8 +187,7 @@ export function AppRouter() {
             </Route>
             <Route path="/admin" element={<AdminPage />} />
             {/* The surfaces the buddy's tools serve. Added beside the onboarding path above, not
-              in place of it: both ways in stay open. The buddy itself now sits with the chat,
-              under `AssistantShell`. */}
+              in place of it: both ways in stay open. The buddy itself is its own page, `/buddy`. */}
             <Route path="/board" element={<BoardPage />} />
             {/* Guarded, because the access policy says it is PM/HR/ADMIN-only and the sidebar
               merely hides it -- which leaves the URL. The page already gates its *actions* by

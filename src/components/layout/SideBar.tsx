@@ -139,8 +139,8 @@ const navItems: SidebarNavItem[] = [
     icon: BoardIcon,
   },
   {
-    label: "Chat",
-    path: "/chat",
+    label: "Buddy",
+    path: "/buddy",
     icon: ChatIcon,
   },
   {
@@ -253,13 +253,6 @@ function SidebarContent({
   // alone would reach the mouse tooltip only.
   const settingsShortcut = navigationShortcut("/settings");
   const settingsLabel = settingsShortcut ? `Settings (${settingsShortcut})` : "Settings";
-
-  /**
-   * The buddy is the other half of the chat's page, not a page of its own: one header, one
-   * switch, two conversations. So the entry that leads there lights up for both — without it
-   * the sidebar claimed the hire was nowhere at all while they were looking at half of Chat.
-   */
-  const isAssistantSectionActive = location.pathname.startsWith("/buddy");
 
   /**
    * Team management and a member's detail page are reached from the PM dashboard and have no
@@ -453,10 +446,7 @@ function SidebarContent({
                   label={item.label}
                   icon={item.icon}
                   end={item.path === "/"}
-                  forceActive={
-                    (item.path === "/pm-dashboard" && isPmSectionActive) ||
-                    (item.path === "/chat" && isAssistantSectionActive)
-                  }
+                  forceActive={item.path === "/pm-dashboard" && isPmSectionActive}
                   shortcut={navigationShortcut(item.path)}
                   indicatorLayoutId={indicatorLayoutId}
                   pointerY={pointerY}

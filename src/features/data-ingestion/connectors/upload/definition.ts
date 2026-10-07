@@ -16,7 +16,7 @@ export const uploadConnector: ConnectorDefinition<ProjectSource, UploadDraftSour
     icon: FileText,
     description: "Indexes manually uploaded documentation, markdown files and project knowledge.",
   },
-  // Uploads are always offered in the chat filter; the backend skips them when it
+  // Uploads are always offered in the buddy's source filter; the backend skips them when it
   // validates a source filter against the enabled connectors.
   chat: {
     filterable: true,

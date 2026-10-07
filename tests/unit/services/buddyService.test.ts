@@ -195,6 +195,110 @@ describe("buddyService", () => {
       expect(onDone).not.toHaveBeenCalled();
     });
 
+    /** One event per thought the model reported, handed over as it came — joining is the caller's. */
+    it("hands each reasoning event to onReasoning", async () => {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode('data: {"type":"reasoning","reasoning":"Check the board."}\n\n'),
+          );
+          controller.enqueue(
+            encoder.encode('data: {"type":"reasoning","reasoning":"Then the docs."}\n\n'),
+          );
+          controller.enqueue(encoder.encode('data: {"type":"token","content":"Done."}\n\n'));
+          controller.enqueue(encoder.encode('data: {"type":"done"}\n\n'));
+          controller.close();
+        },
+      });
+      server.use(
+        http.post(
+          "/api/v1/onboarding/me/buddy/messages",
+          () => new HttpResponse(stream, { headers: { "Content-Type": "text/event-stream" } }),
+        ),
+      );
+
+      const onReasoning = vi.fn();
+      const onToken = vi.fn();
+
+      await streamMessage(
+        "hello",
+        { onToken, onReasoning, onCitation: vi.fn(), onDone: vi.fn() },
+        "session-1",
+      );
+
+      expect(onReasoning.mock.calls).toEqual([["Check the board."], ["Then the docs."]]);
+      // A thought is not part of the answer.
+      expect(onToken.mock.calls).toEqual([["Done."]]);
+    });
+
+    describe("a Stop", () => {
+      it("resolves silently when the request is aborted before it goes out", async () => {
+        const controller = new AbortController();
+        controller.abort();
+        const onDone = vi.fn();
+        const onError = vi.fn();
+
+        await expect(
+          streamMessage(
+            "hello",
+            { onToken: vi.fn(), onCitation: vi.fn(), onDone, onError },
+            "session-1",
+            undefined,
+            undefined,
+            controller.signal,
+          ),
+        ).resolves.toBeUndefined();
+
+        // The hire's own Stop is not a failure, and nothing finished either: the caller reads
+        // the outcome off its own signal.
+        expect(onError).not.toHaveBeenCalled();
+        expect(onDone).not.toHaveBeenCalled();
+      });
+
+      it("resolves silently when the reply is aborted mid-read", async () => {
+        const encoder = new TextEncoder();
+        const controller = new AbortController();
+        let body!: ReadableStreamDefaultController<Uint8Array>;
+        const stream = new ReadableStream<Uint8Array>({
+          start(c) {
+            body = c;
+            c.enqueue(encoder.encode('data: {"type":"token","content":"Part"}\n\n'));
+          },
+        });
+        // What the platform does to a body whose request is aborted.
+        controller.signal.addEventListener("abort", () =>
+          body.error(Object.assign(new Error("aborted"), { name: "AbortError" })),
+        );
+        vi.stubGlobal("fetch", () =>
+          Promise.resolve(
+            new Response(stream, { headers: { "Content-Type": "text/event-stream" } }),
+          ),
+        );
+
+        try {
+          const onDone = vi.fn();
+          const onError = vi.fn();
+          const onToken = vi.fn(() => controller.abort());
+
+          await streamMessage(
+            "hello",
+            { onToken, onCitation: vi.fn(), onDone, onError },
+            "session-1",
+            undefined,
+            undefined,
+            controller.signal,
+          );
+
+          expect(onToken).toHaveBeenCalledWith("Part");
+          expect(onError).not.toHaveBeenCalled();
+          expect(onDone).not.toHaveBeenCalled();
+        } finally {
+          vi.unstubAllGlobals();
+        }
+      });
+    });
+
     it("calls onError when response is not ok", async () => {
       server.use(
         http.post(

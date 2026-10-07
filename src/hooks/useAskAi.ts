@@ -1,33 +1,32 @@
-import { useCallback, useContext } from "react";
+import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChatContext } from "../context/ChatContext";
+import { useBuddyDraftActions } from "../features/buddy/buddyDraftContext";
+import { withSeed } from "../features/buddy/hooks/useBuddy";
 
 /**
- * Hands a prompt to the chat and takes the reader there.
+ * Hands a prompt to the buddy and takes the reader there.
  *
- * The composer is filled but **not** submitted — the same contract the
- * dashboard's quick chat and the chat's own suggestion chips already use — so a
- * mis-aimed selection costs an edit rather than a message. A fresh conversation
- * is requested explicitly (`newChat`), because a quote dragged out of one
- * document has nothing to do with whichever thread happens to be open.
+ * The composer is filled but **not** submitted — the same contract the dashboard's quick
+ * ask and the buddy's suggestion chips already use — so a mis-aimed selection costs an
+ * edit rather than a message. Seeded into the one conversation the buddy keeps, which is
+ * the point of a one-surface buddy: the question lands where the hire's history lives.
  *
- * Returns `false` when there is no chat to hand it to, so a caller can leave the
- * offer out rather than navigate somewhere that cannot use it.
+ * Returns `false` only for an empty prompt; the buddy is always there to hand it to.
  */
 export function useAskAi(): (prompt: string) => boolean {
-  const chat = useContext(ChatContext);
   const navigate = useNavigate();
+  const { setDraft } = useBuddyDraftActions();
 
   return useCallback(
     (prompt: string) => {
       const trimmed = prompt.trim();
-      if (!trimmed || !chat) return false;
+      if (!trimmed) return false;
 
-      chat.setNewRequest(trimmed);
-      void navigate("/chat", { state: { newChat: true } });
+      setDraft((current) => withSeed(current, trimmed));
+      void navigate("/buddy");
 
       return true;
     },
-    [chat, navigate],
+    [navigate, setDraft],
   );
 }

@@ -91,6 +91,8 @@ const MANAGER_ASSIGNMENT_ROUTES: readonly AppRoute[] = [
 
 const routePrefixes: Partial<Record<AppRoute, readonly string[]>> = {
   "/chat": ["/chat/"],
+  // `/buddy/:id` — one conversation of the buddy's page, by its own address.
+  "/buddy": ["/buddy/"],
   "/onboarding": ["/onboarding/"],
   "/blueprints": ["/blueprints/"],
   "/team-management": ["/team/"],

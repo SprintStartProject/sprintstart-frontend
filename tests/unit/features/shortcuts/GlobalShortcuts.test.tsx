@@ -96,7 +96,6 @@ describe("GlobalShortcuts", () => {
     const destinations: ReadonlyArray<readonly [string, string]> = [
       ["{Alt>}h{/Alt}", "/"],
       ["{Alt>}b{/Alt}", "/board"],
-      ["{Alt>}c{/Alt}", "/chat"],
       ["{Alt>}u{/Alt}", "/buddy"],
       ["{Alt>}k{/Alt}", "/knowledge-base"],
       // Character-matched, and typed as a character: the comma is what somebody presses,

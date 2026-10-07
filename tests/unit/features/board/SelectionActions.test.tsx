@@ -6,7 +6,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SelectionActions } from "../../../../src/features/board/selection/SelectionActions";
 import { boardService } from "../../../../src/services/boardService";
 import { queryKeys } from "../../../../src/services/queryKeys";
-import { ChatContext, type ChatContextValue } from "../../../../src/context/ChatContext";
 import { openAiBuddy } from "../../../../src/features/buddy/aiBuddyBus";
 import { FocusModeContext } from "../../../../src/context/FocusModeContext";
 
@@ -23,11 +22,6 @@ vi.mock("../../../../src/features/projects/useProjectContext", () => ({
 
 const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("../../../../src/context/useToast", () => ({ useToast: () => toast }));
-
-const mockQuoteSelection = vi.fn();
-const mockChatContext = {
-  quoteSelection: mockQuoteSelection,
-} as unknown as ChatContextValue;
 
 vi.mock("../../../../src/features/buddy/aiBuddyBus", () => ({ openAiBuddy: vi.fn() }));
 
@@ -69,9 +63,7 @@ describe("SelectionActions", () => {
         <FocusModeContext.Provider
           value={{ isFocused: focused, setFocused: () => {}, toggleFocused: () => {} }}
         >
-          <ChatContext.Provider value={mockChatContext}>
-            <SelectionActions />
-          </ChatContext.Provider>
+          <SelectionActions />
         </FocusModeContext.Provider>
       </MemoryRouter>
     );
@@ -183,7 +175,7 @@ describe("SelectionActions", () => {
   it("offers Reply button when selecting text in an AI assistant message", async () => {
     renderToolbar();
     const container = document.createElement("div");
-    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    container.setAttribute("data-message-role", "ASSISTANT");
     const p = document.createElement("p");
     p.textContent = "AI generated response.";
     container.appendChild(p);
@@ -200,10 +192,15 @@ describe("SelectionActions", () => {
     expect(screen.getByRole("button", { name: /add to board/i })).toBeInTheDocument();
   });
 
-  it("calls quoteSelection and clears selection when Reply is clicked", async () => {
+  /**
+   * Reply hands the answer over as a quote in the buddy's composer — the dock's box when it is
+   * open, the page's otherwise — rather than to a chat context. Seeded, not sent: the hire can
+   * still wrap their actual question around it.
+   */
+  it("seeds the buddy composer and clears selection when Reply is clicked", async () => {
     renderToolbar();
     const container = document.createElement("div");
-    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    container.setAttribute("data-message-role", "ASSISTANT");
     const p = document.createElement("p");
     p.textContent = "AI generated response.";
     container.appendChild(p);
@@ -219,7 +216,10 @@ describe("SelectionActions", () => {
     const replyButton = await screen.findByRole("button", { name: /reply/i });
     await userEvent.click(replyButton);
 
-    expect(mockQuoteSelection).toHaveBeenCalledWith("AI generated response.");
+    expect(vi.mocked(openAiBuddy)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(openAiBuddy).mock.calls[0][0]).toEqual({
+      draft: "> AI generated response.\n\n",
+    });
     expect(window.getSelection()?.rangeCount).toBe(0);
   });
 
@@ -227,7 +227,7 @@ describe("SelectionActions", () => {
     selectedProjectId = "";
     renderToolbar();
     const container = document.createElement("div");
-    container.setAttribute("data-chat-message-role", "ASSISTANT");
+    container.setAttribute("data-message-role", "ASSISTANT");
     const p = document.createElement("p");
     p.textContent = "AI generated response.";
     container.appendChild(p);

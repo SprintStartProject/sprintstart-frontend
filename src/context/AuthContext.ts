@@ -16,7 +16,7 @@ export type AuthStatus = "loading" | "signingOut" | "unauthenticated" | "authent
  * Options for configuring the login flow.
  */
 export interface LoginOptions {
-  /** Optional relative path to return to after authentication (e.g. "/chat" or "/insights/faq/42?tab=1"). */
+  /** Optional relative path to return to after authentication (e.g. "/buddy" or "/insights/faq/42?tab=1"). */
   redirectPath?: string;
   /** Optional absolute URI to return to after authentication. Takes precedence over redirectPath. */
   redirectUri?: string;

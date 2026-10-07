@@ -167,4 +167,9 @@ export const queryKeys = {
     // member side panel counts "phase 2 of 4" from.
     byUser: (userId: string) => ["member-path", userId] as const,
   },
+  buddy: {
+    // The hire's conversations, newest first. Hire-scoped like `knowledgeRequest.mine` — the
+    // missing user id is that entry's argument, not an omission here.
+    sessions: () => ["buddy", "sessions"] as const,
+  },
 } as const;

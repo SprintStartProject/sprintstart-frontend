@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { KnowledgeBasePage } from "../../../src/pages/KnowledgeBasePage";
+import { BuddyProvider } from "../../../src/features/buddy/BuddyProvider";
 
 vi.mock("../../../src/features/projects/useProjectContext", async () => {
   const { createProjectContextValue, createSelectableProject } =
@@ -117,7 +118,12 @@ describe("KnowledgeBasePage Accessibility", () => {
   it("should not have any a11y violations", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <KnowledgeBasePage />
+        {/* Opening an artifact's citation hands the drawer a question the hire could ask
+            their buddy, so the drawer reaches for the app's one session — mount it the way
+            the app does. */}
+        <BuddyProvider>
+          <KnowledgeBasePage />
+        </BuddyProvider>
       </MemoryRouter>,
     );
 
@@ -136,7 +142,12 @@ describe("KnowledgeBasePage Accessibility", () => {
   it("should not have any a11y violations with the filter menu open", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <KnowledgeBasePage />
+        {/* Opening an artifact's citation hands the drawer a question the hire could ask
+            their buddy, so the drawer reaches for the app's one session — mount it the way
+            the app does. */}
+        <BuddyProvider>
+          <KnowledgeBasePage />
+        </BuddyProvider>
       </MemoryRouter>,
     );
 
@@ -153,7 +164,12 @@ describe("KnowledgeBasePage Accessibility", () => {
   it("should not have any a11y violations with AI status chips on the cards", async () => {
     const { baseElement } = render(
       <MemoryRouter>
-        <KnowledgeBasePage />
+        {/* Opening an artifact's citation hands the drawer a question the hire could ask
+            their buddy, so the drawer reaches for the app's one session — mount it the way
+            the app does. */}
+        <BuddyProvider>
+          <KnowledgeBasePage />
+        </BuddyProvider>
       </MemoryRouter>,
     );
 

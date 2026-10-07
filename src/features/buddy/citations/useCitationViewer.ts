@@ -7,8 +7,8 @@ import type { SelectedCitation } from "./types";
  * artifact drawer "Open source" hands the click to.
  *
  * Extracted because two surfaces show the same citations — the `/buddy` page and the dock — and
- * the chat's version of this (in `ChatPage`) was a handful of lines each surface would otherwise
- * have copied: a selected citation, the artifact being viewed, the derived `Artifact` the
+ * the alternative was a handful of lines each surface would otherwise have copied: a selected
+ * citation, the artifact being viewed, the derived `Artifact` the
  * knowledge-base drawer renders, and the handlers between them. Each surface renders its own
  * `CitationPopover` and `ArtifactViewerDrawer` from this state; the state itself never leaves the
  * surface that opened it.

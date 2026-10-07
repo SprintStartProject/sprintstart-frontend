@@ -154,51 +154,6 @@ export const handlers = [
       },
     }),
   ),
-  http.get("/api/v1/chats", () =>
-    HttpResponse.json({
-      chats: [
-        {
-          id: "chat1",
-          userId: "user1",
-          title: "Chat 1",
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    }),
-  ),
-
-  http.get("/api/v1/chats/me", () =>
-    HttpResponse.json({
-      chats: [
-        {
-          id: "chat1",
-          userId: "user1",
-          title: "Chat 1",
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    }),
-  ),
-
-  http.post("/api/v1/chats", async ({ request }) => {
-    const body = (await request.json().catch(() => ({}))) as { userId?: string };
-    return HttpResponse.json({
-      id: "new-chat-id",
-      userId: body.userId ?? "user1",
-      title: "",
-      createdAt: new Date().toISOString(),
-    });
-  }),
-
-  http.post("/api/v1/chats/me", () => {
-    return HttpResponse.json({
-      id: "new-chat-id",
-      userId: "user1",
-      title: "",
-      createdAt: new Date().toISOString(),
-    });
-  }),
-
   http.patch("/api/v1/admin/users/:userId/enabled", async ({ request, params }) => {
     const body = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({
@@ -207,60 +162,6 @@ export const handlers = [
       ...body,
     });
   }),
-
-  http.get("/api/v1/chats/:chatId", ({ params }) =>
-    HttpResponse.json({
-      messages: [
-        {
-          id: "msg1",
-          content: "Hello",
-          role: "USER",
-          chat: null,
-          chatId: params.chatId,
-        },
-      ],
-    }),
-  ),
-
-  http.get("/api/v1/chats/me/:chatId", ({ params }) =>
-    HttpResponse.json({
-      messages: [
-        {
-          id: "msg1",
-          content: "Hello",
-          role: "USER",
-          chat: null,
-          chatId: params.chatId,
-        },
-      ],
-    }),
-  ),
-
-  http.post(
-    "/api/v1/chats/prompt",
-    () =>
-      new HttpResponse(
-        sseStream(
-          JSON.stringify({ type: "token", content: "Hello " }),
-          JSON.stringify({ type: "token", content: "world" }),
-          JSON.stringify({ type: "done" }),
-        ),
-        { headers: { "Content-Type": "text/event-stream" } },
-      ),
-  ),
-
-  http.post(
-    "/api/v1/chats/me/prompt",
-    () =>
-      new HttpResponse(
-        sseStream(
-          JSON.stringify({ type: "token", content: "Hello " }),
-          JSON.stringify({ type: "token", content: "world" }),
-          JSON.stringify({ type: "done" }),
-        ),
-        { headers: { "Content-Type": "text/event-stream" } },
-      ),
-  ),
 
   http.get("/api/v1/onboarding/me/path", () =>
     HttpResponse.json({

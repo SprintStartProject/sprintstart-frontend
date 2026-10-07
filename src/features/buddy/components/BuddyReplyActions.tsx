@@ -1,5 +1,5 @@
 import { BookmarkPlus } from "lucide-react";
-import { CopyButton } from "../../chatbot/components/CopyButton";
+import { CopyButton } from "./CopyButton";
 import { SaveToBoard } from "../../board/save/SaveToBoard";
 import { buddyReplyNote } from "../../board/generation/chatToCard";
 import { BUDDY_ACTION_PLACE_CHECKLIST } from "../types";
@@ -25,8 +25,7 @@ function offersChecklist(message: BuddyMessageView): boolean {
  *
  * One component for the dock and the page, because the two had drifted into different controls —
  * an icon-only square in the dock, a worded `sm` button on the page — for the same action on the
- * same reply. It is also the same row, in the same order and at the same `xs` size, that sits under
- * an answer in the chat, so "what can I do with this answer" has one answer across the app.
+ * same reply — so "what can I do with this answer" has one answer across the app.
  *
  * Pulled left by the buttons' own padding so the first icon lines up with the bubble's edge rather
  * than floating a few pixels inside it.

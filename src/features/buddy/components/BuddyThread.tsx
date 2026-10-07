@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import type { ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
@@ -9,6 +9,7 @@ import type { CitationArtifactOpen } from "../citations/citationArtifact";
 import { toolLabel } from "../toolLabel";
 import { BuddyActionProposals } from "./BuddyActionProposals";
 import { BuddyMarkdown } from "./BuddyMarkdown";
+import { BuddyReasoningPanel } from "./BuddyReasoningPanel";
 import { MessageCitations } from "../citations/MessageCitations";
 import { BuddyMessage, BuddyTypingMessage } from "./BuddyMessage";
 
@@ -17,6 +18,23 @@ const EMPTY_ACTION_DRAFTS: ActionDrafts = {};
 
 /** The citations a row without any gets: one shared array, so its memo is never broken. */
 const EMPTY_CITATIONS: Citation[] = [];
+
+/**
+ * What a finished turn's completion announcement says — see `BuddyThread`.
+ *
+ * The game announces its own outcome while it is open ("Stopped" / "Reply failed" / "Reply
+ * ready" — see `BuddyTypingMessage`), so this stays silent then: two voices saying it would
+ * be noise.
+ */
+function completionAnnouncement(
+  lastTurn: BuddyMessageView | undefined,
+  dinoGameActive: boolean,
+): string {
+  if (dinoGameActive) return "";
+  if (lastTurn?.error) return "Reply failed";
+  if (lastTurn?.stopped === true) return "Reply stopped";
+  return "Response complete";
+}
 
 type BuddyThreadProps = {
   messages: BuddyMessageView[];
@@ -92,6 +110,14 @@ type BuddyThreadProps = {
   /** Tries the read again. The banner is only worth showing when there is something to press. */
   onRetryOpen?: () => void;
   /**
+   * Re-asks the question a failed turn was answering — the "Try again" under its error line.
+   * Rendered only for a turn whose question is still in the thread: a greeting has no question
+   * to re-ask, so no button is offered for it.
+   *
+   * Must be referentially stable, like the callbacks above: the rows below are memoised.
+   */
+  onRetryReply?: (messageId: string) => void;
+  /**
    * Whether the dino waiting-game is open while the buddy thinks (unlocked
    * users only; Space opens it — see useSpaceOpensDino). Both surfaces pass
    * it so dock and page offer the same deal.
@@ -119,6 +145,10 @@ type BuddyThreadRowProps = {
   onCitationClick?: (citation: SelectedCitation) => void;
   /** See `BuddyThreadProps.onOpenArtifact`. */
   onOpenArtifact?: (data: CitationArtifactOpen) => void;
+  /** See `BuddyThreadProps.onRetryReply`. */
+  onRetryReply?: (messageId: string) => void;
+  /** Whether this row's "Try again" would have a question to re-ask — see `BuddyThread`. */
+  retryable: boolean;
   /** The greeting's suggested next step — present on the row it hangs under, nowhere else. */
   lastMessageFooter?: ReactNode;
 };
@@ -126,7 +156,7 @@ type BuddyThreadRowProps = {
 /**
  * One turn: the bubble.
  *
- * Extracted from the thread's map and memoised for the same reason `MessageRow` in the chat is:
+ * Extracted from the thread's map and memoised (the retired chat's `MessageRow` did the same):
  * with the thread memoised, a keystroke never reaches it — and when a token arrives, only the row
  * it belongs to re-renders, while every other row's props stay referentially equal and it bails
  * out instead of re-running `ReactMarkdown` over its reply. In a fifty-message thread that is the
@@ -152,10 +182,13 @@ function BuddyThreadRowImpl({
   renderReplyAction,
   onCitationClick,
   onOpenArtifact,
+  onRetryReply,
+  retryable,
   lastMessageFooter,
 }: BuddyThreadRowProps) {
   const isUser = message.role === "USER";
   const hasText = message.content.trim().length > 0;
+  const hasReasoning = (message.reasoning ?? "").length > 0;
   const hasActions = (message.actions?.length ?? 0) > 0;
   const citations = message.citations ?? EMPTY_CITATIONS;
 
@@ -163,8 +196,13 @@ function BuddyThreadRowImpl({
   // nothing to show, and the typing bubble below already stands in for it — so skip it,
   // otherwise an empty second bubble appears while the buddy is working. A turn that
   // failed before writing a word is the exception: its reason *is* the message, and
-  // dropping it here is what made a failed reply look like no reply.
-  if (!isUser && !hasText && !hasActions && !message.error) return null;
+  // dropping it here is what made a failed reply look like no reply. Same for a turn whose
+  // only arrival so far is reasoning — its panel is worth showing on its own — and for a turn
+  // the hire stopped: a Stop usually lands before the first word, and the line saying so is
+  // then the only answer the question gets.
+  if (!isUser && !hasText && !hasActions && !message.error && !hasReasoning && !message.stopped) {
+    return null;
+  }
 
   return (
     <BuddyMessage
@@ -173,9 +211,11 @@ function BuddyThreadRowImpl({
       compact={compact}
       isStreaming={isStreaming}
       error={message.error}
+      onRetry={retryable && onRetryReply ? () => onRetryReply(message.id) : undefined}
       // A cut-short reply is the backend's story (history read); the hire's own turns never
       // carry it, so it is gated the same way the rest of the buddy-only chrome is.
       incomplete={!isUser && message.isIncomplete === true}
+      stopped={!isUser && message.stopped === true}
       footer={
         <>
           {isUser && renderQuestionAction?.(message.content)}
@@ -194,17 +234,28 @@ function BuddyThreadRowImpl({
         </>
       }
     >
-      {hasText ? (
+      {hasText || hasReasoning ? (
         isUser ? (
           message.content
         ) : (
           <>
-            <BuddyMarkdown
-              content={message.content}
-              citations={citations}
-              onCitationClick={onCitationClick}
-            />
-            {citations.length > 0 && (
+            {hasReasoning && (
+              <BuddyReasoningPanel
+                reasoning={message.reasoning ?? ""}
+                isStreaming={isStreaming}
+                // How much answer text has arrived, in characters — the panel folds itself once
+                // an answer starts and re-opens when thinking resumes (see the panel's rules).
+                answerLength={message.content.length}
+              />
+            )}
+            {hasText && (
+              <BuddyMarkdown
+                content={message.content}
+                citations={citations}
+                onCitationClick={onCitationClick}
+              />
+            )}
+            {hasText && citations.length > 0 && (
               <MessageCitations citations={citations} onOpenArtifact={onOpenArtifact} />
             )}
           </>
@@ -251,15 +302,16 @@ function BuddyThreadImpl({
   onOpenArtifact,
   openError,
   onRetryOpen,
+  onRetryReply,
   dinoGameActive = false,
   onDinoGameExit,
 }: BuddyThreadProps) {
   // The send loop appends an empty assistant message up front and streams into it, so the last
   // one is the turn receiving tokens — while a turn is running at all. Being last is not on its
   // own "live": holding the newest row awake forever is a bot that never sleeps, so the row is
-  // only flagged while tokens are actually arriving. The chat draws the same line in its
-  // `MessageRow` (`streamingMessageId` is null when idle) — see `SleepyBot`'s `canSleep`.
-  const streamingId = messages[messages.length - 1]?.id;
+  // only flagged while tokens are actually arriving — see `SleepyBot`'s `canSleep`.
+  const lastTurn = messages[messages.length - 1];
+  const streamingId = lastTurn?.id;
 
   // Which turn the footer hangs under: the buddy's most recent reply. Not every reply — the same
   // suggestion repeated under all of them reads as the buddy repeating itself. (This started as
@@ -275,6 +327,25 @@ function BuddyThreadImpl({
         message.role === "ASSISTANT" &&
         (message.content.trim().length > 0 || (message.actions?.length ?? 0) > 0),
     )?.id;
+
+  // The first question in the thread: a failed turn before it (the greeting) has nothing to
+  // re-ask, so its row offers no "Try again".
+  const firstUserIndex = messages.findIndex((message) => message.role === "USER");
+
+  /**
+   * The turn's completion, announced politely once per turn: "Response complete" after a good
+   * turn, "Reply failed" / "Reply stopped" otherwise. Held in render state rather than derived
+   * inline so the next turn can clear it — a live region only announces a change — and derived
+   * during render (the documented adjust-state pattern) from the busy flags, which are the
+   * whole signal.
+   */
+  const busy = isThinking || isStreaming;
+  const [announcedBusy, setAnnouncedBusy] = useState(busy);
+  const [completion, setCompletion] = useState("");
+  if (announcedBusy !== busy) {
+    setAnnouncedBusy(busy);
+    setCompletion(busy ? "" : completionAnnouncement(lastTurn, dinoGameActive));
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -296,7 +367,13 @@ function BuddyThreadImpl({
         </div>
       )}
 
-      {messages.map((message) => (
+      {/* The completion line, for screen readers: the thread's own status voice, kept out of
+          the visual layout but always mounted so the text *change* is what speaks. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {completion}
+      </p>
+
+      {messages.map((message, index) => (
         <BuddyThreadRow
           key={message.id}
           message={message}
@@ -318,6 +395,10 @@ function BuddyThreadImpl({
           renderReplyAction={renderReplyAction}
           onCitationClick={onCitationClick}
           onOpenArtifact={onOpenArtifact}
+          // The re-ask belongs to rows that have a question behind them: the failed turn's own
+          // row does, a greeting's does not.
+          onRetryReply={onRetryReply}
+          retryable={Boolean(message.error) && firstUserIndex !== -1 && index > firstUserIndex}
           // Resolved here rather than inside the row: only the buddy's latest reply gets it, and
           // only once the thinking bubble is gone — so the offer lands under a finished answer
           // rather than under a promise.
@@ -340,9 +421,12 @@ function BuddyThreadImpl({
           showName={showNames}
           gameActive={dinoGameActive}
           replyReady={dinoGameActive && !isThinking && !isStreaming}
-          // A failed reply carries its error on the last turn; announcing it as
-          // "Reply ready" would be a lie. The buddy has no Stop, so only two outcomes.
-          turnOutcome={messages[messages.length - 1]?.error ? "failed" : "done"}
+          // How the finished turn ended. A failed reply carries its error on the last turn and
+          // a stopped one carries `stopped` — announcing either as "Reply ready" would be a
+          // lie. The game's row outlives the turn whenever the game is open, which is exactly
+          // how a stopped turn used to reach it and get called ready; `dinoOutcome` renders it
+          // as "Stopped" instead.
+          turnOutcome={lastTurn?.error ? "failed" : lastTurn?.stopped === true ? "stopped" : "done"}
           onGameExit={onDinoGameExit}
         />
       )}

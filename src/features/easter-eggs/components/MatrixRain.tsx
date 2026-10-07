@@ -9,8 +9,8 @@ type MatrixRainProps = {
  * MatrixRain
  *
  * A full-screen "Matrix digital rain" canvas effect, triggered as a chat
- * easter egg (type "matrix" / "the matrix" / "do matrix" in the chat or
- * buddy composer — matched by `matchEggPhrase`, drawn by
+ * easter egg (type "matrix" / "the matrix" / "do matrix" in the buddy
+ * composer — matched by `matchEggPhrase`, drawn by
  * {@link EggEffectsLayer}). Renders a fixed, pointer-events-none canvas
  * above the app for ~6s, then auto-dismisses. Press Escape to dismiss early.
  *
@@ -18,8 +18,8 @@ type MatrixRainProps = {
  * - `onClose` is read through a ref so this effect keeps `[]` deps. The
  *   callback is stable today (the layer hands over the bus's own
  *   `clearEggEffect`), but an inline arrow from a caller would tear down and
- *   restart the canvas + timers on every re-render — which is what the old
- *   ChatPage version did while a streamed message arrived, making the rain
+ *   restart the canvas + timers on every re-render — which an earlier version
+ *   of this layer did while a streamed message arrived, making the rain
  *   flicker.
  * - The canvas is DPR-scaled for crisp rendering and recomputes its column
  *   count on resize.

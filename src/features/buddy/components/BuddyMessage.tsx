@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, MessageSquareOff, UserRound } from "lucide-react";
-import { SleepyBot } from "../../chatbot/components/SleepyBot";
-import { BotGlyph } from "../../chatbot/components/BotGlyph";
+import { Button } from "../../../components/ui/Button";
+import { SleepyBot } from "./SleepyBot";
+import { BotGlyph } from "./BotGlyph";
 import { DinoGameLazy } from "../../easter-eggs/components/DinoGameLazy.tsx";
 import { dinoCompletionProps } from "../../easter-eggs/lib/dinoOutcome.ts";
 import type { DinoTurnOutcome } from "../../easter-eggs/lib/dinoOutcome.ts";
@@ -58,13 +59,25 @@ type BuddyMessageProps = {
    * True when this reply was cut short — the stream ended before the answer finished, and the
    * backend kept the words that had arrived.
    *
-   * A quiet line under the bubble, the shape the chat gives a stopped turn: the partial answer
+   * A quiet line under the bubble: the partial answer
    * is still an answer, and this says why it ends where it does. Only ever read from history —
    * a live failure carries `error` instead, and the two never render together.
    */
   incomplete?: boolean;
+  /**
+   * True for a live turn the hire stopped themselves. The same quiet line as `incomplete`, worded
+   * for what happened — and the whole message when the Stop came before the first word, which it
+   * usually does (see `BuddyMessageView.stopped`).
+   */
+  stopped?: boolean;
   /** Rendered under the bubble, inside the speaker's column: the escalation offer, mostly. */
   footer?: ReactNode;
+  /**
+   * Re-asks the question this failed turn was answering — rendered inside the error box, so
+   * the line that says the reply failed is also where trying again lives. Only given when
+   * there is a question to re-ask (see `BuddyThread`).
+   */
+  onRetry?: () => void;
   /** True for the turn currently receiving tokens — that bot is working, so it stays awake. */
   isStreaming?: boolean;
 };
@@ -97,7 +110,9 @@ export function BuddyMessage({
   meta,
   error,
   incomplete = false,
+  stopped = false,
   footer,
+  onRetry,
   isStreaming = false,
 }: BuddyMessageProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -114,6 +129,10 @@ export function BuddyMessage({
   return (
     <motion.div
       {...entrance}
+      // The one buddy answer's root, so the selection toolbar can tell a reply-to-the-answer
+      // apart from ordinary prose (see `selectionCapture`). The buddy speaks as the assistant;
+      // the hire and their PM are the other side of the conversation.
+      data-message-role={speaker === "BUDDY" ? "ASSISTANT" : "USER"}
       className={`flex w-full min-w-0 gap-2.5 ${isYou ? "flex-row-reverse" : "flex-row"}`}
     >
       {!(compact && isYou) && (
@@ -132,7 +151,7 @@ export function BuddyMessage({
         // because the buddy's turn is the one that streams: a box re-measured on every token
         // widens word by word and snaps back whenever a re-parse changes the rendered markdown,
         // which is unreadable while it is being written. Everyone else's turns arrive whole and
-        // still hug. Same rule, and the same reason, as `MessageRow` in the chat.
+        // still hug.
         className={`flex min-w-0 flex-col gap-1 ${isYou ? "items-end" : "items-start"} ${
           compact && !isYou ? "flex-1" : "max-w-[min(85%,46rem)]"
         } ${speaker === "BUDDY" ? "w-full" : ""}`}
@@ -153,24 +172,29 @@ export function BuddyMessage({
 
         {error && (
           <div
-            className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm leading-relaxed text-app-danger-text ${
+            className={`flex max-w-full min-w-0 items-center gap-2 rounded-2xl rounded-tl-sm border border-app-danger-border bg-app-danger-bg px-4 py-2.5 text-sm leading-relaxed text-app-danger-text ${
               children === undefined ? "" : "mt-1"
             }`}
           >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{error}</span>
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1">{error}</span>
+            {onRetry && (
+              <Button variant="secondary" size="sm" onClick={onRetry}>
+                Try again
+              </Button>
+            )}
           </div>
         )}
 
-        {incomplete && !error && (
+        {(incomplete || stopped) && !error && (
           <div
-            data-testid="buddy-message-incomplete"
+            data-testid={stopped ? "buddy-message-stopped" : "buddy-message-incomplete"}
             className={`flex max-w-full min-w-0 items-start gap-2 rounded-2xl rounded-tl-sm border border-app-border-muted bg-app-surface-muted px-4 py-2.5 text-sm leading-relaxed text-app-text-muted ${
               children === undefined ? "" : "mt-1"
             }`}
           >
             <MessageSquareOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>This reply was cut short.</span>
+            <span>{stopped ? "You stopped this reply." : "This reply was cut short."}</span>
           </div>
         )}
 

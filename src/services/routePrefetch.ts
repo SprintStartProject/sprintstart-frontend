@@ -34,8 +34,8 @@ function prefetchRouteModule(path: string): void {
     case "/board":
       void import("../pages/BoardPage");
       return;
-    case "/chat":
-      void import("../pages/ChatPage");
+    case "/buddy":
+      void import("../pages/BuddyPage");
       return;
     case "/knowledge-base":
       void import("../pages/KnowledgeBasePage");

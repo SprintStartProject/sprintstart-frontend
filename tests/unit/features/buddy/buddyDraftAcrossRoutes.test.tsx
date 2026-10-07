@@ -13,6 +13,8 @@ import {
   BuddySessionContext,
   type BuddySession,
 } from "../../../../src/features/buddy/buddySessionContext";
+import { AuthContext } from "../../../../src/context/AuthContext";
+import { createAuthValue } from "./buddyTestHarness";
 
 /**
  * The composer's words across navigation.
@@ -76,25 +78,30 @@ describe("the composer's words across navigation", () => {
 
   /**
    * The app's own shape: the provider above the router, so the one box outlives any single route.
-   * The session is stubbed to the two things the draft provider reads from it.
+   * The session is stubbed to the things the draft provider reads from it — the submit, and the
+   * conversation each draft is filed under.
    */
   function renderApp() {
     const session = {
-      sendMessage: vi.fn().mockResolvedValue(undefined),
-      draftResetToken: 0,
+      submitMessage: vi.fn(),
+      currentSessionId: null,
+      teamProjectId: null,
+      isSessionBinned: () => false,
     } as unknown as BuddySession;
 
     return render(
-      <BuddySessionContext.Provider value={session}>
-        <BuddyDraftProvider>
-          <MemoryRouter initialEntries={["/board"]}>
-            <Routes>
-              <Route path="/board" element={<Board />} />
-              <Route path="/buddy" element={<Page />} />
-            </Routes>
-          </MemoryRouter>
-        </BuddyDraftProvider>
-      </BuddySessionContext.Provider>,
+      <AuthContext.Provider value={createAuthValue()}>
+        <BuddySessionContext.Provider value={session}>
+          <BuddyDraftProvider>
+            <MemoryRouter initialEntries={["/board"]}>
+              <Routes>
+                <Route path="/board" element={<Board />} />
+                <Route path="/buddy" element={<Page />} />
+              </Routes>
+            </MemoryRouter>
+          </BuddyDraftProvider>
+        </BuddySessionContext.Provider>
+      </AuthContext.Provider>,
     );
   }
 
@@ -156,6 +163,16 @@ describe("the dock’s hand-off control", () => {
           messages={[]}
           isThinking={false}
           isStreaming={false}
+          stopStreaming={vi.fn()}
+          queued={[]}
+          queuePaused={false}
+          removeQueued={vi.fn()}
+          pullQueuedMessage={vi.fn(() => null)}
+          resumeQueue={vi.fn()}
+          filters={{ sourceSystems: [], from: "", to: "" }}
+          setFilters={vi.fn()}
+          capabilitiesEnabled
+          setCapabilitiesEnabled={vi.fn()}
           activeTool={null}
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}
@@ -167,6 +184,7 @@ describe("the dock’s hand-off control", () => {
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}
+          retryReply={vi.fn()}
           onClose={vi.fn()}
         />,
       ),
@@ -186,6 +204,16 @@ describe("the dock’s hand-off control", () => {
           messages={[]}
           isThinking={false}
           isStreaming={false}
+          stopStreaming={vi.fn()}
+          queued={[]}
+          queuePaused={false}
+          removeQueued={vi.fn()}
+          pullQueuedMessage={vi.fn(() => null)}
+          resumeQueue={vi.fn()}
+          filters={{ sourceSystems: [], from: "", to: "" }}
+          setFilters={vi.fn()}
+          capabilitiesEnabled
+          setCapabilitiesEnabled={vi.fn()}
           activeTool={null}
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}
@@ -197,6 +225,7 @@ describe("the dock’s hand-off control", () => {
           isGreeting={false}
           isDeciding={false}
           teamProjectId={null}
+          retryReply={vi.fn()}
           onClose={vi.fn()}
           onOpenFull={onOpenFull}
         />,

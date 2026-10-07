@@ -13,6 +13,13 @@ describe("BuddyTypingMessage with the dino game", () => {
     expect(badge).toHaveAttribute("data-tone", "danger");
   });
 
+  it("labels a stopped turn as stopped, not ready", async () => {
+    render(<BuddyTypingMessage gameActive replyReady turnOutcome="stopped" onGameExit={vi.fn()} />);
+    const badge = await screen.findByTestId("dino-game-reply-ready");
+    expect(badge).toHaveTextContent("Stopped");
+    expect(badge).toHaveAttribute("data-tone", "neutral");
+  });
+
   it("says Reply ready when the reply arrived", async () => {
     render(<BuddyTypingMessage gameActive replyReady turnOutcome="done" onGameExit={vi.fn()} />);
     expect(await screen.findByTestId("dino-game-reply-ready")).toHaveTextContent("Reply ready");

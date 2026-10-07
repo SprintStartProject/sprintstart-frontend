@@ -38,6 +38,8 @@ function renderDock(
     isOpening = false,
     isThinking = false,
     isStreaming = false,
+    isGreeting = false,
+    isDeciding = false,
   }: {
     suggestions?: BuddySuggestion[];
     setDraft?: () => void;
@@ -45,6 +47,8 @@ function renderDock(
     isOpening?: boolean;
     isThinking?: boolean;
     isStreaming?: boolean;
+    isGreeting?: boolean;
+    isDeciding?: boolean;
   } = {},
 ) {
   return render(
@@ -57,6 +61,16 @@ function renderDock(
           messages={messages}
           isThinking={isThinking}
           isStreaming={isStreaming}
+          stopStreaming={vi.fn()}
+          queued={[]}
+          queuePaused={false}
+          removeQueued={vi.fn()}
+          pullQueuedMessage={vi.fn(() => null)}
+          resumeQueue={vi.fn()}
+          filters={{ sourceSystems: [], from: "", to: "" }}
+          setFilters={vi.fn()}
+          capabilitiesEnabled
+          setCapabilitiesEnabled={vi.fn()}
           activeTool={null}
           confirmAction={vi.fn()}
           dismissAction={vi.fn()}
@@ -65,9 +79,10 @@ function renderDock(
           suggestions={suggestions}
           newConversation={newConversation}
           isOpening={isOpening}
-          isGreeting={false}
-          isDeciding={false}
+          isGreeting={isGreeting}
+          isDeciding={isDeciding}
           teamProjectId={null}
+          retryReply={vi.fn()}
           onClose={vi.fn()}
         />
       </BuddyDraftContext.Provider>
@@ -287,27 +302,43 @@ describe("BuddyDock new conversation", () => {
     expect(newConversation).toHaveBeenCalledTimes(1);
   });
 
-  // newConversation clears the thread, but cannot call back the request already streaming into
-  // it: that stream's callbacks still hold the shared conversation, so its tool events would
-  // land in the brand-new one.
-  it("withdraws while the buddy is still thinking", () => {
+  // newConversation aborts the running answer before it clears the thread (see
+  // `stopRunningTurn`), so the control stays on offer mid-answer.
+  it("stays on offer while the buddy is still thinking", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
       isThinking: true,
+    });
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
+  });
+
+  it("stays on offer while a reply is still arriving", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isStreaming: true,
+    });
+
+    expect(screen.getByRole("button", { name: "Start a new conversation" })).toBeInTheDocument();
+  });
+
+  // What the move cannot cut short: a greeting still being written, and a decision's outcome.
+  it("withdraws while the greeting is still being written", () => {
+    renderDock([assistant("Hello."), user("How do we deploy?")], {
+      isGreeting: true,
     });
 
     expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
   });
 
-  it("withdraws while a reply is still arriving", () => {
+  it("withdraws while a proposal decision is in flight", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
-      isStreaming: true,
+      isDeciding: true,
     });
 
     expect(screen.queryByRole("button", { name: "Start a new conversation" })).toBeNull();
   });
 
   // An open is going into the very thread this click would clear: withdrawn while one is in
-  // flight, exactly like a live turn.
+  // flight.
   it("withdraws while a conversation is opening", () => {
     renderDock([assistant("Hello."), user("How do we deploy?")], {
       isOpening: true,

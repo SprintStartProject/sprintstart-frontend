@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion, type MotionValue } from "framer-motion";
-import { Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
-import { SleepyBot } from "../../chatbot/components/SleepyBot";
+import { ArrowDown, Maximize2, MessageSquarePlus, Minus, X } from "lucide-react";
+import { SleepyBot } from "./SleepyBot";
 import { Button } from "../../../components/ui/Button";
 import { centralSpringToken } from "../../../styles/tokens";
 import type { useBuddy } from "../hooks/useBuddy";
@@ -44,6 +44,17 @@ type BuddyDockProps = Pick<
   | "messages"
   | "isThinking"
   | "isStreaming"
+  | "stopStreaming"
+  | "retryReply"
+  | "queued"
+  | "queuePaused"
+  | "removeQueued"
+  | "pullQueuedMessage"
+  | "resumeQueue"
+  | "filters"
+  | "setFilters"
+  | "capabilitiesEnabled"
+  | "setCapabilitiesEnabled"
   | "activeTool"
   | "confirmAction"
   | "dismissAction"
@@ -144,6 +155,17 @@ function BuddyDockImpl({
   messages,
   isThinking,
   isStreaming,
+  stopStreaming,
+  retryReply,
+  queued,
+  queuePaused,
+  removeQueued,
+  pullQueuedMessage,
+  resumeQueue,
+  filters,
+  setFilters,
+  capabilitiesEnabled,
+  setCapabilitiesEnabled,
   activeTool,
   confirmAction,
   dismissAction,
@@ -175,7 +197,7 @@ function BuddyDockImpl({
 }: BuddyDockProps) {
   const prefersReducedMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
-  const { containerRef, onScroll } = useStickToBottom(messages);
+  const { containerRef, onScroll, isPinned, jumpToLatest } = useStickToBottom(messages);
 
   // The chips fill the composer through the write-only half, so this window does not follow
   // every character typed into the box — see `useBuddyDraftActions`.
@@ -306,15 +328,11 @@ function BuddyDockImpl({
                     The hire's surface only — team mode has one conversation per project and
                     nothing to start.
 
-                    Withdrawn while a turn is in flight, and while a conversation is opening:
-                    a new conversation clears the thread, but the click cannot call back the
-                    request already streaming into it — that stream's callbacks still hold the
-                    shared conversation, so its tool events would land in the new one
-                    ("Checking your progress…" beneath an empty thread) — and an open's read is
-                    on its way into the very thread this click would clear. Offering the control
-                    only between turns is the cheap half of that fix; aborting the stream is the
-                    other half and belongs in the session, alongside the same gap on `BuddyPage`. */}
-          {hasUserMessage && !isBusy && !isOpening && teamProjectId === null && (
+                    Withdrawn while a conversation is opening or greeting and while a decision is
+                    in flight: an open's read is on its way into the very thread this click would
+                    clear. Not withdrawn mid-answer: the move aborts the stream itself (see
+                    `stopRunningTurn`), so nothing keeps writing into the thread it clears. */}
+          {hasUserMessage && !isGreeting && !isDeciding && !isOpening && teamProjectId === null && (
             <Button
               variant="ghost"
               size="xs"
@@ -322,8 +340,8 @@ function BuddyDockImpl({
               onClick={() => void newConversation()}
               aria-label="Start a new conversation"
               // No chord named here, deliberately. The window floats over every page, and
-              // `Alt+N` belongs to whichever one is underneath it — on `/chat` it starts a new
-              // *chat*, and on most pages nothing binds it at all. Advertising it from the dock
+              // `Alt+N` belongs to whichever one is underneath it — on the buddy page it is the
+              // page's own, and on most pages nothing binds it at all. Advertising it from the dock
               // would be promising a key that does somebody else's job.
               title="Start a new conversation — your buddy keeps what it has learned about you"
             >
@@ -360,34 +378,51 @@ function BuddyDockImpl({
           </Button>
         </header>
 
-        <div
-          ref={containerRef}
-          onScroll={onScroll}
-          data-testid="buddy-dock-transcript"
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
-        >
-          <BuddyThread
-            renderReplyAction={renderReplyAction}
-            compact
-            messages={messages}
-            isThinking={isThinking}
-            isStreaming={isStreaming}
-            activeTool={activeTool}
-            lastMessageFooter={lastMessageFooter}
-            confirmAction={confirmAction}
-            dismissAction={dismissAction}
-            actionDrafts={actionDrafts}
-            setActionDraft={setActionDraft}
-            // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
-            // team-mode conversation is not one — the offer must not even render there.
-            renderQuestionAction={renderQuestionAction}
-            openError={openError}
-            onRetryOpen={onRetryOpen}
-            dinoGameActive={dinoGameActive}
-            onDinoGameExit={onDinoGameExit}
-            onCitationClick={onCitationClick}
-            onOpenArtifact={onOpenArtifact}
-          />
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div
+            ref={containerRef}
+            onScroll={onScroll}
+            data-testid="buddy-dock-transcript"
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4"
+          >
+            <BuddyThread
+              renderReplyAction={renderReplyAction}
+              compact
+              messages={messages}
+              isThinking={isThinking}
+              isStreaming={isStreaming}
+              activeTool={activeTool}
+              lastMessageFooter={lastMessageFooter}
+              confirmAction={confirmAction}
+              dismissAction={dismissAction}
+              actionDrafts={actionDrafts}
+              setActionDraft={setActionDraft}
+              // Hire-flow only: "Send this to your PM" escalates the hire's own question, and a
+              // team-mode conversation is not one — the offer must not even render there.
+              renderQuestionAction={renderQuestionAction}
+              openError={openError}
+              onRetryOpen={onRetryOpen}
+              onRetryReply={retryReply}
+              dinoGameActive={dinoGameActive}
+              onDinoGameExit={onDinoGameExit}
+              onCitationClick={onCitationClick}
+              onOpenArtifact={onOpenArtifact}
+            />
+          </div>
+
+          {/* The way back to the newest message after scrolling up to re-read — the auto-scroll
+            deliberately does not drag a reader down (see `useStickToBottom`). */}
+          {!isPinned && (
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              data-testid="buddy-jump-to-latest"
+              className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-3 py-1.5 text-xs font-medium text-app-text shadow-md transition-colors hover:bg-app-surface-hover"
+            >
+              <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+              Jump to latest
+            </button>
+          )}
         </div>
 
         <div className="shrink-0 border-t border-app-border bg-app-surface px-4 py-3">
@@ -428,7 +463,25 @@ function BuddyDockImpl({
                         `focusOnMount` rather than a bare `focus()`. A focused textarea with a value
                         in it starts the caret at position 0, so "Ask your buddy about this" used to
                         hand over a question the hire then typed in front of. */}
-          <BuddyComposer compact focusOnMount busy={isBusy} gameActive={dinoGameActive} />
+          <BuddyComposer
+            compact
+            focusOnMount
+            busy={isBusy}
+            gameActive={dinoGameActive}
+            streaming={isThinking || isStreaming}
+            onStop={stopStreaming}
+            queue={{
+              items: queued,
+              paused: queuePaused,
+              onRemove: removeQueued,
+              onPull: pullQueuedMessage,
+              onSendQueued: resumeQueue,
+            }}
+            filters={filters}
+            onFiltersChange={setFilters}
+            capabilitiesEnabled={capabilitiesEnabled}
+            onCapabilitiesChange={setCapabilitiesEnabled}
+          />
         </div>
       </motion.div>
     </motion.div>

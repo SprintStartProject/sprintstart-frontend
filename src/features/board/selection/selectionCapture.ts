@@ -19,7 +19,7 @@ export type CapturedSelection = {
    *
    * [text] collapses every whitespace run because cards and highlights want one line of words; a
    * blockquote of a two-paragraph answer, though, is worth two paragraphs. The Reply offer sends
-   * this instead, and the chatbot's `formatMarkdownQuote` turns each line into its own quoted
+   * this instead, and the buddy's `formatMarkdownQuote` turns each line into its own quoted
    * paragraph.
    */
   quoteText: string;
@@ -65,7 +65,7 @@ export type CapturedSelection = {
   inLink: boolean;
   /** Where the toolbar should sit, in viewport coordinates. */
   rect: DOMRect;
-  /** Whether the selection was made inside an AI assistant chat message. */
+  /** Whether the selection was made inside one of the buddy's answers. */
   isAiMessage: boolean;
 };
 
@@ -110,7 +110,7 @@ export function captureSelection(selection: Selection | null): CapturedSelection
  * A browser's selection `toString` puts a newline at block boundaries — paragraphs, list items —
  * and hands back the stray spacing a drag across inline markup picks up. The quote keeps the
  * paragraph breaks, because that is the whole point of replying with a quote, while dropping
- * empty lines and collapsing horizontal whitespace — so the chatbot's `formatMarkdownQuote`
+ * empty lines and collapsing horizontal whitespace — so the buddy's `formatMarkdownQuote`
  * receives one line per paragraph and nothing else.
  */
 export function selectionQuoteText(raw: string): string {
@@ -256,7 +256,7 @@ function elementOf(node: Node): Element | null {
 }
 
 /**
- * Whether the selection sits entirely inside one AI assistant message bubble.
+ * Whether the selection sits entirely inside one buddy answer.
  *
  * Both ends have to resolve to the same bubble, which keeps the answer independent of the drag
  * direction: a selection that runs from an answer into the next message is not a reply to that
@@ -264,7 +264,7 @@ function elementOf(node: Node): Element | null {
  */
 function isInsideAiMessage(range: Range): boolean {
   const bubbleOf = (node: Node): Element | null =>
-    elementOf(node)?.closest("[data-chat-message-role='ASSISTANT']") ?? null;
+    elementOf(node)?.closest("[data-message-role='ASSISTANT']") ?? null;
   const bubble = bubbleOf(range.startContainer);
   return bubble !== null && bubble === bubbleOf(range.endContainer);
 }
